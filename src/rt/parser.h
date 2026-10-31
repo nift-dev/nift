@@ -28,6 +28,9 @@ struct ParseError {
     static constexpr const char* kCode = "syntax.invalid_statement";
     std::string message;
     std::uint32_t offset = 0;  // byte offset of the reported position
+    // Byte offset where the top-level statement containing the error starts
+    // (set as the error unwinds; the outermost block sets it last).
+    std::uint32_t statement_begin = 0;
 };
 
 struct ParseResult {

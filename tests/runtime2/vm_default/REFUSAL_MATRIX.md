@@ -36,6 +36,12 @@ number, `§`) unless another file is named.
 | `NIFT_VM=0` | No refusals: the legacy interpreter runs everything | Legacy behaviour (unchanged) | §3; §5 "-e program runs on legacy under NIFT_VM=0"; §7 "NIFT_VM=0 piped session is legacy and unchanged" |
 | Invalid `NIFT_VM` (empty, `off`, ...) | Configuration error before anything runs, on every scripting entry point | Exit 1 | §10 |
 
+Positions: a refusal is shown at `file:line:column` only when the compiler
+or parser recorded that position (CompileResult::positioned); otherwise the
+diagnostic says "(the VM gave no exact position)" - for a session input or a
+startup-file statement with the start line of the refused input, labelled as
+such (§18d, §18e).
+
 ## Known limits (tracked, not changed)
 
 - **`$[...]` column drift after quotes.** The shell removes quotes before the
@@ -52,11 +58,16 @@ number, `§`) unless another file is named.
   `printf 'x := 1\nr := run("a")\n' > ~/.niftrc; echo | nift` (stdin not a
   terminal). Expected wording: "no part of it ran". The statement is "may",
   never a false claim that something ran.
-- **`exit` in a startup file.** Legacy fails on it at startup ("unknown value
-  or malformed expression: exit", exit 1). The VM refuses it before it runs;
-  on a terminal the file is therefore interrupted there and the session
-  continues (the owner's refusal rule); without a terminal the file is
-  refused and the exit status is 1, as in legacy (§18c).
+- **`exit` in a startup file - explicit deviation from legacy, awaiting owner
+  confirmation.** Legacy fails on it at startup ("unknown value or malformed
+  expression: exit") and ends the session with status 1. The VM refuses it
+  before it runs; on a terminal the file is therefore interrupted there and
+  the session continues at the prompt (the owner's tty refusal rule); without
+  a terminal the file is refused and the exit status is 1, as in legacy
+  (§18c). Piped, the reason id differs between the two files:
+  `unresolved-name` for ~/.niftrc (compiled with the REPL's tail inspection,
+  as before) and `expression-statement` for `-i file`; aligning them would
+  change how a piped ~/.niftrc is compiled, so it is left as is.
 - **Bare expression statements** (`1+1`, `q`) are refused by the VM in a
   startup file exactly as in a script file (legacy evaluates them silently);
   the file is interrupted there on a terminal (§18c).

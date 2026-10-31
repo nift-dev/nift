@@ -212,6 +212,11 @@ CompileResult refused_unparsed(const Ast& ast, const ParseResult& parsed, std::u
     compiled.reason = parsed.ok ? "session:opaque" : "session:parse";
     const NodeId opaque = parsed.ok ? first_opaque_node(ast, parsed.root) : kNoNode;
     compiled.offset = opaque != kNoNode ? ast.at(opaque).begin : parsed.ok ? unit_begin : parsed.error.offset;
+    // An Opaque region that spans leading blanks (an expression range) starts
+    // at its first character of text.
+    while (opaque != kNoNode && compiled.offset < ast.at(opaque).end && (ast.source()[compiled.offset] == ' ' ||
+           ast.source()[compiled.offset] == '\t' || ast.source()[compiled.offset] == '\n')) ++compiled.offset;
+    compiled.positioned = opaque != kNoNode || !parsed.ok;
     return compiled;
 }
 } // namespace
@@ -278,8 +283,8 @@ SessionResult VmSession::execute_unit(const std::string& source, std::string pat
 #if defined(NIFT_SESSION_MUTANT) && NIFT_SESSION_MUTANT == 1
         namespace_ = pending;  // M1: leak partial compiler publication on refusal
 #endif
-        ++refusals_; result.refusal = compiled.reason; result.offset = compiled.offset;
-        const auto at = source_map->at(compiled.offset);
+        ++refusals_; result.refusal = compiled.reason; result.refusal_positioned = compiled.positioned;
+        const auto at = source_map->at(result.offset = compiled.offset);
         stats.outcome = "require-error"; stats.reason = result.refusal; stats.path = result.refusal_path = at.path;
         stats.line = result.refusal_line = at.line; stats.column = result.refusal_column = at.column;
         result.refusal_in_unit = compiled.offset >= text.unit_begin; detail::report(stats); return result;

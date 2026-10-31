@@ -1676,25 +1676,23 @@ static std::string startup_statement_at;
 // retained source (refusal_in_unit false) keeps that unit's path (~/.niftrc,
 // an -i file) or, for earlier stdin input whose stdin line the session does
 // not keep, is labelled as such; only a position in the unit itself is offset.
-// `start_line`/`start_column` (reported coordinates) is where the unit's own
-// text starts when it is padded to its place in a file or a shell line: a
-// position before it, or none at all, is not a real position, and the unit's
-// start line is reported, labelled as such, instead of an invented one.
+// `start_line` (reported coordinates) is the line where the unit's own text
+// starts when it is padded to its place in a file or a shell line. A refusal
+// whose position the compiler or parser did not record (refusal_positioned
+// false: a limit, a whole-unit refusal) is never shown as a position: the
+// unit's start line is reported, labelled as such.
 static std::string session_refusal_where(const nift::rt::SessionResult& result, const std::string& path,
-                                         std::size_t first_line, std::size_t start_line = 0,
-                                         std::size_t start_column = 0) {
+                                         std::size_t first_line, std::size_t start_line = 0) {
     std::string label = result.refusal_path.empty() ? path : result.refusal_path;
     std::size_t line = result.refusal_line;
     const std::size_t column = result.refusal_column;
     const auto shown = [&](const std::string& name) { return name == "<repl>" ? std::string("<stdin>") : name; };
-    const std::size_t unit_start = start_line ? start_line : first_line;
-    if (result.refusal_in_unit && label == path) {
-        const std::size_t at = line + (path == "<repl>" ? first_line - 1 : 0);
-        if (!line || (start_line && (at < start_line || (at == start_line && column < start_column))))
-            return shown(path) + ':' + std::to_string(unit_start) +
+    if (!result.refusal_positioned || !line) {
+        if (result.refusal_in_unit && label == path)
+            return shown(path) + ':' + std::to_string(start_line ? start_line : first_line) +
                    " (the start line of the refused input; the VM gave no exact position)";
+        return shown(label) + " (the VM gave no exact position)";
     }
-    if (!line) return shown(label) + " (the VM gave no exact position)";
     if (!result.refusal_in_unit && label == "<repl>")
         return "<stdin>: in earlier input, at line " + std::to_string(line) + ", column " +
                std::to_string(column) + " of the unit that defined it";
@@ -1705,14 +1703,14 @@ static std::string session_refusal_where(const nift::rt::SessionResult& result, 
     return label + ':' + std::to_string(line) + ':' + std::to_string(column ? column : 1);
 }
 
-static std::size_t startup_statement_line = 0, startup_statement_column = 0;
+static std::size_t startup_statement_line = 0;
 static void report_session_refusal(const nift::rt::SessionResult& result, const std::string& path,
                                    std::size_t first_line, bool stops,
                                    const std::string& interrupted_file = std::string(),
                                    const std::string& interrupted_at = std::string()) {
     session_refusal_reported = true;
     const std::string where = startup_file_running
-        ? session_refusal_where(result, path, first_line, startup_statement_line, startup_statement_column)
+        ? session_refusal_where(result, path, first_line, startup_statement_line)
         : session_refusal_where(result, path, first_line);
     const std::string interrupted = !interrupted_file.empty() || !startup_file_running ? interrupted_file
                                                                                      : *startup_file_running;
@@ -1807,11 +1805,20 @@ static int run_vm_startup_file(nift::rt::VmSession& session, const std::string& 
     const auto parsed = nift::rt::parse_script_statements(ast, statements);
     std::uint32_t error_at = static_cast<std::uint32_t>(-1);
     std::string error_message;
-    if (!parsed.ok) { error_at = parsed.error.offset; error_message = parsed.error.message; }
+    std::uint32_t error_statement = 0;  // where the top-level statement containing the error starts
+    if (!parsed.ok) {
+        error_at = parsed.error.offset; error_message = parsed.error.message;
+        error_statement = parsed.error.statement_begin;
+    }
     const char* prevalidate_mode = std::getenv("NIFT_PREVALIDATE");
     if (!(prevalidate_mode && std::string(prevalidate_mode) == "off")) {
         const auto verdict = nift::rt::prevalidate(source);
-        if (!verdict.ok && verdict.offset < error_at) { error_at = verdict.offset; error_message = verdict.message; }
+        if (!verdict.ok && verdict.offset < error_at) {
+            error_at = verdict.offset; error_message = verdict.message;
+            error_statement = verdict.offset;  // refined below to its top-level statement's start
+            for (const auto id : statements)
+                if (ast.at(id).begin <= verdict.offset && verdict.offset < ast.at(id).end) error_statement = ast.at(id).begin;
+        }
     }
     const auto interrupted_note = [&](std::size_t line) {
         return "note: initialisation from " + path + " was interrupted at line " + std::to_string(line) +
@@ -1830,7 +1837,7 @@ static int run_vm_startup_file(nift::rt::VmSession& session, const std::string& 
         unit += source.substr(begin, end - begin);
         startup_file_running = &path;
         startup_statement_at = "line " + std::to_string(at.line);
-        startup_statement_line = at.line; startup_statement_column = at.column;
+        startup_statement_line = at.line;
         // inspect=false for both files: the same path as a script statement,
         // never a REPL value echo.
         const int status = run_vm_session_statement(session, unit, path, false, display);
@@ -1842,7 +1849,8 @@ static int run_vm_startup_file(nift::rt::VmSession& session, const std::string& 
         const auto at = nift::rt::locate(source, error_at);
         std::cout.flush();
         std::cerr << "error: " << path << ':' << at.line << ':' << at.column << ": " << error_message << '\n'
-                  << "note: no part of that statement was executed\n" << interrupted_note(at.line) << std::flush;
+                  << "note: no part of that statement was executed\n"
+                  << interrupted_note(nift::rt::locate(source, error_statement).line) << std::flush;
     }
     return 0;
 }
@@ -2207,7 +2215,7 @@ static bool command_token_interpolate_word(Parser& parser, ShellWord& word, std:
                 // The full session refusal diagnostic (as for statements), its
                 // `error: ` label and final newline left to console::error.
                 const std::size_t line_number = shell_source_line_number ? shell_source_line_number : 1;
-                const std::string where = session_refusal_where(result, "<repl>", line_number, line_number, pad + 1);
+                const std::string where = session_refusal_where(result, "<repl>", line_number, line_number);
                 std::string shown = "$[" + expression + "]";
                 if (shell_source_line && shell_source_line_number && close < word.origin.size()) {
                     // The source text as typed (quotes are shell syntax and gone

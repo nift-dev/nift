@@ -80,8 +80,9 @@ bool not_compiled(Stats& stats, VmMode mode, const std::filesystem::path& path, 
     stats.outcome = "require-error";
     report(stats);
     std::cout.flush();
-    const std::string where = path.generic_string() + ':' + std::to_string(stats.line) + ':' +
-                              std::to_string(stats.column);
+    const std::string where = stats.positioned
+        ? path.generic_string() + ':' + std::to_string(stats.line) + ':' + std::to_string(stats.column)
+        : path.generic_string() + " (the VM gave no exact position)";
     std::cerr << vm_refusal_diagnostic(where, stats.reason, path.generic_string()) << std::flush;
     exit_code = 1;
     return true;
@@ -326,7 +327,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         const ParseResult relinked = parse_script(linked_ast);
         if (!relinked.ok || first_opaque_node(linked_ast, relinked.root) != kNoNode) {
             stats.reason = "import-link";  // every module parsed alone: never expected
-            locate_into(stats, source, 0);
+            locate_into(stats, source, 0); stats.positioned = false;
             return not_compiled(stats, mode, source_path, exit_code);
         }
         unit_root = relinked.root;
@@ -339,7 +340,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
         stats.reason = compiled.reason;
-        locate_linked(compiled.offset);
+        locate_linked(compiled.offset); stats.positioned = compiled.positioned;
         return not_compiled(stats, mode, report_path, exit_code);
     }
     // R1 (owner, 2026-10-21): linking reads all modules before execution.

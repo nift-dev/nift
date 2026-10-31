@@ -981,10 +981,10 @@ def main():
         d = work / "nopos"
         d.mkdir()
         proc, rows = run(nift, d, [], {}, stdin='print(1)\nprint(2)\necho $[if(1){2}]\n')
-        check(proc.returncode == 1 and
-              "<stdin>:3 (the start line of the refused input; the VM gave no exact position)" in proc.stderr and
-              "<stdin>:1:1" not in proc.stderr, "no-position `$[...]` refusal: the input's start line, labelled",
-              f"err={proc.stderr!r}")
+        # The Opaque region's recorded position: `if` at 3:8 (never 1:1).
+        check(proc.returncode == 1 and "$[if(1){2}]: <stdin>:3:8: NIFT_VM session refused: session:opaque" in
+              proc.stderr and "<stdin>:1:1" not in proc.stderr,
+              "Opaque `$[...]` refusal: the Opaque region's own position (3:8), never 1:1", f"err={proc.stderr!r}")
         proc, rows = run(nift, d, [], {}, stdin='print(1)\n  x := `a`\n')
         check(proc.returncode == 1 and "<stdin>:2:3: NIFT_VM session refused: session:opaque" in proc.stderr,
               "an Opaque statement is refused at the Opaque region's own position (not 1:1)", f"err={proc.stderr!r}")
@@ -1000,6 +1000,50 @@ def main():
             proc, rows = run(nift, dd, args, {"HOME": str(dd)}, stdin="")
             check(proc.returncode == 1 and f"{path}:1:1" not in proc.stderr,
                   f"{where_label} piped: no invented 1:1 for the whole-file refusal", f"err={proc.stderr!r}")
+
+        # 18e. A refusal whose position the compiler did not record (a limit:
+        # `limit:too many registers` from a 33000-element literal) is never
+        # printed as an exact position: the flag, not the geometry, decides.
+        d = work / "unpositioned"
+        d.mkdir()
+        big = "x := [" + ",".join(["1"] * 33000) + "]\n"
+        (d / "big1.f").write_text(big + 'print("after")\n')
+        nopos = "(the VM gave no exact position)"
+        proc, rows = run(nift, d, ["big1.f"], {})
+        check(proc.returncode == 1 and proc.stdout == "" and
+              proc.stderr.startswith(f"error: {(d / 'big1.f').resolve().as_posix()} {nopos}: not compiled for the VM "
+                                     "(limit:too many registers)") and "big1.f:1:1" not in proc.stderr,
+              "unpositioned refusal of a file: no exact position claimed", f"err={proc.stderr[:300]!r}")
+        proc, rows = run(nift, d, ["-e", big + 'print("after")'], {})
+        check(proc.returncode == 1 and proc.stderr.startswith(f"error: <command-line> {nopos}: not compiled") and
+              "<command-line>:1:1" not in proc.stderr,
+              "unpositioned refusal of an -e program: no exact position claimed", f"err={proc.stderr[:300]!r}")
+        proc, rows = run(nift, d, [], {}, stdin='print(1)\nfn(g()) { return 1 }\n\n\n' + big + 'print("after")\n')
+        check(proc.returncode == 1 and proc.stdout == "1\n" and
+              f"error: <stdin>:5 (the start line of the refused input; the VM gave no exact position): NIFT_VM "
+              "session refused: limit:too many registers" in proc.stderr and "<stdin>:5:1" not in proc.stderr,
+              "unpositioned session refusal (piped): the input's start line, labelled", f"err={proc.stderr[:300]!r}")
+        (d / "s.f").write_text(big + 'print("after")\n')
+        status, out = run_tty(nift, d, ["-i", "s.f"], {}, ['print("PROMPT")', "exit"])
+        sf = (d / "s.f").resolve().as_posix()
+        check(status == 0 and f"error: {sf}:1 (the start line of the refused input; the VM gave no exact position)"
+              in out and f"{sf}:1:1" not in out and "\nafter" not in out and "PROMPT\n" in out,
+              "unpositioned refusal in a tty -i file: the statement's start line, labelled; prompt usable",
+              f"status={status} out={out[:400]!r}")
+
+        # 18f. A syntax error inside a top-level statement interrupts the file at
+        # that statement's start line; the error keeps its own position.
+        for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"syntax-stmt-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text('print("s0")\nif(true) {\n  touch("IN")\n  print("inside")\n  z := (1 +\n}\n')
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            check(status == 0 and out.startswith("s0\nerror: ") and f"error: {path}:5:" in out and
+                  "was interrupted at line 2;" in out and not (d / "IN").exists() and "inside" not in out and
+                  "PROMPT\n" in out,
+                  f"{where_label} on a tty: syntax error at 5:x interrupts at its statement's start (line 2)",
+                  f"status={status} out={out!r}")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background

@@ -25,6 +25,7 @@ bool UnitCompiler::fail(const Node& node, std::string reason) {
     if (reason_.empty()) {
         reason_ = std::move(reason);
         offset_ = node.begin;
+        positioned_ = true;
     }
     return false;
 }
@@ -293,13 +294,13 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     const UnitShape shape = check_unit_depth(ast, root);
     if (!shape.ok) {
         result.reason = "nesting-limit";
-        result.offset = shape.offset;
+        result.offset = shape.offset; result.positioned = true;
         return result;
     }
     const UnitPlan plan = plan_unit(ast, root, limits.session ? &limits.session->phased_functions : nullptr);
     if (!plan.ok) {
         result.reason = plan.reason;
-        result.offset = plan.offset;
+        result.offset = plan.offset; result.positioned = true;
         return result;
     }
     // Code whose legacy meaning depends on the prepared evaluator is refused
@@ -316,7 +317,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
     if (prepared.refused) {
         result.reason = prepared.reason;
-        result.offset = prepared.offset;
+        result.offset = prepared.offset; result.positioned = true;
         return result;
     }
     if (!kinds.converged) {  // never compile with unsound kinds (review D1)
@@ -328,7 +329,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     std::uint32_t handle_offset = 0;
     if (detail::check_handle_flow(ast, root, kinds, handle_reason, handle_offset, limits.session)) {
         result.reason = std::move(handle_reason);
-        result.offset = handle_offset;
+        result.offset = handle_offset; result.positioned = true;
         return result;
     }
     // Persistent task/global snapshots require CP22's separate lifecycle
@@ -340,7 +341,10 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         return result;
     }
     // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
-    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset)) return result;
+    if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset)) {
+        result.positioned = true;
+        return result;
+    }
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
     compiler.set_session(limits.session);
@@ -349,7 +353,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
-        result.offset = compiler.offset();
+        result.offset = compiler.offset(); result.positioned = compiler.positioned();
         if (compiler.unknown_hit() && !limits.session) {
             // Unknown kinds come from something refused anyway: report that
             // refusal when the probe finds one (the unit is refused either way).
@@ -361,17 +365,19 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
                 result.reason = probe.reason();
-                result.offset = probe.offset();
+                result.offset = probe.offset(); result.positioned = probe.positioned();
             }
         }
         return result;
     }
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks
         program->has_coroutines = true;
+        result.positioned = true;  // both checks record an instruction's source offset
         if (!check_coroutine_program(*program, result.reason, result.offset, limits.parallel_tasks)) return result;
         if (!limits.parallel_tasks &&
             !check_cooperative_admission(*program, limits.cooperative_observe, result.reason, result.offset))
             return result;
+        result.positioned = false;
     }
     if (limits.session && limits.session->coherent_recompile)
         for (auto& symbol : limits.session->symbols) {

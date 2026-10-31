@@ -23,6 +23,9 @@ struct SessionResult {
     // (e.g. the body of a function defined by earlier input): its line and
     // column are then relative to that unit, not to the current one.
     bool refusal_in_unit = true;
+    // True only when the compiler or parser recorded the refused position;
+    // otherwise refusal_line/column are just the unit start and are not shown.
+    bool refusal_positioned = false;
     VmResult execution;
     Value value;
     bool presentation = false;

@@ -226,7 +226,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     const int saved_depth = depth_;
     const bool saved_probe = probe_;
     const std::string saved_reason = reason_;
-    const std::uint32_t saved_offset = offset_;
+    const std::uint32_t saved_offset = offset_; const bool saved_positioned = positioned_;
 
     const Node& lambda = ast_.at(task.lambda);
     in_function_ = true;
@@ -242,7 +242,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     depth_ = 0;
     probe_ = false;
     reason_.clear();
-    offset_ = 0;
+    offset_ = 0; positioned_ = false;
     begin("lambda", lambda.b);
     if (!(lambda.flags & kFlagBlockBody)) fb_->session_returns |= kinds(lambda.b);
     // Incoming arguments occupy the first registers, before descriptor locals.
@@ -350,7 +350,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     depth_ = saved_depth;
     probe_ = saved_probe;
     reason_ = saved_reason;
-    offset_ = saved_offset;
+    offset_ = saved_offset; positioned_ = saved_positioned;
     return true;
 }
 
