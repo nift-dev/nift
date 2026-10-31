@@ -7,7 +7,7 @@
 arith.f vm 
 arrays.f vm 
 control.f vm 
-fallback_args.f fallback unresolved-name
+fallback_args.f vm
 # CP22: async functions and `await` run on the VM (tests/runtime2/cp22).
 fallback_await.f vm
 fallback_bare_expression.f fallback expression-statement
