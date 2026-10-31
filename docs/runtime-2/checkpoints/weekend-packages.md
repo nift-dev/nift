@@ -305,7 +305,11 @@ Two ideas are kept apart throughout:
      timeout; legacy waited 3.5 s in the probe). A failure to open or lock gives
      legacy's `cannot acquire package read lock` (and `package read lock identity
      changed`, `unfinished package transaction; run a package command to recover it`)
-     as a §4.2 program-error diagnostic at the import, before anything runs.
+     at the import, before anything runs.
+     - It is a **package-management error** (owner), with its own stable reason id,
+       `import-error:package-lock`.
+     - It uses the §4.2 program-error format, never "not compiled for the VM" or
+       "not supported yet".
   6. One snapshot: legacy's per-import re-validation (`stale package ownership: …`)
      cannot fail inside one held lock and is not reproduced.
 - **Dependencies.** The graph's dependency and `read-source` list is the module files
@@ -354,7 +358,9 @@ note: the program was not executed: its imports are resolved before it runs, so 
   errors have an import statement; should a positionless form ever arise, the existing
   `(the VM gave no exact position)` path is used. A position is never invented.
 - Stable reason ids (for classify-all, the inventory and tests; not shown as a feature
-  name): `import-error:package` (all package steps, including the lock),
+  name): `import-error:package` (package resolution steps), `import-error:package-lock`
+  (lock acquisition: `cannot acquire package read lock`, `package read lock identity
+  changed`, `unfinished package transaction; run a package command to recover it`),
   `import-error:missing`, `import-error:cycle`, `import-error:package-escape`.
 
 **Approved difference (record in `compatibility.md`, Approved breaks):**
@@ -424,6 +430,30 @@ enclosing top-level statement.
 - `comp.f`: a missing import before a `return 5` gives the missing import, as in legacy.
 - `comp2.f`: a `return 5` before a missing import gives the `return` error, as in
   legacy, because the import is never reached.
+
+**Determinism rule (owner).** The reported error never depends on hash-table
+iteration or filesystem traversal order.
+
+The order is legacy's first-executed order, which is well defined for everything the
+graph checks:
+- The graph visits units depth first, in statement order. An import is entered at its
+  statement. The module behind it is checked completely (placement, its own
+  statements and imports, in order) before the importer's next statement.
+- Within a unit, checks run in top-level statement order. A construct nested in a
+  block counts at its enclosing top-level statement. Two candidates in one statement
+  are ordered by source offset.
+- A module already visited is not re-checked. Its first visit's position in the order
+  counts.
+- Feature refusals use the same order. A clash or scope refusal inside one unit is
+  reported at the smallest source offset among its candidates. This replaces the
+  traversal-stack order seen on the `integ/args-cmd` binary: `m_fn.f:3:22` was
+  reported where the first `args` is at `1:22`.
+
+Implementation constraints:
+- `unordered_map`/`unordered_set` (`by_identity_`, `owner`, `Names`) are used only
+  for membership and lookup, never to choose what is reported.
+- The graph reads only paths named by import statements and package manifests. It
+  never lists a directory.
 
 Program errors take precedence over feature refusals (an invalid program is reported
 as invalid). The graph walk records the first feature refusal and continues through
@@ -683,6 +713,28 @@ with no `.nift/`: nothing is created.
 - **Journal present.** `.nift/package-transaction.json` gives the transaction error,
   before anything runs.
 
+**Lock acquisition failure (owner).** Cases:
+- an unopenable lock (a directory named like the lock file);
+- a symlinked lock file (`O_NOFOLLOW`);
+- the journal present;
+- a lock identity change.
+
+Each gives `import-error:package-lock`, legacy's text in the program-error format (no
+"not supported"), rc 1, nothing run.
+
+**Deterministic competing failures (owner).** Fixtures have several possible program
+errors across the graph, for example:
+- module A has `export(1)` and module B's import is missing;
+- a cycle, a missing package and an `export-missing` in sibling modules;
+- a feature refusal next to a program error.
+
+The test creates the module files in every permutation of creation order (and of
+directory-entry order, by re-creating the directory) and permutes the import-name
+lengths, which perturbs hash bucketing. Over the repetitions it asserts one identical
+diagnostic (text, `file:L:C`, reason id), equal to legacy's first-executed error
+where legacy reports one. A mutant that picks the reported error by hash-set
+iteration must fail it.
+
 **Lock failure cleanup.**
 - After success, after each program error, after a feature refusal, and after a
   killed run (SIGKILL while waiting), the lock is free (`flock -n -x` succeeds).
@@ -801,6 +853,7 @@ as default.
 | Follow-up 2 | VM-only, non-creating read-lock function in `PackageTransaction`; legacy byte-identical, with legacy package tests run under `NIFT_VM=0` (§5, §6) |
 | Follow-up 3 | `export(<non-name>)` is a program error in this checkpoint (§4.3) |
 | Conditions | Detailed conditions C1–C3 on the three follow-ups (§4.7); their required tests are in §6 |
+| Final points | Deterministic competing-failure rule (§4.3, §6); lock failure is a package-management error with its own id `import-error:package-lock` (§4.1, §4.2). No further scope changes. |
 
 No open questions remain. Implementation waits for the coordinator's go-ahead after
 `args`/`cmd` lands in `weekend/r2`.
