@@ -1,0 +1,5 @@
+print("pre")
+import("cl.f")
+g := mk()
+t := thread(g)
+print(t.join())

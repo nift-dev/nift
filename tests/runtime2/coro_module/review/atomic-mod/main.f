@@ -1,0 +1,5 @@
+print("pre")
+import("at.f")
+t := thread(inc)
+t.join()
+print(a.load())

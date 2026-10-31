@@ -308,7 +308,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         unit_root = relinked.root;
     }
     CompileLimits limits;
-    limits.module_names = link.module_names; limits.linked = link.linked; cooperative_switches(limits);
+    limits.module_names = link.module_names; limits.link = &link; cooperative_switches(limits);
     limits.invocation = invocation;  // the script's `cmd`/`args` (rt/session_invocation.h)
     if (invocation) locate_invocation_shadows(*invocation, link.linked ? linked_ast : ast, unit_root,
         [&](std::uint32_t at) { return !link.linked || link.locate(at).module == 0; });

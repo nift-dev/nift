@@ -8,3 +8,6 @@ tests/fixtures/HANDOVER.md text eol=lf
 tests/fixtures/MIGRATION.md text eol=lf
 tests/fixtures/REWRITE.md text eol=lf
 tests/fixtures/REDESIGN.md text eol=lf
+
+# Review repro with CRLF line endings (coro-module review 2): keep its bytes.
+tests/runtime2/coro_module/review/crlf/** -text

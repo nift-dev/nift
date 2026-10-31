@@ -1,0 +1,5 @@
+print("pre")
+import("pa.f")
+print(await asq(3))
+r := [1, 2].map((x) => x + 1)
+print(r[1])

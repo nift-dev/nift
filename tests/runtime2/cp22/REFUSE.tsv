@@ -1,6 +1,11 @@
 # CP22 refusal fixtures: <fixture>\t<exact NIFT_VM_STATS reason> (refused before execution)
 r_capture.f	coro-capture
 r_async_value.f	coro-async-value
+r_async_value_object.f	coro-async-value
+r_async_value_object_alias.f	coro-async-value
+r_async_value_object_nested.f	coro-async-value
+r_async_value_object_arg.f	coro-async-value
+r_async_value_object_unused.f	coro-async-value
 r_flow_print.f	coro-future-flow:Call
 r_flow_concat.f	coro-future-flow:Binary
 r_flow_stringify.f	coro-future-flow:Member
