@@ -110,9 +110,6 @@ SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& pa
                        : SourceMap::single(path.generic_string(), source);
 }
 
-} // namespace
-
-namespace {
 // The accepted NIFT_VM values (owner ruling): unset, require, 0, 1, classify,
 // classify-all. Anything else, the empty value included, is invalid.
 bool parse_vm_mode(const char* value, VmMode& mode) {
@@ -305,11 +302,12 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
         return not_compiled(stats, mode, source_path, exit_code);
     }
     // CP12b modules: a unit with imports compiles as its linked text
-    // (rt/module_link.h); positions map back to the module they came from.
+    // (rt/module_link.h); positions map back to their module (unrecorded: the entry's).
     const LinkedUnit link = eval ? LinkedUnit() : link_unit(ast, parsed.root, source, source_path);
     std::filesystem::path report_path = source_path;
-    const auto locate_linked = [&](std::uint32_t offset) {
-        if (!link.linked) return locate_into(stats, source, offset);
+    const auto locate_linked = [&](std::uint32_t offset, bool positioned) {
+        stats.positioned = positioned;
+        if (!link.linked || !positioned) return locate_into(stats, source, link.linked ? 0 : offset);
         const LinkedUnit::Location at = link.locate(offset);
         report_path = at.module == 0 ? source_path : link.graph.modules[at.module]->path;
         locate_into(stats, at.module == 0 ? source : link.graph.modules[at.module]->source,
@@ -341,11 +339,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.compile_us = micros(t1, t2);
     if (!compiled.program) {
         stats.reason = compiled.reason;
-        // A refusal without a recorded position is the whole program's: it is
-        // reported for the entry, never at the module an unrecorded offset maps to.
-        if (compiled.positioned) locate_linked(compiled.offset);
-        else { locate_into(stats, source, 0); report_path = source_path; }
-        stats.positioned = compiled.positioned;
+        locate_linked(compiled.offset, compiled.positioned);
         return not_compiled(stats, mode, report_path, exit_code);
     }
     // R1 (owner, 2026-10-21): linking reads all modules before execution.
@@ -354,13 +348,10 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
 #if !defined(NIFT_R1_MUTANT)  // test-only negative control (tests/runtime2/module_host_order_mutant.sh)
     if (link.linked) {
         std::string host_reason;
-        std::uint32_t host_offset = 0;
-        bool host_positioned = false;
+        std::uint32_t host_offset = 0; bool host_positioned = false;
         if (first_module_host_op(*compiled.program, host_reason, host_offset, &host_positioned)) {
             stats.reason = host_reason;
-            if (host_positioned) locate_linked(host_offset);  // the host op's recorded instruction offset
-            else { locate_into(stats, source, 0); report_path = source_path; }
-            stats.positioned = host_positioned;
+            locate_linked(host_offset, host_positioned);  // the host op's recorded instruction offset
             return not_compiled(stats, mode, report_path, exit_code);
         }
     }
