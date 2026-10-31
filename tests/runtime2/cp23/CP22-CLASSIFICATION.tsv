@@ -13,7 +13,7 @@ r_main_cell.f	coro-main-cell	vm	-	legacy-golden
 r_at_fn_async.f	fn-flags	vm	-	legacy-golden
 r_await_plain.f	await-outside-coroutine-unit	require-error	await-outside-coroutine-unit	preserved-refusal
 r_return_top.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
-r_module.f	coro-module	require-error	coro-module	preserved-refusal
+r_module.f	coro-module	vm	-	legacy-golden
 r_future_result.f	coro-future-flow:Return	require-error	coro-future-flow:Return	preserved-refusal
 # CP25-R (D-057): a statically certain arity mismatch now raises legacy's fatal Error on the VM when reached.
 err_arity.f	static-error:arity	vm-error	callable argument count mismatch: f	legacy-golden

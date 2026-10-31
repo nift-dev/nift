@@ -4274,6 +4274,37 @@ test-rt-vm: test-runtime2-cp22
 test-rt-vm-sanitize: test-runtime2-cp22-sanitize
 test-rt-vm-sanitize: test-runtime2-cp22-tsan
 certify-targets: test-runtime2-cp22-mutants
+# Weekend candidate coro-module: coroutines and async functions in programs
+# that import modules (docs/runtime-2/checkpoints/weekend-coro-module.md).
+# Mutants: the module-admission objects compiled -DNIFT_CORO_MODULE_MUTANT=n,
+# linked with the normal objects; each must fail its named witness.
+.PHONY: test-runtime2-coro-module test-runtime2-coro-module-mutants
+test-runtime2-coro-module: $(TARGET)
+	$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-coro-module
+# The same suite on the ASan/UBSan and TSan builds (parallel tasks running
+# module code; the linked unit's shared SourceMap; worker Error reporting).
+.PHONY: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
+test-runtime2-coro-module-sanitize: $(SAN_TARGET)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-coro-module-tsan: $(TSAN_TARGET)
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/coro_module/coro_module.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm-sanitize: test-runtime2-coro-module-sanitize test-runtime2-coro-module-tsan
+CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_admit.cpp
+CORO_MODULE_MUTANT_DIR := $(TEST_DIR)/coro-module-mutants
+$(CORO_MODULE_MUTANT_DIR)/nift-%: $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CORO_MODULE_SOURCES) \
+		$(RT_VALUE_HEADERS) $(LIBFFI_A)
+	mkdir -p "$(CORO_MODULE_MUTANT_DIR)/$*"
+	set -e; for f in $(CORO_MODULE_SOURCES); do \
+	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MODULE_MUTANT=$* -c $$f \
+	    -o "$(CORO_MODULE_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) \
+		$(addprefix $(CORO_MODULE_MUTANT_DIR)/$*/,$(notdir $(CORO_MODULE_SOURCES:.cpp=.o))) $(LDLIBS) -o $@
+test-runtime2-coro-module-mutants: $(TARGET)
+	MAKE="$(MAKE)" bash tests/runtime2/coro_module/mutants.sh "$(CURDIR)/$(TARGET)" "$(CORO_MODULE_MUTANT_DIR)"
+certify-targets: test-runtime2-coro-module-mutants
 
 # CP18 compiled-program interface: separate from legacy Engine execution.
 CP18_C_TEST := $(TEST_DIR)/cp18/program$(EXEEXT)
