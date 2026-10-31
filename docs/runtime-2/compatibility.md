@@ -25,10 +25,31 @@ Must not change unless a decision in `decisions.md` approves it.
 | Candidates for deliberate language changes (break, argument evaluation, value-based typing, declarations in loops, aliasing, catchable errors) | D-015 table (proposed, not yet scheduled) | — |
 | User functions shadow built-ins of the same name | D-009 #3, D-014 | to be scheduled |
 | `exit` in `~/.niftrc` / `nift -i file` on a terminal is refused (the file stops there, the session continues at the prompt) instead of ending the session with status 1; migration: drop the line | D-061 | VM default |
-| `map()`, `set()` and `stack()` are values, not references: `b := a`, arguments, returns, closure reads, container insertion/extraction, struct fields and thread transfer give independent (deep) copies; self-insertion stores a snapshot instead of failing with "would create a cyclic reference"; `same()` on a collection is an error; threads accept collections. Migration: return or re-assign a collection that a function fills (`m = fill(m)`), keep shared state in one binding, drop `copy()`/`deepcopy()` used only to separate copies | D-063 | weekend collections |
-| `same()` on ordinary values is an error: arrays bound to names (`a := [1]; same(a, a)`: legacy `true`; two arrays: `false`), structs and collections (legacy `true`/`false` by storage); a plain object name errors in both. Migration: compare with `==`, or keep the identity in a handle or callable | D-040 #4, D-063 | weekend collections |
+| ~~`map()`, `set()` and `stack()` are values, not references~~ (**superseded by D-NEXT-refsem**: collections are references again, legacy-equal within an isolate). Historical row: `b := a`, arguments, returns, closure reads, container insertion/extraction, struct fields and thread transfer give independent (deep) copies; self-insertion stores a snapshot instead of failing with "would create a cyclic reference"; `same()` on a collection is an error; threads accept collections. Migration: return or re-assign a collection that a function fills (`m = fill(m)`), keep shared state in one binding, drop `copy()`/`deepcopy()` used only to separate copies | D-063 | weekend collections |
+| `same()` on ordinary values is an error: arrays bound to names (`a := [1]; same(a, a)`: legacy `true`; two arrays: `false`) and (until D-NEXT-refsem) structs and collections, which are now compared by identity, legacy-equal; a plain object name errors in both. Migration: compare with `==` | D-040 #4, D-063; structs and collections superseded by D-NEXT-refsem #2 | weekend collections |
+| `copy(x)` is shallow (Nift v4.2's contract): a new outer struct instance or collection whose contents are shared (an array or object stays a value until Phase B); legacy v4.4+ copies deeply. `deepcopy(x)` preserves sharing inside the copied graph (a collection reached twice is copied once); legacy duplicates it per occurrence. The two-argument filesystem `copy(src, dst)` is unchanged. Migration: use `deepcopy()` where an independent nested value is needed | D-NEXT-refsem #3 | refsem Phase A |
+| A refused reference cycle is a **catchable** Error (code `runtime.reference_cycle`; legacy's text where legacy refuses: "set/push would create a cyclic reference", "assignment would create a cyclic reference: <field>"); legacy's refusal is fatal. The receiver is unchanged | D-NEXT-refsem #4 | refsem Phase A |
+| Threads and parallel `async` accept collections and struct instances, copied as one alias-preserving graph (two aliased arguments alias one copy in the worker); legacy refuses them ("non-transferable resource") | D-NEXT-refsem #5 (D-063 #6) | refsem Phase A |
 | `same()` on mutex, atomic, channel, future and thread compares identity (the same resource or task: `true`; independently created: `false`), where legacy errors "same: operands must be identity-bearing values" | D-063 (owner, 2026-11-01) | weekend collections |
 | A `for ((k, v) : m)` loop over a map visits the entries captured at loop entry; insertions, removals and value updates made by the body do not change the active snapshot (legacy iterates the live entry vector: shows updated values, shifts after a removal, undefined past the end). A visited entry may already be removed from `m`: removing it again fails with "remove: key not found". Migration: read the map again after the loop; guard removals with `m.contains(k)` | D-063 (owner, 2026-11-01) | weekend collections |
+
+### Reference cycles are refused (intentional limitation, D-NEXT-refsem #4)
+
+Maps, sets, stacks and struct instances are references, and there is no cycle
+collector. A store that would make one of them reachable from itself is refused
+before anything changes (a catchable `runtime.reference_cycle` Error). Legacy
+refuses a direct cycle through struct fields and collection values too, but it
+**accepts** cycles through an array, an object or a closure, and so does
+JavaScript; the VM refuses them:
+
+- `m.set(1, [m])`, `m.set(1, {"k": m})`, `st.push([st])`;
+- an object holding a closure that captures the object itself, inside a
+  function: `m := map(); f := () => m.size(); m.set("f", f)` (and the same for
+  an instance field). A closure over a *top-level* binding reads it by name, so
+  storing it closes no cycle and is accepted.
+
+Migration: keep the back reference outside the object (an id into an owning
+collection, or a top-level binding the closure reads).
 
 ## Syntax compatibility (D-045, owner, 2026-10-20)
 
@@ -54,3 +75,7 @@ approved breaks and not completed behaviour.
 | Shape | Legacy | Reason | Decision |
 | --- | --- | --- | --- |
 | `same()` with an argument that is not a plain binding name: a string literal (`same("f", "f")`), a call, an index, any expression; in every program | reads a string argument's text as a binding name first (`f := () => 1; same("f", "f")` is `true`; `same("a", "a")` without `a` is "unknown value or malformed expression: a"), and evaluates other argument shapes up to twice | `same:argument-shape` | D-063 (owner, 2026-11-01) |
+| A reference cycle through an array, an object or a closure (`m.set(1, [m])`, an object holding a closure that captures it): see "Reference cycles are refused" above | accepted (its tags are never freed) | catchable `runtime.reference_cycle` at run time, before the store | D-NEXT-refsem #4 |
+| A map, set or stack as a map key or set member, lookups included (`m.set(k, 1)` with `k := map()`, `s.add(s)`, `s.contains(t)`) | compares the tagged collections structurally (a key mutated later is looked up by its new contents) | `collection-mutable-key` | D-NEXT-refsem #6 |
+| An array or object program whose output would change once arrays and objects are references (Phase B): a mutated copy (`b := a; b.push(2)`, the former D-040 witnesses), a mutating function given a live array (`f(a)` that pushes, then reading `a`; `x = f(x)` stays admitted), an array stored in a collection or returned by a closure and then mutated, a mutated value read out of a collection or returned by an element method | copies (or location-aliases) as before | `reference-guard:<route>` | D-NEXT-refsem #9 |
+| Field access through a value that may be a struct instance or something else (a field initialised with `""` that later holds an instance, read back: `x := a.next; x.v = 7`) | runs (structs are tagged strings) | `struct-value` | D-NEXT-refsem #8 |

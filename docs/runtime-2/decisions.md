@@ -1534,3 +1534,127 @@ Witnesses: `tests/runtime2/collections/approved/*.f` (VM golden and legacy
 witness for each difference), `parity/*.f`, `refuse/*.f`, the heap checks and
 sixteen mutation controls (`make test-runtime2-collections`,
 `test-runtime2-collections-mutants`).
+
+## D-NEXT-refsem — Reference semantics, Phase A: maps, sets, stacks and struct instances are references (owner, 2026-11-01)
+
+(Placeholder identifier: the number is assigned at integration.) Owner
+decision of 2026-11-01 (option 2: reference semantics with cycle creation
+refused, in two phases; rulings D1-D9). Phase A is an internal engineering
+milestone, not approval to release mixed semantics; Phase B (arrays and
+objects) needs its own plan and owner approval. Record:
+`checkpoints/weekend-refsem-a.md`.
+
+**Supersedes** (the earlier decisions stay as historical records and are not
+edited; every changed fixture, row and witness cites this decision):
+
+- **D-063** #1 (collections are values), #2 (self-insertion snapshots), #3 as
+  far as `same()` on a collection is an error, and #6 as far as it presents
+  thread copies as the general value rule;
+- **D-046** #3 and **D-040** V9 (struct instances as values; structural `==`
+  for structs);
+- the **D-040 addendum**'s "acyclic by construction" basis, for the reference
+  kinds (acyclicity is now checked);
+- the CP15 W11 reading of `copy()`/`deepcopy()` as the identity on plain
+  values (`copy` is shallow, `deepcopy` a graph copy).
+
+Not superseded: D-040 for arrays and objects (copy-on-write values until
+Phase B) and its #3 handle rule (a copy never duplicates a resource); D-063
+#4, #5 and #7 (re-affirmed by 6 below); D-055 and the CP23 ownership rules.
+
+1. **Kinds.** Maps, sets, stacks (`rt::Kind::Collection`) and struct
+   instances are identity-bearing mutable objects. Arrays and objects remain
+   values until Phase B (9). Numbers and booleans are values; strings are
+   immutable values; handles keep their identity.
+2. **Within an isolate** assignment, declaration, synchronous arguments,
+   returns, closure captures (cells), container storage and extraction,
+   struct fields and `for` element bindings share the object: a mutation
+   through any alias is visible through all (legacy-equal: legacy's
+   collections and structs are tagged references). `same()` is identity
+   (legacy-equal). `==` keeps legacy's rules: structural for collections,
+   **identity for structs** (D4; `P() == P()` is false, `copy(p) == p`
+   false). A map()/set()/stack() field initialiser is evaluated afresh for
+   every instance: no two instances share one collection.
+3. **Copying is explicit (D3).** `copy(v)` is shallow (Nift v4.2's
+   contract): a new outer instance or collection whose fields, keys, values,
+   members or elements are shared. An array or object is a value until Phase
+   B, so `copy` returns the value itself, indistinguishable from a new outer
+   array with shared elements. `deepcopy(v)` copies every reachable array,
+   object, instance and collection once and preserves the sharing inside the
+   copied graph; callables, handles and futures keep identity. Both reserve
+   the heap budget before building. The two-argument filesystem
+   `copy(src, dst)` is unchanged. Approved difference: legacy v4.4+ copies
+   deeply in `copy`, and its `deepcopy` duplicates a collection reached twice.
+4. **Cycles are refused (D1).** A store that would make a reference-kind
+   object reachable from itself (through fields, keys, values, members,
+   elements, arrays, objects, closure cells or resource payloads) is refused
+   **before** anything changes, with a **catchable** Error, code
+   `runtime.reference_cycle`: legacy's text where legacy refuses the same
+   store ("set would create a cyclic reference", "push would create a cyclic
+   reference", "assignment would create a cyclic reference: <field>"), else
+   "reference cycle: the stored value would contain itself". There is no
+   general garbage collector; refused graphs leak nothing. **Intentional
+   limitation, prominently documented:** legacy accepts a cycle through an
+   array, an object or a closure (`m.set(1, [m])`, `m.set(1, {"k": m})`, and
+   the familiar JavaScript pattern of an object holding a closure that
+   captures that object, `m.set("f", () => m.size())` inside a function); the
+   VM refuses them. A closure over a top-level binding reads it by name (no
+   heap edge) and is accepted. Legacy's refusals are fatal; the VM's are
+   catchable (approved difference).
+5. **Isolate boundaries.** Thread and parallel-async arguments, captures,
+   globals and results cross as one alias-preserving graph copy
+   (`TransferGraph`, unchanged): aliased arguments alias one copy in the
+   worker; nothing mutable is shared between isolates; refcounts stay
+   isolate-local; CP23 ownership and handle rules unchanged. Struct
+   instances cross too (legacy refuses). **Cooperative async (D7):** at task
+   creation (not first run) the arguments and the globals the task reads are
+   copied as one alias-preserving graph, before any task state exists (a
+   budget stop or failed allocation leaves the scheduler unchanged); handles
+   and callables keep identity; the CP22 admission rules (no collection
+   methods, struct code or captures in task code) stay. Equivalence with the
+   parallel path is shown by differential fixtures run under both
+   schedulers; any shape not covered stays refused by the existing
+   cooperative admission.
+6. **Iteration (D5).** A `for` loop over an array, map, set or stack visits
+   the membership at loop entry; the body's mutations change the container,
+   not the active iteration; elements are references. Maps take an explicit
+   O(n), budget-checked snapshot (sets and stacks were already materialised;
+   arrays are copy-on-write values). Re-affirms D-063 #7.
+7. **Keys (D6).** A map, set or stack used as a map key or set member, for
+   lookups too, is refused before any effect (`collection-mutable-key`):
+   their contents may change after insertion, which a hash index cannot
+   follow. Ordinary keys (bool, number, string) and callables (identity) are
+   unchanged; struct identity keys stay refused (`collection-identity-key`).
+   JavaScript-style identity keys are a future design question.
+8. **Sound inference under aliasing.** Collection contents are tracked per
+   allocation site (each `map()`/`set()`/`stack()` call or field
+   initialiser), refined per string-literal map key, never per binding;
+   struct field types are per struct type; a struct receiver is admitted only
+   when the inference proves exactly one struct type. A collection of
+   unknown origin, or a persistent session, reads as "anything".
+9. **Arrays and objects: the forward-compatibility guard (D2).** Until Phase
+   B, the VM refuses every unit whose output could differ between value and
+   reference semantics for arrays and objects
+   (`reference-guard:<route>`, `rt/reference_guard.h`): a mutated array or
+   object must be exclusive (never copied out, its parts never copied out
+   when mutated below the top, every inflow fresh; the `x = f(x)` idiom
+   allowed). The six D-040 witnesses become refusals. Accepted programs keep
+   their output when Phase B lands.
+10. **Legacy (D8).** `NIFT_VM=0` is unchanged. Every VM difference is an
+    approved difference (`compatibility.md`, cp25 classification).
+11. **Certification findings (D9).** All rt-lint findings fixed. The
+    checked-build relocation (`aggregate_store.h`) still moves storage of at
+    most 256 elements on every mutation (every stale-reference control is
+    small and is caught at its next use) and larger storage once every
+    size/256 mutations, so the 200,000-element stress fixtures stay linear
+    under sanitizers and keep their full size and budget coverage.
+
+Migration (`compatibility.md`): to keep an independent value use `copy()`
+(shallow) or `deepcopy()`; use `same()` to test sharing; a function that fills
+a collection passed to it now fills the caller's (`m = fill(m)` keeps
+working); build self-referential structures from ids into an owning
+collection.
+
+Witnesses: `tests/runtime2/refsem/` (`make test-runtime2-refsem`, fifteen
+mutation controls `test-runtime2-refsem-mutants`); the D-063 fixtures that
+became legacy-equal moved to `collections/parity/`, their value-semantics
+goldens kept in `collections/superseded/` (`INDEX.tsv`).

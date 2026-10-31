@@ -1,5 +1,15 @@
 # Weekend candidate: map, set and stack values on the VM (cand/collections)
 
+> **Superseded in part by D-NEXT-refsem** (reference semantics, Phase A;
+> `weekend-refsem-a.md`): maps, sets, stacks and struct instances are
+> references within an isolate, cycles are refused, `copy` is shallow,
+> collections are refused as keys. Sections 2.1-2.4 and 2.6 (values,
+> snapshots, `same()`), the `collection-loop-binding` refusal, the clone
+> budget and mutants 1-4 and 10 describe the superseded value semantics; the
+> rest (methods, texts, keys rules otherwise, iteration, refusals) stands.
+> This record is kept unchanged otherwise; the superseded fixtures are in
+> `tests/runtime2/collections/superseded/` (`INDEX.tsv`).
+
 Status: **candidate, corrected after review** (`513bd70d` rejected; the
 correction commits follow it; not integrated). Owner rulings of 2026-11-01
 are in section 8. Branch `cand/collections`, base local `weekend/r2` @`10c41015`.
