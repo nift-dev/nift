@@ -43,7 +43,19 @@ struct SessionSymbol {
     std::uint16_t slot = 0, kinds = 0, returns = 0, arity = 0, contract = 0;
     bool callable = false, const_array = false, defined = true, readonly = false;
     bool untracked_callables = false;
+    // A script invocation binding (`cmd`, `args`; rt/session_invocation.h).
+    bool invocation = false;
     std::vector<std::uint16_t> params, param_types;
+};
+// The script invocation bindings legacy installs for every program and
+// session (`cmd`: the script name, `args`: its arguments; readonly, `args` a
+// const array). One description (rt/session_invocation.h) for both owners: a
+// session keeps the values in its namespace cells; a script unit's main frame
+// keeps them as globals set before its first statement.
+struct InvocationBinding {
+    SessionSymbol symbol;
+    Value value;
+    std::int64_t type = 0;  // the binding type (legacy's, of the value)
 };
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
@@ -72,6 +84,9 @@ struct SessionCompileContext {
 };
 struct CompileLimits {
     SessionCompileContext* session = nullptr;  // private compile transaction, never the live namespace
+    // A script unit's invocation bindings (never with `session`, whose
+    // namespace already holds them). Null: none (eval, embedders, tests).
+    const std::vector<InvocationBinding>* invocation = nullptr;
     std::size_t kind_walks = 0;  // infer_unit_kinds max_walks (0: automatic)
     // CP12b modules (rt/module_link.h): names declared outside functions in
     // imported modules. A user-call argument path rooted at one is refused

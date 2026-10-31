@@ -43,6 +43,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace nift::rt {
 
@@ -57,8 +58,11 @@ std::string vm_mode_configuration_error();
 // Returns true when the script was handled here (its exit status in
 // `exit_code`); false when the caller must run it on the legacy engine.
 // `source` is the program text after shebang removal; `source_path` is the
-// path legacy diagnostics name.
-bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code);
+// path legacy diagnostics name. `command`/`arguments` are the script
+// invocation bindings `cmd`/`args`, exactly as legacy installs them
+// (Parser::set_script_invocation; rt/session_invocation.h).
+bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path,
+                      const std::string& command, const std::vector<std::string>& arguments, int& exit_code);
 
 // eval entry: true means selected/handled here; false means the caller must
 // evaluate the untouched expression on legacy. A VM failure never retries.

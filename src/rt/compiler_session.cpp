@@ -10,8 +10,8 @@
 
 // rt-lint: cold-file incremental compiler namespace publication
 namespace nift::rt::detail {
-void UnitCompiler::set_session(SessionCompileContext* session) {
-    session_ = session;
+void UnitCompiler::set_session(SessionCompileContext* session, const std::vector<InvocationBinding>* invocation) {
+    session_ = session; invocation_ = session ? nullptr : invocation;  // a session's namespace holds them
     if (!session_) return;
     for (const auto& symbol : session_->symbols) {
         Binding binding;
@@ -23,6 +23,7 @@ void UnitCompiler::set_session(SessionCompileContext* session) {
         binding.type_reg = symbol.slot + 1;
         binding.decl_kinds = symbol.kinds;
         binding.const_array = symbol.const_array; binding.readonly = symbol.readonly;
+        binding.invocation = symbol.invocation;
         const auto schema = plan_.struct_index.find(symbol.struct_name);
         if (schema != plan_.struct_index.end()) binding.struct_id = static_cast<int>(schema->second);
         session_bindings_.emplace(symbol.name, binding);

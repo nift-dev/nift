@@ -38,15 +38,15 @@ public:
     // program is discarded even if it compiles (compiler.cpp).
     bool unknown_hit() const { return unknown_hit_; }
     void probe_unknown() { probe_ = true; }
-    void set_session(SessionCompileContext* session);
+    void set_session(SessionCompileContext* session, const std::vector<InvocationBinding>* invocation = nullptr);
     void expression_result() { expression_result_ = true; }
     void set_parallel_tasks(bool enabled) { parallel_tasks_ = enabled; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 private:
-    SessionCompileContext* session_ = nullptr;
+    SessionCompileContext* session_ = nullptr; const std::vector<InvocationBinding>* invocation_ = nullptr;
     std::unordered_map<std::string, Binding> session_bindings_;
     bool session_function(NodeId id);
-    bool session_admit();
+    bool session_admit(); bool invocation_prologue();  // the latter: rt/compiler_invocation.h
     bool session_render(NodeId id);
     bool session_order_call_types(const Node&, NodeId, std::uint16_t, bool&);
     bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);

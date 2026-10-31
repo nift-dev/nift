@@ -1,4 +1,8 @@
 #include "rt/script_runner_stats.h"
+#include "rt/eval_refusal_inventory.h"
+#include "rt/refusal_inventory.h"
+
+#include <algorithm>
 
 #include <cstdlib>
 #include <fstream>
@@ -8,7 +12,6 @@
 // rt-lint: cold-file process-level entry reporting only
 
 namespace nift::rt::detail {
-
 
 std::string json_escape(const std::string& text) {
     std::string out;
@@ -52,6 +55,41 @@ void report(const Stats& s) {
         std::ofstream file(target, std::ios::app);
         file << line.str();
     }
+}
+
+namespace {
+
+// The source line containing `offset` (at most 160 bytes), for the inventory.
+std::string line_text(const std::string& source, std::uint32_t offset) {
+    const std::size_t begin = source.rfind('\n', offset == 0 ? 0 : offset - 1);
+    const std::size_t from = begin == std::string::npos || offset == 0 ? 0 : begin + 1;
+    const std::size_t end = source.find('\n', offset);
+    return source.substr(from, std::min<std::size_t>((end == std::string::npos ? source.size() : end) - from, 160));
+}
+
+} // namespace
+
+// NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
+void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats, bool eval,
+                   const std::vector<InvocationBinding>* invocation) {
+    const RefusalInventory inventory = eval ? inventory_eval_refusals(source)
+                                            : inventory_refusals(source, source_path, 2048, invocation);
+    std::string out = ",\"reasons\":[";
+    for (std::size_t k = 0; k < inventory.items.size(); ++k) {
+        const InventoryItem& item = inventory.items[k];
+        const std::string text = item.text.empty() ? line_text(source, item.offset) : item.text;
+        out += (k ? ",{" : "{") + std::string("\"reason\":\"") + json_escape(item.reason) +
+               "\",\"line\":" + std::to_string(item.line) + ",\"column\":" + std::to_string(item.column) +
+               ",\"consequential\":" + (item.consequential ? "true" : "false") +
+               (item.path.empty() ? std::string() : ",\"path\":\"" + json_escape(item.path) + "\"") +
+               (item.detail.empty() ? std::string() : ",\"detail\":\"" + json_escape(item.detail) + "\"" +
+                                                         ",\"text\":\"" + json_escape(text) +
+                                                         "\"") + "}";
+    }
+    out += "],\"inventory_complete\":" + std::string(inventory.complete ? "true" : "false") +
+           ",\"inventory_stop\":\"" + json_escape(inventory.stop) + "\",\"inventory_rounds\":" +
+           std::to_string(inventory.rounds);
+    stats.inventory_json = out;
 }
 
 } // namespace nift::rt::detail

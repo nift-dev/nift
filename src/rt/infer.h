@@ -36,6 +36,7 @@
 
 namespace nift::rt {
 struct SessionCompileContext;
+struct InvocationBinding;
 namespace infer_detail { struct Ty; }
 
 using KindSet = std::uint32_t;
@@ -148,7 +149,10 @@ struct UnitKinds {
 // `globals` (CP12b, rt/globals.h): a function's free name that resolves to a
 // top-level binding reads that binding's kinds, and its writes widen them for
 // every unit (one shared slot); nullptr: free names are unknown, as before.
+// `invocation`: a script unit's `cmd`/`args` (CompileLimits::invocation),
+// seeded exactly as a session's namespace symbols; ignored with `session`.
 UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks = 0,
-                           const GlobalPlan* globals = nullptr, const SessionCompileContext* session = nullptr);
+                           const GlobalPlan* globals = nullptr, const SessionCompileContext* session = nullptr,
+                           const std::vector<InvocationBinding>* invocation = nullptr);
 
 } // namespace nift::rt

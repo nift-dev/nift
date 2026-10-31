@@ -17,6 +17,12 @@ TyRef Inference::session_expression_seed(NodeId id) {
 TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(ast_.size(), id, v)); }
 
 void Inference::seed_session() {
+    // A script unit's invocation bindings: the session's symbols, unchanged.
+    if (!session_ && invocation_) for (const auto& entry : *invocation_) {
+        external_.emplace(entry.symbol.name, vars_.size());
+        if (entry.symbol.const_array) const_arrays_.insert(vars_.size());
+        vars_.push_back(entry.symbol.structure ? entry.symbol.structure : kinds_ty(entry.symbol.kinds));
+    }
     if (session_) for (const auto& symbol : session_->symbols) {
         external_.emplace(symbol.name, vars_.size());
         if (symbol.const_array) const_arrays_.insert(vars_.size());
@@ -135,8 +141,9 @@ TyRef Inference::session_call(const Node& n) {
 
 namespace nift::rt {
 UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks,
-                           const GlobalPlan* globals, const SessionCompileContext* session) {
-    return infer_detail::Inference(ast, root, plan, globals, session).run(max_walks);
+                           const GlobalPlan* globals, const SessionCompileContext* session,
+                           const std::vector<InvocationBinding>* invocation) {
+    return infer_detail::Inference(ast, root, plan, globals, session, invocation).run(max_walks);
 }
 
 } // namespace nift::rt

@@ -167,7 +167,8 @@ LinkedUnit::Location LinkedUnit::locate(std::size_t offset) const {
     return out;
 }
 
-LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source, const fs::path& entry_path) {
+LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source, const fs::path& entry_path,
+                     const std::vector<std::string_view>& entry_names) {
     LinkedUnit out;
     bool imports = false;
     std::vector<NodeId> stack{root};
@@ -217,6 +218,9 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
                 if (!seen.second && seen.first->second != m)
                     { refuse(m, units[m].ast->at(units[m].root).begin, "import-name-clash"); return out; }
             }
+    // The entry's invocation bindings are the entry's (no unit can declare
+    // them: reserved names, refused by the compiler).
+    for (std::string_view name : entry_names) owner.emplace(name, 0);
     // A unit names another unit's binding or function only where it
     // imports it (legacy isolates module scopes).
     for (std::size_t m = 0; m < count; ++m) {

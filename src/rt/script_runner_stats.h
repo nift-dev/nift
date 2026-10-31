@@ -2,8 +2,11 @@
 // Private shared-entry reporting data; not a script-visible Error or VM API.
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
+
+namespace nift::rt { struct InvocationBinding; }
 
 namespace nift::rt::detail {
 
@@ -34,5 +37,9 @@ struct Stats {
 
 std::string json_escape(const std::string& text);
 void report(const Stats& stats);
+// NIFT_VM=classify-all: every refusal reason of the unit (rt/refusal_inventory.h)
+// into stats.inventory_json, compiled with the run's invocation bindings.
+void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats, bool eval,
+                   const std::vector<InvocationBinding>* invocation);
 
 } // namespace nift::rt::detail

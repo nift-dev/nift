@@ -57,8 +57,14 @@ struct LinkedUnit {
     Location locate(std::size_t offset) const;
 };
 
-// `entry_source` is the text `entry` was parsed from.
+// `entry_source` is the text `entry` was parsed from. `entry_names`: names
+// the entry unit has besides its own declarations (the script invocation
+// bindings `cmd`/`args`). Legacy binds them in the entry script's scope only:
+// a module's top-level code cannot see them, and a module function sees them
+// only through a caller's scope (dynamic resolution), so a module naming one
+// is refused (`import-scope`), as for any other binding of the entry.
 LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_source,
-                     const std::filesystem::path& entry_path);
+                     const std::filesystem::path& entry_path,
+                     const std::vector<std::string_view>& entry_names = {});
 
 } // namespace nift::rt
