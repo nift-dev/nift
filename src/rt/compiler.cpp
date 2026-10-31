@@ -138,9 +138,9 @@ bool UnitCompiler::statement(NodeId id) {
             update_flags();
             return ok;  // keeps its binding registers
         case NodeKind::ExprStmt: ok = expression_statement(node); break;
-        case NodeKind::Assign: ok = assign(node); break;
-        case NodeKind::CompoundAssign: ok = compound_assign(node); break;
-        case NodeKind::IncDec: ok = inc_dec(node); break;
+        case NodeKind::Assign: ok = !invocation_write(id) && assign(node); break;
+        case NodeKind::CompoundAssign: ok = !invocation_write(id) && compound_assign(node); break;
+        case NodeKind::IncDec: ok = !invocation_write(id) && inc_dec(node); break;
         case NodeKind::If: ok = if_chain(node); break;
         case NodeKind::While: ok = while_loop(node); break;
         case NodeKind::For: ok = for_loop(node); break;

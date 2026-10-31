@@ -1,7 +1,6 @@
 #include "rt/infer_session.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
-#include "rt/session_invocation.h"
 #include "rt/collection.h"
 #include <algorithm>
 
@@ -20,7 +19,7 @@ TyRef Inference::constant(NodeId id, double v) { return kinds_ty(constants_.set(
 void Inference::seed_session() {
     // A script unit's invocation bindings: the session's symbols, unchanged.
     if (!session_ && invocation_) for (const auto& entry : *invocation_) {
-        if (invocation_shadow(ast_, root_, entry.symbol.name) != kNoNode) continue;  // an ordinary binding
+        if (entry.shadow != kNoNode) continue;  // the entry's own top-level binding replaces it
         external_.emplace(entry.symbol.name, vars_.size());
         if (entry.symbol.const_array) const_arrays_.insert(vars_.size());
         vars_.push_back(entry.symbol.structure ? entry.symbol.structure : kinds_ty(entry.symbol.kinds));

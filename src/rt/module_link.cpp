@@ -208,6 +208,24 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             return out;
         }
     }
+    // A module never declares the entry's invocation bindings (`args := …`
+    // outside functions, exported or not): legacy's import of such an export
+    // collides with the entry's binding; the module-private case is refused too
+    // (strict policy, D-062 #1). Refused at the declared name, which `collect`
+    // records as a use. (A module function or local named so is refused by the
+    // compiler: fn-name-reserved, binding-name-reserved.)
+#if !(defined(NIFT_ARGSCMD_MUTANT) && (NIFT_ARGSCMD_MUTANT == 7 || NIFT_ARGSCMD_MUTANT == 8))  // test-only (mutants.sh)
+    for (std::size_t m = 1; m < count; ++m)
+        for (std::string_view name : entry_names) {
+            if (!units[m].top.count(name)) continue;
+            std::uint32_t first = UINT32_MAX;  // its first mention in the module
+            for (NodeId id : units[m].uses)
+                if (units[m].ast->text(units[m].ast->at(id)) == name)
+                    first = std::min<std::uint32_t>(first, units[m].ast->at(id).begin);
+            refuse(m, first, "import-scope:invocation-binding");
+            return out;
+        }
+#endif
     // Names declared outside functions, and function names, are the unit's
     // own: no other unit declares them.
     std::unordered_map<std::string_view, std::size_t> owner;

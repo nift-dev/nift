@@ -46,7 +46,7 @@ private:
     SessionCompileContext* session_ = nullptr; const std::vector<InvocationBinding>* invocation_ = nullptr;
     std::unordered_set<NodeId> invocation_shadows_;  // top-level `args := …` targets (rt/compiler_invocation.h)
     std::unordered_map<std::string, Binding> session_bindings_;
-    bool session_function(NodeId id); bool session_admit(); bool invocation_prologue();
+    bool session_function(NodeId id); bool session_admit(); bool invocation_prologue(); bool invocation_write(NodeId);
     bool session_render(NodeId id);
     bool session_order_call_types(const Node&, NodeId, std::uint16_t, bool&);
     bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);

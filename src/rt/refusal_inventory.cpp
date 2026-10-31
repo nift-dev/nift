@@ -158,7 +158,8 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
     std::unique_ptr<Ast> linked_ast;
     NodeId unit_root = parsed.root;
     CompileLimits limits;
-    limits.invocation = invocation;
+    std::vector<InvocationBinding> bindings = invocation ? *invocation : std::vector<InvocationBinding>();
+    limits.invocation = invocation ? &bindings : nullptr;
     if (link.linked) {
         linked_ast = std::make_unique<Ast>(link.text);
         const ParseResult relinked = parse_script(*linked_ast);
@@ -206,6 +207,8 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
             inventory.stop = "round-limit";
             break;
         }
+        locate_invocation_shadows(bindings, ast, unit_root,
+            [&](std::uint32_t at) { return !link.linked || link.locate(at).module == 0; });
         const CompileResult compiled = compile_unit(ast, unit_root, limits);
         ++inventory.rounds;
         if (compiled.program) {

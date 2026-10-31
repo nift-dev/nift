@@ -246,6 +246,12 @@ def suite(root):
     refused("assign cmd", touch + 'cmd = "x"\n', work, home, "invocation-assign:cmd")
     refused("compound-assign cmd", touch + 'cmd += "x"\n', work, home, "invocation-assign:cmd")
     refused("assign args in a function", touch + 'fn(f()) { args = [] }\nf()\n', work, home, "invocation-assign:args")
+    refused("compound-assign an element of args", touch + 'args[0] += "z"\n', work, home, "invocation-assign:args",
+            ["a"])
+    refused("assign a nested element of args", touch + 'args[0][0] = "q"\n', work, home, "invocation-assign:args",
+            ["a"])
+    refused("assign a member of an element of args", touch + 'args[0].x = 1\n', work, home, "invocation-assign:args",
+            ["a"])
     refused("assign args after a loop of effects", 'for(i : [1, 2]) { touch("side.txt") }\nprint("before")\n'
             'args = ["x"]\n', work, home, "invocation-assign:args")
     refused("read args before a top-level shadow", touch + 'print(args.size())\nargs := ["k"]\n', work, home,
@@ -269,6 +275,31 @@ def suite(root):
     refused("module function naming cmd", touch + 'import("lib.f")\nprint(g())\n', work, home,
             "import-scope:invocation-binding",
             files={"lib.f": 'fn(g()) { return cmd }\nexport(g)\n'})
+    # A module that declares `args`/`cmd` at its top level, exported or not, whether or not the entry names it
+    # (review of 8d0b7d74: the linked-unit scan took a module's `args :=` for the entry's replacement). The
+    # effect is output, not a host operation: a program with imports refuses host operations by itself
+    # (module-host-op), which would mask the defect.
+    for name, value in (("args", '["m1", "m2"]'), ("cmd", '"modcmd"')):
+        for exported in (True, False):
+            for entry_names_it in (True, False):
+                label = "module declares %s (%s, entry %s)" % (name, "exported" if exported else "private",
+                                                               "names it" if entry_names_it else "does not")
+                d = Path(tempfile.mkdtemp(dir=work))
+                (d / "lib.f").write_text(name + " := " + value + "\n" + ("export(" + name + ")\n" if exported else
+                                         'print("lib " + ' + (name + '.join(",")' if name == "args" else name) +
+                                         ')\n'))
+                (d / "main.f").write_text('print("before")\nimport("lib.f")\n' +
+                                          ('print(%s)\n' % (name + '.join(",")' if name == "args" else name)
+                                           if entry_names_it else 'print("main")\n'))
+                vm, rows = run([NIFT, "main.f", "a"], d, None, home)
+                check(vm.returncode == 1 and vm.stdout == "" and "(import-scope:invocation-binding)" in vm.stderr
+                      and "lib.f:1:1" in vm.stderr and not any(r.get("vm_executions") for r in rows),
+                      label + ": refused before any effect, import-scope:invocation-binding at the declaration",
+                      repr((vm.returncode, vm.stdout, vm.stderr[:240])))
+                legacy, _ = run([NIFT, "main.f", "a"], d, "0", home)
+                check(legacy.stdout.startswith("before\n"), label + ": control: legacy prints before",
+                      repr((legacy.returncode, legacy.stdout, legacy.stderr[:160])))
+                shutil.rmtree(d)
     # The module's own code is the control here: legacy cannot see `args` at a
     # module's top level (its error), a module function sees the caller's.
     (work / "lib.f").write_text('w := args.size()\nexport(w)\n')
@@ -355,6 +386,19 @@ def suite(root):
                        ("args shadowed, cmd still bound", 'args := []\nprint(cmd + ":" + args.size().to_string())\n')):
         (work / "sh.f").write_text(src)
         parity("shadow: " + label, [NIFT, "sh.f", "a", "b"], work, home)
+
+    # 10. Argument-count limits: positionless refusals (no invented location); legacy runs them.
+    (work / "many.f").write_text('touch("side.txt")\nprint(args.size())\n')
+    for count, reason in ((70000, "limit:invocation-arguments"), (40000, "limit:too many registers")):
+        vm, _ = run([NIFT, "many.f", *(["a"] * count)], work, None, home)
+        check(vm.returncode == 1 and "(" + reason + ")" in vm.stderr and
+              "many.f (the VM gave no exact position)" in vm.stderr and "many.f:1:1" not in vm.stderr and
+              not (work / "side.txt").exists(), "%d arguments: positionless %s refusal" % (count, reason),
+              vm.stderr[:300])
+        legacy, _ = run([NIFT, "many.f", *(["a"] * count)], work, "0", home)
+        check(legacy.returncode == 0 and legacy.stdout == "%d\n" % count,
+              "%d arguments: legacy runs it (known VM limit)" % count, legacy.stderr[:200])
+        (work / "side.txt").unlink(missing_ok=True)
 
     # 9. Live heap at stop (NIFT_VM_STATS heap_live).
     def live(src, argv):

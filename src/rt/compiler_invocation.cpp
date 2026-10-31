@@ -12,7 +12,7 @@ namespace nift::rt::detail {
 // main's first registers hold them, set before its first statement and
 // marked initialised; the isolate wrapper copies them like any global.
 // A unit that never names a binding compiles exactly as without it; a
-// top-level declaration of the name replaces it (invocation_shadow).
+// top-level declaration of the name in the entry replaces it (entry.shadow).
 bool UnitCompiler::invocation_prologue() {
     if (session_ || !invocation_) return true;
     for (const auto& entry : *invocation_) {
@@ -20,7 +20,7 @@ bool UnitCompiler::invocation_prologue() {
 #if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 6  // test-only: no top-level shadowing (mutants.sh)
         const NodeId shadow = kNoNode;
 #else
-        const NodeId shadow = invocation_shadow(ast_, root_, symbol.name);
+        const NodeId shadow = entry.shadow;
 #endif
         if (shadow != kNoNode) { invocation_shadows_.insert(shadow); continue; }
         bool named = false;
@@ -39,7 +39,10 @@ bool UnitCompiler::invocation_prologue() {
         std::uint16_t k = 0;
         if (entry.value.is(Kind::Array)) {
             const auto& items = array_items(entry.value);
-            if (items.size() > 0xffffu) return fail(ast_.at(root_), "limit:invocation-arguments");
+            if (items.size() > 0xffffu) {  // a limit of the unit, not of a source position
+                if (reason_.empty()) { reason_ = "limit:invocation-arguments"; offset_ = 0; positioned_ = false; }
+                return false;
+            }
             const std::uint16_t mark = fb_->top();
             std::uint16_t first = mark;
             for (std::size_t i = 0; i < items.size(); ++i) {
@@ -61,6 +64,21 @@ bool UnitCompiler::invocation_prologue() {
         session_bindings_[symbol.name] = binding;
     }
     return builder_ok();
+}
+
+// D-062 #2: a write whose target is rooted at an injected binding (`args = …`,
+// `args[0] += …`, `args[0][0] = …`, `args[0].x = …`, `cmd++`) is a program
+// error rejected before execution, whatever the write form.
+bool UnitCompiler::invocation_write(NodeId id) {
+    NodeId at = ast_.at(id).a;
+    while (at != kNoNode && (ast_.at(at).kind == NodeKind::Index || ast_.at(at).kind == NodeKind::Member ||
+                             ast_.at(at).kind == NodeKind::SafeMember))
+        at = ast_.at(at).a;
+    if (at == kNoNode || ast_.at(at).kind != NodeKind::Ident) return false;
+    const Binding* binding = find_binding(text(ast_.at(at)));
+    if (!binding || !binding->invocation) return false;
+    fail(ast_.at(ast_.at(id).a), "invocation-assign:" + std::string(text(ast_.at(at))));
+    return true;
 }
 
 } // namespace nift::rt::detail

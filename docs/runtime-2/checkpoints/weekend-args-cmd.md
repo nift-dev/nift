@@ -93,7 +93,7 @@ Mutability (legacy: `mutable_binding=false`, `deep_readonly=true`):
 |---|---|---|
 | read anywhere: top level, functions, lambdas, `thread(...)`, async functions | value | value (same output) |
 | `args.push/pop/sort(...)` | runtime error "cannot mutate const array: args", exit 1 | the same error, at the same point, exit 1 |
-| `args = ...`, `args[i] = ...`, `cmd = ...`, `cmd += ...` (anywhere, functions included) | fatal error "cannot assign to const binding" at the statement, after earlier statements ran | **D-062 #2, approved break**: a program error rejected before execution (`invocation-assign:<name>`), nothing runs, earlier statements included; exit 1 |
+| any write rooted at a binding: `args = ...`, `args[i] = ...`, `args[i] += ...`, `args[i][j] = ...`, `args[i].x = ...`, `cmd = ...`, `cmd += ...`, `++`/`--` (anywhere, functions included) | fatal error "cannot assign to const binding" at the statement, after earlier statements ran | **D-062 #2, approved break**: a program error rejected before execution (`invocation-assign:<name>`), nothing runs, earlier statements included; exit 1 |
 | `args(...)` | runtime error "undefined callable: args" | the same error |
 | `cmd(...)` | legacy's built-in builder | **refused before any effect** (`callable:cmd`, deferred) |
 | `b := args; b.push(x)` | aliases: `args` grows | **D-040 value semantics**: `b` is a copy, `args` unchanged |
@@ -127,6 +127,16 @@ or parameter `args`. The VM supports exactly one form, needed by case 6:
 | the other binding | still bound | still bound (`args := []; print(cmd)` works) |
 
 Refusals are not behaviour changes: the program does not run; `NIFT_VM=0` runs it.
+
+A module may not declare `args`/`cmd` at its top level either, exported or not,
+whether or not the entry names the binding: refused before any effect with
+`import-scope:invocation-binding`, at the module's first mention of the name. Legacy
+fails on an exported one at the import ("import: export collides with existing
+binding: args", after earlier statements ran); a module-private one runs in legacy,
+but it is refused here too (strict policy; review of `8d0b7d74`). Only the entry
+script's own top-level `args := …` replaces the binding: the shadow is located in
+the linked unit only where the offset maps back to the entry (`LinkedUnit::locate`),
+and the linker refuses module declarations first.
 
 Modules: legacy runs an imported module in a fresh environment. A module's
 top-level code cannot see `args`/`cmd` (legacy: "import: unknown value or malformed
@@ -219,11 +229,48 @@ Mutation controls (`mutants.sh`; each recompiles one object with
 `-DNIFT_ARGSCMD_MUTANT=n` and must fail the suite): (1) no script bindings,
 (2) `args` loses its last element (wrong value; scripts and sessions), (3) no
 `cmd(...)` precedence (the session bug back), (4) modules see the bindings,
-(5) writable bindings, (6) no top-level shadowing (case 6 refused again). Results: see *Evidence*.
+(5) writable bindings, (6) no top-level shadowing (case 6 refused again), (7) no linker
+refusal of a module declaring `args`/`cmd` (the compiler then refuses it with another
+reason), (8) the review defect back: the linked-unit shadow scan without the entry check,
+and no linker refusal (two objects). Further sections: 9 live heap at stop, 10 argument-count
+limits, and the module-declaration matrix (exported/private x `args`/`cmd` x entry names it
+or not) in section 3. Results: see *Evidence*.
 
 ## Evidence
 
-(filled on the final tip; see the gate table below)
+Local evidence, through `heavy.sh`, the binary confirmed built from the tested tree:
+
+- `b30bc637` (all gate lanes): `make nift`, test-runtime2-args-cmd, test-runtime2-vm-default,
+  cp17-tripwire, test-cp19-functional, cp22, cp23, test-cp23-cp19-combined, test-cp25r,
+  test-site-dx, test-content, test-template-optional, test-template-variables,
+  test-pagination, test-markup-json-directives, test-v410-build-pipeline and the eight cp19
+  session scripts: exit 0. Full test-rt-vm: **exit 2** (2733 s), at
+  test-runtime2-closures-s1-stress (`million_acyclic.f: live heap at stop 128 != 0`: the
+  unused invocation values were kept alive; later sub-targets did not run).
+- `8d0b7d74` (the heap fix): `make nift`, test-runtime2-args-cmd (213 checks; section 9
+  fails without the fix: heap_live 64 instead of 0), test-runtime2-closures-s1-stress
+  (5 cases, 0 failures), the 6 mutants: exit 0. Independent review: REJECTED (module
+  declarations of `args`/`cmd`, an invented position, three write forms; fixed in the
+  next commit).
+- The tip after the review fixes: see the final report; the full gate list and test-rt-vm
+  run on Linode on that exact tip.
+- Inventory: `tests/runtime2/cp25/inventory.py collect` on base `10c41015` and the
+  candidate; classify-all deltas recorded in `classification.tsv`. Execute mode: the six
+  units run on the VM (rt-diff drops `NIFT_VM_BIN`, so both execute collections used the
+  worktree binary; the base side is the committed TSV evidence). `report --check` lists
+  six unclassified reasons (`coro-blocking-host:file`, `coro-blocking-host:rm`,
+  `method:close/open/save/write`), identically on base: pre-existing, not this candidate.
+
+## Known limits
+
+- **Argument counts.** The prologue loads each argument into a register before building
+  `args`. From about 32,766 arguments the unit is refused `limit:too many registers`, and
+  above 65,535 `limit:invocation-arguments`; both before any effect and positionless
+  ("(the VM gave no exact position)"). Legacy runs both (witness: `args_cmd.py` section 10,
+  40,000 and 70,000 arguments). Building `args` from one constant array would lift it, but
+  it puts a heap array in the constant pool, which the isolate constant transfer and heap
+  accounting would have to be re-verified for: not a trivial local change, so recorded
+  here, not done.
 
 ## Open questions
 

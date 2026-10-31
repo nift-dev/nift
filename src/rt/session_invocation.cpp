@@ -32,16 +32,24 @@ std::vector<InvocationBinding> invocation_bindings(const std::string& command,
     return out;
 }
 
-NodeId invocation_shadow(const Ast& ast, NodeId root, std::string_view name) {
+void locate_invocation_shadows(std::vector<InvocationBinding>& bindings, const Ast& ast, NodeId root,
+                               const std::function<bool(std::uint32_t)>& in_entry) {
     const Node& program = ast.at(root);
     const NodeId* items = ast.list(program);
-    for (std::uint32_t k = 0; k < program.count; ++k) {
-        const Node& st = ast.at(items[k]);
-        if (st.kind == NodeKind::Declare && st.a != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
-            ast.text(ast.at(st.a)) == name)
-            return st.a;
+    for (auto& binding : bindings) {
+        binding.shadow = kNoNode;
+        for (std::uint32_t k = 0; k < program.count && binding.shadow == kNoNode; ++k) {
+            const Node& st = ast.at(items[k]);
+            if (st.kind == NodeKind::Declare && st.a != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
+                ast.text(ast.at(st.a)) == binding.symbol.name &&
+#if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 8  // test-only: the linked-unit scan (mutants.sh)
+                (in_entry(st.begin) || true))
+#else
+                in_entry(st.begin))
+#endif
+                binding.shadow = st.a;
+        }
     }
-    return kNoNode;
 }
 
 std::vector<std::string_view> invocation_names(const std::vector<InvocationBinding>* invocation) {

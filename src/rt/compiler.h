@@ -56,6 +56,9 @@ struct InvocationBinding {
     SessionSymbol symbol;
     Value value;
     std::int64_t type = 0;  // the binding type (legacy's, of the value)
+    // The target of the entry script's own top-level `name := …` replacing the
+    // binding in the unit being compiled (locate_invocation_shadows), or kNoNode.
+    NodeId shadow = kNoNode;
 };
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
