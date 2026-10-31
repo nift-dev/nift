@@ -1,7 +1,7 @@
 # Weekend checkpoint: package imports (cand/packages) — phase 1 contract
 
-Status: **phase 1 (investigation and contract only).** No production source is
-changed. Implementation waits for the owner's go-ahead *and* for the `args`/`cmd`
+Status: **phase 1 (investigation and contract only), owner rulings of 2026-11-01
+folded in (§4, §7).** No production source is changed. Implementation waits for the owner's go-ahead *and* for the `args`/`cmd`
 integration (`integ/args-cmd`) to land in `weekend/r2`, because both change
 `src/rt/module_link.cpp`.
 
@@ -72,7 +72,7 @@ exactly. The only difference is one extra `note:` line.
 | 31 | v46_b4_cp7_worker_hardening/001-mod_w | rc 1, `mod_w.f:3:1: import: script is not readable: …` (after starting a worker) | — | `import-missing` | legacy error, pre-execution |
 | 32 | v44_relative_import_ownership_smoke/013-runtime-child | rc 0 | — | `import-nested` (import in a function) | still refused |
 | 33 | v44_relative_import_ownership_smoke/015-child | rc 0 | — | `import-nested` (function) | still refused |
-| 34 | v44_relative_import_ownership_smoke/018-main | rc 1, `src/main.f:11:1: import: package is not installed: bare` | — | `import-nested` (functions, method, lambda) | still refused (placement is checked before resolution) |
+| 34 | v44_relative_import_ownership_smoke/018-main | rc 1, `src/main.f:11:1: import: package is not installed: bare` | — | `import-nested` (functions, method, lambda) | legacy error, pre-execution: the program error at 11:1 takes precedence over the nested-import refusal (§4.3) |
 | 35 | v46_b4_cp3_recoverable_errors/002-importer | rc 0, `user.module/2` | — | `import-nested` (`try { import }`) | still refused |
 | 36 | v46_b4_cp3_recoverable_errors/004-worker-importer | rc 1, `…: import: failed import created worker resources: unsafe` | — | `import-nested` (try) | still refused |
 | 37 | v46_b4_cp3_recoverable_errors/006-fatal-worker-importer | rc 1, `…: failed import created worker resources: division by zero` | — | `import-nested` (try) | still refused |
@@ -90,9 +90,9 @@ is the linker's conservative name rule, not package resolution. All 7 snapshot
 packages also use `run()` (deferred) and `@struct`.
 
 **Counts.** The inventory currently sends 44 units to fallback for these reasons. As
-the corpus stands, the 31 `import-package` and `import-missing` units stop falling
-back. Each ends in legacy's own error, pre-execution. The 13 `import-nested` and
-`import-collision` units stay refused. With packages installed as their smoke tests
+the corpus stands, 32 units stop falling back: the 31 `import-package` and
+`import-missing` units and row 34. Each ends in legacy's own error, pre-execution.
+The other 11 `import-nested` units and the `import-collision` unit stay refused. With packages installed as their smoke tests
 install them, 2 of the 23 package units run on the VM with legacy's output. The other
 21 move on to these next refusals:
 
@@ -255,7 +255,20 @@ see them, and module code *called later* sees the entry's root bindings.
   does before an import can create, change or remove a module or package file. Only
   another process can.
 
-## 4. Contract
+## 4. Contract (owner rulings of 2026-11-01 folded in)
+
+Guiding line (owner): **an unsupported VM capability is a feature refusal ("not
+supported by the Runtime 2.0 VM yet"); an invalid program is a program error** (legacy
+text, stable reason id, exit 1, no "yet", no legacy hint, no request to report it).
+
+Two ideas are kept apart throughout:
+- **User-program side effects.** None happen before a program error or refusal: no
+  statement of the entry or of any module runs, and none of their output, files,
+  processes, tasks or environment changes occur.
+- **Package-management housekeeping.** Creating (if absent) and taking the package
+  lock file `.nift/.packages-transaction.lock` during resolution is the *single*
+  allowed exception (owner, Q2). It is not a user-program effect, it happens whether
+  resolution then succeeds or fails, and nothing else is ever written.
 
 ### 4.1 What resolves
 
@@ -264,49 +277,66 @@ see them, and module code *called later* sees the entry's root bindings.
   `import("")` is a package name and gives legacy's `invalid package name: `.
 - Project is cwd, as in legacy, for imports from the entry and from any module.
 - The resolved entry is an ordinary module: the same graph, linker, identity
-  (`module_identity`), initialise-once (D-041), and D-046 #2 exported bindings.
+  (`module_identity`), D-041 initialise-once, D-046 #2 exported bindings, and the
+  same initialisation order. Successful imports keep their order and run-once rules.
 - `Module::package_root` and `Module::package_name` are recorded. A relative import
-  from a module with a package root must satisfy `path_within(root, path)`, lexically
-  and canonically. Otherwise: `package-relative import escapes package root: <abs>`.
+  from a module with a package root must satisfy `path_within(root, path)` lexically
+  and canonically, else `package-relative import escapes package root: <abs>`.
   Absolute imports are not contained, as in legacy.
-- **No creation.** The VM never creates `.nift/`, the lock file or anything else.
-  - Without `.nift/`, a valid name gives `package is not installed: <n>`. This is the
-    text legacy gives, without legacy's directory creation.
-  - With `.nift/` but no `.nift/.packages-transaction.lock`, the VM reads without the
-    lock, but still checks the journal. Legacy would create the lock file. No `nift
-    add` has run in such a store; it is a hand-made store. See Q2.
-- **One snapshot.** When the lock file exists, the VM opens it without `O_CREAT`
-  (Windows: `OPEN_EXISTING`). It takes the shared lock blocking, like legacy, at the
-  first package import of the graph build. It holds it until the graph is built, then
-  releases it before compile and run.
-  - Legacy's per-import re-validation (`stale package ownership: …`) cannot fail inside
-    one held snapshot, so it is not reproduced.
-  - The journal check runs at acquisition.
-- **Dependencies.** The graph's dependency and trace (`read-source`) list is the module
-  files read, as legacy records it (`result_.dependencies`). Manifest and lock reads
-  are not dependencies, as in legacy.
+- **Locking (Q2 ruling):**
+  1. Legacy's path and mechanism: `.nift/.packages-transaction.lock`, opened as
+     legacy's `open_and_lock` does (POSIX `O_CREAT | O_RDWR | O_NOFOLLOW`, mode 0644,
+     regular-file check, `flock(LOCK_SH)`; Windows `OPEN_ALWAYS` + `LockFileEx`),
+     then legacy's `lock_identity_valid` and journal check. The lock is on the
+     descriptor, never on the file's existence.
+  2. `O_CREAT` without `O_TRUNC`/`O_EXCL` is atomic create-or-open: concurrent
+     creators get the same file, and an existing file is never truncated, replaced or
+     written. Its contents and mode are preserved.
+  3. **`.nift/` is never created.** If `<cwd>/.nift` does not exist, no lock is taken
+     and a valid name gives `package is not installed: <n>` (legacy's text, without
+     legacy's directory creation). Nothing is installed, modified or published, and no
+     other `.nift/` artifact is created.
+  4. Critical section: the lock is taken at the first package import of the graph
+     build and held, as an RAII object of the graph builder, until the graph is
+     complete; it is released before compile and run on every path (success, program
+     error, feature refusal, C++ exception). On cancellation (signal, kill) the kernel
+     releases `flock`/`LockFileEx` with the descriptor.
+  5. Acquisition blocks while a writer holds the exclusive lock, as in legacy (no
+     timeout; legacy waited 3.5 s in the probe). A failure to open or lock gives
+     legacy's `cannot acquire package read lock` (and `package read lock identity
+     changed`, `unfinished package transaction; run a package command to recover it`)
+     as a §4.2 program-error diagnostic at the import, before anything runs.
+  6. One snapshot: legacy's per-import re-validation (`stale package ownership: …`)
+     cannot fail inside one held lock and is not reproduced.
+- **Dependencies.** The graph's dependency and `read-source` list is the module files
+  read, as legacy records them. Manifest and lock reads are not dependencies.
 - **Identity.** A package imported by name and by path is one module. Within one unit
-  that is a second import, which stays `import-reinitialised` (no diamond redesign).
-  Legacy fails it as `export collides`.
+  that is a second import and stays `import-reinitialised` (no diamond redesign);
+  legacy fails it as `export collides with existing binding: <x>`.
+- **Texts (Q3 ruling).** Every message follows legacy exactly, including the pathless
+  `file does not exist` for an absent lock file.
 
-### 4.2 Import-time errors: rejected before execution as program errors
+### 4.2 Import-resolution errors: program errors, rejected before running (Q1 ruling)
 
-Every resolution error of §2 is a **program error**:
+**Covered:**
+- every package step of §2 (name, store, manifest, entry, lock, revision, lock
+  acquisition);
+- a missing or unreadable imported file (`script is not readable: <abs>`);
+- an import cycle (`script import cycle through <abs>`);
+- a package-path escape (`package-relative import escapes package root: <abs>`).
 
-- every package step;
-- `script is not readable`;
-- `script import cycle through`;
-- `package-relative import escapes package root`.
+**Scope (ruling).** This covers only import-*resolution* errors in whole-program
+execution (`nift file.f`, `-c`, stdin).
+- Runtime errors inside successfully imported modules keep their runtime-error
+  semantics: they happen during execution, after earlier effects.
+- Interactive startup files (`~/.niftrc`, `nift -i file`) and persistent sessions
+  keep their own incremental contracts (D-054, D-061). Whole-program prevalidation is
+  not extended to them; their `statement:Import` refusal is unchanged.
 
-It is not a missing VM feature. It replaces today's `import-package` and
-`import-missing` / `import-cycle` refusals.
-
-**When it happens.** The VM finds the error while building the graph, before any
-statement runs. The program is rejected whole and nothing of it runs, including the
-statements before the import. Exit status 1. This is the D-062 #2 pattern and an
-**approved-break candidate (Q1)**: legacy runs the earlier statements first. Under R1
-those statements can only compute, print and start tasks, so the departure is output
-and timing.
+**Behaviour.** The VM finds the error while building the graph. The program is
+rejected whole: no user-program side effect, including from statements before the
+import and from modules imported before it (none has been initialised). Exit
+status 1. Only the §4 lock housekeeping may have happened.
 
 **Diagnostic.** For an error at an import in file `F` (line L, column C), with import
 frames `f1…fn` (outermost first, `fn` the failing import):
@@ -317,203 +347,335 @@ note: the program was not executed: its imports are resolved before it runs, so 
 ```
 
 - `pk` is `@import: ` when frame k is spelled `@import` (`kFlagTemplateImport`),
-  otherwise `import: `.
-- The message is legacy's text from §2, with paths as `generic_string()` absolute.
-- The diagnostic has no "not compiled for the VM", no "yet", no `NIFT_VM=0` hint and
-  no request to report it.
-- **Positions.** The position is the failing import statement's start in its own
-  module, with `positioned = true` set explicitly at each site. Every one of these
-  errors has an import statement, so a positionless form should not arise. If it ever
-  does, the existing `(the VM gave no exact position)` path is used, never `1:1`.
+  otherwise `import: `. The message is legacy's text, paths absolute
+  (`generic_string()`).
+- Position: the failing import statement's start in its own module, the position
+  legacy reports. `positioned = true` is set explicitly at every site. All covered
+  errors have an import statement; should a positionless form ever arise, the existing
+  `(the VM gave no exact position)` path is used. A position is never invented.
+- Stable reason ids (for classify-all, the inventory and tests; not shown as a feature
+  name): `import-error:package` (all package steps, including the lock),
+  `import-error:missing`, `import-error:cycle`, `import-error:package-escape`.
 
-Corpus check: rows 1–31 match legacy's first stderr line and its rc. All 8 VM
-positions for missing modules already equal legacy's.
+**Approved difference (record in `compatibility.md`, Approved breaks):**
 
-**Precedence.** These are the first failure in graph order. Placement refusals
-(`import-nested`, `export-nested`, `module-return`) for a unit are checked when the
-graph visits that unit, as today, so row 34 stays `import-nested`. Compile-time
-refusals come later, so an import error wins over them.
+| | Legacy (`NIFT_VM=0`) | VM |
+|---|---|---|
+| statements before the failing import | run (output, effects, started workers) | none run |
+| error text, position, prefixes | legacy | the same |
+| exit status | 1 | 1 |
+| lock file | `.nift/` and lock created if absent | lock created only if `.nift/` exists; `.nift/` never created |
+| unreached import (top-level `return` earlier) | not reached, rc 0 | rejected, rc 1 (below) |
 
-**Unreached imports.** If the entry's top level has a `return` outside functions
-before the failing import's top-level statement, rc and output could differ (legacy
-rc 0). Such a unit keeps a refusal, `import-error-unreached`, worded as "not supported
-yet". Modules cannot be affected: any module top-level `return` is already
-`module-return`.
+Corpus check: rows 1–31 then match legacy's stdout (empty), first stderr line and rc;
+the VM adds one `note:` line.
 
-**Small text fix in scope.** Runtime errors raised while a module initialises use each
-frame's own spelling (`@import: ` / `import: `), outermost first, as in legacy. Today
-every prefix is `import: `. If D-048 #1 lands first, the point is moot.
+**Top-level `return` before a failing import (ruling).** The pre-execution rejection
+is kept and the difference recorded. The diagnostic gives the real reason and does not
+claim the import ran:
 
-### 4.3 Still refused before any effect (unchanged reasons)
+```
+error: r1.f:3:1: import: script is not readable: /…/missing.f
+note: the program was not executed: its imports are resolved before it runs, so no part of it ran
+note: a top-level `return` at r1.f:2:1 comes before this import; legacy would end there without reaching it (exit 0)
+```
+
+Both positions are recorded offsets (the import statement and the `return`
+statement). If the `return`'s offset were unavailable, the note omits the location
+rather than inventing one. This replaces the phase-1 `import-error-unreached` feature
+refusal, which would have misrepresented an invalid program as a missing VM feature.
+
+### 4.3 Module program errors: `return`, `export-missing`, `export-duplicate` (Q6 ruling)
+
+Program errors refused before running, with exit 1, legacy text, a truthful
+position, no "not supported yet" wording and a stable reason id. No side effects,
+including from imported modules: none is initialised.
+
+| Reason id | Condition | Legacy text | Position |
+|---|---|---|---|
+| `module-error:return-value` | `return <value>` outside functions in an imported module | `return with a value is not allowed in import` (with the frame prefixes) | the importing statement, where legacy reports it (`e_ret.f:2:1`), plus `note: the \`return\` is at ret.f:1:1` |
+| `module-error:export-missing` | `export(x)` where no earlier top-level binding, function or import of the module provides `x` | `export names no existing binding: x` | the `export` statement (legacy: `exm.f:1:1`, `em2.f:3:1`) |
+| `module-error:export-duplicate` | a second `export(x)` | `duplicate export: x` | the second `export` (legacy: `exd.f:3:1`) |
+
+Verified legacy agreement for the static rules:
+- Legacy does not hoist: `export(f)` before `fn(f())` fails in legacy too.
+- A binding declared in a top-level block is not exported (`blk.f`: legacy fails).
+
+Not covered, so these keep feature refusals:
+- **Bare `return`** at a module's top level (`module-return`, renamed
+  `module-bare-return`). It is legal in legacy: it ends the module, and later exports
+  are not made. That is a VM gap, not a program error.
+- **`export(<non-name>)`.** Legacy says `export requires a binding name`; the VM
+  marks it `import-opaque:legacy-runtime-error`. It is unchanged here and is a
+  candidate for the same treatment later.
+
+**Approved difference.** A `return <value>` that legacy never executes (in an
+untaken branch, `cret.f`: legacy rc 0) is rejected. The rule is static: "a module may
+not `return` a value outside its functions". The diagnostic states the rule and the
+`return`'s position. It does not claim the `return` ran.
+
+**Competing errors.** The graph reports the first program error in legacy's execution
+order: depth first, statement order. A construct nested in a block counts at its
+enclosing top-level statement.
+- `comp.f`: a missing import before a `return 5` gives the missing import, as in legacy.
+- `comp2.f`: a `return 5` before a missing import gives the `return` error, as in
+  legacy, because the import is never reached.
+
+Program errors take precedence over feature refusals (an invalid program is reported
+as invalid). The graph walk records the first feature refusal and continues through
+every unit it can parse, to find a program error in that order. It stops at a unit
+that does not parse. If no program error is found, the first feature refusal is
+reported as today. With this rule, row 34 (`018-main`) reports legacy's
+`package is not installed: bare` at `src/main.f:11:1`.
+
+### 4.4 Still refused before any effect (feature refusals, unchanged)
 
 | Reason | Why |
 |---|---|
 | `import-nested` | imports in functions, lambdas, methods and `try` blocks: runtime import, D-041 failure caching, transactional rollback |
 | `import-dynamic` | D-037 |
 | `import-reinitialised` | D-041 #2 policy; no diamond redesign |
-| `import-name-clash` | no mangling |
-| `import-collision`, `import-scope`, `export-*`, `module-return`, `import-opaque:*`, `import-parse-error`, `import-limit` | unchanged |
+| `import-name-clash` | no general mangling |
+| `module-bare-return` | see §4.3 |
+| `import-collision`, `import-scope`, `export-nested`, `export-struct`, `import-opaque:*`, `import-parse-error`, `import-limit` | unchanged |
 | `module-host-op:*` | R1 |
 | `callable:package_path`, `callable:module_path` | unchanged |
-| `statement:Import` in sessions | D-054: no REPL package use on the VM |
+| `statement:Import` in sessions | D-054 |
 
-### 4.4 `args`/`cmd` in modules (lifts D-062 #1; legacy-compatible)
+### 4.5 `args`/`cmd` in modules (Q4/Q5 ruling; supersedes D-062 #1)
 
-**I1. Functions see the bindings.** A read of `args` or `cmd` inside a module's
-function body sees the entry script's invocation bindings. That covers a lambda inside
-a function, and a function reached by any path from the entry: directly, through other
-modules, as a value, or in a `thread`/`async`.
+Resolution is by binding identity (lexical or module scope), never by spelling alone.
+D-062 stays as historical evidence. The superseding decision is recorded as
+`D-NEXT-packages` (numbered at integration).
 
-The linker splices the module at its import, so such a read compiles exactly as an
-entry function at that position reading the name. This gives:
-- e6: an entry top-level `args := …` *before* the import is what the module sees.
-- e10: a replacement after a module function may already have read the name is refused
-  as the entry-function equivalent is today (`free-name`), not mis-run.
+| Case | Contract |
+|---|---|
+| the entry script reads the injected `args`/`cmd` | supported (D-062) |
+| an imported function reads `args`/`cmd`, and static resolution proves the name is the entry binding (the module declares no `args` of its own) | supported: it sees the entry's values. If the entry replaced the binding by a top-level `args := …` before the import, it sees that (e6). It compiles as an entry function at the import's position would, so a replacement that a module function may have read earlier is refused as for entry functions (`free-name`, e10). |
+| a module's top level, or code that may run while any module initialises, reads the **injected** binding | refused before any effect: `import-scope:invocation-init`, a program error at the read, with `note: reached while <module> initialises, at F:L:C` (e2, e3, e14) |
+| a module declares a private top-level `args := …` / `cmd := …` (e12) | **supported, as in legacy** |
+| a module reads or assigns its own private `args` | ordinary binding rules (mutable unless declared otherwise). D-062 #2's read-only rule applies only to the injected bindings. |
+| ambiguous or unprovable access | refused before any effect: `import-scope:invocation-ambiguous` |
 
-**I2. Module initialisation does not.** A read that may execute while any module
-initialises is refused before any effect with **`import-scope:invocation-init`**, at
-the read, `positioned`. "May execute" means:
-- a read at a module's top level outside functions, including a top-level lambda's
-  body;
+**"May run while a module initialises":**
+- a read in a module's top-level code outside functions, including a top-level
+  lambda's body;
 - a read in a function that any module's top-level code may reach. A function is
-  reachable when that code mentions it by name, as a call or as a value, directly or
-  through the names mentioned in the bodies of the functions it mentions (fixed
-  point). Names are disjoint across units because of `import-name-clash`, so the
-  closure is exact by name and conservative for values.
+  reachable when that code mentions it by name, as a call or a value, directly or
+  through the names mentioned in the bodies of functions it mentions (fixed point).
 
-A note gives the initialising mention (`note: reached while <module> initialises, at
-<file>:L:C`). Legacy fails these if they execute (e2, e3, e14). The refusal is
-conservative for code that is never executed (e13). Its wording is a program error
+Names are disjoint across units (`import-name-clash`), so this is exact by name and
+conservative for values. It is conservative for code never executed (e13, legacy
+rc 0); that is part of the recorded difference, and the wording states what was found
 ("an imported module reads the entry script's `args`/`cmd` while it initialises; they
-are visible to its functions only after the import"), with no "yet". See Q4.
+are visible to its functions only after the import").
 
-**I3. Unchanged.**
-- A module *declaring* `args`/`cmd` at top level stays refused
-  (`import-scope:invocation-binding`, the strict policy of D-062). That remains the
-  only use of that reason.
-- Locals, parameters and functions named `args` stay `binding-name-reserved` /
-  `param-name-reserved` / `fn-name-reserved` (D-062 open question 1).
+**Ambiguous or unprovable** (each refused at the first such mention, positioned):
+- a module whose `args`/`cmd` declaration is not a plain top-level statement (inside a
+  block at top level; legacy scopes it to the block);
+- a module that both declares its private binding and has reads of the name that may
+  run before the declaration does;
+- `args`/`cmd` as a local, parameter or function name in a module. These are
+  unchanged: `binding-name-reserved` / `param-name-reserved` / `fn-name-reserved`, as
+  in the entry (D-062 open question 1).
+
+Also unchanged:
 - Struct methods reading `args` stay `free-name`.
 - `cmd(...)` stays `callable:cmd`.
-- Sessions are unchanged.
+- Other entry globals read from a module stay `import-scope` (D-038 lexical; no
+  unrestricted module-global access).
 
-**I4. Other entry globals.** I1 applies only to the two invocation names. Other entry
-globals read from a module function stay `import-scope` (D-038 lexical; legacy's
-dynamic lookup is not reproduced).
+**Scope report for the private `args :=` (as requested before doing it).** It needs
+no module-binding redesign, but it is not free.
+- The linker splices every module into one unit, whose globals are keyed by name. The
+  entry's injected `args` and a module's private `args` can therefore only coexist if
+  the linker **renames that module's binding**.
+- The rename gives every identifier in that module's segments, which resolve to the
+  private binding, a fresh name that no unit uses. That is a narrowly scoped instance
+  of the name-clash mangling the owner kept out of scope, limited to the two invocation
+  names.
+- It also needs a display-name hook, so that the VM messages that quote binding names
+  still say `args`. Today those come from source text:
+  - `compiler_const.cpp:58` (`cannot assign to const binding: <name>`);
+  - `vm_array_mutation.cpp:19` (`cannot mutate const array: <name>`);
+  - `compiler_call.cpp:98` (`callable argument count mismatch: <name>`);
+  - refusal and diagnostic positions, through the linker's segment map (a renamed
+    token maps back to its original span).
+- Estimate: ~120–160 lines across `module_link.cpp`, a small `link_rename` helper, the
+  segment map and those message sites, plus tests. Moderate and contained; no compiler
+  scope redesign.
+- If the owner prefers not to take on the rename, the fallback is to keep the private
+  declaration refused with `import-scope:invocation-binding`.
 
-### 4.5 Approved departures this needs (for a decision record)
+### 4.6 Approved differences to record (`D-NEXT-packages`, `compatibility.md`)
 
-1. Rejection before execution for import resolution errors (Q1).
-2. No `.nift/` or lock-file creation on lookup.
-3. One read-lock snapshot instead of per-import re-validation.
-4. `import-scope:invocation-init` is conservative for never-executed module code.
+1. Import-resolution errors are rejected before running (§4.2), including an import
+   that a top-level `return` would leave unreached.
+2. Package-lock housekeeping is the single exception to "no effects before
+   execution". The lock file may be created, but only inside an existing `.nift/`;
+   `.nift/` itself is never created. One lock snapshot replaces per-import
+   re-validation.
+3. Module program errors are rejected before running, including a `return <value>` in
+   an untaken branch (§4.3).
+4. `import-scope:invocation-init` is conservative for module code that is never
+   executed (§4.5).
 
 ## 5. Implementation plan
 
 The work starts after `integ/args-cmd` is in `weekend/r2`, and is rebased onto it.
 `cand/coro-module` does not touch these files. `cand/collections` changes one line of
-`script_runner.cpp` and takes D-063, so this decision is D-064 or the next free number.
+`script_runner.cpp`.
 
 | File | Change | Size |
 |---|---|---|
-| `src/rt/package_resolve.{h,cpp}` (new) | Pure resolver: `resolve_package(name, project) -> {entry, root, error text}`. Uses header-only `PackageMetadata.h`/`PackageGraphLock.h` and `FileSystem` helpers. Takes its own non-creating shared lock (POSIX `open` without `O_CREAT` + `flock`; Windows `OPEN_EXISTING` + `LockFileEx`), plus the journal check. A `PackageSnapshot` RAII object is held by the graph builder. | ~180 |
-| `src/rt/module_graph.{h,cpp}` | Package branch in `GraphBuilder::import`; `Module::package_root`/`package_name`; package-relative containment. `ModuleGraph::error {message, frames, where, offset, positioned}`: a program error distinct from `reason`. Missing, cycle and package errors fill it. Entry top-level `return` before → `import-error-unreached`. `import("")` → package path. Split into `module_graph_errors.cpp` if needed for rt-lint's 400 lines (now 289). | ~110 |
-| `src/rt/module_link.{h,cpp}` | Propagate the graph error. Per-module frame-spelling chain (replaces `depth` for prefixes). D-062 #1: invocation-name uses in module function bodies are allowed; `import-scope:invocation-init` comes from a new `rt/module_invocation.{h,cpp}` (mention graph, fixed point, first read in text order). | ~40 + ~120 |
-| `src/rt/script_runner.cpp`, `refusal_text.cpp` | Render §4.2 diagnostics and prefixes; `invocation-init` wording. `script_runner.cpp` is ~380 lines after integ, so a helper moves out if needed. | ~50 |
-| `src/rt/refusal_inventory.cpp` | Builds the same graph (F12 lesson). A program error is listed as `import-error:<kind>`, not as a fallback reason. | ~15 |
-| `Makefile` | `src/JsonFile.cpp` into `RT_VALUE_SOURCES` (rt unit binaries link the resolver); `test-runtime2-packages` target. | ~10 |
-| `tests/runtime2/packages/packages.py` + `mutants.sh` (new) | §6 | ~500 |
-| Docs | this file; decision record; `compatibility.md` approved breaks; `classification.tsv`: `import-package` closed, `import-missing`/`import-cycle` → `import-error:*` (not fallbacks), new `import-scope:invocation-init` and `import-error-unreached` rows; refusal register. | — |
+| `src/PackageTransaction.{h,cpp}` (legacy, behaviour-preserving) | Expose the shared lock for an *existing* store: `acquire_read_existing(error, bool& store_present)`. It is the same `open_and_lock`, identity and journal checks, without `create_directories(.nift)`. Legacy's `acquire_read` is unchanged. | ~25 |
+| `src/rt/package_resolve.{h,cpp}` (new) | Resolver: `resolve_package(name, project, PackageSnapshot&) -> {entry, root, error text}`. It uses `PackageMetadata.h`/`PackageGraphLock.h`/`FileSystem` and holds the RAII `PackageSnapshot`. | ~170 |
+| `src/rt/module_graph.{h,cpp}` (+ `module_graph_errors.cpp` for rt-lint's 400 lines) | Package branch, `package_root`, containment. `ModuleGraph::error {id, message, frames, where, offset, positioned, notes}`. The walk continues past feature refusals; the first program error is found in execution order. Return-value, export-missing and export-duplicate become program errors; bare return becomes `module-bare-return`. The entry-`return` note. | ~150 |
+| `src/rt/module_link.{h,cpp}`, `rt/module_invocation.{h,cpp}` (new), `rt/link_rename.{h,cpp}` (new) | Graph-error propagation; per-module frame spelling; D-062 #1 lift (`invocation-init`, `invocation-ambiguous`); the private-`args` rename and segment map. | ~60 + ~120 + ~80 |
+| compiler and VM message sites (3) | display names for renamed bindings | ~30 |
+| `src/rt/script_runner.cpp`, `refusal_text.cpp` | program-error rendering (§4.2, §4.3) and prefixes. `script_runner.cpp` is ~380 lines after integ, so a helper moves out. | ~60 |
+| `src/rt/refusal_inventory.cpp` | Builds the same graph (F12). Program errors are listed by id, not as fallbacks. | ~15 |
+| `Makefile` | `src/JsonFile.cpp` and `src/PackageTransaction.cpp` (and its dependencies) into `RT_VALUE_SOURCES`; `test-runtime2-packages`. | ~10 |
+| tests | §6 | ~700 |
+| docs | this file; `D-NEXT-packages` in `decisions.md`; `compatibility.md`; `classification.tsv` (`import-package` closed; `import-missing`/`import-cycle`/`export-missing`/`export-duplicate`/`module-return` become program-error ids, not fallbacks; new `invocation-init`/`invocation-ambiguous`/`module-bare-return` rows); refusal register. | — |
 
-Production total is about 500–550 lines in 8–10 files. The earlier release-plan
-estimate of 220–300 did not include the D-062 lift or the error conversion.
+Production total is about 700–750 lines in ~14 files, including the private-`args`
+rename (~200 of it).
 
 **Risks.**
-- Lock semantics: blocking like legacy, no timeout. Behaviour without a lock file.
-  Windows `LockFileEx` without create.
-- Linking `JsonFile.cpp` into the rt test binaries.
-- rt-lint size limits in `module_graph.cpp` and `script_runner.cpp`.
-- Positions for every error site (each must set `positioned`).
-- The precedence of graph errors over compile refusals.
-- Windows path case (`module_identity` lowercases) against `path_within` containment.
-- Over-promising: only 2 of 23 package units run fully on the VM. The rest need
-  D-048 fixture migration, `run()`, `export-struct`, `import-nested`,
-  `import-name-clash` and `import-reinitialised`.
+- Linking `PackageTransaction.cpp` into the rt test binaries (its dependencies).
+- Lock lifetime across the graph build and its release on every path.
+- Walking past feature refusals without exploring an inconsistent graph.
+- Competing-error order.
+- The rename's display names and segment map.
+- rt-lint size limits.
+- Windows path case against containment.
+- Over-promising: 2 of 23 package units run fully on the VM.
 
 ## 6. Tests (phase 2)
 
-**Legacy/VM differentials.** `tests/runtime2/packages/packages.py` runs each workspace
-in both engines and compares stdout, the first stderr line (text and position) and rc.
-The "before" output is the approved difference. Cases:
-- every §2 step (§9 `lg/*`);
+**Differentials.** `tests/runtime2/packages/packages.py` runs each workspace in both
+engines and compares stdout, the first stderr line (text and `file:L:C`) and rc. The
+only approved deltas are §4.6. Cases:
+- every §2 step (§9 `lg/*`), each with prefix spelling and nesting depth;
 - cwd vs script directory;
 - package in package, missing and present;
 - package-relative helper;
 - `../` and symlink escapes;
 - absolute import from a package;
-- runtime error in a package;
+- runtime error in a package (legacy timing kept);
 - mixed `@import`/`import` frames;
-- cycle, self-cycle, missing and nested missing;
-- the 9 + 2 corpus shapes;
-- the unreached-`return` refusal.
+- cycle and self-cycle;
+- missing and nested missing;
+- the corpus shapes.
 
-**Negative controls, refused before effect** (no output, no files):
-- the cases that stay refused: `import-name-clash` across two packages,
-  `import-reinitialised` by name + path, a package using `@fn`, `module_path()`;
-- an assertion that a run never creates `.nift/` or the lock.
+**Pre-effect and position regressions (Q1, Q6).** Each program-error case has an
+earlier statement that would print and write a marker file. Before the failing
+import or module, the entry also imports a successfully loading module whose
+top level prints and writes a marker. The test asserts:
+- no stdout, no marker files, rc 1;
+- the exact `file:L:C`, and `positioned` (no `no exact position`, never `1:1` unless
+  the statement is there).
 
-**Concurrency.** With an exclusive lock held, the VM waits and then runs, like legacy.
-A journal present gives the transaction error.
+Cases:
+- a missing package, a missing file, a cycle, an escape;
+- `return 5`, `export(nope)` and a duplicate export, each at depth 1 and depth 2+;
+- competing errors (`comp.f`, `comp2.f`, two missing imports, a program error after
+  a feature refusal);
+- the entry-`return` note (`r1.f`).
 
-**`args`/`cmd`.** e1, e4–e10, e8 and e9 run equal to legacy. e2, e3, e13 and e14 are
-refused `import-scope:invocation-init` at the read. e12 stays
-`import-scope:invocation-binding`.
+**Required adversarial test 1 (owner): a missing package leaves a valid lock.** A
+project has `.nift/` and a lock file holding known bytes. The entry prints and writes
+a marker, then imports a package that is not installed. The test asserts:
+- the VM fails before the earlier statements: no stdout, no marker, rc 1;
+- the lock file still exists with byte-identical contents and the same mode;
+- it is unlocked: `flock -n -x` succeeds at once;
+- a following legacy run and a following VM run can both take it.
+
+Repeat with no lock file: it is created empty, mode 0644, and the rest holds. Repeat
+with no `.nift/`: nothing is created.
+
+**Required adversarial test 2 (owner): concurrent resolution, one protocol.**
+- **Readers.** N VM processes and N legacy processes resolve the same package
+  concurrently in a loop, from a cold start with no lock file (concurrent creation).
+  All succeed. Exactly one regular lock file exists, with its contents preserved.
+  There is no deadlock (overall timeout).
+- **Writer.** Legacy's writer path (`nift add <local package>` / `nift remove`, which
+  takes the exclusive transaction lock in `PackageTransaction::acquire`) runs in a
+  loop against VM readers.
+  - Each VM run either waits and then sees a consistent installed state (old or new,
+    never partial: manifest, entry and lock agree), or reports a §2 error for the
+    state it saw.
+  - No run hangs past the timeout.
+  - `nift` package state is valid afterwards (`nift` package listing and lock agree).
+- **Held lock.** An external `flock -x` is held for 3 s while a VM run starts. The VM
+  run waits and then succeeds, like legacy.
+- **Journal present.** `.nift/package-transaction.json` gives the transaction error,
+  before anything runs.
+
+**Lock failure cleanup.**
+- After success, after each program error, after a feature refusal, and after a
+  killed run (SIGKILL while waiting), the lock is free (`flock -n -x` succeeds).
+- No file other than the lock is created anywhere under the project (tree diff).
+- The lock file's contents are preserved in every case.
+
+**`args`/`cmd` (§4.5).**
+- Equal to legacy: e1, e4–e9, a module with a private `args :=` read at top level and
+  in its functions (e12), and a module function next to a private-args module
+  (identity, not spelling).
+- Refused before effect, with marker controls:
+  - e2, e3, e14 (`invocation-init`), including the nested-import variant;
+  - e10 (`free-name`);
+  - block-scoped and read-before-declare private `args` (`invocation-ambiguous`);
+  - a module local or parameter named `args`.
+- e13 is recorded as the conservative difference.
+- Error texts that quote names say `args`, never the renamed form.
 
 **Mutants.** Each must make a test fail:
 - the script directory as project;
 - `.nift` creation;
+- `O_TRUNC` on the lock;
+- the lock not released on the error path;
+- no lock taken;
 - a missing per-frame prefix or wrong spelling;
 - `args` visible at module top level;
 - the init closure not following value mentions;
+- resolution by spelling (a private `args` treated as the entry's);
 - no package-relative containment;
-- no lock taken.
+- feature refusal preferred over a program error;
+- statement order of competing errors reversed.
 
-**Inventory re-collect.** Rows 1–31 leave the fallback list. Rows 32–44 are
-unchanged.
+**Inventory re-collect.** Rows 1–31 and row 34 leave the fallback list as program
+errors; the other import rows are unchanged.
 
 **nift-regression-suite.** `contract/v44_packages_smoke.sh`,
 `v46_import_ownership_smoke.sh`, `v46_package_graph_smoke.sh`,
 `v48_package_combined_fixture_smoke.sh` and `v45_integration_smoke.sh`, with the VM
 as default.
 
-## 7. Open owner questions
+## 7. Owner rulings (2026-11-01) and remaining questions
 
-1. **Error timing.** Should import resolution errors be rejected before execution
-   (proposed, as D-061/D-062 #2), or raised at the import after earlier statements
-   ran (legacy order)?
-   - The raise-at-point alternative truncates the linked text at the failing import
-     and needs a positioned raise operation.
-   - It adds ~150 lines, and compile refusals for code after the import vanish.
-   - It also keeps legacy's rc 0 for unreached imports.
-2. **Store without a lock file.** For `.nift/` with no `.packages-transaction.lock`,
-   should the VM read unlocked (proposed; journal still checked)? The alternative is
-   to treat it as an error or as "not installed".
-3. **Uninformative legacy texts.** Keep legacy's texts exactly (proposed for parity),
-   or improve them? The case is `file does not exist` for an absent lock, which names
-   no path. A possible replacement is `package lock not found: .nift/packages.lock.json`.
-4. **`import-scope:invocation-init` wording.** Should it be a program error (proposed;
-   no "yet") although it is conservative for never-executed module code? The
-   alternative is a "not supported yet" refusal.
-5. **A module's private top-level `args := …`** (legacy runs it, e12). Keep it refused
-   (D-062 strict policy, proposed), or allow it as a module-private name?
-6. **Out of scope unless asked.** `module-return`, `export-missing` and
-   `export-duplicate` are legacy program errors too. Should they get the §4.2
-   treatment? They are unconditional only at top level, and `module-return`'s legacy
-   position is the import, not the `return`.
+| Question | Ruling |
+|---|---|
+| Q1 | Import-resolution errors are rejected before running; scope limited to whole-program execution (§4.2) |
+| Q2 | Create (inside an existing `.nift/` only) and use legacy's lock file; the single allowed housekeeping exception (§4.1) |
+| Q3 | Legacy texts, including `file does not exist` |
+| Q4/Q5 | Identity-based `args`/`cmd`; a private `args :=` is supported; ambiguity is refused (§4.5) |
+| Q6 | Module `return <value>`, `export-missing` and `export-duplicate` are program errors; the entry-`return` case is kept pre-execution, with the real reason (§4.2, §4.3) |
+
+Remaining:
+
+1. **Private `args :=`.** The scope report in §4.5 estimates ~200 lines for a linker
+   rename limited to `args`/`cmd`, plus display names. Is that acceptable, or should
+   the private declaration stay refused?
+2. **`export(<non-name>)`** (`export requires a binding name`, currently
+   `import-opaque`). Should it join §4.3 later?
 
 ## 8. Not done in phase 1
 
 No production source was changed. No tests were added yet. Nothing was pushed.
+The owner rulings of 2026-11-01 are folded into §4–§7; the decision is recorded as
+`D-NEXT-packages` in `decisions.md` (numbered at integration).
 
 ## 9. Evidence (scratch, not committed)
 
@@ -527,5 +689,6 @@ Under `/tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpa
 | `real.json` | installed and next-refusal columns |
 | `lg/` | §2 resolution probes |
 | `ge/` | import-time error and prefix probes |
+| `q6/` | module `return`/`export` probes (hoisting, blocks, bare and conditional `return`, competing errors) |
 | `ac/` | `args`/`cmd` probes (e1–e14, s1, s2; VM side run with the `integ-argscmd` binary) |
 | `prior_units.json` | reasons from the inventory |

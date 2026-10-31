@@ -1465,3 +1465,59 @@ Controls: `tests/runtime2/vm_policy_negative.py`.
 Witness: `tests/runtime2/vm_default/vm_default.py` §18c (`.niftrc` and
 `-i file` on a pty: earlier effect kept, nothing later runs, the prompt then
 works; legacy under `NIFT_VM=0` exits 1; piped exits 1).
+
+## D-NEXT-packages — Package imports and import-time program errors on the VM (owner, 2026-11-01; number assigned at integration)
+
+Context: `checkpoints/weekend-packages.md` (phase 1 contract, owner rulings Q1–Q6).
+Supersedes D-062 #1 for imported modules; D-062 is kept as historical evidence.
+Guiding line: an unsupported VM capability is a feature refusal; an invalid program
+is a program error (legacy text, stable reason id, truthful position, exit 1, no
+"not supported yet").
+
+1. **Import-resolution errors are rejected before running** (Q1). This covers:
+   - a missing or uninstalled package, and every other package-resolution step;
+   - a missing imported file;
+   - an import cycle;
+   - a package-path escape.
+
+   Each is reported at the real import statement, with legacy's text and frame
+   prefixes. No user-program side effect happens, including from statements before
+   the import. This is an approved difference: legacy runs the earlier statements;
+   the text, position and exit status are the same. An import that a top-level
+   `return` leaves unreached is still rejected. The diagnostic says so, and does not
+   claim the import ran.
+
+   Scope: whole-program execution only.
+   - Runtime errors in successfully imported modules, successful imports'
+     initialisation order and run-once rules, interactive startup files and
+     persistent sessions are unchanged.
+2. **Package lock** (Q2).
+   - Legacy's lock file and mechanism (`.nift/.packages-transaction.lock`, a shared
+     descriptor lock).
+   - Created atomically if `.nift/` exists and the file is missing; never truncated
+     or replaced.
+   - Held for the resolution critical section and released on every path.
+   - An acquisition failure is a clear error before anything runs.
+   - `.nift/` is never created by an import; nothing is installed, modified or
+     published, and no other artifact is written.
+   - This lock housekeeping is the single allowed exception to "no side effects
+     before execution". It is package-management state, not a user-program effect.
+3. **Legacy texts** (Q3), including the pathless `file does not exist`.
+4. **`args`/`cmd` in modules** (Q4/Q5), resolved by binding identity, never by
+   spelling alone.
+   - An imported function sees the entry's binding where static resolution proves it
+     is that binding.
+   - Module top-level or init-time reads of the injected binding are refused before
+     any effect (`import-scope:invocation-init`, program-error wording).
+   - A module's private `args := …` is supported, as in legacy, with ordinary binding
+     rules.
+   - Ambiguous or unprovable access is refused before any effect.
+   - No unrestricted module-global access and no module-binding redesign. The scope of
+     the private-binding support is reported in the checkpoint before it is
+     implemented.
+5. **Module program errors** (Q6). A module-level `return <value>`, `export-missing`
+   and `export-duplicate` are program errors refused before running, with legacy text,
+   truthful position, exit 1 and a stable reason id. A bare `return` (legal in legacy)
+   stays a feature refusal.
+
+Witness: `tests/runtime2/packages/` (phase 2).
