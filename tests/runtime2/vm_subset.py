@@ -189,7 +189,7 @@ UNSUPPORTED = [
     # CP12b: a free name resolved to a top-level binding compiles (globals);
     # one only a caller's local can resolve stays refused (L25, D-038).
     ("free-name", "fn(f()) { return n }\nfn(g()) { n := 1\nreturn f() }\nprint(g())\n", "free-name"),
-    ("unresolved-name", "print(args)\n", "unresolved-name"),
+    ("unresolved-name", "print(zz_unbound)\n", "unresolved-name"),  # was print(args): args is bound for scripts since D-062
     # Literals.
     ("leading-zero", "print(01)\n", "number-literal"),
     ("hex-literal", "print(0x10)\n", "opaque:legacy-runtime-error"),
