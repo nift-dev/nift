@@ -858,11 +858,56 @@ as default.
 No open questions remain. Implementation waits for the coordinator's go-ahead after
 `args`/`cmd` lands in `weekend/r2`.
 
-## 8. Not done in phase 1
+## 8. Phase 2: implementation
 
-No production source was changed. No tests were added yet. Nothing was pushed.
-The owner rulings of 2026-11-01 are folded into §4–§7; the decision is recorded as
-`D-NEXT-packages` in `decisions.md` (numbered at integration).
+Base: `weekend/r2` `9b2f40a6` (args/cmd integrated), merged into `cand/packages`
+with a merge commit. Nothing was pushed.
+
+**Where each contract item lives.**
+
+| Item | Implementation |
+|---|---|
+| §4.1 resolution, legacy order and texts (Q3) | `src/rt/package_resolve.{h,cpp}` (`PackageReader::resolve`), called from `GraphBuilder::import` (`module_graph.cpp`); `Module::package_root` inherited as legacy's ModuleEnv; package-relative containment with `filesystem::path_within` |
+| Q2 / C2 lock | `PackageTransaction::acquire_read_existing_store` (the one VM-facing addition; additive diff, legacy call paths byte-identical), held by one `PackageReader` per graph build and released when the build ends (`GraphBuilder::finish`, destructor) |
+| Q1 / §4.2 import-resolution program errors | `GraphError` (`module_graph.h`): id, legacy message with per-frame `import: `/`@import: ` prefixes, position (`positioned` set at every site); rendered by `rt/link_diagnostic.cpp` and `script_runner.cpp` (`program_message`), never with feature-refusal wording |
+| Q6 / C3 module program errors | `module_graph.cpp`: `return <value>` checked in statement order (reported at the import, note at the `return`), `export-missing`, `export-duplicate`, `export(<not a name>)` (the Opaque `export(` statement, `rt/module_scan.cpp`) |
+| early-`return` note | `GraphBuilder::early_return`: the first top-level `return` before the failing statement on the active chain |
+| competing-failure order | depth-first, statement order; program errors end the walk; feature refusals are recorded and the walk goes on; a refusal taints its chain so `export-missing` makes no claim there; `import-scope` and clash positions are the smallest offset |
+| `import-error:package-lock` | `PackageResolution::lock_error` |
+| Q4/Q5 / C1 `args`/`cmd` | `rt/module_invocation.{h,cpp}` (`plan_invocation`: private declarations, init-reach fixed point, ambiguity) and the narrow rename in `module_link.cpp` (generated names checked against every unit's text, stored in the heap-stable `Module`, display names via `LinkedUnit::display`, renamed tokens map back to their span) |
+| runtime prefixes | `LinkedUnit::prefix` (each import's own spelling) used by `script_runner.cpp` |
+| legacy unchanged | `make test-runtime2-packages-legacy` (`NIFT_VM=0 make test-v44-packages` and the suite's section L) |
+
+**Recorded deviations from the plan text.**
+- An export of a module's private `args`/`cmd` is refused
+  (`import-scope:invocation-ambiguous`), not supported. Into the entry, legacy fails it
+  (`export collides`). Into another module, which binding that module's `args` means is
+  not proved without widening the rename.
+- A top-level lambda bound by a declaration (`g := () => args.size()`) is treated as a
+  function named `g`. It is reached only where `g` is mentioned, so legacy's e9 runs.
+  Any other top-level lambda body counts as initialisation code.
+- `import-scope:invocation-init` is reported at the read. Legacy reports at the call
+  frame (`m.f:1:15` for `return args.size()`).
+- `module-return` is split. `return <value>` becomes the program error
+  `module-error:return-value`; the bare form keeps a feature refusal under the new name
+  `module-bare-return`.
+- The packages mutation control 13 breaks the order rule (it reports the last clash in
+  text). A literal hash-iteration mutant is not observable with libstdc++, whose set
+  order coincides with text order here (`mutants.sh` header).
+- The args/cmd suite's module section and mutants 4, 7 and 8 are superseded by
+  D-NEXT-packages #4. The section was rewritten to the new contract; the module
+  mutation controls are now the packages mutants.
+- Other tests' reason names were updated for the new ids: `vm_modules_unit.cpp`,
+  `vm_modules.py`, `vm_inventory_links.py` and `vm_records_coverage.py`.
+
+**Size.** Production code is about 1,100 lines added and 180 removed, across 11 changed
+and 8 new files.
+- ~90 of the added lines are moved, not new (`module_scan`).
+- ~70 are mutation-control hooks.
+- Net new logic is ~850 lines, above the 700–750 estimate. The overrun is in the
+  competing-failure walk and the `args`/`cmd` planner.
+- The rename itself (private-declaration detection, rename ids, generated names,
+  display names and segment mapping) is ~110 lines, within its ~200.
 
 ## 9. Evidence (scratch, not committed)
 
