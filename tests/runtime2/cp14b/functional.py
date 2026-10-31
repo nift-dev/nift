@@ -149,6 +149,16 @@ CASES.update({
 'ordinary_lambda_collection_error':'g:=()=>[1].filter(x=>x); g()',
 })
 
+# D-NEXT-refsem #1 (Phase A forward-compatibility guard, review round 1): the
+# VM refuses these before any effect; their output changes once arrays are
+# references (a callback or loop mutating the array it walks, a function used
+# as a value mutating its parameter, a mutator whose result aliases its
+# receiver). Legacy (NIFT_VM=0) is unchanged.
+GUARDED={'snapshot_mutation':'reference-guard:lent','snapshot_growth':'reference-guard:lent',
+'arity_guard_reverse':'reference-guard:shared','arity_guard_sort':'reference-guard:shared',
+'iterator_mutation':'reference-guard:lent','captured_snapshot':'reference-guard:lent',
+'aggregate_callback_mutation':'reference-guard:argument','aggregate_reduce_result':'reference-guard:argument'}
+
 def run(binary,mode,source,root):
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')
@@ -165,7 +175,11 @@ def main():
                 ok,detail=cprof.refused_ok(prof,a.nift,a.legacy,source,Path(tmp));unverified+=1
                 results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
             legacy=run(a.legacy,'0',source,Path(tmp));vm=run(a.nift,'require',source,Path(tmp))
-            ok=all(legacy[k]==vm[k] for k in ['out','err','exit']) and vm['stats'] and vm['stats'][-1]['outcome'] in ['vm','vm-error'] and vm['stats'][-1]['legacy_executions']==0
+            if name in GUARDED:
+                st=vm['stats'][-1] if vm['stats'] else {}
+                ok=vm['out']=='' and vm['exit']==1 and st.get('outcome')=='require-error' and st.get('reason')==GUARDED[name] and st.get('vm_executions')==0
+            else:
+                ok=all(legacy[k]==vm[k] for k in ['out','err','exit']) and vm['stats'] and vm['stats'][-1]['outcome'] in ['vm','vm-error'] and vm['stats'][-1]['legacy_executions']==0
             results.append(dict(name=name,source=source,pass_=bool(ok),legacy=legacy,vm=vm));print('PASS' if ok else 'FAIL',name)
     print(cprof.banner(prof,unverified,'functional'))
     Path(a.output).write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_cases=unverified,results=results),indent=2)+'\n');return 0 if all(r['pass_'] for r in results) else 1
