@@ -61,18 +61,34 @@ def check(ok, label, detail=""):
         FAILS.append(label)
 
 
-# Output with every path under the random temporary work directory removed
-# (its name, e.g. vm-default-pugdqe2f, can contain any short token a check
-# looks for: "e2", "b2", "s5", ...). Checks that a short program output is
-# absent, or counted, run on this text (zero-flakiness policy).
-WORK_ROOTS = []
+# The program's own output lines: every captured line except the
+# diagnostics ("error: ..." / "note: ..."), which name paths under the
+# temporary work directory (its random name, e.g. vm-default-pugdqe2f, can
+# contain any short token a check looks for: "e2", "b2", "s5", ...). Checks
+# that a short program output is absent, or printed once, compare whole lines
+# of this list - never a substring of the captured text (zero-flakiness
+# policy). --work-prefix runs the suite in a directory whose name contains
+# the tokens (the Makefile target does both).
+DIAGNOSTIC_PREFIXES = ("error: ", "note: ")
+PATH_TOKENS = ("e2", "b2", "s5", "p2", "s1", "inside", "middle", "block", "before")
 
 
-def program_output(out):
-    import re
-    for root in sorted(WORK_ROOTS, key=len, reverse=True):
-        out = re.sub(re.escape(root) + r"[^\s:'\"`()]*", "<path>", out)
-    return out
+def program_lines(out):
+    return [line for line in out.split("\n") if not line.startswith(DIAGNOSTIC_PREFIXES)]
+
+
+PATH_CONTROLLED = set()
+
+
+def path_control(work, out, token, label):
+    """With a work directory named after `token`, the captured output has
+    more occurrences of it (in a diagnostic's path: the old substring check
+    failed there) than the program's lines: the check addresses the cause."""
+    if token in work.name and work.name in out:  # (an output naming no path cannot confuse the check)
+        PATH_CONTROLLED.add(token)
+        check(out.count(token) > program_lines(out).count(token),
+              f"regression ({label}): {token!r} in the temp path is in the captured output, not in the program's "
+              "lines", f"out={out!r}")
 
 
 def base_env(extra):
@@ -255,25 +271,26 @@ def tree(path: Path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
-    args = ap.parse_args()
-    nift = str(Path(args.nift).resolve())
-    with tempfile.TemporaryDirectory(prefix="vm-default-") as work:
-        WORK_ROOTS[:] = sorted({work, os.path.realpath(work), Path(work).resolve().as_posix()})
+    ap.add_argument("--work-prefix", default="vm-default-",
+                    help="temporary directory prefix (the regression run uses one containing e2, b2, ...)")
+    opts = ap.parse_args()
+    nift = str(Path(opts.nift).resolve())
+    with tempfile.TemporaryDirectory(prefix=opts.work_prefix) as work:
         work = Path(work)
 
-        # 0. The path-insensitive output checks: a temporary directory whose
-        # name contains the token never matches, a real leaked line always does.
-        saved = WORK_ROOTS[:]
-        WORK_ROOTS[:] = ["/tmp/vm-default-pugdqe2f"]
-        in_path = "e1\nerror: /tmp/vm-default-pugdqe2f/s5-b2/init.f:3:1: refused\nPROMPT\n"
-        check("e2" not in program_output(in_path) and "b2" not in program_output(in_path) and "s5" not in program_output(in_path) and
-              program_output(in_path).count("e1") == 1,
-              "control: a token inside the temporary directory's path is not program output")
-        for token in ("e2", "b2", "s5", "p2", "inside"):
-            check(token in program_output(in_path.replace("PROMPT\n", token + "\nPROMPT\n")) and
-                  token in program_output(in_path + token) and token in program_output(token + "\n" + in_path),
+        # 0. The line checks: a token inside a diagnostic's path is never
+        # program output; a real leaked line always is.
+        in_path = "e1\nerror: /tmp/vm-default-pugdqe2f/s5-b2-s1/init.f:3:1: refused\nnote: in /tmp/x-inside-p2\nPROMPT\n"
+        check(not any(t in program_lines(in_path) for t in PATH_TOKENS) and program_lines(in_path).count("e1") == 1,
+              "control: a token inside a diagnostic's path is not a program line")
+        for token in PATH_TOKENS:
+            leaked = (in_path.replace("PROMPT\n", token + "\nPROMPT\n"), in_path + token, token + "\n" + in_path)
+            check(all(token in program_lines(text) for text in leaked) and
+                  all(program_lines(text).count(token) == 1 for text in leaked),
                   f"control: a real leaked {token!r} line is still caught next to the path")
-        WORK_ROOTS[:] = saved
+        if opts.work_prefix != "vm-default-":
+            check(all(t in work.name for t in PATH_TOKENS),
+                  f"regression: the work directory {work.name!r} contains every checked token")
 
         # 1. Default runs a supported script on the VM (stats prove the engine).
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
@@ -859,10 +876,12 @@ def main():
             diag = (f"error: {path}:4:19: NIFT_VM session refused: type:length: ")
             note = (f"note: initialisation from {path} was interrupted at line 7 (`g(3)`); later statements in it "
                     "were not run\nnote: the session continues at the prompt\n")
-            check(status == 0 and out.startswith("s1\ns3\n") and program_output(out).count("s1") == 1 and
+            path_control(work, out, "s1", "s1")
+            check(status == 0 and out.startswith("s1\ns3\n") and program_lines(out).count("s1") == 1 and
                   out.count("s3\n") == 1 and (d / "s3.txt").exists(),
                   f"{label} on a tty: statements before the refused one ran, each exactly once", f"out={out!r}")
-            check("s5" not in program_output(out) and not (d / "s5.txt").exists(),
+            path_control(work, out, "s5", "s5")
+            check("s5" not in program_lines(out) and not (d / "s5.txt").exists(),
                   f"{label} on a tty: the refused statement and everything after it never ran", f"out={out!r}")
             check(diag in out and note in out and out.count("NIFT_VM session refused") == 1,
                   f"{label} on a tty: the refused position (in g) and the interrupted statement (line 7) reported",
@@ -893,7 +912,8 @@ def main():
             status, out = run_tty(nift, d, args, {}, ['greet("b")', "exit"])
             head = f"error: {path}:9:6: NIFT_VM session refused: callable:run"
             # No value echo: only what the statements print.
-            check(status == 0 and out.startswith("block\nhi a\nerror: ") and program_output(out).count("block") == 1 and
+            path_control(work, out, "block", "block")
+            check(status == 0 and out.startswith("block\nhi a\nerror: ") and program_lines(out).count("block") == 1 and
                   out.count("hi a") == 1 and head in out and "\nlater\n" not in out and
                   f"initialisation from {path} was interrupted at line 9" in out and
                   "hi b\n" in out.split(head, 1)[-1],
@@ -965,8 +985,9 @@ def main():
             (d / name).write_text('print("b1")\n1+1\nprint("b2")\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            path_control(work, out, "b2", "b2")
             check(status == 0 and out.startswith("b1\nerror: ") and
-                  f"error: {path}:2:1: NIFT_VM session refused: expression-statement" in out and "b2" not in program_output(out) and
+                  f"error: {path}:2:1: NIFT_VM session refused: expression-statement" in out and "b2" not in program_lines(out) and
                   "command not found" not in out and "was interrupted at line 2" in out and "PROMPT\n" in out,
                   f"{where_label} on a tty: a bare expression is a refused Nift statement (as in a script file)",
                   f"status={status} out={out!r}")
@@ -981,9 +1002,10 @@ def main():
             (d / name).write_text('print("e1")\ntouch("e1.txt")\nexit\nprint("e2")\ntouch("e2.txt")\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', 'touch("typed.txt")', "exit"])
+            path_control(work, out, "e2", "e2")
             check(status == 0 and out.startswith("e1\nerror: ") and f"error: {path}:3:1: NIFT_VM session refused" in out
                   and f"initialisation from {path} was interrupted at line 3 (`exit`); later statements in it were "
-                  "not run" in out and "e2" not in program_output(out) and not (d / "e2.txt").exists() and (d / "e1.txt").exists() and
+                  "not run" in out and "e2" not in program_lines(out) and not (d / "e2.txt").exists() and (d / "e1.txt").exists() and
                   "PROMPT\n" in out and (d / "typed.txt").exists(),
                   f"{where_label} on a tty: `exit` refused (named in the note), the earlier effect kept, nothing later "
                   "ran, prompt usable (D-061)", f"status={status} out={out!r}")
@@ -991,8 +1013,9 @@ def main():
                 if (d / f).exists():
                     (d / f).unlink()
             status, out = run_tty(nift, d, args, {"NIFT_VM": "0"}, ['print("PROMPT")', "exit"])
+            path_control(work, out, "e2", "e2")
             check(status == 1 and out.startswith("e1\n") and "unknown value or malformed expression: exit" in out and
-                  "e2" not in program_output(out), f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error (exit 1)",
+                  "e2" not in program_lines(out), f"{where_label} on a tty under NIFT_VM=0: legacy treats `exit` as an error (exit 1)",
                   f"status={status} out={out!r}")
             for f in ("e1.txt", "e2.txt"):
                 if (d / f).exists():
@@ -1009,8 +1032,10 @@ def main():
                                   'print(f(3))\nprint("after")\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
-            check(status == 0 and out.startswith("before\nmiddle\nerror: ") and program_output(out).count("before") == 1 and
-                  program_output(out).count("middle") == 1 and f"error: {path}:3:10: NIFT_VM session refused: type:length" in out and
+            path_control(work, out, "before", "before")
+            path_control(work, out, "middle", "middle")
+            check(status == 0 and out.startswith("before\nmiddle\nerror: ") and program_lines(out).count("before") == 1 and
+                  program_lines(out).count("middle") == 1 and f"error: {path}:3:10: NIFT_VM session refused: type:length" in out and
                   "interrupted at line 6" in out and "\nafter" not in out and "PROMPT\n" in out,
                   f"{where_label} on a tty: definition admitted on its own; the call refused at f's size() "
                   "(3:10), interrupted at line 6; `after` never runs", f"status={status} out={out!r}")
@@ -1033,8 +1058,9 @@ def main():
             (dd / name).write_text('print("p1")\n\n\n\n  x := `a`\nprint("p2")\n')
             path = (dd / name).resolve().as_posix()
             status, out = run_tty(nift, dd, args, {}, ['print("PROMPT")', "exit"])
+            path_control(work, out, "p2", "p2")
             check(f"error: {path}:5:3: NIFT_VM session refused: session:opaque" in out and f"{path}:1:1" not in out
-                  and "interrupted at line 5" in out and "p2" not in program_output(out),
+                  and "interrupted at line 5" in out and "p2" not in program_lines(out),
                   f"{where_label} on a tty: an Opaque statement at 5:3 is located there (not 1:1)", f"out={out!r}")
             proc, rows = run(nift, dd, args, {"HOME": str(dd)}, stdin="")
             check(proc.returncode == 1 and f"{path}:1:1" not in proc.stderr,
@@ -1078,8 +1104,9 @@ def main():
             (d / name).write_text('print("s0")\nif(true) {\n  touch("IN")\n  print("inside")\n  z := (1 +\n}\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
+            path_control(work, out, "inside", "inside")
             check(status == 0 and out.startswith("s0\nerror: ") and f"error: {path}:5:" in out and
-                  "was interrupted at line 2;" in out and not (d / "IN").exists() and "inside" not in program_output(out) and
+                  "was interrupted at line 2;" in out and not (d / "IN").exists() and "inside" not in program_lines(out) and
                   "PROMPT\n" in out,
                   f"{where_label} on a tty: syntax error at 5:x interrupts at its statement's start (line 2)",
                   f"status={status} out={out!r}")
@@ -1274,6 +1301,11 @@ def main():
         for drop in ("not executed", "NIFT_VM=0 nift\n", ISSUES, REASON, "<stdin>:3:6", "the call `run()`"):
             check(bool(diagnostic_problems(good.replace(drop, "X"), "<stdin>:3:6", "", session=True)),
                   f"control: session diagnostic predicate rejects a diagnostic without {drop!r}")
+
+        if opts.work_prefix != "vm-default-":
+            check(PATH_CONTROLLED == set(PATH_TOKENS),
+                  "regression: every checked token was exercised inside a diagnostic's path",
+                  f"missing {sorted(set(PATH_TOKENS) - PATH_CONTROLLED)}")
 
     print("PASS VM-default policy" if not FAILS else f"FAIL VM-default policy ({len(FAILS)} failures)")
     return 0 if not FAILS else 1
