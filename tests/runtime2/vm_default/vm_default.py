@@ -690,8 +690,8 @@ def main():
             status, out = run_tty(nift, d, args, {}, typed)
             diag = (f"error: {path}:5:6: NIFT_VM session refused: {REASON}: {RUN_FEATURE} is not supported by the "
                     "Runtime 2.0 VM yet\n" + STATEMENT_NOTE +
-                    f"note: initialisation from {path} was interrupted at its statement at line 5, column 1; later "
-                    "statements in it were not run\n"
+                    f"note: initialisation from {path} was interrupted at line 5; later statements in it were not "
+                    "run\n"
                     "note: the session continues at the prompt\n"
                     f"note: to run it on the legacy interpreter: NIFT_VM=0 nift{' -i init.f' if args else ''}\n"
                     f"note: please report unsupported programs at {ISSUES}\n")
@@ -828,8 +828,8 @@ def main():
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ["print(n)", "print(7)", "exit"])
             diag = (f"error: {path}:4:19: NIFT_VM session refused: type:length: ")
-            note = (f"note: initialisation from {path} was interrupted at its statement at line 7, column 1; later "
-                    "statements in it were not run\nnote: the session continues at the prompt\n")
+            note = (f"note: initialisation from {path} was interrupted at line 7; later statements in it were not "
+                    "run\nnote: the session continues at the prompt\n")
             check(status == 0 and out.startswith("s1\ns3\n") and out.count("s1") == 1 and
                   out.count("s3\n") == 1 and (d / "s3.txt").exists(),
                   f"{label} on a tty: statements before the refused one ran, each exactly once", f"out={out!r}")
@@ -850,6 +850,26 @@ def main():
                   "the session stopped here" in proc.stderr,
                   f"{label} piped: the whole file is refused before anything runs, exit 1",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r}")
+
+        # 18b. A startup file on a terminal behaves exactly as if typed: the
+        # REPL's own statement accumulation joins multi-line definitions and
+        # blocks (a physical line is not a statement).
+        multi = ('fn(greet(name)) {\n  print("hi " + name)\n  return 1\n}\nif(1 < 2) {\n  print("block")\n}\n'
+                 'greet("a")\nr := run("echo", "x")\nprint("later")\n')
+        for label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
+            d = work / f"multiline-{name.strip('.').replace('.', '-')}"
+            d.mkdir()
+            (d / name).write_text(multi)
+            path = (d / name).resolve().as_posix()
+            status, out = run_tty(nift, d, args, {}, ['greet("b")', "exit"])
+            head = f"error: {path}:9:6: NIFT_VM session refused: callable:run"
+            # Exactly as typed: the if-block's and the call's values are shown too.
+            check(status == 0 and out.startswith("block\nnull\nhi a\n1\n") and out.count("block") == 1 and
+                  out.count("hi a") == 1 and head in out and "\nlater\n" not in out and
+                  f"initialisation from {path} was interrupted at line 9" in out and
+                  "hi b\n" in out.split(head, 1)[-1],
+                  f"{label} on a tty: multi-line fn and if-block run once in order, refusal at 9:6, no later "
+                  "print, the multi-line function callable from the prompt", f"status={status} out={out!r}")
 
         # 19. Refusal-matrix gaps (tests/runtime2/vm_default/REFUSAL_MATRIX.md):
         # a plain `-` stdin program; `$[...]` in a redirected and in a background

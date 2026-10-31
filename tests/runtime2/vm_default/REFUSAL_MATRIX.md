@@ -24,8 +24,8 @@ number, `§`) unless another file is named.
 | `-i file` / `-i -e` without a tty | The initial unit (nothing of it runs); the session stops | Exit 1 | §7 "-i script ..." and "-i -e ..."; §15 "... piped: the session still stops with exit 1" |
 | `~/.niftrc` without a tty | The whole file (nothing of it runs); the session stops | Exit 1 | §15 "~/.niftrc piped ..." |
 | Typed tty REPL | Current statement only (transactional: no definition or effect) | Back at the prompt; session usable | §7 "tty REPL: refusal reported ..."; `cp19/session_refusal_cli.py` pty runs; `cp23/cp19_combined.py` job-refusal-tty |
-| `~/.niftrc` on a tty | Run statement by statement as typed input: the first refused statement and the rest of the file (earlier statements ran once) | Prompt; session usable | §15 "~/.niftrc on a tty ..."; §18 "~/.niftrc on a tty: ..." |
-| `-i file` on a tty | Same path as `~/.niftrc`: the first refused statement and the rest of the file | Prompt; session usable | §15 "nift -i file on a tty ..."; §18 "nift -i file on a tty: ..." |
+| `~/.niftrc` on a tty | Fed through the shell loop exactly as typed input (the REPL's own statement accumulation): the first refused input and the rest of the file; earlier input ran once | Prompt; session usable | §15 "~/.niftrc on a tty ..."; §18 "~/.niftrc on a tty: ..."; §18b multi-line |
+| `-i file` on a tty | The same path as `~/.niftrc` | Prompt; session usable | §15 "nift -i file on a tty ..."; §18 "nift -i file on a tty: ..."; §18b multi-line |
 | `-i -e` / `-i -c` on a tty | The initial unit (nothing of it runs); the session stops | Exit 1 | §17c "-i -e on a tty: ..." |
 | Shell-form user function / builtin (`f 3`, `pwd a b`) | Logical command line (no later `;` / `&&` / `\|\|` segment) | Piped: session stops, exit 1. Tty: prompt | §16 (piped and tty, `\|\|`, `;`, `&&`) |
 | `$[...]` interpolation, incl. `;`, `&&`, `\|\|`, pipelines, redirects, `&` | Logical command line (the containing command and every later segment) | Piped: session stops, exit 1. Tty: prompt | §12; §13 (`;`, `\|\|`, `&&`, `;` then `\|\|`, pipeline stages); §19 (redirect, `&`) |
