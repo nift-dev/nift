@@ -1,6 +1,7 @@
 # Reference semantics, Phase A (cand/refsem-a)
 
-Status: **candidate** for independent review; not integrated. Branch
+Status: **candidate**, review round 1 (the independent review rejected
+`ad9d842f`; section 13 maps every finding to its fix); not integrated. Branch
 `cand/refsem-a`, built on the frozen collections candidate `cand/collections`
 @`18720d14` (history kept). Decision: **D-NEXT-refsem** (`../decisions.md`;
 the number is assigned at integration). Owner decisions of 2026-11-01
@@ -23,11 +24,12 @@ Tests: `make test-runtime2-refsem` (`tests/runtime2/refsem_a.py`,
 | Cycles | refused **before** the store, catchable `runtime.reference_cycle`; legacy's text where legacy refuses ("set/push would create a cyclic reference", "assignment would create a cyclic reference: <field>"), else "reference cycle: the stored value would contain itself"; the receiver is unchanged, nothing leaks | =L text (legacy fatal: catchability is an approved difference); cycles through arrays, objects and closures: **new limitation** (legacy accepts) |
 | `copy(x)` | shallow: a new outer instance/collection, contents shared; arrays and objects are values until Phase B (the value itself) | ΔL (v4.4+ deep; v4.2 contract) |
 | `deepcopy(x)` | every reachable array, object, instance and collection copied once, sharing inside the graph preserved; callables, handles, futures keep identity; budget reserved first | ΔL for a collection reached twice (legacy duplicates); =L otherwise |
-| Iteration (D5) | arrays, maps, sets and stacks iterate the membership at loop entry; maps take an explicit O(n) budgeted snapshot | =L arrays/sets/stacks; ΔL maps (D-063 #7) |
+| Iteration (D5) | maps, sets and stacks iterate the membership at loop entry; maps take an explicit O(n) budgeted snapshot. Arrays and objects iterate their copy-on-write value; an array mutated while its loop runs is **refused** (`reference-guard:lent`): array snapshot iteration as a reference rule lands with Phase B | =L sets/stacks; ΔL maps (D-063 #7); RL arrays mutated in their loop |
 | Keys (D6) | a map/set/stack as a map key or set member (lookups too) is refused before effects (`collection-mutable-key`); bool/number/string and callables unchanged; struct keys stay refused (`collection-identity-key`) | RL |
 | Threads, parallel async | arguments, captures, globals and results as one alias-preserving `TransferGraph` copy (unchanged); instances cross too | ΔL (legacy refuses) |
 | Cooperative async (D7) | arguments and the globals a task reads are copied as one alias-preserving graph **at task creation**, before any task state exists | equivalent to the parallel path (section 4) |
-| Arrays/objects (D2) | values until Phase B; the forward-compatibility guard refuses every unit whose output could change once they are references (`reference-guard:<route>`) | RL (section 5) |
+| Arrays/objects (D2) | values until Phase B; the whole-program forward-compatibility guard refuses every unit whose output could change once they are references (`reference-guard:<route>`) | RL (section 5; cost in section 13) |
+| Object keys | an object as a map key or set member is refused (`collection-object-key`) | RL (legacy: run-time error) |
 
 ## 2. Implementation (files)
 
@@ -84,6 +86,16 @@ and is accepted; inside a function the map is a captured cell and the store is
 refused. Refused graphs are unchanged and leak nothing (`heap/cycle_refused*.f`:
 4 and 40 refused attempts end with the same live heap).
 
+Every refusal is catchable, including a store into a captured cell (an
+assignment to a captured binding, a push into a captured array, an upvalue
+store from a closure: `Vm::refuse_cell_cycle` in `vm_closure.cpp`; the
+review found these were fatal). The check runs before `cell_rebind`, so the
+cell keeps its value; `approved/cell_cycle_*.f` show the catch and the
+unchanged binding, and `heap/cell_cycle_refused{,_many}.f` against
+`heap/cell_cycle_control.f` (the same program without the refused stores)
+end with the same live heap: no reference count or heap accounting changes.
+Mutation control R16 (fatal again) is caught.
+
 ## 4. Cooperative async equivalence (D7)
 
 Cooperative task code (CP22 admission, unchanged) cannot call a collection
@@ -103,20 +115,68 @@ Cancellation releases the task's copies with its stack.
 
 ## 5. The forward-compatibility guard (D2, arrays and objects)
 
-`rt/reference_guard.h` states the rule. In short, a binding that may hold an
-array or object and is mutated in place must be exclusive: never copied out
-(declaration, assignment, return, literal item, container store, an escaping
-parameter, an expression-bodied lambda's result), its parts never copied out
-when it is mutated below the top, and every inflow fresh (literal,
-constructing built-in or method, user function whose returns are fresh,
-`deepcopy`, `copy` for top-level mutation); a mutated parameter needs fresh
-arguments at every call site or the `x = f(x)` idiom. Runs after
-compilation, so earlier refusals keep their reasons. Routes: `inflow`,
-`argument`, `shared`, `shared-part`, `contents`, `lambda-parameter`,
-`unresolved`. The six D-040 witnesses are refused now (`d040_witnesses.py`
-note; `vm-corpus/cp11/EXPECT`, `vm_review_cp12.py`, `vm_engine_selection.py`
-updated; `tools/rt-diff/policies/d040-vm.json` retired from `vm_parity.py`,
-the file kept).
+`rt/reference_guard.h` states the rule; it is a flow-insensitive analysis of
+the whole linked unit (imports are linked into one unit, `module_link.h`, so
+module code is ordinary code here). The first guard (`ad9d842f`) reasoned per
+site and was unsound (section 13); this one is whole-program.
+
+**Why the two models can differ.** In the copy model every holder (binding,
+parameter, element, loop binding, native operand) holds its own value; in
+Phase B holders of the same array/object share it. Output can differ only
+when an object is mutated through one holder while another holder later
+observes it. Captures are not holders of their own: a closure shares the
+captured binding's cell in both models.
+
+**The rule.** For every array/object binding B mutated in place anywhere
+(every binding, in a persistent session):
+
+1. *Exclusive* (as before): every inflow fresh (deep when B is mutated below
+   its top), stored contents fresh, B never retained by another holder that
+   outlives an operation (declaration, assignment, return, literal item,
+   container store, an escaping parameter, an expression lambda's result),
+   nor its parts when mutated below the top. Retention is widened: a
+   parameter any closure captures escapes (it outlives the call in its cell);
+   an argument to a callable value is retained; a native given a callable
+   that is not a lambda literal retains its operands' parts.
+2. *Lent* (`reference-guard:lent`): B or a part of it is lent when passed to
+   a call's non-escaping parameter, to a native (and its callbacks) or
+   iterated by `for`. The lending holder lives exactly as long as that call
+   or loop. B may not be mutated during it: no mutation of B is written
+   inside the call or loop (outside the lent expression, which is evaluated
+   first), and if B is referenced from any body other than its declaring one
+   (another function, method or lambda, or a later session statement) the
+   call or loop may not run user code (a user function, a callable value, a
+   native given a non-literal callable, or any such call written inside it).
+   Code outside the region in B's own body cannot run during it (a recursive
+   call has its own frame), so these are all the mutations that can.
+3. *Parts*: a loop binding or a native callback's parameter is a part of its
+   operand's root; a closure capturing it retains that part. Over a fresh
+   iterable (literal, constructing call, fresh at every depth) the loop
+   binding is an exclusive value of its own.
+4. *Unknown callers*: a user function used as a value, or any function in a
+   session, may not mutate its parameters (`argument`); aggregates held by a
+   struct instance (`this`, an implicit field, a field of an instance) are
+   unknown roots (`unresolved` when mutated). A store into an instance's own
+   field is an instance mutation (a reference in both models), not an
+   aggregate one.
+
+With 1 no second holder outlives an operation; with 2 no mutation runs
+while a short-lived holder exists; 3 and 4 close the remaining holders. So an
+admitted unit observes no object through two holders across a mutation, and
+both models print the same. Earlier refusals keep their reasons (the guard
+runs after compilation); within the guard, the exclusivity routes are
+reported before `lent`.
+
+Evidence (`tests/runtime2/refsem/`): the review's repros as `refuse/lend_*`,
+`refuse/loop_*`, `refuse/function_value_mutates_parameter.f`, three
+`modules/*` cases and four piped sessions; adversarial additions (argument
+order through a user function and through a native, a callback that calls a
+mutator, a closure returned from a callee's callee). `phaseb/*.f` and
+`modules/reader_module` are admitted programs with their Phase B transcripts
+derived by hand (`NAME.phaseb`, the reason in each fixture's comment); the
+suite requires the VM to run them and print exactly that, and legacy to
+agree. Mutation controls R13 (guard off), R17 (lent rule off), R18 (captured
+parameters do not escape) are caught.
 
 ## 6. Sound inference under sharing
 
@@ -147,6 +207,25 @@ mutant R7.
   rows `collection-mutable-key`, `reference-guard:*`.
 - `compatibility.md`: superseded rows marked, new approved differences and
   limitations, the cycle limitation in its own section.
+- Review round 1 (each file cites D-NEXT-refsem):
+  `closures-s1/EXPECT` (g8_value_semantics → `fallback:reference-guard:inflow`;
+  g1_aggregate_cycle and g1_index_cycle → `fallback:reference-guard:shared`,
+  their cycle-witness coverage restored by the new g1_aggregate_cycle_cell.f
+  and g1_index_cycle_cell.f, which still reach the cycle check);
+  `for-s2/EXPECT` (g6_call_copy → `argument`; g6_element_modify,
+  g6_element_modify_late, g6_push_each, g6_push_once, g9_million_write,
+  t16_same_iter_modify → `lent`), for-mutant 2's witness moved from
+  g6_push_once.f to the new g6_rebind_longer.f (rebinding is no mutation, so
+  the guard admits it and the mutant's extra visits show);
+  `capture_origins.py` (`GUARDED`: 24 cases refused before effects, with the
+  legacy oracle still checked on NIFT_VM=0/1); `for_s2_bench.py` (write_for.f
+  refused; the no-copy memory check on write_while.f); `vm_structs.py`
+  (copy/print of an instance and four probes run on the VM: D4);
+  `rt-diff-selftest-corpus/gen/m1/main.f` (three copies made explicit with
+  `deepcopy` so the module-reproducer selftest still runs on the VM);
+  `refsem/parity/iteration_snapshot_set_stack_array.f` →
+  `iteration_snapshot_set_stack.f` (its array case is now
+  `refuse/loop_array_push.f`).
 
 ## 8. D9
 
@@ -154,15 +233,30 @@ mutant R7.
   `vm_keyed.h`, long lines, relocated loop statements and two small inference
   helpers, comment reflow); `python3 tools/rt-lint.py src/rt`: 0 problems.
 - Checked-build relocation (`aggregate_store.h`): storage of at most 256
-  elements moves on every mutation (deterministic stale-reference detection
-  at the next use); larger storage once every size/256 + 1 mutations (a stale
-  reference still faults within that many). Stress fixtures keep 200,000
-  elements and their budgets. Stale-reference controls extended
-  (`tests/rt/value_round2.cpp`: map, set, stack, struct, large array; the
-  `test-rt-value-sanitize` loop runs all eight).
-- Local ASan+UBSan evidence (a driver over the value-layer sources, `-O1`):
-  200,000 inserts take 1.5 s (map), 8.5 s (set), 3.2 s (stack), against an
-  extrapolated 770 s before. Every stale-reference control (array, object,
+  elements moves on every mutation; larger storage moves on the first
+  mutation after a reference or pointer into it was handed out (bit 6 of the
+  header tag, `kStorageLent`, set by `array_items`, `array_mut`,
+  `object_entries`, `object_get`, `object_slot_mut`, `collection_items`), so
+  "take a reference, mutate once, use it" faults at the use at every size;
+  otherwise once every size/256 + 1 mutations. The hand-out moves draw on a
+  per-thread credit (2^21 elements to start, +512 per mutation), so the moved
+  volume stays linear even when reads and writes of a huge container
+  interleave. (The first schedule's claim that a stale reference into large
+  storage "still faults within that many" mutations was too weak: the
+  per-thread tick is shared across containers; the review's finding.)
+  Stress fixtures keep 200,000 elements and their budgets. Stale-reference
+  controls (`tests/rt/value_round2.cpp`; the `test-rt-value-sanitize` loop
+  runs all twelve): array, object, string, map, set, stack, struct, and
+  take-mutate-once-use on a 5,000-element array, map, set and stack and a
+  600-entry object.
+- Local ASan+UBSan evidence (drivers over the value-layer sources, `-O1`;
+  round 1): 200,000 pure inserts take 1.9 s (array), 4.5 s (map), 7.1 s
+  (set), 2.3 s (stack), against an extrapolated 770 s before; the worst case,
+  a reference handed out before every insert, 7.1 / 13.5 / 20.3 / 6.9 s
+  (linear). All twelve stale-reference controls abort with
+  heap-use-after-free; with the hand-out rule compiled out (R19,
+  `-DNIFT_REFSEM_MUTANT=19`) or relocation off the five large controls go
+  undetected, so their detection is the new rule's. Earlier figures: Every stale-reference control (array, object,
   map, set, stack, struct, a 1,000-element array, a 5,000-entry map) aborts
   with heap-use-after-free. With relocation compiled out
   (`-DNIFT_RT_RELOCATION_MUTANT`) the three controls that do not grow their
@@ -173,6 +267,11 @@ mutant R7.
 ## 9. Still refused, and why
 
 - Cycles through arrays, objects and closures (no collector; D1).
+- Arrays and objects mutated while lent, shared, or reached from code the
+  guard cannot see (section 5): in particular an array mutated in its own
+  `for` loop (Phase B iterates live), and a global array mutated by a helper
+  function and passed to any user function (the guard has no call graph).
+- An object as a map key or set member (`collection-object-key`).
 - Collections as keys or members (D6); struct identity keys (not established).
 - Array/object programs whose meaning Phase B would change (D2 guard).
 - Field access through a value that may be an instance or something else
@@ -193,28 +292,31 @@ mutant R7.
    approved difference) or be refused like legacy.
 3. Phase B scope: the guard's refusals measured by the CP25-R inventory
    (section 11) are the starting list.
-4. Imported (module) bindings holding arrays: the guard treats an
-   unresolved holder as shared whenever the unit mutates an array or object
-   in place (conservative); a module-aware rule is Phase B work.
+4. The guard's cost (section 13): keep it, narrow arrays and objects
+   further, or bring Phase B forward (owner guidance: it is a temporary
+   internal measure and is not grown further here).
 
 ## 11. CP25-R inventory (classify-all, 589 shared units; execute, 608 entries)
 
-Against the base candidate `18720d14`, ten units change:
+Re-collected on the round-1 tip (`inventory.py collect`, base `18720d14`
+against the tip). Nine units change, the same nine as before round 1: the
+whole-program guard adds no refusal on these corpora, and no execute entry
+changes (0 of 608).
 
 | Unit | Before | Now |
 | --- | --- | --- |
 | `vm-corpus/cp11/replay_alias.f`, `semantics/alias_place.f` | VM (D-040 witnesses) | `reference-guard:inflow` |
-| `semantics/copy_at_call.f` | VM | `reference-guard:argument` (Phase B makes `f(a)`'s mutation visible; predicted) |
-| `vm-corpus/cp11/arrays.f` | VM | `reference-guard:shared` (5/4 becomes 5/5 in Phase B; predicted) |
+| `semantics/copy_at_call.f` | VM | `reference-guard:argument` (Phase B makes `f(a)`'s mutation visible) |
+| `vm-corpus/cp11/arrays.f` | VM | `reference-guard:shared` (5/4 becomes 5/5 in Phase B) |
 | `semantics/struct_reference.f` | `aliasing` | **VM**, legacy-equal |
 | smoke `v42_struct_private_smoke/013-copy` | `struct-value` | **VM**, legacy-equal |
 | smoke `v42_struct_private_smoke/012-cross-instance` | `struct-value` | `struct-private` (unchanged refusal family) |
-| smoke `v44_root_path_corruption_reproducers/003-structarr`, `004-mapstruct` | `struct-construction` | `context:struct-new` (construction in a loop region; new row) |
+| smoke `v44_root_path_corruption_reproducers/003-structarr`, `004-mapstruct` | `struct-construction` | `context:struct-new` |
 
-`collection-mutable-key` is not seen on the corpora. `--check` still reports
-the six pre-existing unclassified reasons of the base
-(`rt-diff-corpus/async/fileops/main.f`: `coro-blocking-host:file`/`rm`,
-`method:open/write/save/close`); `context:struct-new` is now classified.
+`classification.tsv` rows: `reference-guard:*` (route `lent` added),
+`collection-object-key` (new), `collection-mutable-key`, `context:struct-new`.
+`--check` still reports the six pre-existing unclassified reasons of the base
+(`rt-diff-corpus/async/fileops/main.f`).
 
 ## 12. Local runs
 
@@ -237,3 +339,45 @@ gate; the only later commit adds this section (documentation only).
 The CP25-R inventory (section 11) was taken on `a43472ed`; the later guard
 refinement (`7c1fc2b4`) only admits more programs, and was not re-inventoried.
 The full `test-rt-vm`, rt-diff and the sanitizer lanes are not run locally.
+
+## 13. Review round 1 (review of `ad9d842f`)
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| BLOCKER 1: the guard missed mutations while a binding is lent (globals, captured cells, modules, nested calls, sessions) and closures capturing a parameter | whole-program rule (section 5), route `lent`, captured parameters escape | the review's g01, g02, h01, h04, h07, i08, j01, j06, mod2-mod4 and a piped session refused (`refuse/lend_*`, `loop_*`, `modules/`, sessions); `phaseb/` admitted with Phase B transcripts; R13, R17, R18 caught |
+| HIGH 2: cycles through captured cells were fatal | `Vm::refuse_cell_cycle`: catchable, cell unchanged | review k05, k07, k08, k09 (`approved/cell_cycle_*`); equal live heaps against a no-store control; R16 caught |
+| HIGH 3: stale EXPECT files | `closures-s1/EXPECT`, `for-s2/EXPECT` cite D-NEXT-refsem; cycle witnesses restored (`g1_*_cycle_cell.f`); static audit below | `test-runtime2-closures-s1`, `test-runtime2-for-s2` (section 12) |
+| MEDIUM 4: D5 for arrays claimed | records corrected (array snapshot with Phase B); in-loop mutation refused | `refuse/loop_*`, `for-s2`, `capture_origins` |
+| MEDIUM 5: large-storage stale references caught only every size/256+1 mutations | hand-out bit and credit (section 8) | five large take-mutate-once-use controls caught; R19 and relocation-off miss them; 200,000 inserts linear |
+| MEDIUM 6: re-inventory | section 11 | — |
+| LOW 7: object key mislabelled | `collection-object-key` | `refuse/key_object.f`, `collections/refuse/object_member.f` |
+
+**Static audit** (every `.f` under `tests/`, 1,763 files, `NIFT_VM=classify`
+with the base `18720d14` and the tip): 1,017 compile on the base; 85 of them
+are refused on the tip, 28 refused ones compile, 4 change reason. Of the 85,
+40 are this candidate's own (new) refusal fixtures and re-based D-063
+fixtures; the other 45 are `cp12c-probes` (30), `for-s2` (7), `closures-s1`
+(3), `semantics` (2), `vm-corpus/cp11` (2) and `for-s2-bench` (1), every one
+an array mutated while its loop or a call holds it, or a mutated alias of
+it. Each is checked against its EXPECT, table or golden (section 7); the
+`cp12c-probes` harness accepts refusals, `capture_origins.py` lists its 24
+cases explicitly.
+
+**Cost of the guard (owner guidance: a temporary internal measure).** On the
+release corpora (section 11) the guard costs nothing beyond the D-040
+witnesses. In `tests/` it refuses the loop-mutation and aliasing probes
+above. Common workloads, probed directly (base / tip):
+
+| Shape | Base | Tip |
+| --- | --- | --- |
+| build with `push`, then `for` to sum; `while` index updates; `filter`/`map` chains; a local passed to a reading helper; a global appended to from a helper called in a loop; rows of rows | VM | VM |
+| `for (x : a) { a[i] = x * 2; i += 1 }` (update the iterated array in place) | VM | refused (`lent`) |
+| a global array mutated by helper functions, then passed to a function that only reads it | VM | refused (`lent`) |
+
+The last two print the same in Phase B, but the guard cannot show it
+without index reasoning (which positions a loop body writes) and a call
+graph (which functions a call can reach). That is new inference machinery,
+so per the owner's guidance the guard is **not grown further**: the choice
+between keeping it, narrowing arrays and objects further, and bringing Phase
+B forward is the owner's (section 10).
+

@@ -47,6 +47,10 @@ JavaScript; the VM refuses them:
   function: `m := map(); f := () => m.size(); m.set("f", f)` (and the same for
   an instance field). A closure over a *top-level* binding reads it by name, so
   storing it closes no cycle and is accepted.
+- the cycle closed the other way, by storing into the captured binding
+  itself: `m.set("f", () => a.length())` then `a = [m]` or `a.push(m)` inside
+  a function. This refusal is catchable too, and the binding keeps its value
+  (review round 1: it was fatal).
 
 Migration: keep the back reference outside the object (an id into an owning
 collection, or a top-level binding the closure reads).
@@ -78,4 +82,6 @@ approved breaks and not completed behaviour.
 | A reference cycle through an array, an object or a closure (`m.set(1, [m])`, an object holding a closure that captures it): see "Reference cycles are refused" above | accepted (its tags are never freed) | catchable `runtime.reference_cycle` at run time, before the store | D-NEXT-refsem #4 |
 | A map, set or stack as a map key or set member, lookups included (`m.set(k, 1)` with `k := map()`, `s.add(s)`, `s.contains(t)`) | compares the tagged collections structurally (a key mutated later is looked up by its new contents) | `collection-mutable-key` | D-NEXT-refsem #6 |
 | An array or object program whose output would change once arrays and objects are references (Phase B): a mutated copy (`b := a; b.push(2)`, the former D-040 witnesses), a mutating function given a live array (`f(a)` that pushes, then reading `a`; `x = f(x)` stays admitted), an array stored in a collection or returned by a closure and then mutated, a mutated value read out of a collection or returned by an element method | copies (or location-aliases) as before | `reference-guard:<route>` | D-NEXT-refsem #9 |
+| (review round 1, whole-program guard) An array or object mutated while it is lent: an array mutated in its own `for` loop (`for (x : a) { a.push(x) }`, `a[i] = x * 2` inside it: Phase B iterates the live array), a binding mutated by a callee, closure, module function or later session statement while a call holds it (`fn f(x) { a.push(2); print(x) }; f(a)`), a later argument mutating an earlier one, a callback mutating its receiver; a parameter captured by a closure that outlives the call; a function used as a value that mutates its parameter. Also refused although Phase B would print the same (the guard has no index reasoning or call graph): an in-place update of the array a `for` iterates, and a global array mutated by helper functions then passed to a reading function | copies (or location-aliases) as before | `reference-guard:lent` (or `shared`, `argument`) | D-NEXT-refsem #9 (round 1) |
+| An object as a map key or set member | run-time error "key must be bool, number, or string" | refused before any effect (`collection-object-key`) | D-NEXT-refsem (round 1) |
 | Field access through a value that may be a struct instance or something else (a field initialised with `""` that later holds an instance, read back: `x := a.next; x.v = 7`) | runs (structs are tagged strings) | `struct-value` | D-NEXT-refsem #8 |

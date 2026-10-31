@@ -1658,3 +1658,60 @@ Witnesses: `tests/runtime2/refsem/` (`make test-runtime2-refsem`, fifteen
 mutation controls `test-runtime2-refsem-mutants`); the D-063 fixtures that
 became legacy-equal moved to `collections/parity/`, their value-semantics
 goldens kept in `collections/superseded/` (`INDEX.tsv`).
+
+**Review round 1 (independent review of `ad9d842f`, 2026-11-01).** The
+review rejected the candidate; these rulings amend 4, 6, 7, 9 and 11 above
+(the text above is kept as first written).
+
+- **9 amended: a whole-program guard.** The first guard reasoned per site
+  and missed mutations that run while a binding is lent (a callee mutating a
+  global its parameter aliases, a closure passed along with the binding, a
+  module function, a later session statement) and closures that capture a
+  parameter. It is replaced by a rule over the whole linked unit (modules are
+  linked into one unit, `module_link.h`): for every array/object binding that
+  is mutated in place anywhere (every binding, in a session),
+  (a) the exclusivity rules above (inflow, contents, retention) still hold,
+  with retention widened: a parameter any closure captures escapes, an
+  argument to an unresolved or callable callee is retained, a native given a
+  callable value that is not a lambda literal retains its operands' parts;
+  (b) **lent** (new route `reference-guard:lent`): while the binding's value
+  or a part of it is lent (to a call's parameter, a native and its
+  callbacks, a `for` loop), no mutation of it may be written inside that call
+  or loop (outside the lent expression itself), and if the binding is
+  referenced from any other body (function, method, lambda; a session's
+  later statements) the call or loop may not run user code;
+  (c) a loop binding or a native callback's parameter is a part of its
+  operand; a closure capturing it retains that part; a loop over a fresh
+  iterable (literal, constructing call) binds an exclusive value;
+  (d) a user function used as a value (or any function in a session) may not
+  mutate its parameters; aggregates held by struct instances are unknown
+  roots. Proof sketch (`checkpoint` §5): in the copy model and in Phase B
+  the outputs differ only if an object is mutated through one holder while a
+  second holder observes it; (a) excludes every second holder outliving an
+  operation, (b) every mutation during a lending, whose holders end with it.
+- **6 amended (D5 for arrays).** Array (and object) iteration is the
+  copy-on-write value in Phase A; an array mutated while its loop runs is
+  refused by (b), since Phase B would iterate the live array. Array snapshot
+  iteration as a reference rule lands with Phase B.
+- **4 amended.** A cycle closed by a store into a captured cell (closure
+  capture, upvalue) raises the catchable `runtime.reference_cycle` too; the
+  cell, the stored value, reference counts and heap accounting are left
+  unchanged.
+- **7 amended.** An object as a map key or set member is refused under its
+  own reason, `collection-object-key` (it was reported as a struct or handle).
+- **11 amended (relocation).** Larger storage also moves on the first
+  mutation after a reference or pointer into it was handed out (a header bit
+  set by the reference-returning accessors), so "take a reference, mutate
+  once, use it" is caught at every size; these moves draw on a per-thread
+  credit refilled by every mutation, so the moved volume stays linear.
+- **Cost (owner guidance of 2026-11-01: the guard is a temporary internal
+  measure).** CP25-R corpora (589 shared units, 608 execute entries): no
+  refusal beyond the four the first guard already made. `tests/` (1,757
+  `.f`): the new refusals are the loop-mutation and aliasing probes
+  (`for-s2`, `cp12c-probes`, `capture_origins`, `closures-s1`). Two common
+  shapes are newly refused although Phase B would print the same: an in-place
+  update of the array a `for` iterates (`for (x : a) { a[i] = x * 2 }`), and
+  a global array that helper functions mutate, passed to a function that only
+  reads it. Admitting them needs index reasoning and a call graph; the guard
+  is not grown further pending the owner's choice (keep it, narrow arrays and
+  objects further, or bring Phase B forward).
