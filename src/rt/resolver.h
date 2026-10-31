@@ -50,6 +50,7 @@ struct Binding {
     bool const_array = false;  // CP14B narrow array const admission
     bool const_scalar = false;  // CP25: `const`/`immut` scalar: every write is legacy's fatal Error
     bool readonly = false;  // CP13B: a catch binding (body-scoped, never assigned)
+    bool invocation = false;  // a script invocation binding (`cmd`, `args`), session or script
     std::uint16_t cell_reg = 0;
     std::uint16_t upvalue_index = 0;
     // CP12C slice 2 lazy `for` read binding (array single form).
@@ -71,6 +72,13 @@ struct Binding {
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };
+
+// D-062 (owner, 2026-10-31): a write to an invocation binding (`args = …`,
+// `cmd = …`, an element, compound or increment) is a program error rejected
+// before execution, `invocation-assign:<name>`; otherwise `other`.
+inline std::string write_refusal(const Binding* b, std::string_view name, const char* other) {
+    return b && b->invocation ? "invocation-assign:" + std::string(name) : std::string(other);
+}
 
 class Scopes {
 public:

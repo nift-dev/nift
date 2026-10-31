@@ -82,6 +82,7 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
         }
     }
     begin("", program, &assigned);
+    if (!invocation_prologue()) return false;
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
@@ -137,9 +138,9 @@ bool UnitCompiler::statement(NodeId id) {
             update_flags();
             return ok;  // keeps its binding registers
         case NodeKind::ExprStmt: ok = expression_statement(node); break;
-        case NodeKind::Assign: ok = assign(node); break;
-        case NodeKind::CompoundAssign: ok = compound_assign(node); break;
-        case NodeKind::IncDec: ok = inc_dec(node); break;
+        case NodeKind::Assign: ok = !invocation_write(id) && assign(node); break;
+        case NodeKind::CompoundAssign: ok = !invocation_write(id) && compound_assign(node); break;
+        case NodeKind::IncDec: ok = !invocation_write(id) && inc_dec(node); break;
         case NodeKind::If: ok = if_chain(node); break;
         case NodeKind::While: ok = while_loop(node); break;
         case NodeKind::For: ok = for_loop(node); break;
@@ -273,17 +274,6 @@ bool UnitCompiler::return_statement(const Node& node) {
     return true;
 }
 
-bool UnitCompiler::loop_jump(const Node& node) {
-    if (loops_.empty()) return fail(node, "jump-outside-loop");
-    fb_->set_offset(node.begin);
-    const std::size_t exited = try_scopes_.size() - loops_.back().try_depth;
-    for (std::size_t k = 0; k < exited; ++k) fb_->emit(OpCode::TryEnd, 0, 0, 1);
-    const std::size_t at = fb_->emit(OpCode::Jmp);
-    if (node.kind == NodeKind::Break) loops_.back().breaks.push_back(at);
-    else loops_.back().continues.push_back(at);
-    return builder_ok();
-}
-
 } // namespace detail
 
 static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const CompileLimits& limits,
@@ -309,7 +299,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     // copy); the order of the refusals is unchanged.
     // CP12b: free names of functions that resolve to top-level bindings.
     const GlobalPlan globals = plan_globals(ast, root, plan);
-    const UnitKinds kinds = infer_session_aliases(ast, root, plan, limits.kind_walks, &globals, limits.session);
+    const UnitKinds kinds = infer_session_aliases(ast, root, plan, &globals, limits);
     if (limits.session && kinds.converged) {
         const auto refusal = validate_session_history(kinds, plan.functions.size());
         if (!refusal.empty()) { result.reason = refusal; result.offset = ast.at(root).begin; return result; }
@@ -345,7 +335,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         return result;  // positioned only where the check recorded a node's offset (not coro-module)
     detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
     compiler.set_module_names(&limits.module_names);
-    compiler.set_session(limits.session);
+    compiler.set_session(limits.session, limits.invocation);
     if (expression_result) compiler.expression_result();
     compiler.set_parallel_tasks(limits.parallel_tasks);
     auto program = std::make_unique<Program>();
@@ -360,6 +350,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             if (expression_result) probe.expression_result();
             probe.set_module_names(&limits.module_names);
             probe.set_parallel_tasks(limits.parallel_tasks);
+            probe.set_session(nullptr, limits.invocation);
             Program discarded;
             if (!probe.compile_program(root, discarded) && !probe.reason().empty()) {
                 result.reason = probe.reason();

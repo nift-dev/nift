@@ -12,7 +12,7 @@
 namespace nift::rt::detail {
 
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
-    if (reserved_name(name)) return fail(at, "binding-name-reserved");
+    if (reserved_name(name) && !invocation_shadows_.count(node_id(at))) return fail(at, "binding-name-reserved");
     if (plan_.index.count(name)) return fail(at, "binding-shadows-fn");
     // The type register comes first so the value register is the newest one
     // (a call initialiser then returns in place).
@@ -156,7 +156,8 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
         // Const admission is limited to CP14B's guarded methods. The older
         // generic index setter has no const lifecycle contract: retain refusal.
-        if(holder&&(holder->const_array||holder->const_scalar))return fail(target,"declare-const");
+        if(holder&&(holder->const_array||holder->const_scalar))
+            return fail(target,write_refusal(holder,text(object),"declare-const"));
         const bool global = holder != nullptr && holder->global;
         const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
         const Binding held = (global || indirect) ? *holder : Binding();
@@ -193,7 +194,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
     if (!binding)
         if (const StructFieldInfo* field = own_field(text(target)))  // CP12b: an implicit field
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
-    if (!binding) return fail(target, "assign-free-name");
+    if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
     if (binding->const_array) return fail(target, "declare-const");
     if (binding->const_scalar) return const_write(node, nullptr, result, *binding, false);  // CP25: before the value
     if (binding->readonly) return fail(target,
@@ -280,7 +281,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     if (!reason_.empty()) return false;
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
     const Binding* binding = find_binding(text(target));
-    if (!binding) return fail(target, "assign-free-name");
+    if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
     if (binding->const_array) return fail(target, "declare-const");
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
@@ -317,7 +318,7 @@ bool UnitCompiler::inc_dec(const Node& node) {
     if (!reason_.empty()) return false;
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* binding = find_binding(text(target));
-    if (!binding) return fail(target, "assign-free-name");
+    if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
     if (binding->const_array) return fail(target, "declare-const");
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
@@ -333,7 +334,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     const Node& target = ast_.at(node.a);
     if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
     const Binding* found = find_binding(text(target));
-    if (!found) return fail(target, "assign-free-name");
+    if (!found || found->invocation) return fail(target, write_refusal(found, text(target), "assign-free-name"));
     if (found->const_array) return fail(target, "declare-const");
     if (found->readonly) return fail(target, "assign-catch-binding");
     const Binding b = *found;

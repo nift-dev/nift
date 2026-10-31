@@ -30,6 +30,8 @@
 #include <string_view>
 #include <vector>
 
+namespace nift::rt { struct InvocationBinding; }
+
 namespace nift::rt {
 
 struct InventoryItem {
@@ -51,8 +53,11 @@ struct RefusalInventory {
     std::size_t rounds = 0;            // compilations run
 };
 
+// `invocation`: the script invocation bindings the run installs
+// (CompileLimits::invocation); the inventory compiles with them as the run does.
 RefusalInventory inventory_refusals(std::string_view source,
                                    const std::filesystem::path& source_path = {},
-                                   std::size_t max_rounds = 2048);
+                                   std::size_t max_rounds = 2048,
+                                   const std::vector<InvocationBinding>* invocation = nullptr);
 
 } // namespace nift::rt

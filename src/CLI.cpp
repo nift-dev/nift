@@ -1908,7 +1908,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     // back; returns false to run legacy unchanged (NIFT_VM=0, or a mode-1 fallback).
     if (!interactive_after) {
         int vm_exit = 0;
-        if (nift::rt::run_script_on_vm(source, source_path, vm_exit)) return vm_exit;
+        if (nift::rt::run_script_on_vm(source, source_path, cmd, script_args, vm_exit)) return vm_exit;
     }
     ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host,info);
     parser.set_script_invocation(cmd, script_args);

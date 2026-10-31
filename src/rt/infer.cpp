@@ -15,8 +15,8 @@
 namespace nift::rt {
 namespace infer_detail {
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
-                     const SessionCompileContext* session)
-    : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session) {
+                     const SessionCompileContext* session, const std::vector<InvocationBinding>* invocation)
+    : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session), invocation_(invocation) {
     if (session && (!session->call_result_seeds.empty() || !session->opaque_call_seeds.empty()))
         result_.session_proof = std::make_shared<SessionInferenceProof>();
     result_.kinds.assign(ast.size(), static_cast<KindSet>(kKindAll | kKindUnknown));

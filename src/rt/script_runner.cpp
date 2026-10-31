@@ -1,11 +1,11 @@
 #include "rt/script_runner.h"
 #include "rt/script_runner_stats.h"
 #include "rt/script_runner_options.h"
+#include "rt/session_invocation.h"
 
 #include "HostTrace.h"
 #include "rt/compiler_eval.h"
 #include "rt/eval_result.h"
-#include "rt/eval_refusal_inventory.h"
 #include "rt/compiler_coro_admit.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
@@ -15,7 +15,6 @@
 #include "rt/natives/builtin.h"
 #include "rt/opcodes.h"
 #include "rt/parser.h"
-#include "rt/refusal_inventory.h"
 #include "rt/refusal_text.h"
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
@@ -103,7 +102,8 @@ void internal_failure(Stats& stats, const std::filesystem::path& path, const std
 struct EvalResult { nift::RuntimeValue& value; std::string& error; };
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
-              int& exit_code, EvalResult* eval = nullptr);
+              int& exit_code, EvalResult* eval = nullptr,
+              std::vector<InvocationBinding>* invocation = nullptr);
 
 SourceMap source_map_for(const LinkedUnit& link, const std::filesystem::path& path, const std::string& source) {
     return link.linked ? SourceMap::linked(link, path.generic_string(), source)
@@ -143,14 +143,19 @@ std::string vm_mode_configuration_error() {
            "interpreter), 1 (the VM with legacy fallback), classify, classify-all; nothing was run";
 }
 
-bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path, int& exit_code) {
+bool run_script_on_vm(const std::string& source, const std::filesystem::path& source_path,
+                      const std::string& command, const std::vector<std::string>& arguments, int& exit_code) {
     const VmMode mode = vm_mode_from_environment();
     if (mode == VmMode::Off) return false;
     Stats stats;
     stats.source_bytes = source.size();
     stats.path = source_path.generic_string();
     try {
-        return run_unit(source, source_path, mode, stats, exit_code);
+        std::vector<InvocationBinding> invocation = invocation_bindings(command, arguments);
+#if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 1  // test-only: no script bindings (args_cmd/mutants.sh)
+        return run_unit(source, source_path, mode, stats, exit_code, nullptr, nullptr);
+#endif
+        return run_unit(source, source_path, mode, stats, exit_code, nullptr, &invocation);
     } catch (const std::bad_alloc&) {
         internal_failure(stats, source_path, "out of memory (std::bad_alloc)", exit_code);
     } catch (const std::exception& error) {
@@ -182,35 +187,6 @@ bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
 }
 
 namespace {
-
-// The source line containing `offset` (at most 160 bytes), for the inventory.
-std::string line_text(const std::string& source, std::uint32_t offset) {
-    const std::size_t begin = source.rfind('\n', offset == 0 ? 0 : offset - 1);
-    const std::size_t from = begin == std::string::npos || offset == 0 ? 0 : begin + 1;
-    const std::size_t end = source.find('\n', offset);
-    return source.substr(from, std::min<std::size_t>((end == std::string::npos ? source.size() : end) - from, 160));
-}
-
-// NIFT_VM=classify-all: every refusal reason (rt/refusal_inventory.h).
-void add_inventory(const std::string& source, const std::filesystem::path& source_path, Stats& stats, bool eval) {
-    const RefusalInventory inventory = eval ? inventory_eval_refusals(source) : inventory_refusals(source, source_path);
-    std::string out = ",\"reasons\":[";
-    for (std::size_t k = 0; k < inventory.items.size(); ++k) {
-        const InventoryItem& item = inventory.items[k];
-        const std::string text = item.text.empty() ? line_text(source, item.offset) : item.text;
-        out += (k ? ",{" : "{") + std::string("\"reason\":\"") + json_escape(item.reason) +
-               "\",\"line\":" + std::to_string(item.line) + ",\"column\":" + std::to_string(item.column) +
-               ",\"consequential\":" + (item.consequential ? "true" : "false") +
-               (item.path.empty() ? std::string() : ",\"path\":\"" + json_escape(item.path) + "\"") +
-               (item.detail.empty() ? std::string() : ",\"detail\":\"" + json_escape(item.detail) + "\"" +
-                                                         ",\"text\":\"" + json_escape(text) +
-                                                         "\"") + "}";
-    }
-    out += "],\"inventory_complete\":" + std::string(inventory.complete ? "true" : "false") +
-           ",\"inventory_stop\":\"" + json_escape(inventory.stop) + "\",\"inventory_rounds\":" +
-           std::to_string(inventory.rounds);
-    stats.inventory_json = out;
-}
 
 bool finish_run(const std::string& source, const std::filesystem::path& source_path,
                 const LinkedUnit& link, const VmResult& result, const Value& returned,
@@ -280,8 +256,8 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
 }
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
-              int& exit_code, EvalResult* eval) {
-    if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats, eval != nullptr);
+              int& exit_code, EvalResult* eval, std::vector<InvocationBinding>* invocation) {
+    if (mode == VmMode::ClassifyAll) add_inventory(source, source_path, stats, eval != nullptr, invocation);
     const auto t0 = Clock::now();
     Ast ast(source);
     ParseResult parsed;
@@ -303,7 +279,8 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     // CP12b modules: a unit with imports compiles as its linked text
     // (rt/module_link.h); positions map back to their module (unrecorded: the entry's).
-    const LinkedUnit link = eval ? LinkedUnit() : link_unit(ast, parsed.root, source, source_path);
+    const LinkedUnit link =
+        eval ? LinkedUnit() : link_unit(ast, parsed.root, source, source_path, invocation_names(invocation));
     std::filesystem::path report_path = source_path;
     const auto locate_linked = [&](std::uint32_t offset, bool positioned) {
         stats.positioned = positioned;
@@ -333,10 +310,14 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     CompileLimits limits;
     limits.module_names = link.module_names; limits.linked = link.linked; cooperative_switches(limits);
+    limits.invocation = invocation;  // the script's `cmd`/`args` (rt/session_invocation.h)
+    if (invocation) locate_invocation_shadows(*invocation, link.linked ? linked_ast : ast, unit_root,
+        [&](std::uint32_t at) { return !link.linked || link.locate(at).module == 0; });
     CompileResult compiled = eval ? compile_eval_program(ast, make_eval_program(ast, parsed.root), limits)
                                   : compile_unit(link.linked ? linked_ast : ast, unit_root, limits);
     const auto t2 = Clock::now();
     stats.compile_us = micros(t1, t2);
+    if (invocation) invocation->clear();  // the program holds what it uses; the rest is not live heap
     if (!compiled.program) {
         stats.reason = compiled.reason;
         locate_linked(compiled.offset, compiled.positioned);
