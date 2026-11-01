@@ -157,3 +157,40 @@ integrated tree.
   difference; the `genuine()` test helper is improved when the harness is next touched.
 - The ACCEPT and certification establish that this candidate meets its agreed checkpoint
   contract and passes its gates; they are not a claim that Runtime 2.0 as a whole is correct.
+
+## Reference semantics Phase A integration (2026-11-01)
+
+`weekend/r2` fast-forwarded from `9ee77096` to `90ab2ef4` (tree `0ab6e16e`), the certified tip
+of `integ/refsem-a`. Four identities, kept distinct:
+1. **Accepted production source:** `73b327e5` (tree `480a8f5c`). Reviews 1-4 REJECT (kept),
+   Review 5 ACCEPT (two LOW, recorded for Phase B). Its standalone Linode run
+   (`refsem-73b327e5`) FAILED cp19-functional, cp19-session-cli x2 and test-rt-vm (cp14b
+   `splice_throw`); it is historical evidence, not a pass.
+2. **Test corrections (no `src/` changes):** `fdcdd0ed`, `104f83cb` on `cand/refsem-a` (CP19
+   `unrelated-callback-shadow`; cp14b `splice_throw` per the F2 splice ruling; design mutant 11
+   redefined as remove-first; guarded cp14b witnesses preserved); on `integ/refsem-a`
+   `5d553e2b` (four args-cmd cases, owner Option 2, guard frozen), `c3704a38` (five review
+   LOWs), `2a1c228a` (mutant 5 suspended; REJECTED by independent review, F1: mutant 5 is
+   witnessable by classification), `90ab2ef4` (mutant 5 reinstated with the `args.push(args)`
+   witness; coordinator-verified on both builds, not a new independent ACCEPT). Preserved
+   originals and legacy expectations: `tests/runtime2/refsem/pending/`.
+3. **Integration:** merges `afaf3920` (73b327e5) and `0779c1df` (104f83cb) into `9ee77096`;
+   follow-ups `99a19d31` (coro-module D-063 renumbered D-064; combined fixtures) and `542f0a65`
+   (lint, comments only). Merge-resolution review ACCEPT on `542f0a65` (five LOW, fixed).
+4. **Certification:** Linode `integ-refsem-90ab2ef4` on the exact tree `0ab6e16e`: all 43 gates
+   exit 0, including refsem/collections/for-s2 sanitize and tsan lanes, every mutant lane
+   (args-cmd mutants 1,2,3,5,6 caught; cp14b design 1-11 detected, 12 unverified comparator
+   profile), packages (three lanes), coro-module, cp14b, cp19 + session CLI x2, cp22, cp23,
+   vm-default, prebuild 1032 s + full test-rt-vm 1592 s; no OOM. The `2a1c228a` run was stopped
+   (tree superseded) and is diagnostic only.
+- These establish that the candidate meets its agreed checkpoint contract; they are not a claim
+  that Runtime 2.0 as a whole is correct.
+- Pre-release safety blockers (pre-existing on `9ee77096`, not Phase A): presenting
+  `mutex()`/`channel()` values exits 70 after output; `for (a : args) { a.push(1) }` exits 70
+  after output. Both must be fixed (correct execution or pre-execution refusal) before release.
+- Phase B requirements recorded: remove the reference guard and every pending over-refusal
+  (incl. nift-packages/http `capabilities()`, iteration over `args`); privacy-aware struct
+  rendering; one validate-commit-bookkeeping mutation protocol; operation-level admission;
+  settle the `args` immutability contract (owner preference: the injected `args` array is
+  immutable through every alias, not just a non-reassignable binding) and re-witness args-cmd
+  mutant 5 through the real const-mutation error.
