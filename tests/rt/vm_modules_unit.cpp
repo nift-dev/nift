@@ -240,9 +240,9 @@ void check_details() {
     }
     {
         // `return <value>` in a module (a program error): reported at the
-        // import in its importer, as legacy, with the `return` in the module.
+        // `return` itself, in that module (contract §4.6).
         const Planned p = plan(probe("module_return"), InitPolicy::RefuseReinitialisation);
-        CHECK(p.graph.error.where == 0 && p.graph.error.return_note && p.graph.error.return_where == 1 &&
+        CHECK(p.graph.program_error && p.graph.error.where == 1 && p.graph.error.positioned &&
               name_of(p.graph.modules[1]->path) == "ret.nft");
     }
     {

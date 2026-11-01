@@ -215,9 +215,11 @@ InvocationPlan plan_invocation(const std::vector<InvocationUnit>& units, const M
             }
         }
         // The entry's binding: never at top level, never in init-reachable code.
+#if !(defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 7)  // test-only (packages/mutants.sh)
         for (const Mention& t : scans[m].top)
             if (named(names, t.name) && !named(plan.private_names[m], t.name))
                 add(t.offset, "import-scope:invocation-init");
+#endif
         for (std::size_t f : scans[m].functions) {
             if (!init[f].first) continue;
             for (const Mention& r : table[f].mentions)

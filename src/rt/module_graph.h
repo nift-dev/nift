@@ -22,8 +22,8 @@
 // legacy's rules (rt/package_resolve.h) under one read lock held for the build.
 //
 // Program errors (D-NEXT-packages, checkpoints/weekend-packages.md §4.2, §4.3)
-// are not refusals: the program is invalid, legacy fails on it too, and the
-// unit is rejected before anything runs with legacy's text (GraphError):
+// are not refusals: the program is invalid, and the unit is rejected before
+// anything runs, with a stable id, a recorded position and a message (GraphError):
 //   import-error:package       a package resolution step (name, store, manifest, lock, revision)
 //   import-error:package-lock  the package read lock cannot be acquired
 //   import-error:missing       the module cannot be read
@@ -31,14 +31,12 @@
 //   import-error:package-escape a package-relative import leaves its package,
 //                              or has no frozen package provenance (absolute import below a package)
 //   module-error:syntax        a module fails legacy's load-time prevalidation (rt/prevalidate.h)
-//   import-scope:invocation-init  a module's top-level code reads the entry's args/cmd
+//   import-scope:invocation-export  a module exports its own args/cmd into the entry
 //   module-error:return-value  `return <value>` outside functions in a module
 //   module-error:export-missing / export-duplicate / export-name
-// Order (determinism rule): the first program error in legacy's execution
-// order (depth first, statement order; a construct inside a block counts at
-// its top-level statement), never hash or directory order. A program error
-// wins over any feature refusal: the walk records the first refusal and goes on
-// through every unit it can parse.
+// Order (owner policy, §4.6): the walk is depth first in statement order and
+// stops at the first problem it finds, refusal or program error; it never
+// depends on hash or directory order.
 #include "rt/ast.h"
 
 #include <cstddef>
@@ -102,15 +100,6 @@ struct GraphError {
     std::size_t where = 0;     // module of the reported position
     std::uint32_t offset = 0;
     bool positioned = false;   // set by every error site
-    // `module-error:return-value`: the `return` itself (legacy reports at the import).
-    bool return_note = false;
-    std::size_t return_where = 0;
-    std::uint32_t return_offset = 0;
-    std::uint32_t entry_item = 0;  // the entry's top-level statement under which it happens
-    // A top-level `return` earlier on the active chain: legacy stops there first.
-    bool early_return = false;
-    std::size_t early_where = 0;
-    std::uint32_t early_offset = 0;
 };
 
 struct ModuleGraph {

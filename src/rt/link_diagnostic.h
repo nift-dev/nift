@@ -8,22 +8,10 @@
 
 #include <filesystem>
 #include <string>
-#include <vector>
 
 namespace nift::rt {
 
-struct InvocationBinding;
-
 void describe_link_refusal(const LinkedUnit& link, const std::filesystem::path& source_path, const std::string& source,
-                           detail::Stats& stats, std::filesystem::path& report_path);
-
-// A program error found by the graph: compiles the entry's statements before
-// the one it happens under (LinkedUnit::prefix_link) and, when that finds a
-// compile-time program error (static-error:*, invocation-assign:*), which is
-// earlier in execution order, fills `stats`/`report_path` with it and returns
-// true (it is reported instead).
-bool earlier_compile_error(const LinkedUnit& link, const std::filesystem::path& source_path,
-                           const std::string& source, std::vector<InvocationBinding>* invocation,
                            detail::Stats& stats, std::filesystem::path& report_path);
 
 } // namespace nift::rt

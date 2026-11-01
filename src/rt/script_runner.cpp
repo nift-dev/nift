@@ -293,8 +293,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
                     static_cast<std::uint32_t>(at.offset));
     };
     if (link.linked && !link.ok) {
-        if (!earlier_compile_error(link, source_path, source, invocation, stats, report_path))
-            describe_link_refusal(link, source_path, source, stats, report_path);
+        describe_link_refusal(link, source_path, source, stats, report_path);
         return not_compiled(stats, mode, report_path, exit_code);
     }
     Ast linked_ast(link.linked ? std::string_view(link.text) : std::string_view());

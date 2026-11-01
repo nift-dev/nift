@@ -1,7 +1,6 @@
 #include "rt/module_link.h"
 
 #include "rt/module_invocation.h"
-#include "rt/module_link_prefix.h"
 
 #include <algorithm>
 #include <functional>
@@ -282,7 +281,6 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
         const GraphError& e = out.graph.error;
         refuse(e.where, e.offset, e.id, e.positioned);
         out.program_error = true;
-        link_prefix(out, entry, root, entry_source, entry_path, entry_names);
         return out;
     }
     if (!out.graph.ok) {
@@ -331,11 +329,7 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
                 const bool inside = !before(name.data(), text.data()) &&
                                     before(name.data(), text.data() + text.size());
                 const std::uint32_t offset = inside ? static_cast<std::uint32_t>(name.data() - text.data()) : 0;
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 13  // test-only (packages/mutants.sh)
-                if (!clash || (inside && offset > at)) {
-#else
                 if (!clash || (inside && (!positioned || offset < at))) {
-#endif
                     at = offset;
                     positioned = inside;
                 }

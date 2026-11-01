@@ -52,15 +52,6 @@ std::vector<std::string_view> importer_names(const Ast& ast, NodeId root);
 // An import's plain string-literal argument (empty included: a package name).
 bool literal_argument(const Ast& ast, const Node& st, std::string& out);
 
-// The offset of the first top-level statement before `item` that is itself
-// a `return` (unconditional), or UINT32_MAX.
-std::uint32_t first_unconditional_return(const Ast& ast, NodeId root, std::uint32_t item);
-
-// The first read of one of `names` outside functions and lambdas in one
-// statement (UINT32_MAX: none), its node in `node`.
-std::uint32_t invocation_read(const Ast& ast, NodeId statement, const std::vector<std::string_view>& names,
-                              NodeId& node);
-
 // The first import or export (in text order) that is not a top-level
 // statement: "import-nested" / "export-nested" at `at`, or nullptr.
 const char* first_misplaced(const Ast& ast, NodeId root, std::uint32_t& at);
@@ -69,12 +60,8 @@ const char* first_misplaced(const Ast& ast, NodeId root, std::uint32_t& at);
 // NIFT_PREVALIDATE=off skips it, as legacy): false with the first failure.
 bool module_prevalidates(const std::string& source, std::uint32_t& offset, std::string& message);
 
-// The first of `names` (the entry's invocation bindings) a module exports
-// into the entry (`importer` 0), or empty.
-std::string_view invocation_export(std::size_t importer, const std::vector<std::string_view>& exports,
-                                   const std::vector<std::string_view>& names);
-
-// The unit declares one of `names` by a plain top-level statement.
-bool private_invocation(const Ast& ast, NodeId root, const std::vector<std::string_view>& names);
+// An export named like one of `names` (the entry's invocation bindings)
+// into the entry (`importer` 0).
+bool invocation_export(std::size_t importer, std::string_view exported, const std::vector<std::string_view>& names);
 
 } // namespace nift::rt

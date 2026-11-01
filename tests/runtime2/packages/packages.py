@@ -141,6 +141,32 @@ def same_error_as_legacy(label, files, script="m.f", cwd=".", reason=None, notes
     return vm, legacy
 
 
+def genuine(label, files, reason, at, text=None, script="m.f", cwd=".", args=(), program_error=True):
+    """Owner diagnostic policy (contract §4.6): the reported error is genuine and classified (`reason`), at a
+    recorded position (`at`, R-relative), with a meaningful message, rejected before any user-program effect.
+    Which of several genuine errors is reported follows the VM's documented order, not legacy's."""
+    root = tree(files)
+    before = snapshot(root)
+    vm, rows = run([script, *args], root / cwd)
+    after = snapshot(root)
+    line = error_line(vm.stderr).replace(str(root), "R")
+    check(vm.returncode == 1 and vm.stdout == "", label + ": rejected, exit 1, no output", repr((vm.returncode, vm.stderr)))
+    check(any(r.get("reason") == reason for r in rows), label + ": reason " + reason, repr((rows, vm.stderr)))
+    check(line.startswith("error: " + at + ":"), label + ": at " + at, line)
+    if text:
+        check(text in line, label + ": message", line)
+    check("no exact position" not in vm.stderr, label + ": a recorded position", vm.stderr)
+    if program_error:
+        check("not supported" not in vm.stderr and "not compiled for the VM" not in vm.stderr,
+              label + ": a program error, not a missing feature", vm.stderr)
+    check(not any(r.get("vm_executions") for r in rows), label + ": nothing executed", repr(rows))
+    created = sorted(set(after) - set(before) - {".nift/.packages-transaction.lock"})
+    check(not created and all(before[k] == after.get(k) for k in before), label + ": no user-program effect",
+          repr(created))
+    shutil.rmtree(root)
+    return vm
+
+
 def parity(label, files, script="m.f", cwd=".", args=(), expect=None):
     vm_root = tree(files)
     lg_root = tree(files)
@@ -284,12 +310,6 @@ def section_a():
 def section_b():
     """Module program errors (Q6, C3)."""
     cases = [
-        ("B return value", {"r.f": 'x := 1\nreturn 5\n', "m.f": EARLY + 'import("r.f")\n'}, "module-error:return-value",
-         ["note: the `return` is at R/r.f:2:1"]),
-        ("B return value, depth 2", {"r.f": 'return 5\n', "mid.f": 'import("r.f")\n', "m.f": EARLY + 'import("mid.f")\n'},
-         "module-error:return-value", ["note: the `return` is at R/r.f:1:1"]),
-        ("B return value via @import", {"r.f": 'return 5\n', "m.f": EARLY + '@import("r.f")\n'},
-         "module-error:return-value", []),
         ("B export missing", {"e.f": 'export(nope)\n', "m.f": EARLY + 'import("e.f")\n'}, "module-error:export-missing", []),
         ("B export missing after a function", {"e.f": 'fn(g()) { return 2 }\nexport(g)\nexport(nope)\n',
                                                "m.f": EARLY + 'import("e.f")\n'}, "module-error:export-missing", []),
@@ -310,6 +330,13 @@ def section_b():
                                                      "m.f": EARLY + 'import("mid.f")\n'}, "module-error:export-name", []))
     for label, files, reason, notes in cases:
         same_error_as_legacy(label, files, reason=reason, notes=notes)
+    # `return <value>` in a module: reported at the `return` itself (owner policy: the VM's own position).
+    genuine("B return value", {"r.f": 'x := 1\nreturn 5\n', "m.f": EARLY + 'import("r.f")\n'},
+            "module-error:return-value", "R/r.f:2:1", "import: return with a value is not allowed in import")
+    genuine("B return value, depth 2", {"r.f": 'return 5\n', "mid.f": 'import("r.f")\n', "m.f": EARLY + 'import("mid.f")\n'},
+            "module-error:return-value", "R/r.f:1:1", "import: import: return with a value is not allowed in import")
+    genuine("B return value via @import", {"r.f": 'return 5\n', "m.f": EARLY + '@import("r.f")\n'},
+            "module-error:return-value", "R/r.f:1:1", "@import: return with a value is not allowed in @import")
     # Valid exports are unaffected.
     parity("B valid exports", {"e.f": 'x := 1\nfn(f()) { return x + 1 }\nimport("g.f")\nexport(x)\nexport(f)\nexport(gv)\n',
                                "g.f": 'gv := 7\nexport(gv)\n', "m.f": 'import("e.f")\nprint(x)\nprint(f())\nprint(gv)\n'},
@@ -323,7 +350,7 @@ def section_b():
     vm, rows = run(["m.f"], root)
     legacy, _ = run(["m.f"], root, "0")
     check(legacy.returncode == 0 and vm.returncode == 1 and "return with a value is not allowed in import" in vm.stderr
-          and "note: the `return` is at" in vm.stderr and vm.stdout == "",
+          and "R/c.f:1:14:" in vm.stderr.replace(str(root), "R") and vm.stdout == "",
           "B return in an untaken branch: rejected by the static rule (recorded difference)",
           repr((legacy.returncode, vm.stderr)))
     shutil.rmtree(root)
@@ -338,7 +365,11 @@ def section_c():
                  "a.f": 'import("b.f")\n', "b.f": 'import("a.f")\n', "e.f": 'export(nope)\n', "r.f": 'return 1\n',
                  "n.f": 'export(1)\n',
                  "m.f": 'print("entry ran")\ntouch("marker.txt")\nimport("ok.f")\n' + failing}
-        vm, legacy = same_error_as_legacy("C " + label + " after effects and a loaded module", files)
+        if label == "return value":  # reported at the `return` (owner policy), so not legacy's position
+            genuine("C return value after effects and a loaded module", files, "module-error:return-value", "R/r.f:1:1")
+            legacy, _ = run(["m.f"], tree(files), "0")
+        else:
+            vm, legacy = same_error_as_legacy("C " + label + " after effects and a loaded module", files)
         check("entry ran" in legacy.stdout and "ok module ran" in legacy.stdout,
               "C " + label + ": control: legacy ran the earlier statements and module", repr(legacy.stdout))
         root = tree(files)
@@ -352,8 +383,8 @@ def section_d():
     # A missing import before `return 5`: the missing import (legacy order).
     same_error_as_legacy("D missing import before return", {"c.f": 'import("missing.f")\nreturn 5\n',
                                                             "m.f": EARLY + 'import("c.f")\n'}, reason="import-error:missing")
-    same_error_as_legacy("D return before missing import", {"c.f": 'return 5\nimport("missing.f")\n',
-                                                            "m.f": 'import("c.f")\n'}, reason="module-error:return-value")
+    genuine("D return before missing import", {"c.f": 'return 5\nimport("missing.f")\n', "m.f": 'import("c.f")\n'},
+            "module-error:return-value", "R/c.f:1:1")
     same_error_as_legacy("D two missing imports", {"m.f": EARLY + 'import("one.f")\nimport("two.f")\n'},
                          reason="import-error:missing")
     same_error_as_legacy("D export(1) in A, missing import in B",
@@ -362,10 +393,9 @@ def section_d():
     same_error_as_legacy("D missing import in B first",
                          {"a.f": 'export(1)\n', "b.f": 'import("missing.f")\n', "m.f": 'import("b.f")\nimport("a.f")\n'},
                          reason="import-error:missing")
-    # A program error after a feature refusal: the program error (row 34's shape).
-    vm, _ = same_error_as_legacy("D program error over an earlier feature refusal",
-                                 {"m.f": 'fn(load()) { import("./x.f"); return 1 }\nimport("missing.f")\n'},
-                                 reason="import-error:missing")
+    # A feature refusal found first by the walk is reported (owner policy: the walk stops at the first problem).
+    genuine("D feature refusal found first", {"m.f": 'fn(load()) { import("./x.f"); return 1 }\nimport("missing.f")\n'},
+            "import-nested", "R/m.f:1:14", program_error=False)
     # The early-`return` note (legacy exits 0 before the import).
     files = {"m.f": 'print("b")\nreturn\nimport("missing.f")\n'}
     root = tree(files)
@@ -373,10 +403,8 @@ def section_d():
     legacy, _ = run(["m.f"], root, "0")
     st = vm.stderr.replace(str(root), "R")
     check(legacy.returncode == 0 and vm.returncode == 1 and vm.stdout == "" and
-          "error: R/m.f:3:1: import: script is not readable: R/missing.f" in st and
-          "note: a top-level `return` at R/m.f:2:1 comes before this; legacy would stop there without reaching it "
-          "(exit 0)" in st and "not supported" not in st,
-          "D early return: rejected with the real reason and the note", repr((legacy.returncode, st)))
+          "error: R/m.f:3:1: import: script is not readable: R/missing.f" in st and "not supported" not in st,
+          "D early return: the import is rejected with its real reason (recorded difference)", repr((legacy.returncode, st)))
     shutil.rmtree(root)
     # Determinism: the same diagnostic whatever the creation order, directory
     # order or name lengths (hash bucketing).
@@ -849,30 +877,20 @@ def section_r():
     same_error_as_legacy("R legacy-runtime-error region in a module stops the walk",
                          {"mod.f": 'f := (a,) => a\nimport("missing.f")\n', "m.f": EARLY + 'import("mod.f")\n'},
                          reason="module-error:syntax")
-    for label, files, at in (
-            ("R invocation-init before a later missing import",
-             {"a.f": 'n := args.size()\nfn(f()) { return n }\nexport(f)\n', "m.f": 'import("a.f")\nimport("missing.f")\n'},
-             "R/a.f:1:6"),
-            ("R invocation-init before a later export-missing in the same module",
-             {"b.f": 'n := args.size()\nexport(nope)\n', "m.f": 'import("b.f")\n'}, "R/b.f:1:6"),
-            ("R invocation-init through a function before a later missing import",
-             {"a.f": 'fn(n()) { return args.size() }\ny := n()\nexport(y)\n', "m.f": 'import("a.f")\nimport("missing.f")\n'},
-             "R/a.f:1:18")):
-        root = tree(files)
-        vm, rows = run(["m.f", "x"], root)
-        legacy, _ = run(["m.f", "x"], root, "0")
-        check(vm.returncode == 1 and vm.stdout == "" and error_line(vm.stderr).replace(str(root), "R").startswith(
-              "error: " + at + ":") and any(r.get("reason") == "import-scope:invocation-init" for r in rows) and
-              "unknown value or malformed expression: args" in legacy.stderr,
-              label, repr((vm.stderr, legacy.stderr)))
-        shutil.rmtree(root)
-    root = tree({"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'})
-    vm, rows = run(["m.f"], root)
-    legacy, _ = run(["m.f"], root, "0")
-    check(vm.returncode == 1 and "m.f:2:1:" in error_line(vm.stderr) and "m.f:2:1:" in error_line(legacy.stderr) and
-          any(r.get("reason") == "static-error:redeclared" for r in rows),
-          "R an entry compile-time error before a later graph error wins", repr((vm.stderr, legacy.stderr, rows)))
-    shutil.rmtree(root)
+    # Several errors: the VM's own documented order (contract §4.6): the module graph first (depth first,
+    # statement order, first problem stops it), then the linker's checks (here the args/cmd planner), then the
+    # compiler. Each case reports a genuine, classified, positioned error before any effect.
+    genuine("R graph error before the planner's invocation-init",
+            {"a.f": 'n := args.size()\nfn(f()) { return n }\nexport(f)\n', "m.f": 'import("a.f")\nimport("missing.f")\n'},
+            "import-error:missing", "R/m.f:2:1", args=("x",))
+    genuine("R graph export-missing before the planner's invocation-init",
+            {"b.f": 'n := args.size()\nexport(nope)\n', "m.f": 'import("b.f")\n'},
+            "module-error:export-missing", "R/b.f:2:1", args=("x",))
+    genuine("R invocation-init when the graph is clean",
+            {"b.f": 'n := args.size()\nexport(n)\n', "m.f": 'import("b.f")\nprint(n)\n'},
+            "import-scope:invocation-init", "R/b.f:1:6", args=("x",))
+    genuine("R graph error before a compile-time error", {"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'},
+            "import-error:missing", "R/m.f:3:1")
     # The early-return note only for an unconditional top-level `return`.
     for label, files in (("R conditional return in the entry: no note",
                           {"m.f": 'x := 0\nif (x == 1) { return }\nprint("b")\nimport("missing.f")\n'}),
@@ -913,30 +931,42 @@ def section_r():
 
 
 def section_s():
-    """Narrow review of 2f37ed36: only code legacy runs outranks; invocation-export in execution order."""
+    """Errors in code that never runs do not matter; collisions name the binding that collides (F3)."""
     for label, entry in (
             ("S redeclaration in a function never called", 'fn(g()) { y := 1\n y := 2\n return y }\nimport("missing.f")\n'),
             ("S arity error in a function never called",
              'fn(g(a)) { return a }\nfn(h()) { return g() }\nimport("missing.f")\n'),
             ("S redeclaration in a branch not taken", 'x := 0\nif (x == 1) { y := 1\n y := 2 }\nimport("missing.f")\n')):
         same_error_as_legacy(label + ": the missing import, as legacy", {"m.f": entry}, reason="import-error:missing")
-    # Unconditional top-level code still outranks (d3/e2.f).
-    root = tree({"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'})
-    vm, rows = run(["m.f"], root)
-    check("m.f:2:1:" in error_line(vm.stderr) and any(r.get("reason") == "static-error:redeclared" for r in rows),
-          "S unconditional top-level redeclaration still wins", vm.stderr)
-    shutil.rmtree(root)
+    genuine("S graph error reported before the compiler runs", {"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'},
+            "import-error:missing", "R/m.f:3:1")
     pa = 'args := [1,2]\nfn(g()) { return args.size() }\nexport(args)\nexport(g)\n'
     pa2 = 'args := [9]\nfn(g()) { return args.size() }\nexport(g)\nexport(args)\n'
     for label, files in (
             ("S colliding import before a missing import", {"pa2.f": pa2, "m.f": 'import("pa2.f")\nimport("missing.f")\n'}),
             ("S colliding import before a module with a missing import",
              {"pa.f": pa, "mm.f": 'import("missing.f")\n', "m.f": 'import("pa.f")\nimport("mm.f")\n'}),
-            ("S invocation-export over an earlier feature refusal",
-             {"nested.f": 'fn(q()) { import("ok.f") }\nfn(z()) { return 1 }\nexport(z)\n', "ok.f": 'fn(f()) { return 1 }\n'
-              'export(f)\n', "pa.f": pa, "m.f": 'import("nested.f")\nimport("pa.f")\nprint(g())\n'}),
             ("S colliding cmd", {"pc.f": 'cmd := "c"\nexport(cmd)\n', "m.f": 'print("b")\nimport("pc.f")\n'})):
         same_error_as_legacy(label, files, reason="import-scope:invocation-export", args=("a",))
+    # The walk stops at the first problem: an earlier feature refusal is reported (owner policy).
+    genuine("S feature refusal before invocation-export",
+            {"nested.f": 'fn(q()) { import("ok.f") }\nfn(z()) { return 1 }\nexport(z)\n', "ok.f": 'fn(f()) { return 1 }\n'
+             'export(f)\n', "pa.f": pa, "m.f": 'import("nested.f")\nimport("pa.f")\nprint(g())\n'},
+            "import-nested", "R/nested.f:1:11", program_error=False, args=("a",))
+    # F3: the collision names the binding that collides, in the module's export order.
+    genuine("S c11 args exported before cmd names args",
+            {"pz.f": 'cmd := "c"\nargs := [1]\nexport(args)\nexport(cmd)\n', "m.f": 'import("pz.f")\n'},
+            "import-scope:invocation-export", "R/m.f:1:1", "export collides with existing binding: args", args=("a",))
+    genuine("S c11b cmd exported before args names cmd",
+            {"pz.f": 'cmd := "c"\nargs := [1]\nexport(cmd)\nexport(args)\n', "m.f": 'import("pz.f")\n'},
+            "import-scope:invocation-export", "R/m.f:1:1", "export collides with existing binding: cmd", args=("a",))
+    vm = genuine("S b08 an ordinary collision first is the import-collision refusal (x)",
+                 {"px.f": 'x := 5\nargs := [1]\nexport(x)\nexport(args)\n', "m.f": 'x := 1\nimport("px.f")\n'},
+                 "import-collision", "R/m.f:2:1", program_error=False, args=("a",))
+    check("args" not in error_line(vm.stderr), "S b08 does not name args", vm.stderr)
+    genuine("S b08b args first names args",
+            {"px.f": 'x := 5\nargs := [1]\nexport(args)\nexport(x)\n', "m.f": 'x := 1\nimport("px.f")\n'},
+            "import-scope:invocation-export", "R/m.f:2:1", "export collides with existing binding: args", args=("a",))
 
 
 def main():

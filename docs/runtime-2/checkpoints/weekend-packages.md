@@ -424,14 +424,14 @@ untaken branch, `cret.f`: legacy rc 0) is rejected. The rule is static: "a modul
 not `return` a value outside its functions". The diagnostic states the rule and the
 `return`'s position. It does not claim the `return` ran.
 
-**Competing errors.** The graph reports the first program error in legacy's execution
+**Competing errors.** *(Superseded by the owner's diagnostic policy, §4.6 item 5; kept as history.)* The graph reported the first program error in legacy's execution
 order: depth first, statement order. A construct nested in a block counts at its
 enclosing top-level statement.
 - `comp.f`: a missing import before a `return 5` gives the missing import, as in legacy.
 - `comp2.f`: a `return 5` before a missing import gives the `return` error, as in
   legacy, because the import is never reached.
 
-**Determinism rule (owner).** The reported error never depends on hash-table
+**Determinism rule (owner).** *(Its legacy-order part is superseded by §4.6 item 5; determinism itself stands.)* The reported error never depends on hash-table
 iteration or filesystem traversal order.
 
 The order is legacy's first-executed order, which is well defined for everything the
@@ -547,7 +547,7 @@ no module-binding redesign, but it is not free.
 ### 4.6 Approved differences to record (`D-NEXT-packages`, `compatibility.md`)
 
 1. Import-resolution errors are rejected before running (§4.2), including an import
-   that a top-level `return` would leave unreached.
+   that a top-level `return` would leave unreached (no note is given; see item 5).
 2. Package-lock housekeeping is the single exception to "no effects before
    execution". The lock file may be created, but only inside an existing `.nift/`;
    `.nift/` itself is never created. One lock snapshot replaces per-import
@@ -556,17 +556,49 @@ no module-binding redesign, but it is not free.
    an untaken branch (§4.3).
 4. `import-scope:invocation-init` is conservative for module code that is never
    executed (§4.5).
-5. **Accepted gap (competing failures).** A compile-time program error that legacy
-   would hit first, but which lies inside the failing module itself (before the
-   module's failing statement), is not detected: the graph's error is reported. The
-   same holds for one reached only through a call (an error in a function body
-   called from earlier top-level code).
-   - Only errors in the entry prefix's unconditional top-level code outrank a graph
-     error (narrow review of 2f37ed36).
-   - Errors in uncalled function bodies, untaken branches, loops, `try` blocks or
-     short-circuit operands never outrank it.
-   - The report is a correct error in either case; only which one is reported
-     differs from legacy.
+5. **Diagnostic policy (owner, 2026-11-01; supersedes every earlier package
+   diagnostic-precedence ruling, including the competing-failure rule of §4.3, the
+   early-`return` note of §4.2 and the `return` note of §4.3).**
+   - **Priorities, in order:**
+     1. correct execution;
+     2. clean, maintainable architecture with minimal special cases;
+     3. performance;
+     4. accurate, deterministic diagnostics;
+     5. legacy compatibility, for intended language behaviour only.
+   - **Not required.** Diagnostics need not report the error legacy hits first,
+     follow legacy's discovery order, or match legacy's text byte for byte.
+   - **Required.** Every reported error is:
+     - genuine and correctly classified (program error or capability refusal);
+     - at a recorded position, never invented;
+     - given a meaningful message and a stable id;
+     - naming the binding that is at fault;
+     - raised before any user-program effect.
+
+     Catchable runtime errors stay catchable.
+   - **Precedence implemented (deterministic, by compiler stage).** The first stage
+     that finds a problem reports its first one; later stages do not run:
+     1. The module graph. It is walked depth first in statement order; an import
+        is entered at its statement. The first problem stops it, whether a refusal
+        or a program error:
+        - placement (`import-nested`, `export-nested`), checked when a unit is
+          entered;
+        - per statement, a module's `return <value>` (reported at the `return`)
+          and its exports;
+        - at each import: resolution, load-time validation (`module-error:syntax`;
+          `export(<not a name>)` is `module-error:export-name`), then the imported
+          module's exports, in the module's export order. The first that collides
+          is reported: the entry's `args`/`cmd` as `import-scope:invocation-export`,
+          another binding as `import-collision`.
+     2. The linker:
+        - a bare module `return` (`module-bare-return`);
+        - name clashes;
+        - cross-unit scope;
+        - the `args`/`cmd` planner (`import-scope:invocation-init`,
+          `import-scope:invocation-ambiguous`; the first in each module's text,
+          modules in graph order).
+     3. The compiler, on the linked unit. Then R1 host operations.
+   - **Never.** Nothing depends on hash or directory order. No control-flow
+     analysis is used to pick among errors.
 
 ### 4.7 Owner conditions on the follow-up approvals (2026-11-01)
 
@@ -882,7 +914,7 @@ with a merge commit. Nothing was pushed.
 | Q2 / C2 lock | `PackageTransaction::acquire_read_existing_store` (the one VM-facing addition; additive diff, legacy call paths byte-identical), held by one `PackageReader` per graph build and released when the build ends (`GraphBuilder::finish`, destructor) |
 | Q1 / §4.2 import-resolution program errors | `GraphError` (`module_graph.h`): id, legacy message with per-frame `import: `/`@import: ` prefixes, position (`positioned` set at every site); rendered by `rt/link_diagnostic.cpp` and `script_runner.cpp` (`program_message`), never with feature-refusal wording |
 | Q6 / C3 module program errors | `module_graph.cpp`: `return <value>` checked in statement order (reported at the import, note at the `return`), `export-missing`, `export-duplicate`, `export(<not a name>)` (the Opaque `export(` statement, `rt/module_scan.cpp`) |
-| early-`return` note | `GraphBuilder::early_return`: the first top-level `return` before the failing statement on the active chain |
+| early-`return` note | removed (owner diagnostic policy, §4.6 item 5) |
 | competing-failure order | depth-first, statement order; program errors end the walk; feature refusals are recorded and the walk goes on; a refusal taints its chain so `export-missing` makes no claim there; `import-scope` and clash positions are the smallest offset |
 | `import-error:package-lock` | `PackageResolution::lock_error` |
 | Q4/Q5 / C1 `args`/`cmd` | `rt/module_invocation.{h,cpp}` (`plan_invocation`: private declarations, init-reach fixed point, ambiguity) and the narrow rename in `module_link.cpp` (generated names checked against every unit's text, stored in the heap-stable `Module`, display names via `LinkedUnit::display`, renamed tokens map back to their span) |
@@ -953,6 +985,36 @@ Tests: section R of `packages.py`. Mutation controls 16–20 were added:
 | 18 | whole-identifier display |
 | 19 | the unconditional-`return` rule |
 | 20 | the entry prefix |
+
+### Owner diagnostic policy (2026-11-01): simplification
+
+The policy is §4.6 item 5. Logic whose only purpose was to reproduce legacy's error
+order was removed:
+
+| Removed | Why it was order-only |
+|---|---|
+| `earlier_compile_error`, `unconditional_at`, `rt/module_link_prefix.{h,cpp}`, `LinkedUnit::prefix_*`, `GraphError::entry_item` | It compiled the entry prefix so that an earlier compile-time error could outrank a graph error. A genuine error was reported either way. |
+| Walking on past feature refusals, and the tainting of `export-missing` | That existed so a later program error could win over an earlier refusal. The walk now stops at its first problem. |
+| The in-walk top-level `args`/`cmd` read check (`invocation_read`, `private_invocation`) | It only put `invocation-init` ahead of later graph errors. The linker's planner still refuses every such read. |
+| The early-`return` note (`early_return`, `first_unconditional_return`), and the `return` note with its report at the import | Notes about legacy's order. `module-error:return-value` is now reported at the `return` itself. |
+| Mutation controls 11, 12, 13 and 19–22 | They guarded only the removed order behaviour. |
+
+Kept, because it serves correctness or classification:
+- resolution, provenance and package-relative containment;
+- locking, and pre-effect rejection;
+- load-time validation (`module-error:syntax`), `export-name`, `export-missing` and
+  `export-duplicate`;
+- binding identity and the private rename;
+- `invocation-export` at the import;
+- the classify `program-error` outcome.
+
+F3 (`c11`, `b08`): a collision names the binding that collides. The imported module's
+exports are walked in export order:
+- the entry's `args`/`cmd` is `import-scope:invocation-export` naming it (`c11`
+  names `args`);
+- another binding is the parent's `import-collision` refusal at the import (`b08`).
+
+Mutation control 25 checks this.
 
 ## 9. Evidence (scratch, not committed)
 

@@ -68,53 +68,6 @@ bool literal_argument(const Ast& ast, const Node& st, std::string& out) {
     return true;  // empty: a package name (legacy: invalid package name)
 }
 
-std::uint32_t first_unconditional_return(const Ast& ast, NodeId root, std::uint32_t item) {
-    if (root == kNoNode) return UINT32_MAX;
-    const Node& program = ast.at(root);
-    const NodeId* items = ast.list(program);
-    for (std::uint32_t k = 0; k < item && k < program.count; ++k)
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 19  // test-only (packages/mutants.sh)
-        if (const std::uint32_t r = first_return(ast, items[k], false); r != UINT32_MAX) return r;
-#else
-        if (ast.at(items[k]).kind == NodeKind::Return) return ast.at(items[k]).begin;
-#endif
-    return UINT32_MAX;
-}
-
-std::uint32_t invocation_read(const Ast& ast, NodeId statement, const std::vector<std::string_view>& names,
-                              NodeId& node) {
-    // As module_link's collect(): declared names, member keys and export
-    // arguments are not reads; function and lambda bodies are not walked.
-    std::uint32_t at = UINT32_MAX;
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 7  // test-only (packages/mutants.sh)
-    return at;
-#endif
-    std::vector<NodeId> stack{statement};
-    while (!stack.empty()) {
-        const NodeId id = stack.back();
-        stack.pop_back();
-        if (id == kNoNode) continue;
-        const Node& n = ast.at(id);
-        if (n.kind == NodeKind::FnDecl || n.kind == NodeKind::Lambda) continue;
-        if (n.kind == NodeKind::Ident && n.begin < at &&
-            std::find(names.begin(), names.end(), ast.text(n)) != names.end()) {
-            at = n.begin;
-            node = id;
-        }
-        NodeId skip = kNoNode;
-        if (n.kind == NodeKind::Declare || n.kind == NodeKind::StructDecl || n.kind == NodeKind::EnumDecl ||
-            n.kind == NodeKind::Export)
-            skip = n.a;
-        if (n.kind == NodeKind::Member || n.kind == NodeKind::SafeMember) skip = n.b;
-        for (NodeId child : {n.a, n.b, n.c})
-            if (child != skip) stack.push_back(child);
-        if (n.kind == NodeKind::EnumDecl) continue;
-        const NodeId* list = ast.list(n);
-        for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
-    }
-    return at;
-}
-
 const char* first_misplaced(const Ast& ast, NodeId root, std::uint32_t& at) {
     const Node& program = ast.at(root);
     const NodeId* items = ast.list(program);
@@ -144,26 +97,8 @@ bool module_prevalidates(const std::string& source, std::uint32_t& offset, std::
     return verdict.ok;
 }
 
-std::string_view invocation_export(std::size_t importer, const std::vector<std::string_view>& exports,
-                                   const std::vector<std::string_view>& names) {
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 22  // test-only (packages/mutants.sh)
-    return {};
-#endif
-    if (importer != 0) return {};
-    for (std::string_view name : names)
-        if (std::find(exports.begin(), exports.end(), name) != exports.end()) return name;
-    return {};
-}
-
-bool private_invocation(const Ast& ast, NodeId root, const std::vector<std::string_view>& names) {
-    const Node& program = ast.at(root);
-    const NodeId* items = ast.list(program);
-    for (std::uint32_t k = 0; k < program.count; ++k) {
-        const Node& st = ast.at(items[k]);
-        const bool declares = st.kind == NodeKind::Declare;
-        if (declares && std::find(names.begin(), names.end(), declared_name(ast, st)) != names.end()) return true;
-    }
-    return false;
+bool invocation_export(std::size_t importer, std::string_view exported, const std::vector<std::string_view>& names) {
+    return importer == 0 && std::find(names.begin(), names.end(), exported) != names.end();
 }
 
 } // namespace nift::rt

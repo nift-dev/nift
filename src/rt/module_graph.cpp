@@ -33,36 +33,29 @@ struct Frame {
     std::size_t unit = 0;      // the importing unit
     std::uint32_t offset = 0;  // its import statement
     bool at_import = false;    // spelled `@import`
-    std::uint32_t item = 0;    // that statement's top-level index in the importer
 };
 
 class GraphBuilder {
 public:
     GraphBuilder(ModuleGraph& graph, const ModuleGraphOptions& options) : graph_(graph), options_(options) {}
 
-    // A feature refusal: the first is kept (at a recorded position); the
-    // walk goes on (a later program error wins). The active chain is tainted:
-    // its units' bound names may be incomplete, so they skip export-missing.
-    void refuse(std::size_t where, std::uint32_t offset, std::string reason) {
-        if (graph_.ok && !graph_.program_error) {
-            graph_.ok = false;
-            graph_.reason = std::move(reason);
-            graph_.where = where;
-            graph_.offset = offset;
-            graph_.positioned = true;
-        }
-        tainted_.resize(graph_.modules.size(), false);
-        tainted_[where] = true;
-        for (const Frame& f : frames_) tainted_[f.unit] = true;
+    // The walk stops at the first problem it finds (owner policy: one plain,
+    // deterministic order; checkpoints/weekend-packages.md §4.6): a feature
+    // refusal (the VM lacks a capability) or a program error (below).
+    bool refuse(std::size_t where, std::uint32_t offset, std::string reason) {
+        graph_.ok = false;
+        graph_.reason = std::move(reason);
+        graph_.where = where;
+        graph_.offset = offset;
+        graph_.positioned = true;
+        stopped_ = true;
+        return false;
     }
 
     // A program error at a recorded position; `importing` adds the statement
-    // being imported as the innermost frame. Ends the walk.
+    // being imported as the innermost frame.
     bool error(std::size_t where, std::uint32_t offset, std::string id, const std::string& text,
-               const Frame* importing = nullptr, bool in_unit = true) {
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 11  // test-only (packages/mutants.sh)
-        if (!graph_.ok && !graph_.program_error) { stopped_ = true; return false; }
-#endif
+               const Frame* importing = nullptr) {
         GraphError& e = graph_.error;
         e.id = std::move(id);
         e.where = where;
@@ -76,9 +69,6 @@ public:
         if (importing) prefix += importing->at_import ? "@import: " : "import: ";
 #endif
         e.message = prefix + text;
-        // The entry's top-level statement the error happens under (its import).
-        e.entry_item = !frames_.empty() ? frames_.front().item : importing ? importing->item : current_item_;
-        early_return(importing, in_unit);
         graph_.ok = false;
         graph_.program_error = true;
         stopped_ = true;
@@ -88,8 +78,9 @@ public:
     // One initialisation of unit `index` (legacy's order: its imports run at
     // their statements, depth first).
     bool visit(std::size_t index, const Ast& ast, NodeId root, const fs::path& base, std::vector<fs::path>& active) {
-        const char* misplaced = first_misplaced(ast, root, misplaced_at_);
-        if (misplaced) refuse(index, misplaced_at_, misplaced);
+        std::uint32_t misplaced_at = 0;
+        if (const char* misplaced = first_misplaced(ast, root, misplaced_at))
+            return refuse(index, misplaced_at, misplaced);
         // Names bound in this unit, with the module that originally declared
         // them: an import may rebind a name to the same declaration (the
         // shared instance, D-041), never to a different one.
@@ -98,29 +89,15 @@ public:
         Names provided;  // names earlier statements of a module bind (for `export`)
         const Node& program = ast.at(root);
         const NodeId* items = ast.list(program);
-        for (std::uint32_t step = 0; step < program.count && !stopped_; ++step) {
-#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 12  // test-only (packages/mutants.sh)
-            const std::uint32_t k = program.count - 1 - step;
-#else
-            const std::uint32_t k = step;
-#endif
+        for (std::uint32_t k = 0; k < program.count && !stopped_; ++k) {
             const Node& st = ast.at(items[k]);
-            current_item_ = k;
-            if (index > 0) {
+            if (index > 0) {  // `return <value>` outside functions in a module, at the `return`
                 const std::uint32_t ret = first_return(ast, items[k], true);
-                if (ret != UINT32_MAX) return return_error(index, ret);
+                if (ret != UINT32_MAX)
+                    return error(index, ret, "module-error:return-value",
+                                 std::string("return with a value is not allowed in ") +
+                                     (!frames_.empty() && frames_.back().at_import ? "@import" : "import"));
             }
-            if (index > 0 && !private_invocation(ast, root, options_.invocation_names)) {
-                NodeId node = kNoNode;
-                const std::uint32_t read = invocation_read(ast, items[k], options_.invocation_names, node);
-                if (read != UINT32_MAX)
-                    return error(index, read, "import-scope:invocation-init",
-                                 "an imported module reads the entry script's `" + std::string(ast.text(ast.at(node))) +
-                                     "` while it initialises; `args` and `cmd` are visible to its functions only "
-                                     "after the import");
-            }
-            if (index > 0 && export_without_name(ast, st))
-                return error(index, st.begin, "module-error:export-name", "export requires a binding name");
             if (st.kind == NodeKind::Export) {
                 if (index > 0 && !check_export(index, ast, st, provided, bound)) return false;
                 continue;
@@ -128,22 +105,27 @@ public:
             if (const std::string_view name = declared_name(ast, st); !name.empty()) provided.push_back(name);
             if (st.kind != NodeKind::Import) continue;
             std::size_t target = 0;
-            const Frame frame{index, st.begin, (st.flags & kFlagTemplateImport) != 0, k};
+            const Frame frame{index, st.begin, (st.flags & kFlagTemplateImport) != 0};
             const int status = import(index, ast, st, items[k], base, active, frame, target);
-            if (status < 0) return false;  // a program error (or the walk stopped)
-            if (status == 0) continue;     // refused: no exports bound
+            if (status <= 0) return false;  // the walk stopped
             const Module& mod = *graph_.modules[target];
-            // A module's `args`/`cmd` exported into the entry: legacy fails at this import.
-            if (const std::string_view name = invocation_export(index, mod.exports, options_.invocation_names);
-                !name.empty())
-                return error(index, st.begin, "import-scope:invocation-export",
-                             "export collides with existing binding: " + std::string(name), &frame);
+            // In the module's export order: the first export that collides is
+            // the one reported (it names the binding that collides).
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 25  // test-only (packages/mutants.sh)
+            for (std::string_view name : options_.invocation_names)  // by invocation name, not export order
+                if (index == 0 && has(mod.exports, name))
+                    return error(index, st.begin, "import-scope:invocation-export",
+                                 "export collides with existing binding: " + std::string(name), &frame);
+#endif
             for (std::size_t e = 0; e < mod.exports.size(); ++e) {
                 const Origin incoming{mod.exports[e], mod.export_origins[e]};
+                if (invocation_export(index, incoming.name, options_.invocation_names))  // the entry's args/cmd
+                    return error(index, st.begin, "import-scope:invocation-export",
+                                 "export collides with existing binding: " + std::string(incoming.name), &frame);
                 const auto same = std::find_if(bound.begin(), bound.end(),
                                                [&](const Origin& o) { return o.name == incoming.name; });
                 if (same != bound.end()) {
-                    if (same->module != incoming.module) refuse(index, st.begin, "import-collision");
+                    if (same->module != incoming.module) return refuse(index, st.begin, "import-collision");
                     continue;  // the same declaration again: rebound
                 }
                 bound.push_back(incoming);
@@ -156,11 +138,11 @@ public:
     void finish() { packages_.reset(); }  // ends the package critical section
 
 private:
-    // -1: stop (program error or limit); 0: refused, go on; 1: imported.
+    // -1: the walk stopped (a refusal or a program error); 1: imported.
     int import(std::size_t index, const Ast& ast, const Node& st, NodeId statement, const fs::path& base,
                std::vector<fs::path>& active, const Frame& frame, std::size_t& target) {
         std::string argument;
-        if (!literal_argument(ast, st, argument)) return refuse(index, st.begin, "import-dynamic"), 0;
+        if (!literal_argument(ast, st, argument)) return refuse(index, st.begin, "import-dynamic"), -1;
         fs::path root = graph_.modules[index]->package_root;  // inherited, as legacy's ModuleEnv
         bool provenance = false;  // legacy: frozen only for a package entry and relative imports below it
         fs::path path;
@@ -199,13 +181,13 @@ private:
         path = fs::absolute(path).lexically_normal();
         if (!options_.project_root.empty() &&
             !path_inside(fs::absolute(options_.project_root).lexically_normal(), path))
-            return refuse(index, st.begin, "import-outside-project"), 0;
+            return refuse(index, st.begin, "import-outside-project"), -1;
         const fs::path identity = module_identity(path);
         if (std::find(active.begin(), active.end(), identity) != active.end())
             return error(index, st.begin, "import-error:cycle", "script import cycle through " + path.generic_string(),
                          &frame), -1;
-        bool fresh = false, parsed = true;
-        const int loaded = load(index, st, path, identity, root, provenance, frame, target, fresh, parsed);
+        bool fresh = false;
+        const int loaded = load(index, st, path, identity, root, provenance, frame, target, fresh);
         if (loaded <= 0) return loaded;
         Module& mod = *graph_.modules[target];
         ++mod.legacy_initialisations;
@@ -213,12 +195,12 @@ private:
         if (!fresh) {
             // Legacy runs the module again here (a fresh environment); the
             // VM initialises it once. The single policy point (InitPolicy).
-            if (options_.policy == InitPolicy::RefuseReinitialisation) refuse(index, st.begin, "import-reinitialised");
+            if (options_.policy == InitPolicy::RefuseReinitialisation)
+                return refuse(index, st.begin, "import-reinitialised"), -1;
             return 1;
         }
-        if (!parsed) return 0;  // refused (import-parse-error): nothing to visit
         // Refused at the import itself (Review 8), as a check on entering it.
-        if (active.size() >= kMaxModuleDepth) return refuse(index, st.begin, "import-limit"), stopped_ = true, -1;
+        if (active.size() >= kMaxModuleDepth) return refuse(index, st.begin, "import-limit"), -1;
         active.push_back(identity);
         frames_.push_back(frame);
         const bool ok = visit(target, *mod.ast, mod.root, mod.path.parent_path(), active);
@@ -228,18 +210,13 @@ private:
     }
 
     int load(std::size_t importer, const Node& st, const fs::path& path, const fs::path& identity,
-             const fs::path& package_root, bool provenance, const Frame& frame, std::size_t& index, bool& fresh,
-             bool& parsed_ok) {
+             const fs::path& package_root, bool provenance, const Frame& frame, std::size_t& index, bool& fresh) {
         const auto known = by_identity_.find(identity.generic_string());
         if (known != by_identity_.end()) {
             index = known->second;
             return 1;
         }
-        if (graph_.modules.size() >= kMaxModules) {
-            refuse(importer, st.begin, "import-limit");
-            stopped_ = true;
-            return -1;
-        }
+        if (graph_.modules.size() >= kMaxModules) return refuse(importer, st.begin, "import-limit"), -1;
         ModuleSource source = load_module_source(path);
         if (!source.found) {
             graph_.absent.push_back(path);
@@ -259,69 +236,24 @@ private:
         fresh = true;
         by_identity_.emplace(identity.generic_string(), index);
         graph_.modules.push_back(std::move(mod));
-        // Legacy validates a module when it loads it, before any of its
-        // statements runs: the first failure there ends the program (D-022 #3).
+        // A module is validated when it loads (as legacy, D-022 #3): a syntax
+        // error is a program error; so is `export(<not a name>)`, which the
+        // parser keeps as an Opaque statement; other Opaque text is refused.
+        frames_.push_back(frame);
         std::uint32_t bad = 0;
         std::string message;
-        if (!module_prevalidates(graph_.modules[index]->source, bad, message)) {
-            frames_.push_back(frame);
-            error(index, bad, "module-error:syntax", message, nullptr, false);
-            frames_.pop_back();
-            return -1;
-        }
-        if (!parsed.ok) {
-            parsed_ok = false;
-            frames_.push_back(frame);
-            refuse(index, parsed.error.offset, "import-parse-error");
-            frames_.pop_back();
-            return 1;
-        }
+        bool ok = true;
         const Module& m = *graph_.modules[index];
-        const NodeId opaque = first_opaque_node(*m.ast, m.root);
-        if (opaque != kNoNode) {  // refused; the walk still visits it (an `export(<expr>)` is a program error)
-            frames_.push_back(frame);
-            refuse(index, m.ast->at(opaque).begin,
-                   std::string("import-opaque:") + opaque_reason_name(m.ast->at(opaque).reason));
-            frames_.pop_back();
-        }
-        return 1;
-    }
-
-    // `return <value>` outside functions in a module: legacy reports it at the
-    // module's import, after the module ran up to it.
-    bool return_error(std::size_t index, std::uint32_t at) {
-        const Frame importing = frames_.back();
+        const NodeId opaque = parsed.ok ? first_opaque_node(*m.ast, m.root) : kNoNode;
+        if (!module_prevalidates(m.source, bad, message)) ok = error(index, bad, "module-error:syntax", message);
+        else if (!parsed.ok) ok = refuse(index, parsed.error.offset, "import-parse-error");
+        else if (opaque != kNoNode && export_without_name(*m.ast, m.ast->at(opaque)))
+            ok = error(index, m.ast->at(opaque).begin, "module-error:export-name", "export requires a binding name");
+        else if (opaque != kNoNode)
+            ok = refuse(index, m.ast->at(opaque).begin,
+                        std::string("import-opaque:") + opaque_reason_name(m.ast->at(opaque).reason));
         frames_.pop_back();
-        graph_.error.return_note = true;
-        graph_.error.return_where = index;
-        graph_.error.return_offset = at;
-        const std::string text = std::string("return with a value is not allowed in ") +
-                                 (importing.at_import ? "@import" : "import");
-        current_item_ = importing.item;
-        error(importing.unit, importing.offset, "module-error:return-value", text, &importing);
-        frames_.push_back(importing);
-        return false;
-    }
-
-    // The first unconditional top-level `return` before the failing statement
-    // on the active chain, outermost first: legacy would stop there first.
-    // `in_unit`: the error is at a statement of graph_.error.where (else at
-    // its import, before any of its statements).
-    void early_return(const Frame* importing, bool in_unit) {
-        std::vector<std::pair<std::size_t, std::uint32_t>> chain;  // (unit, top-level item)
-        for (const Frame& f : frames_) chain.push_back({f.unit, f.item});
-        if (importing) chain.push_back({importing->unit, current_item_});
-        else if (in_unit) chain.push_back({graph_.error.where, current_item_});
-        for (const auto& [unit, item] : chain) {
-            const Ast& ast = unit == 0 ? *entry_ : *graph_.modules[unit]->ast;
-            const NodeId root = unit == 0 ? entry_root_ : graph_.modules[unit]->root;
-            const std::uint32_t at = first_unconditional_return(ast, root, item);
-            if (at == UINT32_MAX) continue;
-            graph_.error.early_return = true;
-            graph_.error.early_where = unit;
-            graph_.error.early_offset = at;
-            return;
-        }
+        return ok ? 1 : -1;
     }
 
     // `export(x)` (modules only): x is bound by an earlier top-level statement
@@ -335,20 +267,15 @@ private:
         const std::string_view name = ast.text(ast.at(st.a));
         if (has(mod.exports, name))
             return error(index, st.begin, "module-error:export-duplicate", "duplicate export: " + std::string(name));
-        tainted_.resize(graph_.modules.size(), false);
-        if (!has(provided, name)) {
-            if (tainted_[index]) return true;  // names may be missing after a refusal: no claim
+        if (!has(provided, name))
             return error(index, st.begin, "module-error:export-missing",
                          "export names no existing binding: " + std::string(name));
-        }
         const Node& program = ast.at(mod.root);
         const NodeId* items = ast.list(program);
         for (std::uint32_t k = 0; k < program.count; ++k) {
             const Node& decl = ast.at(items[k]);
-            if (decl.kind == NodeKind::StructDecl && declared_name(ast, decl) == name) {
-                refuse(index, st.begin, "export-struct");
-                return true;
-            }
+            if (decl.kind == NodeKind::StructDecl && declared_name(ast, decl) == name)
+                return refuse(index, st.begin, "export-struct");
         }
         std::size_t origin = index;
         for (const Origin& o : bound)
@@ -358,18 +285,11 @@ private:
         return true;
     }
 
-public:
-    const Ast* entry_ = nullptr;
-    NodeId entry_root_ = kNoNode;
-private:
     ModuleGraph& graph_;
     const ModuleGraphOptions& options_;
     std::unordered_map<std::string, std::size_t> by_identity_;  // lookup only, never iterated
     std::unique_ptr<PackageReader> packages_;
     std::vector<Frame> frames_;   // the active imports, outermost first
-    std::vector<bool> tainted_;   // per module: a refusal may have hidden bound names
-    std::uint32_t current_item_ = 0;
-    std::uint32_t misplaced_at_ = 0;
     bool stopped_ = false;
 };
 
@@ -390,8 +310,6 @@ ModuleGraph build_module_graph(const Ast& entry, NodeId root, const fs::path& en
     unit->legacy_initialisations = 1;
     graph.modules.push_back(std::move(unit));
     GraphBuilder builder(graph, options);
-    builder.entry_ = &entry;
-    builder.entry_root_ = root;
     builder.visit(0, entry, root, base, active);
     builder.finish();
     return graph;
