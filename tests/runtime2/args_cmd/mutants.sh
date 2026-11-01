@@ -7,16 +7,11 @@
 #   2 session_invocation.cpp  `args` loses its last argument (wrong value; scripts and sessions)
 #   3 compiler_call.cpp       `cmd(...)` calls the `cmd` string (the VM-session runtime bug)
 #   5 compiler_invocation.cpp the bindings are writable (no readonly/const array)
-#     SUSPENDED (equivalent under the Phase A reference guard; coordinator
-#     ruling, integ/refsem-a, 2026-11-01): every script-unit mutation of `args`
-#     is refused by the guard before the const check, so no admitted program
-#     can tell mutant 5 from the real build (the bounded search of the
-#     integration report: scripts, piped sessions, a module function, natives
-#     and callbacks, struct fields, `cmd`). Not counted as caught. The tripwire
-#     below fails if any of those forms is ever admitted: mutant 5 must then be
-#     reinstated with that form as its witness. Phase B reinstates it; its
-#     witnesses are tests/runtime2/refsem/pending/args_push_after_output.f and
-#     args_sort.f, which then reach the const-mutation error.
+#     Witnessed by classification (review of 2a1c228a, F1): `args.push(<array
+#     or object>)` takes the const-array path and is refused by the guard, while
+#     the writable binding's path refuses it as `aliasing`. Phase B must still
+#     re-witness it through the const-mutation error
+#     (tests/runtime2/refsem/pending/args_push_after_output.f, args_sort.f).
 #   6 compiler_invocation.cpp no top-level shadowing (`args := []` refused again)
 # Mutants 4, 7 and 8 (module rules) were retired with D-NEXT-packages #4: modules
 # now see the entry's bindings where resolution proves it, and a module's own
@@ -32,8 +27,10 @@ if make -s -n nift | grep -qE -- " -o nift$"; then
     echo "FAIL args/cmd mutants: ./nift is not current (run make nift)" >&2; exit 1
 fi
 fail=0
-# Tripwire for the suspended mutant 5: each form must still be refused by the
-# Phase A guard (reference-guard:*) on the real build, before any effect.
+# Tripwire (args/cmd x the reference guard): each form must still be refused
+# by the Phase A guard (reference-guard:*) on the real build, before any
+# effect; if one is admitted, it becomes a direct witness of mutant 5 (the
+# const-mutation error) and must be added as one.
 tw="$TMP/tripwire"; mkdir -p "$tw"
 tripwire_forms=(
   'print("e")\nargs.push("z")\n' 'args.sort()\n' 'args.pop()\nprint(args.size())\n'
@@ -50,20 +47,19 @@ for form in "${tripwire_forms[@]}"; do
     out=$(cd "$tw" && NIFT_VM=require "$ROOT/nift" p.f a b 2>&1 || true)
     if ! grep -q "not compiled for the VM (reference-guard:" <<<"$out" || grep -qv '^error: \|^note: ' <<<"$out"; then
         echo "FAIL tripwire: script form now admitted or refused otherwise: $(printf "$form" | tr '\n' ' ')"
-        echo "     reinstate mutant 5 with this form as its witness: ${out:0:200}"; fail=1
+        echo "     add this form to args_cmd.py as a witness of mutant 5: ${out:0:200}"; fail=1
     fi
 done
 for form in "${session_forms[@]}"; do
     out=$(cd "$tw" && printf "$form" | NIFT_VM=require "$ROOT/nift" -i -e 'k := 1' a b 2>&1 || true)
     if ! grep -q "NIFT_VM session refused: reference-guard:" <<<"$out"; then
         echo "FAIL tripwire: session form now admitted or refused otherwise: $(printf "$form" | tr '\n' ' ')"
-        echo "     reinstate mutant 5 with this form as its witness: ${out:0:200}"; fail=1
+        echo "     add this form to args_cmd.py as a witness of mutant 5: ${out:0:200}"; fail=1
     fi
 done
 [ $fail = 0 ] && echo "PASS tripwire: ${#tripwire_forms[@]} script and ${#session_forms[@]} session forms still refused by the guard"
-echo "SUSPENDED mutant 5 (src/rt/compiler_invocation.cpp): equivalent under the Phase A reference guard (not counted as caught)"
 for spec in 1:src/rt/script_runner.cpp 2:src/rt/session_invocation.cpp 3:src/rt/compiler_call.cpp \
-            6:src/rt/compiler_invocation.cpp; do
+            5:src/rt/compiler_invocation.cpp 6:src/rt/compiler_invocation.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

@@ -259,6 +259,19 @@ def suite(root):
               "runtime error: " + label + ": legacy's const error kept", repr((legacy.returncode, legacy.stderr)))
         check(vm.returncode == 1 and vm.stdout == "" and "(reference-guard:" in vm.stderr and "no part of it ran" in vm.stderr,
               "runtime error: " + label + ": refused before any effect (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+    # The const binding is still classified (review of 2a1c228a, F1): pushing
+    # an array or object onto `args` takes the const-array path and is refused
+    # by the guard, never as `aliasing` (the path of a writable binding). Phrased
+    # as "refused by the guard, not aliasing" so it stays valid once the
+    # diagnostic becomes the const error (a pre-release obligation).
+    for label, src in (("args.push(args)", 'print("e")\nargs.push(args)\n'),
+                       ("args.push(x) with x := [1]", 'print("e")\nx := [1]\nargs.push(x)\n')):
+        (work / "rt.f").write_text(src)
+        vm, _ = run([NIFT, "rt.f", "a"], work, None, home)
+        check(vm.returncode == 1 and vm.stdout == "" and "the program was not executed" in vm.stderr,
+              "const args: " + label + ": refused before any effect", repr((vm.returncode, vm.stdout, vm.stderr)))
+        check("(reference-guard:" in vm.stderr and "(aliasing)" not in vm.stderr,
+              "const args: " + label + ": refused by the guard, not aliasing", repr(vm.stderr))
     for label, src in (("out-of-range index", 'print(args[5])\n'),
                        ("calling args", 'print("e")\nargs("a")\n')):
         (work / "rt.f").write_text(src)

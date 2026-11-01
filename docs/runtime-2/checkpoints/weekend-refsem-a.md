@@ -361,14 +361,14 @@ mutant R7.
   prepare without touching the original, commit once (section 16); Phase B's
   shared protocol keeps that order.
 
-- Reinstate args/cmd mutant 5 (`tests/runtime2/args_cmd/mutants.sh`, the
-  script invocation bindings made writable). It is SUSPENDED while the Phase A
-  guard refuses every script-unit mutation of `args` before the const check
-  (an equivalent mutant; coordinator ruling at the refsem-a integration,
-  2026-11-01), with a tripwire that fails if any of those forms is admitted.
-  Its witnesses are the preserved cases 1-2,
-  `tests/runtime2/refsem/pending/args_push_after_output.f` and `args_sort.f`,
-  which in Phase B must reach the const-mutation error.
+- Re-witness args/cmd mutant 5 (`tests/runtime2/args_cmd/mutants.sh`, the
+  script invocation bindings made writable) through the const-mutation error.
+  In Phase A it is caught by classification only (review of `2a1c228a`, F1):
+  `args.push(<array or object>)` is refused by the guard on the real build
+  and as `aliasing` under the mutant. A tripwire fails if any guard-only
+  mutation form of `args` is admitted. Phase B's witnesses are the preserved
+  cases 1-2, `tests/runtime2/refsem/pending/args_push_after_output.f` and
+  `args_sort.f`, which must then reach the const-mutation error.
 
 ## 10. Open questions
 
@@ -747,8 +747,9 @@ after a first call is refused (`string-arg-type`).
      mutation is not assumed right).
   Originals and legacy's behaviour: `tests/runtime2/refsem/pending/args_*`.
   Coverage: `args_cmd.py` mutants 1, 2, 3 and 6 are still caught; mutant 5
-  (the script bindings writable) is SUSPENDED as an equivalent mutant with a
-  tripwire (section 9a). Its only witnesses were cases 1 and
+  (the script bindings writable) is caught by classification
+  (`args.push(args)`: refused by the guard, not as `aliasing`), with a
+  tripwire over the guard-only forms (section 9a). Its only witnesses were cases 1 and
   2, and no script-unit mutation of `args` reaches the const check while the
   guard refuses every one (twelve mutation forms probed, real and mutant
   builds identical); see the integration report.
