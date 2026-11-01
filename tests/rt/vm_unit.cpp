@@ -572,9 +572,15 @@ void check_kind_inference() {
     }
     // CP14B's approved D-040 copy is independent. Keep long-chain coverage
     // as a positive execution assertion, rather than the obsolete refusal.
+    // D-NEXT-refsem #1: the implicit copy (`b := a` then b.push) is refused by
+    // the Phase A guard (Phase B would alias), so the long chain must still
+    // reach that refusal, and an explicit deepcopy is the positive execution.
     for(int n:{199,201,500}) {
-        const auto copied=rt_vm_tool::run(chain_program(n,
+        const auto aliased=rt_vm_tool::run(chain_program(n,
             "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n"));
+        CHECK(aliased.reason=="reference-guard:inflow");
+        const auto copied=rt_vm_tool::run(chain_program(n,
+            "a := [1]\nb := deepcopy(a)\nb.push(2)\nprint(a.length())\n"));
         CHECK(copied.reason.empty());CHECK(copied.result.reason==StopReason::None);
         CHECK(copied.output=="1\n");
     }
