@@ -244,6 +244,15 @@ def main():
               lives[0] is not None and lives[0] == lives[1] == lives[2],
               "heap cell_mutator_refused: exits %s outputs %s live heaps %s: %r" %
               ([r[2] for r in runs], [r[0] for r in runs], lives, runs[0][1][:200]))
+        # Review round 3: a splice removing elements (count > 0) whose
+        # replacement closes the cycle removes nothing, in every form.
+        runs = [run(nift, os.path.join(heap, n), "require", work)
+                for n in ("cell_splice_refused.f", "cell_splice_refused_many.f", "cell_splice_control.f")]
+        lives = [r[3].get("heap_live") if r[3] else None for r in runs]
+        check([r[2] for r in runs] == [0, 0, 0] and [r[0] for r in runs] == ["56\n", "560\n", "56\n"] and
+              lives[0] is not None and lives[0] == lives[1] == lives[2],
+              "heap cell_splice_refused: exits %s outputs %s live heaps %s: %r" %
+              ([r[2] for r in runs], [r[0] for r in runs], lives, runs[0][1][:200]))
         for fname, budget in (("budget_deepcopy.f", 4_750_000), ("budget_copy.f", 4_750_000),
                               ("budget_snapshot.f", 4_750_000), ("budget_spawn.f", 4_750_000)):
             vo, ve, vr, st = run(nift, os.path.join(heap, fname), "require", work, budget=budget,

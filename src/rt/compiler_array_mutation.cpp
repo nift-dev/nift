@@ -72,11 +72,22 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     if(argc>0&&!expr_to(args[0],state+Item))return false;
     if(argc>1&&!expr_to(args[1],state+Returned))return false;
     const int stored=method==M::Push?state+Item:method==M::Insert?state+Returned:-1;
-    if(!read(true,stored))return false;
+    // D-NEXT-refsem #4 (review round 3): a splice with a replacement on a cell
+    // removes from a copy (no take, no store) and stores once, after the
+    // replacement: the store refuses a cycle before the cell changes, so a
+    // refused splice removes nothing. The replacement cannot read the receiver
+    // (refused above), so it cannot observe which copy holds the removal.
+    const bool atomic=method==M::Splice&&argc==3&&(binding.cell||binding.upvalue)&&!binding.global;
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 22
+    const bool once=false&&atomic;  // R22: the removal is stored before the replacement's cycle check
+#else
+    const bool once=atomic;
+#endif
+    if(!read(!once,stored))return false;
     fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,0);
-    if(!put())return false;
+    if(!once&&!put())return false;
     if(method==M::Splice&&argc==3) {
-        if(!expr_to(args[2],state+Keys)||!read(true,state+Keys))return false;
+        if(!expr_to(args[2],state+Keys)||(!once&&!read(true,state+Keys)))return false;
         fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,1);
         if(!put())return false;
     }

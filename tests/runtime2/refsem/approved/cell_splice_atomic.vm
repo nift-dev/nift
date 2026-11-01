@@ -1,0 +1,23 @@
+statement runtime.reference_cycle
+true
+statement-last runtime.reference_cycle
+true
+expression runtime.reference_cycle
+true
+expression-last runtime.reference_cycle
+true
+closure runtime.reference_cycle
+closure-last runtime.reference_cycle
+closure-expr runtime.reference_cycle
+true
+captured-last runtime.reference_cycle
+20,21,22,
+1,2,3,[10],
+4
+[10]
+1
+1
+30,31,32,3,[10],
+20,40,22,
+--- stderr
+--- exit 0
