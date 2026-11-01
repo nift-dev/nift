@@ -1718,3 +1718,39 @@ review rejected the candidate; these rulings amend 4, 6, 7, 9 and 11 above
   bindings; the guard
   is not grown further pending the owner's choice (keep it, narrow arrays and
   objects further, or bring Phase B forward).
+
+**Review round 2 (independent review of `964901ae`, 2026-11-01; the owner's
+last guard round).** Amends round 1 above (kept as written).
+
+- **Guard: collection iteration.** A `for` loop over a map, set or stack
+  (or a `copy`/`deepcopy` of one, or a call returning one) binds elements of
+  an unknown holder: the collection's elements alias every other holder in
+  Phase B. The first guard treated such a binding as exclusive (`fresh`
+  short-circuits on a non-aggregate kind). Mutating it is refused
+  (`reference-guard:collection-element`); retaining, capturing or lending
+  it counts as an unknown holder; extracting from it is a non-fresh inflow.
+  Only literals and constructing calls bind exclusive values (as round 1
+  stated). In a session, only top-level bindings are treated as mutated by
+  later statements (a function's or lambda's locals are reached only by the
+  unit's own code), and a session recompile's capture initializer (the
+  existing captured cell's value) is not a new inflow.
+- **Cycles (4).** A store into a captured array by insert, splice, an
+  expression push or an element store moved the array out of its cell before
+  the cycle check, so a caught refusal left the cell empty. The check now
+  runs before the value leaves the cell (`CellTake` carries the stored
+  value's register); the graph, reference counts and heap accounting stay
+  unchanged, and later reads, mutations and cleanup behave.
+- **Relocation (11).** Internal transient reads (VM element reads, sizes,
+  iteration) use non-lending views; `array_mut` no longer counts its own
+  mutation as a hand-out. Guarantee, exactly: a mutation of storage above 256
+  elements moves it when a reference or pointer was handed out since its last
+  move and the thread's relocation credit (2^21 elements to start, plus 512
+  per mutation) covers its size; otherwise once every size/256 + 1 mutations.
+  Ordinary VM reads no longer spend the credit.
+- **Sessions (a Phase A defect, review of the Linode run).** The session
+  symbol table stored kinds in 16-bit fields; `kKindStruct` (bit 23) and the
+  collection kinds were truncated, so an instance (or collection) binding came
+  back as a string in the next statement and was refused. The fields are
+  32-bit now; instance and collection bindings work across statements
+  (legacy-equal). An instance or collection with no identity-bearing content
+  has no callable shape (it made struct schema replacement refuse).

@@ -152,9 +152,15 @@ captured binding's cell in both models.
 3. *Parts*: a loop binding or a native callback's parameter is a part of its
    operand's root; a closure capturing it retains that part. Over a fresh
    iterable (literal, constructing call, fresh at every depth) the loop
-   binding is an exclusive value of its own.
+   binding is an exclusive value of its own. Over a map, set or stack (or a
+   copy of one, or a call returning one) it is an element of an unknown
+   holder (round 2): mutating it is refused (`collection-element`), and
+   retaining, capturing or lending it counts as an unknown holder.
 4. *Unknown callers*: a user function used as a value, or any function in a
-   session, may not mutate its parameters (`argument`); aggregates held by a
+   session, may not mutate its parameters (`argument`); in a session, the
+   top-level bindings count as mutated by later statements (round 2: not a
+   function's locals; a recompile's capture initializer is the existing
+   cell's value, not a new inflow); aggregates held by a
    struct instance (`this`, an implicit field, a field of an instance) are
    unknown roots (`unresolved` when mutated). A store into an instance's own
    field is an instance mutation (a reference in both models), not an
@@ -233,12 +239,18 @@ mutant R7.
   `vm_keyed.h`, long lines, relocated loop statements and two small inference
   helpers, comment reflow); `python3 tools/rt-lint.py src/rt`: 0 problems.
 - Checked-build relocation (`aggregate_store.h`): storage of at most 256
-  elements moves on every mutation; larger storage moves on the first
-  mutation after a reference or pointer into it was handed out (bit 6 of the
-  header tag, `kStorageLent`, set by `array_items`, `array_mut`,
-  `object_entries`, `object_get`, `object_slot_mut`, `collection_items`), so
-  "take a reference, mutate once, use it" faults at the use at every size;
-  otherwise once every size/256 + 1 mutations. The hand-out moves draw on a
+  elements moves on every mutation. Larger storage moves on a mutation when a
+  reference or pointer into it was handed out since its last move (bit 6 of
+  the header tag, `kStorageLent`, set by `array_items`, `object_entries`,
+  `object_get`, `collection_items`) **and** the thread's relocation credit
+  covers its size; otherwise once every size/256 + 1 mutations. That is the
+  guarantee: "take a reference, mutate once, use it" faults at the use while
+  the credit lasts, which ordinary VM work no longer spends: the VM's
+  transient reads (element reads, sizes, iteration) use non-lending views
+  (`array_view`, `collection_view`, `object_view`, `object_find`,
+  `collection_item_count`), and `array_mut`/`object_slot_mut` do not count
+  their own mutation as a hand-out (round 2; the round-1 text said "at every
+  size", which held only while the credit lasted). The hand-out moves draw on a
   per-thread credit (2^21 elements to start, +512 per mutation), so the moved
   volume stays linear even when reads and writes of a huge container
   interleave. (The first schedule's claim that a stale reference into large
@@ -248,7 +260,17 @@ mutant R7.
   controls (`tests/rt/value_round2.cpp`; the `test-rt-value-sanitize` loop
   runs all twelve): array, object, string, map, set, stack, struct, and
   take-mutate-once-use on a 5,000-element array, map, set and stack and a
-  600-entry object.
+  600-entry object. VM-path controls (round 2,
+  `make test-runtime2-refsem-stale-vm`, `tests/runtime2/refsem/stale_vm.cpp`):
+  a 5,000-element map, set and stack built and read through a VM session
+  (each insert followed by a VM read), and a 5,000-element VM-built array,
+  each with and without a 20,000-element VM read-after-push churn first (which
+  spent the whole credit while VM reads counted as hand-outs); a reference is
+  taken, the container is mutated once through the VM (a session statement;
+  for the array, `set_index`, the SetIndex opcode's implementation, since a
+  session statement replaces a session-held array by copy-on-write), and the
+  reference is used: all eight abort with heap-use-after-free, and the R19
+  build misses all eight.
 - Local ASan+UBSan evidence (drivers over the value-layer sources, `-O1`;
   round 1): 200,000 pure inserts take 1.9 s (array), 4.5 s (map), 7.1 s
   (set), 2.3 s (stack), against an extrapolated 770 s before; the worst case,
@@ -272,6 +294,8 @@ mutant R7.
   `for` loop (Phase B iterates live), and a global array mutated by a helper
   function and passed to any user function (the guard has no call graph).
 - An object as a map key or set member (`collection-object-key`).
+- An array or object reached by iterating a map, set or stack, mutated
+  through the loop binding (`collection-element`).
 - Collections as keys or members (D6); struct identity keys (not established).
 - Array/object programs whose meaning Phase B would change (D2 guard).
 - Field access through a value that may be an instance or something else
@@ -392,4 +416,15 @@ place rather than a second holder. That is new inference machinery,
 so per the owner's guidance the guard is **not grown further**: the choice
 between keeping it, narrowing arrays and objects further, and bringing Phase
 B forward is the owner's (section 10).
+
+## 14. Review round 2 (review of `964901ae`; the last guard round)
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| BLOCKER: a loop over a map, set or stack bound "exclusive" values (`fresh` short-circuit) | collection loop bindings are elements of an unknown holder (section 5, rule 3) | the review's t4, m3, k3, m4, o4, o2, n5, m1, m6, m8, m9, t3, k2 (`refuse/coll_review_*`) and the owner's variations: nested iteration both ways, extraction, argument, closure capture, a loop over a collection parameter, copy/deepcopy (`refuse/coll_*`); read-only loops admitted (`phaseb/coll_*`); R20 caught |
+| HIGH: a caught insert/splice cycle refusal left the captured array's cell empty | `CellTake` checks the stored value before the take (`vm_closure.cpp`; array_mutation, SetIndex, statement push, global take) | review c/cx, c6, c7, c9; `approved/cell_cycle_mutators.f` (state after each catch, later mutations); `heap/cell_mutator_*` (4 and 40 rounds against a no-store control: the same live heap, 0 at stop); R21 caught |
+| MEDIUM: the stale-reference controls did not represent the VM path | non-lending internal views; VM-path controls (section 8) | `test-runtime2-refsem-stale-vm`: 8 of 8 caught, R19 misses 8 of 8; value-layer controls 12 of 12, R19 misses the 5 large; 200,000-element stress unchanged |
+| LOW: `gen/m1` claimed to be generated | marked hand-maintained with the reason (header, corpus README) | — |
+| Linode `test-cp19-functional` (session.cpp 277/278) | a Phase A defect: 16-bit session kind fields truncated kKindStruct, so an instance binding came back as a string and every later use was refused (the Error value was never caught); also instance/collection callable shapes. Kinds are 32-bit now | `.build/cp19/session` 405 of 405; expectations changed with citations: an instance held across a mutation sees it (D-NEXT-refsem #2), and two session-array blocks (the guard) |
+| Linode `test-cp19-session-cli` (`array_callback`) | the conservative session guard; `GUARDED` with citations in `session_cli.py`, `session_callable_cli.py` (8 cases), one rewritten case in `session_refusal_cli.py` | all cp19 session CLI harnesses pass |
 

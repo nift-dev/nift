@@ -1,7 +1,8 @@
-// rt-diff gen.py --seed 7 index 2
-// D-NEXT-refsem #1: the three copies below are explicit (deepcopy) so the
-// Phase A guard admits the program (legacy aliased here, D-040; with the
-// copies legacy and the VM agree). The selftest needs only the module import.
+// HAND-MAINTAINED (not regenerated): derived from rt-diff gen.py --seed 7
+// index 2 and edited for D-NEXT-refsem #1: three copies are explicit
+// (deepcopy) so the Phase A guard admits it (legacy aliased there, D-040;
+// with the copies legacy and the VM agree). The selftest needs only a module
+// import (rt_diff_selftest.sh, "module program minimised").
 import("mod1.f")
 print(mf2((7 * 100)))
 a3 := [(7 % 1)]
