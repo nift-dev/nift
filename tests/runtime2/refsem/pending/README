@@ -50,3 +50,9 @@ from tests/runtime2/args_cmd/args_cmd.py:
                             a successful mutation is NOT assumed to be the
                             right answer. Phase B rules on it; it does not
                             just admit it.
+
+  args_push_after_output.f and args_sort.f are also the witnesses of the
+  SUSPENDED args/cmd mutant 5 (tests/runtime2/args_cmd/mutants.sh: the script
+  bindings made writable; equivalent while the guard refuses every
+  script-unit mutation of `args`). Phase B must reinstate mutant 5; these
+  cases must then reach the const-mutation error.
