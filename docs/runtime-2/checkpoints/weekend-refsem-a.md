@@ -570,3 +570,20 @@ object, nested, the three methods, `.length()`, function, closure),
 `modules/presentation_struct_contents`, session `session_struct_contents`,
 and `parity/presentation_struct_scalars.f` (still admitted: scalars,
 equality, copies, reads).
+
+Owner guidance (folded in): both presentation refusals of this round
+(`presentation-mixed-struct`, `presentation-struct-contents`) refuse
+programs legacy runs; they are compatibility gaps to eliminate (VM rendering
+of struct instances), not intended behaviour, and are listed as such in
+`compatibility.md` and `classification.tsv`. Supporting instances in the
+serializer needs field privacy on the run-time instance (a heap-layout and
+transfer change), which is outside a bounded correction, so the narrow
+pre-effect refusal was chosen and no static analysis was added to compensate.
+
+Splice identity (owner): the splice copy is a shallow copy of the array, so
+every nested map, set, stack and instance in the proposed result is the same
+object as in the receiver, and the receiver's cell is untouched until the
+single store. `approved/cell_splice_identity.f`: after a successful splice the
+elements read back are `same()` as the originals and a mutation through an
+alias shows; after a refused splice the receiver has its length and elements,
+each nested element is still `same()` as before with its contents unchanged.
