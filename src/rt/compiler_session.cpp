@@ -330,7 +330,6 @@ bool UnitCompiler::session_function(NodeId id) {
             if (ast_.at(statement).kind != NodeKind::FnDecl) return fail(node, "session:redefinition-order");
         }
 #endif
-
     }
     Binding binding;
     std::uint16_t value = 0;

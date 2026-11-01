@@ -34,8 +34,7 @@ bool UnitCompiler::declare(const Node& node) {
     const Node& target = ast_.at(node.a);
     // CP25: a `const`/`immut` binding of a proved scalar is an ordinary binding
     // whose every write raises legacy's fatal "cannot assign to const binding"
-    // Error. Captured or session constants keep the refusal (the capture and
-    // session paths carry no const flag).
+    // Error. Captured or session constants keep the refusal (the capture and session paths carry no const flag).
     const KindSet init_kinds = kinds(node.b);
     const bool const_decl = (node.flags & (kFlagImmut | kFlagConst)) != 0;
     // In loop-evaluator code legacy's prepared path does not enforce a const

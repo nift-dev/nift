@@ -221,12 +221,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
             return fail(node, "builtin-presentation-chain");
-        // Review rounds 3-4: the serializer cannot render a struct instance (no
-        // field privacy at run time). In a unit that declares a struct, a
-        // presentation method on a value whose inferred kinds include a struct
-        // instance or a container (contents are not tracked) is refused before
-        // effects, whatever the receiver expression.
-        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & kKindStruct))
+        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & kKindStruct))  // no struct rendering (R3-4)
             return fail(callee, "presentation-struct:" + std::string(name));
         if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & (kKindAggregate | kKindCollection)))
             return fail(callee, "presentation-struct-contents:" + std::string(name));
