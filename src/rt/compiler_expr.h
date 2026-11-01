@@ -107,8 +107,8 @@ private:
     bool keyed_key_ok(const Node& node, int method);
     bool key_kinds_ok(NodeId key);  // D-NEXT-refsem #6
     bool keyed_mutator_call(const Node& node);
-    // D-063 (resolver.h), D-NEXT-refsem: the unit may hold a legacy-tagged value.
-    bool unit_makes_collections() const { return plan_.collections || !plan_.structs.empty(); }
+    bool unit_makes_collections() const { return plan_.collections || !plan_.structs.empty(); }  // D-063 tagged
+    bool unit_may_hold_structs() const;  // round 3: a struct declared here or earlier in the session
     bool collection_inspection_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver);
     bool error_new(const Node& node, std::uint16_t dst);
     bool error_method_call(const Node& node, std::uint16_t dst, std::string_view name, NodeId receiver);

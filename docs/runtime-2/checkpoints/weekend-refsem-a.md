@@ -330,13 +330,15 @@ mutant R7.
   review round 3): dynamic dispatch of presentation methods over mixed
   struct/collection receivers. A candidate for Phase B or a later VM
   capability checkpoint, not a permanent limitation.
-- Known gap, not fixed this round (found while checking the class in round
-  3; outside the bounded scope): presenting an exact array, object or
-  collection that *contains* a struct instance (`[C()].stringify()`,
-  `m.set("a", C()); m.stringify()`) is admitted and stops after earlier
-  output with an internal failure (exit 70); legacy prints `[C{v:0}]`. Either
-  a compile-time refusal (inference does not track struct kinds in contents)
-  or the VM rendering of instances is needed.
+- `stringify()`, `prettify()`, `highlight()` on a value that may be an
+  array, object or collection, in a unit or session that declares a struct
+  (`presentation-struct-contents:<method>`, review round 3, coordinator):
+  the VM's serializer cannot render an instance inside a container (an
+  instance carries no field privacy at run time) and inference does not track
+  struct kinds in contents, so this is refused before any effect.
+  Conservative: it also refuses containers that hold no instance. A candidate
+  for Phase B or a later VM capability checkpoint (rendering instances), not a
+  permanent limitation.
 
 ## 9a. Phase B requirements (recorded in review round 3)
 
@@ -529,3 +531,42 @@ struct field store: checked before the store (R14 and the `cycle_*` parity
 fixtures; a refused field store leaves the field unchanged). A top-level
 array is read by name from a closure, so storing a value that refers to such
 a closure into it closes no cycle (legacy-equal).
+
+### Round 3, second part: containers holding struct instances (coordinator)
+
+Phase A admits struct instances inside containers; on `84d67337`
+`[C()].stringify()` printed earlier output and then exited 70 (weekend/r2
+refused the program at the construction). Every built-in or VM operation
+that walks container contents was probed with an instance inside, VM against
+legacy, each program printing first:
+
+| Operation | Before the fix | Now |
+| --- | --- | --- |
+| `stringify`/`prettify`/`highlight` on an array, object, map, stack, nested (array of map of instance), in a function, closure, module, session | **exit 70 after output** | refused before effect, `presentation-struct-contents:<method>` |
+| the same on a set | refused (`collection-identity-key` at the add) | unchanged |
+| `print(a)` of a container or instance | legacy-equal (both: "value is not directly renderable" after `before`) | unchanged |
+| `"x" + a`, `"x" + C()` | refused (`type:+`) | unchanged |
+| `"x${a}"` | legacy-equal (literal text) | unchanged |
+| `==`/`!=` on arrays, objects, maps holding instances (nested too) | legacy-equal (identity per element) | unchanged |
+| `copy`, `deepcopy`, `reverse`, `filter`, `slice`, `length`, `keys` | legacy-equal | unchanged |
+| `[C()] + [C()]` | refused (`type:+`) | unchanged |
+| `env().stringify()` in a unit that declares a struct (an over-refusal of the conservative rule) | legacy-equal | refused, `presentation-struct-contents:stringify` |
+| `sort`, `unique`, `join`, `max` | refused (`collection-element:*`) | unchanged |
+| `indexOf` with an instance | refused (`collection-argument:indexOf`) | unchanged |
+| an instance as a map key or set member, `contains` | refused (`collection-identity-key`) | unchanged |
+| `includes`, `sorted`, `flat`, `values`, `to_string`, `string()`, `json_stringify`, `write_file` | refused (not VM methods, or legacy errors too) | unchanged |
+| reading an instance back (`m.get`, `st.pop`, `a[0]`, `type`) | legacy-equal | unchanged |
+| an array of instances captured by a `thread` | VM copies (open question 2); legacy fails in the thread body | unchanged (approved difference, not a crash) |
+
+The only crashing path was the presentation serializer. Fix (b), a
+compile-time refusal, was chosen over (a), VM rendering: legacy's struct form
+skips private fields, and privacy exists only in the compile-time plan, not
+on the run-time instance. Rendering would mean carrying a per-type privacy
+mask on every instance (heap layout, thread transfer, sessions) and matching
+legacy's pretty form (a trailing comma after every field). The refusal is a
+few lines at the two places presentation builtins are compiled.
+Fixtures: `refuse/presentation_struct_contents_*` (array, map, set, stack,
+object, nested, the three methods, `.length()`, function, closure),
+`modules/presentation_struct_contents`, session `session_struct_contents`,
+and `parity/presentation_struct_scalars.f` (still admitted: scalars,
+equality, copies, reads).

@@ -1782,6 +1782,15 @@ above (kept as written).
   a candidate for Phase B or a later VM capability checkpoint, not a
   permanent limitation. Exact collection receivers, collection/array mixes and
   unconstrained values (`env()`, decoded JSON) keep the generic path.
+- **Presentation of containers holding struct instances (coordinator).**
+  Phase A admits instances inside containers, and the VM serializer cannot
+  render one (legacy: `[C{v:0}]`, private fields skipped; privacy is not on
+  the run-time instance), so `[C()].stringify()` stopped after output with an
+  internal failure. In a unit or session that declares a struct, a
+  presentation method on a value that may be a container is refused at
+  compile time (`presentation-struct-contents:<method>`); conservative, a
+  Phase B / VM capability candidate. An audit of every content-walking
+  operation found no other crashing path (checkpoint section 15).
 - **Phase B requirements (recorded, not implemented).** Every
   cycle-capable mutation of arrays and objects goes through one shared
   protocol: validate the complete proposed mutation, commit it, then update

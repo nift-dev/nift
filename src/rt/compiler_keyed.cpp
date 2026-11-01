@@ -102,6 +102,8 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     if (!spec && presentation)
         spec = natives::find_builtin(natives::Receiver::Any, name);
     if (!spec) return fail(callee, "method:" + name) ? 1 : 0;
+    if (presentation && unit_may_hold_structs())  // review round 3: see compiler_call.cpp
+        return fail(callee, "presentation-struct-contents:" + name) ? 1 : 0;
     return builtin_call(node, *spec, callee.a, dst) ? 1 : 0;
 }
 
@@ -199,4 +201,9 @@ bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
     fb_->release_to(mark);
     return builder_ok();
 }
+
+bool UnitCompiler::unit_may_hold_structs() const {
+    return !plan_.structs.empty() || (session_ && !session_->structures.empty());
+}
+
 } // namespace nift::rt::detail

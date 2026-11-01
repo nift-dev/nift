@@ -220,6 +220,10 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         const bool top = (k & kKindAll) == kKindAll;
         if (presentation_builtin(*spec) && (k & kKindStruct) && (k & ~kKindStruct) && !top)
             return fail(callee, "presentation-mixed-struct:" + std::string(name));
+        // The serializer cannot render an instance inside a container (no field
+        // privacy at run time); contents are untracked: refused in a unit with structs.
+        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & (kKindAggregate | kKindCollection)))
+            return fail(callee, "presentation-struct-contents:" + std::string(name));
         return builtin_call(node, *spec, callee.a, dst);
     }
     const bool size = name == "size";  // rt-lint: allow-string-compare compile time

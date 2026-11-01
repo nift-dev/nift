@@ -81,6 +81,11 @@ def run_session(nift, stdin, work, mode="require"):
 # so a copied array, a lending to session code, or a loop over a session
 # array is refused; ordinary array use runs).
 SESSIONS = [
+    # Review round 3 (coordinator): a struct declared in an earlier statement;
+    # presenting an array holding an instance is refused before that statement.
+    # The earlier statement's print ran; the refused statement printed nothing.
+    ("session_struct_contents", 'struct(C) {\n  v := 0\n}\nc := C()\na := [c]\nprint("before")\n'
+     'print("x"); print(a.stringify())\n', ("refuse", "before\n", "presentation-struct-contents:stringify")),
     ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
     ("session_array_map", 'xs := [3, 1, 2]\nys := xs.map((v) => v * 2)\nprint(ys.length())\n', ("parity",)),
     # Sessions are fully conservative: a session read is typed "anything", so
