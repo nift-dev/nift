@@ -4627,6 +4627,15 @@ test-runtime2-refsem-tsan: $(TSAN_TARGET)
 	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm: test-runtime2-refsem test-runtime2-refsem-mutants
 test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+# B0 pre-release safety (docs/runtime-2/checkpoints/b0-safety.md): an admitted
+# program never stops with an internal VM failure (exit 70) because of a
+# run-time operand kind: handles presented, wrong-kind mutator receivers.
+.PHONY: test-runtime2-safety test-runtime2-safety-mutants
+test-runtime2-safety: $(TARGET)
+	$(PYTHON) tests/runtime2/safety/safety.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-safety-mutants: $(TARGET) $(LIBFFI_A)
+	SAFETY_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/safety/mutants.sh "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-safety test-runtime2-safety-mutants
 # Review round 2 (D9): stale-reference controls on the real VM path. The
 # relocation schedule lives in aggregate.cpp/aggregate_collection.cpp only
 # (aggregate_store.h), so those two are built checked (NIFT_RT_CHECKED_REFS)

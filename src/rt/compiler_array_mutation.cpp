@@ -88,7 +88,9 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     if(splice3&&!late&&!expr_to(args[2],state+Keys))return false;
     const int stored=method==M::Push?state+Item:method==M::Insert?state+Returned:splice3&&!late?state+Keys:-1;
     if(!read(true,stored))return false;
-    fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,splice3&&!late?2:0);
+    // The call text: the VM's wrong-receiver message (B0, vm_array_mutation.cpp).
+    fb_->set_offset(collection_offset(node));
+    fb_->note(fb_->emit(OpCode::ArrayMutate,state,id,splice3&&!late?2:0),std::string(text(node)));
     if(splice3) {
         if(late&&(!put()||!expr_to(args[2],state+Keys)||!read(true,state+Keys)))return false;
         fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,1);

@@ -83,8 +83,18 @@ bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, 
         case Kind::Bytes: error = "bytes values are not serializable"; return false;
         case Kind::Error: return serialize_error(value, pretty, depth, out, error);
         case Kind::Function: error = "opaque runtime value is not serializable"; return false;
+        // B0 (docs/runtime-2/checkpoints/b0-safety.md): a shared handle (mutex,
+        // channel, atomic, task) or a future reaches here at run time, through
+        // any container: an ordinary program error, the same as a function.
+#if defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 1
+        case Kind::Handle: case Kind::Future: bad_kind = true; error = "stringify argument kind"; return false;  // S1
+#else
+        case Kind::Handle: case Kind::Future: error = "opaque runtime value is not serializable"; return false;
+#endif
         case Kind::Array: case Kind::Object: break;
         case Kind::Collection: return serialize_collection(value, pretty, depth, out, error, bad_kind);
+        // Struct (refused before any effect: presentation-struct*, whole unit)
+        // and Cell (never a first-class value) cannot reach the serializer.
         default: bad_kind = true; error = "stringify argument kind"; return false;
     }
     const bool array = value.is(Kind::Array);

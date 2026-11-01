@@ -96,6 +96,18 @@ bool to_document(const Value& v, json::Document& doc, std::string& error, bool& 
                 if (!to_document(entry.second, member, error, bad_kind, limit, depth + 1)) return false;
             }
             return true;
+        // B0: values validate() can be given at run time inside an array or
+        // object are ordinary program errors (CP15 J1 has no JSON form for them).
+#if defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 3
+        case Kind::Function: case Kind::Handle: case Kind::Future: case Kind::Collection: case Kind::Struct:
+            bad_kind = true; error = "json argument kind"; return false;  // S3
+#else
+        case Kind::Function: case Kind::Handle: case Kind::Future:
+            error = "opaque runtime value is not serializable"; return false;
+        case Kind::Collection: error = "map, set and stack values are not JSON serializable"; return false;
+        case Kind::Struct: error = "struct instances are not JSON serializable"; return false;
+#endif
+        // Cell: never a first-class value.
         default: bad_kind = true; error = "json argument kind"; return false;
     }
 }

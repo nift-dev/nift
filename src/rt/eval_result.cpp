@@ -37,6 +37,12 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
         }
         return true;
     }
+    // B0: a shared handle or a future shown as a result: the VM's wording for
+    // an opaque value (a timer keeps its legacy form through to_legacy).
+    if ((value.is(Kind::Handle) && value.handle_kind() != HandleKind::Timer) || value.is(Kind::Future)) {
+        error = "opaque runtime value is not serializable";
+        return false;
+    }
     return to_legacy(value, out, error);
 }
 } // namespace

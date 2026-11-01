@@ -1778,7 +1778,14 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     if ((expression || result.execution.returned) && !result.value.is_null()) {
         nift::RuntimeValue value;
         std::string error;
-        if (!nift::rt::eval_result_to_legacy(result.value, value, error)) { console::error(error); return 70; }
+        // B0 (b0-safety.md): a statement value the session cannot show (a
+        // handle, a map/set/stack from an earlier statement) is an ordinary
+        // statement error, as `nift eval` reports it, never an internal stop.
+#if defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 4
+        if (!nift::rt::eval_result_to_legacy(result.value, value, error)) { console::error(error); return 70; }  // S4
+#else
+        if (!nift::rt::eval_result_to_legacy(result.value, value, error)) { console::error(error); return 1; }
+#endif
         if (!(value.is_string() && value.string.empty()))
             std::cout << ((!expression || result.presentation) && value.is_string() ? value.string : value.dump()) << '\n';
     }

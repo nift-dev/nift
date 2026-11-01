@@ -12,7 +12,16 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     Value* s=R+in.a;const auto m=static_cast<M>(in.b);
     const std::string_view name=collection_names[in.b];
     const auto fail=[&](std::string text){return raise(fault,StopReason::Error,std::move(text));};
-    if(!s[Source].is(Kind::Array))return internal(fault,"array mutation receiver");
+    // B0 (b0-safety.md): a statement mutator on a loop binding, a selector or a
+    // const binding is lowered without a receiver kind proof; a receiver that is
+    // not an array at run time is legacy's (and OpCode::Push's) ordinary error.
+#if defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 2
+    if(!s[Source].is(Kind::Array))return internal(fault,"array mutation receiver");  // S2
+#else
+    if(!s[Source].is(Kind::Array)){const Note* note=proto->note(&in-proto->code.data());
+        return fail(note&&in.c!=100?"unknown value or malformed expression: "+note->text:
+            std::string(name)+": receiver is not an array");}
+#endif
     const auto n=array_size(s[Source]);
     if(in.c==100){if(m==M::Pop&&!n)return fail("pop: array is empty");
         const Note* note=proto->note(&in-proto->code.data());
