@@ -1500,7 +1500,11 @@ the G03 study, all supported on the VM).
 Witness: `tests/runtime2/args_cmd/args_cmd.py` §3 (writes, with an earlier file
 effect and output that must not happen; module refusals) and §4 (session).
 
-## D-063 — Coroutines in programs that import modules (owner, 2026-10-31; weekend `coro-module`)
+## D-064 — Coroutines in programs that import modules (owner, 2026-10-31; weekend `coro-module`)
+
+(Numbered D-063 on weekend/r2; renumbered at the refsem-a integration, where
+D-063 is the weekend collections decision. References below and in the
+coro-module records were updated.)
 
 (D-062 is claimed by `cand/args-cmd`.)
 

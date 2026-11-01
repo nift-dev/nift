@@ -1162,7 +1162,7 @@ def main():
         d.mkdir()
         (d / "lib.f").write_text("x := 1\n")
         coro = 'fn[async](g()) { return 6 }\nf := g()\nprint(await f)\n'
-        # Since D-063 (weekend coro-module) the whole-unit coro-module refusal
+        # Since D-064 (weekend coro-module; D-063 on weekend/r2) the whole-unit coro-module refusal
         # exists only under the cooperative model; the parallel default runs it.
         coop = {"NIFT_VM_COOPERATIVE_THREADS": "1"}
         for name, text in (("main.f", '// header\n\nimport("lib.f")\n' + coro), ("first.f", 'import("lib.f")\n' + coro)):
@@ -1178,7 +1178,7 @@ def main():
             refused(proc, f"<stdin> {nopos}", "coro-module", f"coro-module ({name} as `-`): no exact position")
             proc, rows = run(nift, d, [name], {})
             check(proc.returncode == 0 and proc.stdout == "6\n" and proc.stderr == "",
-                  f"coro-module ({name}): the parallel default runs the linked coroutine unit (D-063)",
+                  f"coro-module ({name}): the parallel default runs the linked coroutine unit (D-064)",
                   f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr[:300]!r}")
         # The genuine 1:1 of a coroutine refusal (an async function's value at 1:1).
         (d / "genuine.f").write_text('g\n' + coro)

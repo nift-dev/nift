@@ -453,7 +453,7 @@ revision gives the same reason for all 17 units.
 | H1: a user struct method named like a built-in callback method (`map`, `filter`, `sort`) turned the callback rule off (`a1`, `a2`, `s1`) | HIGH | every method call given a function value is a call through a value; the method's name plays no part |
 | L1 (over-refusal): an async lambda called in a module function was refused as private-async; legacy runs it (`al1`) | LOW | private-async no longer refuses calls of async lambdas. `al1` itself now stops earlier at an unrelated pre-existing refusal (`text-type-name`, the lambda body `x * x`; the inline program is refused the same way). `al1b` (body `x * 2`) runs, equal to legacy |
 | L1 (over-refusal): an async lambda created at a module's top level and only called later was refused as init-task at the lambda (`q2`) | LOW | creating an async lambda at the top level is not a task start; calling it there still is (`q3`, now reported at the call). `q2` stops at the same unrelated `text-type-name`; `q2b` and `q1` run, equal to legacy |
-| L2 (over-claim): D-063 #2 and #3 over-claimed coverage "through a value" and "including built-in callbacks" | LOW | D-063 rewritten: what counts as a call through a value, by structure; the whole-unit matching of function values stated |
+| L2 (over-claim): D-064 (then D-063) #2 and #3 over-claimed coverage "through a value" and "including built-in callbacks" | LOW | D-064 rewritten: what counts as a call through a value, by structure; the whole-unit matching of function values stated |
 
 **Base commit (separate).** `src/rt/compiler_coro.cpp` `FutureFlow::value_position`
 treated every child of a `Property`, `StructField` and `ForBinding` as a name.

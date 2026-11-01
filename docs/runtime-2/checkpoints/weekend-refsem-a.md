@@ -661,3 +661,56 @@ this case as a fourth failure (weekend/r2 fails three there; the baseline and
 `--expect old` parts fail identically on both, 31 and 9). The target is not
 part of `test-rt-vm` (nor of `test-rt-vm-sanitize`) and fails on weekend/r2
 already, so no expectation was changed.
+
+## 17. Integration onto weekend/r2 (`integ/refsem-a`, merge of `73b327e5` into `9ee77096`)
+
+The merge carries Phase A and the weekend collections base it builds on.
+Conflicts (resolved without changing either side's contract): `compiler.h`
+(the session symbol keeps args/cmd's `invocation` flag and takes Phase A's
+32-bit KindSet `params`), `compiler_loops.cpp` (Phase A's verbatim move of
+`while_loop`), `classification.tsv` (packages' and coro-module's rows,
+Phase A's collection rows), `compatibility.md` and `decisions.md` (both
+sides' additions). Follow-up: the coro-module decision, D-063 on weekend/r2,
+is renumbered D-064 (D-063 is the collections decision that Phase A cites
+throughout).
+
+Interactions checked (combined fixtures in `tests/runtime2/refsem/`):
+
+- **Packages.** A package's exported map, set, stack and struct instance keep
+  their identity across the boundary (`same()`, mutations through the
+  package's functions visible to the importer); `copy`/`deepcopy` of an
+  imported map are independent of later mutations; legacy-equal, and Phase B
+  keeps it (`modules/package_reference_exports`, with its `.nift/` store).
+  The runner copies a module case's directories now.
+- **Coroutines with modules (D7).** An async task given an imported module's
+  map receives a copy made at creation (`modules/coro_module_copy_at_creation`:
+  neither side sees the other's later mutation). Weekend/r2 refused the unit
+  (`coro-module-capture`, no `map()` there); legacy refuses the map as
+  non-transferable (an approved difference, D-NEXT-refsem #5). Passing a
+  module's struct instance stays refused (`coro-module-capture`, as on
+  weekend/r2). The cooperative scheduler keeps coro-module's whole-unit
+  refusal for linked units (its documented unpositioned refusal).
+- **`args`/`cmd` and the guard.** `a := args; a.push(x)` is refused before
+  any effect (`reference-guard:inflow`, `refuse/args_copy_mutated.f`):
+  legacy's `a` aliases `args` (it grows too), weekend/r2 ran it with a copy
+  (`args` unchanged, unlike legacy). Reading `args` (a call argument, a loop,
+  a value stored in a map, `cmd`) stays admitted and legacy-equal
+  (`parity/args_read_only.f`). `args` extracted from a map and mutated is
+  refused the same way.
+- **Diag-positions.** Every refusal fixture of Phase A (refsem, collections,
+  modules) carries a position (no "the VM gave no exact position"), at the
+  refused node (spot-checked across the guard, collection and presentation
+  reasons).
+
+Pre-flight (classify, the merged binary against `9ee77096` and `73b327e5`):
+in `tests/runtime2` only the four new combined fixtures differ from both
+parents (each needs both sides' features); every other change matches one
+parent. Release corpus (CP25-R): against `9ee77096` exactly Phase A's own
+changes (4 newly refused, the D-040 witnesses; 19 newly admitted); against
+`73b327e5` exactly weekend/r2's; 0 of 608 execute entries change, and no
+unit or entry differs from both parents.
+
+Observed, pre-existing on both parents, not interactions: a module function
+parameter named like an importer's top-level binding is refused
+(`import-scope`), and a string-literal argument to an imported function
+after a first call is refused (`string-arg-type`).

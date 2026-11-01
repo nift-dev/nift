@@ -23,8 +23,9 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
                 objects (D-NEXT-refsem #1; the comment in each says why).
   pending/*.f   valid programs Phase A over-refuses (Phase B must admit them):
                 NAME.expected the valid output (legacy's), NAME.reason today's refusal.
-  modules/*/    module cases (main.f imports m.f): `reason` (refused before
-                any effect) or `phaseb` (as phaseb/ above).
+  modules/*/    module cases (main.f imports m.f, or a package in .nift/):
+                `reason` (refused before any effect), `phaseb` (as phaseb/
+                above) or `vm` (an approved difference: the VM's output; legacy differs).
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
                 execution give the same transcript, NAME.vm, both on the VM (D7).
   heap          a refused cycle leaks nothing (4 and 40 refused attempts end
@@ -48,8 +49,9 @@ def run(nift, path, mode, work, budget=None, extra=None, tree=None):
     d = tempfile.mkdtemp(dir=work)
     name = os.path.basename(path)
     if tree:  # a module case: the whole directory
-        for f in os.listdir(tree):
-            shutil.copy(os.path.join(tree, f), os.path.join(d, f))
+        for f in os.listdir(tree):  # directories too (a package store, `.nift/`)
+            src = os.path.join(tree, f)
+            (shutil.copytree if os.path.isdir(src) else shutil.copy)(src, os.path.join(d, f))
     else:
         shutil.copy(path, os.path.join(d, name))
     stats = os.path.join(d, "stats.jsonl")
@@ -211,6 +213,12 @@ def main():
                 reason = open(os.path.join(tree, "reason")).read().strip()
                 check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
                       "module %s: expected %s before effects, got %d %r %r" % (case, reason, vr, vo, ve[:300]))
+            elif os.path.exists(os.path.join(tree, "vm")):  # an approved difference (the VM's golden)
+                want = open(os.path.join(tree, "vm")).read()
+                lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
+                check(ran_on_vm(st) and vr == 0 and vo == want and (lo, lr) != (vo, vr),
+                      "module %s: VM %r/%r/%d (expected %r), legacy %r/%d must differ" % (case, vo, ve[:200], vr,
+                                                                                       want, lo, lr))
             else:
                 want = open(os.path.join(tree, "phaseb")).read()
                 lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
