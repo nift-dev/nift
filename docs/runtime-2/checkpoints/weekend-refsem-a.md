@@ -374,6 +374,31 @@ full `test-rt-vm` and sanitizer lanes (Linode), and the rt-diff selftest,
 whose timeout and interleave checks fail on this host for the base binary
 too (its module-reproducer check needs `gen/m1`, fixed in section 7).
 
+### Round 2 runs
+
+Full set on `44f9a476` (tree `5788b819`), through the heavy-job gate, every
+exit 0: `make nift`, `test-rt-lint` (0 problems), `refsem_a.py` (312
+checks), `weekend_collections.py` (273), `refsem/mutants.sh` (R1-R18, R20,
+R21: 20 of 20 caught), `collections/mutants.sh`,
+`test-runtime2-refsem-stale-vm` (8 of 8, R19 misses 8 of 8),
+`test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-vm-default`,
+`-closures-s1`, `-closures-s1-stress`, `-for-s2`, `-for-s2-mutants`, `-cp22`,
+`-cp23`, `-capture-origins`, `-cp12c-probes`, `-cp14b`, `-cp14b-witnesses`,
+`test-cp25r`, `-d040-witnesses`, `-vm-corpus-complete`, `-cp16-n1`,
+`-kind-bits`, `-cp12c-mutant-controls`, `-closures-s1-mutants`, `-cp13b`, and
+`vm_parity.py --gen 300 --rt-diff`, `vm_adversarial.py --count 600`,
+`vm_subset.py`, `vm_subset_gen.py --count 500`, `vm_builtins.py`,
+`vm_known_refused.py`, `vm_engine_selection.py`, `vm_former_replay.py
+--sample 600`, `vm_review_cp12.py`, `vm_golden.py`, `vm_inventory.py`,
+`vm_modules.py --gen 100`, `vm_structs.py --gen 100`, `vm_globals.py --gen
+200`, `semantics_modules.py` (both dirs). Static audit (1,793 `.f`): no
+outcome change against the round-1 tip on any file both contain (the 30 new
+files are this round's fixtures). CP25-R inventory: unchanged from round 1
+(section 11), 0 of 608 execute entries changed. The next commit adds one
+session regression case (`session_saved_error`) and this text, no source;
+`refsem_a.py` was rerun on it. Not run locally: the full `test-rt-vm` and
+sanitizer lanes; the Linode run on `964901ae` is diagnostic evidence only.
+
 ## 13. Review round 1 (review of `ad9d842f`)
 
 | Finding | Fix | Evidence |

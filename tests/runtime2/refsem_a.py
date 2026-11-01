@@ -99,6 +99,12 @@ SESSIONS = [
     # defect); with 32-bit fields they run, legacy-equal (maps are references).
     ("session_map_alias", 'm := map()\nb := m\nx := b.set(1, 2)\nprint(m.size())\n', ("parity",)),
     ("session_struct_instance", 'struct(C){v:=0;fn(add(n)){v+=n}}\nc:=C()\nc.add(3)\nprint(c.v)\n', ("parity",)),
+    # Review round 2 (cp19 session.cpp 277/278): an Error thrown by an instance
+    # method from an earlier statement, caught and saved, keeps its message and
+    # source (the 16-bit session kinds turned `c` into a string, so the
+    # statement was refused and `saved` kept its seed).
+    ("session_saved_error", 'struct(C){v:=0;fn(fail()){throw error("original")}}\nc:=C()\n'
+     'saved:=error("seed");try{c.fail()}catch(e){saved=e}\nprint(saved.message)\nprint(saved.source)\n', ("parity",)),
 ]
 
 
