@@ -300,6 +300,7 @@ bool UnitCompiler::session_publish(std::string_view name, const Binding& binding
         symbol.structure = session_shape(shape->second);
         symbol.kinds = symbol.contract = symbol.structure->kinds;
     }
+    if (binding.struct_id >= 0 && !(symbol.contract & kKindStruct)) symbol.kinds = symbol.contract = kKindStruct;
     if (!binding.readonly) symbol.contract = session_binding_kinds(symbol.contract);
     symbol.const_array = binding.const_array; symbol.readonly = binding.readonly;
     if (existing == session_->symbols.end()) session_->symbols.push_back(std::move(symbol));

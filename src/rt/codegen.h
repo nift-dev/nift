@@ -13,7 +13,7 @@ namespace nift::rt {
 
 class FunctionBuilder {
 public:
-    std::uint16_t session_returns = 0;
+    std::uint32_t session_returns = 0;  // a KindSet (32 bits: kKindStruct is bit 23)
     explicit FunctionBuilder(std::string name);
 
     // Registers: a stack. `alloc` returns the next free register; `release_to`

@@ -51,6 +51,20 @@ cases=[
  ('object-reader-redefinition','fn(g(v)){return v+1};o:={"f":v=>g(v)}\nfn(g(v)){return v+2}\n(o.f(2))\nexit\n',3),
  ('object-alias-redefinition','fn(g(v)){return v+1};o:={"f":g}\nfn(g(v)){return v+2}\n(o.f(2))\nexit\n',3),
 ]
+# D-NEXT-refsem #1 (review round 2): the Phase A guard (sessions fully
+# conservative) refuses these before the statement runs: each mutates a session
+# array through a loop binding, aliases one (`old:=a`), or passes a session
+# function by name as a native's callback over one; earlier statements ran.
+GUARDED={
+ 'nested-kind-widening':'reference-guard:shared-part',
+ 'capture-nested-kind-widening':'reference-guard:lent',
+ 'widened-callable-bound':'reference-guard:shared-part',
+ 'replacement-loop-capture':'reference-guard:lent',
+ 'wrapper-lexical-shadow':'reference-guard:lent',
+ 'nested-loop-mutation':'reference-guard:shared-part',
+ 'nested-loop-snapshot':'reference-guard:inflow',
+ 'quoted-named-callback':'reference-guard:shared-part',
+}
 for name,source,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-callable-') as td:
   root=Path(td);baseline=None;errors=1 if name in ('const-captured-kind','named-order-pre-error','widened-native-argument-error') else 0
@@ -64,6 +78,12 @@ for name,source,units in cases:
    channels=(r.returncode,r.stdout,r.stderr)
    if baseline is None:
     baseline=channels;assert r.returncode==0 and bool(r.stderr)==bool(errors),record;continue
+   if name in GUARDED:
+    reason=GUARDED[name]
+    assert r.returncode==1 and ('NIFT_VM session refused: %s:'%reason) in r.stderr,record
+    assert rows and rows[-1]['reason']==reason and rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,record
+    assert all(x['vm_executions']==1 and x['legacy_executions']==0 for x in rows[:-1]),record
+    continue
    if name=='nested-loop-snapshot':
     # D-040 ordinary values copy on write; legacy's outer alias is deliberately different.
     assert baseline==(0,'[[1,2],[2,2]]\n[[1,2],[2,2]]\n',''),baseline

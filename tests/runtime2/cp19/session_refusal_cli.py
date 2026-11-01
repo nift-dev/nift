@@ -7,7 +7,11 @@ binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True
 cases=[
  ('literal-type-refusal','x:=5\nprint("FORBIDDEN");1*"bad"\nx\nexit\n','5\n','type:*'),
  ('loop-nested-compilation-atomicity','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")};bytes([65])\na.stringify()\nexit\n','[[1]]\n','builtin-bytes:bytes'),
- ('capture-nested-compilation-atomicity','fn(makec()){a:=[[1]];return v=>{for(row:a){row.push(v)};return a.stringify()}};c:=makec()\nprint("FORBIDDEN");c("bad");bytes([65])\nc(2)\nexit\n','"[[1,2]]"\n','builtin-bytes:bytes'),
+ # D-NEXT-refsem #1 (review round 2): the closure pushes into its captured array
+ # directly (it pushed through a loop binding over a nested array,
+ # `for(row:a){row.push(v)}`, which the Phase A guard refuses before the
+ # statement under test); `warm` types the parameter, as in session_callable_cli.
+ ('capture-nested-compilation-atomicity','fn(makec()){a:=[1];return v=>{a.push(v);return a.stringify()}};c:=makec();warm:=c(0)\nprint("FORBIDDEN");c("bad");bytes([65])\nc(2)\nexit\n','"[1,0,2]"\n','builtin-bytes:bytes'),
  ('captured-struct','x:=5\nstruct(Point){x:=1};print("FORBIDDEN");fn(makep()){p:=Point();return ()=>p.x};f:=makep()\nx\nexit\n','5\n','session:captured-struct'),
  ('lambda-rebind-spelling','f:=v=>v+1\nprint("FORBIDDEN");f=v=>v*2\nf(3)\nexit\n','4\n','session:lambda-assignment-spelling'),
  ('struct-outer-shadow','v:=99\nstruct(Counter){v:=0;fn(get()){return v}};print("FORBIDDEN");c:=Counter()\nv\nexit\n','99\n','session:struct-dynamic-shadow'),
