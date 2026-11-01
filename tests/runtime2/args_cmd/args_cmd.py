@@ -213,8 +213,19 @@ def suite(root):
            expect=["<stdin>\n2\n<p>\n<q>\n"])
     parity("-i file, piped session", [NIFT, "-i", "sess.f", "a", "b"], work, home, stdin=SESSION_INPUT,
            expect=["cmd=sess.f\nargc=2\nfn=2\nsess.f\n2\na,b\n"], session=True)
-    parity("-i -e, piped session", [NIFT, "-i", "-e", INLINE, "a"], work, home, stdin=SESSION_INPUT,
-           expect=["<command-line>\n1\n<a>\n<command-line>\n1\na\n"], session=True)
+    # Owner ruling "args/cmd x reference guard, Option 2, 2026-11-01": the Phase A guard refuses a loop over the session
+    # array `args` (reference-guard:shared-part, a temporary over-refusal Phase B
+    # must admit). The original and legacy's output are preserved as
+    # tests/runtime2/refsem/pending/args_session_loop.*; the loop over `args`
+    # in a script stays covered by the -e/-c cases above.
+    legacy, _ = run([NIFT, "-i", "-e", INLINE, "a"], work, "0", home, SESSION_INPUT)
+    vm, _ = run([NIFT, "-i", "-e", INLINE, "a"], work, None, home, SESSION_INPUT)
+    check(legacy.returncode == 0 and legacy.stdout == "<command-line>\n1\n<a>\n<command-line>\n1\na\n",
+          "-i -e, piped session: legacy output kept", repr((legacy.returncode, legacy.stdout)))
+    check(vm.returncode == 1 and vm.stdout == "" and "session refused: reference-guard:shared-part" in vm.stderr,
+          "-i -e, piped session: refused before the line runs (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+    parity("-i -e, piped session without a loop over args", [NIFT, "-i", "-e", 'print(cmd); print(args.size()); print(args[0])', "a"],
+           work, home, stdin=SESSION_INPUT, expect=["<command-line>\n1\na\n<command-line>\n1\na\n"], session=True)
     parity("bare piped session", [NIFT], work, home, stdin=SESSION_INPUT, expect=["<repl>\n0\n\n"], session=True)
     (home / ".niftrc").write_text('print("rc " + cmd + " " + args.size().to_string())\n')
     parity("~/.niftrc, piped session", [NIFT], work, home, stdin=SESSION_INPUT,
@@ -233,9 +244,22 @@ def suite(root):
           repr((status, out)))
 
     # 2. Runtime errors: legacy's text, status and order.
+    # Owner ruling "args/cmd x reference guard, Option 2, 2026-11-01": a mutation of `args` is refused before any effect by
+    # the Phase A guard (reference-guard:*), not raised as legacy's const error
+    # after earlier output. A temporary diagnostic-classification difference;
+    # correcting the diagnostic is a pre-release obligation. The originals and
+    # legacy's behaviour are preserved as tests/runtime2/refsem/pending/
+    # args_push_after_output.*, args_sort.*.
     for label, src in (("args.push is an error after earlier output", 'print("e")\nargs.push("z")\n'),
-                       ("args.sort is an error", 'args.sort()\n'),
-                       ("out-of-range index", 'print(args[5])\n'),
+                       ("args.sort is an error", 'args.sort()\n')):
+        (work / "rt.f").write_text(src)
+        legacy, _ = run([NIFT, "rt.f", "a"], work, "0", home)
+        vm, _ = run([NIFT, "rt.f", "a"], work, None, home)
+        check(legacy.returncode == 1 and "cannot mutate const array: args" in legacy.stderr,
+              "runtime error: " + label + ": legacy's const error kept", repr((legacy.returncode, legacy.stderr)))
+        check(vm.returncode == 1 and vm.stdout == "" and "(reference-guard:" in vm.stderr and "no part of it ran" in vm.stderr,
+              "runtime error: " + label + ": refused before any effect (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+    for label, src in (("out-of-range index", 'print(args[5])\n'),
                        ("calling args", 'print("e")\nargs("a")\n')):
         (work / "rt.f").write_text(src)
         vm = parity("runtime error: " + label, [NIFT, "rt.f", "a"], work, home)
@@ -366,12 +390,17 @@ def suite(root):
           and "not supported" not in vm.stderr and not (work / "s.txt").exists() and "next" not in vm.stdout,
           "piped session: D-062 assignment rejected before the line runs", repr((vm.returncode, vm.stderr)))
 
-    # 5. D-040: value semantics (intentional, owner-approved): a copy is independent.
+    # 5. A copy of args then mutated. Owner ruling "args/cmd x reference guard, Option 2, 2026-11-01": refused before any
+    # effect by the Phase A guard (reference-guard:inflow; formerly D-040's
+    # independent copy). Phase B must establish the reference-and-immutability
+    # contract (aliasing must not bypass a genuinely immutable binding; a
+    # successful mutation is not assumed right). Preserved as
+    # tests/runtime2/refsem/pending/args_copy_push.*.
     (work / "copy.f").write_text('b := args\nb.push("q")\nprint(b.size())\nprint(args.size())\n')
     vm, rows = run([NIFT, "copy.f", "a"], work, None, home)
     legacy, _ = run([NIFT, "copy.f", "a"], work, "0", home)
-    check(vm.returncode == 0 and vm.stdout == "2\n1\n" and on_vm(rows), "D-040: a copy of args is independent",
-          repr((vm.returncode, vm.stdout, vm.stderr)))
+    check(vm.returncode == 1 and vm.stdout == "" and "(reference-guard:inflow)" in vm.stderr and "no part of it ran" in vm.stderr,
+          "a copy of args then mutated: refused before any effect (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
     check(legacy.stdout == "2\n2\n", "D-040 control: legacy aliases the array", repr(legacy.stdout))
 
     # 6. eval binds neither name (legacy: unknown value; VM: refused, nothing run).

@@ -714,3 +714,31 @@ Observed, pre-existing on both parents, not interactions: a module function
 parameter named like an importer's top-level binding is refused
 (`import-scope`), and a string-literal argument to an imported function
 after a first call is refused (`string-arg-type`).
+
+### Integration test corrections (owner rulings, 2026-11-01)
+
+- CP19 `unrelated-callback-shadow` and cp14b (`splice_throw`, the design
+  mutation lane): test-only commits `fdcdd0ed`, `104f83cb` on `cand/refsem-a`,
+  merged here; originals in `tests/runtime2/refsem/pending/`. The standalone
+  `73b327e5` Linode run's cp19 and cp14b failures stay recorded as failures of
+  that tip.
+- args/cmd x the reference guard (Option 2: the guard stays frozen), four
+  `test-runtime2-args-cmd` cases, test-only, on this branch (they exist only
+  in the combined tree):
+  1. `print("e"); args.push("z")` and 2. `args.sort()`: refused before any
+     effect (`reference-guard:unresolved`) where legacy raises "cannot mutate
+     const array: args" after earlier output. A temporary
+     diagnostic-classification difference; **correcting the misleading
+     diagnostic is a pre-release obligation**.
+  3. A loop over `args` in a piped `-i -e` session (`reference-guard:shared-part`):
+     a temporary Phase A over-refusal; Phase B must admit it.
+  4. `b := args; b.push("q")` (`reference-guard:inflow`; legacy aliases `args`):
+     Phase B must establish the final reference-and-immutability contract
+     (aliasing must not bypass a genuinely immutable binding; a successful
+     mutation is not assumed right).
+  Originals and legacy's behaviour: `tests/runtime2/refsem/pending/args_*`.
+  Coverage: `args_cmd.py` mutants 1, 2, 3 and 6 are still caught; mutant 5
+  (the script bindings writable) is not. Its only witnesses were cases 1 and
+  2, and no script-unit mutation of `args` reaches the const check while the
+  guard refuses every one (twelve mutation forms probed, real and mutant
+  builds identical); see the integration report.

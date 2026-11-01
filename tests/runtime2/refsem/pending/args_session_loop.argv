@@ -1,0 +1,1 @@
+["-i", "-e", "print(cmd); print(args.size()); for(a : args) { print(\"<\" + a + \">\") }", "a"]

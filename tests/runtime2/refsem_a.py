@@ -46,7 +46,7 @@ import tempfile
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "refsem")
 
 
-def run(nift, path, mode, work, budget=None, extra=None, tree=None):
+def run(nift, path, mode, work, budget=None, extra=None, tree=None, args=()):
     d = tempfile.mkdtemp(dir=work)
     name = os.path.basename(path)
     if tree:  # a module case: the whole directory
@@ -62,7 +62,7 @@ def run(nift, path, mode, work, budget=None, extra=None, tree=None):
         env["NIFT_VM_HEAP_BUDGET"] = str(budget)
     if extra:
         env.update(extra)
-    p = subprocess.run(["timeout", "120", nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL,
+    p = subprocess.run(["timeout", "120", nift, name, *args], cwd=d, env=env, stdin=subprocess.DEVNULL,
                        capture_output=True)
     st = None
     if os.path.exists(stats):
@@ -74,11 +74,11 @@ def run(nift, path, mode, work, budget=None, extra=None, tree=None):
     return norm(p.stdout), norm(p.stderr), p.returncode, st
 
 
-def run_session(nift, stdin, work, mode="require"):
+def run_session(nift, stdin, work, mode="require", argv=()):
     d = tempfile.mkdtemp(dir=work)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode}
-    p = subprocess.run(["timeout", "120", nift], cwd=d, env=env, input=stdin.encode(), capture_output=True)
+    p = subprocess.run(["timeout", "120", nift, *argv], cwd=d, env=env, input=stdin.encode(), capture_output=True)
     return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
 
 
@@ -195,13 +195,19 @@ def main():
         # original evidence (kept unchanged where it lives); NAME.expected is
         # its valid output (legacy's); today the VM refuses it before any
         # effect with NAME.reason. Phase B turns each into a parity case.
+        def extra_of(base, ext, default=None):  # optional NAME.args / NAME.exit / NAME.error / NAME.argv
+            return open(base + ext).read() if os.path.exists(base + ext) else default
         for f in fixtures("pending"):
             name = os.path.basename(f)
             reason = open(f[:-2] + ".reason").read().strip()
             want = open(f[:-2] + ".expected").read()
-            lo, le, lr, _ = run(nift, f, "0", work)
-            vo, ve, vr, st = run(nift, f, "require", work)
-            check(lr == 0 and lo == want, "pending %s: the preserved valid output changed: %r %r" % (name, lo, le[:200]))
+            argv = tuple(extra_of(f[:-2], ".args", "").split())
+            want_exit = int(extra_of(f[:-2], ".exit", "0"))
+            want_error = (extra_of(f[:-2], ".error", "") or "").strip()
+            lo, le, lr, _ = run(nift, f, "0", work, args=argv)
+            vo, ve, vr, st = run(nift, f, "require", work, args=argv)
+            check(lr == want_exit and lo == want and want_error in le,
+                  "pending %s: the preserved legacy behaviour changed: %d %r %r" % (name, lr, lo, le[:200]))
             check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
                   "pending %s: expected the Phase A refusal %s before effects (or Phase B support: make it "
                   "a parity case), got %d %r %r" % (name, reason, vr, vo, ve[:200]))
@@ -211,10 +217,11 @@ def main():
         for name in sorted(f for f in os.listdir(pend) if f.endswith(".session")):
             base = os.path.join(pend, name[:-len(".session")])
             stdin = open(base + ".session").read()
+            argv = tuple(json.loads(extra_of(base, ".argv", "[]")))
             reason = open(base + ".reason").read().strip()
             want = open(base + ".expected").read()
-            lo, le, lr = run_session(nift, stdin, work, mode="0")
-            vo, ve, vr = run_session(nift, stdin, work)
+            lo, le, lr = run_session(nift, stdin, work, mode="0", argv=argv)
+            vo, ve, vr = run_session(nift, stdin, work, argv=argv)
             check(lr == 0 and lo == want, "pending %s: the preserved valid output changed: %r %r" % (name, lo, le[:200]))
             check(vr == 1 and vo == "" and "session refused: %s" % reason in ve,
                   "pending %s: expected the Phase A refusal %s before the statement's effects (or Phase B "

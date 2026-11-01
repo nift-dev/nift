@@ -1,0 +1,3 @@
+print(cmd)
+print(args.size())
+print(args.join(","))
