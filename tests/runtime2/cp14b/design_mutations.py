@@ -18,7 +18,10 @@ COPIES=[
 'a:=[1,2]; a.pop(); print(a.stringify())',
 'fn(f()) { a:=[1,2]; a.pop(); print(a.stringify()) }; f()',
 'fn(f()) { a:=[1,2]; g:=()=>a.pop(); g(); print(a.stringify()) }; f()',
-'a:=[[1,2]]; for(v:a) { v.pop() }; print(a.stringify())']
+'a:=[[1,2]]; for(v:a) { v.pop() }; print(a.stringify())',
+# The loop-binding form the guard admits (review of 542f0a65): the binding is
+# mutated and read, the iterated array is not read back.
+'for(v:[[1,2]]) { v.pop(); print(v.stringify()) }']
 # Witnesses the Phase A forward-compatibility guard refuses before any effect
 # (reference-guard:lent: an array mutated while a loop or a callback holds it;
 # D-NEXT-refsem #9). They cannot witness a VM mutant while the guard stands;
@@ -111,6 +114,14 @@ def main():
         subprocess.run(['g++','-pthread',str(driver),*linked,'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)],check=True,capture_output=True)
         return binary,dict(intended_commit=intended_commit,driver_sha256=driver_hash,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),source_sha256=source_hash,flags=flags,macro=macro,marker=name)
     normal,normal_identity=build('control');results=[];negatives=[]
+    # Each excluded witness must still be refused by the guard before any
+    # effect; if the guard changes, the coverage loss is flagged here.
+    with tempfile.TemporaryDirectory(prefix='cp14b-guarded-') as folder:
+        for source in sorted(GUARDED_WITNESSES):
+            row=run(str(normal),'require',source,Path(folder));st=row['stats'][-1] if row['stats'] else {}
+            if not (row['exit']==1 and row['out']=='' and st.get('outcome')=='require-error'
+                    and str(st.get('reason','')).startswith('reference-guard:') and st.get('vm_executions')==0):
+                raise RuntimeError('Guarded witness no longer refused by the guard (restore it): '+source+' '+str(row))
     import comparator_profile as cprof
     prof=cprof.profile(str(normal));unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-design-mutants-') as folder:

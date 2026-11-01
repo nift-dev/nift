@@ -26,7 +26,9 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
                 (legacy's), NAME.reason today's refusal (pending/README).
   modules/*/    module cases (main.f imports m.f, or a package in .nift/):
                 `reason` (refused before any effect), `phaseb` (as phaseb/
-                above) or `vm` (an approved difference: the VM's output; legacy differs).
+                above) or `vm` (an approved difference: the VM's output; `legacy`
+                its recorded exit status and error text).
+  NAME.args     (parity/, pending/) script arguments for the case.
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
                 execution give the same transcript, NAME.vm, both on the VM (D7).
   heap          a refused cycle leaks nothing (4 and 40 refused attempts end
@@ -154,8 +156,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="refsem-") as work:
         for f in fixtures("parity"):
             name = os.path.basename(f)
-            lo, le, lr, _ = run(nift, f, "0", work)
-            vo, ve, vr, st = run(nift, f, "require", work)
+            argv = tuple(open(f[:-2] + ".args").read().split()) if os.path.exists(f[:-2] + ".args") else ()
+            lo, le, lr, _ = run(nift, f, "0", work, args=argv)
+            vo, ve, vr, st = run(nift, f, "require", work, args=argv)
             check(ran_on_vm(st), "parity %s: not run by the VM: %s" % (name, ve.strip()[:200]))
             check((lo, le, lr) == (vo, ve, vr),
                   "parity %s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo[-300:], le[-200:], lr, vo[-300:],
@@ -237,10 +240,13 @@ def main():
                       "module %s: expected %s before effects, got %d %r %r" % (case, reason, vr, vo, ve[:300]))
             elif os.path.exists(os.path.join(tree, "vm")):  # an approved difference (the VM's golden)
                 want = open(os.path.join(tree, "vm")).read()
+                # legacy's recorded behaviour: `legacy` = exit status, then an error-text substring
+                legacy_exit, legacy_error = open(os.path.join(tree, "legacy")).read().split("\n", 1)
                 lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
-                check(ran_on_vm(st) and vr == 0 and vo == want and (lo, lr) != (vo, vr),
-                      "module %s: VM %r/%r/%d (expected %r), legacy %r/%d must differ" % (case, vo, ve[:200], vr,
-                                                                                       want, lo, lr))
+                check(ran_on_vm(st) and vr == 0 and vo == want and lr == int(legacy_exit) and
+                      legacy_error.strip() in le,
+                      "module %s: VM %r/%r/%d (expected %r), legacy %r/%r/%d (expected exit %s with %r)" %
+                      (case, vo, ve[:200], vr, want, lo, le[:200], lr, legacy_exit, legacy_error.strip()))
             else:
                 want = open(os.path.join(tree, "phaseb")).read()
                 lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
