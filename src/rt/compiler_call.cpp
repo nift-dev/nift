@@ -213,15 +213,13 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
             return fail(node, "builtin-presentation-chain");
-        // Review round 3: a presentation method on a value inferred to be a
-        // struct instance or another kind needs dynamic dispatch (the struct's
-        // rendering), which the VM lacks: refused before effects. An
-        // unconstrained (top) value keeps the generic path (env(), JSON).
-        const bool top = (k & kKindAll) == kKindAll;
-        if (presentation_builtin(*spec) && (k & kKindStruct) && (k & ~kKindStruct) && !top)
-            return fail(callee, "presentation-mixed-struct:" + std::string(name));
-        // The serializer cannot render an instance inside a container (no field
-        // privacy at run time); contents are untracked: refused in a unit with structs.
+        // Review rounds 3-4: the serializer cannot render a struct instance (no
+        // field privacy at run time). In a unit that declares a struct, a
+        // presentation method on a value whose inferred kinds include a struct
+        // instance or a container (contents are not tracked) is refused before
+        // effects, whatever the receiver expression.
+        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & kKindStruct))
+            return fail(callee, "presentation-struct:" + std::string(name));
         if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & (kKindAggregate | kKindCollection)))
             return fail(callee, "presentation-struct-contents:" + std::string(name));
         return builtin_call(node, *spec, callee.a, dst);

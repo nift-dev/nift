@@ -24,8 +24,11 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     if(m==M::Insert||m==M::Remove){if(!natives::number_to_size(s[Item],
         index))return fail(std::string(name)+": invalid index");
         if(m==M::Insert?index>n:index>=n)return fail(std::string(name)+": index out of range");}
-    if(m==M::Splice&&in.c==0){if(!natives::number_to_size(s[Item],index)||!natives::number_to_size(s[Returned],
+    // c: 0 the removal, 2 the removal of a splice whose replacement is already
+    // evaluated (validated here, before anything changes), 1 the insertion.
+    if(m==M::Splice&&in.c!=1){if(!natives::number_to_size(s[Item],index)||!natives::number_to_size(s[Returned],
         count))return fail("splice: invalid index/count");
+        if(in.c==2&&!s[Keys].is(Kind::Array))return fail("splice: replacements must be an array");
         index=std::min(index,n);count=std::min(count,n-index);
         s[Index]=Value::integer(index);s[Length]=Value::integer(count);}
     if(m==M::Splice&&in.c==1){if(!s[Keys].is(Kind::Array))return fail("splice: replacements must be an array");
@@ -34,7 +37,7 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     if(m==M::Pop&&!n)return fail("pop: array is empty");
     if(m==M::Pop)s[Result]=array_view(s[Source]).back();
     if(m==M::Remove)s[Result]=array_view(s[Source])[index];
-    if(m==M::Splice&&in.c==0){s[Result]=make_array(count);for(std::size_t k=0;k<count;++k)array_push(s[Result],
+    if(m==M::Splice&&in.c!=1){s[Result]=make_array(count);for(std::size_t k=0;k<count;++k)array_push(s[Result],
         array_view(s[Source])[index+k]);}
     natives::Context context;context.heap_limit=heap_limit_;
     if(m==M::Sort)return collection_plain_sort(s,context,fault)&&memory_ok(fault);
@@ -52,7 +55,7 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         case M::Insert:items.insert(items.begin()+index,s[Returned]);s[Result]=s[Returned];break;
         case M::Clear:items.clear();s[Result]=Value();break;
         case M::Reverse:std::reverse(items.begin(),items.end());s[Result]=s[Source];break;
-        case M::Splice:if(in.c==0)items.erase(items.begin()+index,items.begin()+index+count);else{
+        case M::Splice:if(in.c!=1)items.erase(items.begin()+index,items.begin()+index+count);else{
             const auto& replacement=array_view(s[Keys]);items.insert(items.begin()+index,replacement.begin(),
             replacement.end());}break;
 

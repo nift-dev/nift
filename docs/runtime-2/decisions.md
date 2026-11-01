@@ -1796,3 +1796,38 @@ above (kept as written).
   protocol: validate the complete proposed mutation, commit it, then update
   bookkeeping. Phase B separates static admission from runtime dispatch, so a
   valid program is not refused only because inference is imprecise.
+
+**Review round 4 (independent review of `2640ab48`, 2026-11-01; F1-F3
+owner-approved; no guard changes).** Amends round 3 above (kept as written).
+
+- **Presentation of struct instances (F1).** Round 3 refused only receivers
+  inferred to be a struct *and* something else, so an exactly-struct receiver
+  that is not a plain name (`C().stringify()`, `a[0]`, `m.get(k)`,
+  `st.pop()`, a call result, a loop element, a session binding) reached the
+  serializer and stopped after output with an internal failure. In a unit or
+  session that declares a struct, a presentation method on a value whose
+  inferred kinds include a struct instance is refused at compile time
+  (`presentation-struct:<method>`, renamed from `presentation-mixed-struct`),
+  decided from the receiver's kinds whatever the expression; containers keep
+  `presentation-struct-contents`. Compatibility gaps to eliminate (Phase B /
+  VM struct rendering).
+- **Splice argument order (F2, coordinator ruling under the owner's
+  correctness-over-legacy policy, owner-approved; the owner may reverse it).**
+  Every splice evaluates the receiver and all arguments, validates bounds,
+  the replacement and cycles, prepares the result without touching the
+  original and commits once; on failure the array is unchanged (captured,
+  global or local alike). Argument side effects are not rolled back.
+  Legacy's remove-before-evaluate order is an approved difference. No other
+  mutator evaluates an argument after a partial mutation (audit in the
+  checkpoint, section 16). Mutant R23 (only captured splices evaluate first)
+  is caught.
+- **Known over-refusal (F3).** The struct-unit container rule refuses
+  containers that hold no instance (the nift-packages/http `capabilities()`
+  shape); a temporary Phase A limitation Phase B must eliminate, the program
+  and its valid output preserved as `tests/runtime2/refsem/pending/`.
+- **Phase B (recorded only).** Operation admission from the semantic receiver
+  and argument types through one operation-level admission interface, not
+  per syntactic form.
+- **Pre-existing, reported.** Presenting a `mutex()` or `channel()` value
+  (alone or in a container) stops after output with an internal failure on
+  weekend/r2 as well; not part of this change.

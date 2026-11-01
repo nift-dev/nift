@@ -33,8 +33,9 @@ declare -A FILE=(
   [20]=src/rt/reference_guard_walk.cpp  # a loop over a map/set/stack binds exclusive values (the review-2 short-circuit)
   [21]=src/rt/vm_closure.cpp          # a cycle through a captured cell is checked only after the take (cell emptied)
   [22]=src/rt/compiler_array_mutation.cpp  # a splice stores its removal before the replacement's cycle check
+  [23]=src/rt/compiler_array_mutation.cpp  # only a captured splice evaluates its arguments first (review round 4)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

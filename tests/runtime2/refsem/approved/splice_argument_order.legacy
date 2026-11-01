@@ -1,0 +1,17 @@
+global boom
+[3]
+global-expr boom
+[]
+local boom
+[3]
+local-expr boom
+[3]
+captured boom
+[3]
+closure boom
+[3]
+1
+6
+["global","global-expr","local","local-expr","captured","closure"]
+--- stderr
+--- exit 0

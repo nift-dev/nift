@@ -21,6 +21,8 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
                 them, matches legacy, and prints NAME.phaseb, the transcript
                 derived by hand under reference semantics for arrays and
                 objects (D-NEXT-refsem #1; the comment in each says why).
+  pending/*.f   valid programs Phase A over-refuses (Phase B must admit them):
+                NAME.expected the valid output (legacy's), NAME.reason today's refusal.
   modules/*/    module cases (main.f imports m.f): `reason` (refused before
                 any effect) or `phaseb` (as phaseb/ above).
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
@@ -84,6 +86,10 @@ SESSIONS = [
     # Review round 3 (coordinator): a struct declared in an earlier statement;
     # presenting an array holding an instance is refused before that statement.
     # The earlier statement's print ran; the refused statement printed nothing.
+    # Review round 4 (F1): a session binding holding an instance, presented
+    # through another name.
+    ("session_struct_value", 'struct(C) {\n  v := 0\n}\nc := C()\nx := c\nprint("before")\n'
+     'print("x"); print(x.stringify())\n', ("refuse", "before\n", "presentation-struct:stringify")),
     ("session_struct_contents", 'struct(C) {\n  v := 0\n}\nc := C()\na := [c]\nprint("before")\n'
      'print("x"); print(a.stringify())\n', ("refuse", "before\n", "presentation-struct-contents:stringify")),
     ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
@@ -181,6 +187,21 @@ def main():
             vo, ve, vr, st = run(nift, f, "require", work)
             check(ran_on_vm(st) and (vo, ve, vr) == (lo, le, lr) and vo == want,
                   "phaseb %s: VM %r/%r/%d legacy %r/%d, Phase B transcript %r" % (name, vo, ve[:200], vr, lo, lr, want))
+        # Review round 4 (F3): valid programs Phase A over-refuses (a temporary
+        # limitation Phase B must eliminate). The program is a copy of the
+        # original evidence (kept unchanged where it lives); NAME.expected is
+        # its valid output (legacy's); today the VM refuses it before any
+        # effect with NAME.reason. Phase B turns each into a parity case.
+        for f in fixtures("pending"):
+            name = os.path.basename(f)
+            reason = open(f[:-2] + ".reason").read().strip()
+            want = open(f[:-2] + ".expected").read()
+            lo, le, lr, _ = run(nift, f, "0", work)
+            vo, ve, vr, st = run(nift, f, "require", work)
+            check(lr == 0 and lo == want, "pending %s: the preserved valid output changed: %r %r" % (name, lo, le[:200]))
+            check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
+                  "pending %s: expected the Phase A refusal %s before effects (or Phase B support: make it "
+                  "a parity case), got %d %r %r" % (name, reason, vr, vo, ve[:200]))
         mods = os.path.join(HERE, "modules")
         for case in sorted(os.listdir(mods)):
             tree = os.path.join(mods, case)

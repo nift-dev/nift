@@ -325,20 +325,16 @@ mutant R7.
   instruction rules.
 - Mutation through a non-binding receiver (`a[0].set(...)`, `o.m.push(...)`)
   stays refused (legacy: malformed expression).
-- `stringify()`, `prettify()`, `highlight()` on a value inferred to be a
-  struct instance or another kind (`presentation-mixed-struct:<method>`,
-  review round 3): dynamic dispatch of presentation methods over mixed
-  struct/collection receivers. A candidate for Phase B or a later VM
-  capability checkpoint, not a permanent limitation.
-- `stringify()`, `prettify()`, `highlight()` on a value that may be an
-  array, object or collection, in a unit or session that declares a struct
-  (`presentation-struct-contents:<method>`, review round 3, coordinator):
-  the VM's serializer cannot render an instance inside a container (an
-  instance carries no field privacy at run time) and inference does not track
-  struct kinds in contents, so this is refused before any effect.
-  Conservative: it also refuses containers that hold no instance. A candidate
-  for Phase B or a later VM capability checkpoint (rendering instances), not a
-  permanent limitation.
+- `stringify()`, `prettify()`, `highlight()`, in a unit or session that
+  declares a struct, on a value whose inferred kinds include a struct
+  instance (`presentation-struct:<method>`) or a container
+  (`presentation-struct-contents:<method>`), whatever the receiver
+  expression (review rounds 3-4): the VM's serializer cannot render an
+  instance (no field privacy at run time) and inference does not track
+  struct kinds in contents. Conservative: it also refuses containers that
+  hold no instance (a known over-refusal, section 16). Compatibility gaps to
+  eliminate (Phase B or a later VM checkpoint: struct rendering), not
+  intended behaviour.
 
 ## 9a. Phase B requirements (recorded in review round 3)
 
@@ -350,9 +346,20 @@ mutant R7.
   single store); Phase B should not repeat that per mutator.
 - Phase B separates static admission from runtime dispatch: a valid program
   must not be refused only because inference is imprecise (the guard's
-  `lent` refusals of in-place loop updates, `presentation-mixed-struct`).
+  `lent` refusals of in-place loop updates, `presentation-struct`,
+  `presentation-struct-contents`).
   Where inference cannot decide, the VM dispatches at run time with legacy's
   behaviour rather than refusing.
+
+- Operation admission is decided from the semantic receiver and argument
+  types through one operation-level admission interface (review round 4,
+  owner), not from special cases per syntactic form: Phase A's refusals
+  (`presentation-struct`, `struct-no-method`, `collection-receiver`,
+  `builtin-receiver`) are scattered over the compiler's call paths. Not
+  implemented in Phase A.
+- Splice (and every array mutator) follows evaluate all arguments, validate,
+  prepare without touching the original, commit once (section 16); Phase B's
+  shared protocol keeps that order.
 
 ## 10. Open questions
 
@@ -548,7 +555,9 @@ legacy, each program printing first:
 | `"x" + a`, `"x" + C()` | refused (`type:+`) | unchanged |
 | `"x${a}"` | legacy-equal (literal text) | unchanged |
 | `==`/`!=` on arrays, objects, maps holding instances (nested too) | legacy-equal (identity per element) | unchanged |
-| `copy`, `deepcopy`, `reverse`, `filter`, `slice`, `length`, `keys` | legacy-equal | unchanged |
+| `copy`, `deepcopy`, `reverse`, `filter`, `slice`, `length`, object `keys` | legacy-equal | unchanged |
+| map `keys()` (round 4 correction) | refused (`method:keys`) | unchanged |
+| array `contains(c)` with an instance (round 4 correction) | refused (`collection-argument:contains`) | unchanged |
 | `[C()] + [C()]` | refused (`type:+`) | unchanged |
 | `env().stringify()` in a unit that declares a struct (an over-refusal of the conservative rule) | legacy-equal | refused, `presentation-struct-contents:stringify` |
 | `sort`, `unique`, `join`, `max` | refused (`collection-element:*`) | unchanged |
@@ -558,7 +567,11 @@ legacy, each program printing first:
 | reading an instance back (`m.get`, `st.pop`, `a[0]`, `type`) | legacy-equal | unchanged |
 | an array of instances captured by a `thread` | VM copies (open question 2); legacy fails in the thread body | unchanged (approved difference, not a crash) |
 
-The only crashing path was the presentation serializer. Fix (b), a
+The only crashing path *in this table* was the presentation serializer on
+a container. **Corrected in round 4 (F1):** a receiver that is exactly an
+instance but not a plain name (`C().stringify()`, `a[0]`, `m.get(k)`,
+`st.pop()`, a call result, a loop element, a session binding) also reached
+the serializer and exited 70; see section 16. Fix (b), a
 compile-time refusal, was chosen over (a), VM rendering: legacy's struct form
 skips private fields, and privacy exists only in the compile-time plan, not
 on the run-time instance. Rendering would mean carrying a per-type privacy
@@ -587,3 +600,64 @@ single store. `approved/cell_splice_identity.f`: after a successful splice the
 elements read back are `same()` as the originals and a mutation through an
 alias shows; after a refused splice the receiver has its length and elements,
 each nested element is still `same()` as before with its contents unchanged.
+
+## 16. Review round 4 (review of `2640ab48`; owner-approved F1-F3)
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| F1 HIGH: an exact-instance receiver that is not a plain name skipped both refusals and exited 70 after output | one rule on the generic presentation path from the receiver's inferred kinds: in a unit or session that declares a struct, kinds including a struct instance refuse (`presentation-struct:<method>`, renamed from `presentation-mixed-struct`), containers refuse (`presentation-struct-contents:<method>`); position: the receiver | the review's pr/ and au/ sets, ses/t1-t5, mod/m1-m4: no internal failure; `refuse/presentation_struct_{temporary,index,map_get,stack_pop,fn_return,fn_arg,loop_element,loop_binding,closure_result,struct_scalar}.f`, `modules/presentation_struct_expression`, session `session_struct_value` |
+| F2 HIGH: a throwing splice argument left a captured array whole but removed elements from other arrays | every splice evaluates the receiver and all arguments, validates (bounds, replacement kind, cycle via the take's pre-check), prepares the result on the taken value and commits with one store (`compiler_array_mutation.cpp`; `ArrayMutate` c=2 validates the replacement before the removal) | `approved/splice_argument_order.f` (plain local, captured, global, inside a closure, statement and expression: all `[1,2,3]`; the argument's own push to `log` stays); R23 (only captured splices evaluate first) caught; R22 caught |
+| F3 LOW: records | over-refusal named; the program and its valid output preserved as `refsem/pending/` (checked: legacy output unchanged, VM refusal before effects); audit corrections above | — |
+
+Splice order (coordinator ruling under the owner's correctness-over-legacy
+policy, 2026-11-01, owner-approved; the owner may reverse it): 1. evaluate
+the receiver and every argument; 2. validate bounds, replacement values and
+cycles; 3. prepare the result without touching the original; 4. commit once.
+If evaluation or validation fails, the array is unchanged, captured, global
+or local. Side effects performed while an argument is evaluated are **not**
+rolled back: atomicity covers the splice mutation only. Legacy removes before
+it evaluates the replacement (an approved difference).
+
+**Mutator order** (a throwing argument; plain local, captured, global, inside
+a closure; VM against legacy):
+
+| Mutator | Throwing argument | VM | Legacy |
+| --- | --- | --- | --- |
+| `push`, expression `push` | the value | unchanged | unchanged |
+| `insert` | the index or the value | unchanged | unchanged |
+| `remove` | the index | unchanged | unchanged |
+| element store `a[i] = v` | the value | unchanged | unchanged |
+| element store | the index | refused (`index-target`) | unchanged |
+| `splice` | the start or the count | unchanged | unchanged |
+| `splice` | the replacement (statement or expression) | **unchanged (was: removed, except captured)** | removed (`[3]`) |
+| `sort` with a comparator | the comparator | refused (`method:sort`) | unchanged |
+| map `set` | the key or the value | unchanged | unchanged |
+| set `add`, stack `push` | the value | unchanged | unchanged |
+| object field store `o["k"] = v` | the value | refused (`index-target`) | unchanged |
+
+Only `splice` evaluated an argument after a partial mutation; no other
+mutator changed. (The captured forms of most array mutators are refused by
+the guard here, `reference-guard:shared`, as before, and `set`/`add` inside a
+closure with an untyped key are refused, `collection-object-key`; mutator run-time errors
+such as `insert: index out of range` are fatal on both engines.)
+
+**Sweep for other internal failures after effects.** Presentation of every
+receiver form above with structs: none left. Presentation of shared and host
+handles: a `mutex()` or `channel()` value, alone or inside an array, map or
+object, still stops after output with an internal failure (`unexpected
+operands ... built-in stringify`). This is **pre-existing**: weekend/r2
+(`8b3cd02f`) does the same, and it does not involve structs; it is reported
+for a separate decision, not fixed here. Atomics, bytes, files, functions,
+Errors and tasks are refused or give ordinary errors.
+
+**Known over-refusal (F3).** `tests/runtime2/diagnostics/changes/ret_multiline_http_shape.f`
+(the nift-packages/http `capabilities()` shape: a struct method returns an
+object of scalars, then `.stringify()`) compiled on `84d67337` and is refused
+since `bd094496` (`presentation-struct-contents:stringify`). A temporary
+Phase A limitation Phase B must eliminate; the program and its valid output
+are preserved in `tests/runtime2/refsem/pending/` (the original stays where
+it is). `test-runtime2-diagnostics`: its `changes --expect new` part reports
+this case as a fourth failure (weekend/r2 fails three there; the baseline and
+`--expect old` parts fail identically on both, 31 and 9). The target is not
+part of `test-rt-vm` (nor of `test-rt-vm-sanitize`) and fails on weekend/r2
+already, so no expectation was changed.
