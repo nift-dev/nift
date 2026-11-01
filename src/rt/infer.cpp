@@ -356,10 +356,10 @@ TyRef Inference::call(const Node& n) {
             const TyRef result = call_callables(field, values, grew);
             return result;
         }
-        if (recv->kinds & kKindCollection) {  // D-063: map/set/stack methods
-            if (recv->any || (recv->kinds & ~kKindCollection)) return any_ty();  // refused by the compiler
-            return keyed_result(n, recv, values, key);
-        }
+        const bool mixed = recv->any || (recv->kinds & ~kKindCollection);  // D-063: possibly a collection
+        const bool shown = !n.count && (key == "stringify" || key == "prettify" || key == "highlight");
+        if ((recv->kinds & kKindCollection) && !(mixed && shown))  // presentation: a string for any value
+            return mixed ? any_ty() : keyed_result(n, recv, values, key);  // mixed: refused by the compiler
         const int collection = collection_method(key);
         if (collection >= 0 && recv->kinds == kKindArray) {
             const auto result = collection_result(n, recv, values, collection);

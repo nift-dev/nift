@@ -374,6 +374,21 @@ full `test-rt-vm` and sanitizer lanes (Linode), and the rt-diff selftest,
 whose timeout and interleave checks fail on this host for the base binary
 too (its module-reproducer check needs `gen/m1`, fixed in section 7).
 
+### Integration review: presentation methods on possibly-collection values
+
+`e := env(); print(e.stringify().length() > 0)` runs on weekend/r2
+(8b3cd02f) but was refused as `type:length` here (vm_host.py, recipe line
+12): since the collections base (D-063, 18720d14) the inference routes any
+receiver whose kinds include a collection bit to the collection methods and
+returns "anything" for a receiver that is only possibly a collection; an
+`any` type now carries the collection bits, so `stringify()` on an object of
+unknown fields lost its string result. The presentation methods
+(`stringify`, `prettify`, `highlight`, no arguments) keep their string
+result for such receivers (`infer.cpp`); a receiver that is exactly a
+collection still uses the collection rules. Regression fixtures:
+`refsem/parity/presentation_*.f` (the five vm_host contexts, an object, a
+map), each checked against the weekend/r2 binary where it exists there.
+
 ### Round 2 runs
 
 Full set on `44f9a476` (tree `5788b819`), through the heavy-job gate, every
