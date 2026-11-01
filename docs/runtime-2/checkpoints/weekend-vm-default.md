@@ -132,3 +132,28 @@ fast-forwarded to `b89299b5`.
   before coroutine admission); deterministic, truthful positions, no effects.
 - Open (LOW): `private-async` can point at an unrelated call when a module async function is used
   as a value (real position; whole-unit approximation).
+
+## packages integration (2026-11-01)
+
+`cand/packages` integrated by fast-forwarding `weekend/r2` from `8b3cd02f` to `21360bf8`
+(tree `84e83c4a`); `cand/packages` already contained `8b3cd02f`, so the certified tree is the
+integrated tree.
+- Review history (kept as recorded): Review 1 REJECT (absolute/relative provenance); Review 2
+  ACCEPT on `2f37ed36` with two MEDIUM diagnostic-order findings; narrow review of `7f05c811`
+  REJECT (F1/F2 order, F3 wrong binding name, F4 docs). Owner policy change (2026-11-01):
+  legacy error order and text are not requirements; any genuine error by a documented,
+  deterministic compiler-stage order. `21360bf8` removes the order-only machinery and fixes F3;
+  revised-contract assessment ACCEPT on `21360bf8`. Interrupted F1/F2 work kept on
+  `wip/packages-f1f2` (`1ffd5d99`) as evidence only.
+- Linode on `21360bf8`: every gate exit 0, including packages (all three lanes, nift-packages
+  present), packages mutants 16/16, args-cmd, coro-module, vm-default, cp22, cp23, cp19 and the
+  session CLI x2, prebuild 1089 s + full test-rt-vm 1453 s, no OOM. Earlier `2f37ed36` and
+  `7f05c811` runs are diagnostic only.
+- Owner rulings on the open findings: C1 (a real import-name collision reported as the
+  capability refusal `import-collision`) must be fixed before release; C2 (`export(<non-name>)`
+  in code that never runs is a program error) accepted and documented, with no control-flow
+  machinery; C3 (an opaque region legacy treats as a runtime error reported as unsupported)
+  reviewed before release; C4 (module-initialisation `args` read) remains an approved
+  difference; the `genuine()` test helper is improved when the harness is next touched.
+- The ACCEPT and certification establish that this candidate meets its agreed checkpoint
+  contract and passes its gates; they are not a claim that Runtime 2.0 as a whole is correct.
