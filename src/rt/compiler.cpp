@@ -327,7 +327,8 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     // D-NEXT-refsem: the Phase A forward-compatibility guard (reference_guard.h),
     // on a unit the compiler otherwise admits (earlier refusals keep their reason).
-    if (!check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset)) {
+    if (!check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset,
+                               limits.session ? &limits.session->capture_initializers : nullptr)) {
         result.positioned = true;
         return result;
     }

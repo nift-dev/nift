@@ -20,6 +20,7 @@ bool Guard::run(NodeId root, std::string& reason, std::uint32_t& offset) {
         isolated_.clear();
         unknown_.clear();
         unknown_mutations_.clear();
+        opaque_mutations_.clear();
         returns_.assign(plan_.functions.size(), {});
         free_reads_.clear();
         owners_.clear();
@@ -163,6 +164,7 @@ bool Guard::check(std::string& reason, std::uint32_t& offset) {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 13
     return true;  // R13: the forward-compatibility guard is off
 #endif
+    if (!opaque_mutations_.empty()) return fail(opaque_mutations_.front(), "collection-element", reason, offset);
     if (!unknown_mutations_.empty()) return fail(unknown_mutations_.front(), "unresolved", reason, offset);
     // A loop binding or a native callback's parameter is a part of its
     // operand's root: captured by a closure, that part outlives the loop.
@@ -176,13 +178,19 @@ bool Guard::check(std::string& reason, std::uint32_t& offset) {
     for (auto& [d, f] : facts_) {
         if (f.loop) continue;  // a part of its iterable's root (checked there)
         // An idiom argument may be mutated at any depth by the callee.
-        const bool nested_mutation = session_ || f.mut_nested || !f.idioms.empty();
-        if (!session_ && !mutated(f)) continue;
+        // A persistent session binding (declared at the top level) may be
+        // mutated by any later statement; a function's or lambda's local is
+        // reached only by this unit's code, which the guard sees (review
+        // round 2: treating locals as session state refused recompiles of
+        // admitted history units).
+        const bool persistent = session_ && f.owner == -1;
+        const bool nested_mutation = persistent || f.mut_nested || !f.idioms.empty();
+        if (!persistent && !mutated(f)) continue;
         if (!f.retained_top.empty()) return fail(f.retained_top.front(), "shared", reason, offset);
         if (nested_mutation && !f.retained_sub.empty())
             return fail(f.retained_sub.front(), "shared-part", reason, offset);
         for (NodeId value : f.inflows)
-            if (!fresh(value, nested_mutation) && !idiom_result(f, value))
+            if (!fresh(value, nested_mutation) && !idiom_result(f, value) && !carried(value))
                 return fail(value, "inflow", reason, offset);
         if (nested_mutation)
             for (NodeId value : f.contents)
@@ -208,7 +216,7 @@ bool Guard::check(std::string& reason, std::uint32_t& offset) {
         const auto found = facts_.find(lend.decl);
         if (found == facts_.end()) continue;
         const Facts& f = found->second;
-        if (!session_ && !mutated(f)) continue;
+        if (!(session_ && f.owner == -1) && !mutated(f)) continue;
         const Node& region = at(lend.region);
         for (NodeId site : f.mut_sites)
             if (site != lend.region && within(at(site), region) && !within(at(site), at(lend.value)))
@@ -265,8 +273,12 @@ bool Guard::idiom_argument(NodeId arg) const {
 } // namespace reference_guard_detail
 
 bool check_reference_guard(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds, bool session,
-                           std::string& reason, std::uint32_t& offset) {
-    return reference_guard_detail::Guard(ast, plan, kinds, session).run(root, reason, offset);
+                           std::string& reason, std::uint32_t& offset,
+                           const std::unordered_map<NodeId, NodeId>* carried) {
+    reference_guard_detail::Guard guard(ast, plan, kinds, session);
+    if (carried)
+        for (const auto& [declaration, initializer] : *carried) guard.carry(initializer);
+    return guard.run(root, reason, offset);
 }
 
 } // namespace nift::rt

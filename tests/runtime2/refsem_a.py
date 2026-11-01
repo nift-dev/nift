@@ -94,10 +94,11 @@ SESSIONS = [
     ("session_loop_calls_mutator", 'a := [1]\nfn(g()) { a.push(1); return 0 }\nfor (x : a) { g() }\n',
      ("refuse", "", "reference-guard:shared-part")),
     ("session_array_push", 'a := [1, 2]\na.push(3)\nprint(a.length())\n', ("parity",)),
-    # Unchanged from the base (18720d14): a map-typed session binding was already
-    # refused by the session shape contract; Phase A does not widen sessions.
-    ("session_map_alias", 'm := map()\nb := m\nx := b.set(1, 2)\nprint(m.size())\n',
-     ("refuse", "", "session:binding-shape-contract")),
+    # Review round 2: map-typed session bindings were refused because the
+    # session symbol's 16-bit kind fields truncated the collection bits (a base
+    # defect); with 32-bit fields they run, legacy-equal (maps are references).
+    ("session_map_alias", 'm := map()\nb := m\nx := b.set(1, 2)\nprint(m.size())\n', ("parity",)),
+    ("session_struct_instance", 'struct(C){v:=0;fn(add(n)){v+=n}}\nc:=C()\nc.add(3)\nprint(c.v)\n', ("parity",)),
 ]
 
 
@@ -226,6 +227,16 @@ def main():
         check([r[2] for r in runs] == [0, 0, 0] and [r[0] for r in runs] == ["12\n", "120\n", "12\n"] and
               lives[0] is not None and lives[0] == lives[1] == lives[2],
               "heap cell_cycle_refused: exits %s outputs %s live heaps %s: %r" %
+              ([r[2] for r in runs], [r[0] for r in runs], lives, runs[0][1][:200]))
+        # Review round 2: the same for every array mutator on a captured cell
+        # (insert, splice, expression push, element store, statement push),
+        # each followed by reads, mutations and cleanup.
+        runs = [run(nift, os.path.join(heap, n), "require", work)
+                for n in ("cell_mutator_refused.f", "cell_mutator_refused_many.f", "cell_mutator_control.f")]
+        lives = [r[3].get("heap_live") if r[3] else None for r in runs]
+        check([r[2] for r in runs] == [0, 0, 0] and [r[0] for r in runs] == ["32\n", "320\n", "32\n"] and
+              lives[0] is not None and lives[0] == lives[1] == lives[2],
+              "heap cell_mutator_refused: exits %s outputs %s live heaps %s: %r" %
               ([r[2] for r in runs], [r[0] for r in runs], lives, runs[0][1][:200]))
         for fname, budget in (("budget_deepcopy.f", 4_750_000), ("budget_copy.f", 4_750_000),
                               ("budget_snapshot.f", 4_750_000), ("budget_spawn.f", 4_750_000)):

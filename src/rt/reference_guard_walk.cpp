@@ -64,7 +64,7 @@ Guard::Root Guard::root_of(NodeId id, int owner) {
             if (d == kNoNode) return {kNoNode, true, false};
             if (!kinds_.bindings.count(id)) return {kNoNode, false, false, true};  // an implicit field
             const Facts& f = facts(d);
-            if (f.loop) return {f.loop_root, false, f.loop_root != kNoNode};
+            if (f.loop) return {f.loop_root, false, f.loop_root != kNoNode, f.collection_part, f.collection_part};
             return {d, true, true};
         }
         case NodeKind::Index: case NodeKind::Member: case NodeKind::SafeIndex: case NodeKind::SafeMember: {
@@ -111,7 +111,7 @@ void Guard::mutate(NodeId receiver, bool whole_receiver, NodeId site, int owner)
     const Node& r0 = at(receiver);
     if ((r0.kind == NodeKind::Ident && ast_.text(r0) == "this") || (kinds(receiver) & kKindStruct)) return;
     const Root r = root_of(receiver, owner);
-    if (!r.known) { unknown_mutations_.push_back(site); return; }
+    if (!r.known) { (r.collection ? opaque_mutations_ : unknown_mutations_).push_back(site); return; }
     if (r.decl == kNoNode) return;
     Facts& f = facts(r.decl);
     const bool top = r.whole && whole_receiver;
@@ -128,6 +128,40 @@ void Guard::store_into(NodeId receiver, NodeId value, int owner) {
 void Guard::walk_list(const Node& n, bool keep, int owner) {
     const NodeId* list = ast_.list(n);
     for (std::uint32_t k = 0; k < n.count; ++k) walk(list[k], keep, owner);
+}
+
+void Guard::walk_for(NodeId id, int owner) {
+    const Node& n = at(id);
+    // The loop holds its iterable (a snapshot in the copy model, the
+    // live value in Phase B) while the body runs: a lending.
+    const Node& header = at(n.a);
+    const Root r = shared(header.a) ? root_of(header.a, owner) : Root{};
+    lend(header.a, id, owner);
+    walk(header.a, false, owner);
+    // Over an iterable no binding holds (a literal, a constructing
+    // call: fresh at every depth) the loop binding holds an exclusive
+    // part: an independent binding.
+    // A map, set or stack (or a copy of one, or a call returning one) is
+    // never such an iterable: its elements are held by the collection
+    // and, in Phase B, alias whatever else holds them (review round 2:
+    // `fresh` short-circuits on a non-aggregate kind). Its bindings are
+    // parts of an unknown holder.
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 20
+    const bool collection = false;  // R20: a collection iterable binds exclusive values again
+#else
+    const bool collection = (kinds(header.a) & kKindCollection) != 0;
+#endif
+    const bool exclusive = !collection && r.decl == kNoNode && !r.opaque && fresh(header.a, true);
+    const NodeId* names = ast_.list(header);
+    for (std::uint32_t k = 0; k < header.count; ++k) {
+        Facts& f = facts(names[k]);
+        f.loop = !exclusive;
+        f.collection_part = collection;
+        f.loop_root = r.known && !collection ? r.decl : kNoNode;
+        f.owner = owner;
+        f.declared = true;
+    }
+    walk(n.b, false, owner);
 }
 
 void Guard::walk(NodeId id, bool keep, int owner) {
@@ -209,28 +243,7 @@ void Guard::walk(NodeId id, bool keep, int owner) {
             }
             walk(n.a, true, owner);
             return;
-        case NodeKind::For: {
-            // The loop holds its iterable (a snapshot in the copy model, the
-            // live value in Phase B) while the body runs: a lending.
-            const Node& header = at(n.a);
-            const Root r = shared(header.a) ? root_of(header.a, owner) : Root{};
-            lend(header.a, id, owner);
-            walk(header.a, false, owner);
-            // Over an iterable no binding holds (a literal, a constructing
-            // call: fresh at every depth) the loop binding holds an exclusive
-            // part: an independent binding.
-            const bool exclusive = r.decl == kNoNode && !r.opaque && fresh(header.a, true);
-            const NodeId* names = ast_.list(header);
-            for (std::uint32_t k = 0; k < header.count; ++k) {
-                Facts& f = facts(names[k]);
-                f.loop = !exclusive;
-                f.loop_root = r.known ? r.decl : kNoNode;
-                f.owner = owner;
-                f.declared = true;
-            }
-            walk(n.b, false, owner);
-            return;
-        }
+        case NodeKind::For: walk_for(id, owner); return;
         case NodeKind::Ternary:
             walk(n.a, false, owner);
             walk(n.b, keep, owner);

@@ -39,6 +39,7 @@ struct Facts {
     std::uint32_t param_k = 0;
     int owner = -1;         // the body declaring it (-1: main or a global; a lambda: lambda_owner)
     bool declared = false;  // `owner` is known (a declaration, parameter or loop binding)
+    bool collection_part = false;  // a loop binding over a map, set or stack: an element of an unknown holder
     std::vector<NodeId> mut_sites;  // every in-place mutation rooted here (the lent rule)
 };
 
@@ -58,6 +59,9 @@ public:
 
     bool run(NodeId root, std::string& reason, std::uint32_t& offset);
 
+    // A session recompile's capture initializer (reference_guard.h).
+    void carry(NodeId initializer) { carried_.insert(initializer); }
+
 private:
     KindSet kinds(NodeId id) const { return kinds_.of(id); }
     bool shared(NodeId id) const { return id != kNoNode && (kinds(id) & kShared) != 0; }
@@ -75,7 +79,8 @@ private:
         NodeId decl = kNoNode;
         bool whole = false;
         bool known = false;
-        bool opaque = false;  // held by a struct instance (no binding tracks it)
+        bool opaque = false;      // held by something no binding tracks (a struct instance, a collection)
+        bool collection = false;  // an element of a map, set or stack (a loop binding over one)
     };
     Root root_of(NodeId id, int owner);
 
@@ -102,6 +107,9 @@ private:
     void walk_list(const Node& n, bool keep, int owner);
 
     void walk(NodeId id, bool keep, int owner);
+
+    // A `for` loop: the lending of its iterable, its bindings' roots.
+    void walk_for(NodeId id, int owner);
 
     // A user function, constructor or method's parameter k escapes.
     bool escapes(int f, std::uint32_t k) const;
@@ -166,7 +174,10 @@ private:
     std::vector<std::vector<NodeId>> returns_;
     std::vector<std::pair<NodeId, int>> calls_;
     std::vector<NodeId> free_reads_, unknown_, unknown_mutations_;
+    std::vector<NodeId> opaque_mutations_;  // through an element of a map, set or stack
     std::unordered_set<NodeId> idiom_args_;
+    std::unordered_set<NodeId> carried_;
+    bool carried(NodeId value) const { return carried_.count(value) != 0; }
     std::unordered_map<NodeId, std::vector<int>> owners_;  // decl -> the bodies referencing it
     std::vector<Lend> lends_;
     std::vector<NodeId> user_calls_;   // calls that may run user code

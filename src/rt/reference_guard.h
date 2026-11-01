@@ -33,11 +33,16 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 namespace nift::rt {
 
 // False (with reason and source offset) when the unit must be refused.
+// carried: a session recompile's capture initializers (declaration -> its
+// synthetic initializer): the existing captured cell's value, already a
+// holder of that binding, not a new inflow.
 bool check_reference_guard(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds, bool session,
-                           std::string& reason, std::uint32_t& offset);
+                           std::string& reason, std::uint32_t& offset,
+                           const std::unordered_map<NodeId, NodeId>* carried = nullptr);
 
 } // namespace nift::rt
