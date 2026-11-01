@@ -288,7 +288,7 @@ private:
     bool print_argument_ok(NodeId id, const Node& arg);
     // A global aggregate taken out of its slot for an in-place update (so the
     // update does not copy it), and put back after.
-    bool global_take(const Binding& b, std::uint16_t& reg, std::string_view name = {});
+    bool global_take(const Binding& b, std::uint16_t& reg, std::string_view name = {}, std::uint16_t check = 0);
     void global_put(const Binding& b, std::uint16_t reg);
     std::size_t binding_scope(const Binding& b) const { return b.global ? plan_.functions.size() : scope_index(); }
     // CP12b structs (compiler_structs.cpp): instances live in bindings and are used only as receivers of their fields

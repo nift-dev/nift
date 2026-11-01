@@ -174,9 +174,9 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             fb_->set_offset(target.begin);
             if (!global_check_defined(held.reg, text(object))) return false;
         }
-        if (indirect && !global && held.selector_root_only && !held.loop_binding)
-            fb_->emit(OpCode::CellTake, reg, held.reg);
-        if (global && !global_take(held, reg, text(object))) return false;  // CP12b: in place, after the operands
+        if (indirect && !global && held.selector_root_only && !held.loop_binding)  // the value cycle-checked first
+            fb_->emit(OpCode::CellTake, reg, held.reg, static_cast<std::uint16_t>(value + 1));
+        if (global && !global_take(held, reg, text(object), static_cast<std::uint16_t>(value + 1))) return false;
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));

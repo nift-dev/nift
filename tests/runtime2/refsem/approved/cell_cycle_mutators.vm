@@ -1,0 +1,12 @@
+insert runtime.reference_cycle
+[1]
+splice runtime.reference_cycle
+[1]
+push-expr runtime.reference_cycle
+[1]
+index runtime.reference_cycle
+[1]
+[5,6,1,7]
+1
+--- stderr
+--- exit 0

@@ -100,7 +100,21 @@ bool Vm::refuse_cell_cycle(Fault& fault, const Proto* proto, const Instr& in, Ce
 bool Vm::op_cell_cached(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     std::string missing;
     bool ok = false;
-    if (in.op == OpCode::CellTake) { R[in.a] = cell_take(R[in.b]); return true; }
+    if (in.op == OpCode::CellTake) {
+        // D-NEXT-refsem #4 (review round 2): c = 1 + the register of the value the
+        // mutation will store; a store that would close a cycle through this cell
+        // is refused here, before the value leaves the cell (the cell, the graph,
+        // reference counts and heap accounting stay as they were).
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 21)
+        // A constant operand (kConstantBit) is plain data: it cannot close a cycle.
+        const auto stored = static_cast<std::uint16_t>(in.c - 1u);
+        if (in.c != 0 && !(stored & kConstantBit) &&
+            refuse_cell_cycle(fault, proto, in, cell_of(cell_anchor(R[in.b])), R[stored]))
+            return false;
+#endif
+        R[in.a] = cell_take(R[in.b]);
+        return true;
+    }
     if (in.op == OpCode::CellAnchor) { R[in.a] = cell_anchor(R[in.b]); return true; }
     if (in.op == OpCode::CellSlot) { R[in.a] = cell_slot(R[in.b]); return true; }
     if (in.op == OpCode::CellLoadCached) ok = cell_cached_read(R[in.b], R[in.a], missing);

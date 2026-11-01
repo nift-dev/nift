@@ -42,9 +42,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
                  !kinds_within(callee.a, kKindArray, receiver, "type:push")))
                 return false;
             if (!expr_any(arg, value)) return false;
+            // D-NEXT-refsem #4: the pushed value is checked for a cycle before the take.
             if (indirect && !global && held.selector_root_only && !held.loop_binding)
-                fb_->emit(OpCode::CellTake, reg, held.reg);
-            if (global && !global_take(held, reg, text(receiver))) return false;
+                fb_->emit(OpCode::CellTake, reg, held.reg, static_cast<std::uint16_t>(value + 1));
+            if (global && !global_take(held, reg, text(receiver), static_cast<std::uint16_t>(value + 1))) return false;
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));
