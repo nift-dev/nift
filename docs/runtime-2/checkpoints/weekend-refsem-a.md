@@ -285,6 +285,24 @@ mutant R7.
   storage (object replacement, large array, large map) go undetected, so
   their detection is the schedule's; the growth controls are also caught by
   the natural reallocation.
+- **What the stale-reference evidence shows, and does not (review round 3).**
+  Three separate statements:
+  (a) the sanitizer runs pass: every control above aborts with
+  heap-use-after-free under ASan on the checked build, and the refsem suite
+  passes on the sanitizer build (`test-runtime2-refsem-sanitize`);
+  (b) deliberately broken builds are detected, per control: R19 (hand-out
+  rule compiled out) is missed by all 8 VM-path controls and by the 5 large
+  value-layer controls; the review's "reads count as hand-outs" mutant (VM
+  transient reads lend again) is discriminated by the map controls (plain
+  and churn, 2 of 2 missed) and the stack controls (2 of 2 missed), and NOT
+  by the array and set controls (plain and churn still abort, 4 of 4), so
+  only 4 of the 8 VM-path controls discriminate that mutant;
+  (c) the instrumentation does not guarantee that every stale-reference
+  mutation is detected (storage above 256 elements moves only while the
+  credit lasts, otherwise every size/256 + 1 mutations); no claim of complete
+  coverage is made. The array VM-path control mutates through C++
+  `set_index` (the SetIndex opcode's implementation), not through a VM
+  instruction stream.
 
 ## 9. Still refused, and why
 
@@ -307,6 +325,32 @@ mutant R7.
   instruction rules.
 - Mutation through a non-binding receiver (`a[0].set(...)`, `o.m.push(...)`)
   stays refused (legacy: malformed expression).
+- `stringify()`, `prettify()`, `highlight()` on a value inferred to be a
+  struct instance or another kind (`presentation-mixed-struct:<method>`,
+  review round 3): dynamic dispatch of presentation methods over mixed
+  struct/collection receivers. A candidate for Phase B or a later VM
+  capability checkpoint, not a permanent limitation.
+- Known gap, not fixed this round (found while checking the class in round
+  3; outside the bounded scope): presenting an exact array, object or
+  collection that *contains* a struct instance (`[C()].stringify()`,
+  `m.set("a", C()); m.stringify()`) is admitted and stops after earlier
+  output with an internal failure (exit 70); legacy prints `[C{v:0}]`. Either
+  a compile-time refusal (inference does not track struct kinds in contents)
+  or the VM rendering of instances is needed.
+
+## 9a. Phase B requirements (recorded in review round 3)
+
+- Every cycle-capable mutation of arrays and objects goes through one shared
+  protocol: validate the complete proposed mutation (every value it stores,
+  against the receiver), commit the mutation, then update bookkeeping
+  (reference counts, heap accounting, relocation state). Phase A's array
+  mutators do this case by case (the `CellTake` pre-check, the splice's
+  single store); Phase B should not repeat that per mutator.
+- Phase B separates static admission from runtime dispatch: a valid program
+  must not be refused only because inference is imprecise (the guard's
+  `lent` refusals of in-place loop updates, `presentation-mixed-struct`).
+  Where inference cannot decide, the VM dispatches at run time with legacy's
+  behaviour rather than refusing.
 
 ## 10. Open questions
 
@@ -468,3 +512,20 @@ B forward is the owner's (section 10).
 | Linode `test-cp19-functional` (session.cpp 277/278) | a Phase A defect: 16-bit session kind fields truncated kKindStruct, so an instance binding came back as a string and every later use was refused (the Error value was never caught); also instance/collection callable shapes. Kinds are 32-bit now | `.build/cp19/session` 405 of 405; expectations changed with citations: an instance held across a mutation sees it (D-NEXT-refsem #2), and two session-array blocks (the guard) |
 | Linode `test-cp19-session-cli` (`array_callback`) | the conservative session guard; `GUARDED` with citations in `session_cli.py`, `session_callable_cli.py` (8 cases), one rewritten case in `session_refusal_cli.py` | all cp19 session CLI harnesses pass |
 
+
+## 15. Review round 3 (review of `22685af2`; owner addendum: bounded correction)
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| HIGH: a refused splice with count > 0 still removed elements | a captured-array splice with a replacement removes and inserts on a copy and stores once; the store checks the complete result against the receiver before the cell changes (`compiler_array_mutation.cpp`) | review repro-splice-cycle.f (`[1,2,3]` both times), cy/h06.f, repro-splice-cycle-closure.f, cy/sp40.f (200, was 120); `approved/cell_splice_atomic.f` (statement, expression, closure, captured cell; several replacements where only the last cycles: the receiver and its nested array render identically after each catch); `heap/cell_splice_*` (4 and 40 rounds against a no-splice control: 56/560/56, equal live heaps); R22 (removal stored first) caught |
+| MEDIUM: `stringify()` on a possibly-struct receiver admitted, then exit 70 after output | refused at compile time, `presentation-mixed-struct:<method>`, at the receiver's position (`compiler_call.cpp`); unconstrained (top) values keep the generic path | review repro-stringify-struct-mixed.f, inf/i04.f, i05.f, j02.f (`refuse/presentation_mixed_struct_review_*`); struct+array, struct+map, struct+set x stringify/prettify/highlight, with and without `.length()` (18 fixtures); function, closure and module forms; every fixture prints first and the runner requires empty stdout; j01.f stays admitted (`parity/presentation_collection_array_mix.f`); `presentation_*` pass |
+| LOW: stale-reference limitation wording | section 8, (a) (b) (c) | the review's `stale.log` and mutant logs |
+| Phase B notes | section 9a | — |
+
+Mutator audit (check first, then mutate): insert, statement and expression
+push, element store: the stored value is checked before the take (round 2);
+splice: one store of the complete result (this round); map set, stack push,
+struct field store: checked before the store (R14 and the `cycle_*` parity
+fixtures; a refused field store leaves the field unchanged). A top-level
+array is read by name from a closure, so storing a value that refers to such
+a closure into it closes no cycle (legacy-equal).

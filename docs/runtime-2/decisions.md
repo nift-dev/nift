@@ -1754,3 +1754,36 @@ last guard round).** Amends round 1 above (kept as written).
   32-bit now; instance and collection bindings work across statements
   (legacy-equal). An instance or collection with no identity-bearing content
   has no callable shape (it made struct schema replacement refuse).
+
+**Review round 3 (independent review of `22685af2`, 2026-11-01; owner
+addendum: a bounded correction, no guard changes).** Amends rounds 1 and 2
+above (kept as written).
+
+- **Cycles (4): validate the whole mutation, then commit.** A splice that
+  removes elements (count > 0) on a captured array stored the removal into
+  the cell before the replacement was evaluated and checked, so a refused
+  splice still removed elements (the review's repro: `[1,2,3]` became `[3]`).
+  The splice now removes and inserts on a copy and stores once: the store
+  checks the complete result (every replacement, including the last) against
+  the receiver before the cell changes, so a refused splice leaves the
+  receiver and its reachable graph byte-for-byte unchanged, in statement,
+  expression, closure and captured-cell forms. The other array mutators
+  (insert, push, element store) check the stored value before the take (round
+  2); map set, stack push and struct field stores check before the store. A
+  global array is read by name from closures, so storing into it closes no
+  cycle. Mutant R22 (the removal stored first) is caught.
+- **Presentation on mixed struct receivers.** `stringify()`, `prettify()` and
+  `highlight()` on a value inferred to be a struct instance or another kind
+  (an array, map, set, stack or scalar) were admitted and stopped after
+  output with an internal failure (exit 70). They are refused at compile time
+  before any effect (`presentation-mixed-struct:<method>`), wherever the call
+  sits (top level, function, closure, imported module). This is dynamic
+  dispatch of presentation methods over mixed struct/collection receivers:
+  a candidate for Phase B or a later VM capability checkpoint, not a
+  permanent limitation. Exact collection receivers, collection/array mixes and
+  unconstrained values (`env()`, decoded JSON) keep the generic path.
+- **Phase B requirements (recorded, not implemented).** Every
+  cycle-capable mutation of arrays and objects goes through one shared
+  protocol: validate the complete proposed mutation, commit it, then update
+  bookkeeping. Phase B separates static admission from runtime dispatch, so a
+  valid program is not refused only because inference is imprecise.
