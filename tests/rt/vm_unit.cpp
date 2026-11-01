@@ -55,7 +55,9 @@ void check_outputs() {
         {"fn(g(a, b)) { while(b != 0) { t := b; b = a % b; a = t } return a }\nprint(g(1071, 462))\n", "21\n"},
         {"a := [1, 2]\na.push(3)\na[0] = 9\nprint(a[0] + a.length())\n", "12\n"},
         {"o := {\"k\": [{\"z\": 4}, {\"z\": 5}]}\nprint(o.k[1].z)\nprint(o[\"k\"][0].z)\n", "5\n4\n"},
-        {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n", "2\n1\n"},
+        // D-NEXT-refsem #1: a mutating callee gets an explicit copy (the implicit
+        // D-040 copy at the call is refused by the Phase A guard; see the refusals).
+        {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(deepcopy(b)))\nprint(b.length())\n", "2\n1\n"},
         {"i := 0\nwhile(i < 9) { i += 1; if(i == 3) { return i } }\n", "3\n"},
         {"k := 1\nif(true) { k := 2; print(k) }\nprint(k)\n", "2\n1\n"},
         // Review round 1.
@@ -231,6 +233,10 @@ void check_errors() {
         {"fn(f(a)) {\nx := 1\nx = a\nreturn x }\ni := 0\nwhile (i < 1) { i += 1\nprint(f(\"s\")) }\n",
          "context:assignment-error"},
         {"a := [1]\nb := a\n", "aliasing"},
+        // D-NEXT-refsem #1: the D-040 copy at a call to a mutating callee (Phase B
+        // would let g's push reach b) is refused by the Phase A guard.
+        {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n",
+         "reference-guard:argument"},
         {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
         // CP25-R: print([1]) compiles; the VM raises legacy's print Error.
         {"s := \"abc\"\nprint(s.size())\n", "type:length"},
