@@ -269,3 +269,36 @@ analysis pass. Deviations from the plan text, for review:
    checks (the plan's stage order; §2).
 4. `push` and `set` (and struct/collection removal) reserve no budget, as
    before; their growth is still counted after the step.
+
+## Independent review (ACCEPT, 5d4db7fa) and record corrections
+
+**Atomicity scope (corrected wording).** On a validation failure, the receiver and everything
+reachable from it are unchanged. Side effects of evaluating operands (index, value, arguments)
+and VM scratch registers are excluded (Pop/Remove/Splice write their result register before the
+budget check). This replaces any wider "live heap unchanged" claim at the VM level.
+
+**Known exception (pre-existing, also on weekend/r2): sessions lose the receiver binding on a
+failed array mutator** (pop on empty, insert/remove out of range, invalid splice), because the
+session path moves the receiver out and does not put it back on an ordinary error. Not visible in
+scripts (ordinary errors are fatal). B2 must remove take/put or restore the binding, with a
+session regression fixture.
+
+**Commitments for B2** (from the review):
+- Make the receiver-facing commit primitives private to `mutation.cpp`, or lint `array_push`/
+  `object_set` on anything but a just-constructed local; the `storage-write` rule is a heuristic
+  (reference/pointer aliases, `std::swap`, casts and `collection_sort.cpp` `raw()` evade it).
+- Preserve `kImmutable` across thread/async transfer, or obtain an owner ruling that a transferred
+  `args` is a mutable copy (today the decoder builds a mutable object; harmless while name checks
+  and the guard remain).
+- One implementation for array mutators: the VM ArrayMutate path and `mutation::insert/remove/
+  pop/reverse/splice/clear` must be the same code (budget formulas differ today).
+- Reserve capacity before the first write in `map_set`, `set_add`, `stack_push` (a `bad_alloc`
+  between pushes could leave a key without a value).
+- VM-level mutants for the immutability routing once the name checks go; mutants for
+  budget-after-commit and key/value cycle order; a session receiver-loss witness.
+- Sort registry: tie the entry to the sort's controller/VM frame so unwinding, `try`, coroutine/task
+  cancellation, budget stops and isolate teardown release it automatically (owner preference);
+  define recursive sort of the same receiver (refused as a mutation), nested sorts on different
+  receivers (a stack, scoped), and coroutine mutation while a comparator is suspended (refused).
+
+TSan was run by the reviewer: `test-runtime2-collections-tsan`, 273 checks, 0 warnings.
