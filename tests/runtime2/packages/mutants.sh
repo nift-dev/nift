@@ -27,6 +27,8 @@
 #  18 module_link.cpp         display names replaced as substrings (nift__args__m1 inside ..m11)
 #  19 module_scan.cpp         the early-return note for any nested `return`
 #  20 module_link_prefix.cpp  no entry prefix (earlier invocation-init / compile errors lose)
+#  21 link_diagnostic.cpp     any earlier compile-time error outranks (uncalled functions, untaken branches)
+#  22 module_scan.cpp         no invocation-export check during the walk (decided after it)
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
@@ -42,7 +44,8 @@ for spec in 1:src/rt/package_resolve.cpp 2:src/rt/package_resolve.cpp 3:src/Pack
             10:src/rt/module_graph.cpp 11:src/rt/module_graph.cpp 12:src/rt/module_graph.cpp \
             13:src/rt/module_link.cpp 14:src/rt/module_link.cpp 15:src/rt/module_link.cpp \
             16:src/rt/module_graph.cpp 17:src/rt/module_scan.cpp 18:src/rt/module_link.cpp \
-            19:src/rt/module_scan.cpp 20:src/rt/module_link_prefix.cpp; do
+            19:src/rt/module_scan.cpp 20:src/rt/module_link_prefix.cpp 21:src/rt/link_diagnostic.cpp \
+            22:src/rt/module_scan.cpp; do
     n=${spec%%:*}; one=${spec#*:}
     obj=${one%.cpp}.o; mobj="$TMP/m$n-$(basename "$obj")"
     plan=$(make -s -n nift -W "$one")

@@ -133,6 +133,11 @@ public:
             if (status < 0) return false;  // a program error (or the walk stopped)
             if (status == 0) continue;     // refused: no exports bound
             const Module& mod = *graph_.modules[target];
+            // A module's `args`/`cmd` exported into the entry: legacy fails at this import.
+            if (const std::string_view name = invocation_export(index, mod.exports, options_.invocation_names);
+                !name.empty())
+                return error(index, st.begin, "import-scope:invocation-export",
+                             "export collides with existing binding: " + std::string(name), &frame);
             for (std::size_t e = 0; e < mod.exports.size(); ++e) {
                 const Origin incoming{mod.exports[e], mod.export_origins[e]};
                 const auto same = std::find_if(bound.begin(), bound.end(),
@@ -212,9 +217,7 @@ private:
             return 1;
         }
         if (!parsed) return 0;  // refused (import-parse-error): nothing to visit
-        // The import that would nest initialisations deeper than the limit is
-        // refused at its own statement (Review 8: not at 1:1 of the module it
-        // names). The same condition and order as a check on entering it.
+        // Refused at the import itself (Review 8), as a check on entering it.
         if (active.size() >= kMaxModuleDepth) return refuse(index, st.begin, "import-limit"), stopped_ = true, -1;
         active.push_back(identity);
         frames_.push_back(frame);
@@ -355,11 +358,9 @@ private:
         return true;
     }
 
-
 public:
     const Ast* entry_ = nullptr;
     NodeId entry_root_ = kNoNode;
-
 private:
     ModuleGraph& graph_;
     const ModuleGraphOptions& options_;

@@ -69,6 +69,11 @@ const char* first_misplaced(const Ast& ast, NodeId root, std::uint32_t& at);
 // NIFT_PREVALIDATE=off skips it, as legacy): false with the first failure.
 bool module_prevalidates(const std::string& source, std::uint32_t& offset, std::string& message);
 
+// The first of `names` (the entry's invocation bindings) a module exports
+// into the entry (`importer` 0), or empty.
+std::string_view invocation_export(std::size_t importer, const std::vector<std::string_view>& exports,
+                                   const std::vector<std::string_view>& names);
+
 // The unit declares one of `names` by a plain top-level statement.
 bool private_invocation(const Ast& ast, NodeId root, const std::vector<std::string_view>& names);
 

@@ -912,6 +912,33 @@ def section_r():
     shutil.rmtree(root)
 
 
+def section_s():
+    """Narrow review of 2f37ed36: only code legacy runs outranks; invocation-export in execution order."""
+    for label, entry in (
+            ("S redeclaration in a function never called", 'fn(g()) { y := 1\n y := 2\n return y }\nimport("missing.f")\n'),
+            ("S arity error in a function never called",
+             'fn(g(a)) { return a }\nfn(h()) { return g() }\nimport("missing.f")\n'),
+            ("S redeclaration in a branch not taken", 'x := 0\nif (x == 1) { y := 1\n y := 2 }\nimport("missing.f")\n')):
+        same_error_as_legacy(label + ": the missing import, as legacy", {"m.f": entry}, reason="import-error:missing")
+    # Unconditional top-level code still outranks (d3/e2.f).
+    root = tree({"m.f": 'x := 1\nx := 2\nimport("missing.f")\n'})
+    vm, rows = run(["m.f"], root)
+    check("m.f:2:1:" in error_line(vm.stderr) and any(r.get("reason") == "static-error:redeclared" for r in rows),
+          "S unconditional top-level redeclaration still wins", vm.stderr)
+    shutil.rmtree(root)
+    pa = 'args := [1,2]\nfn(g()) { return args.size() }\nexport(args)\nexport(g)\n'
+    pa2 = 'args := [9]\nfn(g()) { return args.size() }\nexport(g)\nexport(args)\n'
+    for label, files in (
+            ("S colliding import before a missing import", {"pa2.f": pa2, "m.f": 'import("pa2.f")\nimport("missing.f")\n'}),
+            ("S colliding import before a module with a missing import",
+             {"pa.f": pa, "mm.f": 'import("missing.f")\n', "m.f": 'import("pa.f")\nimport("mm.f")\n'}),
+            ("S invocation-export over an earlier feature refusal",
+             {"nested.f": 'fn(q()) { import("ok.f") }\nfn(z()) { return 1 }\nexport(z)\n', "ok.f": 'fn(f()) { return 1 }\n'
+              'export(f)\n', "pa.f": pa, "m.f": 'import("nested.f")\nimport("pa.f")\nprint(g())\n'}),
+            ("S colliding cmd", {"pc.f": 'cmd := "c"\nexport(cmd)\n', "m.f": 'print("b")\nimport("pc.f")\n'})):
+        same_error_as_legacy(label, files, reason="import-scope:invocation-export", args=("a",))
+
+
 def main():
     global NIFT, WORK
     parser = argparse.ArgumentParser()
@@ -924,7 +951,7 @@ def main():
     try:
         for name, fn in (("a", section_a), ("b", section_b), ("c", section_c), ("d", section_d), ("e", section_e),
                          ("f", section_f), ("g", section_g),
-                         ("l", section_l), ("r", section_r)):
+                         ("l", section_l), ("r", section_r), ("s", section_s)):
             if not opts.only or name in opts.only:
                 fn()
     finally:

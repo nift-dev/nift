@@ -556,6 +556,17 @@ no module-binding redesign, but it is not free.
    an untaken branch (§4.3).
 4. `import-scope:invocation-init` is conservative for module code that is never
    executed (§4.5).
+5. **Accepted gap (competing failures).** A compile-time program error that legacy
+   would hit first, but which lies inside the failing module itself (before the
+   module's failing statement), is not detected: the graph's error is reported. The
+   same holds for one reached only through a call (an error in a function body
+   called from earlier top-level code).
+   - Only errors in the entry prefix's unconditional top-level code outrank a graph
+     error (narrow review of 2f37ed36).
+   - Errors in uncalled function bodies, untaken branches, loops, `try` blocks or
+     short-circuit operands never outrank it.
+   - The report is a correct error in either case; only which one is reported
+     differs from legacy.
 
 ### 4.7 Owner conditions on the follow-up approvals (2026-11-01)
 
@@ -920,6 +931,18 @@ and 8 new files.
 | `h3`: the early-return note | Only for a top-level statement that is itself a `return`. A `return` inside a branch no longer gives the note, in the entry or in modules. |
 | `f6`: display names at module index ≥ 10 | Generated names are replaced only as whole identifiers. |
 | classify / inventory; invocation-ambiguous wording | Under `NIFT_VM=classify` and `classify-all` the outcome is `program-error`, and inventory items are marked with the detail `program-error`. A private `args` exported into the entry is the program error `import-scope:invocation-export`, with legacy's text `export collides with existing binding: args` at the entry's import. Exported into another module it stays the capability refusal `import-scope:invocation-ambiguous`. |
+
+Narrow review of `2f37ed36` (two MEDIUM order findings):
+
+| Finding | Correction |
+|---|---|
+| `K/k3`, `k12`, `k13`: a static error in code legacy never runs outranked the missing import | `earlier_compile_error` accepts only an error in unconditional top-level code (`unconditional_at`: not in a function, lambda or struct body, branch, loop, `try` or short-circuit operand); `d3/e2.f` keeps its result |
+| `I/i5`–`i7`: `import-scope:invocation-export` decided after the walk | decided at its own import during the walk (`invocation_export`), in first-executed order, ahead of feature refusals |
+
+These are tested in section S of `packages.py`, with mutation controls 21 and 22. The
+LOW findings stay documented, not changed:
+- A re-import with different provenance gives `import-reinitialised`.
+- The informational notes.
 
 Tests: section R of `packages.py`. Mutation controls 16–20 were added:
 

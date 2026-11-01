@@ -144,6 +144,17 @@ bool module_prevalidates(const std::string& source, std::uint32_t& offset, std::
     return verdict.ok;
 }
 
+std::string_view invocation_export(std::size_t importer, const std::vector<std::string_view>& exports,
+                                   const std::vector<std::string_view>& names) {
+#if defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 22  // test-only (packages/mutants.sh)
+    return {};
+#endif
+    if (importer != 0) return {};
+    for (std::string_view name : names)
+        if (std::find(exports.begin(), exports.end(), name) != exports.end()) return name;
+    return {};
+}
+
 bool private_invocation(const Ast& ast, NodeId root, const std::vector<std::string_view>& names) {
     const Node& program = ast.at(root);
     const NodeId* items = ast.list(program);

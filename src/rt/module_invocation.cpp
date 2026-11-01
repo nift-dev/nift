@@ -175,8 +175,6 @@ InvocationPlan plan_invocation(const std::vector<InvocationUnit>& units, const M
             return std::any_of(k.begin(), k.end(), [&](const Mention& e) { return e.id == id; });
         };
         std::vector<Candidate> found;
-        std::pair<bool, const Node*> export_into_entry{false, nullptr};
-        std::string_view export_name;
         const auto add = [&](std::uint32_t at, const char* reason, bool note = false, Root root = {}) {
             found.push_back({at, reason, note, root});
         };
@@ -210,13 +208,10 @@ InvocationPlan plan_invocation(const std::vector<InvocationUnit>& units, const M
             for (std::uint32_t k = 0; k < program.count; ++k) {
                 const Node& st = ast.at(items[k]);
                 if (st.kind != NodeKind::Export || ident(ast, st.a) != name) continue;
-                for (const ModuleImport& imp : graph.modules[0]->imports)
-                    if (imp.module == m && !export_into_entry.first) {
-                        const Node& at = units[0].ast->at(imp.statement);
-                        export_into_entry = {true, &at};
-                        export_name = name;
-                    }
-                if (!export_into_entry.first) add(st.begin, "import-scope:invocation-ambiguous");
+                // Into the entry it is the graph's program error (import-scope:invocation-export).
+                bool into_entry = false;
+                for (const ModuleImport& imp : graph.modules[0]->imports) into_entry = into_entry || imp.module == m;
+                if (!into_entry) add(st.begin, "import-scope:invocation-ambiguous");
             }
         }
         // The entry's binding: never at top level, never in init-reachable code.
@@ -228,17 +223,6 @@ InvocationPlan plan_invocation(const std::vector<InvocationUnit>& units, const M
             for (const Mention& r : table[f].mentions)
                 if (named(names, r.name) && !named(plan.private_names[m], r.name) && !kept(r.id))
                     add(r.offset, "import-scope:invocation-init", true, init[f].second);
-        }
-        if (export_into_entry.first) {  // the entry's import of this module: legacy's error there
-            plan.ok = false;
-            plan.reason = "import-scope:invocation-export";
-            plan.where = 0;
-            plan.offset = export_into_entry.second->begin;
-            plan.positioned = true;
-            plan.message = std::string((export_into_entry.second->flags & kFlagTemplateImport) ? "@import: "
-                                                                                                   : "import: ") +
-                           "export collides with existing binding: " + std::string(export_name);
-            return plan;
         }
         if (found.empty()) continue;
         const Candidate& first = *std::min_element(found.begin(), found.end(),

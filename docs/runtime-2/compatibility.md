@@ -30,6 +30,7 @@ Must not change unless a decision in `decisions.md` approves it.
 | A VM package lookup creates `.nift/.packages-transaction.lock` only inside an existing `.nift/` (never truncating it) and never creates `.nift/` itself; legacy creates both. One read lock covers all package imports of the program | D-NEXT-packages #2 | weekend packages |
 | A module's `return <value>` outside functions, `export(x)` naming no binding, a duplicate export and `export(<not a name>)` reject the program before it runs (legacy fails when the statement executes); a `return <value>` in a branch legacy never takes is rejected too | D-NEXT-packages #5 | weekend packages |
 | A module's top-level code (or a function it may call while initialising) reading the entry script's `args`/`cmd` is refused before running (`import-scope:invocation-init`; legacy fails when it executes, and runs it when the code is never executed) | D-NEXT-packages #4 | weekend packages |
+| Of several program errors, the one legacy hits first is reported, with one accepted gap: a compile-time program error inside the failing module before its failing statement, or one reached only through a call, is not detected, so the later import or module error is reported (both are real errors; only which one is named differs) | D-NEXT-packages | weekend packages |
 
 ## Syntax compatibility (D-045, owner, 2026-10-20)
 
