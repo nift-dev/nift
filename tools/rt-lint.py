@@ -13,6 +13,14 @@ Rules
                    after `#pragma once`; every .cpp includes its own header
                    first (one header/implementation pair per concern); no file
                    exceeds 400 lines.
+  storage-write    B1 mutation protocol (b1-mutation.md): no direct write to
+                   an aggregate's `items`/`entries`/`fields` storage, no raw
+                   storage hand-out (array_mut, *_slot_mut) and no call of a
+                   receiver-mutating commit primitive outside rt/mutation.cpp,
+                   the commit primitives (aggregate*.cpp), the construction
+                   builders (natives/support) and the decoders. A line that
+                   builds or tears down a fresh value it alone holds may say
+                   `// rt-lint: storage-ok <why>`.
 
 Usage: rt-lint.py [paths...]   (default: src/rt)
        rt-lint.py --self-test  (each rule must fire on tests/rt/lint_fixtures)
@@ -25,6 +33,15 @@ MAX_FUNCTION = 150
 MAX_LINE = 120
 MAX_FILE = 400
 CONTROL = re.compile(r'\b(if|for|while|switch|catch|do|else|return|namespace|class|struct|union|enum)\b|=\s*$|\[[^\]]*\]\s*\(')
+STORAGE_WRITE = re.compile(
+    r'heap_as<\s*(ArrayObject|ObjectObject|StructObject|CollectionObject)\s*>\s*\(\s*\)\s*->\s*'
+    r'(items|entries|fields)\b\s*(\[[^\]]*\])?\s*(=(?!=)|\.\s*(push_back|emplace_back|insert|erase|clear|resize|'
+    r'pop_back|swap|assign|emplace)\s*\()'
+    r'|(?<!mutation::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|struct_set|map_set|'
+    r'set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\(')
+STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
+                   'aggregate_collection.h', 'aggregate_store.h', 'support.cpp', 'support.h',
+                   'isolate_transfer_decode.cpp', 'transfer_heap.cpp', 'isolate_snapshot.cpp'}
 LITERAL_COMPARE = re.compile(r'(==|!=)\s*"|"\s*(==|!=)|\bstrn?cmp\s*\(')
 
 
@@ -98,6 +115,12 @@ def lint_file(path, problems):
         if not cold and 'rt-lint: allow-string-compare' not in line and \
                 LITERAL_COMPARE.search(quoted) and ('"' in stripped or 'cmp' in stripped):
             problems.append(f'{path}:{number}: string-compare: comparison against a string literal on a hot path')
+    storage_checked = os.path.basename(path) not in STORAGE_ALLOWED
+    in_comment = False
+    for number, line in enumerate(lines, 1):
+        stripped, in_comment = strip(line, in_comment)
+        if storage_checked and 'rt-lint: storage-ok' not in line and STORAGE_WRITE.search(stripped):
+            problems.append(f'{path}:{number}: storage-write: aggregate storage written outside the mutation protocol')
     for start, length in function_spans(lines):
         if length > MAX_FUNCTION:
             problems.append(f'{path}:{start}: function-length: function body of {length} lines > {MAX_FUNCTION}')
@@ -132,6 +155,7 @@ def self_test():
                 'bad_compare.cpp': {'string-compare'},
                 'bad_concern.h': {'one-concern'},
                 'bad_concern.cpp': {'one-concern'},
+                'bad_storage.cpp': {'storage-write'}, 'bad_storage.h': set(),
                 'good.cpp': set(), 'good.h': set()}
     failed = False
     for name, rules in sorted(expected.items()):

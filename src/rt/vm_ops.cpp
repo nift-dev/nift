@@ -266,9 +266,10 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
         return raise(fault, StopReason::Error,
                      "assignment index does not address an array or object: " + note_text(note));
     }
-    Value copy = value;
-    array_mut(object)[static_cast<std::size_t>(i)] = static_cast<Value&&>(copy);
-    return true;
+    mutation::Env env;  // B1: the protocol (immutability; arrays are not cycle-checked while copied)
+    env.receiver_text = note_text(note);
+    const mutation::Outcome out = mutation::set(object, static_cast<std::size_t>(i), value, env);
+    return out.ok() || raise(fault, StopReason::Error, out.text);
 }
 
 // A noted member read is a path argument of a user call (compiler_call.cpp
@@ -303,8 +304,10 @@ bool push_value(Value& array, const Value& value, Fault& fault, const Note* note
         return raise(fault, StopReason::Error,
                      "unknown value or malformed expression: " + std::string(note ? note->text : ""));
     }
-    array_push(array, value);
-    return true;
+    mutation::Env env;  // B1: the protocol; the growth is counted after the step (memory_ok), as before
+    if (note != nullptr) env.receiver_text = note->text;
+    const mutation::Outcome out = mutation::push(array, value, env);
+    return out.ok() || raise(fault, StopReason::Error, out.text);
 }
 
 bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault) {

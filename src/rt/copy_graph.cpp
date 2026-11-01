@@ -1,4 +1,5 @@
 #include "rt/copy_graph.h"
+#include "rt/mutation.h"
 
 #include "rt/aggregate.h"
 #include "rt/heap.h"
@@ -146,11 +147,12 @@ private:
             // Keys and set members are scalars or callables (never copied):
             // inserted in order, the index is rebuilt as the source's.
             if (kind == CollectionKind::Map) {
-                for (std::size_t k = 0; k + 1 < items.size(); k += 2) map_set(copy, items[k], mapped(items[k + 1]));
+                for (std::size_t k = 0; k + 1 < items.size(); k += 2)
+                    map_set(copy, items[k], mapped(items[k + 1]));  // rt-lint: storage-ok fresh copy
             } else if (kind == CollectionKind::Set) {
-                for (const Value& member : items) set_add(copy, mapped(member));
+                for (const Value& member : items) set_add(copy, mapped(member));  // rt-lint: storage-ok fresh copy
             } else {
-                for (const Value& item : items) stack_push(copy, mapped(item));
+                for (const Value& item : items) stack_push(copy, mapped(item));  // rt-lint: storage-ok fresh copy
             }
         }
     }
@@ -176,6 +178,16 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
         Value copy = make_struct(struct_type(source), struct_fields(source).size());
         for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, field.second);
+        out = std::move(copy);
+        return CopyStatus::Ok;
+    }
+    if (mutation::is_immutable(source) && (source.is(Kind::Array) || source.is(Kind::Object))) {
+        // B1: copy() of an immutable array or object (`args`) is a new,
+        // mutable outer object sharing the contents.
+        if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
+        Value copy = source.is(Kind::Array) ? make_array(array_size(source)) : make_object();
+        if (source.is(Kind::Array)) for (const Value& item : array_view(source)) array_push(copy, item);
+        else for (const auto& entry : object_view(source)) object_set(copy, entry.first, entry.second);
         out = std::move(copy);
         return CopyStatus::Ok;
     }

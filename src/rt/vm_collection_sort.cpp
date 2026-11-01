@@ -30,7 +30,11 @@ bool Vm::op_collection_sort(const Instr& in,Value* R,Fault& fault,const Proto* p
     Value* s=R+in.a;s[Source]=std::move(*place);
     natives::Context context;context.heap_limit=heap_limit_;
     bool ok=true;
-    if((in.c&15)==0)ok=collection_sort_init(s,context,fault,static_cast<std::size_t>(&in-proto->code.data()));
+    if((in.c&15)==0) {  // B1: stage 2.2 before the sort starts (rt/mutation.h)
+        const Note* note=proto->note(&in-proto->code.data());
+        const auto out=mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view());
+        ok=out.ok()?collection_sort_init(s,context,fault,static_cast<std::size_t>(&in-proto->code.data())):
+            raise(fault,StopReason::Error,out.text);}
     else if(!s[Returned].is(Kind::Bool))ok=raise(fault,StopReason::Error,"sort: comparator must return bool");
     else if(!collection_sort_resume(s,s[Returned].as_bool(),false))ok=internal(fault,"sort controller");
     *place=std::move(s[Source]);
@@ -40,7 +44,7 @@ bool Vm::op_collection_sort(const Instr& in,Value* R,Fault& fault,const Proto* p
         const auto n=array_size(*place);
         if(!natives::reserve_result(context,sizeof(ArrayObject)+n*sizeof(Value)))return internal(fault,
             "memory budget exceeded");
-        s[Directions]=make_array(n);s[Directions].heap_as<ArrayObject>()->items.resize(n);
+        s[Directions]=make_array(n);s[Directions].heap_as<ArrayObject>()->items.resize(n);  // rt-lint: storage-ok fresh
         mark_may_hold_identity(s[Directions].heap());
     }
     return memory_ok(fault);

@@ -16,7 +16,7 @@ declare -A FILE=(
   [2]=src/rt/aggregate.cpp            # a shared struct instance is copied on a field write (value semantics)
   [3]=src/rt/compare.cpp              # struct == is structural (the old D-040 rule)
   [4]=src/rt/natives/collection_methods.cpp  # same() answers structurally for collections and instances
-  [5]=src/rt/vm_keyed.cpp             # no reference-cycle check at all
+  [5]=src/rt/mutation.cpp             # no reference-cycle check at all (B1: the protocol's stage 2.4)
   [6]=src/rt/compiler_structs.cpp     # a map()/set()/stack() field initialiser is one shared constant
   [7]=src/rt/infer_collection.cpp     # collection contents are unknown-empty (inference unsound under aliasing)
   [8]=src/rt/vm_iter.cpp              # a map loop iterates the live map (no snapshot)

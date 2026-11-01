@@ -1,5 +1,6 @@
 #include "rt/collection_plain_sort.h"
 #include "rt/aggregate.h"
+#include "rt/mutation.h"
 #include "rt/natives/support.h"
 #include "rt/string.h"
 #include <algorithm>
@@ -19,7 +20,7 @@ bool collection_plain_sort(Value* s,const natives::Context& context,Fault& fault
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     s[HashTable]=make_array(n);
     for(std::size_t i=0;i<n;++i)array_push(s[HashTable],Value::integer(i));
-    auto& order=array_mut(s[HashTable]);
+    auto& order=array_mut(s[HashTable]);  // rt-lint: storage-ok the fresh scratch order
     std::sort(order.begin(),order.end(),[&](const Value& x,const Value& y) {
         const auto a=static_cast<std::size_t>(x.as_int()),b=static_cast<std::size_t>(y.as_int());
         int c=0;
@@ -27,16 +28,7 @@ bool collection_plain_sort(Value* s,const natives::Context& context,Fault& fault
         else {const auto l=string_view_of(input[a]),r=string_view_of(input[b]);c=l<r?-1:l>r?1:0;}
         return c?c<0:a<b;
     });
-    auto& items=array_mut(s[Source]);
-    for(std::size_t i=0;i<n;++i) {
-        if(static_cast<std::size_t>(order[i].as_int())==i)continue;
-        Value value=std::move(items[i]);std::size_t at=i;
-        while(static_cast<std::size_t>(order[at].as_int())!=i) {
-            const auto next=static_cast<std::size_t>(order[at].as_int());
-            items[at]=std::move(items[next]);order[at]=Value::integer(at);at=next;
-        }
-        items[at]=std::move(value);order[at]=Value::integer(at);
-    }
+    mutation::commit_permutation(s[Source],order);  // B1: the one commit (the order was built on the side)
     s[Result]=s[Source];return true;
 }
 }

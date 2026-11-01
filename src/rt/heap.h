@@ -49,6 +49,14 @@ inline constexpr std::uint8_t kMayHoldIdentity = 0x80;
 // Checked builds only (rt/aggregate_store.h): a reference or pointer into this
 // aggregate's storage was handed out since its storage last moved.
 inline constexpr std::uint8_t kStorageLent = 0x40;
+// B1 (b1-mutation.md): the object refuses every mutation through the shared
+// mutation protocol (rt/mutation.h), whoever holds it. Set once, after
+// construction (the injected `args` array); never cleared on the object
+// itself: copy()/deepcopy() and copy-on-write clones build new objects
+// without it. Bit 4 stays reserved (Phase B plan section 5.1).
+inline constexpr std::uint8_t kImmutable = 0x20;
+inline bool is_immutable(const HeapObject* object) noexcept { return (object->tag & kImmutable) != 0; }
+inline void mark_immutable(HeapObject* object) noexcept { object->tag |= kImmutable; }
 inline bool may_hold_identity(const HeapObject* object) noexcept { return (object->tag & kMayHoldIdentity) != 0; }
 inline void mark_may_hold_identity(HeapObject* object) noexcept { object->tag |= kMayHoldIdentity; }
 inline void clear_may_hold_identity(HeapObject* object) noexcept {

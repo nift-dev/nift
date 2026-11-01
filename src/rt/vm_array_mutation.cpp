@@ -26,6 +26,10 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     if(in.c==100){if(m==M::Pop&&!n)return fail("pop: array is empty");
         const Note* note=proto->note(&in-proto->code.data());
         return fail("cannot mutate const array: "+std::string(note?note->text:""));}
+    // B1 (rt/mutation.h): stage 2.2, the object's immutability, before bounds.
+    {const Note* note=proto->note(&in-proto->code.data());
+        const auto out=mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view());
+        if(!out.ok())return fail(out.text);}
     if(m==M::Push){const Note* note=proto->note(&in-proto->code.data());if(!push_value(s[Source],s[Item],fault,
         note))return false;
         s[Result]=s[Item];return memory_ok(fault);}
@@ -51,25 +55,22 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     natives::Context context;context.heap_limit=heap_limit_;
     if(m==M::Sort)return collection_plain_sort(s,context,fault)&&memory_ok(fault);
     const std::size_t growth=m==M::Insert?1:m==M::Splice&&in.c==1?array_size(s[Keys]):0;
-    const auto capacity=s[Source].heap_as<ArrayObject>()->items.capacity();
-    const std::size_t clone=s[Source].refcount()>1?n:0;
-    if(growth>std::size_t(-1)/(4*sizeof(Value))-n)return internal(fault,"memory budget exceeded");
-    const std::size_t reserve=clone+(growth&&n+growth>capacity?2*(n+growth):0);
-    if(reserve&&!natives::reserve_result(context,reserve*sizeof(Value)+128))
+    // Stage 2.5 (no cycle check: arrays are copied, so acyclic by construction).
+    if(!mutation::reserve(heap_limit_,mutation::array_reserve_bytes(s[Source],growth)))
         return internal(fault,"memory budget exceeded");
-    auto& items=array_mut(s[Source]);
-    switch(m) {
-        case M::Pop:items.pop_back();break;
-        case M::Remove:items.erase(items.begin()+index);break;
-        case M::Insert:items.insert(items.begin()+index,s[Returned]);s[Result]=s[Returned];break;
-        case M::Clear:items.clear();s[Result]=Value();break;
-        case M::Reverse:std::reverse(items.begin(),items.end());s[Result]=s[Source];break;
-        case M::Splice:if(in.c!=1)items.erase(items.begin()+index,items.begin()+index+count);else{
-            const auto& replacement=array_view(s[Keys]);items.insert(items.begin()+index,replacement.begin(),
-            replacement.end());}break;
-
+    using E=mutation::ArrayEdit;
+    switch(m) {  // stage 3 + 4: one commit
+        case M::Pop:mutation::commit_array(s[Source],E::Pop,0,0,Value());break;
+        case M::Remove:mutation::commit_array(s[Source],E::Remove,index,0,Value());break;
+        case M::Insert:mutation::commit_array(s[Source],E::Insert,index,0,s[Returned]);s[Result]=s[Returned];break;
+        case M::Clear:mutation::commit_array(s[Source],E::Clear,0,0,Value());s[Result]=Value();break;
+        case M::Reverse:mutation::commit_array(s[Source],E::Reverse,0,0,Value());s[Result]=s[Source];break;
+        case M::Splice:
+            if(in.c!=1)mutation::commit_array(s[Source],E::SpliceRemove,index,count,Value());
+            else mutation::commit_array(s[Source],E::SpliceInsert,index,0,s[Keys]);
+            break;
         default:return internal(fault,"array mutation method");
     }
-    heap_retally(s[Source].heap());return memory_ok(fault);
+    return memory_ok(fault);
 }
 } // namespace nift::rt

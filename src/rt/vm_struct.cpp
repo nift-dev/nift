@@ -3,6 +3,7 @@
 #include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/cell.h"
+#include "rt/mutation.h"
 #include "rt/vm_ops.h"
 
 // rt-lint: cold-file struct instance operations (CP12b): construction, field
@@ -37,12 +38,12 @@ bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, 
             if (!instance.is(Kind::Struct) || !struct_get(instance, Atom{in.b}))
                 return raise(fault, StopReason::Error, "struct has no field: " + note_of(note));
             const Value& stored = rk(R, K, in.c);
-            // D-NEXT-refsem #4: refused before the field changes.
-            if (refuse_reference_cycle(fault, proto, in, instance.heap(), stored,
-                                       "assignment would create a cyclic reference: " + note_of(note)))
-                return false;
-            struct_set(instance, Atom{in.b}, stored);
-            return true;
+            // B1: through the mutation protocol (immutability, then the
+            // D-NEXT-refsem #4 cycle check before the field changes).
+            const mutation::Outcome out = mutation::field_set(instance, Atom{in.b}, stored, mutation_env(note));
+            if (out.ok()) return true;
+            return mutation_failed(fault, proto, in, out, instance.heap(), stored,
+                                   "assignment would create a cyclic reference: " + note_of(note));
         }
         case OpCode::CheckField: {
             // Legacy's three wordings: through a member (`this.x = v`, `p.x = v`),

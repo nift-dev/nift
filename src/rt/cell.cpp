@@ -1,4 +1,5 @@
 #include "rt/cell.h"
+#include "rt/mutation.h"
 
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
@@ -82,8 +83,8 @@ bool cell_read(const Value& cell, Value& value, std::string& missing) {
     }
     value = std::move(selected);
     if (CellObject* owner = cell_of(cell); owner && owner->binding_type == kSelectorCell) {
-        array_set(owner->value, 5, Value::boolean(true));
-        array_set(owner->value, 6, anchor);
+        array_set(owner->value, 5, Value::boolean(true));  // rt-lint: storage-ok the cell's own descriptor
+        array_set(owner->value, 6, anchor);  // rt-lint: storage-ok the cell's own descriptor
     }
     return true;
 }
@@ -101,7 +102,7 @@ bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
     // The cached pointer belongs to the value owner at the last sync, not to
     // a later replacement of its source slot. Preserve that owner explicitly.
     Value descriptor = object->value;
-    array_set(descriptor, 0, parts[6]);
+    array_set(descriptor, 0, parts[6]);  // rt-lint: storage-ok a private descriptor copy
     Value cached = make_cell(std::move(descriptor), kSelectorCell);
     return cell_read(cached, value, missing);
 }
@@ -122,9 +123,10 @@ bool replace_path(Value& parent, const std::vector<Value>& keys, std::size_t at,
         replacement = *previous;
         if (!replace_path(replacement, keys, at + 1, value)) return false;
     }
-    if (parent.is(Kind::Array)) array_set(parent, static_cast<std::size_t>(key.as_int()), replacement);
-    else object_set(parent, atom, replacement);
-    return true;
+    // B1: the location store goes through the mutation protocol.
+    const mutation::Env env;
+    return parent.is(Kind::Array) ? mutation::set(parent, static_cast<std::size_t>(key.as_int()), replacement, env).ok()
+                                  : mutation::object_put(parent, atom, replacement, env).ok();
 }
 } // namespace
 

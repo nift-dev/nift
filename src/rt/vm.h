@@ -35,6 +35,7 @@
 #include "Diagnostic.h"
 #include "rt/proto.h"
 #include "rt/source_map.h"
+#include "rt/mutation.h"
 #include "rt/value_cycle.h"
 #include "rt/vm_ops.h"
 
@@ -270,8 +271,13 @@ private:
     // reference cycle raises the catchable runtime.reference_cycle (the cell
     // keeps its value).
     bool refuse_cell_cycle(Fault& fault, const Proto* proto, const Instr& in, CellObject* cell, const Value& stored);
-    bool refuse_reference_cycle(Fault& fault, const Proto* proto, const Instr& in, const HeapObject* receiver,
-                                const Value& stored, const std::string& legacy_text);
+    // B1: a mutation protocol failure (rt/mutation.h) as the VM's stop: a
+    // cycle is the catchable runtime.reference_cycle (legacy's text when the
+    // stored value contains the receiver directly), a budget failure the
+    // budget stop, anything else an ordinary error.
+    bool mutation_failed(Fault& fault, const Proto* proto, const Instr& in, const mutation::Outcome& outcome,
+                         const HeapObject* receiver, const Value& stored, const std::string& legacy_text);
+    mutation::Env mutation_env(const Note* note) const;
     bool atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto* proto, const Instr* pc,
                           Fault& fault);
     bool collection(const Instr&,Value*,Fault&,const Proto*);

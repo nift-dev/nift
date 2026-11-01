@@ -335,6 +335,33 @@ $(RT_ISOLATE_TRANSFER_UNIT): tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_DEPS)
 test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
 	"$(RT_ISOLATE_TRANSFER_UNIT)"
 
+# B1 mutation protocol (docs/runtime-2/checkpoints/b1-mutation.md): every
+# mutator x every validation failure leaves the receiver, the live heap and
+# the refcounts unchanged. The mutants (NIFT_MUTATION_MUTANT: 1 validates
+# push after its commit, 2 skips object_put's immutable check, 3 skips an
+# array edit's heap tally) must each fail it (exit 1).
+RT_MUTATION_DIR := $(TEST_DIR)/rt/mutation
+RT_MUTATION_OBJECTS := $(filter-out src/rt/mutation.o,$(RT_VALUE_SOURCES:.cpp=.o)) src/RuntimeValue.o
+RT_MUTATION_MUTANTS := 1 2 3
+$(RT_MUTATION_DIR)/protocol$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
+	mkdir -p "$(RT_MUTATION_DIR)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp src/rt/mutation.cpp \
+		$(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+$(RT_MUTATION_DIR)/protocol-m%$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
+	mkdir -p "$(RT_MUTATION_DIR)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_MUTATION_MUTANT=$* tests/rt/mutation_protocol.cpp \
+		src/rt/mutation.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+.PHONY: test-rt-mutation-protocol test-rt-mutation-protocol-mutants
+test-rt-mutation-protocol: $(RT_MUTATION_DIR)/protocol$(EXEEXT)
+	"$(RT_MUTATION_DIR)/protocol$(EXEEXT)"
+test-rt-mutation-protocol-mutants: test-rt-mutation-protocol \
+		$(foreach n,$(RT_MUTATION_MUTANTS),$(RT_MUTATION_DIR)/protocol-m$(n)$(EXEEXT))
+	@for n in $(RT_MUTATION_MUTANTS); do \
+		"$(RT_MUTATION_DIR)/protocol-m$$n$(EXEEXT)" > "$(RT_MUTATION_DIR)/m$$n.log" 2>&1; rc=$$?; \
+		if [ $$rc -eq 1 ]; then echo "PASS M-B1 mutant $$n caught: $$(grep -m1 'case\|CHECK' "$(RT_MUTATION_DIR)/m$$n.log")"; \
+		else echo "FAIL M-B1 mutant $$n not caught (exit $$rc)"; exit 1; fi; done
+test-rt-vm: test-rt-mutation-protocol-mutants
+
 # CP23 milestone 2: isolate task entry/result API (wrapper execution, cloned
 # constants, TransferGraph arguments/globals/result; no worker threads yet).
 RT_ISOLATE_TASK_UNIT := $(TEST_DIR)/rt/isolate-task-unit$(EXEEXT)

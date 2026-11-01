@@ -3,6 +3,7 @@
 #include "rt/aggregate.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
+#include "rt/mutation.h"
 #include "rt/string.h"
 #include <algorithm>
 #include <cstring>
@@ -92,7 +93,7 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
         sizeof(State)+(2*n+(n+1)/2)*sizeof(Value)+512))
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     // Allocation is allowed here and before a request, never in drain.
-    array_mut(s[Source]);
+    mutation::sort_storage(s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
     s[HashTable]=make_bytes({});auto& bytes=s[HashTable].heap_as<BytesObject>()->data;bytes.resize(sizeof(State));
     new(bytes.data()) State();heap_retally(s[HashTable].heap());
     s[Keys]=make_array((n+1)/2);raw(s[Keys]).resize((n+1)/2);

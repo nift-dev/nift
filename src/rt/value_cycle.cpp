@@ -125,7 +125,7 @@ private:
     }
 
     void consider(const Value& child, bool& any) {
-        if (!may_contain_identity(child)) return;
+        if (!may_contain_identity(child) && !(values_ && (child.is(Kind::Array) || child.is(Kind::Object)))) return;
         any = true;
         b_.work.push_back(&child);
     }
@@ -137,7 +137,7 @@ private:
         // collection or instance holding only plain data may still be it).
         if (target_.kind == CycleTarget::Kind::Aggregate && target_.cell == object) { found_ = true; return; }
 #endif
-        if (!may_hold_identity(object) || !b_.seen.insert(address_key(object))) return;
+        if ((!may_hold_identity(object) && !values_) || !b_.seen.insert(address_key(object))) return;
         bool any = false;
         if (v.is(Kind::Array)) {
             for (const Value& child : array_items(v)) consider(child, any);
@@ -158,6 +158,13 @@ private:
     const CycleGraph& graph_;
     Buffers& b_;
     bool found_ = false;
+    // B1: an array or object target (not reachable while arrays and objects
+    // are copied) may sit below plain data, which the identity summary does
+    // not mark yet (plan 5.1 redefines it in B2), so its walk follows every
+    // array and object instead of pruning on the summary.
+    const bool values_ = target_.kind == CycleTarget::Kind::Aggregate &&
+                         (static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Array ||
+                          static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Object);
 };
 
 } // namespace

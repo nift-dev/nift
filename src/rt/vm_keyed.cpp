@@ -19,18 +19,25 @@ const char* keyed_cycle_legacy_text(KeyedMethod method) noexcept {
     return nullptr;
 }
 
-bool Vm::refuse_reference_cycle(Fault& fault, const Proto* proto, const Instr& in, const HeapObject* receiver,
-                                const Value& stored, const std::string& legacy_text) {
-#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 5
-    return false;  // R5: no cycle check (the stored value may close a cycle and leak)
-#endif
-    if (!would_close_cycle(CycleTarget::aggregate(receiver), stored, cycle_graph_)) return false;
+mutation::Env Vm::mutation_env(const Note* note) const {
+    mutation::Env env;
+    env.graph = &cycle_graph_;
+    env.heap_limit = heap_limit_;
+    if (note != nullptr) env.receiver_text = note->text;
+    return env;
+}
+
+bool Vm::mutation_failed(Fault& fault, const Proto* proto, const Instr& in, const mutation::Outcome& outcome,
+                         const HeapObject* receiver, const Value& stored, const std::string& legacy_text) {
+    using mutation::Failure;
+    if (outcome.failure == Failure::Budget) return raise(fault, StopReason::Internal, "memory budget exceeded");
+    if (outcome.failure != Failure::Cycle) return raise(fault, StopReason::Error, outcome.text);
     const std::string text = !legacy_text.empty() && legacy_reference_cycle(receiver, stored)
                                  ? legacy_text
                                  : std::string("reference cycle: the stored value would contain itself");
     const auto at = static_cast<std::size_t>(&in - proto->code.data());
     raise_catchable(fault, "runtime.reference_cycle", text, proto, at < proto->offsets.size() ? proto->offsets[at] : 0);
-    return true;
+    return false;
 }
 
 bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
@@ -43,72 +50,49 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
     const auto fail = [&](const char* text) { return raise(fault, StopReason::Error, text); };
     Value& c = s[Source];
     const std::size_t n = collection_item_count(c);
-    // Budget before growth (as array mutation): a reallocation of its storage.
-    // A shared collection is mutated in place, so no clone is ever reserved.
-    std::size_t grow = 0;
-    if (m >= kFirstKeyedRead) {  // reads: nothing to reserve
-    } else if (m == K::MapSet || m == K::SetAdd || m == K::StackPush) {
-        const std::size_t step = m == K::MapSet ? 2 : 1;
-        const std::size_t capacity = c.heap_as<CollectionObject>()->items.capacity();
-        grow = n + step > capacity ? 2 * (n + step) * sizeof(Value) + 4 * (n + step) * sizeof(std::uint32_t) : 0;
-    }
-    if (grow) {
-        natives::Context context;
-        context.heap_limit = heap_limit_;
-        // The VM's budget stop (as memory_exceeded), before any storage grows.
-        if (!natives::reserve_result(context, grow))
-            return raise(fault, StopReason::Internal, "memory budget exceeded");
-    }
-    // D-NEXT-refsem #4: a store that would close a reference cycle is refused
-    // before anything is stored, after legacy's own argument checks (a
-    // callable key or member may capture the receiver's cell too).
+    // B1: every mutator goes through the mutation protocol (rt/mutation.h):
+    // immutability, legacy's argument checks, the cycle check for each stored
+    // value (D-NEXT-refsem #4), the budget before growth, then one commit.
+    const mutation::Env env = mutation_env(proto->note(&in - proto->code.data()));
     const char* legacy = keyed_cycle_legacy_text(m);
-    const auto cycle = [&](const Value& stored, const char* text) {
-        return refuse_reference_cycle(fault, proto, in, c.heap(), stored, text ? text : "");
+    const auto failed = [&](const mutation::Outcome& out, const Value* stored, const char* text) {
+        return mutation_failed(fault, proto, in, out, c.heap(), stored ? *stored : Value(), text ? text : "");
     };
+    mutation::Outcome out;
     switch (m) {
         case K::MapSet:
-            if (!natives::collection_key_ok(s[Item])) return fail("map: key must be bool, number, or string");
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 14
-            map_set(c, s[Item], s[Returned]);  // R14: the store happens before the refusal (graph changed)
+            if (natives::collection_key_ok(s[Item]))
+                map_set(c, s[Item], s[Returned]);  // rt-lint: storage-ok R14: the store before the refusal
 #endif
-            if (cycle(s[Item], nullptr) || cycle(s[Returned], legacy)) return false;
-            map_set(c, s[Item], s[Returned]);
+            out = mutation::map_put(c, s[Item], s[Returned], env);
+            if (!out.ok()) return failed(out, out.operand ? &s[Returned] : &s[Item], out.operand ? legacy : nullptr);
             s[Result] = s[Returned];
             break;
-        case K::MapRemove: {
-            const std::ptrdiff_t at = collection_find(c, s[Item]);
-            if (at < 0) return fail("remove: key not found");
-            s[Result] = collection_view(c)[static_cast<std::size_t>(at) * 2 + 1];
-            collection_erase(c, static_cast<std::size_t>(at));
+        case K::MapRemove: case K::SetRemove: {
+            Value removed;
+            out = mutation::collection_remove(c, s[Item], &removed, env);
+            if (!out.ok()) return failed(out, nullptr, nullptr);
+            s[Result] = m == K::MapRemove ? removed : s[Item];
             break;
         }
         case K::SetAdd:
-            if (!natives::collection_key_ok(s[Item])) return fail("add: set values must be bool, number, or string");
-            if (cycle(s[Item], nullptr)) return false;
-            set_add(c, s[Item]);
+            out = mutation::set_insert(c, s[Item], env);
+            if (!out.ok()) return failed(out, &s[Item], nullptr);
             s[Result] = s[Item];
             break;
-        case K::SetRemove: {
-            if (!natives::collection_key_ok(s[Item]))
-                return fail("remove: set values must be bool, number, or string");
-            const std::ptrdiff_t at = collection_find(c, s[Item]);
-            if (at >= 0) collection_erase(c, static_cast<std::size_t>(at));  // a missing member is a no-op
-            s[Result] = s[Item];
-            break;
-        }
         case K::StackPush:
-            if (cycle(s[Item], legacy)) return false;
-            stack_push(c, s[Item]);
+            out = mutation::stack_push(c, s[Item], env);
+            if (!out.ok()) return failed(out, &s[Item], legacy);
             s[Result] = s[Item];
             break;
         case K::StackPop:
-            if (!n) return fail("pop: collection is empty");
-            s[Result] = collection_view(c).back();
-            stack_pop(c);
+            out = mutation::stack_pop(c, &s[Result], env);
+            if (!out.ok()) return failed(out, nullptr, nullptr);
             break;
         case K::Clear:
-            collection_clear(c);
+            out = mutation::clear(c, env);
+            if (!out.ok()) return failed(out, nullptr, nullptr);
             s[Result] = Value();
             break;
         case K::MapGet: {

@@ -42,7 +42,7 @@ struct HeapObject {
     // Low 4 bits: the Kind (all kinds fit). Bit 7: the D-040 identity summary
     // ("may contain a callable or handle", rt/heap.h). Bit 6: checked builds
     // only, "storage handed out since the last relocation" (rt/aggregate_store.h).
-    // Bits 4-5 are unused.
+    // Bit 5: kImmutable (rt/heap.h, B1). Bit 4 is unused (reserved).
     std::uint8_t tag;
     // Live-heap accounting (rt/heap_account.h): the footprint last counted
     // for this object, in 64-byte granules (24 bits; objects of 1 GiB or more
