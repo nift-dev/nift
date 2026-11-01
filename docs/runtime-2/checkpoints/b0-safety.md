@@ -203,3 +203,22 @@ the reviewed `expected.json`. Cases marked legacy must also equal
 
 Totals: 1,062 cases (615 ordinary errors, 419 refusals, 28 run to
 completion).
+
+## 6. Local runs (`89dace52`, tree as committed; through the host's heavy-job gate)
+
+Every step ran alone, in this order, each exit 0:
+
+| Gate | Exit |
+| --- | --- |
+| `make nift`, `make test-rt-lint` (0 problems) | 0, 0 |
+| `test-runtime2-safety` (1,062 cases), `test-runtime2-safety-mutants` (base passes; S1-S5 caught: 532, 23, 23, 27, 6 cases exit 70) | 0, 0 |
+| `test-rt-vm` prerequisites, one by one: `test-runtime2-vm-corpus-complete`, `.build/rt/vm-unit`, `vm-globals-unit`, `vm-modules-unit`, `vm-run`, `vm-prepared-parse`, `.build/rt-parse-dump`, `test-runtime2-cp13b`, `test-rt-source-map`, `test-rt-error-oom`, `test-cp25r`, `test-runtime2-cp16-n1`, `-inventory-links`, `-inventory-host-mutant`, `-kind-bits`, `-closures-s1`, `-closures-s1-stress`, `-closures-s1-mutants`, `-cp12c-mutant-controls`, `-for-s2`, `-for-s2-mutants`, `-capture-origins`, `test-rt-vm-policy-tooling`, `-cp14b`, `-cp14b-sort`, `-cp14b-witnesses`, `-d040-witnesses`, `-cp14b-profile`, `-cp22`, `-coro-module`, `-cp17-n2`, `-cp17-tripwire`, `-collections` (273), `-collections-mutants`, `-refsem` (463), `-refsem-mutants` (22 of 22), `-vm-default`, `-args-cmd`, `-packages` (828) | 0 each |
+| the 32 `test-rt-vm` recipe lines, one by one (unit binaries, rt-lint, legacy_names, `vm_parity --gen 300 --rt-diff`, adversarial selftest and `--count 600`, subset, subset_gen 500, builtins, host, records_coverage, path_wording, known_refused, engine_selection, former_replay 600, d018, context_consistency, policy_negative, review_cp12, golden, int_bounds, inventory, chain, modules 100, module_host_order, structs 100, globals 200, semantics_modules (both dirs), modules_d041 `--legacy-today`, cp12b_inventory selftest) | 0 each |
+| `test-runtime2-args-cmd-mutants`, `-packages-mutants`, `-packages-legacy` (packages: all three lanes), `-cp14b-design-mutants` (1-11 detected; 12 unverified comparator profile, as on Linode), `test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-cp23` | 0 each |
+
+Classify diff against the `weekend/r2` binary (`33904a6f`, rebuilt: up to
+date): `NIFT_VM=classify` over every `.f` in `tests/runtime2` (1,816 units)
+and CP25-R `classify-all` over the release corpus (589 units, reasons and
+positions compared, temporary paths normalised): **0 changes**. B0 changes no
+admission decision. Not run locally: sanitizer/TSan lanes and the Linode
+website-build and presentation micro-benchmark (plan §6 B0).
