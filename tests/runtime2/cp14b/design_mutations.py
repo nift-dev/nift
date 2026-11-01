@@ -19,6 +19,14 @@ COPIES=[
 'fn(f()) { a:=[1,2]; a.pop(); print(a.stringify()) }; f()',
 'fn(f()) { a:=[1,2]; g:=()=>a.pop(); g(); print(a.stringify()) }; f()',
 'a:=[[1,2]]; for(v:a) { v.pop() }; print(a.stringify())']
+# Witnesses the Phase A forward-compatibility guard refuses before any effect
+# (reference-guard:lent: an array mutated while a loop or a callback holds it;
+# D-NEXT-refsem #9). They cannot witness a VM mutant while the guard stands;
+# each is preserved unchanged, with legacy's output, in
+# tests/runtime2/refsem/pending/cp14b_*.f (CP19/CP14B test correction, owner
+# decision 2026-11-01). The other witnesses of their mutants still run.
+GUARDED_WITNESSES={COPIES[3],CASES['snapshot_mutation'],
+    'a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())'}
 # name, translation unit, existing test macro (0 means source-copy injection), witnesses
 MUTANTS=[
 ('ignored-callback-result','collection_helpers',0,[CASES['map'],'print([1,2,3].reduce((a,x)=>a+x,10))']),
@@ -115,6 +123,8 @@ def main():
                 results.append(dict(number=number,name=name,detected=all(oks),coverage='unverified-comparator'))
                 print('UNVERIFIED' if all(oks) else 'FAIL',number,name,flush=True);continue
             binary,identity=build(name,stem,macro,number);records=[]
+            witnesses=[w for w in witnesses if w not in GUARDED_WITNESSES]
+            if not witnesses:raise RuntimeError('No unguarded witness left: '+name)
             for source in witnesses:
                 if number==7:os.environ['NIFT_CP14B_TEST_MAX_FRAMES']='1'
                 else:os.environ.pop('NIFT_CP14B_TEST_MAX_FRAMES',None)
