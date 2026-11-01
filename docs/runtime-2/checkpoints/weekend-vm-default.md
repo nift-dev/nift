@@ -194,3 +194,32 @@ of `integ/refsem-a`. Four identities, kept distinct:
   settle the `args` immutability contract (owner preference: the injected `args` array is
   immutable through every alias, not just a non-reassignable binding) and re-witness args-cmd
   mutant 5 through the real const-mutation error.
+
+## B0 pre-release safety integration (2026-11-02)
+
+`weekend/r2` fast-forwarded from `33904a6f` to `12781121` (tree `d37aa27a`), `cand/b0-safety`.
+- Scope: no admitted program exits 70 because of a runtime-reachable operand kind. Handle
+  presentation and wrong-kind mutator receivers are ordinary runtime errors; three more paths
+  (`validate()`, session display, session tail) and, after review, mixed-kind interpolation
+  (`scalar_to_string`, string append) fixed. About 100 production lines; no compiler or admission
+  change; guard, reference semantics and legacy untouched. Record: `b0-safety.md`.
+- Reviews (distinct): REJECT `8a9dc923` (F1 mixed-kind interpolation exit 70, found by the
+  reviewer's fuzzer); narrow production ACCEPT `fe2ec7fc`; final ACCEPT `12781121` (docs and fuzz
+  runner only).
+- Root cause (for B4): inference correct ({int, mutex}); interpolation narrowed to scalars
+  (`scalar_only`) before a scalar-only native. B4 owns the structural fix and the invariant
+  "no runtime-reachable kind causes an internal failure through dispatch", with a mutation test.
+- New permanent gates: `test-runtime2-safety` (1,163 cases + fixed-seed fuzz, 33,512 programs,
+  five invariant checks with a selftest; fails 134 on `8a9dc923`) and
+  `test-runtime2-safety-mutants` (S1-S7). Known limit: the fuzzer's lost-output check is skipped
+  for errors in functions defined above the first print (covered by `safety.py` fixtures).
+  `expected.json` is a recorded snapshot, not proof of correctness.
+- Linode `b0-12781121` on the exact tree: all 33 gates exit 0 (safety + mutants, sanitizer
+  prebuild, refsem + mutants, collections, packages three lanes, args-cmd + mutants, coro-module,
+  cp14b + design mutants, cp19 + session CLI x2, cp22, cp23, vm-default, full test-rt-vm), no OOM.
+  Website build (`benchmark-10k`, same machine, serial): B0 full build median 1.025 s vs
+  `33904a6f` 1.047 s; no-op 0.318 vs 0.318 s; single page 0.308 vs 0.329 s; shared template
+  1.238 vs 1.293 s. No regression.
+- Rendering ruling (owner): mutex/channel keep the ordinary error; struct rendering is B3
+  (required); maps/sets/stacks, functions, atomics, futures assessed in B4, presentation separate
+  from serialization, no legacy quirks.
