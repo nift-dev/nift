@@ -46,7 +46,9 @@ The complete approved design mutation strategy is also reproducible:
 make test-runtime2-cp14b-design-mutants CP14B_BASE=/absolute/base-nift
 This builds twelve fresh named variants, including ignored results/direction,
 mutation of a copy in four binding forms, a test-only small frame budget,
-missing reporting metadata, factory hoisting and early splice replacement.
+missing reporting metadata, factory hoisting and a splice that removes before
+it evaluates its replacement (the pre-F2 order; until D-NEXT-refsem round 4,
+F2, owner-approved 2026-11-01, the mutant was the reverse, early evaluation).
 Source-copy injections never edit production files. Every variant has a fresh
 marker/hash, a passing exact normal oracle (or the explicit small-budget stop),
 an unaffected control, and negative classifier controls. Missing/malformed or

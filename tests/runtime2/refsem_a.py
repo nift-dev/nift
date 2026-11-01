@@ -21,8 +21,9 @@ Contract: docs/runtime-2/checkpoints/weekend-refsem-a.md.
                 them, matches legacy, and prints NAME.phaseb, the transcript
                 derived by hand under reference semantics for arrays and
                 objects (D-NEXT-refsem #1; the comment in each says why).
-  pending/*.f   valid programs Phase A over-refuses (Phase B must admit them):
-                NAME.expected the valid output (legacy's), NAME.reason today's refusal.
+  pending/      valid programs Phase A over-refuses (Phase B must admit them):
+                NAME.f or NAME.session (piped), NAME.expected the valid output
+                (legacy's), NAME.reason today's refusal (pending/README).
   modules/*/    module cases (main.f imports m.f): `reason` (refused before
                 any effect) or `phaseb` (as phaseb/ above).
   equiv/*.f     cooperative (NIFT_VM_COOPERATIVE_THREADS=1) and parallel task
@@ -202,6 +203,20 @@ def main():
             check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
                   "pending %s: expected the Phase A refusal %s before effects (or Phase B support: make it "
                   "a parity case), got %d %r %r" % (name, reason, vr, vo, ve[:200]))
+        # The same for piped sessions (NAME.session): the statements before the
+        # refused one run (they print nothing here), the refused one has no effect.
+        pend = os.path.join(HERE, "pending")
+        for name in sorted(f for f in os.listdir(pend) if f.endswith(".session")):
+            base = os.path.join(pend, name[:-len(".session")])
+            stdin = open(base + ".session").read()
+            reason = open(base + ".reason").read().strip()
+            want = open(base + ".expected").read()
+            lo, le, lr = run_session(nift, stdin, work, mode="0")
+            vo, ve, vr = run_session(nift, stdin, work)
+            check(lr == 0 and lo == want, "pending %s: the preserved valid output changed: %r %r" % (name, lo, le[:200]))
+            check(vr == 1 and vo == "" and "session refused: %s" % reason in ve,
+                  "pending %s: expected the Phase A refusal %s before the statement's effects (or Phase B "
+                  "support: make it a parity case), got %d %r %r" % (name, reason, vr, vo, ve[:200]))
         mods = os.path.join(HERE, "modules")
         for case in sorted(os.listdir(mods)):
             tree = os.path.join(mods, case)

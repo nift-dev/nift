@@ -1,0 +1,14 @@
+Valid programs Phase A over-refuses (temporary limitations Phase B must
+eliminate), kept unchanged as regression evidence. NAME.f (a script) or
+NAME.session (a piped session's input); NAME.expected: the valid output
+(legacy's, and weekend/r2's where it ran there); NAME.reason: the Phase A
+refusal, raised before the refused statement has any effect. Phase B turns
+each into a parity case.
+
+  ret_multiline_http_shape.f        tests/runtime2/diagnostics/changes/ (the
+                                    nift-packages/http capabilities() shape);
+                                    review round 4, F3
+  cp19_unrelated_callback_shadow    tests/runtime2/cp19/session_struct_cli.py,
+    .session                        case unrelated-callback-shadow as it was;
+                                    CP19 test correction (owner decision,
+                                    2026-11-01)

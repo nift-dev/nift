@@ -1,0 +1,4 @@
+struct(Point){x:=0;fn(get()){return x}};p:=Point()
+[1,2].map(x=>x+1).stringify()
+p.get()
+exit

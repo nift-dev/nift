@@ -159,6 +159,14 @@ GUARDED={'snapshot_mutation':'reference-guard:lent','snapshot_growth':'reference
 'iterator_mutation':'reference-guard:lent','captured_snapshot':'reference-guard:lent',
 'aggregate_callback_mutation':'reference-guard:argument','aggregate_reduce_result':'reference-guard:argument'}
 
+# Approved differences (the VM's result differs from legacy's on purpose).
+# splice_throw: D-NEXT-refsem review round 4, F2 (owner-approved difference,
+# 2026-11-01): a splice evaluates every argument first, so a throwing
+# replacement leaves the array unchanged. Legacy removes before it evaluates
+# the replacement; its output is kept here as the documented difference.
+APPROVED={'splice_throw':dict(vm='boom\n[1,2,3]\n',legacy='boom\n[1,3]\n',
+          citation='D-NEXT-refsem round 4 F2, owner-approved difference 2026-11-01')}
+
 def run(binary,mode,source,root):
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')
@@ -175,7 +183,11 @@ def main():
                 ok,detail=cprof.refused_ok(prof,a.nift,a.legacy,source,Path(tmp));unverified+=1
                 results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
             legacy=run(a.legacy,'0',source,Path(tmp));vm=run(a.nift,'require',source,Path(tmp))
-            if name in GUARDED:
+            if name in APPROVED:
+                want=APPROVED[name];st=vm['stats'][-1] if vm['stats'] else {}
+                ok=(vm['out']==want['vm'] and legacy['out']==want['legacy'] and vm['err']==legacy['err'] and
+                    vm['exit']==legacy['exit'] and st.get('outcome') in ['vm','vm-error'] and st.get('legacy_executions')==0)
+            elif name in GUARDED:
                 st=vm['stats'][-1] if vm['stats'] else {}
                 ok=vm['out']=='' and vm['exit']==1 and st.get('outcome')=='require-error' and st.get('reason')==GUARDED[name] and st.get('vm_executions')==0
             else:
