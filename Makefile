@@ -4633,6 +4633,7 @@ test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
 .PHONY: test-runtime2-safety test-runtime2-safety-mutants
 test-runtime2-safety: $(TARGET)
 	$(PYTHON) tests/runtime2/safety/safety.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/safety/fuzz.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_SAFETY_SEED:-1}
 test-runtime2-safety-mutants: $(TARGET) $(LIBFFI_A)
 	SAFETY_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/safety/mutants.sh "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-safety test-runtime2-safety-mutants

@@ -17,8 +17,10 @@ declare -A FILE=(
   [3]=src/rt/natives/json_methods.cpp    # S3: a function, handle, future, collection or instance given to validate() is Status::Internal
   [4]=src/CLI.cpp                        # S4: a session statement value with no shown form stops the session with exit 70
   [5]=src/rt/vm_session_render.cpp       # S5: a handle or earlier collection as a session statement tail is an internal failure
+  [6]=src/rt/natives/format_methods.cpp  # S6: to_string of a kind the interpolation lowering set aside is Status::Internal (review F1)
+  [7]=src/rt/vm_ops.cpp                  # S7: appending such a value to an interpolation's string is an internal failure
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

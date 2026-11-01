@@ -233,9 +233,34 @@ const char* public_type_name(const Value& value) {
     }
 }
 
+const char* unrenderable_text(const Value& value) {
+    switch (value.kind()) {
+        case Kind::Function: case Kind::Handle: case Kind::Future: return "opaque runtime value is not serializable";
+        case Kind::Collection: return "map, set and stack values cannot be rendered as text";
+        case Kind::Struct: return "struct instances cannot be rendered as text";
+        case Kind::Array: return "cannot render a JSON array as text; select an element first";
+        case Kind::Object: return "cannot render a JSON object as text; select a member first";
+        case Kind::Error: return "Error values cannot be rendered as text";
+        case Kind::Bytes: return "bytes values cannot be rendered as text; decode as UTF-8 first";
+        default: return nullptr;
+    }
+}
+
+// The interpolation lowering (compiler_interp.cpp) binds to_string from the
+// scalar part of the operand's kinds (scalar_only); a value of a kind it set
+// aside arrives here at run time (`for (v : [1, mutex()]) { "$[v]" }`, B0 F1).
 Status scalar_to_string(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+#if defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 6
     if (argc == 0 || !(args[0].is_number() || args[0].is(Kind::Bool) || args[0].is_null()))
-        return internal(error, "to_string receiver");
+        return internal(error, "to_string receiver");  // S6
+#else
+    if (argc == 0) return internal(error, "to_string receiver");  // the compiler always passes the receiver
+    if (!(args[0].is_number() || args[0].is(Kind::Bool) || args[0].is_null())) {
+        const char* text = unrenderable_text(args[0]);
+        if (!text) return internal(error, "to_string receiver");  // a string: the lowering appends it directly
+        return fail(error, text);
+    }
+#endif
     if (!no_arguments(argc, "to_string", error)) return Status::Error;
     std::string text;
     append_scalar(args[0], text);

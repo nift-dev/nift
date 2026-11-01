@@ -3229,6 +3229,511 @@
   "stderr": "error: p.f:6:7: validate: struct instances are not JSON serializable\n",
   "stdout": "b\n"
  },
+ "i_atomic_bool_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_bool_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_bool_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_bool_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_bool_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_bool_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_bool_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_bool_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_bool_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_atomic_bool_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_atomic_bool_session": {
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_atomic_int_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_int_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_int_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_int_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_int_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_int_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_int_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_atomic_int_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_atomic_int_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_atomic_int_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_atomic_int_session": {
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_channel_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_channel_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_channel_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_channel_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_channel_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_channel_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_channel_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_channel_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_channel_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_channel_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_channel_session": {
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_function_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_function_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_function_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_function_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_function_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_function_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_function_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_function_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_function_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_function_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_function_session": {
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_map_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_map_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_map_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_map_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_map_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_map_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_map_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_map_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_map_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_map_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_map_session": {
+  "exit": 0,
+  "stderr": "error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_mutex_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_mutex_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_mutex_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_mutex_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_mutex_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_mutex_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_mutex_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_mutex_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
+  "stdout": "b\nis\n"
+ },
+ "i_mutex_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_mutex_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
+ },
+ "i_mutex_session": {
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_set_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_set_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_set_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_set_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_set_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_set_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_set_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_set_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_set_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_set_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_set_session": {
+  "exit": 0,
+  "stderr": "error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_stack_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_stack_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:17: lambda body error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_stack_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_stack_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:3:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_stack_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_stack_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:5:54: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_stack_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_stack_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:1:26: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_stack_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_stack_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:11: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_stack_session": {
+  "exit": 0,
+  "stderr": "error: map, set and stack values cannot be rendered as text\n",
+  "stdout": "b\ni1\nafter\n"
+ },
+ "i_struct_closure_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:17: lambda body error: struct instances cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_struct_closure_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:17: lambda body error: struct instances cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_struct_loop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:6:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_struct_loop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:6:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_struct_mapget_int": {
+  "exit": 1,
+  "stderr": "error: p.f:8:54: struct instances cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_struct_mapget_str": {
+  "exit": 1,
+  "stderr": "error: p.f:8:54: struct instances cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_struct_module_int": {
+  "exit": 1,
+  "stderr": "error: p.f:2:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_struct_module_str": {
+  "exit": 1,
+  "stderr": "error: p.f:2:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_struct_param_int": {
+  "exit": 1,
+  "stderr": "error: p.f:4:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\ni1\n"
+ },
+ "i_struct_param_str": {
+  "exit": 1,
+  "stderr": "error: p.f:4:26: struct instances cannot be rendered as text\n",
+  "stdout": "b\nis\n"
+ },
+ "i_struct_pop_int": {
+  "exit": 1,
+  "stderr": "error: p.f:7:11: struct instances cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_struct_pop_str": {
+  "exit": 1,
+  "stderr": "error: p.f:7:11: struct instances cannot be rendered as text\n",
+  "stdout": "b\n"
+ },
+ "i_struct_session": {
+  "exit": 1,
+  "stderr": "error: <stdin>:5:14: NIFT_VM session refused: context:struct-new: a context-dependent legacy behaviour (struct-new) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+  "stdout": "b\n"
+ },
  "k_clear_array_loop": {
   "exit": 1,
   "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",

@@ -5,6 +5,7 @@
 #include "rt/compare.h"
 #include "rt/error.h"
 #include "rt/heap.h"
+#include "rt/natives/format_methods.h"
 #include "rt/number.h"
 #include "rt/render.h"
 #include "rt/shared_state.h"
@@ -131,6 +132,12 @@ bool add_assign_slow(const Instr& in, Value& target, const Value& right, Fault& 
         }
         return concatenate(target, right, target, fault);
     }
+#if !(defined(NIFT_SAFETY_MUTANT) && NIFT_SAFETY_MUTANT == 7)
+    // B0: an interpolation appends a part whose kinds the lowering narrowed to
+    // string (`for (v : ["s", mutex()]) { "$[v]" }`); the other kinds arrive here.
+    if (target.is(Kind::String))
+        if (const char* text = natives::unrenderable_text(right)) return raise(fault, StopReason::Error, text);
+#endif
     if (!target.is_number() || !right.is_number()) return internal(fault, "compound assignment");
     return arith_slow(in, OpCode::Add, target, right, target, fault);
 }

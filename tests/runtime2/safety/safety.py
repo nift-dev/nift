@@ -128,6 +128,33 @@ def cases():
     add("catch_control", {"p.f": 'print("b")\nm := map()\ntry { m.set("k", m) } catch (e) '
                                  '{ print("caught " + e.message) }\nprint("after")\n'})
 
+    # interpolation of a value whose kinds mix a scalar with a non-scalar (review F1):
+    # the lowering binds to_string (or a string append) from the scalar part
+    struct = 'struct(P) {\n  v := 0\n}\n'
+    kinds = {"mutex": "mutex()", "channel": "channel()", "atomic_int": "atomic<int>(1)",
+             "atomic_bool": "atomic<bool>(true)", "map": "map()", "set": "set()", "stack": "stack()",
+             "function": "(() => 1)", "struct": "P()"}
+    for k, ctor in kinds.items():
+        decl = struct if k == "struct" else ""
+        for first, tag in (("1", "int"), ('"s"', "str")):
+            add("i_%s_loop_%s" % (k, tag), {"p.f": decl + 'print("b")\nxs := [%s, %s]\nfor (v : xs) { print("i$[v]") }\n'
+                                                  % (first, ctor)})
+            add("i_%s_param_%s" % (k, tag), {"p.f": decl + 'fn(show(v)) { return "i$[v]" }\nprint("b")\n'
+                                                   'print(show(%s))\nprint(show(%s))\n' % (first, ctor)})
+            add("i_%s_closure_%s" % (k, tag), {"p.f": decl + 'g := (v) => "i$[v]"\nprint("b")\nprint(g(%s))\n'
+                                                     'print(g(%s))\n' % (first, ctor)})
+            add("i_%s_pop_%s" % (k, tag), {"p.f": decl + 'aa := [%s, %s]\nprint("b")\nv := aa.pop()\n'
+                                                 'print("i$[v]")\n' % (first, ctor)})
+            add("i_%s_mapget_%s" % (k, tag), {"p.f": decl + 'mm := map()\nmm.set("a", %s)\nmm.set("b", %s)\n'
+                                                    'print("b")\nfor (key : ["a", "b"]) { v := mm.get(key); '
+                                                    'print("i$[v]") }\n' % (first, ctor)})
+        add("i_%s_session" % k, stdin=decl + 'print("b")\nfor (v : [1, %s]) { print("i$[v]") }\nprint("after")\n'
+            % ctor)
+    for tag, first in (("int", "1"), ("str", '"s"')):
+        add("i_struct_module_%s" % tag, {"m.f": struct + "fn(mk()) {\n  return P()\n}\nexport(mk)\n",
+                                        "p.f": 'import("m.f")\nfn(show(v)) { return "i$[v]" }\nprint("b")\n'
+                                               'print(show(%s))\nprint(show(mk()))\n' % first})
+
     # ------------------------------------------------------------ mutators (b)
     for n in (0, 1, 2):
         add("m_args_push_%d" % n, {"p.f": 'print("before")\nfor (a : args) { a.push(1) }\nprint("after")\n'},
@@ -176,7 +203,6 @@ def cases():
     for r, lit in wrong.items():
         add("k_stack_push_%s_loop" % r, {"p.f": 'print("b")\nxs := [stack(), %s]\nfor (a : xs) { a.push(1) }\n'
                                                 % lit})
-    struct = 'struct(P) {\n  v := 0\n}\n'
     for r, lit in receivers.items():
         add("s_field_%s_loop" % r, {"p.f": struct + 'print("b")\nxs := [%s]\nfor (p : xs) { p.v = 1 }\n' % lit})
         add("s_field_%s_mixed" % r, {"p.f": struct + 'print("b")\nxs := [P(), %s]\nfor (p : xs) { p.v = 1 }\n'

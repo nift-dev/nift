@@ -1,6 +1,7 @@
 # B0: pre-release safety (cand/b0-safety)
 
-Status: **candidate**, not reviewed, not integrated. Branch `cand/b0-safety`,
+Status: **candidate**, review round 1: the independent review of `8a9dc923`
+rejected it on one HIGH finding (F1, section 7); not integrated. Branch `cand/b0-safety`,
 built on `weekend/r2` @`33904a6f` (reference semantics Phase A integrated).
 Plan: Phase B plan §6 "B0"; owner decisions of 2026-11-02 (B0 ruling). B0 is
 standalone: it changes no semantics of an admitted program that ran to
@@ -8,9 +9,10 @@ completion, no admission decision, legacy (`NIFT_VM=0`), the Phase A guard or
 reference semantics.
 
 Tests: `make test-runtime2-safety` (`tests/runtime2/safety/safety.py`, the
-reviewed transcripts in `tests/runtime2/safety/expected.json`),
+recorded transcripts in `tests/runtime2/safety/expected.json`, and
+`tests/runtime2/safety/fuzz.py`, a fixed-seed sweep),
 `make test-runtime2-safety-mutants` (`tests/runtime2/safety/mutants.sh`,
-S1-S5). Both are prerequisites of `test-rt-vm`.
+S1-S7). Both are prerequisites of `test-rt-vm`.
 
 ## 1. Contract
 
@@ -73,7 +75,7 @@ The same defect class, also exit 70 on `weekend/r2`, fixed the same way:
 | Path | Before | Now |
 | --- | --- | --- |
 | `validate(schema, v)` with a function, handle, future, map/set/stack or struct instance inside `v` (`json_methods.cpp` `to_document`) | exit 70 | `validate: opaque runtime value is not serializable`; `validate: map, set and stack values are not JSON serializable`; `validate: struct instances are not JSON serializable` |
-| Session display of a statement value with no shown form: a bare `m`, `mutex()`, a map from an earlier statement, `v.set("k", mutex())` (CLI `run_vm_session_statement`) | the session stops, exit 70 | the statement's ordinary error, the session continues (`nift eval` already reported it as an error, exit 2) |
+| Session display of a statement value with no shown form: a bare `m`, `mutex()`, a map from an earlier statement, `v.set("k", mutex())` (CLI `run_vm_session_statement`) | the session stops, exit 70 | the statement's ordinary error, the session continues (`nift eval` already reported it as an error, exit 2). For a mutator statement such as `v.set("k", mutex())` the error is about displaying its result: the mutation has already happened when it appears (legacy shows the handle's tag) |
 | Session statement tail: `m := mutex(); m`, `x := 1; s` with an earlier collection (`vm_session_render.cpp`) | exit 70 | `opaque runtime values cannot be rendered as text in $[m]`; `map, set and stack values cannot be rendered as text in $[s]` (the wording of its Error/bytes neighbours) |
 
 The shown-result converter (`eval_result.cpp`) reports a handle or future as
@@ -151,7 +153,10 @@ generated suite (1,062 cases) is the permanent form of that evidence.
 | `vm_iter.cpp` array element/object key/lookup sources, safe index/key/atom | | invariant: the per-step opcodes read the loop's own snapshot register that `ForPrep` checked (non-iterables are ordinary `@for` errors there; 80 probes) |
 | `collection_sort.cpp` sort receiver, `collection_helpers.cpp` collection receiver/method/phase, `vm_collection_sort.cpp` location/controller | | invariant: emitted only after `kinds(receiver) == kKindArray` (`collection_method_call`) and, for a comparator sort, not on a loop or selector binding |
 | `natives/array_methods.cpp` (19), `string_methods.cpp` (17), `object_methods.cpp` (9), `number_methods.cpp` (2), `bytes_methods.cpp` (6), `collection_methods.cpp` (7) receivers and arities | | invariant: `bind_method` binds a built-in only when every possible receiver kind matches (else `builtin-receiver:*`, `method:*`, `collection-receiver:*`); bytes are refused entirely (`builtin-bytes`) |
-| `format_methods.cpp` presentation receiver (argc 0), `to_string` receiver | | invariant: the compiler always passes the receiver; `to_string` binds to proven scalars only |
+| `format_methods.cpp` presentation receiver (argc 0) | | invariant: the compiler always passes the receiver |
+| `format_methods.cpp` `scalar_to_string` receiver (review F1; the first version of this table wrongly said `to_string` binds to proven scalars only) | interpolation of a value whose kinds mix a scalar and a non-scalar: `compiler_interp.cpp` `scalar_only` keeps the scalar bits and binds `to_string` from them | **fixed** (S6); a string receiver stays internal: the lowering appends a string part directly and never calls `to_string` for it |
+| `vm_ops.cpp` `add_assign_slow` "compound assignment" | the same narrowing to string (`["s", mutex()]`): the interpolation appends the part with `AddAssign` | **fixed** (S7) for a string target and a non-renderable part; other operand pairs: invariant (`+=` is emitted after `kinds_within`) |
+| other kind-narrowing helpers that drop kinds before binding a native | | none found: `scalar_only` is used only by `compiler_interp.cpp` (lines 152, 188, 192, 266), all ending at the two rows above; the other `& ~kKind...` tests (`compiler_assign`, `compiler_call`, `compiler_expr`, `compiler_keyed`, `compiler_stmt_expr`, `compiler_structs`, `builtin_bind`) require the whole kind set to be inside the receiver set, they never drop kinds |
 | `format_methods.cpp` `type`/`is_*` argument kind (`public_type_name` null) | | invariant: only host handles and cells lack a public type; host handles in these positions are refused (`host-handle-flow`) |
 | `shared_methods.cpp` channel sentinel construction | | not an operand kind: an allocation failure building the Error |
 | `host_file_handles_internal.h` `map_handle` default, `host_util.h` HostStatus::Internal | | invariant: wrong kinds are ordinary errors before resolution (`close: expected a file or stream handle`, `recv: expected a channel`: 21 probes); the remaining statuses (forged, foreign, protocol misuse) cannot be produced by a script (CP17 typed handles) |
@@ -159,7 +164,7 @@ generated suite (1,062 cases) is the permanent form of that evidence.
 
 ## 4. Implementation
 
-Production, 7 files, +60/-3 lines: `natives/format_methods.cpp`,
+Production (round 0), 7 files, +60/-3 lines: `natives/format_methods.cpp`,
 `natives/json_methods.cpp`, `vm_array_mutation.cpp`,
 `compiler_array_mutation.cpp` (the note), `vm_session_render.cpp`,
 `eval_result.cpp`, `CLI.cpp`. Mutants are compile-time flags on the touched
@@ -172,6 +177,8 @@ object (`NIFT_SAFETY_MUTANT=n`), as the refsem and collections mutants are:
 | S3 | `natives/json_methods.cpp` | `Status::Internal` for those kinds in `validate` |
 | S4 | `CLI.cpp` | exit 70 for a session value with no shown form |
 | S5 | `vm_session_render.cpp` | the internal failure for a handle/collection statement tail |
+| S6 | `natives/format_methods.cpp` | `Status::Internal` in `scalar_to_string` (review F1) |
+| S7 | `vm_ops.cpp` | the internal failure for a non-renderable part appended to an interpolation |
 
 ## 5. Tests (`tests/runtime2/safety/`)
 
@@ -181,8 +188,14 @@ corpora the classifiers walk) and checks, for every case: no exit 70; no
 ordinary error, the earlier output present, one positioned
 `error: FILE:LINE:COL:` line (sessions: the session continues); for a
 refusal, nothing run and a real position; and the whole transcript equal to
-the reviewed `expected.json`. Cases marked legacy must also equal
-`NIFT_VM=0` byte for byte.
+`expected.json`. Cases marked legacy must also equal `NIFT_VM=0` byte for
+byte.
+
+`expected.json` is a recorded snapshot (`safety.py --update`), summarised and
+spot-checked by its author, not a hand-reviewed expectation per case. What
+binds is the runner's invariants (no exit 70, no internal text, the earlier
+output, a real position, nothing run on a refusal) and the legacy-matched
+cases; the snapshot only makes any later change of a transcript visible.
 
 - Handles: `mutex`, `channel`, `atomic<int>`, `atomic<bool>`; alone, in an
   array, an object, a map and a stack, at depth 1 and 2; `stringify`,
@@ -201,8 +214,25 @@ the reviewed `expected.json`. Cases marked legacy must also equal
   element `push`; struct field stores on four wrong receivers through a loop,
   a mixed loop, a parameter, a map get and `args`.
 
-Totals: 1,062 cases (615 ordinary errors, 419 refusals, 28 run to
+- Mixed-kind interpolation (review F1): `"i$[v]"` where `v` is `1` or `"s"`
+  first and then a mutex, channel, atomic, map, set, stack, function or
+  struct instance, through a loop, a parameter, a closure, `pop`, a
+  `map.get`, a piped session, and a struct returned from a module (101 cases).
+
+Totals: 1,163 cases (715 ordinary errors, 420 refusals, 28 run to
 completion).
+
+`fuzz.py` (the reviewer's generator, adapted): 16 value kinds x 11 wrappers
+(alone, array, object, depth 3, depth 4, a mixed array, map, stack and their
+nestings) x 14 delivery routes (direct, parameter, the two mixed parameter
+routes, closure, module, map get, `pop`, loop, the two mixed loops, channel,
+returned from a branch, assigned in an `if`) x 38 operations (presentation,
+`validate`, `print`, interpolation, `type`, equality, container methods, every
+mutator, index and member stores, `+=`). Fixed seed 1: every kind x route x
+operation with the value alone (8,512), 20,000 sampled programs over the whole
+space, 5,000 sampled as piped sessions; about 80 s on this host. It asserts
+only the invariants (no exit 70, no internal-failure text) and runs in
+`test-runtime2-safety` after `safety.py`.
 
 ## 6. Local runs (`89dace52`, tree as committed; through the host's heavy-job gate)
 
@@ -222,3 +252,51 @@ and CP25-R `classify-all` over the release corpus (589 units, reasons and
 positions compared, temporary paths normalised): **0 changes**. B0 changes no
 admission decision. Not run locally: sanitizer/TSan lanes and the Linode
 website-build and presentation micro-benchmark (plan §6 B0).
+
+## 7. Review round 1 (review of `8a9dc923`)
+
+Verdict REJECT on one HIGH finding; decisions (a) and (b), S1-S5, the
+spot-checked internal returns, the B4 sub-kind note, the classify diff and
+the gates held.
+
+**F1 (HIGH): interpolating a mixed-kind value exited 70 after output.**
+`print("b")` / `for (v : [1, mutex()]) { print("i$[v]") }` printed `b`,
+`i1`, then `unexpected operands ... built-in to_string`. The interpolation
+lowering's `scalar_only` drops the non-scalar kinds of a mixed set and binds
+`to_string` (or, for a string part, a plain append) from the scalar rest;
+`scalar_to_string` and `add_assign_slow` treated the other kinds as a
+compiler defect. Routes: a loop over a mixed array, a parameter called with
+a scalar then a handle/collection/function/module struct, `pop`, `map.get`,
+a closure. Fix (no admission change): both now raise an ordinary error for
+a value with no text form (`natives::unrenderable_text`):
+
+| Kind | Text | Source of the wording |
+| --- | --- | --- |
+| function, handle, future | `opaque runtime value is not serializable` | presentation (functions, B0 handles) |
+| map, set, stack | `map, set and stack values cannot be rendered as text` | the B0 session-render text without its `in $[...]` |
+| struct instance | `struct instances cannot be rendered as text` | the same pattern |
+| array, object | `cannot render a JSON array as text; select an element first` (object: member) | legacy's session wording without its `$[...]` (not reachable today: aggregates are refused, `interpolation:non-scalar`) |
+| Error, bytes | `Error values cannot be rendered as text`; `bytes values cannot be rendered as text; decode as UTF-8 first` | the session-render texts without `in $[...]` |
+
+The error is positioned at the interpolated expression; not catchable (an
+ordinary error, section 1). Section 3 corrects the `to_string` row and adds
+the append row; no other kind-narrowing helper drops kinds before a native.
+Fixtures `i_*` (section 5), mutants S6 and S7, and the reviewer's generator
+as a regression gate (`fuzz.py`).
+
+Fuzz evidence, seed 1, 33,512 programs: on `8a9dc923` **134** break the
+invariants (all file mode, all interpolation: 79 `built-in to_string`, 55
+`compound assignment`, through the `loopmix`, `loopmixs`, `param2`, `params`
+and `pop` routes); on the fix 0.
+
+Round 1 runs (this commit's tree, through the heavy-job gate), each exit 0:
+`make nift`; `make test-rt-lint` (0 problems); `test-runtime2-safety`
+(`safety.py` 1,163 cases, then `fuzz.py` 33,512 programs, 0 broken);
+`test-runtime2-safety-mutants` (base passes; S1-S7 caught: 532, 23, 23, 27,
+6, 54, 46 cases exit 70); `test-runtime2-vm-default`; `test-runtime2-refsem`
+(463 checks); `vm_host.py` (160 pass, 5 refused); `vm_builtins.py`;
+`test-cp19-session-cli`. The same `fuzz.py` on the `8a9dc923` binary: exit 1,
+134 programs broken. Classify diff against the `weekend/r2` binary
+(`33904a6f`): 0 of 1,816 `tests/runtime2` units, 0 of 589 CP25-R units.
+Round 1 production change: 3 files (`natives/format_methods.{h,cpp}`,
+`vm_ops.cpp`), no compiler change.

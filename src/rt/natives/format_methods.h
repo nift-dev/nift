@@ -39,6 +39,12 @@ Status fn_is_enum(const Context&, const Value* args, std::uint32_t argc, Value& 
 // handles) are reported through `internal`.
 bool serialize(const Value& value, bool pretty, std::string& out, std::string& error, bool& internal);
 
+// B0 (docs/runtime-2/checkpoints/b0-safety.md): the ordinary error text for a
+// value that has no text form in an interpolation (`"$[v]"`) or a string
+// append: a function, handle or future, a map/set/stack, a struct instance,
+// an array or object, an Error, bytes. Null for a value that has one.
+const char* unrenderable_text(const Value& value);
+
 // Legacy public_type for the value kinds rt has ("int"/"float" by value).
 const char* public_type_name(const Value& value);
 
