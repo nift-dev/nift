@@ -214,7 +214,7 @@ bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note*
 
 bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault) {
     if (object.is(Kind::Array) && key.is_number()) {
-        const auto& items = array_items(object);
+        const auto& items = array_view(object);
         std::int64_t i = 0;
         const bool integral = number_to_i64(key, i) && i >= 0;
         if (integral && static_cast<std::uint64_t>(i) < items.size()) {
@@ -238,7 +238,7 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
     if (object.is(Kind::Object) && key.is(Kind::String)) {
         Atom atom;
         if (AtomTable::current().find(string_view_of(key), atom)) {
-            if (const Value* member = object_get(object, atom)) {
+            if (const Value* member = object_find(object, atom)) {
                 out = *member;
                 return true;
             }
@@ -278,7 +278,7 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
         return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
     }
     if (!object.is(Kind::Object)) return internal(fault, "member");
-    if (const Value* member = object_get(object, key)) {
+    if (const Value* member = object_find(object, key)) {
         out = *member;
         return true;
     }

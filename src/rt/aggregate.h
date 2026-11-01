@@ -41,6 +41,14 @@ namespace nift::rt {
 
 Value make_array(std::size_t reserve = 0);
 const std::vector<Value>& array_items(const Value& array);
+// Transient internal views (review round 2): the same storage, for a reader
+// that copies what it needs out before anything mutates the aggregate (a VM
+// element read, a length). They are not hand-outs, so they do not make the
+// next mutation relocate in checked builds (aggregate_store.h); anything that
+// keeps a reference across a call uses array_items / object_entries.
+const std::vector<Value>& array_view(const Value& array);
+const std::vector<std::pair<Atom, Value>>& object_view(const Value& object);
+const Value* object_find(const Value& object, Atom key);
 // Unshares first. Raw storage: the array is conservatively marked as possibly
 // holding identity-bearing values (rt/heap.h); prefer array_set for one slot.
 std::vector<Value>& array_mut(Value& array);

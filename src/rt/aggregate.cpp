@@ -106,10 +106,14 @@ const std::vector<Value>& array_items(const Value& array) {
     return array.heap_as<ArrayObject>()->items;
 }
 
+const std::vector<Value>& array_view(const Value& array) { return array.heap_as<ArrayObject>()->items; }
+
+// The storage is for the caller's own mutation (it relocated first): not a
+// hand-out of the result (review round 2: setting the bit here drained the
+// relocation credit on every VM mutation).
 std::vector<Value>& array_mut(Value& array) {
     if (!unshare(array)) relocate_storage(array.heap());
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
-    note_lent(array.heap());
     return array.heap_as<ArrayObject>()->items;
 }
 
@@ -146,6 +150,16 @@ std::size_t object_size(const Value& object) { return object.heap_as<ObjectObjec
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object) {
     note_lent(object.heap());
     return object.heap_as<ObjectObject>()->entries;
+}
+
+const std::vector<std::pair<Atom, Value>>& object_view(const Value& object) {
+    return object.heap_as<ObjectObject>()->entries;
+}
+
+const Value* object_find(const Value& object, Atom key) {
+    const auto* o = object.heap_as<ObjectObject>();
+    const std::ptrdiff_t at = find_position(*o, key);
+    return at < 0 ? nullptr : &o->entries[static_cast<std::size_t>(at)].second;
 }
 
 const Value* object_get(const Value& object, Atom key) {
@@ -186,8 +200,7 @@ bool object_remove(Value& object, Atom key) {
 Value* object_slot_mut(Value& object, Atom key) {
     if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
     ObjectObject& o = object_mut(object);
-    mark_may_hold_identity(&o);
-    note_lent(&o);
+    mark_may_hold_identity(&o);  // the slot is for the caller's own store: not a hand-out
     return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
 }
 

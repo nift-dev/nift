@@ -44,7 +44,7 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
                 // mutate in place, so the snapshot is an explicit shallow copy
                 // (O(n), budget-checked), never the live object.
 #if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 8)
-                if (!reserve_snapshot(collection_items(source).size(), fault)) return false;
+                if (!reserve_snapshot(collection_item_count(source), fault)) return false;
                 source = collection_shallow_clone(source);  // R[a] is the loop's own snapshot register
 #endif
                 return memory_ok(fault);
@@ -55,7 +55,7 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
         }
         if (in.b != 0)  // the pair form (or its forced error): legacy's array message, nothing converted
             return raise(fault, StopReason::Error, "array @for syntax is @for(item : array){...}");
-        const auto& items = collection_items(source);
+        const auto& items = collection_view(source);
         if (!reserve_snapshot(items.size(), fault)) return false;
         Value array = make_array(items.size());
 #if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 7
@@ -103,7 +103,7 @@ bool Vm::op_array_elem(const Instr& in, Value* R, Fault& fault) {
     const std::int64_t index = R[in.c].is(Kind::Int) ? R[in.c].as_int() : -1;
     const auto size = static_cast<std::int64_t>(array_size(source));
     if (index >= 0 && index < size) {
-        R[in.a] = array_items(source)[static_cast<std::size_t>(index)];
+        R[in.a] = array_view(source)[static_cast<std::size_t>(index)];
         R[in.a + 1] = Value::boolean(true);
     } else {
         R[in.a] = Value();
@@ -120,7 +120,7 @@ bool Vm::op_array_elem_value(const Instr& in, Value* R, Fault& fault) {
     const std::int64_t index = R[in.c].is(Kind::Int) ? R[in.c].as_int() : -1;
     if (index < 0 || static_cast<std::uint64_t>(index) >= array_size(source))
         return internal(fault, "safe array element index");
-    R[in.a] = array_items(source)[static_cast<std::size_t>(index)];
+    R[in.a] = array_view(source)[static_cast<std::size_t>(index)];
     return true;
 }
 
@@ -128,14 +128,14 @@ bool Vm::op_array_elem_value(const Instr& in, Value* R, Fault& fault) {
 bool Vm::op_object_keys(const Instr& in, Value* R, Fault& fault) {
     const Value& source = R[in.b];
     if (source.is(Kind::Collection) && collection_kind(source) == CollectionKind::Map) {  // D-063: typed keys
-        const auto& items = collection_items(source);
+        const auto& items = collection_view(source);
         Value keys = make_array(items.size() / 2);
         for (std::size_t k = 0; k < items.size(); k += 2) array_push(keys, items[k]);
         R[in.a] = std::move(keys);
         return true;
     }
     if (!source.is(Kind::Object)) return internal(fault, "object keys source");
-    const auto& entries = object_entries(source);
+    const auto& entries = object_view(source);
     Value keys = make_array(entries.size());
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 7
     for (std::size_t k = entries.size(); k-- > 0;)  // M6: object order changed
@@ -154,7 +154,7 @@ bool Vm::op_object_lookup(const Instr& in, Value* R, Fault& fault) {
     const Value& source = R[in.b];
     if (source.is(Kind::Collection) && collection_kind(source) == CollectionKind::Map) {  // D-063
         const std::ptrdiff_t at = collection_find(source, R[in.c]);
-        R[in.a] = at < 0 ? Value() : collection_items(source)[static_cast<std::size_t>(at) * 2 + 1];
+        R[in.a] = at < 0 ? Value() : collection_view(source)[static_cast<std::size_t>(at) * 2 + 1];
         R[in.a + 1] = Value::boolean(at >= 0);
         return true;
     }
@@ -163,7 +163,7 @@ bool Vm::op_object_lookup(const Instr& in, Value* R, Fault& fault) {
     if (key.is(Kind::String)) {
         Atom atom;
         if (AtomTable::current().find(string_view_of(key), atom)) {
-            if (const Value* member = object_get(source, atom)) {
+            if (const Value* member = object_find(source, atom)) {
                 R[in.a] = *member;
                 R[in.a + 1] = Value::boolean(true);
                 return true;
@@ -182,7 +182,7 @@ bool Vm::op_object_lookup_value(const Instr& in, Value* R, Fault& fault) {
     if (source.is(Kind::Collection) && collection_kind(source) == CollectionKind::Map) {  // D-063
         const std::ptrdiff_t at = collection_find(source, R[in.c]);
         if (at < 0) return internal(fault, "safe map key missing");
-        R[in.a] = collection_items(source)[static_cast<std::size_t>(at) * 2 + 1];
+        R[in.a] = collection_view(source)[static_cast<std::size_t>(at) * 2 + 1];
         return true;
     }
     if (!source.is(Kind::Object)) return internal(fault, "object lookup source");
@@ -190,7 +190,7 @@ bool Vm::op_object_lookup_value(const Instr& in, Value* R, Fault& fault) {
     if (!key.is(Kind::String)) return internal(fault, "safe object key");
     Atom atom;
     if (!AtomTable::current().find(string_view_of(key), atom)) return internal(fault, "safe object atom");
-    const Value* member = object_get(source, atom);
+    const Value* member = object_find(source, atom);
     if (member == nullptr) return internal(fault, "safe object key missing");
     R[in.a] = *member;
     return true;

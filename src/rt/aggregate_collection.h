@@ -25,6 +25,10 @@ CollectionKind collection_kind(const Value& collection);
 // Entries for a map, members/elements otherwise.
 std::size_t collection_size(const Value& collection);
 const std::vector<Value>& collection_items(const Value& collection);
+// A transient internal view (aggregate.h, array_view): not a hand-out.
+const std::vector<Value>& collection_view(const Value& collection);
+// The raw item count (map: keys and values).
+std::size_t collection_item_count(const Value& collection);
 // Map/set: the entry (map) or member (set) position of `key`, or -1.
 std::ptrdiff_t collection_find(const Value& collection, const Value& key);
 // Map: insert at the end or replace the value in place (position kept).

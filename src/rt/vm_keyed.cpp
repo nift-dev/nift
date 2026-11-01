@@ -42,7 +42,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
     const auto m = static_cast<K>(in.b);
     const auto fail = [&](const char* text) { return raise(fault, StopReason::Error, text); };
     Value& c = s[Source];
-    const std::size_t n = collection_items(c).size();
+    const std::size_t n = collection_item_count(c);
     // Budget before growth (as array mutation): a reallocation of its storage.
     // A shared collection is mutated in place, so no clone is ever reserved.
     std::size_t grow = 0;
@@ -79,7 +79,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
         case K::MapRemove: {
             const std::ptrdiff_t at = collection_find(c, s[Item]);
             if (at < 0) return fail("remove: key not found");
-            s[Result] = collection_items(c)[static_cast<std::size_t>(at) * 2 + 1];
+            s[Result] = collection_view(c)[static_cast<std::size_t>(at) * 2 + 1];
             collection_erase(c, static_cast<std::size_t>(at));
             break;
         }
@@ -104,7 +104,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
             break;
         case K::StackPop:
             if (!n) return fail("pop: collection is empty");
-            s[Result] = collection_items(c).back();
+            s[Result] = collection_view(c).back();
             stack_pop(c);
             break;
         case K::Clear:
@@ -114,7 +114,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
         case K::MapGet: {
             const std::ptrdiff_t at = collection_find(c, s[Item]);
             if (at < 0) return fail("get: key not found");
-            s[Result] = collection_items(c)[static_cast<std::size_t>(at) * 2 + 1];
+            s[Result] = collection_view(c)[static_cast<std::size_t>(at) * 2 + 1];
             return true;
         }
         case K::SetContains:
@@ -124,7 +124,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
             return true;
         case K::StackTop: case K::StackFront:
             if (!n) return fail(m == K::StackTop ? "top: collection is empty" : "front: collection is empty");
-            s[Result] = m == K::StackTop ? collection_items(c).back() : collection_items(c).front();
+            s[Result] = m == K::StackTop ? collection_view(c).back() : collection_view(c).front();
             return true;
         default: return internal(fault, "keyed mutation method");
     }

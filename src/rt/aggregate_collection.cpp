@@ -82,6 +82,14 @@ const std::vector<Value>& collection_items(const Value& collection) {
     return collection.heap_as<CollectionObject>()->items;
 }
 
+const std::vector<Value>& collection_view(const Value& collection) {
+    return collection.heap_as<CollectionObject>()->items;
+}
+
+std::size_t collection_item_count(const Value& collection) {
+    return collection.heap_as<CollectionObject>()->items.size();
+}
+
 std::ptrdiff_t collection_find(const Value& collection, const Value& key) {
     return find_entry(*collection.heap_as<CollectionObject>(), key);
 }

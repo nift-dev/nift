@@ -32,10 +32,10 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         index=static_cast<std::size_t>(s[Index].as_int());if(index>n)return internal(fault,
         "splice receiver changed during replacement");}
     if(m==M::Pop&&!n)return fail("pop: array is empty");
-    if(m==M::Pop)s[Result]=array_items(s[Source]).back();
-    if(m==M::Remove)s[Result]=array_items(s[Source])[index];
+    if(m==M::Pop)s[Result]=array_view(s[Source]).back();
+    if(m==M::Remove)s[Result]=array_view(s[Source])[index];
     if(m==M::Splice&&in.c==0){s[Result]=make_array(count);for(std::size_t k=0;k<count;++k)array_push(s[Result],
-        array_items(s[Source])[index+k]);}
+        array_view(s[Source])[index+k]);}
     natives::Context context;context.heap_limit=heap_limit_;
     if(m==M::Sort)return collection_plain_sort(s,context,fault)&&memory_ok(fault);
     const std::size_t growth=m==M::Insert?1:m==M::Splice&&in.c==1?array_size(s[Keys]):0;
@@ -53,7 +53,7 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         case M::Clear:items.clear();s[Result]=Value();break;
         case M::Reverse:std::reverse(items.begin(),items.end());s[Result]=s[Source];break;
         case M::Splice:if(in.c==0)items.erase(items.begin()+index,items.begin()+index+count);else{
-            const auto& replacement=array_items(s[Keys]);items.insert(items.begin()+index,replacement.begin(),
+            const auto& replacement=array_view(s[Keys]);items.insert(items.begin()+index,replacement.begin(),
             replacement.end());}break;
 
         default:return internal(fault,"array mutation method");

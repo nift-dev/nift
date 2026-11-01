@@ -4591,6 +4591,34 @@ test-runtime2-refsem-tsan: $(TSAN_TARGET)
 	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm: test-runtime2-refsem test-runtime2-refsem-mutants
 test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+# Review round 2 (D9): stale-reference controls on the real VM path. The
+# relocation schedule lives in aggregate.cpp/aggregate_collection.cpp only
+# (aggregate_store.h), so those two are built checked (NIFT_RT_CHECKED_REFS)
+# under ASan with the driver, linked with the normal objects. Each control
+# builds a 5,000-element container through a VM session (with and without a
+# 20,000-element read-after-push churn first), takes a reference, mutates once
+# through the VM and uses it: heap-use-after-free is required; the R19 build
+# (no relocation after a hand-out) must miss every control.
+.PHONY: test-runtime2-refsem-stale-vm
+REFSEM_STALE_DIR := $(TEST_DIR)/refsem-stale-vm
+REFSEM_STALE_OBJECTS := $(filter-out src/rt/aggregate.o src/rt/aggregate_collection.o,$(CP19_EXPR_OBJECTS))
+REFSEM_STALE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address -DNIFT_RT_CHECKED_REFS -pthread
+REFSEM_STALE_SOURCES := tests/runtime2/refsem/stale_vm.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp
+$(REFSEM_STALE_DIR)/stale-vm$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
+$(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) -DNIFT_REFSEM_MUTANT=19 $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
+test-runtime2-refsem-stale-vm: $(REFSEM_STALE_DIR)/stale-vm$(EXEEXT) $(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT)
+	@for m in array map set stack; do for c in plain churn; do \
+		if ASAN_OPTIONS=detect_leaks=0 "$(REFSEM_STALE_DIR)/stale-vm" $$m $$c >/dev/null 2>"$(REFSEM_STALE_DIR)/$$m-$$c.log"; then \
+			echo "FAIL: VM-path stale reference ($$m $$c) not detected"; exit 1; fi; \
+		grep -q "heap-use-after-free" "$(REFSEM_STALE_DIR)/$$m-$$c.log" || { cat "$(REFSEM_STALE_DIR)/$$m-$$c.log"; echo "FAIL: $$m $$c"; exit 1; }; \
+		if ! ASAN_OPTIONS=detect_leaks=0 "$(REFSEM_STALE_DIR)/stale-vm-r19" $$m $$c >/dev/null 2>"$(REFSEM_STALE_DIR)/r19-$$m-$$c.log"; then \
+			echo "FAIL: R19 did not miss $$m $$c (the control does not discriminate)"; exit 1; fi; \
+		echo "PASS VM-path stale reference detected, missed by R19: $$m $$c"; done; done
+test-rt-vm-sanitize: test-runtime2-refsem-stale-vm
 # VM-default policy: the VM is the default scripting engine with no silent
 # legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
 # interpreter; NIFT_VM=1 still falls back; any other value, empty included, is
