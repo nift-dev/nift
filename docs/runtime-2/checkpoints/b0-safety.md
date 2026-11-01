@@ -300,3 +300,107 @@ Round 1 runs (this commit's tree, through the heavy-job gate), each exit 0:
 (`33904a6f`): 0 of 1,816 `tests/runtime2` units, 0 of 589 CP25-R units.
 Round 1 production change: 3 files (`natives/format_methods.{h,cpp}`,
 `vm_ops.cpp`), no compiler change.
+
+## 8. F1 follow-up (owner approval of the bounded correction, 2026-11-02)
+
+The review of `8a9dc923` stays a **REJECT** (section 7); `fe2ec7fc` is the
+bounded correction, under a narrow independent re-check. This section adds
+records and fuzz-runner checks only: no production change.
+
+### Root cause: (ii) unsafe dispatch, not (i) incorrect inference
+
+The inference is right: for `for (v : [1, mutex()]) { print("i$[v]") }` the
+binding's kinds are {int, shared handle}. Evidence: the same `v` in every
+other operation is refused because of the handle bit (`v + 1`: `type:+`;
+`-v`: `type:unary`; `v.length()`: `type:length`; `v.trim()`:
+`builtin-receiver:trim`; probe set `k1`), and a `v` that is only a mutex is
+refused in the interpolation itself (`interpolation:unknown-type`), so the
+handle bit is present where interpolation reads it. The dispatch drops it:
+`interpolation_kind` returns `scalar_only(binding->decl_kinds)`
+(`compiler_interp.cpp:152`; also `:188`, `:192` for `??` and `?:`, and
+`:266` on the part), and `scalar_only` (`:39`) returns `kinds & kKindScalar`,
+the scalar bits of a mixed set; `to_string` is bound from that ({int}), or,
+for {string}, the part is appended directly. `NIFT_VM_DUMP=1` shows the
+emitted `CallNative ... 51` (to_string) on the mixed part. The file's own
+contract (its header: "unproven or mixed families use
+interpolation:unknown-type") is what the narrowing breaks.
+
+**Still true after B0:** the compiler still selects the scalar path for a
+mixed kind set; B0 makes that path safe at run time (an ordinary error,
+never Internal) and changes no admission. The structural fix is assigned to
+**B4** (operation admission interface): a proven kind compiles to the
+specialised operation, an uncertain kind to a checked dynamic operation,
+an unsupported one is refused; for interpolation that means a mixed set is
+either refused before effects (as the exact non-scalar kind is) or lowered
+to a checked conversion. B4 must carry a mutation test for the invariant
+**"no native returns Internal because of an imprecise kind"**: a mutant that
+narrows a receiver's kinds (as `scalar_only` does) must be caught by the B4
+suite, and the B0 fuzz gate (`fuzz.py`) stays in `test-runtime2-safety` as
+its run-time backstop.
+
+### Which kinds `$[...]` supports (the VM's contract)
+
+`compiler_interp.cpp`: only an expression whose scalar proof succeeds is
+compiled; aggregates are `interpolation:non-scalar`, unproven or mixed
+families `interpolation:unknown-type`, host handles `host-handle-flow`. So
+the VM renders exactly one scalar family per part: number, string, bool or
+null. Per kind (probe set `ik`: `v := K; print("x$[v]")` for the exact kind;
+`for (v : [1, K])` and `for (v : ["s", K])` for the mixed one, after this
+commit's production tree `fe2ec7fc`):
+
+| Kind | Exact kind on the VM | Mixed with 1 / "s" on the VM | Legacy (`NIFT_VM=0`) | Status |
+| --- | --- | --- | --- | --- |
+| int, float | rendered | with 1: rendered (`x1`, `x5`); with "s": refused `unknown-type` | rendered | the mixed scalar family is the existing interpolation coverage gap, not B0 |
+| string | rendered | with "s": rendered; with 1: refused `unknown-type` | rendered | same gap |
+| bool, null | rendered | refused `unknown-type` (both) | rendered | same gap |
+| array, object | refused `interpolation:non-scalar` | refused `non-scalar` | error after output (`print: parameter expression must resolve to a scalar value`) | equal unsupported status; never reaches B0's text |
+| map, set, stack | refused `unknown-type` | ordinary error `map, set and stack values cannot be rendered as text`, after `x1`/`xs` | renders the tag `\x1fnift:collection:N` | **compatibility gap** (D-063: no VM shown form for a collection) |
+| struct instance | refused `unknown-type` | refused `context:struct-new` in this form; through a parameter or a module function ordinary error `struct instances cannot be rendered as text` | renders `\x1fnift:struct:N` | **compatibility gap, assigned to B3** (struct rendering) |
+| function | refused `unknown-type` | ordinary error `opaque runtime value is not serializable` | renders `\x1fnift:callable:lambda:N` | **compatibility gap** (an internal tag string) |
+| mutex, channel | refused `unknown-type` | ordinary error `opaque runtime value is not serializable` | mutex: `\x1fnift:mutex:N`; channel: not a legacy callable | **compatibility gap** for mutex (CP17 abolished the handle string encoding) |
+| atomic | refused `unknown-type` | ordinary error `opaque runtime value is not serializable` | renders the atomic's **value** (`x1`) | **compatibility gap** (legacy reads the value; the VM needs `.load()`) |
+| file / stream handle | refused `host-handle-flow` | refused `host-handle-flow` | renders `\x1fnift:file:N` | compatibility gap (CP17) |
+| future | refused `coro-future-flow:String` | refused `coro-future-flow:String` | renders `\x1fnift:async:N` | compatibility gap |
+| Error | not constructible in an interpolated position on the VM today (`catch` with that body: `opaque:legacy-runtime-error`) | same | legacy errors before (`[].pop()`) | B0's text is defensive only |
+| bytes | refused `builtin-bytes` (bytes values are not on the VM) | same | legacy errors before (`encode`) | B0's text is defensive only |
+
+So B0's ordinary errors cover only kinds the VM does not render in any form:
+for every kind the exact path renders (number, string, bool, null), the mixed
+path renders it too (the `1` or `"s"` element prints before the error), and
+no exact-renderable kind ever reaches `unrenderable_text`. Where the exact
+kind is refused before effects and the mixed one fails at run time, both
+report the same unsupported status; the difference is only *when* it is
+established, which is the dispatch issue B4 owns. No legitimate conversion
+is rejected, so no production change was needed. The compatibility gaps
+above are recorded as gaps, not intended behaviour: structs to B3; the tag
+renderings of collections, callables, mutexes, files and futures, and the
+atomic's value, have no Phase B checkpoint today and are for the owner to
+assign.
+
+### Fuzz gate (owner requirements)
+
+`fuzz.py` now checks, for each of the 33,512 programs: (1) **internal** no
+exit 70; (2) **leak** no internal diagnostic in stdout *or* stderr; (3)
+**lost** output printed before the failing operation is present (a run that
+failed at a line after its `print("b")`, or in a module function called
+after it, has printed `b`; a session not refused printed `b` and `after`; a
+refused session statement after the print line still shows `b`); (4)
+**determinism** every 20th program (1,676) runs twice with identical exit
+status, stdout and stderr; (5) **crash** any exit status outside the
+documented {0, 1}, a signal, an abort or sanitizer report, and a timeout
+(30 s) fail; none counts as a refusal.
+
+`fuzz.py --selftest` (also in `test-runtime2-safety`) makes each check fire
+on a crafted fake binary: exit 70; internal text on stdout; an error at a
+line after the print with no output; exit 3; SIGSEGV; an AddressSanitizer
+report; a 30 s sleep against a 2 s timeout; an alternating output; and a
+clean ordinary error fires nothing. Results, seed 1: the fix `fe2ec7fc`:
+PASS, 0 violations (1,676 repeated identically); `8a9dc923`: FAIL, 134
+violations (each both `internal` and `leak`).
+
+### On `expected.json`
+
+As section 5 says, `expected.json` is a recorded snapshot, not proof of
+correctness: it was produced by `safety.py --update` from the candidate
+binary. The binding evidence is the runner's invariants, the
+legacy-matched cases, the mutants and the fuzz gate.

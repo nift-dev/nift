@@ -8,9 +8,23 @@ Three fixed slices, every program printing first:
   exhaustive  every kind x delivery x operation with the value alone (16 x 14 x 38)
   sample      a fixed-seed sample of the whole space (every wrapper, depth 4)
   session     a fixed-seed sample run as a piped `nift -i` session (no modules)
-It asserts only the B0 invariants: no exit 70, no internal-failure text. The
-outcome of each program (ordinary error, refusal, success) is not checked here;
-safety.py checks the reviewed cases. Exit 0 when no program breaks them.
+Checks (owner requirements, b0-safety.md section 8), for every program:
+  internal    no exit 70;
+  leak        no internal diagnostic ("internal failure", "compiler defect",
+              "unexpected operands") in stdout or stderr;
+  lost        output printed before the failing operation is present: a
+              program that ran (not refused) and failed at a line after its
+              `print("b")` has printed `b`; a session that was not refused
+              printed `b` and `after`; a refused session statement after the
+              `print("b")` line still shows `b`;
+  crash       the exit status is one of the documented ones (0, 1); any other
+              status, a signal, an abort or sanitizer report, or a timeout fails;
+  determinism a fixed subset (every 20th program, at least 500) runs twice and
+              must give the same exit status, stdout and stderr.
+The outcome itself (ordinary error, refusal, success) is not checked here:
+safety.py checks recorded transcripts and the legacy-matched cases.
+`--selftest` makes each check fire on a crafted fake binary. Exit 0 when no
+program breaks a check.
 """
 import argparse
 import concurrent.futures
@@ -18,6 +32,7 @@ import itertools
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -100,7 +115,12 @@ def build(kind, wrap, deliver, op):
     return files
 
 
-def run(nift, files, session):
+DOCUMENTED_EXITS = (0, 1)
+CRASH_TEXT = ("AddressSanitizer", "UndefinedBehaviorSanitizer", "runtime error:", "Segmentation fault", "Aborted",
+              "terminate called")
+
+
+def run(nift, files, session, timeout):
     d = tempfile.mkdtemp(prefix="nift-safety-fuzz-")
     try:
         for f, t in files.items():
@@ -109,25 +129,139 @@ def run(nift, files, session):
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C", "LC_ALL": "C",
                "TZ": "UTC", "NIFT_VM": "require"}
         if session:
-            p = subprocess.run(["timeout", "30", nift, "-i"], cwd=d, env=env, capture_output=True,
-                               input=files["p.f"].encode() + b'print("after")\n')
+            argv, stdin = [nift, "-i"], files["p.f"].encode() + b'print("after")\n'
         else:
-            p = subprocess.run(["timeout", "30", nift, "p.f"], cwd=d, env=env, stdin=subprocess.DEVNULL,
-                               capture_output=True)
-        return p.returncode, p.stderr.decode("utf-8", "replace")
+            argv, stdin = [nift, "p.f"], b""
+        try:
+            p = subprocess.run(argv, cwd=d, env=env, input=stdin, capture_output=True, timeout=timeout)
+            rc, out, err = p.returncode, p.stdout, p.stderr
+        except subprocess.TimeoutExpired as e:
+            rc, out, err = "timeout", e.stdout or b"", e.stderr or b""
+        norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+        return rc, norm(out), norm(err)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
 
+def violations(mode, files, rc, out, err):
+    """The checks this one result breaks (internal, leak, lost, crash)."""
+    v = []
+    if rc == 70:
+        v.append("internal")
+    if any(t in out or t in err for t in INTERNAL):
+        v.append("leak")
+    if rc == "timeout":
+        v.append("crash:timeout")
+    elif rc not in DOCUMENTED_EXITS and rc != 70:
+        v.append("crash:exit %s" % rc)
+    if any(t in err for t in CRASH_TEXT):
+        v.append("crash:report")
+    lines = files["p.f"].split("\n")
+    printed_at = lines.index('print("b")') + 1 if 'print("b")' in lines else None
+    refused = "no part of it ran" in err or "NIFT_VM session refused" in err
+    m = re.search(r"(?:^|\n)error: (?:p\.f|<stdin>):(\d+):\d+: ", err)
+    module_error = re.search(r"(?:^|\n)error: m\.f:\d+:\d+: ", err) is not None
+    if printed_at is not None and rc != "timeout":
+        if mode == "session":
+            if not refused and not ("b\n" in out and out.endswith("after\n")):
+                v.append("lost")
+            elif refused and m and int(m.group(1)) > printed_at and "b\n" not in out:
+                v.append("lost")
+        elif not refused and rc != 0:
+            # the run failed: a failure after the print line must leave `b`
+            after = (m is not None and int(m.group(1)) > printed_at) or (module_error and "import" not in err)
+            if after and not out.startswith("b\n"):
+                v.append("lost")
+        elif rc == 0 and not out.startswith("b\n"):
+            v.append("lost")
+    return v
+
+
+def sweep(nift, jobs, workers, timeout):
+    def one(job):
+        mode, case, files = job
+        return job, run(nift, files, mode == "session", timeout)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(one, jobs))
+
+
+def check_all(nift, jobs, workers, timeout, repeat_every, show):
+    bad, stats = [], {}
+    results = sweep(nift, jobs, workers, timeout)
+    for (mode, case, files), (rc, out, err) in results:
+        v = violations(mode, files, rc, out, err)
+        key = "%s:%s" % (mode, "BROKEN" if v else ("ok" if rc == 0 else "error-or-refusal"))
+        stats[key] = stats.get(key, 0) + 1
+        if v:
+            bad.append({"checks": v, "mode": mode, "case": list(case), "exit": rc, "stdout": out[-120:],
+                        "stderr": err.strip()[-240:]})
+    again = [j for k, j in enumerate(jobs) if k % repeat_every == 0]
+    first = {id(j): r for j, r in results}
+    rerun = sweep(nift, again, workers, timeout)
+    for job, r in rerun:
+        if first[id(job)] != r:
+            bad.append({"checks": ["determinism"], "mode": job[0], "case": list(job[1]), "first": first[id(job)],
+                        "second": r})
+    stats["repeated"] = len(again)
+    return bad, stats
+
+
+def selftest(timeout):
+    """Each check must fire: crafted fake binaries (shell scripts) stand in for nift."""
+    d = tempfile.mkdtemp(prefix="nift-safety-fuzz-selftest-")
+    fakes = {
+        "internal": 'echo b; echo "error: p.f: oops" >&2; exit 70',
+        "leak": 'echo b; echo "unexpected operands (compiler defect): x"; exit 0',
+        "lost": 'echo "error: p.f:9:1: boom" >&2; exit 1',
+        "crash:exit 3": 'echo b; exit 3',
+        "crash:exit -11": 'echo b; kill -SEGV $$',
+        "crash:report": 'echo b; echo "==1==ERROR: AddressSanitizer: heap-use-after-free" >&2; exit 1',
+        "crash:timeout": 'echo b; sleep 30',
+        "determinism": 'echo b; if [ -e "$HOME/../nift-fuzz-flip" ]; then rm "$HOME/../nift-fuzz-flip"; '
+                       'echo x; else touch "$HOME/../nift-fuzz-flip"; fi; exit 0',
+        "pass": 'echo b; echo "error: p.f:9:1: an ordinary error" >&2; exit 1',
+    }
+    case = ("int", "alone", "direct", "PRINT")
+    files = build(*case)
+    files["p.f"] = "\n" * 3 + files["p.f"]  # the print line is line 4 or later; the fake fails at line 9
+    failed = 0
+    try:
+        for want, body in fakes.items():
+            path = os.path.join(d, want.replace(":", "_").replace(" ", "_") + ".sh")
+            with open(path, "w") as fh:
+                fh.write("#!/bin/sh\n" + body + "\n")
+            os.chmod(path, 0o755)
+            jobs = [("file", case, files)]
+            bad, _ = check_all(path, jobs, 1, timeout, 1, 0)
+            fired = sorted({c for b in bad for c in b["checks"]})
+            ok = (not fired) if want == "pass" else (want in fired)
+            print("%s selftest %-15s fired %s" % ("PASS" if ok else "FAIL", want, fired))
+            failed += not ok
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+        try:
+            os.remove(os.path.join(tempfile.gettempdir(), "nift-fuzz-flip"))
+        except OSError:
+            pass
+    print(("PASS" if not failed else "FAIL") + " runtime2 safety fuzz selftest: %d check(s) did not fire" % failed)
+    return 1 if failed else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--nift", required=True)
+    ap.add_argument("--nift")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--sample", type=int, default=20000)
     ap.add_argument("--session-sample", type=int, default=5000)
     ap.add_argument("--jobs", type=int, default=2)
+    ap.add_argument("--timeout", type=float, default=30)
+    ap.add_argument("--repeat-every", type=int, default=20)
     ap.add_argument("--show", type=int, default=20)
+    ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest(2)
     nift = os.path.abspath(a.nift)
     ops = OPS + MUT
     space = list(itertools.product(VALS, list(WRAP) + list(WRAPC), DELIVER, ops))
@@ -136,27 +270,19 @@ def main():
     rest = [c for c in space if c[1] != "alone"]
     sample = rng.sample(rest, min(a.sample, len(rest)))
     session = rng.sample([c for c in space if c[2] != "module"], a.session_sample)
-    jobs = [("file", c) for c in exhaustive + sample] + [("session", c) for c in session]
-    bad, stats = [], {}
-
-    def one(job):
-        mode, case = job
-        rc, err = run(nift, build(*case), mode == "session")
-        return mode, case, rc, err
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=a.jobs) as pool:
-        for mode, case, rc, err in pool.map(one, jobs):
-            broken = rc == 70 or any(t in err for t in INTERNAL)
-            key = "%s:%s" % (mode, "BROKEN" if broken else ("ok" if rc == 0 else "error-or-refusal"))
-            stats[key] = stats.get(key, 0) + 1
-            if broken:
-                bad.append({"mode": mode, "case": list(case), "exit": rc, "stderr": err.strip()[-240:]})
+    jobs = [("file", c, build(*c)) for c in exhaustive + sample] + [("session", c, build(*c)) for c in session]
+    bad, stats = check_all(nift, jobs, a.jobs, a.timeout, a.repeat_every, a.show)
     for b in bad[:a.show]:
         print("FAIL " + json.dumps(b))
-    summary = "%d programs (%d exhaustive, %d sampled, %d session; seed %d) %s" % (
-        len(jobs), len(exhaustive), len(sample), len(session), a.seed, json.dumps(stats, sort_keys=True))
+    by = {}
+    for b in bad:
+        for c in b["checks"]:
+            by[c.split(":")[0]] = by.get(c.split(":")[0], 0) + 1
+    summary = "%d programs (%d exhaustive, %d sampled, %d session; seed %d; %d run twice) %s" % (
+        len(jobs), len(exhaustive), len(sample), len(session), a.seed, stats.pop("repeated"),
+        json.dumps(stats, sort_keys=True))
     if bad:
-        print("FAIL runtime2 safety fuzz: %d program(s) exit 70 or report an internal failure; %s" % (len(bad), summary))
+        print("FAIL runtime2 safety fuzz: %d violation(s) %s; %s" % (len(bad), json.dumps(by, sort_keys=True), summary))
         return 1
     print("PASS runtime2 safety fuzz: %s" % summary)
     return 0
