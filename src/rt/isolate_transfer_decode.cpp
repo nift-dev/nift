@@ -25,6 +25,7 @@ public:
         // All nodes remain anchored while partial edges are cut, even at OOM.
         for (auto& v : decoded_) switch (v.kind()) {
             case Kind::Array: v.heap_as<ArrayObject>()->items.clear(); break;
+            case Kind::Collection: v.heap_as<CollectionObject>()->items.clear(); break;
             case Kind::Object: v.heap_as<ObjectObject>()->entries.clear(); break;
             case Kind::Struct: v.heap_as<StructObject>()->fields.clear(); break;
             case Kind::Function: v.heap_as<FunctionObject>()->upvalues.clear(); break;
@@ -81,6 +82,15 @@ private:
             case WireKind::String: value = make_string(n.text); break;
             case WireKind::Bytes: value = make_bytes(n.bytes); break;
             case WireKind::Array: value = Value::adopt(new ArrayObject()); break;
+            case WireKind::Collection:
+                if (n.binding_type < 0 || n.binding_type > static_cast<std::int64_t>(CollectionKind::Stack)) {
+                    fail(TransferStatus::InvalidGraph, "invalid collection kind", error); return false;
+                }
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 9
+                value = Value::adopt(new CollectionObject(CollectionKind::Stack)); break;  // M9: kind lost
+#else
+                value = Value::adopt(new CollectionObject(static_cast<CollectionKind>(n.binding_type))); break;
+#endif
             case WireKind::Object: value = Value::adopt(new ObjectObject()); break;
             case WireKind::Struct: value = Value::adopt(new StructObject(atom(n.name))); break;
             case WireKind::Cell: {
@@ -140,16 +150,26 @@ private:
         };
         switch (n.kind) {
             case WireKind::Array:
-                for (auto index : n.children) v.heap_as<ArrayObject>()->items.push_back(child(index)); break;
+                for (auto index : n.children) v.heap_as<ArrayObject>()->items.push_back(child(index));
+                break;
+            case WireKind::Collection: {
+                auto* c = v.heap_as<CollectionObject>();
+                for (auto index : n.children) c->items.push_back(child(index));
+                rebuild_collection_index(*c);
+                break;
+            }
             case WireKind::Object:
                 for (auto& field : n.fields)
                     v.heap_as<ObjectObject>()->entries.emplace_back(atom(field.first), child(field.second));
-                rebuild_object_index(*v.heap_as<ObjectObject>()); break;
+                rebuild_object_index(*v.heap_as<ObjectObject>());
+                break;
             case WireKind::Struct:
                 for (auto& field : n.fields)
-                    v.heap_as<StructObject>()->fields.emplace_back(atom(field.first), child(field.second)); break;
+                    v.heap_as<StructObject>()->fields.emplace_back(atom(field.first), child(field.second));
+                break;
             case WireKind::Function:
-                for (auto index : n.children) v.heap_as<FunctionObject>()->upvalues.push_back(child(index)); break;
+                for (auto index : n.children) v.heap_as<FunctionObject>()->upvalues.push_back(child(index));
+                break;
             case WireKind::Cell: if (n.has_child) v.heap_as<CellObject>()->value = child(n.child); break;
             case WireKind::Error: if (n.has_child) v.heap_as<ErrorObject>()->cause = child(n.child); break;
             default: break;

@@ -80,21 +80,48 @@ bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note)
     return true;
 }
 
-bool Vm::op_cell_cached(const Instr& in, Value* R, Fault& fault) {
+bool Vm::refuse_cell_cycle(Fault& fault, const Proto* proto, const Instr& in, CellObject* cell, const Value& stored) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 16
+    if (would_close_cycle(CycleTarget::captured_cell(cell), stored, cycle_graph_)) {  // R16: fatal, not catchable
+        raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
+        fault.code = "runtime.reference_cycle";
+        return true;
+    }
+    return false;
+#else
+    if (!would_close_cycle(CycleTarget::captured_cell(cell), stored, cycle_graph_)) return false;
+    const auto at = static_cast<std::size_t>(&in - proto->code.data());
+    raise_catchable(fault, "runtime.reference_cycle", "reference cycle: the stored value would contain itself", proto,
+                    at < proto->offsets.size() ? proto->offsets[at] : 0);
+    return true;
+#endif
+}
+
+bool Vm::op_cell_cached(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
     std::string missing;
     bool ok = false;
-    if (in.op == OpCode::CellTake) { R[in.a] = cell_take(R[in.b]); return true; }
+    if (in.op == OpCode::CellTake) {
+        // D-NEXT-refsem #4 (review round 2): c = 1 + the register of the value the
+        // mutation will store; a store that would close a cycle through this cell
+        // is refused here, before the value leaves the cell (the cell, the graph,
+        // reference counts and heap accounting stay as they were).
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 21)
+        // A constant operand (kConstantBit) is plain data: it cannot close a cycle.
+        const auto stored = static_cast<std::uint16_t>(in.c - 1u);
+        if (in.c != 0 && !(stored & kConstantBit) &&
+            refuse_cell_cycle(fault, proto, in, cell_of(cell_anchor(R[in.b])), R[stored]))
+            return false;
+#endif
+        R[in.a] = cell_take(R[in.b]);
+        return true;
+    }
     if (in.op == OpCode::CellAnchor) { R[in.a] = cell_anchor(R[in.b]); return true; }
     if (in.op == OpCode::CellSlot) { R[in.a] = cell_slot(R[in.b]); return true; }
     if (in.op == OpCode::CellLoadCached) ok = cell_cached_read(R[in.b], R[in.a], missing);
     else {
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
         Value owner = cell_cached_owner(R[in.a]);
-        if (would_close_cycle(CycleTarget::captured_cell(cell_of(owner)), R[in.b], cycle_graph_)) {
-            raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
-            fault.code = "runtime.reference_cycle";
-            return false;
-        }
+        if (refuse_cell_cycle(fault, proto, in, cell_of(owner), R[in.b])) return false;
 #endif
         ok = cell_cached_put(R[in.a], R[in.b], missing);
     }
@@ -112,11 +139,7 @@ bool Vm::op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* pro
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
-    if (would_close_cycle(CycleTarget::captured_cell(cell), R[in.b], cycle_graph_)) {
-        raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
-        fault.code = "runtime.reference_cycle";
-        return false;
-    }
+    if (refuse_cell_cycle(fault, proto, in, cell, R[in.b])) return false;
 #endif
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 1
     return true;
@@ -181,11 +204,7 @@ bool Vm::op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* pr
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
-    if (would_close_cycle(CycleTarget::captured_cell(cell), R[in.b], cycle_graph_)) {
-        raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
-        fault.code = "runtime.reference_cycle";
-        return false;
-    }
+    if (refuse_cell_cycle(fault, proto, in, cell, R[in.b])) return false;
 #endif
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 1
     return true;

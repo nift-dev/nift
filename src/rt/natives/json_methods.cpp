@@ -4,6 +4,7 @@
 #include "Json.h"
 #include "rt/aggregate.h"
 #include "rt/atom.h"
+#include "rt/copy_graph.h"
 #include "rt/natives/support.h"
 #include "rt/number.h"
 #include "rt/string.h"
@@ -130,33 +131,25 @@ Status fn_validate(const Context&, const Value* args, std::uint32_t argc, Value&
     return Status::Ok;
 }
 
-// copy(v) and deepcopy(v): a recursively independent value. Copy-on-write
-// already gives that for plain values (a later mutation of either side
-// unshares exactly the path it changes), so the result shares storage.
-// Structs (identity, legacy re-creates them) and collection handles are
-// CP12 phase B / CP17.
-Status fn_copy(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+// copy(v) and deepcopy(v) (D-NEXT-refsem #3, the v4.2 contract;
+// rt/copy_graph.h): copy is shallow (a new outer struct instance or
+// collection, nested references shared; arrays and objects are copy-on-write
+// values until Phase B, so the value itself), deepcopy copies every reachable
+// array, object, instance and collection once, preserving the sharing inside
+// the copied graph. Callables, handles and futures keep their identity (a
+// copy never duplicates a resource). The copy is budgeted before it is made.
+Status fn_copy(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+               std::string& error) {
     if (argc != 1) return fail(error, "copy: expected one value");
-    // Functions and Error values are immutable or identity values: legacy
-    // copies them as they are (review D1). A struct or handle anywhere in the
-    // value would have to be re-created (legacy clones structs): CP17. The
-    // compiler admits copy only for provably plain arguments (wiring rule
-    // W11), so finding one here is a compiler defect, reported loudly (D2).
-    std::vector<const Value*> work{&args[0]};
-    while (!work.empty()) {
-        const Value* v = work.back();
-        work.pop_back();
-        if (v->is(Kind::Struct) || v->is(Kind::Handle)) {
-            error = "copy of a struct or handle (CP17)";
-            return Status::Internal;
-        }
-        if (v->is(Kind::Array))
-            for (const Value& item : array_items(*v)) work.push_back(&item);
-        else if (v->is(Kind::Object))
-            for (const auto& entry : object_entries(*v)) work.push_back(&entry.second);
-    }
-    out = args[0];
-    return Status::Ok;
+    if (shallow_copy(args[0], out, context.heap_limit) == CopyStatus::Ok) return Status::Ok;
+    return Status::Memory;  // the heap budget, before anything was copied
+}
+
+Status fn_deepcopy(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+                   std::string& error) {
+    if (argc != 1) return fail(error, "deepcopy: expected one value");
+    if (deep_copy(args[0], out, context.heap_limit) == CopyStatus::Ok) return Status::Ok;
+    return Status::Memory;  // the heap budget, before anything was copied
 }
 
 } // namespace nift::rt::natives

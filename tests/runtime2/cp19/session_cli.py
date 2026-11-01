@@ -9,6 +9,11 @@ from pathlib import Path
 # GCC 15.2 run) makes a refusing binary fail. Every other case is unchanged.
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'cp14b'))
 import comparator_profile as cprof
+# D-NEXT-refsem #1 (review round 2): refused by the Phase A guard in a session
+# (fully conservative): a session function as a native's callback over a session
+# array, and `b:=a` (the D-040 alias witness, whose value-copy result the `cow`
+# branch below accepted before Phase A).
+GUARDED={'array_callback':'reference-guard:shared-part','cow':'reference-guard:inflow'}
 COMPARATOR_CASES={'array_sort'}
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text('')
@@ -89,6 +94,15 @@ for name,argv,stdin,rc,units in cases:
     assert all(s['vm_executions']==1 and s['legacy_executions']==0 and s['outcome']=='vm' for s in rows[:-1]),r
     assert rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,r
     unverified+=1;continue
+   if name in GUARDED:
+    # D-NEXT-refsem #1: sessions are fully conservative under the Phase A
+    # guard; a session function passed as a native's callback over a session
+    # array may reach it, so the statement is refused before execution.
+    reason=GUARDED[name]
+    assert channels[0]==1 and channels[1]=='' and ('NIFT_VM session refused: %s:'%reason) in channels[2],r
+    assert rows and rows[-1]['reason']==reason and rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,r
+    assert all(s['vm_executions']==1 and s['legacy_executions']==0 for s in rows[:-1]),r
+    continue
    if name == 'cow':
     # Accepted D-040 array value-copy semantics; retain the raw legacy alias
     # result as evidence instead of pretending these channels are identical.

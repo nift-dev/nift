@@ -77,11 +77,10 @@ namespace nift::rt {
     X(GetUpvalueCell) /* R[a] = the cell Value of closure upvalue b            */                    \
     X(SetUpvalue) /* check/store R[b] into closure cell a; text type RK[c]      */                    \
     X(Undefined)  /* raise "unknown value or malformed expression" (lambda free name) */                \
-    X(SlotOf)     /* R[a] = the absolute stack slot of register b (CP12b structs) */                  \
     X(NewStruct)  /* R[a] = a new instance of struct (atom b), no fields yet      */                   \
     X(StructAdd)  /* R[a].(atom b) = RK[c] while constructing                    */                   \
-    X(FieldGet)   /* R[a] = S[R[b]].(atom c): a field of the instance at a slot  */                   \
-    X(FieldSet)   /* S[R[a]].(atom b) = RK[c]                                    */                   \
+    X(FieldGet)   /* R[a] = R[b].(atom c): a field of the instance (a reference)  */                   \
+    X(FieldSet)   /* R[a].(atom b) = RK[c], in place (cycle-checked first)      */                   \
     X(CheckField) /* RK[a] assignable to field type RK[b]; c: legacy's wording    */                  \
     X(IterCheck)  /* R[a] is the iterable; b: 0 single-array, 1 pair-object,       */                    \
                   /* 2 force non-iterable, 3 force array-pair, 4 force object-single*/                 \
@@ -110,6 +109,7 @@ namespace nift::rt {
     X(CollectionStep) /* private CP14B state-window operation */ \
     X(CollectionCall) /* checked ordinary-frame collection callback */ \
     X(ArrayMutate) /* synchronous bare-binding mutation */ \
+    X(KeyedMutate) /* D-063: map/set/stack bare-binding mutation (rt/keyed.h) */ \
     X(SessionRender) /* append a compound REPL statement value, never stdout */ \
     X(SessionNumeric) /* CP19 numeric operand guard for widened readers */ \
     X(Spawn)      /* R[a] = future of protos[b](R[a] .. ); c: argc, bit 15: + argc type regs (CP22) */ \

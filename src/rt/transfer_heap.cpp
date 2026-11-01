@@ -9,6 +9,7 @@ template<class F> void children(const Value& v, F visit) {
         case Kind::Array: for (auto& x : v.heap_as<ArrayObject>()->items) visit(x); break;
         case Kind::Object: for (auto& x : v.heap_as<ObjectObject>()->entries) visit(x.second); break;
         case Kind::Struct: for (auto& x : v.heap_as<StructObject>()->fields) visit(x.second); break;
+        case Kind::Collection: for (auto& x : v.heap_as<CollectionObject>()->items) visit(x); break;
         case Kind::Function: for (auto& x : v.heap_as<FunctionObject>()->upvalues) visit(x); break;
         case Kind::Cell: visit(v.heap_as<CellObject>()->value); break;
         case Kind::Error: visit(v.heap_as<ErrorObject>()->cause); break;
@@ -20,6 +21,10 @@ void cut(Value& v) noexcept {
         case Kind::Array: v.heap_as<ArrayObject>()->items.clear(); break;
         case Kind::Object: v.heap_as<ObjectObject>()->entries.clear(); break;
         case Kind::Struct: v.heap_as<StructObject>()->fields.clear(); break;
+        case Kind::Collection:
+            v.heap_as<CollectionObject>()->items.clear();
+            v.heap_as<CollectionObject>()->index.clear();
+            break;
         case Kind::Function: v.heap_as<FunctionObject>()->upvalues.clear(); break;
         case Kind::Cell: v.heap_as<CellObject>()->value = Value(); break;
         case Kind::Error: v.heap_as<ErrorObject>()->cause = Value(); break;

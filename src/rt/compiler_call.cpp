@@ -179,6 +179,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(ast_.at(callee.b));
+    if (int r = keyed_method_call(node, dst); r >= 0) return r == 1;  // D-063 map/set/stack
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;
     if (int r = future_method(node, dst); r >= 0) return r == 1;  // CP22
     if (error_method_call(node, dst, name, callee.a)) return true;
@@ -220,6 +221,15 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
             return fail(node, "builtin-presentation-chain");
+        // Review rounds 3-4: the serializer cannot render a struct instance (no
+        // field privacy at run time). In a unit that declares a struct, a
+        // presentation method on a value whose inferred kinds include a struct
+        // instance or a container (contents are not tracked) is refused before
+        // effects, whatever the receiver expression.
+        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & kKindStruct))
+            return fail(callee, "presentation-struct:" + std::string(name));
+        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & (kKindAggregate | kKindCollection)))
+            return fail(callee, "presentation-struct-contents:" + std::string(name));
         return builtin_call(node, *spec, callee.a, dst);
     }
     const bool size = name == "size";  // rt-lint: allow-string-compare compile time

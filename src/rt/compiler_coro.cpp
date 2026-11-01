@@ -235,6 +235,9 @@ private:
         if (thread_builtin(call.a)) return true;  // handles reach a thread's snapshot (legacy shares them)
         if (name == "cancel") return k == kKindFuture || k == kKindThread;  // CP23 cooperative cancellation
         if (name == "type") return k == kKindFuture || k == kKindThread || !(k & kKindTask);
+        // D-063 owner ruling (2026-11-01): `same(t, u)` compares the task
+        // records' identity (rt::same); the handles are only read.
+        if (name == "same") return k == kKindFuture || k == kKindThread;
         // A call through a binding (a lambda value): legacy binds the value.
         return (kinds_.of(call.a) & kKindFunction) && !(kinds_.of(call.a) & kKindUnknown);
     }

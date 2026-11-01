@@ -16,7 +16,7 @@ const TyRef& empty_ty() {
 const TyRef& top_ty() {
     static const TyRef a = [] {
         auto t = std::make_shared<Ty>();
-        t->kinds = kKindAll;
+        t->kinds = kKindAll | kKindTagged;  // D-063, D-NEXT-refsem: a collection or instance may be anywhere
         t->any = true;
         return TyRef(t);
     }();
@@ -46,6 +46,13 @@ namespace {
 constexpr int kMaxDepth = 6;
 } // namespace
 
+TyRef collection_ty(KindSet kinds, std::uint32_t site) {
+    auto t = std::make_shared<Ty>();
+    t->kinds = kinds;
+    t->sites.push_back(site);
+    return t;
+}
+
 TyRef with_text_number(const TyRef& value,bool maybe) {
     if(!maybe||value->legacy_text_number)return value;
     auto next=std::make_shared<Ty>(*value);next->legacy_text_number=true;return next;
@@ -68,7 +75,12 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     t->collection_object = (t->kinds & kKindObject) && (!(a->kinds & kKindObject) || a->collection_object) &&
                            (!(b->kinds & kKindObject) || b->collection_object);
     t->struct_id = a->struct_id == b->struct_id ? a->struct_id : -2;
+    t->sites = a->sites;  // D-NEXT-refsem: sorted union
+    for (std::uint32_t site : b->sites)
+        if (!std::binary_search(t->sites.begin(), t->sites.end(), site))
+            t->sites.insert(std::upper_bound(t->sites.begin(), t->sites.end(), site), site);
     if (a->elem || b->elem) t->elem = unite(a->elem, b->elem, depth + 1);
+    if (a->key || b->key) t->key = unite(a->key, b->key, depth + 1);
     if (a->tuple && b->tuple && a->items.size() == b->items.size()) {
         t->tuple = true;
         for (std::size_t k = 0; k < a->items.size(); ++k)
@@ -90,17 +102,18 @@ bool same(const TyRef& a, const TyRef& b) {
     if (a.get() == b.get()) return true;
     if(a&&b&&(a->collection_array!=b->collection_array||a->collection_object!=b->collection_object||
               a->legacy_text_number!=b->legacy_text_number))return false;
-    const bool a_empty = !a || (a->kinds == 0 && !a->elem && a->fields.empty() && !a->any);
-    const bool b_empty = !b || (b->kinds == 0 && !b->elem && b->fields.empty() && !b->any);
+    const bool a_empty = !a || (a->kinds == 0 && !a->elem && !a->key && a->fields.empty() && !a->any);
+    const bool b_empty = !b || (b->kinds == 0 && !b->elem && !b->key && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
     if (a->historical_callable != b->historical_callable ||
         a->untracked_callable != b->untracked_callable) return false;
     if (a->kinds != b->kinds || a->any != b->any || a->fields.size() != b->fields.size()) return false;
-    if (a->struct_id != b->struct_id || a->callables != b->callables) return false;
+    if (a->struct_id != b->struct_id || a->callables != b->callables || a->sites != b->sites) return false;
     if (a->tuple != b->tuple || a->items.size() != b->items.size()) return false;
     for (std::size_t k = 0; k < a->items.size(); ++k)
         if (!same(a->items[k], b->items[k])) return false;
     if (!same(a->elem, b->elem)) return false;
+    if (!same(a->key, b->key)) return false;
     for (const auto& [key, ty] : a->fields) {
         auto it = b->fields.find(key);
         if (it == b->fields.end() || !same(ty, it->second)) return false;
@@ -120,6 +133,10 @@ TyRef element_of(const TyRef& t, const std::string* key, bool by_member, long po
     } else if (!by_member && (t->kinds & kKindArray) && t->elem) {
         out = unite(out, t->elem);
     }
+    // D-063, D-NEXT-refsem: a collection's contents are shared by every alias
+    // and are tracked per collection kind by the inference (Inference::
+    // contents), never in the value's own type: here, anything.
+    if (!by_member && (t->kinds & kKindCollection) && !(t->kinds & kKindArray)) out = unite(out, top_ty());
     if (t->kinds & kKindObject) {
         if(t->elem)out=unite(out,t->elem);
         if (key) {
@@ -226,6 +243,32 @@ bool holds_future(const TyRef& t, int depth) {
         if (holds_future(item, depth + 1)) return true;
     for (const auto& field : t->fields)
         if (holds_future(field.second, depth + 1)) return true;
+    return false;
+}
+
+bool holds_collection(const TyRef& t, int depth) {
+    if (!t) return false;
+    if (t->any || (t->kinds & (kKindTagged | kKindUnknown)) || t->struct_id != -1) return true;
+    if (depth > kMaxDepth + 2) return true;  // beyond the cap: may be anything
+    if (holds_collection(t->elem, depth + 1) || holds_collection(t->key, depth + 1)) return true;
+    for (const TyRef& item : t->items)
+        if (holds_collection(item, depth + 1)) return true;
+    for (const auto& field : t->fields)
+        if (holds_collection(field.second, depth + 1)) return true;
+    return false;
+}
+
+bool holds_aggregate_below(const TyRef& t) {
+    if (!t) return false;
+    if (t->any) return true;
+    const auto aggregate = [](const TyRef& c) {
+        return c && (c->any || (c->kinds & (kKindArray | kKindObject | kKindUnknown)) != 0);
+    };
+    if (aggregate(t->elem)) return true;
+    for (const TyRef& item : t->items)
+        if (aggregate(item)) return true;
+    for (const auto& field : t->fields)
+        if (aggregate(field.second)) return true;
     return false;
 }
 

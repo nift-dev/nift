@@ -11,7 +11,13 @@ REFUSALS=[
 ]
 PARITY=[
 'const a:=[1,2]; for(v:a) { v=9 }; print(a.stringify())',
-'const a:=[[1],[2]]; for(v:a) { v.push(9) }; print(a.stringify())',
+]
+# D-NEXT-refsem #1: the loop binding writes through to the iterated array
+# (legacy-equal), but the Phase A guard refuses any in-place mutation of an
+# array inside its own loop before any effect (conservative: it cannot tell a
+# write-through from a mutation Phase B would change).
+GUARDED=[
+('const a:=[[1],[2]]; for(v:a) { v.push(9) }; print(a.stringify())','reference-guard:lent'),
 ]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--base',required=True);p.add_argument('--output',required=True);p.add_argument('--vm-only-harness',action='store_true');a=p.parse_args();rows=[]
@@ -30,5 +36,9 @@ def main():
             legacy=run(a.base,'0',source,root);vm=run(a.nift,'require',source,root)
             ok=all(vm[k]==legacy[k] for k in ['out','err','exit']) and vm['stats'] and vm['stats'][-1]['vm_executions']==1 and vm['stats'][-1]['legacy_executions']==0
             rows.append(dict(kind='existing shallow const/for behavior',source=source,pass_=bool(ok),legacy=legacy,require=vm))
+        for source,reason in GUARDED:
+            vm=run(a.nift,'require',source,root);st=vm['stats'][-1] if vm['stats'] else {}
+            ok=(vm['exit']==1 and not vm['out'] and st.get('reason')==reason and st.get('vm_executions')==0) if not a.vm_only_harness else (not vm['out'] and st.get('vm_executions')==0)
+            rows.append(dict(kind='guard refusal (D-NEXT-refsem #1)',source=source,pass_=bool(ok),require=vm))
     Path(a.output).write_text(json.dumps(rows,indent=2)+'\n');print('PASS' if all(r['pass_'] for r in rows) else 'FAIL',len(rows),'const admission checks');return 0 if all(r['pass_'] for r in rows) else 1
 if __name__=='__main__':raise SystemExit(main())

@@ -1,4 +1,5 @@
 #include "rt/infer_walk.h"
+#include "rt/aggregate.h"
 
 #include "rt/number.h"
 #include "rt/session_mutation_shape.h"
@@ -26,6 +27,10 @@ KindSet Inference::value_kinds(const Value& v) {
     if (v.is(Kind::Bool)) return kKindBool;
     if (v.is(Kind::String)) return kKindString;
     if (v.is_number()) return number_is_integer(v) ? kKindInt : kKindFrac;
+    if (v.is(Kind::Collection)) {  // D-063: a struct field initialised with map()/set()/stack()
+        const CollectionKind k = collection_kind(v);
+        return k == CollectionKind::Map ? kKindMap : k == CollectionKind::Set ? kKindSet : kKindStack;
+    }
     return kKindAll;
 }
 
@@ -33,7 +38,9 @@ void Inference::seed_struct_fields() {
     for (const StructInfo& s : plan_.structs)
         for (const StructFieldInfo& f : s.fields) {
             TyRef& var = vars_[field_slot(f)];
-            var = unite(var, kinds_ty(session_ && f.type == 3 ? kKindNumber : value_kinds(f.value)));
+            const KindSet k = session_ && f.type == 3 ? kKindNumber : value_kinds(f.value);
+            // D-NEXT-refsem: a map()/set()/stack() initialiser is the allocation site of every instance's own one.
+            var = unite(var, (k & kKindCollection) ? collection_ty(k, f.node) : kinds_ty(k));
         }
 }
 
@@ -76,7 +83,7 @@ void Inference::statements(const Node& b) {
     for (std::uint32_t k = 0; k < b.count; ++k) statement(list[k]);
 }
 
-void Inference::add_element(NodeId receiver_id, const TyRef& value) {
+void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
     const auto& receiver = ast_.at(receiver_id);
     if (session_) {
         const auto root = session_mutation_root(ast_, receiver_id);
@@ -94,7 +101,8 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value) {
     TyRef* var = find(ast_.text(receiver));
     if (!var || (*var)->any) return;
     auto updated = std::make_shared<Ty>(**var);
-    updated->elem = unite(updated->elem, value);
+    if (key) updated->key = unite(updated->key, value);
+    else updated->elem = unite(updated->elem, value);
     updated->tuple = false;
     updated->items.clear();
     TyRef next = unite(TyRef(updated), TyRef(updated));
@@ -203,8 +211,10 @@ void Inference::statement(NodeId id) {
                 const NodeId* args = ast_.list(e);
                 TyRef v = empty_ty();
                 for (std::uint32_t k = 0; k < e.count; ++k) v = expr(args[k]);
-                expr(ast_.at(e.a).a);
-                if (e.count == 1) add_element(ast_.at(e.a).a, v);
+                const TyRef receiver = expr(ast_.at(e.a).a);
+                // D-NEXT-refsem: a stack's elements are its allocation sites' contents.
+                if (e.count == 1 && (receiver->kinds & kKindCollection)) add_contents(receiver, v, false);
+                else if (e.count == 1) add_element(ast_.at(e.a).a, v);
                 expr(ast_.at(e.a).a);
                 break;
             }

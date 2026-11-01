@@ -59,4 +59,10 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
     return out;
 }
 
+int Inference::function_index(const Node& callee) const {
+    if (callee.kind != NodeKind::Ident) return -1;
+    const auto fn = plan_.index.find(ast_.text(callee));
+    return fn == plan_.index.end() ? -1 : static_cast<int>(fn->second) - 1;
+}
+
 } // namespace nift::rt::infer_detail

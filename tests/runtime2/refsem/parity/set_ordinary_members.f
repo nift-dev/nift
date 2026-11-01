@@ -1,0 +1,18 @@
+// D-NEXT-refsem #6: ordinary set members keep working.
+s := set()
+s.add(1)
+s.add(1.0)
+s.add("1")
+s.add(true)
+s.add(2.5)
+f := () => 1
+s.add(f)
+print(s.size())
+print(s.contains(1))
+print(s.contains("1"))
+print(s.contains(f))
+m := map()
+m.set(true, "t")
+m.set(3, "n")
+m.set("k", "s")
+print(m.get(true) + m.get(3) + m.get("k"))

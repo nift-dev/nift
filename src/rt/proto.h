@@ -72,8 +72,9 @@ struct Proto {
     std::weak_ptr<const Program> session_owner;
     std::shared_ptr<const SessionDefinition> session_definition;
     std::shared_ptr<const std::vector<SessionCallFact>> session_call_facts;
-    std::uint16_t session_returns = 0;
-    std::vector<std::uint16_t> session_params, session_param_types;
+    std::uint32_t session_returns = 0;                  // a KindSet
+    std::vector<std::uint32_t> session_params;          // KindSets
+    std::vector<std::uint16_t> session_param_types;
     std::vector<std::shared_ptr<const infer_detail::Ty>> session_parameter_shapes, session_capture_shapes;
 };
 

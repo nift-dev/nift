@@ -1,0 +1,3 @@
+--- stderr
+error: cell_cycle_mutators.f:11:9: opaque runtime value is not serializable
+--- exit 1

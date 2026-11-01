@@ -41,12 +41,17 @@ struct SessionSymbol {
     std::shared_ptr<const infer_detail::Ty> structure;
     std::shared_ptr<const SessionCallableShape> callable_shape;
     std::uint64_t identity = 0;
-    std::uint16_t slot = 0, kinds = 0, returns = 0, arity = 0, contract = 0;
+    std::uint16_t slot = 0, arity = 0;
+    // KindSets (32 bits: D-NEXT-refsem's kKindStruct is bit 23; review round 2
+    // found these 16-bit fields truncating it, so an instance binding came back
+    // as a string in the next session statement).
+    std::uint32_t kinds = 0, returns = 0, contract = 0;
     bool callable = false, const_array = false, defined = true, readonly = false;
     bool untracked_callables = false;
     // A script invocation binding (`cmd`, `args`; rt/session_invocation.h).
     bool invocation = false;
-    std::vector<std::uint16_t> params, param_types;
+    std::vector<std::uint32_t> params;   // KindSets
+    std::vector<std::uint16_t> param_types;
 };
 // The script invocation bindings legacy installs for every program and
 // session (`cmd`: the script name, `args`: its arguments; readonly, `args` a

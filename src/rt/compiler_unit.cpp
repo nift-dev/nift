@@ -268,7 +268,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     const Node& node = ast_.at(plan_.functions[f]);
     begin(std::string(text(ast_.at(node.a))), node.b, &assigned_fn_[f]);
     const NodeId* params = ast_.list(node);
-    // CP12b structs: a method's first register holds its instance's stack slot.
+    // CP12b structs: a method's first register holds its instance (a reference).
     const bool method = plan_.is_method(f);
     if (method && !fb_->alloc(this_reg_)) return builder_ok();
     std::vector<std::uint16_t> regs(node.count);

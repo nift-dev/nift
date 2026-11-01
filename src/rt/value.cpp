@@ -25,6 +25,7 @@ const char* kind_name(Kind kind) {
         case Kind::Error: return "error";
         case Kind::Cell: return "cell";  // internal only
         case Kind::Future: return "future";
+        case Kind::Collection: return "collection";
     }
     return "unknown";
 }
@@ -53,13 +54,14 @@ void delete_object(HeapObject* object) noexcept {
         }
         case Kind::Cell: delete static_cast<CellObject*>(object); return;
         case Kind::Future: delete static_cast<FutureObject*>(object); return;
+        case Kind::Collection: delete static_cast<CollectionObject*>(object); return;
         default: return;  // immediate kinds never reach the heap
     }
 }
 
 bool has_children(Kind kind) noexcept {
     return kind == Kind::Array || kind == Kind::Object || kind == Kind::Function || kind == Kind::Struct ||
-           kind == Kind::Error || kind == Kind::Cell || kind == Kind::Future;
+           kind == Kind::Error || kind == Kind::Cell || kind == Kind::Future || kind == Kind::Collection;
 }
 
 std::size_t child_count(const HeapObject* o) noexcept {
@@ -71,6 +73,7 @@ std::size_t child_count(const HeapObject* o) noexcept {
         case Kind::Error: return 1;
         case Kind::Cell: return 1;
         case Kind::Future: return 2;  // result, error
+        case Kind::Collection: return static_cast<const CollectionObject*>(o)->items.size();
         default: return 0;
     }
 }
@@ -84,6 +87,7 @@ Value& child_at(HeapObject* o, std::size_t i) noexcept {
         case Kind::Cell: return static_cast<CellObject*>(o)->value;
         case Kind::Future:
             return i == 0 ? static_cast<FutureObject*>(o)->result : static_cast<FutureObject*>(o)->error;
+        case Kind::Collection: return static_cast<CollectionObject*>(o)->items[i];
         default: return static_cast<ErrorObject*>(o)->cause;
     }
 }
@@ -189,6 +193,9 @@ struct Worklist {
                 break;
             case Kind::Struct:
                 for (auto& f : static_cast<StructObject*>(o)->fields) if (f.second.is_heap()) take(f.second);
+                break;
+            case Kind::Collection:
+                for (Value& v : static_cast<CollectionObject*>(o)->items) if (v.is_heap()) take(v);
                 break;
             case Kind::Error: take(static_cast<ErrorObject*>(o)->cause); break;
             case Kind::Cell: take(static_cast<CellObject*>(o)->value); break;

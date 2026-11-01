@@ -1,22 +1,26 @@
 #include "rt/compiler_structs.h"
 
+#include "rt/aggregate.h"
 #include "rt/alias.h"
 #include "rt/atom.h"
+#include "rt/natives/builtin.h"
+#include "rt/native.h"
 
-// CP12b structs (rt/structs.h). Instances are values on the VM (D-040 V9,
-// copy-on-write StructObject); legacy's are references. The two agree on
-// every unit admitted here because an instance never has two holders: it
-// is created by a declaration `p := Name(args)`, lives in that binding, and
-// is used only as the receiver of its fields (`p.x`, `p.x = v`) and methods
-// (`p.m(args)`); any other use of the binding (copy, argument, return,
-// comparison, printing) is refused (`struct-value`). A method gets its
-// instance's absolute stack slot as a hidden first argument and reads and
-// writes the instance in place there (FieldGet/FieldSet), so `this`,
-// implicit fields (`x` inside a method) and nested method calls all reach
-// the caller's binding. Field writes keep the field's binding type
-// (legacy's "cannot change struct field type"). Legacy's loop evaluator
-// fails on field access inside loop bodies (L42): refused there
-// (`context:struct-field`); method calls from loops are admitted.
+// CP12b structs (rt/structs.h). Struct instances are identity-bearing mutable
+// references (D-NEXT-refsem #1, superseding D-046 #3 / D-040 V9): legacy's
+// model. A binding, parameter, return value, container element or captured
+// variable holding an instance holds the same object, and a field write
+// through any of them is visible through all (FieldSet mutates the shared
+// StructObject in place). A receiver (`p.x`, `p.x = v`, `p.m(args)`) is a
+// bare name whose struct is known statically: the declaration `p := Name()`
+// or the kind inference (UnitKinds::struct_ids, exactly one struct type and
+// nothing else); a method gets its instance as a hidden first argument
+// (`this`). Field writes keep the field's binding type (legacy's "cannot
+// change struct field type") and are refused before any change when they
+// would close a reference cycle (legacy's "assignment would create a cyclic
+// reference: <field>"). Legacy's loop evaluator fails on field access inside
+// loop bodies (L42): refused there (`context:struct-field`); method calls
+// from loops are admitted.
 
 namespace nift::rt::detail {
 
@@ -35,31 +39,29 @@ int UnitCompiler::struct_of_receiver(NodeId object, bool& is_this) const {
         return current_struct();
     }
     const Binding* b = find_binding(text(o));
-    return b != nullptr ? b->struct_id : -1;
+    if (b == nullptr) return -1;
+    if (b->struct_id >= 0) return b->struct_id;  // `p := Name(args)` (never rebound: struct-assign)
+    return inferred_struct(object);
 }
 
-// The absolute stack slot of the instance `object` (kNoNode: `this`).
-bool UnitCompiler::receiver_slot(NodeId object, std::uint16_t dst) {
+// D-NEXT-refsem: the struct of an instance-valued expression, when the kind
+// inference proves it is always an instance of exactly that struct.
+int UnitCompiler::inferred_struct(NodeId id) const {
+    if (kinds(id) != kKindStruct) return -1;
+    const auto found = kinds_.struct_ids.find(id);
+    return found != kinds_.struct_ids.end() && found->second >= 0 ? found->second : -1;
+}
+
+// The instance `object` (kNoNode: `this`) into `dst`: a reference to the
+// shared StructObject (D-NEXT-refsem #1).
+bool UnitCompiler::receiver_value(NodeId object, std::uint16_t dst) {
     bool is_this = false;
     if (object == kNoNode || (struct_of_receiver(object, is_this) >= 0 && is_this)) {
         fb_->emit(OpCode::Move, dst, this_reg_);
         return true;
     }
-    const Binding* b = find_binding(text(ast_.at(object)));
-    if (b == nullptr || b->struct_id < 0) return fail(ast_.at(object), "struct-value");
-    if (!b->global) {
-        fb_->emit(OpCode::SlotOf, dst, b->reg);
-        return true;
-    }
-    if (session_ && !global_check_defined(b->reg, b->session_name)) return false;
-    // Negative locations identify stable session cells. Ordinary scripts keep
-    // their existing absolute main-frame locations, and constructors use a
-    // temporary stack location until the instance is published.
-    const auto location = session_ ? -1 - static_cast<std::int64_t>(b->reg) : b->reg;
-    std::uint16_t k = 0;
-    if (!fb_->constant(Value::integer(location), k)) return builder_ok();
-    fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(k & ~kConstantBit));
-    return true;
+    if (struct_of_receiver(object, is_this) < 0) return fail(ast_.at(object), "struct-value");
+    return expr_to(object, dst);
 }
 
 bool UnitCompiler::field_access_ok(const Node& at, int s, std::string_view name, bool is_this,
@@ -74,7 +76,7 @@ bool UnitCompiler::field_access_ok(const Node& at, int s, std::string_view name,
 bool UnitCompiler::field_read(const Node& at, NodeId receiver, const StructFieldInfo& field, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t slot = 0;
-    if (!temp(slot) || !receiver_slot(receiver, slot)) return false;
+    if (!temp(slot) || !receiver_value(receiver, slot)) return false;
     const Atom key = atom(field.name);
     if (key.id > 0xffff) return fail(at, "limit:atoms");
     fb_->set_offset(site(at));
@@ -97,7 +99,7 @@ bool UnitCompiler::field_assign(const Node& node, NodeId receiver, const StructF
     std::uint16_t value = 0, type = 0, slot = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
     if (!fb_->constant(Value::integer(field.type), type)) return builder_ok();
-    if (!temp(slot) || !receiver_slot(receiver, slot)) return false;
+    if (!temp(slot) || !receiver_value(receiver, slot)) return false;
     const Atom key = atom(field.name);
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(node.begin);
@@ -120,7 +122,7 @@ bool UnitCompiler::field_update(const Node& node, NodeId receiver, const StructF
         if (!numbers && !strings && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");
         if (!expr_any(node.b, value)) return false;
     }
-    if (!temp(slot) || !receiver_slot(receiver, slot) || !temp(current)) return false;
+    if (!temp(slot) || !receiver_value(receiver, slot) || !temp(current)) return false;
     if (!fb_->constant(Value::integer(field.type), type)) return builder_ok();
     const Atom key = atom(field.name);
     if (key.id > 0xffff) return fail(node, "limit:atoms");
@@ -169,8 +171,11 @@ bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
     return struct_call(node, s, *m, callee.a, -1, dst);
 }
 
+// `Name(args)` in an expression (D-NEXT-refsem: a new instance anywhere a
+// value is, e.g. `return P()`, `f(P())`, `[P()]`).
 int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::uint16_t dst) {
-    if (plan_.struct_index.count(name)) return fail(ast_.at(node.a), "struct-construction") ? 1 : 0;
+    if (const auto made = plan_.struct_index.find(name); made != plan_.struct_index.end())
+        return struct_construct(node, static_cast<int>(made->second), dst) ? 1 : 0;
     const int s = current_struct();
     if (s < 0 || plan_.index.count(name)) return -1;
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(name);
@@ -178,11 +183,12 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
     return struct_call(node, s, *m, kNoNode, -1, dst) ? 1 : 0;
 }
 
-// `p := Name(args)`: the instance in `reg`, fields from their initialisers,
-// then the constructor (if any) on it.
-bool UnitCompiler::struct_construct(const Node& decl, int s, std::uint16_t reg) {
+// `Name(args)`: the instance in `reg`, fields from their initialisers, then
+// the constructor (if any) on it. A map()/set()/stack() initialiser is
+// evaluated afresh for every instance (D-NEXT-refsem #1: no two instances
+// ever share one collection), like legacy's per-construction evaluation.
+bool UnitCompiler::struct_construct(const Node& call, int s, std::uint16_t reg) {
     const StructInfo& info = plan_.structs[static_cast<std::size_t>(s)];
-    const Node& call = ast_.at(decl.b);
     if (loop_region()) return fail(call, "context:struct-new");
     if (!plain_postfix(call) || !no_trailing_comma(call)) return false;
     auto display_name = info.name;
@@ -192,28 +198,54 @@ bool UnitCompiler::struct_construct(const Node& decl, int s, std::uint16_t reg) 
     }
     const Atom type = atom(display_name);
     if (type.id > 0xffff) return fail(call, "limit:atoms");
+    const std::uint16_t mark = fb_->top();
+    std::uint16_t fresh = 0;
+    if (!temp(fresh)) return false;
     fb_->set_offset(site(call));
-    fb_->emit(OpCode::NewStruct, reg, static_cast<std::uint16_t>(type.id));
+    fb_->emit(OpCode::NewStruct, fresh, static_cast<std::uint16_t>(type.id));
     for (const StructFieldInfo& field : info.fields) {
-        std::uint16_t k = 0;
         const Atom key = atom(field.name);
         if (key.id > 0xffff) return fail(call, "limit:atoms");
+        if (field.value.is(Kind::Collection)) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 6
+            std::uint16_t k = 0;  // R6: the initialiser is one cached constant shared by every instance
+            if (!fb_->constant(field.value, k)) return builder_ok();
+            fb_->emit(OpCode::StructAdd, fresh, static_cast<std::uint16_t>(key.id), k);
+            continue;
+#else
+            using natives::BuiltinId;
+            const CollectionKind kind = collection_kind(field.value);
+            const BuiltinId make = kind == CollectionKind::Map   ? BuiltinId::FnMap
+                                   : kind == CollectionKind::Set ? BuiltinId::FnSet : BuiltinId::FnStack;
+            std::uint16_t value = 0;
+            if (!temp(value)) return false;
+            const auto native = static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(make));
+            fb_->emit(OpCode::CallNative, value, native, 0);
+            fb_->emit(OpCode::StructAdd, fresh, static_cast<std::uint16_t>(key.id), value);
+            fb_->emit(OpCode::LoadNull, value);
+            continue;
+#endif
+        }
+        std::uint16_t k = 0;
         if (!fb_->constant(field.value, k)) return builder_ok();
-        fb_->emit(OpCode::StructAdd, reg, static_cast<std::uint16_t>(key.id), k);
+        fb_->emit(OpCode::StructAdd, fresh, static_cast<std::uint16_t>(key.id), k);
     }
     if (info.ctor < 0) {
         if (call.count != 0) return fail(call, "static-error:struct-arity");
-        return true;
+        fb_->emit(OpCode::Move, reg, fresh);
+        fb_->release_to(mark > reg ? mark : static_cast<std::uint16_t>(reg + 1));
+        return builder_ok();
     }
-    const std::uint16_t mark = fb_->top();
     std::uint16_t result = 0;
     if (!temp(result)) return false;
-    const bool ok = struct_call(call, s, info.methods[static_cast<std::size_t>(info.ctor)], kNoNode, reg, result);
-    fb_->release_to(mark);
-    return ok;
+    if (!struct_call(call, s, info.methods[static_cast<std::size_t>(info.ctor)], kNoNode, fresh, result))
+        return false;
+    fb_->emit(OpCode::Move, reg, fresh);
+    fb_->release_to(mark > reg ? mark : static_cast<std::uint16_t>(reg + 1));
+    return builder_ok();
 }
 
-// A method call: the instance's slot, then the arguments, in a fresh window.
+// A method call: the instance, then the arguments, in a fresh window.
 bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver,
                                int receiver_reg, std::uint16_t dst) {
     (void)s;
@@ -228,8 +260,8 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     const NodeId* args = ast_.list(node);
     const std::uint16_t base = fb_->top();
     if (!operand_window(base, node.count + 1)) return false;
-    if (receiver_reg >= 0) fb_->emit(OpCode::SlotOf, base, static_cast<std::uint16_t>(receiver_reg));
-    else if (!receiver_slot(receiver, base)) return false;
+    if (receiver_reg >= 0) fb_->emit(OpCode::Move, base, static_cast<std::uint16_t>(receiver_reg));
+    else if (!receiver_value(receiver, base)) return false;
     ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     path_arg_ = path_chain_ = kNoNode;  // no member or index path in method arguments

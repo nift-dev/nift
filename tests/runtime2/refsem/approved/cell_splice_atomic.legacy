@@ -1,0 +1,15 @@
+false
+false
+false
+false
+false
+23,24,<stack>,22,
+<stack>,13,<stack>,12,<stack>,
+5
+12
+1
+1
+30,31,32,<stack>,12,<stack>,
+23,40,<stack>,22,
+--- stderr
+--- exit 0

@@ -88,6 +88,22 @@ inline constexpr KindSet kKindAtomicBool = 1u << 18;
 inline constexpr KindSet kKindAtomic = kKindAtomicInt | kKindAtomicBool;
 inline constexpr KindSet kKindChannel = 1u << 19;
 inline constexpr KindSet kKindShared = kKindMutex | kKindAtomic | kKindChannel;
+// Weekend collections (D-063): map(), set() and stack() values (rt::Kind::
+// Collection). Outside kKindAll like the handle bits, so no generic value
+// operation admits one by accident; top_ty (every kind at every depth)
+// includes them, so a collection can never hide behind "anything".
+inline constexpr KindSet kKindMap = 1u << 20;
+inline constexpr KindSet kKindSet = 1u << 21;
+inline constexpr KindSet kKindStack = 1u << 22;
+inline constexpr KindSet kKindCollection = kKindMap | kKindSet | kKindStack;
+// D-NEXT-refsem: a struct instance (an identity-bearing reference; formerly
+// typed as an object). Outside kKindAll like the collection bits: no generic
+// value operation admits one; the struct rules (compiler_structs.cpp) and the
+// identity built-ins do. UnitKinds::struct_ids names the struct.
+inline constexpr KindSet kKindStruct = 1u << 23;
+// Values legacy represents as tagged strings with identity (its collections
+// and struct instances): the tag-observing refusals (D-063 section 3) apply.
+inline constexpr KindSet kKindTagged = kKindCollection | kKindStruct;
 static_assert(kKindBytes == (1u << 7));
 #ifndef NIFT_KIND_MUTANT
 static_assert(kKindFunction == (1u << 8));
@@ -104,6 +120,9 @@ static_assert(kKindThread == (1u << 15) && (kKindAll & kKindThread) == 0);
 static_assert(kKindMutex == (1u << 16) && kKindAtomicInt == (1u << 17) &&
               kKindAtomicBool == (1u << 18) && kKindChannel == (1u << 19));
 static_assert((kKindAll & kKindShared) == 0 && (kKindUnknown & kKindShared) == 0);
+static_assert((kKindAll & kKindStruct) == 0 && (kKindStruct & (kKindCollection | kKindShared | kKindTask)) == 0);
+static_assert((kKindAll & kKindCollection) == 0 && (kKindShared & kKindCollection) == 0 &&
+              (kKindCollection & (kKindHandle | kKindFile | kKindStream | kKindTask | kKindUnknown)) == 0);
 
 struct SessionInferenceProof {
     std::unordered_set<std::uint64_t> historical_calls;
@@ -134,7 +153,31 @@ struct UnitKinds {
     std::unordered_set<NodeId> collection_arrays;
     std::unordered_map<NodeId,NodeId> bindings;
     std::unordered_map<NodeId,KindSet> collection_elements;
+    // D-063 (units that construct a collection, UnitPlan::collections).
+    // Legacy's collections are tag strings, which its scalar rules accept:
+    // collection_elements_of: expressions that may have a map, set or stack
+    // as a direct element or member (`[m].contains(x)`, `max(a)` with
+    // a := [m, m]; deeper nesting fails the same way in both engines);
+    // collection_holders: expressions that may hold one at any depth
+    // (legacy's shared-state transfer check and the shown result of an eval
+    // or session statement look at every depth); collection_inspections: the
+    // member nodes of array method calls that would compare or key on a
+    // collection (a plain sort's elements, a key or comparator callback's
+    // result). The compiler refuses those uses only.
+    std::unordered_set<NodeId> collection_elements_of;
+    std::unordered_set<NodeId> collection_holders;
+    std::unordered_set<NodeId> collection_inspections;
     std::unordered_set<NodeId> collection_text_numbers;
+    // D-NEXT-refsem: for an expression that may be a struct instance, the
+    // struct (an index of UnitPlan::structs; -2: several structs or other
+    // values too). The compiler admits field access and method calls on a
+    // bare-name receiver whose kinds are exactly kKindStruct and whose struct
+    // is known here.
+    std::unordered_map<NodeId, int> struct_ids;
+    // D-NEXT-refsem: expressions whose array/object value may hold an array or
+    // object below its top level (the forward-compatibility guard's deep
+    // freshness, rt/reference_guard.h).
+    std::unordered_set<NodeId> nested_aggregates;
     // CP22: expressions whose value is, or may contain at any depth, a future.
     std::unordered_set<NodeId> future_holders;
     bool converged = false;

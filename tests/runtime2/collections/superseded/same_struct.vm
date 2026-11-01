@@ -1,0 +1,4 @@
+true
+--- stderr
+error: same_struct.f:5:7: same: operands must be identity-bearing values
+--- exit 1

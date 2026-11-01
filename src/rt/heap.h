@@ -34,16 +34,21 @@ struct BytesObject : HeapObject {
 };
 
 // Identity summary (D-040 V16, the cycle rule): bit 7 of the header's tag
-// byte (the Kind uses the low 4 bits) means "this aggregate may contain a
-// callable or a handle, directly or through a child with the bit". It is
+// byte (the Kind uses the low 4 bits) means "this aggregate may contain an
+// identity-bearing value (a callable, a handle, a cell, a future and, since
+// D-NEXT-refsem, a struct instance or a collection), directly or through a
+// child with the bit". It is
 // conservative: set whenever a store might add identity-bearing content
 // (array_mut hands out raw storage, so it sets it too), copied by
 // copy-on-write clones, and cleared only by the cycle checker after it has
-// verified the direct children (rt/value_cycle.h). Removing the last callable
-// or handle from a container leaves the bit set (conservative, never
-// missing). Plain data therefore never needs a walk: an aggregate whose bit is
-// clear holds no callable or handle anywhere below it.
+// verified the direct children (rt/value_cycle.h). Removing the last
+// identity-bearing value from a container leaves the bit set (conservative,
+// never missing). Plain data therefore never needs a walk: an aggregate whose
+// bit is clear holds no identity-bearing value anywhere below it.
 inline constexpr std::uint8_t kMayHoldIdentity = 0x80;
+// Checked builds only (rt/aggregate_store.h): a reference or pointer into this
+// aggregate's storage was handed out since its storage last moved.
+inline constexpr std::uint8_t kStorageLent = 0x40;
 inline bool may_hold_identity(const HeapObject* object) noexcept { return (object->tag & kMayHoldIdentity) != 0; }
 inline void mark_may_hold_identity(HeapObject* object) noexcept { object->tag |= kMayHoldIdentity; }
 inline void clear_may_hold_identity(HeapObject* object) noexcept {
@@ -100,14 +105,35 @@ struct CellObject : HeapObject {
     CellObject() : HeapObject(Kind::Cell) {}
 };
 
-// Struct instances are values (D-040 V9): copies share the object until one
-// of them is written, then rt::struct_set / struct_mut clone it (copy-on-write,
-// like arrays and objects). Fields are kept in declaration order, private
-// fields included; equality is structural (type and every field).
+// Struct instances are identity-bearing mutable references (D-NEXT-refsem
+// #1, superseding D-040 V9 and D-046 #3): every Value holding the instance
+// shares the object, and rt::struct_set mutates it in place. Fields are kept
+// in declaration order, private fields included; equality is identity
+// (legacy's rule, D-NEXT-refsem #2).
 struct StructObject : HeapObject {
     Atom type_name;
     std::vector<std::pair<Atom, Value>> fields;
     explicit StructObject(Atom type) : HeapObject(Kind::Struct), type_name(type) {}
+};
+
+// Weekend collections (D-063): map(), set() and stack(). Identity-bearing
+// mutable references (D-NEXT-refsem #1, superseding D-063 #1): every Value
+// holding the collection shares the object, and the mutators of
+// rt/aggregate_collection.h change it in place. `items` holds, for a map,
+// key/value pairs flattened
+// (key at 2i, value at 2i + 1, insertion order); for a set its members
+// (insertion order); for a stack its elements bottom to top. Map keys and set
+// members are bool, number, string or callable (legacy also accepts its
+// tagged collections; the VM refuses mutable collection keys before any
+// effect, D-NEXT-refsem #6). From kIndexThreshold
+// entries an open-addressing index (rt::hash of the key -> entry + 1) is kept.
+enum class CollectionKind : std::uint8_t { Map, Set, Stack };
+struct CollectionObject : HeapObject {
+    static constexpr std::size_t kIndexThreshold = 8;
+    CollectionKind sub;
+    std::vector<Value> items;
+    std::vector<std::uint32_t> index;  // map/set only; empty below the threshold
+    explicit CollectionObject(CollectionKind k) : HeapObject(Kind::Collection), sub(k) {}
 };
 
 // Immutable error value (legacy RuntimeErrorData): message, code, category,

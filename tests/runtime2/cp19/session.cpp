@@ -278,7 +278,9 @@ int main() {
         CHECK(saved.is(Kind::Error) && saved.heap_as<ErrorObject>()->message == "original");
         r = session.execute("c.add(3)", "method-unit", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && output.empty());
-        CHECK(struct_get(snapshot, atom("v"))->as_int() == 0);
+        // D-NEXT-refsem #2: an instance is a reference (legacy-equal), so the
+        // Value held before c.add(3) is the same instance and sees the update.
+        CHECK(struct_get(snapshot, atom("v"))->as_int() == 3);
         r = session.evaluate("c.get()", "method-result", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 3);
         r = session.execute("struct(Ghost){v:=0};print(\"FORBIDDEN\");bytes([65])", "refused-schema", output);
@@ -393,18 +395,22 @@ int main() {
     {
         VmSession session;
         std::string output;
-        auto r = session.execute("nested:=[[1],[2]];saved:=nested", "nested-state", output);
+        // D-NEXT-refsem #1: a session is fully conservative under the Phase A
+        // guard: `saved:=nested` (an alias in Phase B) and a mutation through a
+        // loop binding over a session array are refused before any effect, so
+        // the copy is explicit (deepcopy) and the in-loop push is a refusal.
+        auto r = session.execute("nested:=[[1],[2]];saved:=deepcopy(nested)", "nested-state", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        const auto saved = session.value("saved");
+        const auto before = session.value("nested");
         r = session.execute("print(\"FORBIDDEN\");for(row:nested){row.push(\"bad\")};bytes([65])", "nested-refusal", output);
         CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes");
         CHECK(r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
-        CHECK(session.value("nested").heap() == saved.heap());
+        CHECK(session.value("nested").heap() == before.heap());
         r = session.execute("for(row:nested){row.push(2.5)}", "nested-numeric", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
+        CHECK(!r.admitted && r.refusal == "reference-guard:shared-part" && r.vm_executions == 0 && output.empty());
         r = session.evaluate("nested.stringify()", "nested-result", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        CHECK(string_view_of(r.value) == "[[1,2.5],[2,2.5]]");
+        CHECK(string_view_of(r.value) == "[[1],[2]]");
         r = session.evaluate("saved.stringify()", "nested-snapshot", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         CHECK(string_view_of(r.value) == "[[1],[2]]");
@@ -435,7 +441,10 @@ int main() {
             r = session.evaluate("old()", "reader-still-original", output);
             CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1]]");
         }
-        r = session.execute("fn(g()){return 3};f = ()=>\"live\";for(row:a){row.push(2.5)};"
+        // D-NEXT-refsem #1: a push through a loop binding over a session array is
+        // refused by the Phase A guard (sessions are fully conservative), so the
+        // runtime unit no longer writes `a` (it was `for(row:a){row.push(2.5)}`).
+        r = session.execute("fn(g()){return 3};f = ()=>\"live\";"
             "print(\"ONCE\");throw error(\"stop\")", "combined-runtime", output);
         if (!r.admitted || r.execution.reason != StopReason::Error)
             std::cerr << "combined runtime refusal=" << r.refusal << " runtime=" << r.execution.message << '\n';
@@ -447,8 +456,12 @@ int main() {
         CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "live");
         CHECK(session.value("f").heap() != function.heap() && bool(function.heap_as<FunctionObject>()->program_owner));
         r = session.evaluate("old()", "old-reader-new-cell", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,2.5]]");
-        r = session.execute("fn(makec()){caparr:=[[1]];return v=>{for(row:caparr){row.push(v)};return caparr.stringify()}};"
+        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1]]");
+        // D-NEXT-refsem #1: the closure's loop state is a captured map (a
+        // reference in both models); an array mutated there (it was
+        // `for(row:caparr){row.push(v)}`) is refused by the Phase A guard, here
+        // or when a later statement recompiles the session's history.
+        r = session.execute("fn(makec()){capm:=map();return v=>{for(x:[0]){capm.set(capm.size(), v)};return capm.size()}};"
             "c:=makec();warm:=c(0)", "combined-capture", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         // A lexical forwarding capture cannot block unrelated registry replacement.
@@ -460,7 +473,7 @@ int main() {
         r = session.execute("print(\"FORBIDDEN\");c(\"bad\");bytes([65])", "capture-still-original", output);
         CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes" && output.empty());
         r = session.evaluate("c(2)", "capture-valid", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && string_view_of(r.value) == "[[1,0,2]]");
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 2);
     }
     {
         VmSession session;

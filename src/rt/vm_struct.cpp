@@ -6,9 +6,10 @@
 #include "rt/vm_ops.h"
 
 // rt-lint: cold-file struct instance operations (CP12b): construction, field
-// reads and writes through an absolute stack slot (a method's `this`), and
-// the field binding-type check. Instances are values (D-040 V9); the
-// compiler admits only units where no instance is observably shared.
+// reads and writes through a register holding the instance, and the field
+// binding-type check. Instances are identity-bearing references
+// (D-NEXT-refsem #1): every register or binding holding one shares the
+// object, and FieldSet changes it in place, visible through every alias.
 
 namespace nift::rt {
 
@@ -20,34 +21,27 @@ const Value& rk(const Value* R, const Value* K, std::uint16_t x) {
 }
 } // namespace
 
-Value* Vm::struct_location(std::int64_t slot) {
-    if (slot >= 0) return static_cast<std::size_t>(slot) < stack_.size() ? &stack_[slot] : nullptr;
-    const auto index = static_cast<std::uint64_t>(-(slot + 1));
-    if (!options_.session_globals || index >= options_.session_globals->size()) return nullptr;
-    auto& value = (*options_.session_globals)[index];
-    return is_cell(value) ? &cell_of(value)->value : nullptr;
-}
-
-bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault) {
+bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault, const Proto* proto) {
     switch (in.op) {
-        case OpCode::SlotOf:
-            R[in.a] = Value::integer(static_cast<std::int64_t>((R - stack_.data()) + in.b));
-            return true;
         case OpCode::NewStruct: R[in.a] = make_struct(Atom{in.b}); return true;
         case OpCode::StructAdd: struct_add_field(R[in.a], Atom{in.b}, rk(R, K, in.c)); return true;
         case OpCode::FieldGet: {
-            const auto* instance = struct_location(R[in.b].as_int());
-            if (!instance) return internal(fault, "struct location");
-            const Value* field = instance->is(Kind::Struct) ? struct_get(*instance, Atom{in.c}) : nullptr;
+            const Value& instance = R[in.b];
+            const Value* field = instance.is(Kind::Struct) ? struct_get(instance, Atom{in.c}) : nullptr;
             if (field == nullptr) return raise(fault, StopReason::Error, "struct has no field: " + note_of(note));
             R[in.a] = *field;
             return true;
         }
         case OpCode::FieldSet: {
-            auto* instance = struct_location(R[in.a].as_int());
-            if (!instance) return internal(fault, "struct location");
-            if (!instance->is(Kind::Struct) || !struct_set(*instance, Atom{in.b}, rk(R, K, in.c)))
+            Value& instance = R[in.a];
+            if (!instance.is(Kind::Struct) || !struct_get(instance, Atom{in.b}))
                 return raise(fault, StopReason::Error, "struct has no field: " + note_of(note));
+            const Value& stored = rk(R, K, in.c);
+            // D-NEXT-refsem #4: refused before the field changes.
+            if (refuse_reference_cycle(fault, proto, in, instance.heap(), stored,
+                                       "assignment would create a cyclic reference: " + note_of(note)))
+                return false;
+            struct_set(instance, Atom{in.b}, stored);
             return true;
         }
         case OpCode::CheckField: {

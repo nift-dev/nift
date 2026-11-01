@@ -1616,3 +1616,373 @@ is a program error (legacy text, stable reason id, truthful position, exit 1, no
      package tests under `NIFT_VM=0`.
 
 Witness: `tests/runtime2/packages/` (phase 2).
+
+## D-063 — map, set and stack are values on the VM (owner, 2026-10-31; weekend collections)
+
+(D-062 is claimed by `cand/args-cmd`; renumber at integration if needed.)
+
+Owner rulings for the weekend collections candidate (`cand/collections`,
+`checkpoints/weekend-collections.md`):
+
+1. **Value semantics, an intentional departure from legacy** (where
+   collections are references). `b := a` gives an independent copy; copying is
+   **deep** and the same for assignment, function arguments, returns, closure
+   capture (values read through a closure), container insertion and
+   extraction, struct fields, `for` values and thread arguments, returns and
+   captures. Copy-on-write is allowed only as an unobservable optimisation.
+   This applies D-040 #3 ("maps and sets are values") to stacks as well.
+2. **Self-insertion snapshots**: `m.set(k, m)`, `k.push(k)`, `s.add(s)` store
+   the receiver's value before the call; ordinary values stay acyclic (D-040
+   addendum). Legacy's "would create a cyclic reference" error disappears.
+3. **`same()` follows D-040 #4**: identity only for identity-bearing values.
+   Collections (like arrays, objects and structs) are ordinary values and
+   `same()` on them is legacy's error text "same: operands must be
+   identity-bearing values" (legacy: `true`/`false` by storage). Callables and
+   file/stream handles compare by identity (legacy-equal). **Owner ruling
+   2026-11-01:** mutex, atomic, channel, future and thread compare by
+   identity too (approved difference; legacy errors): the same resource or
+   task is `true`, independently created ones `false`, by the stable handle
+   (kind, id, generation) or the task record, never a reusable address; no
+   ownership, transfer or lifetime change. Compatibility limitation: the
+   arguments must be plain names (`same:argument-shape`, refused before any
+   effect in every program): legacy reads a string argument as a binding name
+   (`same("f", "f")`) and may evaluate other shapes twice.
+4. **Everything observable apart from copying is legacy's**: constructors
+   (exact `map()`/`set()`/`stack()`), methods and their return values, key and
+   member rules (bool, number, string, and legacy's tagged strings that are
+   values here: collections structurally, callables by identity), insertion
+   order, stack order (iteration top first, `stringify` bottom first),
+   equality per kind, `type()` "collection", the binding type "string",
+   `stringify`/`prettify`, `for` forms and errors, and every error text,
+   position and (un)catchability. Anything not modelled is refused before
+   execution (checkpoint §3), never reinterpreted.
+5. **Value kind.** `rt::Kind::Collection = 15` uses the **last free value of
+   the 4-bit kind tag**; one tag serves map, set and stack (the sub-kind is in
+   the object). A later kind needs the tag mask widened (tag bits 4-6 are
+   unused). No `Value` redesign.
+6. Threads may carry collections (a copy, `WireKind::Collection`), where
+   legacy refuses them ("non-transferable resource"): part of the approved
+   value-semantics break. Stores into shared state (`mutex(v)`, `mx.set(v)`,
+   `send`) of a value holding a collection at any depth stay refused
+   (`collection-argument:`); the atomics and `channel()` take only numbers
+   or bools.
+7. **Snapshot iteration (owner ruling 2026-11-01; a deliberate Runtime 2.0
+   semantic change):** `for ((k, v) : m)` visits the entries captured at loop
+   entry, in the documented insertion order (no new order guarantee);
+   insertions, removals and value updates by the body do not affect the
+   active snapshot. Legacy iterates the live entry vector over the count at
+   entry (appended entries are skipped in both; it shows updates, shifts
+   after a removal and is undefined when the loop outlives one). A removed
+   entry is still visited; a body that removes the visited key again
+   (`mp.remove(2)` on each pass) fails with "remove: key not found" on the
+   second visit, which is this semantics (guard with `contains`).
+
+Migration (`compatibility.md`, Approved breaks): code that relied on two
+names sharing one collection must pass the collection back (`m = fill(m)`,
+`return m`) or keep it in one binding; `copy()`/`deepcopy()` are no longer
+needed to separate copies; `same()` cannot test collection sharing; a map
+loop that mutates its map sees the entries of loop entry (re-read the map
+after the loop, or guard a removal with `contains`); write `same(a, b)` with
+binding names, never `same("a", "b")`.
+
+Witnesses: `tests/runtime2/collections/approved/*.f` (VM golden and legacy
+witness for each difference), `parity/*.f`, `refuse/*.f`, the heap checks and
+sixteen mutation controls (`make test-runtime2-collections`,
+`test-runtime2-collections-mutants`).
+
+## D-NEXT-refsem — Reference semantics, Phase A: maps, sets, stacks and struct instances are references (owner, 2026-11-01)
+
+(Placeholder identifier: the number is assigned at integration.) Owner
+decision of 2026-11-01 (option 2: reference semantics with cycle creation
+refused, in two phases; rulings D1-D9). Phase A is an internal engineering
+milestone, not approval to release mixed semantics; Phase B (arrays and
+objects) needs its own plan and owner approval. Record:
+`checkpoints/weekend-refsem-a.md`.
+
+**Supersedes** (the earlier decisions stay as historical records and are not
+edited; every changed fixture, row and witness cites this decision):
+
+- **D-063** #1 (collections are values), #2 (self-insertion snapshots), #3 as
+  far as `same()` on a collection is an error, and #6 as far as it presents
+  thread copies as the general value rule;
+- **D-046** #3 and **D-040** V9 (struct instances as values; structural `==`
+  for structs);
+- the **D-040 addendum**'s "acyclic by construction" basis, for the reference
+  kinds (acyclicity is now checked);
+- the CP15 W11 reading of `copy()`/`deepcopy()` as the identity on plain
+  values (`copy` is shallow, `deepcopy` a graph copy).
+
+Not superseded: D-040 for arrays and objects (copy-on-write values until
+Phase B) and its #3 handle rule (a copy never duplicates a resource); D-063
+#4, #5 and #7 (re-affirmed by 6 below); D-055 and the CP23 ownership rules.
+
+1. **Kinds.** Maps, sets, stacks (`rt::Kind::Collection`) and struct
+   instances are identity-bearing mutable objects. Arrays and objects remain
+   values until Phase B (9). Numbers and booleans are values; strings are
+   immutable values; handles keep their identity.
+2. **Within an isolate** assignment, declaration, synchronous arguments,
+   returns, closure captures (cells), container storage and extraction,
+   struct fields and `for` element bindings share the object: a mutation
+   through any alias is visible through all (legacy-equal: legacy's
+   collections and structs are tagged references). `same()` is identity
+   (legacy-equal). `==` keeps legacy's rules: structural for collections,
+   **identity for structs** (D4; `P() == P()` is false, `copy(p) == p`
+   false). A map()/set()/stack() field initialiser is evaluated afresh for
+   every instance: no two instances share one collection.
+3. **Copying is explicit (D3).** `copy(v)` is shallow (Nift v4.2's
+   contract): a new outer instance or collection whose fields, keys, values,
+   members or elements are shared. An array or object is a value until Phase
+   B, so `copy` returns the value itself, indistinguishable from a new outer
+   array with shared elements. `deepcopy(v)` copies every reachable array,
+   object, instance and collection once and preserves the sharing inside the
+   copied graph; callables, handles and futures keep identity. Both reserve
+   the heap budget before building. The two-argument filesystem
+   `copy(src, dst)` is unchanged. Approved difference: legacy v4.4+ copies
+   deeply in `copy`, and its `deepcopy` duplicates a collection reached twice.
+4. **Cycles are refused (D1).** A store that would make a reference-kind
+   object reachable from itself (through fields, keys, values, members,
+   elements, arrays, objects, closure cells or resource payloads) is refused
+   **before** anything changes, with a **catchable** Error, code
+   `runtime.reference_cycle`: legacy's text where legacy refuses the same
+   store ("set would create a cyclic reference", "push would create a cyclic
+   reference", "assignment would create a cyclic reference: <field>"), else
+   "reference cycle: the stored value would contain itself". There is no
+   general garbage collector; refused graphs leak nothing. **Intentional
+   limitation, prominently documented:** legacy accepts a cycle through an
+   array, an object or a closure (`m.set(1, [m])`, `m.set(1, {"k": m})`, and
+   the familiar JavaScript pattern of an object holding a closure that
+   captures that object, `m.set("f", () => m.size())` inside a function); the
+   VM refuses them. A closure over a top-level binding reads it by name (no
+   heap edge) and is accepted. Legacy's refusals are fatal; the VM's are
+   catchable (approved difference).
+5. **Isolate boundaries.** Thread and parallel-async arguments, captures,
+   globals and results cross as one alias-preserving graph copy
+   (`TransferGraph`, unchanged): aliased arguments alias one copy in the
+   worker; nothing mutable is shared between isolates; refcounts stay
+   isolate-local; CP23 ownership and handle rules unchanged. Struct
+   instances cross too (legacy refuses). **Cooperative async (D7):** at task
+   creation (not first run) the arguments and the globals the task reads are
+   copied as one alias-preserving graph, before any task state exists (a
+   budget stop or failed allocation leaves the scheduler unchanged); handles
+   and callables keep identity; the CP22 admission rules (no collection
+   methods, struct code or captures in task code) stay. Equivalence with the
+   parallel path is shown by differential fixtures run under both
+   schedulers; any shape not covered stays refused by the existing
+   cooperative admission.
+6. **Iteration (D5).** A `for` loop over an array, map, set or stack visits
+   the membership at loop entry; the body's mutations change the container,
+   not the active iteration; elements are references. Maps take an explicit
+   O(n), budget-checked snapshot (sets and stacks were already materialised;
+   arrays are copy-on-write values). Re-affirms D-063 #7.
+7. **Keys (D6).** A map, set or stack used as a map key or set member, for
+   lookups too, is refused before any effect (`collection-mutable-key`):
+   their contents may change after insertion, which a hash index cannot
+   follow. Ordinary keys (bool, number, string) and callables (identity) are
+   unchanged; struct identity keys stay refused (`collection-identity-key`).
+   JavaScript-style identity keys are a future design question.
+8. **Sound inference under aliasing.** Collection contents are tracked per
+   allocation site (each `map()`/`set()`/`stack()` call or field
+   initialiser), refined per string-literal map key, never per binding;
+   struct field types are per struct type; a struct receiver is admitted only
+   when the inference proves exactly one struct type. A collection of
+   unknown origin, or a persistent session, reads as "anything".
+9. **Arrays and objects: the forward-compatibility guard (D2).** Until Phase
+   B, the VM refuses every unit whose output could differ between value and
+   reference semantics for arrays and objects
+   (`reference-guard:<route>`, `rt/reference_guard.h`): a mutated array or
+   object must be exclusive (never copied out, its parts never copied out
+   when mutated below the top, every inflow fresh; the `x = f(x)` idiom
+   allowed). The six D-040 witnesses become refusals. Accepted programs keep
+   their output when Phase B lands.
+10. **Legacy (D8).** `NIFT_VM=0` is unchanged. Every VM difference is an
+    approved difference (`compatibility.md`, cp25 classification).
+11. **Certification findings (D9).** All rt-lint findings fixed. The
+    checked-build relocation (`aggregate_store.h`) still moves storage of at
+    most 256 elements on every mutation (every stale-reference control is
+    small and is caught at its next use) and larger storage once every
+    size/256 mutations, so the 200,000-element stress fixtures stay linear
+    under sanitizers and keep their full size and budget coverage.
+
+Migration (`compatibility.md`): to keep an independent value use `copy()`
+(shallow) or `deepcopy()`; use `same()` to test sharing; a function that fills
+a collection passed to it now fills the caller's (`m = fill(m)` keeps
+working); build self-referential structures from ids into an owning
+collection.
+
+Witnesses: `tests/runtime2/refsem/` (`make test-runtime2-refsem`, fifteen
+mutation controls `test-runtime2-refsem-mutants`); the D-063 fixtures that
+became legacy-equal moved to `collections/parity/`, their value-semantics
+goldens kept in `collections/superseded/` (`INDEX.tsv`).
+
+**Review round 1 (independent review of `ad9d842f`, 2026-11-01).** The
+review rejected the candidate; these rulings amend 4, 6, 7, 9 and 11 above
+(the text above is kept as first written).
+
+- **9 amended: a whole-program guard.** The first guard reasoned per site
+  and missed mutations that run while a binding is lent (a callee mutating a
+  global its parameter aliases, a closure passed along with the binding, a
+  module function, a later session statement) and closures that capture a
+  parameter. It is replaced by a rule over the whole linked unit (modules are
+  linked into one unit, `module_link.h`): for every array/object binding that
+  is mutated in place anywhere (every binding, in a session),
+  (a) the exclusivity rules above (inflow, contents, retention) still hold,
+  with retention widened: a parameter any closure captures escapes, an
+  argument to an unresolved or callable callee is retained, a native given a
+  callable value that is not a lambda literal retains its operands' parts;
+  (b) **lent** (new route `reference-guard:lent`): while the binding's value
+  or a part of it is lent (to a call's parameter, a native and its
+  callbacks, a `for` loop), no mutation of it may be written inside that call
+  or loop (outside the lent expression itself), and if the binding is
+  referenced from any other body (function, method, lambda; a session's
+  later statements) the call or loop may not run user code;
+  (c) a loop binding or a native callback's parameter is a part of its
+  operand; a closure capturing it retains that part; a loop over a fresh
+  iterable (literal, constructing call) binds an exclusive value;
+  (d) a user function used as a value (or any function in a session) may not
+  mutate its parameters; aggregates held by struct instances are unknown
+  roots. Proof sketch (`checkpoint` §5): in the copy model and in Phase B
+  the outputs differ only if an object is mutated through one holder while a
+  second holder observes it; (a) excludes every second holder outliving an
+  operation, (b) every mutation during a lending, whose holders end with it.
+- **6 amended (D5 for arrays).** Array (and object) iteration is the
+  copy-on-write value in Phase A; an array mutated while its loop runs is
+  refused by (b), since Phase B would iterate the live array. Array snapshot
+  iteration as a reference rule lands with Phase B.
+- **4 amended.** A cycle closed by a store into a captured cell (closure
+  capture, upvalue) raises the catchable `runtime.reference_cycle` too; the
+  cell, the stored value, reference counts and heap accounting are left
+  unchanged.
+- **7 amended.** An object as a map key or set member is refused under its
+  own reason, `collection-object-key` (it was reported as a struct or handle).
+- **11 amended (relocation).** Larger storage also moves on the first
+  mutation after a reference or pointer into it was handed out (a header bit
+  set by the reference-returning accessors), so "take a reference, mutate
+  once, use it" is caught at every size; these moves draw on a per-thread
+  credit refilled by every mutation, so the moved volume stays linear.
+- **Cost (owner guidance of 2026-11-01: the guard is a temporary internal
+  measure).** CP25-R corpora (589 shared units, 608 execute entries): no
+  refusal beyond the four the first guard already made. `tests/` (1,757
+  `.f`): the new refusals are the loop-mutation and aliasing probes
+  (`for-s2`, `cp12c-probes`, `capture_origins`, `closures-s1`). Three common
+  shapes are newly refused although Phase B would print the same: an in-place
+  update of the array a `for` iterates (`for (x : a) { a[i] = x * 2 }`), a
+  write through the loop binding (`for (row : grid) { row.push(0) }`, which
+  already writes through on the VM and in legacy), and a global array that
+  helper functions mutate, passed to a function that only reads it. Admitting
+  them needs index reasoning, a call graph and a place model of loop
+  bindings; the guard
+  is not grown further pending the owner's choice (keep it, narrow arrays and
+  objects further, or bring Phase B forward).
+
+**Review round 2 (independent review of `964901ae`, 2026-11-01; the owner's
+last guard round).** Amends round 1 above (kept as written).
+
+- **Guard: collection iteration.** A `for` loop over a map, set or stack
+  (or a `copy`/`deepcopy` of one, or a call returning one) binds elements of
+  an unknown holder: the collection's elements alias every other holder in
+  Phase B. The first guard treated such a binding as exclusive (`fresh`
+  short-circuits on a non-aggregate kind). Mutating it is refused
+  (`reference-guard:collection-element`); retaining, capturing or lending
+  it counts as an unknown holder; extracting from it is a non-fresh inflow.
+  Only literals and constructing calls bind exclusive values (as round 1
+  stated). In a session, only top-level bindings are treated as mutated by
+  later statements (a function's or lambda's locals are reached only by the
+  unit's own code), and a session recompile's capture initializer (the
+  existing captured cell's value) is not a new inflow.
+- **Cycles (4).** A store into a captured array by insert, splice, an
+  expression push or an element store moved the array out of its cell before
+  the cycle check, so a caught refusal left the cell empty. The check now
+  runs before the value leaves the cell (`CellTake` carries the stored
+  value's register); the graph, reference counts and heap accounting stay
+  unchanged, and later reads, mutations and cleanup behave.
+- **Relocation (11).** Internal transient reads (VM element reads, sizes,
+  iteration) use non-lending views; `array_mut` no longer counts its own
+  mutation as a hand-out. Guarantee, exactly: a mutation of storage above 256
+  elements moves it when a reference or pointer was handed out since its last
+  move and the thread's relocation credit (2^21 elements to start, plus 512
+  per mutation) covers its size; otherwise once every size/256 + 1 mutations.
+  Ordinary VM reads no longer spend the credit.
+- **Sessions (a Phase A defect, review of the Linode run).** The session
+  symbol table stored kinds in 16-bit fields; `kKindStruct` (bit 23) and the
+  collection kinds were truncated, so an instance (or collection) binding came
+  back as a string in the next statement and was refused. The fields are
+  32-bit now; instance and collection bindings work across statements
+  (legacy-equal). An instance or collection with no identity-bearing content
+  has no callable shape (it made struct schema replacement refuse).
+
+**Review round 3 (independent review of `22685af2`, 2026-11-01; owner
+addendum: a bounded correction, no guard changes).** Amends rounds 1 and 2
+above (kept as written).
+
+- **Cycles (4): validate the whole mutation, then commit.** A splice that
+  removes elements (count > 0) on a captured array stored the removal into
+  the cell before the replacement was evaluated and checked, so a refused
+  splice still removed elements (the review's repro: `[1,2,3]` became `[3]`).
+  The splice now removes and inserts on a copy and stores once: the store
+  checks the complete result (every replacement, including the last) against
+  the receiver before the cell changes, so a refused splice leaves the
+  receiver and its reachable graph byte-for-byte unchanged, in statement,
+  expression, closure and captured-cell forms. The other array mutators
+  (insert, push, element store) check the stored value before the take (round
+  2); map set, stack push and struct field stores check before the store. A
+  global array is read by name from closures, so storing into it closes no
+  cycle. Mutant R22 (the removal stored first) is caught.
+- **Presentation on mixed struct receivers.** `stringify()`, `prettify()` and
+  `highlight()` on a value inferred to be a struct instance or another kind
+  (an array, map, set, stack or scalar) were admitted and stopped after
+  output with an internal failure (exit 70). They are refused at compile time
+  before any effect (`presentation-mixed-struct:<method>`), wherever the call
+  sits (top level, function, closure, imported module). This is dynamic
+  dispatch of presentation methods over mixed struct/collection receivers:
+  a candidate for Phase B or a later VM capability checkpoint, not a
+  permanent limitation. Exact collection receivers, collection/array mixes and
+  unconstrained values (`env()`, decoded JSON) keep the generic path.
+- **Presentation of containers holding struct instances (coordinator).**
+  Phase A admits instances inside containers, and the VM serializer cannot
+  render one (legacy: `[C{v:0}]`, private fields skipped; privacy is not on
+  the run-time instance), so `[C()].stringify()` stopped after output with an
+  internal failure. In a unit or session that declares a struct, a
+  presentation method on a value that may be a container is refused at
+  compile time (`presentation-struct-contents:<method>`); conservative, a
+  Phase B / VM capability candidate. An audit of every content-walking
+  operation found no other crashing path (checkpoint section 15).
+- **Phase B requirements (recorded, not implemented).** Every
+  cycle-capable mutation of arrays and objects goes through one shared
+  protocol: validate the complete proposed mutation, commit it, then update
+  bookkeeping. Phase B separates static admission from runtime dispatch, so a
+  valid program is not refused only because inference is imprecise.
+
+**Review round 4 (independent review of `2640ab48`, 2026-11-01; F1-F3
+owner-approved; no guard changes).** Amends round 3 above (kept as written).
+
+- **Presentation of struct instances (F1).** Round 3 refused only receivers
+  inferred to be a struct *and* something else, so an exactly-struct receiver
+  that is not a plain name (`C().stringify()`, `a[0]`, `m.get(k)`,
+  `st.pop()`, a call result, a loop element, a session binding) reached the
+  serializer and stopped after output with an internal failure. In a unit or
+  session that declares a struct, a presentation method on a value whose
+  inferred kinds include a struct instance is refused at compile time
+  (`presentation-struct:<method>`, renamed from `presentation-mixed-struct`),
+  decided from the receiver's kinds whatever the expression; containers keep
+  `presentation-struct-contents`. Compatibility gaps to eliminate (Phase B /
+  VM struct rendering).
+- **Splice argument order (F2, coordinator ruling under the owner's
+  correctness-over-legacy policy, owner-approved; the owner may reverse it).**
+  Every splice evaluates the receiver and all arguments, validates bounds,
+  the replacement and cycles, prepares the result without touching the
+  original and commits once; on failure the array is unchanged (captured,
+  global or local alike). Argument side effects are not rolled back.
+  Legacy's remove-before-evaluate order is an approved difference. No other
+  mutator evaluates an argument after a partial mutation (audit in the
+  checkpoint, section 16). Mutant R23 (only captured splices evaluate first)
+  is caught.
+- **Known over-refusal (F3).** The struct-unit container rule refuses
+  containers that hold no instance (the nift-packages/http `capabilities()`
+  shape); a temporary Phase A limitation Phase B must eliminate, the program
+  and its valid output preserved as `tests/runtime2/refsem/pending/`.
+- **Phase B (recorded only).** Operation admission from the semantic receiver
+  and argument types through one operation-level admission interface, not
+  per syntactic form.
+- **Pre-existing, reported.** Presenting a `mutex()` or `channel()` value
+  (alone or in a container) stops after output with an internal failure on
+  weekend/r2 as well; not part of this change.

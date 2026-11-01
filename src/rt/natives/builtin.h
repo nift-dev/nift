@@ -103,12 +103,18 @@ inline constexpr KindSet kAtomicInt = 1u << 17;
 inline constexpr KindSet kAtomicBool = 1u << 18;
 inline constexpr KindSet kAtomic = kAtomicInt | kAtomicBool;
 inline constexpr KindSet kChannel = 1u << 19;
+// Weekend collections (D-063): map, set and stack values. Outside kAny like
+// the handle families: a native family opts in explicitly.
+inline constexpr KindSet kMap = 1u << 20;
+inline constexpr KindSet kSet = 1u << 21;
+inline constexpr KindSet kStack = 1u << 22;
 
 // The receiver a built-in is called on: a method of a string, array,
 // object, number, bool or null, a method of any value (Any: the presentation
 // methods), or a free function (None).
 enum class Receiver : std::uint8_t {
-    None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream, Mutex, Atomic, Channel
+    None, String, Array, Object, Number, Bool, Null, Any, Bytes, File, Stream, Mutex, Atomic, Channel,
+    Map, Set, Stack  // D-063
 };
 
 // How the result kinds follow from the argument kinds (for kind inference).
@@ -147,7 +153,7 @@ inline constexpr std::uint8_t kVariadic = 255;
 // last in builtin_list.inc. Used by the R1 refusal of linked units
 // (script_runner.cpp). A built-in appended after the block must be added here
 // deliberately (the assert fails until it is).
-static_assert(static_cast<std::uint16_t>(BuiltinId::AtomicCompareExchange) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::FnSame) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {

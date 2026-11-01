@@ -1,0 +1,2 @@
+k := stack()
+k.pop()

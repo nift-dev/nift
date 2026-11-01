@@ -39,7 +39,7 @@ void Vm::collection_error_context(VmResult& result,const Fault& fault,const Prot
     // Entry and result validation can fail before a callback frame exists
     // or after it has returned. Private collection opcodes retain that context.
     bool collection=pc->op==OpCode::CollectionCall||pc->op==OpCode::CollectionStep||
-        pc->op==OpCode::CollectionSort||pc->op==OpCode::ArrayMutate;
+        pc->op==OpCode::CollectionSort||pc->op==OpCode::ArrayMutate||pc->op==OpCode::KeyedMutate;
     for(const Frame& frame:frames_)collection=collection||(frame.ret-1)->op==OpCode::CollectionCall;
     if(!collection)return; // Ordinary CP13B reporting is unchanged.
     for(auto it=frames_.rbegin();it!=frames_.rend();++it) {

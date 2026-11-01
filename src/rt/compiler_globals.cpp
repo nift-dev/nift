@@ -96,12 +96,12 @@ bool UnitCompiler::global_check_defined(std::uint16_t slot, std::string_view nam
 // program, so it is never observed; once the VM catches errors (try/catch),
 // a caught fault would leave the global null, unlike legacy. CP13B must
 // restore the slot on unwind, or update the global in place without taking.
-bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg, std::string_view name) {
+bool UnitCompiler::global_take(const Binding& b, std::uint16_t& reg, std::string_view name, std::uint16_t check) {
     if (b.cell) {
         if (b.selector_root_only) {
             std::uint16_t cell = 0;
             if (!global_read(b.reg, cell) || !temp(reg)) return false;
-            fb_->emit(OpCode::CellTake, reg, cell);
+            fb_->emit(OpCode::CellTake, reg, cell, check);
             return true;
         }
         return read_binding(b, reg);
@@ -150,7 +150,6 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
         }
         return fail(node, in_function_ ? "free-name" : "unresolved-name");
     }
-    if (binding->struct_id >= 0) return fail(node, "struct-value");  // CP12b: instances are never copied
     if (binding->lazy_for) return for_lazy_read(*binding, reg);
     if (binding->global && !binding->cell)
         return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);

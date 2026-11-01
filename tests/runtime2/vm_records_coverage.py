@@ -54,7 +54,6 @@ import sys
 import tempfile
 
 SUPPORTED = [
-    ('push_arrlit_fnloop', 'fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n'),
     ('push_call_loop', 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\ni := 0\nwhile (i < 3) { a.push(mk(i)); i += 1 }\nprint(a.stringify())\nprint(a[2].t[0] + a[1].id)\n'),
     ('push_call_top', 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\na.push(mk(2))\nprint(a.stringify())\n'),
     ('push_objlit_loop', 'a := []\ni := 0\nwhile (i < 3) { a.push({"k": i, "s": "v" + i, "l": [i, i]}); i += 1 }\nprint(a.stringify())\n'),
@@ -292,6 +291,11 @@ ORACLE = {
 }
 
 REFUSED = [
+    # D-NEXT-refsem #1: add() mutates its parameter, so in Phase B the caller's
+    # `a` would receive the pushes (the D-040 copy at the call loses them): the
+    # Phase A guard refuses it before any effect (it was a supported shape).
+    ('push_arrlit_fnloop', 'fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n',
+     'reference-guard:argument'),
     # Integration review (stage4d): these were listed as supported, but each
     # contains a construct that is refused for a reason that still holds: a
     # pushed member of a binding and a declaration from an array element are

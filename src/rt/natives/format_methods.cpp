@@ -71,6 +71,8 @@ bool serialize_error(const Value& value, bool pretty, int depth, std::string& ou
 // Legacy serialize_value: compact ("," and ":") or pretty (two-space indent,
 // one element per line, ": " after keys; empty containers stay "[]"/"{}").
 // Recursion is bounded by kMaxDepth + 1 levels.
+bool serialize_collection(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
+                          bool& bad_kind);
 bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, std::string& error, bool& bad_kind) {
     if (depth > kMaxDepth) { error = "value serialization depth exceeded"; return false; }
     switch (value.kind()) {
@@ -82,6 +84,7 @@ bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, 
         case Kind::Error: return serialize_error(value, pretty, depth, out, error);
         case Kind::Function: error = "opaque runtime value is not serializable"; return false;
         case Kind::Array: case Kind::Object: break;
+        case Kind::Collection: return serialize_collection(value, pretty, depth, out, error, bad_kind);
         default: bad_kind = true; error = "stringify argument kind"; return false;
     }
     const bool array = value.is(Kind::Array);
@@ -105,6 +108,37 @@ bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, 
     }
     if (pretty && count != 0) out.append(static_cast<std::size_t>(depth * 2), ' ');
     out += array ? ']' : '}';
+    return true;
+}
+
+// D-063: legacy serialize_value's collection form (ParserExpression.cpp):
+// `map([[k,v],...])`, `set([...])`, `stack([...])` (bottom first); pretty puts
+// one entry per line, `[k, v]` with keys and values at the next depth.
+bool serialize_collection(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
+                          bool& bad_kind) {
+    const CollectionKind kind = collection_kind(value);
+    const auto& items = collection_items(value);
+    out += collection_kind_name(kind);
+    out += "([";
+    const std::size_t step = kind == CollectionKind::Map ? 2 : 1;
+    const std::size_t count = items.size() / step;
+    if (pretty && count != 0) out += '\n';
+    for (std::size_t i = 0; i < count; ++i) {
+        if (pretty) out.append(static_cast<std::size_t>((depth + 1) * 2), ' ');
+        if (kind == CollectionKind::Map) {
+            out += '[';
+            if (!serialize_at(items[2 * i], pretty, depth + 1, out, error, bad_kind)) return false;
+            out += pretty ? ", " : ",";
+            if (!serialize_at(items[2 * i + 1], pretty, depth + 1, out, error, bad_kind)) return false;
+            out += ']';
+        } else if (!serialize_at(items[i], pretty, depth + 1, out, error, bad_kind)) {
+            return false;
+        }
+        if (i + 1 < count) out += ',';
+        if (pretty) out += '\n';
+    }
+    if (pretty && count != 0) out.append(static_cast<std::size_t>(depth * 2), ' ');
+    out += "])";
     return true;
 }
 
@@ -184,6 +218,7 @@ const char* public_type_name(const Value& value) {
         case Kind::Struct: return "struct";
         case Kind::Error: return "error";
         case Kind::Handle: return shared_handle_type_name(value);
+        case Kind::Collection: return "collection";  // legacy type() of every collection kind
         default: return nullptr;  // host handles keep their CP17 refusal
     }
 }

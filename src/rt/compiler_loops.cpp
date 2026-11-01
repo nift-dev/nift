@@ -47,8 +47,15 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     const Node& iterable = ast_.at(header.a);
     const KindSet source_kinds = kinds(header.a);
     const bool unknown = (source_kinds & kKindUnknown) != 0;
-    const bool has_array = (source_kinds & kKindArray) != 0;
-    const bool has_object = (source_kinds & kKindObject) != 0;
+    // D-063: a map/set/stack is iterated as legacy does: a set or a stack as
+    // a snapshot array of its members (a stack top first), a map by its typed
+    // entries (pair form). The snapshot is taken at the header (a value: the
+    // body's mutations of the collection are not seen; legacy materialises
+    // sets and stacks the same way and iterates a map's live entry vector).
+    const bool keyed = source_kinds == kKindMap || source_kinds == kKindSet || source_kinds == kKindStack;
+    if (!unknown && (source_kinds & kKindCollection) && !keyed) return fail(node, "for-collection");
+    const bool has_array = (source_kinds & kKindArray) != 0 || (keyed && source_kinds != kKindMap);
+    const bool has_object = (source_kinds & kKindObject) != 0 || source_kinds == kKindMap;
     if (unknown) return fail(node, "type:for-source");
     if (has_array && has_object) return fail(node, "type:for-source-union");
 
@@ -58,17 +65,25 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     else if (state.pair && has_object) state.mode = 1;
     else if (!has_array && !has_object) state.force_mode = 2;
     else if (state.pair && has_array) state.force_mode = 3;
-    else state.force_mode = 4;  // single over an object
+    else state.force_mode = source_kinds == kKindMap ? 5 : 4;  // single over an object (5: a map)
     state.error_only = state.force_mode >= 0;
 
-    if (!state.error_only) for_source_binding(iterable, state.place);
+    // Owner ruling (2026-11-01): a map loop visits the entries captured at
+    // loop entry; the body's insertions, removals and updates do not reach
+    // the active snapshot (M15: the map is re-read live, as an object is).
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 15
+    const bool snapshot = keyed && source_kinds != kKindMap;
+#else
+    const bool snapshot = keyed;
+#endif
+    if (!state.error_only && !snapshot) for_source_binding(iterable, state.place);
     if (state.place != nullptr) {
         // Keep binding identity stable: declaring the loop name below can
         // reallocate the scope vector and must not scroll the source binding.
         state.source_holder = *state.place;
         state.place = &state.source_holder;
     }
-    if (iterable.kind == NodeKind::Ident) state.source_name = text(iterable);
+    if (iterable.kind == NodeKind::Ident && !snapshot) state.source_name = text(iterable);
     state.live = !state.error_only && state.place != nullptr;
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1
     state.snapshot_mutant = state.live;  // M1: a snapshot instead of live re-reads
@@ -167,6 +182,51 @@ bool UnitCompiler::for_finish(ForState& state) {
     update_flags();
     if (!statement_preparable(node)) return fail(node, "prepared-unpreparable");
     return builder_ok();
+}
+
+// `while` (moved from compiler.cpp: rt-lint file length, D-NEXT-refsem D9).
+bool UnitCompiler::while_loop(const Node& node) {
+    // A `while` always runs on legacy's prepared evaluator (its condition and
+    // body), wherever it is; its condition must be one that evaluator accepts.
+    ++loop_depth_;
+    const bool saved_textual = textual_statement_;
+    textual_statement_ = false;
+    update_flags();
+    Loop loop;
+    loop.start = fb_->here();
+    if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration (continue included)
+    loop.try_depth = try_scopes_.size();
+    loops_.push_back(loop);
+    std::vector<std::size_t> exits;
+    bool ok = false_jump(node.a, exits);
+    BlockRegs body_regs;
+    if (ok) {
+        scopes_.push();
+        const std::uint16_t mark = fb_->top();
+        body_regs = block_begin(node.b);
+        ok = statements(ast_.at(node.b));
+        block_end(body_regs);
+        fb_->release_to(mark);
+        scopes_.pop();
+    }
+    if (ok) {
+        // CP17 unwind release: clear the body at each iteration end (`continue` too) and at the exit.
+        fb_->set_offset(node.begin);
+        const std::size_t iteration_end = fb_->here();
+        block_clear(body_regs);
+        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);
+        const std::size_t back = fb_->emit(OpCode::Jmp);
+        fb_->patch(back, loops_.back().start);
+        for (std::size_t at : exits) fb_->patch(at, fb_->here());
+        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());
+        block_clear(body_regs);
+    }
+    loops_.pop_back();
+    if (ok && !statement_preparable(node)) ok = fail(node, "prepared-unpreparable");
+    --loop_depth_;
+    textual_statement_ = saved_textual;
+    update_flags();
+    return ok && builder_ok();
 }
 
 bool UnitCompiler::loop_jump(const Node& node) {

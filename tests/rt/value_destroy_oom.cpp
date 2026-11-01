@@ -15,6 +15,7 @@
 //
 // Usage: value-destroy-oom [case]   (no argument: every case)
 #include "rt/aggregate.h"
+#include "rt/copy_graph.h"
 #include "rt/atom.h"
 #include "rt/heap_account.h"
 #include "rt/proto.h"
@@ -252,7 +253,10 @@ std::vector<Value> build(const Graph& g) {
     for (std::size_t i = 0; i < g.nodes.size(); ++i) {
         const Node& node = g.nodes[i];
         if (node.copy_of >= 0) {
-            Value v = built[node.copy_of];  // shares the object
+            // Shares the object; D-NEXT-refsem: a struct instance is a reference
+            // mutated in place, so its copy is made explicitly (shallow).
+            Value v = built[node.copy_of];
+            if (node.kind == 2) CHECK(shallow_copy(built[node.copy_of], v, kNoCopyLimit) == CopyStatus::Ok);
             const std::size_t slot = node.children.size();
             add_slot(v, node.kind, slot, built[node.children.back()]);  // COW clone sharing every child
             // relabel slot 0 (the clone shares its label string until now)

@@ -149,12 +149,6 @@ TyRef* Inference::find(std::string_view name) {
 
 
 
-int Inference::function_index(const Node& callee) const {
-    if (callee.kind != NodeKind::Ident) return -1;
-    const auto fn = plan_.index.find(ast_.text(callee));
-    return fn == plan_.index.end() ? -1 : static_cast<int>(fn->second) - 1;
-}
-
 TyRef Inference::expr(NodeId id) {
     const Node& n = ast_.at(id);
     if (const auto seed = session_expression_seed(id)) return record(id, seed);
@@ -341,7 +335,7 @@ TyRef Inference::call(const Node& n) {
             if (info.ctor >= 0) method_call(info.methods[static_cast<std::size_t>(info.ctor)].function, n);
             else for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
             auto instance = std::make_shared<Ty>();
-            instance->kinds = kKindObject;
+            instance->kinds = kKindStruct;  // D-NEXT-refsem: a reference, not an object value
             instance->struct_id = static_cast<int>(s->second);
             return instance;
         }
@@ -362,6 +356,10 @@ TyRef Inference::call(const Node& n) {
             const TyRef result = call_callables(field, values, grew);
             return result;
         }
+        const bool mixed = recv->any || (recv->kinds & ~kKindCollection);  // D-063: possibly a collection
+        const bool shown = !n.count && (key == "stringify" || key == "prettify" || key == "highlight");
+        if ((recv->kinds & kKindCollection) && !(mixed && shown))  // presentation: a string for any value
+            return mixed ? any_ty() : keyed_result(n, recv, values, key);  // mixed: refused by the compiler
         const int collection = collection_method(key);
         if (collection >= 0 && recv->kinds == kKindArray) {
             const auto result = collection_result(n, recv, values, collection);
@@ -389,6 +387,7 @@ TyRef Inference::call(const Node& n) {
     }
     // print, a CP14 free built-in, or something the compiler refuses
     TyRef result=callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
+    if (callee.kind == NodeKind::Ident) result = constructed(n, result);  // D-NEXT-refsem: an allocation site
     if(result->kinds&kKindNumber) {
         result=with_text_number(result,true);
     }

@@ -89,6 +89,10 @@ std::size_t raw_footprint(const HeapObject* object) {
         }
         case Kind::Struct:
             return sizeof(StructObject) + vector_storage(static_cast<const StructObject*>(object)->fields);
+        case Kind::Collection: {  // D-063: children counted separately, like an array's
+            const auto* c = static_cast<const CollectionObject*>(object);
+            return sizeof(CollectionObject) + vector_storage(c->items) + vector_storage(c->index);
+        }
         case Kind::Error: {
             const auto* e = static_cast<const ErrorObject*>(object);
             return sizeof(ErrorObject) + text_storage(e->message) + text_storage(e->code) +

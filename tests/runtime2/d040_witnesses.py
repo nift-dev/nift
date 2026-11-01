@@ -17,6 +17,12 @@ stderr, exit status, a refusal, a replay -- is not approved.
 
 Each witness names where it is checked. tests/runtime2/d040_witnesses_selftest.py
 pins the rejection of an unrelated difference and of D-040 lookalikes.
+
+D-NEXT-refsem #9 (reference semantics, Phase A): the forward-compatibility
+guard refuses every one of these programs before execution, since its output
+would change once arrays become references (Phase B). The witnesses are kept
+unchanged as the historical record; a VM run of them is now a refusal, which
+match() never approves.
 """
 import hashlib
 

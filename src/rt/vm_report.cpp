@@ -185,7 +185,7 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));
             break;
-        default: return struct_op(in, note, R, K, fault);  // CP12b structs (vm_struct.cpp)
+        default: return struct_op(in, note, R, K, fault, proto);  // CP12b structs (vm_struct.cpp)
     }
     R[in.a] = std::move(out);
     return true;

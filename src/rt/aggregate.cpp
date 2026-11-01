@@ -1,5 +1,7 @@
 #include "rt/aggregate.h"
 
+#include "rt/aggregate_store.h"
+#include "rt/compare.h"
 #include "rt/heap_account.h"
 
 #include <cstdlib>
@@ -9,45 +11,11 @@ namespace nift::rt {
 
 namespace {
 
+using namespace aggregate_detail;
+
 struct CloneDeleter {
     void operator()(HeapObject* object) const noexcept { destroy_heap_object(object); }
 };
-
-// Reference-safety enforcement (CP11 review round 2, owner item 6): in
-// sanitizer builds (or with NIFT_RT_CHECKED_REFS) every mutation entry point
-// first moves the aggregate's storage to a fresh allocation and frees the old
-// one, so ANY element reference or pointer obtained before the mutation (see
-// the contract in aggregate.h) points into freed memory and AddressSanitizer
-// aborts on its next use, deterministically, instead of only when a real
-// reallocation happens to occur. Release builds compile this away.
-#if defined(__SANITIZE_ADDRESS__) || defined(NIFT_RT_CHECKED_REFS)
-#define NIFT_RT_RELOCATE_ON_MUTATION 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define NIFT_RT_RELOCATE_ON_MUTATION 1
-#endif
-#endif
-
-template <class T> void relocate(std::vector<T>& items) {
-#ifdef NIFT_RT_RELOCATE_ON_MUTATION
-    std::vector<T> fresh;
-    fresh.reserve(items.capacity());
-    for (auto& item : items) fresh.push_back(static_cast<T&&>(item));
-    items.swap(fresh);
-#else
-    (void)items;
-#endif
-}
-
-void relocate_storage(HeapObject* object) {
-    if (object->kind() == Kind::Array) relocate(static_cast<ArrayObject*>(object)->items);
-    if (object->kind() == Kind::Struct) relocate(static_cast<StructObject*>(object)->fields);
-    if (object->kind() == Kind::Object) {
-        auto* o = static_cast<ObjectObject*>(object);
-        relocate(o->entries);
-        relocate(o->index);
-    }
-}
 
 // Open-addressing index for larger objects: slots hold position + 1 (0 =
 // empty); capacity is a power of two at least twice the entry count.
@@ -83,30 +51,6 @@ std::ptrdiff_t find_position(const ObjectObject& object, Atom key) {
     }
 }
 
-// Retain-before-unique (D-040 V16): the stored value is owned by the callee's
-// parameter before the receiver is made unique, so a value stored into
-// itself (`a.push(a)`) is the receiver's previous value and unshare clones
-// the receiver. Checked builds verify that a store never makes an object
-// contain itself directly.
-void check_not_self(const HeapObject* receiver, const Value& stored) {
-#ifdef NIFT_RT_RELOCATE_ON_MUTATION
-    if (stored.is_heap() && stored.heap() == receiver) std::abort();
-#else
-    (void)receiver; (void)stored;
-#endif
-}
-
-// Hot path (every push/set): scalars and strings are decided by one compare,
-// since every kind that can carry identity sorts at or after Kind::Array.
-inline void note_store(HeapObject* receiver, const Value& stored) {
-    if (stored.kind() < Kind::Array) return;
-    if (may_contain_identity(stored)) mark_may_hold_identity(receiver);
-}
-
-void copy_summary(const HeapObject* from, HeapObject* to) {
-    if (may_hold_identity(from)) mark_may_hold_identity(to);
-}
-
 std::ptrdiff_t field_position(const StructObject& s, Atom field) {
     for (std::size_t i = 0; i < s.fields.size(); ++i)
         if (s.fields[i].first == field) return static_cast<std::ptrdiff_t>(i);
@@ -120,6 +64,8 @@ ObjectObject& object_mut(Value& object) {
 
 } // namespace
 
+// Arrays and objects only: struct instances and collections are references
+// (D-NEXT-refsem #1) and are mutated in place, whoever else holds them.
 bool unshare(Value& value) {
     if (value.refcount() <= 1) return false;
     // Own every partial clone before copying or checked-reference relocation.
@@ -134,11 +80,6 @@ bool unshare(Value& value) {
         const auto* source = value.heap_as<ObjectObject>();
         o->entries = source->entries;
         o->index = source->index;
-    } else if (value.is(Kind::Struct)) {
-        const auto* source = value.heap_as<StructObject>();
-        auto* st = new StructObject(source->type_name);
-        copy.reset(st);
-        st->fields = source->fields;
     } else {
         return false;
     }
@@ -160,8 +101,16 @@ Value make_array(std::size_t reserve) {
     return owned;
 }
 
-const std::vector<Value>& array_items(const Value& array) { return array.heap_as<ArrayObject>()->items; }
+const std::vector<Value>& array_items(const Value& array) {
+    note_lent(array.heap());
+    return array.heap_as<ArrayObject>()->items;
+}
 
+const std::vector<Value>& array_view(const Value& array) { return array.heap_as<ArrayObject>()->items; }
+
+// The storage is for the caller's own mutation (it relocated first): not a
+// hand-out of the result (review round 2: setting the bit here drained the
+// relocation credit on every VM mutation).
 std::vector<Value>& array_mut(Value& array) {
     if (!unshare(array)) relocate_storage(array.heap());
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
@@ -188,7 +137,7 @@ Value* array_slot_mut(Value& array, std::size_t index) {
     return &array_mut(array)[index];
 }
 
-std::size_t array_size(const Value& array) { return array_items(array).size(); }
+std::size_t array_size(const Value& array) { return array.heap_as<ArrayObject>()->items.size(); }
 
 Value make_object() {
     auto* object = new ObjectObject();
@@ -199,10 +148,22 @@ Value make_object() {
 std::size_t object_size(const Value& object) { return object.heap_as<ObjectObject>()->entries.size(); }
 
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object) {
+    note_lent(object.heap());
     return object.heap_as<ObjectObject>()->entries;
 }
 
+const std::vector<std::pair<Atom, Value>>& object_view(const Value& object) {
+    return object.heap_as<ObjectObject>()->entries;
+}
+
+const Value* object_find(const Value& object, Atom key) {
+    const auto* o = object.heap_as<ObjectObject>();
+    const std::ptrdiff_t at = find_position(*o, key);
+    return at < 0 ? nullptr : &o->entries[static_cast<std::size_t>(at)].second;
+}
+
 const Value* object_get(const Value& object, Atom key) {
+    note_lent(object.heap());
     const auto* o = object.heap_as<ObjectObject>();
     const std::ptrdiff_t at = find_position(*o, key);
     return at < 0 ? nullptr : &o->entries[static_cast<std::size_t>(at)].second;
@@ -239,7 +200,7 @@ bool object_remove(Value& object, Atom key) {
 Value* object_slot_mut(Value& object, Atom key) {
     if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
     ObjectObject& o = object_mut(object);
-    mark_may_hold_identity(&o);
+    mark_may_hold_identity(&o);  // the slot is for the caller's own store: not a hand-out
     return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
 }
 
@@ -262,8 +223,9 @@ const Value* struct_get(const Value& instance, Atom field) {
     return at < 0 ? nullptr : &s->fields[static_cast<std::size_t>(at)].second;
 }
 
+// Structs are references (D-NEXT-refsem #1, #4): in place, never cloned.
 void struct_add_field(Value& instance, Atom field, Value value) {
-    if (!unshare(instance)) relocate_storage(instance.heap());
+    relocate_storage(instance.heap());
     check_not_self(instance.heap(), value);
     note_store(instance.heap(), value);
     instance.heap_as<StructObject>()->fields.emplace_back(field, static_cast<Value&&>(value));
@@ -272,7 +234,15 @@ void struct_add_field(Value& instance, Atom field, Value value) {
 
 bool struct_set(Value& instance, Atom field, Value value) {
     if (field_position(*instance.heap_as<StructObject>(), field) < 0) return false;
-    if (!unshare(instance)) relocate_storage(instance.heap());
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 2
+    if (instance.refcount() > 1) {  // R2: a shared instance is copied on write (the old value semantics)
+        const auto* source = instance.heap_as<StructObject>();
+        Value copy = make_struct(source->type_name, source->fields.size());
+        for (const auto& f : source->fields) struct_add_field(copy, f.first, f.second);
+        instance = std::move(copy);
+    }
+#endif
+    relocate_storage(instance.heap());
     auto* s = instance.heap_as<StructObject>();
     check_not_self(s, value);
     note_store(s, value);
@@ -282,10 +252,11 @@ bool struct_set(Value& instance, Atom field, Value value) {
 
 Value* struct_slot_mut(Value& instance, Atom field) {
     if (field_position(*instance.heap_as<StructObject>(), field) < 0) return nullptr;
-    if (!unshare(instance)) relocate_storage(instance.heap());
+    relocate_storage(instance.heap());
     auto* s = instance.heap_as<StructObject>();
     mark_may_hold_identity(s);
     return &s->fields[static_cast<std::size_t>(field_position(*s, field))].second;
 }
 
 } // namespace nift::rt
+

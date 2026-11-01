@@ -540,7 +540,8 @@ test-rt-value-sanitize:
 	"$(TEST_DIR)/rt-san/value-regress"
 	"$(TEST_DIR)/rt-san/value-round2"
 	# Reference safety is enforced: a reference held across a mutation must abort.
-	for m in stale-array stale-object stale-string; do \
+	for m in stale-array stale-object stale-string stale-map stale-set stale-stack stale-struct stale-large-array \
+		stale-large-map stale-large-set stale-large-stack stale-large-object; do \
 		if ASAN_OPTIONS=detect_leaks=0 "$(TEST_DIR)/rt-san/value-round2" $$m 2>"$(TEST_DIR)/rt-san/$$m.log"; then \
 			echo "FAIL: stale reference ($$m) not detected"; exit 1; fi; \
 		grep -q "heap-use-after-free" "$(TEST_DIR)/rt-san/$$m.log" || { echo "FAIL: $$m"; exit 1; }; \
@@ -592,7 +593,7 @@ $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
 $(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
 
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
@@ -617,7 +618,7 @@ test-rt-handles-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
 		-o "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-box-unit"
@@ -3277,7 +3278,7 @@ test: test-call-semantics
 # ASan+UBSan build. Linked against the CP09 value model only (not the CP12
 # compiler/VM). RT_BUILTINS_LEGACY: the legacy nift binary used as oracle.
 RT_BUILTINS_LEGACY ?= $(CURDIR)/$(TARGET)
-RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp compare.cpp \
+RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp compare.cpp \
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
@@ -3344,7 +3345,7 @@ bench-rt-case-conversion: $(RT_CASE_BENCH)
 # natives with the CP09 value model WITHOUT RuntimeValue.cpp, legacy_bridge.cpp
 # and render.cpp (a call into them fails the link), and the sources must not
 # include their headers.
-RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp atom.cpp heap_account.cpp \
+RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp \
 	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp $(RT_BUILTINS_HOST)
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
@@ -4598,6 +4599,62 @@ test-cp23-certify: test-runtime2-cp23-tsan
 endif
 CERTIFY_RUNTIME2_GATES += test-cp23-certify
 certify-targets: test-cp23-certify
+# Weekend collections (D-063; reference semantics since D-NEXT-refsem): map/set/stack on the VM.
+.PHONY: test-runtime2-collections test-runtime2-collections-mutants
+test-runtime2-collections: $(TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-collections-mutants: $(TARGET) $(LIBFFI_A)
+	COLLECTIONS_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/collections/mutants.sh "$(CURDIR)/$(TARGET)"
+# Certification lanes (workers): ASan+UBSan and TSan builds over the whole
+# suite (thread transfer of collections included).
+.PHONY: test-runtime2-collections-sanitize test-runtime2-collections-tsan
+test-runtime2-collections-sanitize: $(SAN_TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-collections-tsan: $(TSAN_TARGET)
+	$(PYTHON) tests/runtime2/weekend_collections.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm: test-runtime2-collections test-runtime2-collections-mutants
+test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collections-tsan
+# Reference semantics, Phase A (D-NEXT-refsem): maps, sets, stacks and struct
+# instances are references; cycles refused; copy/deepcopy; the Phase B guard.
+.PHONY: test-runtime2-refsem test-runtime2-refsem-mutants test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+test-runtime2-refsem: $(TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-refsem-mutants: $(TARGET) $(LIBFFI_A)
+	REFSEM_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/refsem/mutants.sh "$(CURDIR)/$(TARGET)"
+test-runtime2-refsem-sanitize: $(SAN_TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-runtime2-refsem-tsan: $(TSAN_TARGET)
+	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TSAN_TARGET)"
+test-rt-vm: test-runtime2-refsem test-runtime2-refsem-mutants
+test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+# Review round 2 (D9): stale-reference controls on the real VM path. The
+# relocation schedule lives in aggregate.cpp/aggregate_collection.cpp only
+# (aggregate_store.h), so those two are built checked (NIFT_RT_CHECKED_REFS)
+# under ASan with the driver, linked with the normal objects. Each control
+# builds a 5,000-element container through a VM session (with and without a
+# 20,000-element read-after-push churn first), takes a reference, mutates once
+# through the VM and uses it: heap-use-after-free is required; the R19 build
+# (no relocation after a hand-out) must miss every control.
+.PHONY: test-runtime2-refsem-stale-vm
+REFSEM_STALE_DIR := $(TEST_DIR)/refsem-stale-vm
+REFSEM_STALE_OBJECTS := $(filter-out src/rt/aggregate.o src/rt/aggregate_collection.o,$(CP19_EXPR_OBJECTS))
+REFSEM_STALE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address -DNIFT_RT_CHECKED_REFS -pthread
+REFSEM_STALE_SOURCES := tests/runtime2/refsem/stale_vm.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp
+$(REFSEM_STALE_DIR)/stale-vm$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
+$(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) -DNIFT_REFSEM_MUTANT=19 $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
+test-runtime2-refsem-stale-vm: $(REFSEM_STALE_DIR)/stale-vm$(EXEEXT) $(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT)
+	@for m in array map set stack; do for c in plain churn; do \
+		if ASAN_OPTIONS=detect_leaks=0 "$(REFSEM_STALE_DIR)/stale-vm" $$m $$c >/dev/null 2>"$(REFSEM_STALE_DIR)/$$m-$$c.log"; then \
+			echo "FAIL: VM-path stale reference ($$m $$c) not detected"; exit 1; fi; \
+		grep -q "heap-use-after-free" "$(REFSEM_STALE_DIR)/$$m-$$c.log" || { cat "$(REFSEM_STALE_DIR)/$$m-$$c.log"; echo "FAIL: $$m $$c"; exit 1; }; \
+		if ! ASAN_OPTIONS=detect_leaks=0 "$(REFSEM_STALE_DIR)/stale-vm-r19" $$m $$c >/dev/null 2>"$(REFSEM_STALE_DIR)/r19-$$m-$$c.log"; then \
+			echo "FAIL: R19 did not miss $$m $$c (the control does not discriminate)"; exit 1; fi; \
+		echo "PASS VM-path stale reference detected, missed by R19: $$m $$c"; done; done
+test-rt-vm-sanitize: test-runtime2-refsem-stale-vm
 # VM-default policy: the VM is the default scripting engine with no silent
 # legacy fallback (unset NIFT_VM == require; NIFT_VM=0 is the explicit legacy
 # interpreter; NIFT_VM=1 still falls back; any other value, empty included, is

@@ -29,15 +29,18 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
         return fail(node,"method:splice");
     const std::uint16_t mark=fb_->top(),state=mark;
     for(std::uint16_t k=0;k<Count;++k){std::uint16_t reg=0;if(!temp(reg))return false;fb_->emit(OpCode::LoadNull,reg);}
-    auto read=[&](bool take)->bool {
+    // stored: the register of the value the mutation stores (push, insert, the
+    // splice replacement), checked for a cycle before the take (D-NEXT-refsem #4).
+    auto read=[&](bool take,int stored)->bool {
         std::uint16_t value=0;
-        if(binding.global&&!binding.cell){if(take){if(!global_take(binding,value,text(receiver)))return false;}
+        const std::uint16_t check=stored<0?0:static_cast<std::uint16_t>(stored+1);
+        if(binding.global&&!binding.cell){if(take){if(!global_take(binding,value,text(receiver),check))return false;}
             else if(!global_read_value(binding.reg,value,text(receiver)))return false;}
         else if(binding.cell||binding.upvalue||binding.selector){
             if(!indexed_binding(binding,value))return false;
             if(take&&!binding.selector&&!binding.loop_binding){std::uint16_t cell=0;if(!binding_cell(binding,
                 cell))return false;
-                fb_->emit(OpCode::CellTake,value,cell);}
+                fb_->emit(OpCode::CellTake,value,cell,check);}
         }else value=binding.reg;
         fb_->emit(OpCode::Move,state+Source,value);
         if(take)fb_->emit(OpCode::LoadNull,value);
@@ -62,20 +65,35 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
 #else
     if(binding.const_array){
 #endif
-        if(!read(false))return false;
+        if(!read(false,-1))return false;
         const auto at=fb_->emit(OpCode::ArrayMutate,state,id,100);fb_->note(at,std::string(text(receiver)));
     }
     const NodeId* args=ast_.list(node);
     if(argc>0&&!expr_to(args[0],state+Item))return false;
     if(argc>1&&!expr_to(args[1],state+Returned))return false;
-    if(!read(true))return false;
-    fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,0);
-    if(!put())return false;
-    if(method==M::Splice&&argc==3) {
-        if(!expr_to(args[2],state+Keys)||!read(true))return false;
+    // D-NEXT-refsem #4, review round 4 (coordinator ruling): every splice
+    // evaluates all its arguments (the replacement included), then validates
+    // (bounds, replacement kind, cycle: the take's pre-check), then commits
+    // with one store. A throwing argument leaves the receiver unchanged,
+    // captured or not (legacy removes first: an approved difference).
+    const bool splice3=method==M::Splice&&argc==3;
+    const bool cell=(binding.cell||binding.upvalue)&&!binding.global;
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 22
+    const bool late=splice3&&cell;  // R22: a captured splice stores its removal before the replacement
+#elif defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 23
+    const bool late=splice3&&!cell;  // R23: only a captured splice evaluates its arguments first
+#else
+    const bool late=false&&cell;
+#endif
+    if(splice3&&!late&&!expr_to(args[2],state+Keys))return false;
+    const int stored=method==M::Push?state+Item:method==M::Insert?state+Returned:splice3&&!late?state+Keys:-1;
+    if(!read(true,stored))return false;
+    fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,splice3&&!late?2:0);
+    if(splice3) {
+        if(late&&(!put()||!expr_to(args[2],state+Keys)||!read(true,state+Keys)))return false;
         fb_->set_offset(collection_offset(node));fb_->emit(OpCode::ArrayMutate,state,id,1);
-        if(!put())return false;
     }
+    if(!put())return false;
     fb_->emit(OpCode::Move,dst,state+Result);
     for(std::uint16_t k=0;k<Count;++k)fb_->emit(OpCode::LoadNull,state+k);
     fb_->release_to(mark);return builder_ok();

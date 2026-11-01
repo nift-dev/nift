@@ -1,0 +1,3 @@
+--- stderr
+error: thread_capture.f:2:11: thread: unknown value or malformed expression: m
+--- exit 1

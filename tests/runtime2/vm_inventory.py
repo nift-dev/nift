@@ -40,8 +40,10 @@ CASES = [
     ("dynamic-shadow", "z := 5\nfn(inner()) { return z }\nfn(outer()) { z := 1\nreturn inner() }\n"
      "print(outer())\n", {"free-name:dynamic-shadow"}),
     ("called-before-declaration", "print(f())\nfn(f()) { return 1 }\n", {"fn-called-before-declaration"}),
-    # CP12b: structs compile; an instance is made only by `p := P()`.
-    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"struct-construction"}),
+    # CP12b: structs compile. D-NEXT-refsem #2: construction is admitted in
+    # expressions (it was struct-construction); the member read of a call
+    # result is the refusal now.
+    ("struct", "struct (P) { x := 1 }\nprint(P().x)\n", {"type:member"}),
     ("parse-error", "fn(f()) {\nprint(1)\n", {"parse-error"}),
 ]
 

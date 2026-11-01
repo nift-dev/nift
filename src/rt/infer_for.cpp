@@ -7,8 +7,11 @@ void Inference::for_statement(const Node& n) {
     const NodeId iterable = header.a;
     const TyRef source = expr(iterable);
     const bool pair = (header.flags & kFlagPairBinding) != 0;
-    const bool array = (source->kinds & kKindArray) != 0;
-    const bool object = (source->kinds & kKindObject) != 0;
+    // D-063: a set or stack iterates like an array, a map like an object
+    // (typed keys, see the compiler's for_setup).
+    const bool keyed = source->kinds == kKindMap || source->kinds == kKindSet || source->kinds == kKindStack;
+    const bool array = (source->kinds & kKindArray) != 0 || (keyed && source->kinds != kKindMap);
+    const bool object = (source->kinds & kKindObject) != 0 || source->kinds == kKindMap;
     // The compiler refuses an unknown/union source before executing;
     // these loops either raise at their header (known non-iterable or
     // the wrong form) or are compiled as a normal array/object loop.
@@ -16,7 +19,8 @@ void Inference::for_statement(const Node& n) {
                         ((pair && object) || (!pair && array));
     TyRef value = kinds_ty(kKindScalar);
     if (normal) {
-        value = pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
+        value = keyed ? contents(source, false)  // D-NEXT-refsem: per-kind contents
+                      : pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
         if (!value || value->kinds == 0) value = kinds_ty(kKindUnknown);
         result_.elements[iterable] |= value->kinds;
     }
@@ -27,7 +31,8 @@ void Inference::for_statement(const Node& n) {
     const NodeId* names = ast_.list(header);
     scopes_.emplace_back();
     if (pair && header.count >= 2) {
-        declare(ast_.text(ast_.at(names[0])), names[0], kinds_ty(kKindString));
+        declare(ast_.text(ast_.at(names[0])), names[0],
+                source->kinds == kKindMap ? map_keys(source) : kinds_ty(kKindString));
         declare(ast_.text(ast_.at(names[1])), names[1], value);
     } else if (!pair && header.count >= 1) {
         declare(ast_.text(ast_.at(names[0])), names[0], value);

@@ -1,0 +1,13 @@
+// D-NEXT-refsem #3 (D3): deepcopy() preserves sharing inside the copied graph; legacy duplicates per occurrence.
+inner := map()
+outer := map()
+outer.set("a", inner)
+outer.set("b", inner)
+d := deepcopy(outer)
+p := d.get("a")
+p.set(1, 1)
+q := d.get("b")
+print(q.size())
+print(same(p, q))
+print(same(p, inner))
+print(inner.size())

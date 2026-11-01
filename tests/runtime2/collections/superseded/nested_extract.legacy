@@ -1,0 +1,12 @@
+map([["in",map([["x",1],["y",3]])]])
+map([["in",map([["x",1],["y",3]])]])
+stack([set([1])])
+map([
+  ["k", stack([
+    set([
+      1
+    ])
+  ])]
+])
+--- stderr
+--- exit 0

@@ -1,0 +1,4 @@
+ran
+--- stderr
+error: same_channel.f:2:6: undefined callable: channel
+--- exit 1

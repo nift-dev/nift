@@ -6,7 +6,9 @@ bool UnitCompiler::expression_statement(const Node& node) {
     const Node& expr = ast_.at(node.a);
     if (expr.kind == NodeKind::Call && ast_.at(expr.a).kind == NodeKind::Member) {
         const Node& callee = ast_.at(expr.a);
-        if (text(ast_.at(callee.b)) == "push") {  // rt-lint: allow-string-compare compile time
+        // D-063: a stack's push is a keyed mutator (compiler_keyed.cpp).
+        if (text(ast_.at(callee.b)) == "push" &&  // rt-lint: allow-string-compare compile time
+            !(kinds(callee.a) != 0 && (kinds(callee.a) & ~kKindCollection) == 0)) {
             const Node& receiver = ast_.at(callee.a);
             if (!plain_postfix(expr) || !plain_postfix(callee) || !no_trailing_comma(expr)) return false;
             std::uint16_t reg = 0, value = 0;
@@ -40,9 +42,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
                  !kinds_within(callee.a, kKindArray, receiver, "type:push")))
                 return false;
             if (!expr_any(arg, value)) return false;
+            // D-NEXT-refsem #4: the pushed value is checked for a cycle before the take.
             if (indirect && !global && held.selector_root_only && !held.loop_binding)
-                fb_->emit(OpCode::CellTake, reg, held.reg);
-            if (global && !global_take(held, reg, text(receiver))) return false;
+                fb_->emit(OpCode::CellTake, reg, held.reg, static_cast<std::uint16_t>(value + 1));
+            if (global && !global_take(held, reg, text(receiver), static_cast<std::uint16_t>(value + 1))) return false;
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));
@@ -60,6 +63,11 @@ bool UnitCompiler::expression_statement(const Node& node) {
     // whose value may be an Error is rendered by legacy's template path
     // (`Error values cannot be rendered as text in $[...]`): refuse it.
     if (session_ && session_->inspect_tail && !in_function_) {
+        // D-063: legacy shows nothing for a statement that mutated at its
+        // top level (last_expression_mutation_), here the value would be
+        // shown; and a collection value has no session form here (below).
+        if (!loop_region() && unit_makes_collections() && keyed_mutator_call(expr))
+            return fail(expr, "session:collection-mutator");
         if (!loop_region()) return session_render(node_id(node));
         std::uint16_t scratch = 0;
         return temp(scratch) && expr_to(node.a, scratch);  // prepared loop statements discard values

@@ -44,11 +44,12 @@ USES = {
     "field-write": ("c.n = c.n + 10\n  print(c.next())",
                     {"*": "vm", "loop": "context:struct-field", "fnloop": "context:struct-field"}),
     "field-type-error": ('c.n = "s"', {"*": "vm", "loop": "context:struct-field", "fnloop": "context:struct-field"}),
-    # An instance is never copied: legacy would share it.
-    "copy": ("d := c\n  print(1)", {"*": "aliasing", "fnloop": "prepared-decl-type"}),
-    # CP25-R: print no longer refuses by kind; a struct instance is still not a
-    # first-class value, so the unit stays refused for that reason.
-    "print": ("print(c)", {"*": "struct-value"}),
+    # D-NEXT-refsem #4: an instance is a reference on the VM too (legacy
+    # shares it), so the copy runs (it was refused as aliasing before).
+    "copy": ("d := c\n  print(1)", {"*": "vm", "fnloop": "prepared-decl-type"}),
+    # CP25-R: print no longer refuses by kind; D-NEXT-refsem #4 made an
+    # instance a first-class value (it was refused as struct-value before).
+    "print": ("print(c)", {"*": "vm"}),
 }
 
 SHAPES = {
@@ -78,14 +79,16 @@ SHAPES = {
 # The legacy probes (directory -> outcome on the VM, or the refusal reason).
 PROBES = {
     "basic": "vm", "concat": "type:+", "constructor": "static-error:arity",
-    "element_member_assign": "struct-construction", "equality": "aliasing",
+    # D-NEXT-refsem #4: element_member_assign was struct-construction, equality
+    # and reference were aliasing, type was struct-value (instances are values).
+    "element_member_assign": "struct-value", "equality": "vm",
     "field_init_time": "struct-after-statement", "field_type": "vm", "loop": "vm", "method_arity": "static-error:arity",
     "method_free_caller": "free-name", "method_free_global": "struct-after-statement",
     "method_on_call": "opaque:legacy-runtime-error", "nested": "struct-field-init", "new_field": "struct-no-field",
     "no_field": "struct-no-field", "print": "struct-field-init", "private_field": "struct-private",
-    "private_method": "struct-private", "redeclared": "struct-redeclared", "reference": "aliasing",
+    "private_method": "struct-private", "redeclared": "struct-redeclared", "reference": "vm",
     "self_call": "vm", "shadows_fn": "struct-shadows-fn", "stringify": "struct-field-init",
-    "this_assign": "assign-free-name", "this_outside": "free-name", "type": "struct-value",
+    "this_assign": "assign-free-name", "this_outside": "free-name", "type": "vm",
 }
 
 

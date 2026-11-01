@@ -1,0 +1,19 @@
+# D-063 value-semantics evidence superseded by D-NEXT-refsem (reference semantics, Phase A).
+# Kept unchanged as the historical record; the runner does not read this directory.
+# fixture	was	superseded-by	now	replacement
+argument_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/argument_copy.f
+assign_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/assign_copy.f
+closure_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/closure_copy.f
+container_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/container_copy.f
+deep_nested	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/deep_nested.f
+mutual_insert	approved	D-NEXT-refsem #4	legacy-equal (legacy's cycle text, catchable on the VM)	collections/parity/mutual_insert.f
+nested_extract	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/nested_extract.f
+return_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/return_copy.f
+same_struct	approved	D-NEXT-refsem #2	legacy-equal (same() is identity)	collections/parity/same_struct.f
+same_value	approved	D-NEXT-refsem #2	legacy-equal (same() is identity)	collections/parity/same_value.f
+struct_field_copy	approved	D-NEXT-refsem #1	legacy-equal	collections/parity/struct_field_copy.f
+self_insert	approved	D-NEXT-refsem #4, #6	m.set(k, m) / k.push(k): refused cycles with legacy's text; s.add(s): a mutable collection member, refused before effects	refsem/parity/cycle_map_self.f, refsem/parity/cycle_stack_self.f, refsem/refuse/key_set_collection.f
+collection_keys	parity	D-NEXT-refsem #6	collection keys refused before effects; callable keys unchanged	collections/parity/callable_keys.f, refsem/refuse/key_map_collection.f, refsem/refuse/key_lookup_collection.f
+loop_binding_mutation	refuse (collection-loop-binding)	D-NEXT-refsem #1	legacy-equal (the loop binding is the element)	collections/parity/loop_binding_mutation.f
+heap/budget_clone	budget stop of the clone of a shared map	D-NEXT-refsem #1	no clone: a shared map is mutated in place and fits the budget of the unshared one	collections/heap/budget_clone.f (runner expectation changed)
+mutants.sh M1 M2 M3 M4 M10	value-semantics controls	D-NEXT-refsem	the defects they planted are the new contract or code that no longer exists	refsem/mutants.sh R1-R15

@@ -1,17 +1,21 @@
 #pragma once
-// The D-040 cycle rule (semantics.md V16) for stores that could close a cycle
-// through identity-bearing values: closure-captured variables and resource
-// payloads. Ordinary stores never call it: a store whose value fails the O(1)
-// rt::may_contain_identity test cannot close a cycle, and ordinary values are
-// acyclic by construction (copy-on-write plus retain-before-unique).
+// The D-040 cycle rule (semantics.md V16; D-NEXT-refsem #4) for stores that
+// could close a cycle through identity-bearing values: closure-captured
+// variables, resource payloads and (D-NEXT-refsem) the reference kinds,
+// struct instances and map/set/stack collections. A store whose value fails
+// the O(1) rt::may_contain_identity test cannot close a cycle. Arrays and
+// objects are acyclic by construction (copy-on-write plus
+// retain-before-unique); the reference kinds are kept acyclic by this check,
+// made before every store into one of them (there is no cycle collector).
 //
 // Model. A store writes value V into a *target*: a captured variable (a cell,
-// identified by an opaque pointer) or a resource's payload (identified by its
-// handle). It closes a cycle exactly when the target is reachable from V
-// through:
-//   * aggregates (array elements, object entries, struct fields) whose
-//     identity summary bit is set (an aggregate with the bit clear holds no
-//     callable or handle anywhere below it, so it is never entered);
+// identified by an opaque pointer), a resource's payload (identified by its
+// handle) or a reference-kind object (identified by its heap object). It
+// closes a cycle exactly when the target is reachable from V through:
+//   * aggregates (array elements, object entries, struct fields, collection
+//     keys, values, members and elements) whose identity summary bit is set
+//     (an aggregate with the bit clear holds no identity-bearing value below
+//     it, so it is never entered, but it may itself be the target);
 //   * a callable's captured variables (CycleGraph::captured), then their
 //     contents;
 //   * a handle's payload (CycleGraph::payload), then its contents.
@@ -35,14 +39,18 @@
 namespace nift::rt {
 
 struct CycleTarget {
-    enum class Kind : std::uint8_t { Cell, Resource } kind = Kind::Cell;
-    const void* cell = nullptr;  // Kind::Cell
+    enum class Kind : std::uint8_t { Cell, Resource, Aggregate } kind = Kind::Cell;
+    const void* cell = nullptr;  // Kind::Cell; Kind::Aggregate: the HeapObject
     Value handle;                // Kind::Resource
     static CycleTarget captured_cell(const void* cell_identity) {
         CycleTarget t; t.kind = Kind::Cell; t.cell = cell_identity; return t;
     }
     static CycleTarget resource(Value handle_value) {
         CycleTarget t; t.kind = Kind::Resource; t.handle = static_cast<Value&&>(handle_value); return t;
+    }
+    // D-NEXT-refsem: a struct instance or collection receiving a store.
+    static CycleTarget aggregate(const HeapObject* object) {
+        CycleTarget t; t.kind = Kind::Aggregate; t.cell = object; return t;
     }
 };
 
@@ -78,6 +86,15 @@ inline bool would_close_cycle(const CycleTarget& target, const Value& stored, co
     return may_contain_identity(stored) && would_close_cycle_walk(target, stored, graph);
 #endif
 }
+
+// D-NEXT-refsem #4: legacy's own cycle rule (ParserExpression.cpp
+// reference_would_cycle), used to choose its wording: `stored` is a struct
+// instance or collection from which `receiver` is reachable through struct
+// fields and collection values/members/elements only (legacy's tagged
+// references; arrays, objects and callables are leaves there). When the VM's
+// full check finds a cycle this test does not, legacy accepts the store and
+// the VM refuses it (a compatibility limitation).
+bool legacy_reference_cycle(const HeapObject* receiver, const Value& stored);
 
 // Counters for tests and the V16 cost measurement (per thread).
 struct CycleCheckStats {

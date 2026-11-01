@@ -9,4 +9,4 @@ gate (the `timeout/` entries never finish by design).
 | `channels/il`, `channels/il2` | async script that only computes; script whose comment mentions async — the combined (stream order) channel is compared unless A's order is measured unstable |
 | `timeout/hang`, `timeout/loop` | a child process that outlives the run; a busy loop — timeouts are differences and leave no process behind |
 | `pc/one`, `other/pc/one` | the same entry id with different programs — policies bind to the source hash |
-| `gen/m1` | a generated program that imports a module — the minimiser copies the whole entry directory |
+| `gen/m1` | a program that imports a module — the minimiser copies the whole entry directory (hand-maintained since D-NEXT-refsem: derived from generator seed 7 index 2, three copies made explicit; see its header) |

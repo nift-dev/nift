@@ -1,6 +1,7 @@
 #include "rt/session_callable.h"
 #include "rt/aggregate.h"
 #include "rt/cell.h"
+#include "rt/heap.h"
 #include "rt/proto.h"
 #include <algorithm>
 #include <unordered_map>
@@ -45,6 +46,10 @@ struct Scan {
         if (value.is(Kind::Handle)) return {};
 #endif
         if (depth > 64) return incomplete();
+        // D-NEXT-refsem (review round 2): instances and collections count as
+        // identity-bearing now; one whose identity summary is clear holds no
+        // callable anywhere below it (heap.h), so it has no callable shape.
+        if ((value.is(Kind::Struct) || value.is(Kind::Collection)) && !may_hold_identity(value.heap())) return {};
         if (!(value.is(Kind::Function) || value.is(Kind::Array) || value.is(Kind::Object))) return incomplete();
         if (active.count(value.heap())) return incomplete();  // no shared_ptr cycles in compiler facts
         const auto found = memo.find(value.heap());

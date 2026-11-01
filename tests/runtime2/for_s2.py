@@ -26,7 +26,9 @@ FIXTURES = os.path.join(HERE, "for-s2")
 # The intended observable defect of each mutant, not just "something failed".
 MUTANT_SIGNATURES = {
     1: {"t26_read_after_shrink_first_iter.f": {"stdout": b"1\n2\n3\n", "exit": 0, "outcome": "vm"}},
-    2: {"g6_push_once.f": {"stdout": b"1\n2\n3\n4\n", "exit": 0, "outcome": "vm"}},
+    # D-NEXT-refsem #1: g6_push_once.f is refused by the guard now (the array
+    # is mutated while the loop holds it); rebinding the source shows M2 too.
+    2: {"g6_rebind_longer.f": {"stdout": b"1\n2\n3\n4\n5\n5\n", "exit": 0, "outcome": "vm"}},
     3: {"g7_closure_loop_var.f": {"stdout": b"1\n1\n1\n", "exit": 0, "outcome": "vm"}},
     4: {"g3_continue_finite.f": {"stdout": b"1\n2\n", "exit": 0, "outcome": "vm"}},
     5: {"g6_break_object.f": {"stdout": b"a\n", "exit": 0, "outcome": "vm", "heap_leak_gt": 32}},
@@ -37,7 +39,7 @@ MUTANT_SIGNATURES = {
 
 MUTANT_CASES = {
     1: ["t26_read_after_shrink_first_iter.f"],
-    2: ["g6_push_once.f"],
+    2: ["g6_rebind_longer.f"],
     3: ["g7_closure_loop_var.f"],
     4: ["g3_continue_finite.f"],
     5: ["g6_break_object.f"],

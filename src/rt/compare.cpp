@@ -69,7 +69,11 @@ std::uint64_t hash_number(const Value& number) {
             break;
         case Kind::Double: {
             const double d = number.as_double();
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 8
+            if (false)  // M8: 1.0 no longer hashes like 1 (index lookups miss)
+#else
             if (std::isfinite(d) && std::trunc(d) == d && std::fabs(d) <= static_cast<double>(kExact))
+#endif
                 return mix(2, static_cast<std::uint64_t>(static_cast<std::int64_t>(d)));
             break;
         }
@@ -103,11 +107,24 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
         case Kind::Object:
             if (identity && left.heap() == right.heap()) return Shallow::Equal;
             return object_size(left) == object_size(right) ? Shallow::Descend : Shallow::Unequal;
-        case Kind::Struct:
-            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+        case Kind::Struct:  // D-NEXT-refsem #2: instances compare by identity (legacy's `==`)
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 3
             return struct_type(left) == struct_type(right) && struct_fields(left).size() == struct_fields(right).size()
-                       ? Shallow::Descend
-                       : Shallow::Unequal;
+                       ? Shallow::Descend : Shallow::Unequal;  // R3: structural struct equality (the old D-040 rule)
+#else
+            return left.heap() == right.heap() ? Shallow::Equal : Shallow::Unequal;
+#endif
+        case Kind::Collection: {  // D-063, legacy's per-kind rules (ParserExpression.cpp structural_equal)
+            if (identity && left.heap() == right.heap()) return Shallow::Equal;
+            const CollectionKind k = collection_kind(left);
+            if (k != collection_kind(right) || collection_size(left) != collection_size(right))
+                return Shallow::Unequal;
+            if (k != CollectionKind::Set) return collection_size(left) ? Shallow::Descend : Shallow::Equal;
+            // Set members are scalars: size plus membership decides.
+            for (const Value& member : collection_items(left))
+                if (collection_find(right, member) < 0) return Shallow::Unequal;
+            return Shallow::Equal;
+        }
         case Kind::Error: same = left.heap() == right.heap() || errors_equal(left, right); break;
         case Kind::Function: same = left.heap() == right.heap(); break;
         case Kind::Future: same = future_identity(left) == future_identity(right); break;  // identity
@@ -152,13 +169,30 @@ Equality equal_within(const Value& left, const Value& right, std::size_t max_dep
         const Value& l = *top.left;
         const bool array = l.is(Kind::Array);
         const bool instance = l.is(Kind::Struct);
-        if (top.next == (array ? array_size(l) : instance ? struct_fields(l).size() : object_size(l))) {
+        const bool collection = l.is(Kind::Collection);  // a stack (in order) or a map (by key)
+        if (top.next == (array ? array_size(l) : instance ? struct_fields(l).size()
+                                               : collection ? collection_size(l) : object_size(l))) {
             open.pop_back();
             continue;
         }
         const Value* a = nullptr;
         const Value* b = nullptr;
-        if (array) {
+        if (collection) {
+            const auto& items = collection_items(l);
+            if (collection_kind(l) == CollectionKind::Stack) {
+                a = &items[top.next];
+                b = &collection_items(*top.right)[top.next];
+            } else {  // map: the entry with an equal key, then the values
+                a = &items[top.next * 2 + 1];
+#if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 6
+                const std::ptrdiff_t at = equal(collection_items(*top.right)[top.next * 2], items[top.next * 2])
+                                              ? static_cast<std::ptrdiff_t>(top.next) : -1;  // M6: by position
+#else
+                const std::ptrdiff_t at = collection_find(*top.right, items[top.next * 2]);
+#endif
+                b = at < 0 ? nullptr : &collection_items(*top.right)[static_cast<std::size_t>(at) * 2 + 1];
+            }
+        } else if (array) {
             a = &array_items(l)[top.next];
             b = &array_items(*top.right)[top.next];
         } else if (instance) {  // same type: same field order (declaration order)
@@ -214,7 +248,7 @@ bool truthy(const Value& value) {
         case Kind::Bytes: return !bytes_of(value).empty();
         case Kind::Array: return array_size(value) != 0;
         case Kind::Object: return object_size(value) != 0;
-        default: return true;  // functions, structs, handles, errors
+        default: return true;  // collections (legacy: a non-empty marker string), functions, structs, handles, errors
     }
 }
 
@@ -233,6 +267,10 @@ std::uint64_t leaf_hash(const Value& value) {
         case Kind::Future: return mix(14, reinterpret_cast<std::uintptr_t>(future_identity(value)));
         case Kind::Error: return mix(13, hash_text(value.heap_as<ErrorObject>()->message));
         case Kind::Handle: return mix(mix(12, value.handle_id()), value.handle_generation());
+        // D-063: equal collections have the same kind and size (contents are
+        // order-independent for maps and sets, so they are not folded in).
+        case Kind::Collection:
+            return mix(mix(15, static_cast<std::uint64_t>(collection_kind(value))), collection_size(value));
         default: return mix(static_cast<std::uint64_t>(value.kind()), reinterpret_cast<std::uintptr_t>(value.heap()));
     }
 }
@@ -263,7 +301,13 @@ std::uint64_t combine(const Value& parent, std::size_t i, std::uint64_t h, std::
     return h + mix(hash_text(atom_text(object_entries(parent)[i].first)), child);
 }
 
-bool is_aggregate(const Value& v) { return v.is(Kind::Array) || v.is(Kind::Object) || v.is(Kind::Struct); }
+// Struct instances hash by identity (leaf_hash), consistent with `==`.
+bool is_aggregate(const Value& v) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 3
+    if (v.is(Kind::Struct)) return true;
+#endif
+    return v.is(Kind::Array) || v.is(Kind::Object);
+}
 
 std::uint64_t seed_of(const Value& v) {
     if (v.is(Kind::Array)) return 8u;
@@ -299,13 +343,18 @@ std::uint64_t hash(const Value& value) {
     }
 }
 
+// D-NEXT-refsem #2: struct instances and collections are references; their
+// identity is the heap object (both operands are live while compared).
 bool identity_bearing(const Value& value) noexcept {
-    return value.is(Kind::Function) || value.is(Kind::Handle) || value.is(Kind::Future);
+    return value.is(Kind::Function) || value.is(Kind::Handle) || value.is(Kind::Future) ||
+           value.is(Kind::Struct) || value.is(Kind::Collection);
 }
 
 Sameness same(const Value& left, const Value& right) noexcept {
     if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
     if (left.kind() != right.kind()) return Sameness::Different;
+    if (left.is(Kind::Struct) || left.is(Kind::Collection))
+        return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
     if (left.is(Kind::Future))
         return future_identity(left) == future_identity(right) ? Sameness::Same : Sameness::Different;
     if (left.is(Kind::Function))

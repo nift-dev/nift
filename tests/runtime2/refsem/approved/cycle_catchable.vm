@@ -1,0 +1,7 @@
+runtime.reference_cycle
+set would create a cyclic reference
+0
+push would create a cyclic reference
+0
+--- stderr
+--- exit 0

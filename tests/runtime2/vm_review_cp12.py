@@ -49,9 +49,9 @@ def programs():
     for n in (199, 201):
         guard = f"if (0 > 1) {{ print(g{n - 1}(1)) }}\n"
         for name, tail, reason in (
-                # CP14B admits b.push through the alias; D-040 (owner 2026-10-25):
-                # exactly the pinned witness (d040_witnesses.py), never a refusal.
-                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "D-040"),
+                # CP14B admitted b.push through the alias as the exact D-040 witness;
+                # D-NEXT-refsem #9 refuses it before execution (Phase A guard).
+                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "reference-guard:inflow"),
                 ("negzero", "x := 0\ni := 0\nwhile (i < 1) { i += 1\nprint(-x) }\n", "context:negative-zero"),
                 ("order", 'fn_v := 1\nprint("x" < 1)\n', "type:<"),
                 ("assign", "x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i++ }\nprint(x)\n", "context:assignment-type"),

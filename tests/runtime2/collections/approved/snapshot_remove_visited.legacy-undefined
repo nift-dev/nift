@@ -1,0 +1,1 @@
+Legacy reads the removed entry's slot of its live entry vector (position 1 of a one-entry vector): undefined behaviour, not a witness. See weekend-collections.md, snapshot iteration.

@@ -1,7 +1,10 @@
 #pragma once
-// Copy-on-write aggregates (CP09; D-040): arrays, insertion-ordered objects
-// and struct instances, all with value semantics.
+// Aggregates (CP09; D-040; D-NEXT-refsem): copy-on-write arrays and
+// insertion-ordered objects with value semantics, and struct instances, which
+// are identity-bearing references mutated in place (D-NEXT-refsem #1, Phase A).
+// Map/set/stack collections, also references, are in rt/aggregate_collection.h.
 //
+// Arrays and objects:
 // Reading never copies. Mutation goes through array_mut/object_mut (or the
 // helpers below), which first make the aggregate unshared: if another Value
 // holds the same object, the receiver gets a shallow clone (children are
@@ -38,6 +41,14 @@ namespace nift::rt {
 
 Value make_array(std::size_t reserve = 0);
 const std::vector<Value>& array_items(const Value& array);
+// Transient internal views (review round 2): the same storage, for a reader
+// that copies what it needs out before anything mutates the aggregate (a VM
+// element read, a length). They are not hand-outs, so they do not make the
+// next mutation relocate in checked builds (aggregate_store.h); anything that
+// keeps a reference across a call uses array_items / object_entries.
+const std::vector<Value>& array_view(const Value& array);
+const std::vector<std::pair<Atom, Value>>& object_view(const Value& object);
+const Value* object_find(const Value& object, Atom key);
 // Unshares first. Raw storage: the array is conservatively marked as possibly
 // holding identity-bearing values (rt/heap.h); prefer array_set for one slot.
 std::vector<Value>& array_mut(Value& array);
@@ -54,9 +65,13 @@ const Value* object_get(const Value& object, Atom key);
 void object_set(Value& object, Atom key, Value value);
 bool object_remove(Value& object, Atom key);
 
-// Struct instances (D-040 V9): fields in declaration order (private ones
-// included). struct_add_field is for construction; struct_set replaces an
-// existing field and returns false when the struct has no such field.
+// Struct instances (D-NEXT-refsem #1): fields in declaration order (private
+// ones included). Every Value holding an instance refers to the same object:
+// struct_set and struct_slot_mut mutate it in place, visibly through every
+// alias (never cloned). struct_add_field is for construction; struct_set
+// replaces an existing field and returns false when the struct has no such
+// field. A store that would make the instance reachable from itself must be
+// refused by the caller before it is made (rt/value_cycle.h).
 Value make_struct(Atom type_name, std::size_t reserve = 0);
 Atom struct_type(const Value& instance);
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
@@ -76,19 +91,26 @@ Value* array_slot_mut(Value& array, std::size_t index);
 Value* object_slot_mut(Value& object, Atom key);
 Value* struct_slot_mut(Value& instance, Atom field);
 
-// Makes `value` (Array, Object or Struct) uniquely owned; returns true if it
-// cloned. The clone keeps the identity summary bit.
+// Makes an Array or Object `value` uniquely owned; returns true if it cloned.
+// The clone keeps the identity summary bit. Structs and collections are
+// references and are never unshared (returns false).
 bool unshare(Value& value);
 
-// O(1): a callable, a handle, or an aggregate whose identity summary bit is
-// set. False means the value certainly contains no callable or handle, so
-// storing it can never close a cycle (D-040 V16).
+// O(1): an identity-bearing value (a callable, a handle, a cell, a future, a
+// struct instance or a collection: D-NEXT-refsem makes the last two shared
+// references), or an array/object whose identity summary bit is set. False
+// means the value certainly is and contains no identity-bearing value, so
+// storing it can never close a cycle (D-040 V16, D-NEXT-refsem #4).
 inline bool may_contain_identity(const Value& value) noexcept {
     switch (value.kind()) {
-        case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: return true;
-        case Kind::Array: case Kind::Object: case Kind::Struct: return may_hold_identity(value.heap());
+        case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: case Kind::Struct:
+        case Kind::Collection:
+            return true;
+        case Kind::Array: case Kind::Object: return may_hold_identity(value.heap());
         default: return false;
     }
 }
 
 } // namespace nift::rt
+
+#include "rt/aggregate_collection.h"  // IWYU pragma: export

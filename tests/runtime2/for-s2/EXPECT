@@ -2,16 +2,16 @@ g10_module_for vm
 g1_array vm
 g1_empty_array vm
 g1_empty_object vm
-g1_map fallback:callable:map
+g1_map vm
 g1_noniter_bool vm-error
 g1_noniter_null vm-error
 g1_noniter_number vm-error
 g1_noniter_string vm-error
 g1_object vm
 g1_pair_array vm-error
-g1_set fallback:callable:set
+g1_set vm
 g1_single_object vm-error
-g1_stack fallback:callable:stack
+g1_stack vm
 g2_object_after vm
 g2_object_order vm
 g3_break vm
@@ -31,15 +31,16 @@ g5_loop_reserved fallback:binding-name-reserved
 g5_loop_scope vm
 g5_loop_var_assign vm
 g6_break_object vm
-g6_call_copy vm
-g6_element_modify vm
-g6_element_modify_late vm
+g6_call_copy fallback:reference-guard:argument  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
+g6_element_modify fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
+g6_element_modify_late fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
 g6_nested_reassign vm
 g6_object_add_key vm
 g6_object_missing_value vm-error
 g6_object_values vm
-g6_push_each vm
-g6_push_once vm
+g6_push_each fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
+g6_rebind_longer vm  # D-NEXT-refsem #1: the for-mutant 2 witness (rebinding is no mutation; the snapshot holds)
+g6_push_once fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
 g6_reassign_empty_unused vm
 g6_reassign_longer vm
 g6_reassign_shorter vm-error
@@ -51,8 +52,8 @@ g8_break_outside fallback:jump-outside-loop
 g8_index_error vm-error
 g8_undefined fallback:unresolved-name
 g9_million vm budget=24000000
-g9_million_write vm budget=24000000
-t16_same_iter_modify vm
+g9_million_write fallback:reference-guard:lent budget=24000000  # D-NEXT-refsem #1: the iterated array is written in the body
+t16_same_iter_modify fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
 t26_read_after_shrink_first_iter vm-error
 t21_lambda_not_called fallback:for-capture-vanishing
 t27_assign_toplevel_after_shrink fallback:for-missing-write
