@@ -9,11 +9,24 @@ TIES='print([{\"k\":0,\"id\":1},{\"k\":0,\"id\":2}].sort_by(x=>x.k).map(x=>x.id)
 DIRECTION='print([{\"k\":1,\"v\":2,\"id\":1},{\"k\":1,\"v\":1,\"id\":2},{\"k\":2,\"v\":1,\"id\":3}].sort_by(x=>x.k,"asc",x=>x.v,"desc").map(x=>x.id).stringify())'
 BUDGET='fn(cb(x)) { if(x>0) { return [x-1].map(cb)[0] }; return 1 }; print([1].map(cb).stringify())'
 SPLICE='a:=[1,2,3]; fn(repl()) { print(a.stringify()); return [9] }; a.splice(1,1,repl()); print(a.stringify())'
+# Witnesses whose intended VM result is an approved difference from legacy
+# (D-NEXT-refsem round 4, F2, owner-approved 2026-11-01): the normal build must
+# give the approved VM output and legacy its recorded output (functional.APPROVED).
+APPROVED_WITNESSES={SPLICE:dict(vm='[1,2,3]\n[1,9,3]\n',legacy='[1,3]\n[1,9,3]\n'),
+                    CASES['splice_throw']:dict(vm='boom\n[1,2,3]\n',legacy='boom\n[1,3]\n')}
 COPIES=[
 'a:=[1,2]; a.pop(); print(a.stringify())',
 'fn(f()) { a:=[1,2]; a.pop(); print(a.stringify()) }; f()',
 'fn(f()) { a:=[1,2]; g:=()=>a.pop(); g(); print(a.stringify()) }; f()',
 'a:=[[1,2]]; for(v:a) { v.pop() }; print(a.stringify())']
+# Witnesses the Phase A forward-compatibility guard refuses before any effect
+# (reference-guard:lent: an array mutated while a loop or a callback holds it;
+# D-NEXT-refsem #9). They cannot witness a VM mutant while the guard stands;
+# each is preserved unchanged, with legacy's output, in
+# tests/runtime2/refsem/pending/cp14b_*.f (CP19/CP14B test correction, owner
+# decision 2026-11-01). The other witnesses of their mutants still run.
+GUARDED_WITNESSES={COPIES[3],CASES['snapshot_mutation'],
+    'a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())'}
 # name, translation unit, existing test macro (0 means source-copy injection), witnesses
 MUTANTS=[
 ('ignored-callback-result','collection_helpers',0,[CASES['map'],'print([1,2,3].reduce((a,x)=>a+x,10))']),
@@ -26,7 +39,7 @@ MUTANTS=[
 ('missing-callback-report-frame','vm_collection_report',0,[CASES['block_error']]),
 ('live-source-not-snapshot','compiler_collection',3,[CASES['snapshot_mutation'],'a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())','a:=[1,2,3]; fn(cb(x)) { a=[9,9,9]; return x }; print(a.map(cb).stringify()); print(a.stringify())']),
 ('selector-factory-hoisted','compiler_collection',0,[CASES['extra_factory'],CASES['sort_by_factories']]),
-('splice-replacement-early','compiler_array_mutation',0,[SPLICE,CASES['splice_throw']]),
+('splice-removal-before-arguments','compiler_array_mutation',0,[SPLICE,CASES['splice_throw']]),
 ('premature-comparator-unwind','vm_collection_sort',9,[DRAIN+'; print(n)']),
 ]
 def substitute(source,old,new):
@@ -44,8 +57,10 @@ def inject(number,source):
     if number==8:return substitute(source,'if((it->ret-1)->op==OpCode::CollectionCall)','if(false)')
     if number==10:return substitute(source,'const bool once=(method>=CollectionMethod::Map&&method<=CollectionMethod::Count)||method==CollectionMethod::GroupBy;','const bool once=true;')
     if number==11:
-        source=substitute(source,'if(argc>1&&!expr_to(args[1],state+Returned))return false;','if(argc>1&&!expr_to(args[1],state+Returned))return false;\n    if(method==M::Splice&&argc==3&&!expr_to(args[2],state+Keys))return false;')
-        return substitute(source,'if(!expr_to(args[2],state+Keys)||!read(true))return false;','if(!read(true))return false;')
+        # D-NEXT-refsem round 4, F2 (owner-approved, 2026-11-01): evaluating
+        # every splice argument first is now the intended order; the mutant is
+        # the old order (the removal stored before the replacement is evaluated).
+        return substitute(source,'const bool late=false&&cell;','const bool late=splice3;')
     return source
 
 def valid(row,marker):
@@ -108,6 +123,8 @@ def main():
                 results.append(dict(number=number,name=name,detected=all(oks),coverage='unverified-comparator'))
                 print('UNVERIFIED' if all(oks) else 'FAIL',number,name,flush=True);continue
             binary,identity=build(name,stem,macro,number);records=[]
+            witnesses=[w for w in witnesses if w not in GUARDED_WITNESSES]
+            if not witnesses:raise RuntimeError('No unguarded witness left: '+name)
             for source in witnesses:
                 if number==7:os.environ['NIFT_CP14B_TEST_MAX_FRAMES']='1'
                 else:os.environ.pop('NIFT_CP14B_TEST_MAX_FRAMES',None)
@@ -116,7 +133,11 @@ def main():
                 control=run(str(normal),'require',source,root)
                 if not valid(control,'control'):raise RuntimeError('Invalid normal execution: '+name+' '+str(control))
                 oracle=run(a.legacy,'0',source,root) if number!=7 else None
-                if oracle and any(control[k]!=oracle[k] for k in ['out','err','exit']):raise RuntimeError('Normal/legacy semantic mismatch: '+name+' '+str(control)+' '+str(oracle))
+                approved=APPROVED_WITNESSES.get(source)
+                if approved and oracle and (control['out']!=approved['vm'] or oracle['out']!=approved['legacy'] or
+                                            control['err']!=oracle['err'] or control['exit']!=oracle['exit']):
+                    raise RuntimeError('Approved-difference witness changed: '+name+' '+str(control)+' '+str(oracle))
+                if not approved and oracle and any(control[k]!=oracle[k] for k in ['out','err','exit']):raise RuntimeError('Normal/legacy semantic mismatch: '+name+' '+str(control)+' '+str(oracle))
                 actual=run(str(binary),'require',source,root);status=verdict(number,control,actual,name)
                 records.append(dict(source=source,status=status,normal=control,oracle=oracle,mutant=actual))
             os.environ.pop('NIFT_CP14B_TEST_MAX_FRAMES',None)
