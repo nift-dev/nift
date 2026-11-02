@@ -53,13 +53,15 @@ bool Vm::Coro::spawn(Vm& vm, const Instr& in, const Proto* callee, const Value& 
     for (std::uint16_t k = 0; k < argc; ++k) seeds.push_back(R[in.a + k]);
     for (std::uint16_t slot : globals) seeds.push_back(slot < vm.stack_.size() ? vm.stack_[slot] : Value());
     bool shared = false;
-    for (const Value& seed : seeds) shared = shared || may_contain_identity(seed);
+    // B2: an array or object is a reference too (copied, like a collection).
+    for (const Value& seed : seeds)
+        shared = shared || seed.is(Kind::Array) || seed.is(Kind::Object) || may_contain_identity(seed);
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 12
     shared = false;  // R12: cooperative tasks share the caller's references (no copy at spawn)
 #endif
     if (shared) {
         std::vector<Value> copies(seeds.size());
-        if (deep_copy_tuple(seeds.data(), seeds.size(), copies.data(), vm.heap_limit_) != CopyStatus::Ok)
+        if (deep_copy_tuple(seeds.data(), seeds.size(), copies.data(), vm.heap_limit_, true) != CopyStatus::Ok)
             return raise(fault, StopReason::Internal, "memory budget exceeded");
         seeds.swap(copies);
     }

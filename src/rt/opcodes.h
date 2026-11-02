@@ -56,6 +56,7 @@ namespace nift::rt {
     X(ReturnNull) /* return null to the caller                                  */                    \
     X(NewArray)   /* R[a] = [R[b] .. R[b+c-1]]                                  */                    \
     X(NewObject)  /* R[a] = {}                                                  */                    \
+    X(MakeImmutable) /* R[a]'s object refuses every mutation (B2: injected args) */                 \
     X(ObjectSet)  /* R[a][atom b] = R[c] (object literal construction)          */                    \
     X(GetIndex)   /* R[a] = R[b][RK[c]]                                         */                    \
     X(SetIndex)   /* R[a][RK[b]] = RK[c]                                        */                    \
@@ -84,6 +85,7 @@ namespace nift::rt {
     X(CheckField) /* RK[a] assignable to field type RK[b]; c: legacy's wording    */                  \
     X(IterCheck)  /* R[a] is the iterable; b: 0 single-array, 1 pair-object,       */                    \
                   /* 2 force non-iterable, 3 force array-pair, 4 force object-single*/                 \
+                  /* c: 1 the loop holds the value (B2: snapshot it if shared)    */                 \
     X(ArrayElem)  /* R[a] = R[b][R[c]] (array); R[a+1] = found (CP12C slice 2)   */                    \
     X(ArrayElemValue) /* R[a] = R[b][R[c]] (array), no found flag (safe lengths) */                    \
     X(ObjectKeys) /* R[a] = insertion-ordered key array of object R[b]          */                     \
@@ -96,7 +98,6 @@ namespace nift::rt {
     X(CopyCellLocation) /* copy a selector descriptor; share an ordinary binding slot */              \
     X(CellLoadCached) /* indexed selector targets use the descriptor cache */                          \
     X(CellStoreCached) /* commit an indexed selector write without detaching */                        \
-    X(CellTake) /* move a source slot's Value out during checked mutation */                          \
     X(NewSourceSlot) /* boxed slot owning a replaceable value cell */                                  \
     X(CellAnchor) /* R[a] = the current value owner of slot R[b] */                                     \
     X(CellSlot) /* R[a] = the descriptor's own lexical slot */                                        \

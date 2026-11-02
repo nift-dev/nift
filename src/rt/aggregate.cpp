@@ -13,10 +13,6 @@ namespace {
 
 using namespace aggregate_detail;
 
-struct CloneDeleter {
-    void operator()(HeapObject* object) const noexcept { destroy_heap_object(object); }
-};
-
 // Open-addressing index for larger objects: slots hold position + 1 (0 =
 // empty); capacity is a power of two at least twice the entry count.
 std::size_t slot_of(Atom key, std::size_t mask) {
@@ -57,39 +53,29 @@ std::ptrdiff_t field_position(const StructObject& s, Atom field) {
     return -1;
 }
 
+// B2 (b2-refrep.md): arrays and objects are references. A mutation writes the
+// shared object in place, visibly through every alias (no copy-on-write
+// clone; unshare is deleted), after the checked-build relocation.
+void array_write(Value& array) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 24
+    if (array.refcount() > 1) {  // R-B2: copy-on-write resurrected (a shared array is cloned on write)
+        Value copy = make_array(array.heap_as<ArrayObject>()->items.size());
+        copy.heap_as<ArrayObject>()->items = array.heap_as<ArrayObject>()->items;
+        copy_summary(array.heap(), copy.heap());
+        array = static_cast<Value&&>(copy);
+    }
+#endif
+    relocate_storage(array.heap());
+}
+
+// B2: objects are references; a mutation writes the shared object in place
+// (no copy-on-write clone), after the checked-build relocation.
 ObjectObject& object_mut(Value& object) {
-    if (!unshare(object)) relocate_storage(object.heap());
+    relocate_storage(object.heap());
     return *object.heap_as<ObjectObject>();
 }
 
 } // namespace
-
-// Arrays and objects only: struct instances and collections are references
-// (D-NEXT-refsem #1) and are mutated in place, whoever else holds them.
-bool unshare(Value& value) {
-    if (value.refcount() <= 1) return false;
-    // Own every partial clone before copying or checked-reference relocation.
-    std::unique_ptr<HeapObject, CloneDeleter> copy;
-    if (value.is(Kind::Array)) {
-        auto* a = new ArrayObject();
-        copy.reset(a);
-        a->items = value.heap_as<ArrayObject>()->items;
-    } else if (value.is(Kind::Object)) {
-        auto* o = new ObjectObject();
-        copy.reset(o);
-        const auto* source = value.heap_as<ObjectObject>();
-        o->entries = source->entries;
-        o->index = source->index;
-    } else {
-        return false;
-    }
-    copy_summary(value.heap(), copy.get());
-    relocate_storage(value.heap());  // stale references into the shared original fault too
-    heap_retally(copy.get());
-    value.replace_heap(copy.release());
-    return true;
-}
-
 
 Value make_array(std::size_t reserve) {
     // Own the object before reserve: embedding contains bad_alloc and keeps
@@ -112,13 +98,13 @@ const std::vector<Value>& array_view(const Value& array) { return array.heap_as<
 // hand-out of the result (review round 2: setting the bit here drained the
 // relocation credit on every VM mutation).
 std::vector<Value>& array_mut(Value& array) {
-    if (!unshare(array)) relocate_storage(array.heap());
+    array_write(array);
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
     return array.heap_as<ArrayObject>()->items;
 }
 
 void array_push(Value& array, Value item) {
-    if (!unshare(array)) relocate_storage(array.heap());
+    array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
     array.heap_as<ArrayObject>()->items.push_back(static_cast<Value&&>(item));
@@ -126,7 +112,7 @@ void array_push(Value& array, Value item) {
 }
 
 void array_set(Value& array, std::size_t index, Value item) {
-    if (!unshare(array)) relocate_storage(array.heap());
+    array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
     array.heap_as<ArrayObject>()->items[index] = static_cast<Value&&>(item);
@@ -138,6 +124,28 @@ Value* array_slot_mut(Value& array, std::size_t index) {
 }
 
 std::size_t array_size(const Value& array) { return array.heap_as<ArrayObject>()->items.size(); }
+
+// B2: the explicit O(n) shallow clones that replaced unshare's implicit one
+// (loop and callback snapshots): a new outer object, the same elements.
+Value array_shallow_clone(const Value& array) {
+    Value owned = make_array(0);  // owned before copying (bad_alloc)
+    auto* a = owned.heap_as<ArrayObject>();
+    a->items = array.heap_as<ArrayObject>()->items;
+    copy_summary(array.heap(), a);
+    heap_retally(a);
+    return owned;
+}
+
+Value object_shallow_clone(const Value& object) {
+    Value owned = make_object();
+    auto* o = owned.heap_as<ObjectObject>();
+    const auto* source = object.heap_as<ObjectObject>();
+    o->entries = source->entries;
+    o->index = source->index;
+    copy_summary(source, o);
+    heap_retally(o);
+    return owned;
+}
 
 Value make_object() {
     auto* object = new ObjectObject();

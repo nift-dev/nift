@@ -35,6 +35,10 @@ CopyStatus deep_copy(const Value& source, Value& out, std::size_t heap_limit);
 // The same as one deep_copy of the tuple `values[0..count)`: references shared
 // between the values stay shared between the copies (CP22 cooperative task
 // arguments, D-NEXT-refsem #5). `out` receives `count` values.
-CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit);
+// `keep_immutable` (B2, owner F3: the cooperative spawn copy, an isolate
+// crossing like a thread transfer): each copy of an immutable object is
+// immutable too. deepcopy() leaves it false: its copies are mutable.
+CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit,
+                           bool keep_immutable = false);
 
 } // namespace nift::rt

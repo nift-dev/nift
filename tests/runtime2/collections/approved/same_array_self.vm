@@ -1,4 +1,0 @@
-ran
---- stderr
-error: same_array_self.f:3:7: same: operands must be identity-bearing values
---- exit 1

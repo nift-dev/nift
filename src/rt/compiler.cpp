@@ -305,6 +305,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     compiler.set_session(limits.session, limits.invocation);
     if (expression_result) compiler.expression_result();
     compiler.set_parallel_tasks(limits.parallel_tasks);
+    compiler.set_reference_probe(limits.reference_probe);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -328,7 +329,8 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     // D-NEXT-refsem: the Phase A forward-compatibility guard (reference_guard.h),
     // on a unit the compiler otherwise admits (earlier refusals keep their reason).
-    if (!check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset,
+    if (!limits.reference_probe &&
+        !check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset,
                                limits.session ? &limits.session->capture_initializers : nullptr)) {
         result.positioned = true;
         return result;

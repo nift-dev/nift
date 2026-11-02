@@ -23,6 +23,7 @@
 #include <string>
 
 namespace nift::rt {
+class CycleGraph;
 
 struct Fault {
     StopReason reason = StopReason::None;
@@ -91,9 +92,16 @@ inline std::int64_t text_binding_type(std::int64_t text_type, const Value& value
 bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault);
 
 bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault);
-bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault);
+// set_index and push_value: the SetIndex and Push implementations (the
+// mutation protocol). `graph`: the VM's cycle graph (null: the default); a
+// refused cycle sets *cycle and returns false without raising (the VM raises
+// the catchable runtime.reference_cycle), or, with no `cycle`, raises an
+// ordinary error.
+bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault,
+               const CycleGraph* graph = nullptr, bool* cycle = nullptr);
 bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fault& fault);
-bool push_value(Value& array, const Value& value, Fault& fault, const Note* note = nullptr);
+bool push_value(Value& array, const Value& value, Fault& fault, const Note* note = nullptr,
+                const CycleGraph* graph = nullptr, bool* cycle = nullptr);
 // `length()` (size = false) or `size()` (size = true).
 bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault);
 

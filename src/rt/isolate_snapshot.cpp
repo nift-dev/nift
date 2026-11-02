@@ -51,14 +51,15 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         if (src.collection_entry) dst.collection_entry = copy->protos.at(indices.at(src.collection_entry)).get();
         input.constant_counts.push_back(src.constants.size());
         for (const auto& v : src.constants) {
-            holds_identity = holds_identity || may_contain_identity(v);
+            holds_identity = holds_identity || v.is(Kind::Array) || v.is(Kind::Object) || may_contain_identity(v);
             items.push_back(v);
         }
         std::uint32_t wire = std::numeric_limits<std::uint32_t>::max();
         (void)map.index_of(&src, wire); input.proto_wires.push_back(wire);
     }
-    // array_mut marks raw storage conservatively; keep the exact identity
-    // summary that per-element stores would have left (aggregate.h).
+    // array_mut marks raw storage conservatively; keep the exact summary
+    // that per-element stores would have left (aggregate.h; B2: a nested
+    // array or object marks it too).
     if (!holds_identity) clear_may_hold_identity(constants.heap());
     if (input.constants_graph.encode(constants, map, error) != TransferStatus::Ok) return false;
     auto& table = AtomTable::current();

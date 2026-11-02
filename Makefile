@@ -363,6 +363,39 @@ test-rt-mutation-protocol-mutants: test-rt-mutation-protocol \
 		else echo "FAIL M-B1 mutant $$n not caught (exit $$rc)"; exit 1; fi; done
 test-rt-vm: test-rt-mutation-protocol-mutants
 
+# B2 reference representation (docs/runtime-2/checkpoints/b2-refrep.md):
+# arrays and objects shared, snapshots, array/object cycles, `args`
+# immutability and session receiver atomicity, through real VM execution
+# (tests/rt/refrep_vm.cpp; the non-contractual CompileLimits::reference_probe).
+# Each mutant rebuilds one object with -DNIFT_REFSEM_MUTANT=n and must fail it.
+RT_REFREP_DIR := $(TEST_DIR)/rt/refrep
+RT_REFREP_MUTANTS := 24:src/rt/aggregate.cpp 25:src/rt/copy_graph.cpp 26:src/rt/natives/object_methods.cpp \
+	27:src/rt/vm_iter.cpp 28:src/rt/collection_helpers.cpp 29:src/rt/isolate_transfer_encode.cpp \
+	21:src/rt/mutation.cpp
+$(RT_REFREP_DIR)/refrep_vm.o: tests/rt/refrep_vm.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -c tests/rt/refrep_vm.cpp -o $@
+$(RT_REFREP_DIR)/refrep-vm$(EXEEXT): $(RT_REFREP_DIR)/refrep_vm.o $(CP19_EXPR_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
+.PHONY: test-rt-refrep test-rt-refrep-mutants
+test-rt-refrep: $(RT_REFREP_DIR)/refrep-vm$(EXEEXT)
+	"$(RT_REFREP_DIR)/refrep-vm$(EXEEXT)"
+test-rt-refrep-mutants: test-rt-refrep
+	@for pair in $(RT_REFREP_MUTANTS); do n=$${pair%%:*}; src=$${pair#*:}; obj=$${src%.cpp}.o; \
+		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_REFSEM_MUTANT=$$n -c $$src -o "$(RT_REFREP_DIR)/m$$n.o" || exit 2; \
+		objs=$$(printf '%s\n' $(CP19_EXPR_OBJECTS) | grep -vx "$$obj"); \
+		$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $$objs "$(RT_REFREP_DIR)/m$$n.o" $(LDLIBS) \
+			-o "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" || exit 2; \
+		if "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" > "$(RT_REFREP_DIR)/m$$n.log" 2>&1; then \
+			echo "FAIL refrep mutant $$n ($$src) survived"; exit 1; fi; \
+		echo "PASS refrep mutant $$n ($$src) caught: $$(grep -m1 'case' "$(RT_REFREP_DIR)/m$$n.log")"; \
+		rm -f "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" "$(RT_REFREP_DIR)/m$$n.o"; done
+test-rt-vm: test-rt-refrep-mutants
+.PHONY: test-runtime2-refrep-cli
+test-runtime2-refrep-cli: $(TARGET)
+	$(PYTHON) tests/runtime2/refrep/refrep_cli.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-refrep-cli
+
 # CP23 milestone 2: isolate task entry/result API (wrapper execution, cloned
 # constants, TransferGraph arguments/globals/result; no worker threads yet).
 RT_ISOLATE_TASK_UNIT := $(TEST_DIR)/rt/isolate-task-unit$(EXEEXT)

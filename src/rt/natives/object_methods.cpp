@@ -42,13 +42,20 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
     return Status::Ok;
 }
 
+// A new object with `source`'s entries (shared values), in order: the result
+// of merge/merge_deep before the other side's entries are applied.
+Value shallow_object(const Value& source) {
+    Value out = make_object();
+    for (const auto& entry : object_view(source)) object_set(out, entry.first, entry.second);
+    return out;
+}
+
 // Legacy merge_deep's recursive merge, at most 64 nested levels (the depth
 // bounds the C++ recursion too).
 bool merge_deep(const Value& left, const Value& right, Value& result, int level, std::string& error) {
     if (level > 64) { error = "merge_deep: maximum merge depth exceeded"; return false; }
     if (!(left.is(Kind::Object) && right.is(Kind::Object))) { result = right; return true; }
-    Value merged = left;
-    unshare(merged);  // before any reference into `right` is taken: `right` may share `left`'s object
+    Value merged = shallow_object(left);  // B2: a new object (`right` may be `left`'s object)
     for (const auto& entry : object_entries(right)) {
         const Value* existing = object_get(merged, entry.first);
         if (existing && existing->is(Kind::Object) && entry.second.is(Kind::Object)) {
@@ -172,8 +179,13 @@ Status obj_merge(const Context&, const Value* args, std::uint32_t argc, Value& o
     if (!receiver(args, argc)) return internal(error, "merge receiver");
     if (argc != 2) return fail(error, "merge: expected one object");
     if (!args[1].is(Kind::Object)) return fail(error, "merge: argument must be an object");
-    Value result = args[0];
-    unshare(result);  // first: `args[1]` may share the receiver's object (o.merge(o))
+    // B2: a new object, never the receiver (merge does not mutate it); built
+    // first, since `args[1]` may be the receiver's object (o.merge(o)).
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 26
+    Value result = args[0];  // R-B5: merge mutates its receiver
+#else
+    Value result = shallow_object(args[0]);
+#endif
     for (const auto& entry : object_entries(args[1])) object_set(result, entry.first, entry.second);
     out = static_cast<Value&&>(result);
     return Status::Ok;

@@ -123,8 +123,9 @@ Status coll_front(const Context&, const Value* args, std::uint32_t argc, Value& 
 // map/set/stack collections (legacy-equal: its tagged references), and
 // mutex, atomic, channel, future and thread (owner ruling 2026-11-01; legacy
 // errors) by their stable handle or task record (rt::same). The compiler
-// admits plain names only. Any other operand (arrays and objects, values
-// until Phase B) is legacy's fatal error text.
+// admits plain names only. B2 (Phase B plan section 3): arrays and objects
+// are references, so same() answers their identity too. Any other operand
+// is legacy's fatal error text.
 Status fn_same(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return fail(error, "same: expected two values");
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 4

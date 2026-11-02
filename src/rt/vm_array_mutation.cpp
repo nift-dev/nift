@@ -26,8 +26,11 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         const Note* note=proto->note(&in-proto->code.data());
         return fail("cannot mutate const array: "+std::string(note?note->text:""));}
     // B1: push is mutation::push (stages 2.1-2.2 there, the same text).
-    if(m==M::Push){const Note* note=proto->note(&in-proto->code.data());if(!push_value(s[Source],s[Item],fault,
-        note))return false;
+    const auto cycle=[&](const Value& stored){return mutation_failed(fault,proto,in,mutation::detail::cycle_failure(0),
+        s[Source].heap(),stored,"");};
+    if(m==M::Push){const Note* note=proto->note(&in-proto->code.data());bool refused_cycle=false;
+        if(!push_value(s[Source],s[Item],fault,note,&cycle_graph_,&refused_cycle))
+            return refused_cycle&&cycle(s[Item]);
         s[Result]=s[Item];return memory_ok(fault);}
     // B1 (rt/mutation.h): stage 2.2, the object's immutability, before bounds.
     if(mutation::refuses_mutation(s[Source])){const Note* note=proto->note(&in-proto->code.data());
@@ -52,10 +55,15 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     if(m==M::Remove)s[Result]=array_view(s[Source])[index];
     if(m==M::Splice&&in.c!=1){s[Result]=make_array(count);for(std::size_t k=0;k<count;++k)array_push(s[Result],
         array_view(s[Source])[index+k]);}
+    // Stage 2.4 (B2: arrays are references): each stored value, before the
+    // budget and any change (the splice replacement's elements, F2 ordering).
+    if(m==M::Insert&&mutation::closes(s[Source],s[Returned],&cycle_graph_))return cycle(s[Returned]);
+    if(m==M::Splice&&in.c!=0&&s[Keys].is(Kind::Array)&&s[Keys].heap()!=s[Source].heap())
+        for(const Value& item:array_view(s[Keys]))if(mutation::closes(s[Source],item,&cycle_graph_))return cycle(item);
     if(m==M::Sort){natives::Context context;context.heap_limit=heap_limit_;  // the only user of a Context
         return collection_plain_sort(s,context,fault)&&memory_ok(fault);}
     const std::size_t growth=m==M::Insert?1:m==M::Splice&&in.c==1?array_size(s[Keys]):0;
-    // Stage 2.5 (no cycle check: arrays are copied, so acyclic by construction).
+    // Stage 2.5.
     if(!mutation::reserve(heap_limit_,mutation::array_reserve_bytes(s[Source],growth)))
         return internal(fault,"memory budget exceeded");
     using E=mutation::ArrayEdit;

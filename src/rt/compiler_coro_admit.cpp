@@ -66,6 +66,7 @@ bool task_op_allowed(OpCode op) {
         case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq:
         case OpCode::JmpNotNe: case OpCode::JmpIncLt: case OpCode::Call: case OpCode::CallNative:
         case OpCode::Return: case OpCode::ReturnNull: case OpCode::NewArray: case OpCode::NewObject:
+        case OpCode::MakeImmutable:
         case OpCode::ObjectSet: case OpCode::GetIndex: case OpCode::SetIndex: case OpCode::GetMember:
         case OpCode::Push: case OpCode::Length: case OpCode::GetGlobal: case OpCode::GetGlobalChecked:
         case OpCode::SetGlobal: case OpCode::MarkGlobal: case OpCode::CheckGlobal: case OpCode::LoadFunction:
@@ -73,7 +74,7 @@ bool task_op_allowed(OpCode op) {
         case OpCode::CallValue: case OpCode::CallValueAny: case OpCode::Undefined: case OpCode::IterCheck:
         case OpCode::ArrayElem: case OpCode::ArrayElemValue: case OpCode::ObjectKeys: case OpCode::ObjectLookup:
         case OpCode::ObjectLookupValue: case OpCode::IterMissing: case OpCode::CopyCellLocation:
-        case OpCode::CellLoadCached: case OpCode::CellStoreCached: case OpCode::CellTake: case OpCode::NewSourceSlot:
+        case OpCode::CellLoadCached: case OpCode::CellStoreCached: case OpCode::NewSourceSlot:
         case OpCode::CellAnchor: case OpCode::CellSlot: case OpCode::TryBegin: case OpCode::TryEnd:
         case OpCode::Throw: case OpCode::ErrorNew: case OpCode::Spawn: case OpCode::Await: case OpCode::Sleep:
         case OpCode::Yield: case OpCode::TaskEnd: case OpCode::FutureOp:

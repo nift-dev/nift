@@ -31,7 +31,7 @@ declare -A FILE=(
   [17]=src/rt/reference_guard.cpp     # the lent rule is off (a lent binding mutated during the call or loop)
   [18]=src/rt/reference_guard.cpp     # a parameter a closure captures does not escape
   [20]=src/rt/reference_guard_walk.cpp  # a loop over a map/set/stack binds exclusive values (the review-2 short-circuit)
-  [21]=src/rt/vm_closure.cpp          # a cycle through a captured cell is checked only after the take (cell emptied)
+  [21]=src/rt/mutation.cpp            # B2: array/object receivers skip the cycle check (the B1 transition rule; was: the take's pre-check)
   [22]=src/rt/compiler_array_mutation.cpp  # a splice stores its removal before the replacement's cycle check
   [23]=src/rt/compiler_array_mutation.cpp  # only a captured splice evaluates its arguments first (review round 4)
 )

@@ -174,7 +174,10 @@ private:
             case WireKind::Error: if (n.has_child) v.heap_as<ErrorObject>()->cause = child(n.child); break;
             default: break;
         }
-        if (v.is_heap()) heap_retally(v.heap());
+        if (v.is_heap()) {
+            heap_retally(v.heap());
+            if (n.immutable) mark_immutable(v.heap());  // B2 (owner F3): after the fill, as at injection
+        }
     }
     const std::vector<Node>& nodes_;
     const TransferProtoMap& protos_;

@@ -83,7 +83,11 @@ std::string_view note_view(const Note* note) { return note ? std::string_view(no
 #if defined(__GNUC__)
 __attribute__((cold, noinline))
 #endif
-bool refused(Fault& fault, const mutation::Outcome& out) { return raise(fault, StopReason::Error, out.text); }
+bool refused(Fault& fault, const mutation::Outcome& out) {
+    if (out.failure == mutation::Failure::Cycle)  // a caller without a catchable path (C++ tests)
+        return raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
+    return raise(fault, StopReason::Error, out.text);
+}
 
 #if defined(__GNUC__)
 __attribute__((cold, noinline))
@@ -272,21 +276,31 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
     return internal(fault, "index");
 }
 
-bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault) {
+// B2 (b2-refrep.md, validation order): kind (compile-time proved; internal
+// otherwise), then the receiver's immutability, then legacy's bounds texts,
+// then the cycle check, then the commit. B1 checked bounds before
+// immutability; no reachable program observes the difference (a const
+// receiver is refused at compile time, an alias of one by the Phase A guard).
+// A refused cycle sets *cycle (the caller raises the catchable error).
+bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault,
+               const CycleGraph* graph, bool* cycle) {
     if (!object.is(Kind::Array) || !key.is_number()) return internal(fault, "element assignment");
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;
-    if (!integral || static_cast<std::uint64_t>(i) >= array_size(object)) {
+    // mutation::set runs the stages in order (immutable, bounds, cycle) and
+    // commits; only its refusals are mapped to legacy's texts here.
+    const mutation::Outcome out = mutation::set(object, integral ? static_cast<std::size_t>(i) : array_size(object),
+                                                value, [note] { return note_view(note); }, graph);
+    if (out.ok()) return true;
+    if (out.failure == mutation::Failure::Bounds) {
         const bool beyond_int64 =  // an integral Decimal (-INT64_MIN, review D3)
             key.is(Kind::Decimal) && number_is_integer(key) && decimal_spelling(key).substr(0, 1) != "-";
         if (integral || beyond_int64) return raise(fault, StopReason::Error, "index out of range: " + note_text(note));
         return raise(fault, StopReason::Error,
                      "assignment index does not address an array or object: " + note_text(note));
     }
-    // B1: the protocol (immutability; arrays are not cycle-checked while copied)
-    const mutation::Outcome out =
-        mutation::set(object, static_cast<std::size_t>(i), value, [note] { return note_view(note); });
-    return out.ok() || refused(fault, out);
+    if (out.failure == mutation::Failure::Cycle && cycle) { *cycle = true; return false; }
+    return refused(fault, out);
 }
 
 // A noted member read is a path argument of a user call (compiler_call.cpp
@@ -316,11 +330,14 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
     return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
 }
 
-bool push_value(Value& array, const Value& value, Fault& fault, const Note* note) {
+bool push_value(Value& array, const Value& value, Fault& fault, const Note* note, const CycleGraph* graph,
+                bool* cycle) {
     if (!array.is(Kind::Array)) return push_kind_error(fault, note);
     // B1: the protocol; the growth is counted after the step (memory_ok), as before
-    const mutation::Outcome out = mutation::push(array, value, [note] { return note_view(note); });
-    return out.ok() || refused(fault, out);
+    const mutation::Outcome out = mutation::push(array, value, [note] { return note_view(note); }, graph);
+    if (out.ok()) return true;
+    if (out.failure == mutation::Failure::Cycle && cycle) { *cycle = true; return false; }
+    return refused(fault, out);
 }
 
 bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault) {

@@ -125,6 +125,9 @@ private:
             default:
                 return fail(TransferStatus::InvalidGraph, "unsupported heap value during transfer", error);
         }
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 29)
+        node.immutable = is_immutable(object);  // B2 (owner F3); R-B6 drops it: immutable lost on transfer
+#endif
         id = static_cast<std::uint32_t>(nodes_.size());
         nodes_.push_back(std::move(node));
         seen_.emplace(object, id);

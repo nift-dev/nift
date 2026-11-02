@@ -54,9 +54,11 @@ def inject(number,source):
         return substitute(source,'case M::Reduce:s[Result]=r;break;','case M::Reduce:s[Result]=s[Item];break;')
     if number==4:return substitute(source,'desc=string_view_of(decoded)=="desc";','desc=false;')
     if number==5:
-        source=substitute(source,'Value* s=R+in.a;const auto m=static_cast<M>(in.b);','Value* s=R+in.a;const auto m=static_cast<M>(in.b); Value saved_receiver=s[Source];')
-        # B1: the commit and its heap tally moved into rt/mutation.cpp (commit_array).
-        return substitute(source,'"array mutation method");\n    }\n    return memory_ok(fault);','"array mutation method");\n    }\n    s[Source]=std::move(saved_receiver);return memory_ok(fault);')
+        # B2 (b2-refrep.md): the receiver is a shared reference mutated in
+        # place, so restoring the register no longer loses the change; the
+        # defect is now the mutation landing on a private copy of the receiver
+        # (copy-on-write resurrected for the instruction).
+        return substitute(source,'Value* s=R+in.a;const auto m=static_cast<M>(in.b);','Value* s=R+in.a;const auto m=static_cast<M>(in.b); if(s[Source].is(Kind::Array))s[Source]=array_shallow_clone(s[Source]);')
     if number==7:return substitute(source,'frames_.size()>=next_frame_check_||callee_base+callee->nregs+1u>stack_.size()','callee_base+callee->nregs+1u>stack_.size()')
     if number==8:return substitute(source,'if((it->ret-1)->op==OpCode::CollectionCall)','if(false)')
     if number==10:return substitute(source,'const bool once=(method>=CollectionMethod::Map&&method<=CollectionMethod::Count)||method==CollectionMethod::GroupBy;','const bool once=true;')

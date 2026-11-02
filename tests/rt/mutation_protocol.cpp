@@ -1,9 +1,11 @@
-// B1 mutation protocol (docs/runtime-2/checkpoints/b1-mutation.md): every
-// mutator x every validation failure (kind, immutable, bounds, argument,
-// cycle, budget) leaves the receiver byte-identical, the live heap equal and
-// every refcount equal; immutability through C++ aliases; copy/deepcopy clear
-// the bit; the cycle check accepts array and object targets; the bookkeeping
-// tallies the heap. Built with NIFT_MUTATION_MUTANT=1/2/3 it must fail.
+// B1 mutation protocol (docs/runtime-2/checkpoints/b1-mutation.md), with B2's
+// reference representation (b2-refrep.md): every mutator x every validation
+// failure (kind, immutable, bounds, argument, cycle, budget) leaves the
+// receiver byte-identical, the live heap equal and every refcount equal;
+// immutability through C++ aliases (B2: no copy-on-write escape); copy and
+// deepcopy clear the bit; the cycle check covers array and object receivers;
+// the bookkeeping tallies the heap. Built with NIFT_MUTATION_MUTANT=1..5 it
+// must fail.
 #include "rt/aggregate.h"
 #include "rt/copy_graph.h"
 #include "rt/heap_account.h"
@@ -127,15 +129,23 @@ void array_matrix() {
     expect_refused("remove", Failure::Bounds, a123(), {}, rem);
     expect_refused("pop", Failure::Bounds, make_array(), {}, pop);
     expect_refused("splice", Failure::Argument, a123(), {x}, spl);
-    // Budget: a shared receiver reserves its clone; a full one its growth.
+    // B2: an array receiver is cycle-checked too (each stored value; the
+    // splice replacement's elements), before anything changes.
+    {
+        Value r = a123();
+        expect_refused("push-self", Failure::Cycle, r, {r}, push);
+        expect_refused("push-nested", Failure::Cycle, r, {array_of({array_of({r})})}, push);
+        expect_refused("insert", Failure::Cycle, r, {array_of({r})}, [&](Value& v, V& o) { return m::insert(v, 0, o[0], e); });
+        expect_refused("set", Failure::Cycle, r, {closure_over(r)}, [&](Value& v, V& o) { return m::set(v, 0, o[0], e); });
+        expect_refused("splice", Failure::Cycle, r, {array_of({array_of({r})})}, spl);
+    }
+    // Budget: growth beyond the capacity (B2: no copy-on-write clone to
+    // reserve, so a shared receiver reserves nothing more), and splice's side
+    // buffer.
     const m::Env b = env_budget();
     const Value shared = a123();
     for (const auto& [name, op] : std::vector<std::pair<const char*, std::function<m::Outcome(Value&, V&)>>>{
              {"insert", [&](Value& r, V& o) { return m::insert(r, 0, o[0], b); }},
-             {"remove", [&](Value& r, V&) { return m::remove(r, 0, nullptr, b); }},
-             {"pop", [&](Value& r, V&) { return m::pop(r, nullptr, b); }},
-             {"reverse", [&](Value& r, V&) { return m::reverse(r, b); }},
-             {"clear", [&](Value& r, V&) { return m::clear(r, b); }},
              {"splice", [&](Value& r, V& o) { return m::splice(r, 0, 1, o[0], nullptr, b); }}})
         expect_refused(name, Failure::Budget, shared, {arr, shared}, op);
 }
@@ -159,6 +169,9 @@ void keyed_matrix() {
     {
         Value s = inst();
         expect_refused("field_set", Failure::Cycle, s, {array_of({s})}, fset);
+        Value o = obj();
+        expect_refused("object_put", Failure::Cycle, o, {o}, oput);
+        expect_refused("object_put-nested", Failure::Cycle, o, {array_of({o})}, oput);
     }
     const auto mput = [&](Value& r, V& o) { return m::map_put(r, o[0], o[1], e); };
     const auto sadd = [&](Value& r, V& o) { return m::set_insert(r, o[0], e); };
@@ -209,14 +222,16 @@ void aliases_and_copies() {
     Value args = immutable(a123());
     const m::Outcome refused = m::push(args, Value::integer(4), e);
     CHECK(refused.failure == Failure::Immutable && refused.text == "cannot mutate const array: args");
-    // A C++ alias of a copy-on-write array: the commit clones, so the
-    // immutable object itself is never written (B1); the clone is mutable.
+    // B2: an array is a reference, so a C++ alias is refused too (the B1
+    // copy-on-write escape is gone), and a mutable alias shares the change.
     const Snap before = snap(args, {});
     Value alias = args;
-    CHECK(m::push(alias, Value::integer(4), e).ok());
-    CHECK(alias.heap() != args.heap() && !m::is_immutable(alias) && array_size(alias) == 4);
+    CHECK(m::push(alias, Value::integer(4), e).failure == Failure::Immutable && alias.heap() == args.heap());
     alias = Value();
     CHECK(snap(args, {}) == before && m::is_immutable(args));
+    Value plain = a123();
+    Value shared = plain;
+    CHECK(m::push(shared, Value::integer(4), e).ok() && shared.heap() == plain.heap() && array_size(plain) == 4);
     // References (struct, collection): immutable through every alias.
     Value s = immutable(inst());
     Value s2 = s;
@@ -231,18 +246,34 @@ void aliases_and_copies() {
     CHECK(!m::is_immutable(shallow) && shallow.heap() != args.heap() && array_size(shallow) == 3);
     CHECK(!m::is_immutable(deep) && m::push(shallow, Value::integer(4), e).ok() && m::push(deep, Value(), e).ok());
     CHECK(array_size(args) == 3);
+    // B2: copy() of any array or object is a new outer object (shared contents).
+    Value inner = a123(), outer = array_of({inner}), copied;
+    CHECK(shallow_copy(outer, copied, static_cast<std::size_t>(-1)) == CopyStatus::Ok);
+    CHECK(copied.heap() != outer.heap() && array_view(copied)[0].heap() == inner.heap());
+    // The cooperative-spawn copy keeps the bit (deep_copy_tuple keep_immutable).
+    Value kept;
+    CHECK(deep_copy_tuple(&args, 1, &kept, static_cast<std::size_t>(-1), true) == CopyStatus::Ok);
+    CHECK(kept.heap() != args.heap() && m::is_immutable(kept));
 }
 
 void cycle_targets_and_bookkeeping() {
-    // The cycle check accepts array and object targets (reachable from B2).
+    // The cycle check covers array and object targets (B2: applies to them).
     const CycleGraph graph;
     Value a = a123(), o = obj();
     Value holder = inst();
     struct_set(holder, atom("x"), a);
-    CHECK(m::closes_cycle(a.heap(), holder, graph));
-    CHECK(m::closes_cycle(o.heap(), array_of({o}), graph));
-    CHECK(!m::closes_cycle(a.heap(), array_of({o}), graph));
-    CHECK(!m::cycle_applies(a) && !m::cycle_applies(o) && m::cycle_applies(holder));
+    CHECK(m::closes_cycle(a.heap(), holder, &graph));
+    CHECK(m::closes_cycle(o.heap(), array_of({o}), &graph));
+    CHECK(!m::closes_cycle(a.heap(), array_of({o}), &graph));
+    CHECK(m::cycle_applies(a) && m::cycle_applies(o) && m::cycle_applies(holder));
+    // B2 summary (plan 5.1): a flat array keeps the bit clear, so storing it
+    // walks nothing; a nested array marks its parent; a flat array that is
+    // the target below a marked parent is still found.
+    Value flat = a123(), nest = array_of({flat});
+    CHECK(!may_contain_identity(flat) && may_contain_identity(nest));
+    const auto walks = cycle_check_stats().checks;
+    CHECK(!m::closes(a, flat, &graph) && cycle_check_stats().checks == walks);
+    CHECK(m::closes(flat, array_of({nest}), &graph));
     // Bookkeeping: an edit that grows the storage is counted (M-B1c).
     Value grow = make_array(64);
     for (int k = 0; k < 64; ++k) array_push(grow, Value::integer(k));  // full: the insert doubles the storage

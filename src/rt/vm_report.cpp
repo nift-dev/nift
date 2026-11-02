@@ -171,15 +171,26 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);
             break;
         case OpCode::NewObject: out = make_object(); break;
+        case OpCode::MakeImmutable: mutation::make_immutable(R[in.a]); return true;
         case OpCode::ObjectSet: {
             Value value = RK(in.c);
             object_set(R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
-        case OpCode::SetIndex: return set_index(note, R[in.a], RK(in.b), RK(in.c), fault);
+        case OpCode::SetIndex: {
+            bool cycle = false;
+            if (set_index(note, R[in.a], RK(in.b), RK(in.c), fault, &cycle_graph_, &cycle)) return true;
+            return cycle && mutation_failed(fault, proto, in, mutation::detail::cycle_failure(0), R[in.a].heap(),
+                                            RK(in.c), "");
+        }
         case OpCode::GetMember: if (!get_member(note, R[in.b], Atom{in.c}, out, fault)) return false; break;
-        case OpCode::Push: return push_value(R[in.a], RK(in.b), fault, note);
+        case OpCode::Push: {
+            bool cycle = false;
+            if (push_value(R[in.a], RK(in.b), fault, note, &cycle_graph_, &cycle)) return true;
+            return cycle && mutation_failed(fault, proto, in, mutation::detail::cycle_failure(0), R[in.a].heap(),
+                                            RK(in.b), "");
+        }
         case OpCode::Length: if (!length_of(note, R[in.b], in.c != 0, out, fault)) return false; break;
         case OpCode::TypeMeet:
             out = Value::integer(

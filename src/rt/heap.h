@@ -33,15 +33,15 @@ struct BytesObject : HeapObject {
     explicit BytesObject(std::vector<std::uint8_t> d) : HeapObject(Kind::Bytes), data(std::move(d)) {}
 };
 
-// Identity summary (D-040 V16, the cycle rule): bit 7 of the header's tag
+// Reference summary (D-040 V16, the cycle rule): bit 7 of the header's tag
 // byte (the Kind uses the low 4 bits) means "this aggregate may contain an
 // identity-bearing value (a callable, a handle, a cell, a future and, since
-// D-NEXT-refsem, a struct instance or a collection), directly or through a
-// child with the bit". It is
-// conservative: set whenever a store might add identity-bearing content
-// (array_mut hands out raw storage, so it sets it too), copied by
-// copy-on-write clones, and cleared only by the cycle checker after it has
-// verified the direct children (rt/value_cycle.h). Removing the last
+// D-NEXT-refsem, a struct instance or a collection) or (B2, plan 5.1) a
+// nested array or object, directly or through a child with the bit". It is
+// conservative: set whenever a store might add such content (array_mut hands
+// out raw storage, so it sets it too), copied by shallow clones, and cleared
+// only by the cycle checker after it has verified the direct children
+// (rt/value_cycle.h). Removing the last
 // identity-bearing value from a container leaves the bit set (conservative,
 // never missing). Plain data therefore never needs a walk: an aggregate whose
 // bit is clear holds no identity-bearing value anywhere below it.
@@ -52,8 +52,8 @@ inline constexpr std::uint8_t kStorageLent = 0x40;
 // B1 (b1-mutation.md): the object refuses every mutation through the shared
 // mutation protocol (rt/mutation.h), whoever holds it. Set once, after
 // construction (the injected `args` array); never cleared on the object
-// itself: copy()/deepcopy() and copy-on-write clones build new objects
-// without it. Bit 4 stays reserved (Phase B plan section 5.1).
+// itself: copy()/deepcopy() build new objects without it; the isolate
+// transfer and the cooperative spawn copy keep it (B2, owner F3).
 inline constexpr std::uint8_t kImmutable = 0x20;
 inline bool is_immutable(const HeapObject* object) noexcept { return (object->tag & kImmutable) != 0; }
 inline void mark_immutable(HeapObject* object) noexcept { object->tag |= kImmutable; }
@@ -63,8 +63,8 @@ inline void clear_may_hold_identity(HeapObject* object) noexcept {
     object->tag = static_cast<std::uint8_t>(object->tag & ~kMayHoldIdentity);
 }
 
-// Copy-on-write aggregates: a Value copy shares the object; mutation through
-// rt::array_mut / rt::object_mut clones it first when refcount > 1.
+// Arrays and objects (B2: references): a Value copy shares the object, and a
+// mutation writes it in place for every holder.
 struct ArrayObject : HeapObject {
     std::vector<Value> items;
     ArrayObject() : HeapObject(Kind::Array) {}

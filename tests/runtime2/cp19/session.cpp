@@ -88,7 +88,9 @@ int main() {
         auto copy = session.value("a");
         r = session.execute("a.push(3)", "mutate", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        CHECK(array_size(copy) == 2 && array_size(session.value("a")) == 3);
+        // B2 (b2-refrep.md, plan section 6 "sessions stop cloning"): the
+        // statement mutated the bound array itself, so a C++ holder sees it.
+        CHECK(array_size(copy) == 3 && session.value("a").heap() == copy.heap());
     }
     {
         VmSession session;
@@ -173,7 +175,7 @@ int main() {
         r = session.evaluate("(a[1]=(tick+=1))", "index-assignment", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
         CHECK(session.value("tick").as_int() == 1 && array_items(session.value("a"))[1].as_int() == 1);
-        CHECK(array_items(snapshot)[1].as_int() == 0);
+        CHECK(array_items(snapshot)[1].as_int() == 1);  // B2: the same (shared) array
         r = session.evaluate("1+(x=7)", "nested-assignment", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 8);
         r = session.evaluate("false && (x=8)", "skipped-assignment", output);

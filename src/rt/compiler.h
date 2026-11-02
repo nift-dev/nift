@@ -118,6 +118,12 @@ struct CompileLimits {
     // CP22, non-contractual test switch: admit programs that observe scheduling
     // (record §12.1 A5) so VM-only scheduler tests can run. Off by default.
     bool cooperative_observe = false;
+    // B2 (b2-refrep.md), non-contractual test switch: skip the Phase A
+    // reference guard and the legacy location-alias refusal (`aliasing`), so
+    // VM-level tests can execute programs that observe the reference
+    // representation (tests/rt/refrep_vm.cpp). Off by default; no runner,
+    // session or CLI path sets it.
+    bool reference_probe = false;
 };
 
 CompileResult compile_unit(const Ast& ast, NodeId root, const CompileLimits& limits = CompileLimits());

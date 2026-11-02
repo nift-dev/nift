@@ -30,6 +30,25 @@ bool Vm::reserve_snapshot(std::size_t n, Fault& fault) {
     return raise(fault, StopReason::Internal, "memory budget exceeded");
 }
 
+// B2 (b2-refrep.md, D5): a loop over an expression's result (c = 1: the
+// loop holds the value in its own register and never re-reads a place)
+// iterates a shallow snapshot taken here when anything else holds the array
+// or object: under copy-on-write the register was a value, and the body's
+// in-place mutation of the original must not reach the active loop. A
+// uniquely held value is the loop's alone (nothing else can reach it).
+// Loops over a binding (c = 0) re-read it live, as before (the full D5
+// snapshot is B5's).
+bool Vm::entry_snapshot(const Instr& in, Value& source, Fault& fault) {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 27
+    return true;  // R-B3: the loop iterates the live array or object
+#endif
+    if (in.c == 0 || source.refcount() <= 1) return true;
+    const std::size_t n = source.is(Kind::Array) ? array_size(source) : object_size(source);
+    if (!reserve_snapshot(n, fault)) return false;
+    source = source.is(Kind::Array) ? array_shallow_clone(source) : object_shallow_clone(source);
+    return memory_ok(fault);
+}
+
 bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
     Value& source = R[in.a];
     // D-063: the loop's snapshot of a set or stack becomes the array legacy
@@ -70,12 +89,12 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
     }
     switch (in.b) {
         case 0:  // single binding: an array
-            if (source.is(Kind::Array)) return true;
+            if (source.is(Kind::Array)) return entry_snapshot(in, source, fault);
             if (source.is(Kind::Object))
                 return raise(fault, StopReason::Error, "object @for syntax is @for((key, val) : object){...}");
             break;
         case 1:  // pair binding: an object
-            if (source.is(Kind::Object)) return true;
+            if (source.is(Kind::Object)) return entry_snapshot(in, source, fault);
             if (source.is(Kind::Array))
                 return raise(fault, StopReason::Error, "array @for syntax is @for(item : array){...}");
             break;

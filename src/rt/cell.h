@@ -27,7 +27,6 @@ Value copy_cell_location(const Value& cell);
 bool cell_cached_read(const Value& cell, Value& value, std::string& missing);
 bool cell_cached_put(Value& cell, Value value, std::string& missing);
 Value cell_cached_owner(const Value& cell);
-Value cell_take(const Value& cell);
 Value cell_slot(const Value& cell);
 Value cell_anchor(const Value& cell);
 void cell_rebind(Value& cell, Value value);

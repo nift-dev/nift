@@ -292,6 +292,7 @@ private:
     bool handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
                      std::size_t& base, const Instr*& pc);
     // CP12C slice 2 default `for` opcodes (vm_iter.cpp).
+    bool entry_snapshot(const Instr& in, Value& source, Fault& fault);
     bool op_iter_check(const Instr& in, Value* R, Fault& fault);
     bool op_array_elem(const Instr& in, Value* R, Fault& fault);
     bool op_array_elem_value(const Instr& in, Value* R, Fault& fault);

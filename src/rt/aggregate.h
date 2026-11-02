@@ -1,35 +1,24 @@
 #pragma once
-// Aggregates (CP09; D-040; D-NEXT-refsem): copy-on-write arrays and
-// insertion-ordered objects with value semantics, and struct instances, which
-// are identity-bearing references mutated in place (D-NEXT-refsem #1, Phase A).
-// Map/set/stack collections, also references, are in rt/aggregate_collection.h.
-//
-// Arrays and objects:
-// Reading never copies. Mutation goes through array_mut/object_mut (or the
-// helpers below), which first make the aggregate unshared: if another Value
-// holds the same object, the receiver gets a shallow clone (children are
-// shared, their refcounts bumped). Copying a Value is therefore O(1), and the
-// legacy "arguments and returns are copies" semantics cost nothing until a
-// copy is actually mutated.
+// Aggregates (CP09; D-040; D-NEXT-refsem; Phase B B2): arrays and
+// insertion-ordered objects, struct instances and (rt/aggregate_collection.h)
+// map/set/stack collections are all references (B2, b2-refrep.md): copying a
+// Value shares the object, and a mutation changes the shared object in place,
+// visibly through every alias (copy-on-write and unshare are gone). Mutating
+// an existing aggregate goes through the mutation protocol (rt/mutation.h);
+// the storage primitives here are its commit layer, and otherwise build fresh
+// values (rt-lint `storage-write`).
 //
 // Reference lifetime contract. Every reference or pointer returned here
 // (array_items, array_mut, object_entries, object_get, and references to
 // elements obtained through them) points into the aggregate's current heap
-// object and is invalidated by ANY of the following on the same Value or on
-// an alias that shares its object:
-//   * array_push, object_set, object_remove, unshare, array_mut/object_mut
-//     (which may clone the object and switch this Value to the clone, so an
-//     earlier array_mut reference keeps writing into the *other* sharer's
-//     storage, breaking copy semantics, or into freed memory once that
-//     sharer is gone);
-//   * copying the Value and then mutating either copy;
-//   * assigning to or destroying the Value (or the last alias).
-// array_push/object_set additionally reallocate storage. Callers (the VM)
-// must re-fetch after any of these and must not hold a mutable reference
-// across a copy of the aggregate. Copy a child Value out before mutating its
-// parent (`Value v = array_items(a)[0]; array_push(a, v);` is safe;
-// `array_push(a, array_items(a)[0])` is safe too because the argument is
-// copied before the call). There is no runtime check (see the CP09 record).
+// object and is invalidated by ANY mutation of that object (through this Value
+// or any alias: they share it), and by assigning to or destroying the last
+// Value holding it. array_push/object_set additionally reallocate storage.
+// Callers (the VM) must re-fetch after any of these. Copy a child Value out
+// before mutating its parent (`Value v = array_items(a)[0]; array_push(a, v);`
+// is safe; `array_push(a, array_items(a)[0])` is safe too because the
+// argument is copied before the call). Checked builds relocate storage on
+// mutation so a stale use faults (aggregate_store.h).
 #include "rt/atom.h"
 #include "rt/heap.h"
 #include "rt/value.h"
@@ -49,15 +38,19 @@ const std::vector<Value>& array_items(const Value& array);
 const std::vector<Value>& array_view(const Value& array);
 const std::vector<std::pair<Atom, Value>>& object_view(const Value& object);
 const Value* object_find(const Value& object, Atom key);
-// Unshares first. Raw storage: the array is conservatively marked as possibly
-// holding identity-bearing values (rt/heap.h); prefer array_set for one slot.
+// Raw storage of the array itself (B2: never a clone): the array is
+// conservatively marked as possibly holding references (rt/heap.h); prefer
+// array_set for one slot.
 std::vector<Value>& array_mut(Value& array);
 void array_push(Value& array, Value item);
-// Replaces element `index` (< size); unshares first.
+// Replaces element `index` (< size), in place.
 void array_set(Value& array, std::size_t index, Value item);
 std::size_t array_size(const Value& array);
 
 Value make_object();
+// B2: a new outer array/object with the same elements (identity kept), O(n).
+Value array_shallow_clone(const Value& array);
+Value object_shallow_clone(const Value& object);
 std::size_t object_size(const Value& object);
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object);
 const Value* object_get(const Value& object, Atom key);
@@ -80,9 +73,8 @@ void struct_add_field(Value& instance, Atom field, Value value);
 bool struct_set(Value& instance, Atom field, Value value);
 
 // In-place mutation of nested places (`a[0].push(x)`, `o["k"]["m"] = v`,
-// `s.q.v = 5`): each returns the child slot of an aggregate after making that
-// aggregate unique, so a path is made unique top-down by chaining them and
-// the final write touches no other value. The returned pointer follows the
+// `s.q.v = 5`): each returns the child slot of an aggregate (written in
+// place: B2, the aggregate is shared by every alias). The returned pointer follows the
 // lifetime contract above (any later mutation of the parent invalidates it),
 // and the parent is conservatively marked as possibly holding identity-bearing
 // values, since the caller may store anything into the slot.
@@ -91,16 +83,13 @@ Value* array_slot_mut(Value& array, std::size_t index);
 Value* object_slot_mut(Value& object, Atom key);
 Value* struct_slot_mut(Value& instance, Atom field);
 
-// Makes an Array or Object `value` uniquely owned; returns true if it cloned.
-// The clone keeps the identity summary bit. Structs and collections are
-// references and are never unshared (returns false).
-bool unshare(Value& value);
-
 // O(1): an identity-bearing value (a callable, a handle, a cell, a future, a
 // struct instance or a collection: D-NEXT-refsem makes the last two shared
-// references), or an array/object whose identity summary bit is set. False
-// means the value certainly is and contains no identity-bearing value, so
-// storing it can never close a cycle (D-040 V16, D-NEXT-refsem #4).
+// references), or an array/object whose summary bit is set. False means the
+// value certainly is and contains no identity-bearing value. B2 (plan 5.1):
+// the bit also marks an array/object holding a nested array or object, so a
+// false answer also means "holds no reference at all": storing it can close
+// a cycle only if it is the receiver itself (D-040 V16, D-NEXT-refsem #4).
 inline bool may_contain_identity(const Value& value) noexcept {
     switch (value.kind()) {
         case Kind::Function: case Kind::Handle: case Kind::Cell: case Kind::Future: case Kind::Struct:

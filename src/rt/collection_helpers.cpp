@@ -150,6 +150,14 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
     if(phase==0) {
         if(!s[Source].is(Kind::Array))return raise(fault,StopReason::Internal,"collection receiver");
         const std::size_t n=array_size(s[Source]);s[Length]=Value::integer(n);s[Index]=Value::integer(0);
+        // B2 (b2-refrep.md, D5; owner Q7): the callback iterates its entry
+        // snapshot. Under copy-on-write this register was a value; now the
+        // receiver is shared, so a callback's in-place mutation of it must
+        // not reach the active iteration (O(n) when shared, budget first).
+#if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 28)
+        if(s[Source].refcount()>1){if(!budget(context,n*sizeof(Value)+128,fault))return false;
+            s[Source]=array_shallow_clone(s[Source]);}
+#endif
         if(core(method)&&!s[Callback].is(Kind::Function))return error(fault,
             "transformation: callback must be callable");
         if((method==M::MinBy||method==M::MaxBy)&&!n)return error(fault,

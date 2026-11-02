@@ -85,11 +85,10 @@ public:
 
     // Phase 2: the shells (each owned by a Value: a failed allocation frees
     // every one made so far), then each shell's contents, mapped, children
-    // before parents: an array or object copy is a copy-on-write value, so
-    // it is complete before any parent holds it (a later push into a shell a
-    // parent already holds would clone it away from the parent). The graph
-    // is acyclic (reference cycles are refused), so the post-order exists.
-    void link() {
+    // before parents (each copy is complete, and marked immutable when asked,
+    // before any parent holds it). The graph is acyclic (reference cycles are
+    // refused), so the post-order exists.
+    void link(bool keep_immutable) {
         copies_.reserve(sources_.size());
         for (const Value* source : sources_) copies_.push_back(shell(*source));
         std::vector<std::uint8_t> state(sources_.size(), 0);  // 0 new, 1 open, 2 filled
@@ -109,6 +108,7 @@ public:
                     continue;
                 }
                 fill(*sources_[node], copies_[node]);
+                if (keep_immutable && is_immutable(sources_[node]->heap())) mark_immutable(copies_[node].heap());
                 state[node] = 2;
                 stack.pop_back();
             }
@@ -181,24 +181,30 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
         out = std::move(copy);
         return CopyStatus::Ok;
     }
-    if (mutation::is_immutable(source) && (source.is(Kind::Array) || source.is(Kind::Object))) {
-        // B1: copy() of an immutable array or object (`args`) is a new,
-        // mutable outer object sharing the contents.
+    if (source.is(Kind::Array) || source.is(Kind::Object)) {
+        // B2: arrays and objects are references, so copy() builds a new,
+        // mutable outer array or object sharing the contents (B1 did this only
+        // for an immutable one; the rest were copy-on-write values).
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 25
+        out = source;  // R-B4: copy() returns the same object
+        return CopyStatus::Ok;
+#endif
         Value copy = source.is(Kind::Array) ? make_array(array_size(source)) : make_object();
         if (source.is(Kind::Array)) for (const Value& item : array_view(source)) array_push(copy, item);
         else for (const auto& entry : object_view(source)) object_set(copy, entry.first, entry.second);
         out = std::move(copy);
         return CopyStatus::Ok;
     }
-    out = source;  // scalars, strings, identities; arrays and objects: values (copy-on-write)
+    out = source;  // scalars, strings, identities
     return CopyStatus::Ok;
 }
 
-CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit) {
+CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit,
+                           bool keep_immutable) {
     GraphCopy graph;
     if (!graph.discover(values, count, heap_limit)) return CopyStatus::Budget;
-    graph.link();
+    graph.link(keep_immutable);
     for (std::size_t k = 0; k < count; ++k) out[k] = graph.mapped(values[k]);
     return CopyStatus::Ok;
 }

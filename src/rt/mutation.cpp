@@ -28,7 +28,6 @@ const CycleGraph& default_graph() {
     return graph;
 }
 
-const CycleGraph& graph_of(const Env& env) { return env.graph != nullptr ? *env.graph : default_graph(); }
 
 const char* receiver_kind_name(const Value& receiver) {
     switch (receiver.kind()) {
@@ -51,13 +50,6 @@ NIFT_MUTATION_COLD Outcome failed(Failure failure, std::string text) {
 
 NIFT_MUTATION_COLD Outcome failed_text(Failure failure, const char* text) { return failed(failure, text); }
 
-NIFT_MUTATION_COLD Outcome cycle_failure(std::size_t operand) {
-    Outcome out;
-    out.failure = Failure::Cycle;
-    out.operand = operand;
-    return out;
-}
-
 NIFT_MUTATION_COLD Outcome budget_failure() { return failed_text(Failure::Budget, "memory budget exceeded"); }
 
 NIFT_MUTATION_COLD Outcome collection_admit_failure(const Value& receiver, CollectionKind sub, const char* method,
@@ -76,17 +68,21 @@ NIFT_MUTATION_INLINE bool admits_collection(const Value& receiver, CollectionKin
     return receiver.is(Kind::Collection) && collection_kind(receiver) == sub && !refuses_mutation(receiver);
 }
 
-// 2.4 for one stored operand. For a struct or collection receiver
-// closes_cycle is would_close_cycle, whose first test is the O(1)
-// may_contain_identity summary; it is hoisted here, so a scalar or plain
-// value makes no call (the same answer).
+using detail::cycle_failure;
+
+// 2.4 for one stored operand (rt/mutation.h closes, with the Env's graph).
 NIFT_MUTATION_INLINE bool closes(const Value& receiver, const Value& stored, const Env& env) {
-#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 5
-    const bool summary = stored.is(Kind::Array) || stored.is(Kind::Object);  // M-B1e: a narrower pre-filter
-#else
-    const bool summary = may_contain_identity(stored);
-#endif
-    return cycle_applies(receiver) && summary && closes_cycle(receiver.heap(), stored, graph_of(env));
+    return mutation::closes(receiver, stored, env.graph);
+}
+
+// 2.4 for the elements an array operand contributes (splice's replacement):
+// the replacement array is not stored, only its elements, so the receiver
+// itself as the replacement (a.splice(0, 0, a)) closes no cycle.
+bool elements_close(const Value& receiver, const Value& replacement, const Env& env) {
+    if (!replacement.is(Kind::Array) || replacement.heap() == receiver.heap()) return false;
+    for (const Value& item : array_view(replacement))
+        if (closes(receiver, item, env)) return true;
+    return false;
 }
 
 } // namespace
@@ -110,6 +106,13 @@ Outcome admit_failure(const Value& receiver, Kind kind, const char* method, cons
 
 Outcome bounds_failure(const char* text) { return failed(Failure::Bounds, text); }
 
+Outcome cycle_failure(std::size_t operand) {
+    Outcome out;
+    out.failure = Failure::Cycle;
+    out.operand = operand;
+    return out;
+}
+
 bool reserve_slow(std::size_t heap_limit, std::size_t bytes) noexcept {
     if (bytes == static_cast<std::size_t>(-1)) return false;
     return natives::reserve_within(heap_limit, bytes);  // reserve_result's check, without building a Context
@@ -117,20 +120,24 @@ bool reserve_slow(std::size_t heap_limit, std::size_t bytes) noexcept {
 
 } // namespace detail
 
+// B2: every aggregate receiver (R21 restores the B1 transition rule: array
+// and object receivers skip the check, as while they were copied).
 bool cycle_applies(const Value& receiver) noexcept {
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 21
     return receiver.is(Kind::Struct) || receiver.is(Kind::Collection);
+#else
+    (void)receiver;
+    return true;
+#endif
 }
 
-bool closes_cycle(const HeapObject* receiver, const Value& stored, const CycleGraph& graph) {
+bool closes_cycle(const HeapObject* receiver, const Value& stored, const CycleGraph* graph) {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 5
     (void)receiver; (void)stored; (void)graph;
     return false;  // R5: no cycle check (the stored value may close a cycle and leak)
 #else
-    const CycleTarget target = CycleTarget::aggregate(receiver);
-    if (receiver->kind() == Kind::Array || receiver->kind() == Kind::Object)  // B2's targets: no summary gate
-        return (stored.is(Kind::Array) || stored.is(Kind::Object) || may_contain_identity(stored)) &&
-               would_close_cycle_walk(target, stored, graph);
-    return would_close_cycle(target, stored, graph);
+    if (stored.is_heap() && stored.heap() == receiver) return true;  // a.push(a)
+    return would_close_cycle_walk(CycleTarget::aggregate(receiver), stored, graph ? *graph : default_graph());
 #endif
 }
 
@@ -165,6 +172,7 @@ Outcome insert(Value& array, std::size_t index, const Value& item, const Env& en
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "insert", "an array", env.receiver_text);
     if (index > array_size(array)) return failed_text(Failure::Bounds, "insert: index out of range");
+    if (closes(array, item, env)) return cycle_failure(0);
     if (!reserve(env.heap_limit, array_reserve_bytes(array, 1))) return budget_failure();
     commit_array(array, ArrayEdit::Insert, index, 0, item);
     return {};
@@ -204,6 +212,7 @@ Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& 
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "splice", "an array", env.receiver_text);
     if (!replacement.is(Kind::Array)) return failed_text(Failure::Argument, "splice: replacements must be an array");
+    if (elements_close(array, replacement, env)) return cycle_failure(0);
     const auto& items = array_view(array);
     const std::size_t n = items.size();
     index = std::min(index, n);

@@ -313,7 +313,7 @@ VmResult Vm::run(std::string& output) {
     OP(LoadFunction) { if (!op_load_function(*pc, R, fault)) FAIL(); NEXT(); }
     OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault)) FAIL(); NEXT(); }
     OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
-    OP(CellLoadCached) OP(CellStoreCached) OP(CellTake) OP(CellAnchor) OP(CellSlot) {
+    OP(CellLoadCached) OP(CellStoreCached) OP(CellAnchor) OP(CellSlot) {
         if (!op_cell_cached(*pc, R, fault, proto)) FAIL();
         NEXT(); }
     OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
@@ -340,7 +340,7 @@ VmResult Vm::run(std::string& output) {
     OP(Throw) { if (!op_throw(*pc, R, proto, pc, fault)) FAIL(); NEXT(); }
     OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
     OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }
-    OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject)
+    OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject) OP(MakeImmutable)
     OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NewStruct)
     OP(StructAdd) OP(FieldGet) OP(FieldSet) OP(CheckField) {
         if (!cold(*pc, proto, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))

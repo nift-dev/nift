@@ -174,14 +174,14 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             fb_->set_offset(target.begin);
             if (!global_check_defined(held.reg, text(object))) return false;
         }
-        if (indirect && !global && held.selector_root_only && !held.loop_binding)  // the value cycle-checked first
-            fb_->emit(OpCode::CellTake, reg, held.reg, static_cast<std::uint16_t>(value + 1));
-        if (global && !global_take(held, reg, text(object), static_cast<std::uint16_t>(value + 1))) return false;
+        if (indirect && !global && held.selector_root_only && !held.loop_binding)  // B2: re-read, never taken
+            fb_->emit(OpCode::CellLoad, reg, held.reg);
+        if (global && !(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(object))))
+            return false;
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
-        if (global) global_put(held, reg);
-        else if (indirect) {
+        if (indirect && !global && (held.selector || held.loop_binding || held.location_source)) {
             std::uint16_t untyped = 0;
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
             if (!store_indexed_binding(held, reg)) return false;

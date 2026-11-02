@@ -132,9 +132,11 @@ inline void check_not_self(const HeapObject* receiver, const Value& stored) {
 
 // Hot path (every push/set): scalars and strings are decided by one compare,
 // since every kind that can carry identity sorts at or after Kind::Array.
+// B2 (plan 5.1): a nested array or object is a reference too, so storing one
+// marks the receiver (a flat array of scalars keeps the bit clear).
 inline void note_store(HeapObject* receiver, const Value& stored) {
     if (stored.kind() < Kind::Array) return;
-    if (may_contain_identity(stored)) mark_may_hold_identity(receiver);
+    if (stored.kind() <= Kind::Object || may_contain_identity(stored)) mark_may_hold_identity(receiver);
 }
 
 inline void copy_summary(const HeapObject* from, HeapObject* to) {

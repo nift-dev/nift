@@ -288,6 +288,7 @@ bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, cons
 // reference (P8); the VM copies. Refused when the place can hold an array or
 // object.
 bool UnitCompiler::no_alias(NodeId value, const Node& at) {
+    if (reference_probe_) return true;  // tests only (CompileLimits::reference_probe)
     const NodeKind kind = ast_.at(value).kind;
     if (kind != NodeKind::Ident && kind != NodeKind::Member && kind != NodeKind::Index) return true;
     const Binding* binding=kind==NodeKind::Ident?find_binding(text(ast_.at(value))):nullptr;

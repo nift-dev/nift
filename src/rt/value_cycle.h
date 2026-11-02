@@ -2,11 +2,12 @@
 // The D-040 cycle rule (semantics.md V16; D-NEXT-refsem #4) for stores that
 // could close a cycle through identity-bearing values: closure-captured
 // variables, resource payloads and (D-NEXT-refsem) the reference kinds,
-// struct instances and map/set/stack collections. A store whose value fails
-// the O(1) rt::may_contain_identity test cannot close a cycle. Arrays and
-// objects are acyclic by construction (copy-on-write plus
-// retain-before-unique); the reference kinds are kept acyclic by this check,
-// made before every store into one of them (there is no cycle collector).
+// struct instances, map/set/stack collections and (B2) arrays and objects.
+// A store whose value fails the O(1) rt::may_contain_identity test cannot
+// close a cycle, except by storing an array or object into itself (an array
+// or object target checks that first: rt/mutation.cpp closes_cycle). Every
+// reference kind is kept acyclic by this check, made before every store into
+// one of them (there is no cycle collector).
 //
 // Model. A store writes value V into a *target*: a captured variable (a cell,
 // identified by an opaque pointer), a resource's payload (identified by its

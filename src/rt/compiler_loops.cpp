@@ -94,11 +94,19 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
             if (!for_read_source(*state.place, state.entry, state.entry_temp)) return false;
         } else {
             if (!temp(state.held) || !expr_to(header.a, state.held)) return false;
+            // B2: a result copied out of a freed temporary (a call's window)
+            // drops that copy, so a fresh result is held once and needs no
+            // entry snapshot.
+            const Instr& last = fb_->at(fb_->here() - 1);
+            if (last.op == OpCode::Move && last.a == state.held && last.b != state.held && last.b >= fb_->top())
+                fb_->emit(OpCode::LoadNull, last.b);
             state.entry = state.held;
             state.entry_temp = false;
         }
         fb_->set_offset(node.begin);
-        fb_->emit(OpCode::IterCheck, state.entry, static_cast<std::uint16_t>(state.mode));
+        // c = 1 (B2): the loop holds the value itself; snapshot it if shared.
+        fb_->emit(OpCode::IterCheck, state.entry, static_cast<std::uint16_t>(state.mode),
+                  static_cast<std::uint16_t>(state.live && !state.snapshot_mutant ? 0 : 1));
     } else {
         if (iterable.kind == NodeKind::Ident) {
             const Binding* binding = find_binding(text(iterable));

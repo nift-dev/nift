@@ -13,7 +13,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             if (!plain_postfix(expr) || !plain_postfix(callee) || !no_trailing_comma(expr)) return false;
             std::uint16_t reg = 0, value = 0;
             const Binding* holder = receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
-            const bool global = holder != nullptr && holder->global;  // CP12b: taken, pushed, put back
+            const bool global = holder != nullptr && holder->global;  // B2: read, pushed in place
             const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
             const Binding held = (global || indirect) ? *holder : Binding();
             if (receiver.kind != NodeKind::Ident ||
@@ -42,15 +42,17 @@ bool UnitCompiler::expression_statement(const Node& node) {
                  !kinds_within(callee.a, kKindArray, receiver, "type:push")))
                 return false;
             if (!expr_any(arg, value)) return false;
-            // D-NEXT-refsem #4: the pushed value is checked for a cycle before the take.
+            // B2 (b2-refrep.md): re-read after the operand (as the take did);
+            // the array stays in its holder, Push writes it in place and
+            // checks the cycle itself (stage 2.4): no write-back.
             if (indirect && !global && held.selector_root_only && !held.loop_binding)
-                fb_->emit(OpCode::CellTake, reg, held.reg, static_cast<std::uint16_t>(value + 1));
-            if (global && !global_take(held, reg, text(receiver), static_cast<std::uint16_t>(value + 1))) return false;
+                fb_->emit(OpCode::CellLoad, reg, held.reg);
+            if (global && !(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(receiver))))
+                return false;
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));
-            if (global) global_put(held, reg);
-            else if (indirect) {
+            if (indirect && !global && (held.selector || held.loop_binding || held.location_source)) {
                 std::uint16_t untyped = 0;
                 if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
                 if (!store_indexed_binding(held, reg)) return false;

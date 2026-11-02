@@ -90,7 +90,7 @@ public:
     void cell(const void* identity, const Value& contents) override {
         if (found_) return;
         if (target_.kind == CycleTarget::Kind::Cell && identity == target_.cell) { found_ = true; return; }
-        if (!may_contain_identity(contents) || !b_.seen.insert(address_key(identity))) return;
+        if (!relevant(contents) || !b_.seen.insert(address_key(identity))) return;
         b_.work.push_back(&contents);
     }
 
@@ -105,7 +105,7 @@ private:
             case Kind::Cell: {
                 const auto* c = v.heap_as<CellObject>();
                 if (target_.kind == CycleTarget::Kind::Cell && target_.cell == c) { found_ = true; return; }
-                if (may_contain_identity(c->value) && b_.seen.insert(address_key(c))) b_.work.push_back(&c->value);
+                if (relevant(c->value) && b_.seen.insert(address_key(c))) b_.work.push_back(&c->value);
                 return;
             }
             case Kind::Handle: visit_handle(v); return;
@@ -121,13 +121,24 @@ private:
         }
         if (!b_.seen.insert(handle_key(h))) return;
         const Value* p = graph_.payload(h);
-        if (p && may_contain_identity(*p)) b_.work.push_back(p);
+        if (p && relevant(*p)) b_.work.push_back(p);
     }
 
+    // B2 (plan 5.1): the summary bit stays set while any direct child is a
+    // reference (an array or object included), whatever the target; the child
+    // is walked when it may hold the target.
     void consider(const Value& child, bool& any) {
-        if (!may_contain_identity(child) && !(values_ && (child.is(Kind::Array) || child.is(Kind::Object)))) return;
+        const bool reference = child.is(Kind::Array) || child.is(Kind::Object) || may_contain_identity(child);
+        if (!reference) return;
         any = true;
-        b_.work.push_back(&child);
+        if (relevant(child)) b_.work.push_back(&child);
+    }
+
+    // A value worth visiting: it may hold an identity-bearing value, or (an
+    // aggregate target) it is an array or object, which may itself be the
+    // target even when its own summary bit is clear.
+    bool relevant(const Value& v) const noexcept {
+        return may_contain_identity(v) || (aggregate_target_ && (v.is(Kind::Array) || v.is(Kind::Object)));
     }
 
     void visit_aggregate(const Value& v) {
@@ -137,7 +148,7 @@ private:
         // collection or instance holding only plain data may still be it).
         if (target_.kind == CycleTarget::Kind::Aggregate && target_.cell == object) { found_ = true; return; }
 #endif
-        if ((!may_hold_identity(object) && !values_) || !b_.seen.insert(address_key(object))) return;
+        if (!may_hold_identity(object) || !b_.seen.insert(address_key(object))) return;
         bool any = false;
         if (v.is(Kind::Array)) {
             for (const Value& child : array_items(v)) consider(child, any);
@@ -158,13 +169,12 @@ private:
     const CycleGraph& graph_;
     Buffers& b_;
     bool found_ = false;
-    // B1: an array or object target (not reachable while arrays and objects
-    // are copied) may sit below plain data, which the identity summary does
-    // not mark yet (plan 5.1 redefines it in B2), so its walk follows every
-    // array and object instead of pruning on the summary.
-    const bool values_ = target_.kind == CycleTarget::Kind::Aggregate &&
-                         (static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Array ||
-                          static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Object);
+    // B2: an array or object target may be any array or object, including one
+    // whose own summary bit is clear (flat data); the summary prunes its
+    // children. (A struct or collection target is never a flat array.)
+    const bool aggregate_target_ = target_.kind == CycleTarget::Kind::Aggregate &&
+                                   (static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Array ||
+                                    static_cast<const HeapObject*>(target_.cell)->kind() == Kind::Object);
 };
 
 } // namespace

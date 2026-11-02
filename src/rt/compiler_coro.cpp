@@ -371,7 +371,7 @@ bool check_coroutine_program(const Program& program, std::string& reason, std::u
             switch (in.op) {
                 case OpCode::Closure: if (in.c != 0 && !parallel && NIFT_CORO_MUTANT != 18) why = "coro-capture"; break;
                 case OpCode::NewCell: case OpCode::NewSourceSlot: case OpCode::CopyCellLocation:
-                case OpCode::CellAnchor: case OpCode::CellSlot: case OpCode::CellTake:
+                case OpCode::CellAnchor: case OpCode::CellSlot:
                     if (p == 0 && !parallel) why = "coro-main-cell";
                     break;
                 case OpCode::CollectionCall: case OpCode::CollectionSort: case OpCode::CollectionStep:

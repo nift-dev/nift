@@ -350,10 +350,16 @@ bool identity_bearing(const Value& value) noexcept {
            value.is(Kind::Struct) || value.is(Kind::Collection);
 }
 
+// B2 (Phase B plan section 3, D-NEXT-refsem-b): arrays and objects are
+// references, so same() answers their identity too.
+static bool same_operand(const Value& value) noexcept {
+    return identity_bearing(value) || value.is(Kind::Array) || value.is(Kind::Object);
+}
+
 Sameness same(const Value& left, const Value& right) noexcept {
-    if (!identity_bearing(left) || !identity_bearing(right)) return Sameness::NotIdentity;
+    if (!same_operand(left) || !same_operand(right)) return Sameness::NotIdentity;
     if (left.kind() != right.kind()) return Sameness::Different;
-    if (left.is(Kind::Struct) || left.is(Kind::Collection))
+    if (left.is(Kind::Struct) || left.is(Kind::Collection) || left.is(Kind::Array) || left.is(Kind::Object))
         return left.heap() == right.heap() ? Sameness::Same : Sameness::Different;
     if (left.is(Kind::Future))
         return future_identity(left) == future_identity(right) ? Sameness::Same : Sameness::Different;

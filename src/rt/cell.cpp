@@ -91,7 +91,10 @@ bool cell_read(const Value& cell, Value& value, std::string& missing) {
 
 Value copy_cell_location(const Value& cell) {
     const CellObject* object = cell_of(cell);
-    return object && object->binding_type == kSelectorCell ? make_cell(object->value, kSelectorCell) : cell;
+    // B2: the copy owns its descriptor (an explicit clone; under copy-on-write
+    // the first cache update of either cell made them independent).
+    if (!object || object->binding_type != kSelectorCell) return cell;
+    return make_cell(array_shallow_clone(object->value), kSelectorCell);
 }
 
 bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
@@ -101,7 +104,9 @@ bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
     if (!parts[5].as_bool()) return cell_read(parts[4], value, missing);
     // The cached pointer belongs to the value owner at the last sync, not to
     // a later replacement of its source slot. Preserve that owner explicitly.
-    Value descriptor = object->value;
+    // B2: a private copy of the descriptor (an explicit clone: arrays are
+    // references, so writing the shared one would change this cell's).
+    Value descriptor = array_shallow_clone(object->value);
     array_set(descriptor, 0, parts[6]);  // rt-lint: storage-ok a private descriptor copy
     Value cached = make_cell(std::move(descriptor), kSelectorCell);
     return cell_read(cached, value, missing);
@@ -163,12 +168,6 @@ Value cell_cached_owner(const Value& cell) {
     if (!object || object->binding_type != kSelectorCell) return cell_anchor(cell);
     const auto& parts = array_items(object->value);
     return parts[parts[5].as_bool() ? 6 : 4];
-}
-
-Value cell_take(const Value& cell) {
-    Value anchor = cell_anchor(cell);
-    CellObject* object = cell_of(anchor);
-    return object ? std::move(object->value) : Value();
 }
 
 Value cell_load(const Value& cell) {

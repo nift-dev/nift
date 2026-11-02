@@ -1,4 +1,5 @@
 #include "rt/compiler_invocation.h"
+#include "rt/mutation.h"
 #include "rt/aggregate.h"
 #include "rt/session_invocation.h"
 
@@ -52,6 +53,9 @@ bool UnitCompiler::invocation_prologue() {
                 fb_->emit(OpCode::LoadK, reg, static_cast<std::uint16_t>(k & ~kConstantBit));
             }
             fb_->emit(OpCode::NewArray, binding.reg, first, static_cast<std::uint16_t>(items.size()));
+            // B2 (owner F3): the script's `args` is immutable through every
+            // alias, as the session's (session_invocation.cpp) already is.
+            if (mutation::is_immutable(entry.value)) fb_->emit(OpCode::MakeImmutable, binding.reg);
             fb_->release_to(mark);
         } else {
             if (!fb_->constant(entry.value, k)) return builder_ok();

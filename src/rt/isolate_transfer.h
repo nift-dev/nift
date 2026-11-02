@@ -69,6 +69,7 @@ private:
     struct Node {
         WireKind kind = WireKind::Null;
         bool boolean = false;
+        bool immutable = false;  // B2 (owner F3): kImmutable crosses with the object
         std::int64_t integer = 0;
         double number = 0;
         double approx = 0;

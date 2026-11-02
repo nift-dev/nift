@@ -31,10 +31,11 @@ bool compare_relational(const Value& left, const Value& right, int& comparison);
 bool truthy(const Value& value);
 std::uint64_t hash(const Value& value);
 
-// `same(a, b)` (D-040 V18): defined only for identity-bearing values
-// (callables and handles); NotIdentity means at least one operand is an
-// ordinary value, which the caller reports as runtime.type_error ("same:
-// operands must be identity-bearing values"). Never exposes storage sharing.
+// `same(a, b)` (D-040 V18): identity, defined for identity-bearing values
+// (callables, handles, futures, struct instances, collections) and (B2) the
+// array and object references; NotIdentity means at least one operand is an
+// ordinary value (a scalar or string), which the caller reports ("same:
+// operands must be identity-bearing values").
 enum class Sameness : std::uint8_t { Different, Same, NotIdentity };
 bool identity_bearing(const Value& value) noexcept;
 Sameness same(const Value& left, const Value& right) noexcept;
