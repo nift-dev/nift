@@ -100,12 +100,13 @@ for mode in ('default', 'switch'):
     if not detected:
         raise RuntimeError('ownership negative control failed for ' + mode)
     print('PASS ownership negative control', mode, flush=True)
-# Restore only R1 unshare, leaving the independently accepted make_array fix.
-start = aggregate.index('bool unshare(Value& value) {')
-end = aggregate.index('\n\nValue make_array', start)
-if 'std::unique_ptr<HeapObject, CloneDeleter> copy;' not in aggregate[start:end]:
-    raise RuntimeError('stale COW ownership negative control')
-old_unshare = Path('tests/runtime2/cp18/unsafe_unshare.txt').read_text().rstrip()
+# B2 (b2-refrep.md): unshare is deleted; the unsafe clone is now the explicit
+# array_shallow_clone that replaced it (not owned while its items are copied).
+start = aggregate.index('Value array_shallow_clone(const Value& array) {')
+end = aggregate.index('\n\nValue object_shallow_clone', start)
+if 'Value owned = make_array(0);  // owned before copying (bad_alloc)' not in aggregate[start:end]:
+    raise RuntimeError('stale clone ownership negative control')
+old_unshare = Path('tests/runtime2/cp18/unsafe_shallow_clone.txt').read_text().rstrip()
 cow_mutant = out / 'unsafe-cow-aggregate.cpp'
 cow_mutant.write_text(aggregate[:start] + old_unshare + aggregate[end:])
 cow_obj = out / 'unsafe-cow-aggregate.o'
@@ -121,7 +122,7 @@ for mode in ('default', 'switch'):
     result = subprocess.run([str(binary)], env=env, capture_output=True, timeout=180)
     (out / (binary.name + '.run.log')).write_bytes(result.stdout + result.stderr)
     detected = (result.returncode == 1 and b'LeakSanitizer: detected memory leaks' in result.stderr
-                and b'unshare' in result.stderr and b'outstanding_allocations ==' in result.stderr)
+                and b'array_shallow_clone' in result.stderr and b'outstanding_allocations ==' in result.stderr)
     cow_negative.append({'mode': mode, 'detected': detected, 'exit': result.returncode,
                          'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
                          'mutant_source_sha256': hashlib.sha256(cow_mutant.read_bytes()).hexdigest()})

@@ -1,4 +1,9 @@
-"""Ordinary-build control: a compiling R1 COW clone must fail real allocation accounting."""
+"""Ordinary-build control: an unsafe explicit clone must fail real allocation accounting.
+
+B2 (b2-refrep.md): retargeted from unshare (deleted) to array_shallow_clone,
+the explicit clone that replaced it (loop/callback snapshots, splice, cell
+descriptors): the mutant leaves the new array unowned while its items are
+copied, so an allocation failure there leaks it."""
 import argparse
 import hashlib
 import json
@@ -12,10 +17,10 @@ parser = argparse.ArgumentParser(); parser.add_argument('--out',required=True)
 parser.add_argument('--libffi',required=True);args=parser.parse_args()
 out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
 source=Path('src/rt/aggregate.cpp').read_text()
-start=source.index('bool unshare(Value& value) {');end=source.index('\n\nValue make_array',start)
-if 'std::unique_ptr<HeapObject, CloneDeleter> copy;' not in source[start:end]:raise RuntimeError('stale COW control')
+start=source.index('Value array_shallow_clone(const Value& array) {');end=source.index('\n\nValue object_shallow_clone',start)
+if 'Value owned = make_array(0);  // owned before copying (bad_alloc)' not in source[start:end]:raise RuntimeError('stale clone control')
 mutant=out/'unsafe-cow.cpp'
-mutant.write_text(source[:start]+Path('tests/runtime2/cp18/unsafe_unshare.txt').read_text().rstrip()+source[end:])
+mutant.write_text(source[:start]+Path('tests/runtime2/cp18/unsafe_shallow_clone.txt').read_text().rstrip()+source[end:])
 obj=out/'unsafe-cow.o'
 subprocess.run(['g++','-std=c++17','-O2','-Isrc','-Iinclude','-fPIC','-c',str(mutant),'-o',str(obj)],check=True)
 objects=sorted(Path('.build/pic').rglob('*.o'))
@@ -32,7 +37,7 @@ for mode in ('default','switch'):
     result=subprocess.run([str(binary)],capture_output=True,timeout=120)
     (out/(binary.name+'.run.log')).write_bytes(result.stdout+result.stderr)
     leak=re.search(rb'Outstanding allocations after program destruction delta ([1-9][0-9]*)',result.stdout)
-    detected=(result.returncode==1 and leak is not None and b'outstanding_allocations ==' in result.stderr)
+    detected=(result.returncode==1 and b'outstanding_allocations == empty_allocations' in result.stderr)
     rows.append({'mode':mode,'detected':detected,'exit':result.returncode,
                  'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),
                  'mutant_source_sha256':hashlib.sha256(mutant.read_bytes()).hexdigest()})

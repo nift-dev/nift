@@ -46,7 +46,10 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         count))return fail("splice: invalid index/count");
         if(in.c==2&&!s[Keys].is(Kind::Array))return fail("splice: replacements must be an array");
         index=std::min(index,n);count=std::min(count,n-index);
-        s[Index]=Value::integer(index);s[Length]=Value::integer(count);}
+        s[Index]=Value::integer(index);s[Length]=Value::integer(count);
+        // B2: a.splice(i, k, a) inserts the receiver's elements before the
+        // removal (as the copy-on-write register did), never its own range.
+        if(in.c==2&&s[Keys].is_heap()&&s[Keys].heap()==s[Source].heap())s[Keys]=array_shallow_clone(s[Keys]);}
     if(m==M::Splice&&in.c==1){if(!s[Keys].is(Kind::Array))return fail("splice: replacements must be an array");
         index=static_cast<std::size_t>(s[Index].as_int());if(index>n)return internal(fault,
         "splice receiver changed during replacement");}

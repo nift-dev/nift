@@ -52,6 +52,10 @@ SESSION_ERR = [
     "error: pop: array is empty",
 ]
 
+# Production configuration: the receiver as its own splice replacement stays
+# refused by the guard (the probe configuration executes it: refrep_vm.cpp).
+SPLICE_SELF = 'a := [1, 2, 3]\na.splice(1, 1, a)\nprint(a.stringify())\n'
+
 LINEAR = 's := ""\ni := 0\nwhile (i < 400000) { s += "x"; i += 1 }\nprint(s.length())\n'
 
 
@@ -80,6 +84,13 @@ def main():
         errors = [line for line in p.stderr.splitlines() if line.startswith("error:")]
         check(errors == SESSION_ERR, "session: errors %r (want %r)" % (errors, SESSION_ERR))
         check("null" not in p.stdout, "session: a binding became null")
+
+        path = os.path.join(work, "splice_self.f")
+        with open(path, "w") as f:
+            f.write(SPLICE_SELF)
+        p = subprocess.run([nift, path], text=True, cwd=work, env=env, capture_output=True, timeout=60)
+        check(p.returncode != 0 and p.stdout == "" and "reference-guard:shared" in p.stderr,
+              "splice-self: %d %r %r" % (p.returncode, p.stdout, p.stderr[:200]))
 
         path = os.path.join(work, "linear.f")
         with open(path, "w") as f:

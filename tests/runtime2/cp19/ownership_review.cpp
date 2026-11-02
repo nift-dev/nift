@@ -1,5 +1,6 @@
 // CP19: expression-result ownership outlives VM, compiler, AST and source.
 #include "rt/aggregate.h"
+#include "rt/mutation.h"
 #include "rt/compiler.h"
 #include "rt/error.h"
 #include "rt/legacy_bridge.h"
@@ -91,15 +92,20 @@ void check_script_return_unchanged() {
 }
 
 void independent_ownership() {
-    Value a=evaluate("[1,2]");Value saved=a;array_push(a,Value::integer(3));
-    CHECK(array_size(saved)==2 && array_size(a)==3);
+    // B2 (b2-refrep.md): an evaluated result is an ordinary owned value, and
+    // arrays/objects are references: a mutation (through the protocol) is
+    // seen through every holder, each holder keeps the object alive, and no
+    // holder is ever null during a mutation. Replaces the copy-on-write
+    // ownership checks (a holder unchanged by another's mutation), whose
+    // subject, the clone, is deleted.
+    const mutation::Env env;
+    Value a=evaluate("[1,2]");Value saved=a;CHECK(mutation::push(a,Value::integer(3),env).ok());
+    CHECK(array_size(saved)==3 && a.heap()==saved.heap() && a.refcount()==2);
     Value object=evaluate("{\"a\":[1,2]}");Value other=object;
-    Value child=*object_get(object,atom("a"));array_set(child,0,Value::integer(99));
-    object_set(object,atom("a"),child);
-    CHECK(equal(array_items(*object_get(other,atom("a")))[0],Value::integer(1)));
-    CHECK(array_items(*object_get(object,atom("a")))[0].as_int()==99);
-    saved=Value();a=Value();other=Value();
-    CHECK(array_size(child)==2 && array_items(child)[0].as_int()==99);
+    Value child=*object_get(object,atom("a"));CHECK(mutation::set(child,0,Value::integer(99),env).ok());
+    CHECK(array_items(*object_get(other,atom("a")))[0].as_int()==99 && !object_get(object,atom("a"))->is_null());
+    saved=Value();a=Value();other=Value();object=Value();
+    CHECK(child.refcount()==1 && array_size(child)==2 && array_items(child)[0].as_int()==99);
     ::setenv("NIFT_VM","require",1);::unsetenv("NIFT_VM_STATS");
     nift::RuntimeValue legacy,retained;std::string error;int exit=999;
     for(int i=0;i<40;++i) {

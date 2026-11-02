@@ -319,3 +319,139 @@ estimate for the whole of B2 (about 700 changed, 600 deleted); commits 2 and 3 f
   `refrep_vm.cpp`.
 - `merge_deep` shares non-object values of its right operand (by reference, like `copy`'s
   contents); with the guard on this is unobservable.
+
+## 13. Commit 1b: test migration (component: test migration)
+
+Commit 1's gate set missed three suites that exercise the deleted copy-on-write machinery directly:
+`test-rt-value`, `test-runtime2-cp18` and `test-cp19-r1` (ownership review). They failed on
+`a85e1f4a` (the commit 1 tip). This commit migrates them under the coordinator's hybrid rules:
+checks of deleted machinery are retired, the invariants they guarded are re-expressed for the
+reference model, and the generators are ported to reference semantics through `mutation::Protocol`
+with cycle refusal as a property. Seeds and iteration counts are unchanged. These three suites are
+in the gate set of every later commit.
+
+### 13.1 Retirement table
+
+Every retired test last existed at `a85e1f4a`. Nothing is squashed: commit 1 and this commit are
+separate.
+
+| Retired (file: test) | What it checked | Replacement (this commit) |
+| --- | --- | --- |
+| `tests/rt/value_unit.cpp`: `arrays_cow` | `unshare` clones a shared array; writes stay independent | `arrays_shared`: a Value copy shares the object, a mutation is seen through both holders, refcounts count every holder, an explicit shallow clone is a new outer array sharing its elements; object alias check |
+| `tests/rt/value_d040.cpp`: `nested_cow` (section 2) | random copies and deep place writes against a deep-copy model | `nested_references`: a node-graph reference model (ops 0-7: alias, shallow copy, deep place write, push, self-store, nesting), every write through the protocol; refused cycles leave model and value unchanged; value and identity checked per step; acyclic (V16) kept |
+| `value_d040.cpp`: section 2b, self-insertion stores the pre-write snapshot | `a.push(a)` gives `[1,[1]]` | self-insertion (direct, repeated, two levels deep, through an alias) is a refused cycle, receiver unchanged; struct cases unchanged |
+| `value_d040.cpp`: section 3, "storage sharing is never exposed" | `same()` false for COW copies | `same()` is identity for arrays and objects (alias true, distinct-equal false) |
+| `value_d040.cpp`: section 7, COW metadata | summary bit copied across COW clones | the bit across aliases (one shared bit) and explicit clones; set by a nested array/object (plan 5.1); a flat scalar array stays clear |
+| `tests/rt/value_property.cpp`: `cow_model` (+ `legacy_remove`) | random aliasing and mutation behave like deep copies | `reference_model` (arrays) and the object model ported: a node graph, every mutation through the protocol, nesting refused when the target reaches the receiver, value (legacy oracle) and identity (`same_identity`, `check_slots`) per step; `coverage.refused_cycles` counted |
+| `tests/rt/value_regress.cpp`: COW programs "stores the pre-push snapshot" | self-store snapshot | self-store is a protocol refusal before anything changes; child-into-parent stays memory safe |
+| `value_regress.cpp`: "a saturated object is shared: mutation clones" | clone at saturated refcount | mutation writes in place and the count stays saturated |
+| `tests/rt/value_destroy_oom.cpp`: COW-clone DAG children | DAG built from COW clones | the same DAG built with explicit `shallow_copy` for every kind; destruction properties unchanged |
+| `tests/runtime2/cp18/cow_allocation.cpp`: direct `unshare` campaign | allocation failure inside `unshare` | direct campaigns on `array_shallow_clone`, `object_shallow_clone`, `shallow_copy` (struct) |
+| `cow_allocation.cpp`: ABI program `fn(g(a)) { a.push(1) ... } g(b)` | COW clone of a shared argument | refused by the guard since before B2; replaced by `fn(g(n)) { a := [n]; a.push(1); ... }` (same output) |
+| `tests/runtime2/cp18/cow_negative.py` + `unsafe_unshare.txt` | ordinary-build control: unsafe `unshare` must fail allocation accounting | retargeted to `array_shallow_clone` with `unsafe_shallow_clone.txt` (new array unowned while items copy); detected in both modes |
+| `tests/runtime2/cp18/sanitize.py` | sanitizer lane over the `unshare` control | same lane over the shallow-clone control |
+| `tests/runtime2/cp18/cow_semantics.py`: `array-admitted` | pinned the COW result `2\n1\n` | `array-argument` (the guard refusal, `reference-guard:argument`) and `array-local` (an admitted mutation with the same output). `array-admitted` already failed at `919b5669` (the guard predates B2) |
+| `tests/runtime2/cp19/ownership_review.cpp`: COW ownership checks | a holder unchanged by another's mutation | an evaluated result is an owned value; a mutation through the protocol is seen through every holder, each holder keeps the object alive, no holder is null during a mutation |
+
+### 13.2 New allocation-failure coverage (owner addition; ASan/LSan)
+
+`cow_allocation.cpp` gains, each failing every allocation site in turn and checking recovery and
+no leak: growth campaigns 0-6 (push, insert, splice, map put, set add, stack push, self-splice);
+reference-model campaigns (creation, copy, deep copy, nested growth) with an intact check after
+every failure; a persistent `VmSession` campaign (465 sites, 464 recoveries; the internal stop
+closes the session by the CP19 design, which the test accepts and records; at least 100 sites
+required). Destruction under low memory stays in `value_destroy_oom.cpp`.
+
+The campaign found a pre-existing leak: `make_struct` held a raw pointer across
+`fields.reserve`, so an allocation failure in the reserve leaked the instance. Fixed in
+`src/rt/aggregate.cpp` (owned `Value` before the reserve).
+
+### 13.3 Self-splice fix and aliasing audit (component: self-splice and aliasing)
+
+`a.splice(i, n, a)` read the receiver's own vector while inserting into it. Fixed in two places:
+`mutation.h` (`commit_array`, SpliceInsert copies the items first when the replacement is the
+receiver) and `vm_array_mutation.cpp` (the shared-receiver branch clones the replacement when it
+is the source). Result: the elements before the removal are inserted, as the copy-on-write
+register gave. Legacy inserts the elements after the removal (`[1,1,3,3]` for `a.splice(1,1,a)`);
+that difference is a B5 decision. Coverage, both configurations where reachable:
+`mutation_protocol.cpp` (begin, middle, end, full range, empty receiver; a replacement holding the
+receiver is a refused cycle), `refrep_vm.cpp` (probe: splice-self-middle/front/end/full/empty/
+alias/nested), `refrep_cli.py` (production: the program is refused by the guard),
+`cow_allocation.cpp` growth campaign 6 (allocation failure while preparing the copy).
+
+Every mutator with an aliasing operand:
+
+| Mutator | Operand aliasing the receiver | Status |
+| --- | --- | --- |
+| push, insert, set, object put, map put, set add, stack push | the receiver itself | refused as a cycle before anything changes |
+| same, with an element of the receiver's own storage | operand copied before the storage can move | safe; tests in `mutation_protocol.cpp` (ASan, 119 checks) |
+| splice | the receiver as replacement | fixed (above) |
+| merge | the receiver as either side | safe: builds a new object first |
+| reverse, clear, pop, remove | none | safe: no operand |
+| sort | comparator mutating the receiver | commit 3 |
+
+### 13.4 Pre-existing failures (not caused by B2)
+
+- `test-rt-builtins`: `builtins_diff` static assert "Host built-ins must stay last" and link
+  errors. Fails on `919b5669` and on `d209febd`: `tests/rt/builtins_diff.cpp:487` static
+  assertion "the Host built-ins must stay last in builtin_list.inc", a compile-time failure,
+  identical in two runs on each revision (deterministic; trees from `git archive`, syntax check).
+  Out of B2 scope; a release-blocker audit item.
+- `test-runtime2-cp18`: `combined_cp14b.py` (`b := a` refused, `reference-guard:inflow`, the
+  same compiler at `919b5669`); `cow_semantics.py` struct-copy case admitted on both `919b5669`
+  and this tree (left failing, recorded).
+- `test-cp19-r1`: `eval_entry.py` unresolved-name check fails with the `919b5669` binary.
+
+### 13.5 R19 (documented negative control)
+
+R19 (`-DNIFT_REFSEM_MUTANT=19`) removes the relocation after a hand-out in the checked
+`aggregate.cpp`/`aggregate_collection.cpp` build, so a stale reference stays readable. It is kept
+as a negative control, not a mutant to kill: `test-runtime2-refsem-stale-vm` builds a
+5,000-element container through a VM session (plain, and after a 20,000-element read-after-push
+churn) for array, map, set and stack, takes a reference, mutates once through the VM and uses it.
+The normal checked build must abort with heap-use-after-free, and the R19 build must miss (exit
+0); if R19 also aborted, the gate fails ("the control does not discriminate"). Evidence: all 8
+controls report "detected, missed by R19" on `e30bd6c9` and on this commit.
+
+Gate discrimination, shown by running the gate's loop verbatim with its two binaries swapped
+(`scratchpad/b2/r19demo.sh`, on this commit):
+
+| Normal slot / R19 slot | Gate |
+| --- | --- |
+| `stale-vm` / `stale-vm-r19` (the real gate) | PASS (8 of 8) |
+| `stale-vm-r19` / `stale-vm-r19` (a must-catch control missed) | FAIL: "VM-path stale reference (array plain) not detected" |
+| `stale-vm` / `stale-vm` (R19 caught) | FAIL: "R19 did not miss array plain (the control does not discriminate)" |
+
+### 13.6 Gates (commit 1b; rerun from scratch after two container restarts)
+
+Each alone through the heavy-job gate, on this commit's tree: `nift`, `test-rt-lint`,
+`test-rt-mutation-protocol` (119 checks; ASan/UBSan with checked references: 0 failures, no
+leaks), `test-rt-refrep` (61 checks), `test-rt-value`, `test-rt-mutation-protocol-mutants`,
+`test-rt-refrep-mutants`, `test-runtime2-refrep-cli`, `-refsem`, `-refsem-mutants`, `-collections`,
+`-collections-mutants`, `-safety`, `-vm-default`, `-cp14b`, `-args-cmd`, `-packages`,
+`-coro-module`, `test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-cp22`, `-cp23`,
+`-refsem-stale-vm`: 0 each.
+
+`test-runtime2-cp18` and `test-cp19-r1` stop at their first pre-existing failure (13.4), so every
+recipe line was run separately (`scratchpad/b2/missed.sh`): CP18 C 1044 checks (both lanes),
+Python 70 (both), COW allocation "0 failures" (both, every campaign), `cow_negative` detected
+(both modes), CP19 expression unit 1442, eval bypass mutant detected, ownership review 1562 checks
+(both lanes), R1 183 observations (both lanes), return-prefix mutant detected, reviewer matrix 135
+(both lanes): all 0. Failing, all pre-existing (13.4): `combined_cp14b.py` (both lanes),
+`cow_semantics.py` struct-copy (both), `eval_entry.py` (threaded and switch).
+
+Classify diff against `919b5669`: 1,816 runtime2 units, 0 changes; CP25-R 589 units, 0 changes.
+
+Performance (local callgrind, VM Ir/op; d209febd / 919b5669 / 1b): array_push 382 / 384 / 366;
+array_set 388 / 413 / 380; array_push_pop 1440 / 1422 / 1304; array_insert_pop 2462 / 2421 /
+2209; map_set 1788 / 1472 / 1463; set_add 1366 / 1341 / 1337; stack_push_pop 2240 / 2123 / 2121.
+Within F (array_push at most 382, array_set at most 388).
+
+Pending at this commit (run next and recorded in a following commit): the sanitizer lanes
+`test-rt-value-sanitize`, `test-runtime2-cp18-sanitize`, `test-cp19-r1-sanitize`,
+`test-runtime2-refsem-sanitize`, `test-runtime2-collections-sanitize`, and `make test-rt-vm`.
+
+### 13.7 Size (commit 1b)
+
+Production: +15 / -3 (`mutation.h`, `vm_array_mutation.cpp`, `aggregate.cpp`). Tests: about
+780 inserted lines, under the 800-line split threshold; no unresolved ownership problem.

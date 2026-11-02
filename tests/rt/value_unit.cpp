@@ -60,24 +60,27 @@ void strings() {
     CHECK(hash(S("long string beyond inline")) == hash(make_string(std::string("long string beyond inline"))));
 }
 
-void arrays_cow() {
+// B2 (b2-refrep.md): arrays are references. Replaces arrays_cow, whose
+// subject (unshare, the copy-on-write clone) is deleted: a Value copy shares
+// the object, a mutation through either is seen through both, refcounts
+// count every holder, and only an explicit shallow clone is a new outer
+// array (sharing the elements).
+void arrays_shared() {
     Value a = make_array();
     array_push(a, I(1));
     array_push(a, I(2));
-    Value b = a;  // O(1) copy
+    Value b = a;  // O(1) copy: the same array
     CHECK(a.heap() == b.heap() && a.refcount() == 2);
-    array_push(b, I(3));  // b unshares, a unchanged
-    CHECK(a.heap() != b.heap() && array_size(a) == 2 && array_size(b) == 3);
-    CHECK(a.refcount() == 1 && b.refcount() == 1);
-    CHECK(!unshare(b));  // already unique: no clone
+    array_push(b, I(3));  // in place: a sees it
+    CHECK(a.heap() == b.heap() && array_size(a) == 3 && array_size(b) == 3 && a.refcount() == 2);
     array_mut(b)[0] = S("z");
-    CHECK(equal(array_items(b)[0], S("z")) && equal(array_items(a)[0], I(1)));
-    // Nested sharing: cloning the outer array shares inner values.
+    CHECK(equal(array_items(b)[0], S("z")) && equal(array_items(a)[0], S("z")));
     Value outer = make_array();
     array_push(outer, a);
-    Value alias = outer;
-    array_mut(alias);  // shallow clone
-    CHECK(array_items(alias)[0].heap() == a.heap() && a.refcount() == 3);
+    Value clone = array_shallow_clone(outer);
+    CHECK(clone.heap() != outer.heap() && array_items(clone)[0].heap() == a.heap() && a.refcount() == 4);
+    clone = Value();
+    CHECK(a.refcount() == 3);  // the clone's holder released
     CHECK(truthy(a) && !truthy(make_array()));
 }
 
@@ -96,9 +99,10 @@ void objects() {
     object_set(p, ka, D(20.0));
     object_set(p, kb, I(1));
     CHECK(equal(o, p) && hash(o) == hash(p));
-    Value q = o;
+    Value q = o;  // B2: objects are references (replaced: o unchanged under copy-on-write)
     object_set(q, kb, I(9));
-    CHECK(object_get(o, kb)->as_int() == 1 && object_get(q, kb)->as_int() == 9);
+    CHECK(object_get(o, kb)->as_int() == 9 && q.heap() == o.heap());
+    object_set(q, kb, I(1));
     // Indexed lookup beyond the linear threshold, including removal.
     Value big = make_object();
     for (int i = 0; i < 300; ++i) object_set(big, atom("k" + std::to_string(i)), I(i));
@@ -210,7 +214,7 @@ void functions_and_structs() {
 int main() {
     layout_and_scalars();
     strings();
-    arrays_cow();
+    arrays_shared();
     objects();
     numbers();
     decimals();

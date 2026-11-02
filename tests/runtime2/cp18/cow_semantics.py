@@ -1,4 +1,11 @@
-"""Pin admitted COW behavior and unchanged representative object/struct refusals."""
+"""Pin the representative array/object/struct admissions and refusals of the program API.
+
+B2 (b2-refrep.md): 'array-admitted' pinned the copy-on-write result of a
+callee's push into a shared argument ('2\n1\n'). Its subject (the clone) is
+deleted, and the Phase A guard has refused that program since before B2
+(reference-guard:argument), so the case failed at 919b5669 too; it is
+replaced by 'array-argument' (that refusal) and 'array-local' (an admitted
+array mutation with the same output)."""
 import importlib.util
 from pathlib import Path
 import sys
@@ -7,7 +14,8 @@ root=Path(__file__).resolve().parents[3]
 spec=importlib.util.spec_from_file_location('cow_program',root/'bindings/python/nift/program.py')
 api=importlib.util.module_from_spec(spec);sys.modules[spec.name]=api;spec.loader.exec_module(api)
 cases=[
- ('array-admitted','fn(g(a)) { a.push(1); return a.length(); } b := [5]; print(g(b)); print(b.length());','2\n1\n',None),
+ ('array-argument','fn(g(a)) { a.push(1); return a.length(); } b := [5]; print(g(b)); print(b.length());',None,'reference-guard:argument'),
+ ('array-local','fn(g(n)) { a := [n]; a.push(1); return a.length(); } b := [5]; print(g(5)); print(b.length());','2\n1\n',None),
  ('object-member','fn(g(o)) { o.x = 2; return o.x; } b := {"x":1}; print(g(b)); print(b.x);',None,'static-error:member-assign'),
  ('object-index','fn(g(o)) { o["x"] = 2; return o["x"]; } b := {"x":1}; print(g(b)); print(b["x"]);',None,'index-target'),
  ('object-alias','b := {"x":1}; c := b; c["x"] = 2; print(c["x"]); print(b["x"]);',None,'aliasing'),
@@ -24,4 +32,4 @@ for name,source,output,refusal in cases:
     except api.ProgramCompileError as error:
         assert refusal and error.result.outcome==2 and error.result.message==refusal,(name,error.result)
         assert error.result.output==b'',name
-print('PASS COW semantic/admission witnesses:',len(cases))
+print('PASS array/object/struct admission witnesses:',len(cases))

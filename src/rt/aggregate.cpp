@@ -213,10 +213,14 @@ Value* object_slot_mut(Value& object, Atom key) {
 }
 
 Value make_struct(Atom type_name, std::size_t reserve) {
-    auto* instance = new StructObject(type_name);
+    // Owned before reserve (as make_array): a failed reserve must release the
+    // instance (B2: found by the struct copy's allocation-failure campaign,
+    // tests/runtime2/cp18/cow_allocation.cpp; a leak before B2 too).
+    Value owned = Value::adopt(new StructObject(type_name));
+    auto* instance = owned.heap_as<StructObject>();
     instance->fields.reserve(reserve);
     heap_retally(instance);
-    return Value::adopt(instance);
+    return owned;
 }
 
 Atom struct_type(const Value& instance) { return instance.heap_as<StructObject>()->type_name; }

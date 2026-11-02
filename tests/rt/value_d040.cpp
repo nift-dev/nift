@@ -5,20 +5,22 @@
 // 1. structs and collections are references (D-NEXT-refsem, superseding the
 //    copy-on-write struct values of D-040 V9): shared writes, identity
 //    equality and hash, self-stores found by the cycle checker
-// 2. nested copy-on-write against a deep-copy model: random copies, deep
-//    place writes through array/object/struct slot chains, pushes and
-//    self-stores over several slots; after every step each slot equals its
-//    model and no value contains itself (acyclic, V16)
+// 2. nested references against a reference model (B2, b2-refrep.md;
+//    replaces nested copy-on-write against a deep-copy model): random
+//    aliases and shallow copies, deep place writes through the protocol,
+//    pushes and self-stores (refused cycles, receiver unchanged) over
+//    several slots; after every step each slot equals its model by value
+//    and identity and no value contains itself (acyclic, V16)
 // 2b. self-insertion: arrays, objects and structs, two levels deep and
-//    repeated; the stored value is the pre-write snapshot (no cycle)
-// 3. same(): identity for callables, handles, instances and collections
-//    (D-NEXT-refsem #2), NotIdentity otherwise
+//    repeated; B2: a cycle the protocol refuses before anything changes
+// 3. same(): identity for callables, handles, instances, collections
+//    (D-NEXT-refsem #2) and (B2) arrays and objects, NotIdentity otherwise
 // 4. the identity summary bit: sound (an aggregate with a callable, a handle
 //    or a marked child below it is marked), precise for API stores of plain
 //    data, conservative for raw array_mut
 // 6. heap accounting: objects at and above the 512 MiB and 1 GiB boundaries,
 //    several large objects, counter arithmetic (concern 3)
-// 7. copy-on-write metadata: the identity summary bit across copies
+// 7. summary-bit metadata across aliases and explicit clones (B2)
 // 8. tag-byte masking: with the bit set on every heap kind, kind, equality,
 //    hash, rendering, serialization, legacy conversion, footprint, cloning and
 //    destruction match the unmarked value
@@ -27,7 +29,9 @@
 //    stores into instances and collections (D-NEXT-refsem #4, aggregate targets)
 #include "rt/aggregate.h"
 #include "rt/compare.h"
+#include "rt/copy_graph.h"
 #include "rt/heap.h"
+#include "rt/mutation.h"
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
 #include "rt/natives/format_methods.h"
@@ -83,7 +87,7 @@ void structs() {
     Value px = make_struct(atom("P"));
     struct_add_field(px, atom("x"), I(1));
     CHECK(!equal(px, o) && !equal(o, px));
-    CHECK(!unshare(copy) && copy.heap() == p.heap());  // never cloned
+    CHECK(copy.heap() == p.heap());  // never cloned (B2: no unshare at all)
     // A self-store is a cycle: found by the checker before anything is stored.
     CycleGraph graph;
     Value self = make_struct(atom("N"));
@@ -105,60 +109,68 @@ void structs() {
     Value m = make_collection(CollectionKind::Map);
     Value alias = m;
     map_set(alias, I(1), I(2));
-    CHECK(collection_size(m) == 1 && alias.heap() == m.heap() && !unshare(alias));
+    CHECK(collection_size(m) == 1 && alias.heap() == m.heap());  // B2: no unshare at all
     Value clone = collection_shallow_clone(m);
     map_set(clone, I(3), I(4));
     CHECK(collection_size(m) == 1 && collection_size(clone) == 2 && clone.heap() != m.heap());
 }
 
-// ---- 2. nested copy-on-write vs a deep-copy model ---------------------------
+// ---- 2. nested references vs a reference model (B2) -------------------------
+// Replaces nested copy-on-write vs a deep-copy model: B2 deletes the clone it
+// tested. The model is a node graph: a holder of a node holds THE node.
 struct Model {
-    enum class K { Int, Arr, Obj, Str } k = K::Int;
+    enum class K { Int, Arr, Obj } k = K::Int;
     std::int64_t i = 0;
-    std::string type;
-    std::vector<Model> items;                       // Arr
-    std::vector<std::pair<std::string, Model>> kv;  // Obj, Str (fields)
+    std::vector<int> items;                       // Arr: child ids (Int nodes for numbers)
+    std::vector<std::pair<std::string, int>> kv;  // Obj
+};
+struct Graph {
+    std::vector<Model> n;
+    int add(Model m) { n.push_back(std::move(m)); return static_cast<int>(n.size()) - 1; }
+    int num(std::int64_t i) { Model m; m.i = i; return add(m); }
+    int arr() { Model m; m.k = Model::K::Arr; return add(m); }
+    int obj() { Model m; m.k = Model::K::Obj; return add(m); }
+    int& at(int node, const std::string& key) {
+        for (auto& e : n[node].kv) if (e.first == key) return e.second;
+        n[node].kv.emplace_back(key, -1);
+        return n[node].kv.back().second;
+    }
+    bool reaches(int from, int target) const {
+        if (from == target) return true;
+        for (int c : n[from].items) if (reaches(c, target)) return true;
+        for (const auto& e : n[from].kv) if (reaches(e.second, target)) return true;
+        return false;
+    }
 };
 
-Model mk(Model::K k) { Model m; m.k = k; return m; }
-Model mint(std::int64_t i) { Model m; m.i = i; return m; }
-
-bool matches(const Value& v, const Model& m) {
-    switch (m.k) {
-        case Model::K::Int: return v.is(Kind::Int) && v.as_int() == m.i;
-        case Model::K::Arr: {
-            if (!v.is(Kind::Array) || array_size(v) != m.items.size()) return false;
-            for (std::size_t n = 0; n < m.items.size(); ++n)
-                if (!matches(array_items(v)[n], m.items[n])) return false;
-            return true;
-        }
-        case Model::K::Obj: {
-            if (!v.is(Kind::Object) || object_size(v) != m.kv.size()) return false;
-            for (std::size_t n = 0; n < m.kv.size(); ++n)
-                if (atom_text(object_entries(v)[n].first) != m.kv[n].first ||
-                    !matches(object_entries(v)[n].second, m.kv[n].second))
-                    return false;
-            return true;
-        }
-        case Model::K::Str: {
-            if (!v.is(Kind::Struct) || atom_text(struct_type(v)) != m.type || struct_fields(v).size() != m.kv.size())
-                return false;
-            for (std::size_t n = 0; n < m.kv.size(); ++n)
-                if (atom_text(struct_fields(v)[n].first) != m.kv[n].first ||
-                    !matches(struct_fields(v)[n].second, m.kv[n].second))
-                    return false;
-            return true;
-        }
+// Value and identity: one heap object per aggregate node and vice versa.
+bool matches(const Value& v, const Graph& g, int node, std::map<int, const HeapObject*>& by_node,
+             std::map<const HeapObject*, int>& by_heap) {
+    const Model& m = g.n[node];
+    if (m.k == Model::K::Int) return v.is(Kind::Int) && v.as_int() == m.i;
+    if (!(m.k == Model::K::Arr ? v.is(Kind::Array) : v.is(Kind::Object))) return false;
+    const auto a = by_node.emplace(node, v.heap());
+    const auto b = by_heap.emplace(v.heap(), node);
+    if (a.first->second != v.heap() || b.first->second != node) return false;
+    if (!a.second) return true;
+    if (m.k == Model::K::Arr) {
+        if (array_size(v) != m.items.size()) return false;
+        for (std::size_t k = 0; k < m.items.size(); ++k)
+            if (!matches(array_items(v)[k], g, m.items[k], by_node, by_heap)) return false;
+        return true;
     }
-    return false;
+    if (object_size(v) != m.kv.size()) return false;
+    for (std::size_t k = 0; k < m.kv.size(); ++k)
+        if (atom_text(object_entries(v)[k].first) != m.kv[k].first ||
+            !matches(object_entries(v)[k].second, g, m.kv[k].second, by_node, by_heap))
+            return false;
+    return true;
 }
 
-// The document of the owner's case: an object holding arrays of objects and
-// a struct, so every write path crosses each aggregate kind.
-Value base_doc(Model& m) {
+// The document of the owner's case: an object holding arrays of objects.
+Value base_doc(Graph& g, int& root) {
     Value items = make_array();
-    m = mk(Model::K::Obj);
-    Model mi = mk(Model::K::Arr);
+    const int mi = g.arr();
     for (int n = 0; n < 3; ++n) {
         Value item = make_object();
         object_set(item, atom("id"), I(n));
@@ -166,24 +178,23 @@ Value base_doc(Model& m) {
         array_push(tags, I(10 * n));
         object_set(item, atom("tags"), tags);
         array_push(items, item);
-        Model mo = mk(Model::K::Obj);
-        mo.kv.push_back({"id", mint(n)});
-        Model mt = mk(Model::K::Arr);
-        mt.items.push_back(mint(10 * n));
-        mo.kv.push_back({"tags", mt});
-        mi.items.push_back(mo);
+        const int mo = g.obj(), mt = g.arr();
+        g.at(mo, "id") = g.num(n);
+        const int tag = g.num(10 * n);  // added before taking a reference into g.n
+        g.n[mt].items.push_back(tag);
+        g.at(mo, "tags") = mt;
+        g.n[mi].items.push_back(mo);
     }
-    // D-NEXT-refsem #1: an instance is a shared reference, so the value model
-    // holds an object here (instances are covered by section 1 and the suite).
     Value meta = make_object();
     object_set(meta, atom("n"), I(3));
-    Model mm = mk(Model::K::Obj);
-    mm.kv.push_back({"n", mint(3)});
+    const int mm = g.obj();
+    g.at(mm, "n") = g.num(3);
     Value doc = make_object();
     object_set(doc, atom("items"), items);
     object_set(doc, atom("meta"), meta);
-    m.kv.push_back({"items", mi});
-    m.kv.push_back({"meta", mm});
+    root = g.obj();
+    g.at(root, "items") = mi;
+    g.at(root, "meta") = mm;
     return doc;
 }
 
@@ -201,85 +212,97 @@ bool acyclic(const Value& v, std::vector<const HeapObject*>& path) {
     return ok;
 }
 
-void nested_cow(long sequences) {
+using mutation::Failure;
+const mutation::Env kEnv;
+Value member(const Value& o, const char* key) { return *object_get(o, atom(key)); }
+
+void nested_references(long sequences) {
     constexpr int kSlots = 4;
+    long refused = 0;
     for (long s = 0; s < sequences; ++s) {
+        Graph g;
         std::vector<Value> slot(kSlots);
-        std::vector<Model> model(kSlots);
-        slot[0] = base_doc(model[0]);
-        for (int k = 1; k < kSlots; ++k) { slot[k] = slot[0]; model[k] = model[0]; }
+        std::vector<int> ms(kSlots);
+        slot[0] = base_doc(g, ms[0]);
+        for (int k = 1; k < kSlots; ++k) { slot[k] = slot[0]; ms[k] = ms[0]; }
         for (int step = 0; step < 40; ++step) {
             const int a = static_cast<int>(below(kSlots)), b = static_cast<int>(below(kSlots));
             const std::int64_t x = static_cast<std::int64_t>(below(1000));
             const std::size_t item = below(3);
-            switch (below(7)) {
-                case 0: slot[a] = slot[b]; model[a] = model[b]; break;  // copy
-                case 1: {  // deep write doc["items"][item]["tags"][0] = x
-                    Value* items = object_slot_mut(slot[a], atom("items"));
-                    Value* it = items ? array_slot_mut(*items, item % array_size(*items)) : nullptr;
-                    Value* tags = it ? object_slot_mut(*it, atom("tags")) : nullptr;
-                    if (tags && array_size(*tags) > 0) {
-                        array_set(*tags, 0, I(x));
-                        auto& mi = model[a].kv[0].second.items;
-                        mi[item % mi.size()].kv[1].second.items[0] = mint(x);
+            const int items_node = g.at(ms[a], "items");
+            Value items = member(slot[a], "items");
+            const std::size_t at = item % array_size(items);
+            switch (below(8)) {
+                case 0: slot[a] = slot[b]; ms[a] = ms[b]; break;  // alias: the same document
+                case 1: {  // deep write doc["items"][item]["tags"][0] = x, through the protocol
+                    Value tags = member(array_items(items)[at], "tags");
+                    const int mt = g.at(g.n[items_node].items[at], "tags");
+                    if (array_size(tags) > 0) {
+                        CHECK(mutation::set(tags, 0, I(x), kEnv).ok());
+                        g.n[mt].items[0] = g.num(x);
                     }
                     break;
                 }
                 case 2: {  // push into a nested array: doc["items"][item]["tags"].push(x)
-                    Value* items = object_slot_mut(slot[a], atom("items"));
-                    Value* it = array_slot_mut(*items, item % array_size(*items));
-                    array_push(*object_slot_mut(*it, atom("tags")), I(x));
-                    auto& mi = model[a].kv[0].second.items;
-                    mi[item % mi.size()].kv[1].second.items.push_back(mint(x));
+                    Value tags = member(array_items(items)[at], "tags");
+                    CHECK(mutation::push(tags, I(x), kEnv).ok());
+                    const int added = g.num(x);  // added before taking a reference into g.n
+                    g.n[g.at(g.n[items_node].items[at], "tags")].items.push_back(added);
                     break;
                 }
                 case 3: {  // a member through a path: doc.meta.n = x
-                    object_set(*object_slot_mut(slot[a], atom("meta")), atom("n"), I(x));
-                    model[a].kv[1].second.kv[0].second = mint(x);
+                    Value meta = member(slot[a], "meta");
+                    CHECK(mutation::object_put(meta, atom("n"), I(x), kEnv).ok());
+                    g.at(g.at(ms[a], "meta"), "n") = g.num(x);
                     break;
                 }
-                case 4: {  // self-store: doc["items"].push(doc["items"]) stores the previous value
-                    Value* items = object_slot_mut(slot[a], atom("items"));
-                    const Value previous = *items;
-                    array_push(*items, previous);
-                    auto& mi = model[a].kv[0].second;
-                    const Model before = mi;
-                    if (mi.items.size() < 12) { mi.items.push_back(before); } else { array_mut(*items).pop_back(); }
+                case 4: {  // self-store doc["items"].push(doc["items"]): a cycle, refused, unchanged
+                    const std::size_t before = array_size(items);
+                    CHECK(mutation::push(items, items, kEnv).failure == Failure::Cycle);
+                    CHECK(array_size(items) == before);
+                    ++refused;
                     break;
                 }
-                case 5: {  // whole-document self-store under a new key
-                    if (object_size(slot[a]) < 4) {
-                        const Value previous = slot[a];
-                        object_set(slot[a], atom("old" + std::to_string(object_size(slot[a]))), previous);
-                        const Model before = model[a];
-                        model[a].kv.push_back({"old" + std::to_string(model[a].kv.size()), before});
-                    }
+                case 5: {  // whole-document self-store under a new key: refused, unchanged
+                    const std::size_t before = object_size(slot[a]);
+                    CHECK(mutation::object_put(slot[a], atom("old"), slot[a], kEnv).failure == Failure::Cycle);
+                    CHECK(object_size(slot[a]) == before);
+                    ++refused;
                     break;
                 }
-                default: {  // repeated writes to one copy
-                    Value* items = object_slot_mut(slot[a], atom("items"));
-                    for (int rep = 0; rep < 3; ++rep) {
-                        Value* it = array_slot_mut(*items, item % array_size(*items));
-                        object_set(*it, atom("id"), I(x + rep));
-                    }
-                    auto& mi = model[a].kv[0].second.items;
-                    mi[item % mi.size()].kv[0].second = mint(x + 2);
+                case 6: {  // a shallow copy: a new outer document sharing its members
+                    Value copy;
+                    CHECK(shallow_copy(slot[b], copy, kNoCopyLimit) == CopyStatus::Ok);
+                    Model m = g.n[ms[b]];
+                    slot[a] = copy;
+                    ms[a] = g.add(m);
+                    break;
+                }
+                default: {  // repeated writes to one shared item
+                    Value it = array_items(items)[at];
+                    for (int rep = 0; rep < 3; ++rep) CHECK(mutation::object_put(it, atom("id"), I(x + rep), kEnv).ok());
+                    g.at(g.n[items_node].items[at], "id") = g.num(x + 2);
                     break;
                 }
             }
+            std::map<int, const HeapObject*> by_node;
+            std::map<const HeapObject*, int> by_heap;
             for (int k = 0; k < kSlots; ++k) {
-                CHECK(matches(slot[k], model[k]));
+                CHECK(matches(slot[k], g, ms[k], by_node, by_heap));
                 std::vector<const HeapObject*> path;
                 CHECK(acyclic(slot[k], path));
             }
+            for (int k = 0; k < kSlots; ++k) CHECK(!g.reaches(g.at(ms[k], "items"), ms[k]));
         }
     }
+    std::printf("nested references: %ld refused cycle-forming stores\n", refused);
 }
 
 
-// ---- 2b. self-insertion (owner requirement): the copy-on-write detach happens
-// before the insert, so the stored value is the pre-write snapshot; no graph
-// cycle is ever built and later writes to either side stay independent.
+// ---- 2b. self-insertion (owner requirement). B2 (b2-refrep.md): arrays and
+// objects are references, so a self-insertion is a cycle the protocol refuses
+// before anything changes (replaces "the copy-on-write detach stores the
+// pre-write snapshot": the clone is deleted). No graph cycle is ever built.
 std::string show(const Value& v) {
     switch (v.kind()) {
         case Kind::Int: return std::to_string(v.as_int());
@@ -312,45 +335,33 @@ bool acyclic_value(const Value& v) {
 }
 
 void self_insertion() {
-    // a = [1]; a.push(a) -> [1,[1]]; later writes to a or a[1] stay independent.
+    // a = [1]; a.push(a): refused, a unchanged; later writes work.
     Value a = make_array();
     array_push(a, I(1));
-    array_push(a, a);
-    CHECK(show(a) == "[1,[1]]" && acyclic_value(a));
-    array_push(a, I(2));
-    CHECK(show(a) == "[1,[1],2]");
-    array_push(*array_slot_mut(a, 1), I(9));
-    CHECK(show(a) == "[1,[1,9],2]");
-    // Repeated self-insertion: each step stores the previous snapshot.
-    Value r = make_array();
-    array_push(r, I(0));
-    std::string expect = "[0]";
-    for (int n = 0; n < 5; ++n) {
-        array_push(r, r);
-        expect = expect.substr(0, expect.size() - 1) + "," + expect + "]";
-        CHECK(show(r) == expect && acyclic_value(r));
-    }
-    // Two levels deep, array: a[0][0].push(a) stores the whole previous a.
+    CHECK(mutation::push(a, a, kEnv).failure == Failure::Cycle);
+    CHECK(show(a) == "[1]" && acyclic_value(a) && a.refcount() == 1);
+    CHECK(mutation::push(a, I(2), kEnv).ok() && show(a) == "[1,2]");
+    // Repeated self-insertion: every attempt is refused.
+    for (int n = 0; n < 5; ++n) CHECK(mutation::push(a, a, kEnv).failure == Failure::Cycle && show(a) == "[1,2]");
+    // Two levels deep, array: a[0][0].push(a) would make a reach itself.
     Value d = make_array();
     { Value inner = make_array(); Value leaf = make_array(); array_push(leaf, I(1)); array_push(inner, leaf);
       array_push(d, inner); }
-    const Value snap = d;
-    array_push(*array_slot_mut(*array_slot_mut(d, 0), 0), snap);
-    CHECK(show(d) == "[[[1,[[[1]]]]]]" && show(snap) == "[[[1]]]" && acyclic_value(d));
+    Value leaf = array_items(array_items(d)[0])[0];
+    CHECK(mutation::push(leaf, d, kEnv).failure == Failure::Cycle);
+    CHECK(show(d) == "[[[1]]]" && acyclic_value(d));
     // Objects, two levels: o["k"]["m"].push(o) and o["self"] = o.
     Value o = make_object();
     { Value k = make_object(); Value m = make_array(); array_push(m, I(1)); object_set(k, atom("m"), m);
       object_set(o, atom("k"), k); }
-    const Value before = o;
-    array_push(*object_slot_mut(*object_slot_mut(o, atom("k")), atom("m")), before);
-    CHECK(show(o) == "{k:{m:[1,{k:{m:[1]}}]}}" && acyclic_value(o));
-    object_set(o, atom("self"), o);
-    CHECK(show(o) == "{k:{m:[1,{k:{m:[1]}}]},self:{k:{m:[1,{k:{m:[1]}}]}}}" && acyclic_value(o));
-    array_push(*object_slot_mut(*object_slot_mut(o, atom("k")), atom("m")), I(5));
-    CHECK(show(*object_get(o, atom("self"))) == "{k:{m:[1,{k:{m:[1]}}]}}");
-    // Structs (D-NEXT-refsem #4, superseding the V16 snapshot for them): a
-    // store of an instance into itself, directly or two levels down, is a
-    // cycle the checker finds before the caller stores anything.
+    Value m = *object_get(*object_get(o, atom("k")), atom("m"));
+    CHECK(mutation::push(m, o, kEnv).failure == Failure::Cycle);
+    CHECK(mutation::object_put(o, atom("self"), o, kEnv).failure == Failure::Cycle);
+    CHECK(show(o) == "{k:{m:[1]}}" && acyclic_value(o));
+    CHECK(mutation::push(m, I(5), kEnv).ok() && show(o) == "{k:{m:[1,5]}}");  // in place, seen through o
+    // Structs (D-NEXT-refsem #4): a store of an instance into itself, directly
+    // or two levels down, is a cycle the checker finds before the caller
+    // stores anything.
     Value s = make_struct(atom("S"));
     { Value inner = make_struct(atom("In")); struct_add_field(inner, atom("list"), make_array());
       struct_add_field(s, atom("inner"), inner); struct_add_field(s, atom("next"), Value()); }
@@ -359,16 +370,15 @@ void self_insertion() {
     CHECK(would_close_cycle(CycleTarget::aggregate(s.heap()), s, graph));
     CHECK(would_close_cycle(CycleTarget::aggregate(list_owner), s, graph));
     CHECK(show(s) == "S{inner:In{list:[]},next:?}" && acyclic_value(s));
-    // Self-insertion through a copy-on-write share that another slot still holds.
+    // Self-insertion through an alias another slot holds: the same object, refused.
     Value x = make_array();
     array_push(x, I(1));
     Value y = x;
-    array_push(x, y);
-    CHECK(show(x) == "[1,[1]]" && show(y) == "[1]" && acyclic_value(x));
-    // Ordinary self-stores never reach the cycle checker.
+    CHECK(mutation::push(x, y, kEnv).failure == Failure::Cycle && show(x) == "[1]" && show(y) == "[1]");
+    // A direct self-store is refused in O(1), without a walk.
     CycleCheckStats before_stats = cycle_check_stats();
-    array_push(a, a);
-    object_set(o, atom("again"), o);
+    CHECK(mutation::push(a, a, kEnv).failure == Failure::Cycle);
+    CHECK(mutation::object_put(o, atom("again"), o, kEnv).failure == Failure::Cycle);
     CHECK(cycle_check_stats().checks == before_stats.checks);
 }
 
@@ -383,13 +393,17 @@ void sameness() {
     CHECK(same(f, f2) == Sameness::Same && same(f, g) == Sameness::Different);
     CHECK(same(h, h2) == Sameness::Same && same(h2, h) == Sameness::Same && same(h, h3) == Sameness::Different);
     CHECK(same(f, h) == Sameness::Different);
+    // B2 (plan section 3): arrays and objects are references, so same() is
+    // their identity (replaces "storage sharing is never exposed").
     Value a = make_array();
-    Value b = a;  // storage sharing is never exposed (arrays are values until Phase B)
+    Value b = a;
     Value m = make_object();
-    for (const Value* ordinary : {&a, &b, &m}) {
-        CHECK(same(*ordinary, *ordinary) == Sameness::NotIdentity);
-        CHECK(same(*ordinary, f) == Sameness::NotIdentity && same(f, *ordinary) == Sameness::NotIdentity);
-    }
+    Value twin = make_array();
+    CHECK(same(a, b) == Sameness::Same && same(a, a) == Sameness::Same && same(m, m) == Sameness::Same);
+    CHECK(same(a, twin) == Sameness::Different && equal(a, twin));  // equal content, distinct identity
+    CHECK(same(a, m) == Sameness::Different && same(a, f) == Sameness::Different);
+    Value copy;
+    CHECK(shallow_copy(a, copy, kNoCopyLimit) == CopyStatus::Ok && same(a, copy) == Sameness::Different);
     CHECK(same(I(1), I(1)) == Sameness::NotIdentity && same(make_string("x"), h) == Sameness::NotIdentity);
     // D-NEXT-refsem #2: struct instances and collections are identities.
     Value st = make_struct(atom("P"));
@@ -399,7 +413,7 @@ void sameness() {
     CHECK(same(st, st2) == Sameness::Same && same(st, other) == Sameness::Different);
     CHECK(same(c, c) == Sameness::Same && same(c, st) == Sameness::Different);
     CHECK(identity_bearing(f) && identity_bearing(h) && !identity_bearing(a) && identity_bearing(st) &&
-          identity_bearing(c));
+          identity_bearing(c));  // identity_bearing: the D-040 identity kinds (arrays: references, B2)
 }
 
 // ---- 4. the identity summary bit -----------------------------------------------
@@ -413,8 +427,9 @@ bool contains_identity(const Value& v) {
 
 void summary_bit(long rounds) {
     for (long r = 0; r < rounds; ++r) {
-        // Arrays and objects (copy-on-write values); instances are references
-        // whose self-stores would be cycles (D-NEXT-refsem #4): section 1.
+        // Arrays and objects (B2: references; a store that would close a cycle
+        // is refused by the protocol, the receiver unchanged); instances:
+        // section 1.
         std::vector<Value> pool = {make_array(), make_object()};
         for (int step = 0; step < 30; ++step) {
             Value item;
@@ -425,13 +440,17 @@ void summary_bit(long rounds) {
                 default: item = I(static_cast<std::int64_t>(below(100))); break;
             }
             Value& target = pool[below(pool.size())];
-            if (target.is(Kind::Array)) array_push(target, item);
-            else object_set(target, atom("k" + std::to_string(below(4))), item);
-            if (below(4) == 0) pool.push_back(target);  // a shared copy
+            const mutation::Outcome out = target.is(Kind::Array)
+                ? mutation::push(target, item, kEnv)
+                : mutation::object_put(target, atom("k" + std::to_string(below(4))), item, kEnv);
+            CHECK(out.ok() || out.failure == Failure::Cycle);
+            if (below(4) == 0) pool.push_back(target);  // an alias (B2: the same object)
         }
         for (const Value& v : pool) CHECK(!contains_identity(v) || may_contain_identity(v));  // sound
     }
     // Precise for API stores of plain data; conservative for raw storage.
+    // B2 (plan 5.1): a nested array or object marks its parent (it is a
+    // reference); a flat array of scalars stays clear.
     Value plain = make_array();
     for (int n = 0; n < 50; ++n) array_push(plain, I(n));
     Value obj = make_object();
@@ -439,13 +458,12 @@ void summary_bit(long rounds) {
     Value st = make_struct(atom("S"));
     struct_add_field(st, atom("o"), obj);
     array_set(plain, 0, I(5));
-    CHECK(!may_contain_identity(plain) && !may_contain_identity(obj));
-    CHECK(may_contain_identity(st) && !may_hold_identity(st.heap()));  // an identity itself, plain contents
+    CHECK(!may_contain_identity(plain) && may_contain_identity(obj));
+    CHECK(may_contain_identity(st) && may_hold_identity(st.heap()));  // an identity itself, holding an object
     array_mut(plain)[1] = I(6);
     CHECK(may_contain_identity(plain));  // raw access: marked conservatively
-    Value copy = plain;
-    array_push(copy, I(1));
-    CHECK(may_contain_identity(copy));  // clones keep the bit
+    Value copy = array_shallow_clone(plain);
+    CHECK(may_contain_identity(copy));  // explicit clones keep the bit
     Value holder = make_array();
     array_push(holder, Value::adopt(new FunctionObject()));
     Value outer = make_object();
@@ -708,30 +726,31 @@ void large_accounting() {
     CHECK(live_heap_bytes() == base);
 }
 
-// ---- 7. copy-on-write metadata (identity summary bit) ---------------------------
-// Behaviour chosen: the bit is conservative. It is copied by clones, set by
-// any store that may add a callable or handle, and may stay set after the last
-// one is removed (cleared only when the cycle checker verifies the children);
-// it is never missing while a callable or handle is present.
+// ---- 7. summary-bit metadata across aliases and explicit clones (B2) ----------
+// Behaviour chosen: the bit is conservative. It is copied by explicit clones,
+// set by any store that may add a callable, a handle or (B2) a nested array or
+// object, and may stay set after the last one is removed (cleared only when
+// the cycle checker verifies the children); it is never missing while one is
+// present. Replaces the copy-on-write version (aliases now share one bit).
 void cow_metadata() {
     Value a = make_array();
     array_push(a, I(1));
-    Value b = a;  // shared
-    array_push(a, Value::adopt(new FunctionObject()));  // a.push(fn() { return 1 })
-    CHECK(a.heap() != b.heap());
-    CHECK(may_contain_identity(a) && !may_contain_identity(b));  // b keeps its contents and its bit
-    CHECK(array_size(b) == 1 && array_items(b)[0].as_int() == 1 && array_size(a) == 2);
-    // A cycle-producing store involving a is refused and leaves a and b unchanged.
+    Value b = a;  // an alias: the same array, one bit
+    CHECK(mutation::push(a, Value::adopt(new FunctionObject()), kEnv).ok());  // a.push(fn() { return 1 })
+    CHECK(a.heap() == b.heap() && may_contain_identity(a) && may_contain_identity(b) && array_size(b) == 2);
+    // A cycle-producing store involving a is refused and leaves a unchanged.
     TestGraph g;
     g.cells.assign(1, Value());
     auto* f = new FunctionObject();
     Value closure = Value::adopt(f);
     g.captures[f] = {0};
     g.cells[0] = a;
-    Value holder = a;
-    array_push(holder, closure);  // holder = a + [closure capturing cell 0]
+    Value holder = array_shallow_clone(a);
+    array_push(holder, closure);  // holder = a's elements + [closure capturing cell 0 (a)]
     CHECK(would_close_cycle(CycleTarget::captured_cell(&g.cells[0]), holder, g));
-    CHECK(array_size(a) == 2 && array_size(b) == 1 && !may_contain_identity(b));
+    CHECK(would_close_cycle(CycleTarget::aggregate(a.heap()), closure, g));
+    CHECK(array_size(a) == 2 && may_contain_identity(holder));
+    g.cells[0] = Value();
     // Removing the last callable or handle: the bit may stay set, never missing.
     Value c = make_array();
     array_push(c, Value::handle(HandleKind::File, 1, 1));
@@ -743,12 +762,9 @@ void cow_metadata() {
     CHECK(!may_contain_identity(c));           // verified clean by the checker
     array_push(c, Value::adopt(new FunctionObject()));
     CHECK(may_contain_identity(c));            // never missing when one is present
-    Value d = c;
+    Value d = array_shallow_clone(c);          // an explicit clone keeps the bit
     array_mut(d).pop_back();
-    CHECK(may_contain_identity(c) && array_size(c) == 2);  // the original keeps its function and bit
-    Value e = c;
-    array_push(e, I(5));  // the clone still holds the function: the bit travels with the clone
-    CHECK(may_contain_identity(e) && e.heap() != c.heap());
+    CHECK(may_contain_identity(c) && array_size(c) == 2 && d.heap() != c.heap() && may_contain_identity(d));
 }
 
 
@@ -809,11 +825,12 @@ void tag_masking() {
         CHECK(heap_footprint(plain.heap()) == heap_footprint(marked.heap()));
         CHECK(std::string(kind_name(marked.kind())) == kind_name(plain.kind()));
         if (!(std::string(name) == "array" || std::string(name) == "object" || std::string(name) == "struct")) continue;
-        // Cloning a marked aggregate: the clone has the right kind and keeps the bit.
+        // Cloning a marked aggregate: the clone has the right kind and keeps the
+        // bit (B2: an explicit shallow clone; a write goes to the shared object).
         Value share = marked;
         Value clone = marked;
-        if (clone.is(Kind::Array)) array_push(clone, I(9));
-        if (clone.is(Kind::Object)) object_set(clone, atom("z"), I(9));
+        if (clone.is(Kind::Array)) { clone = array_shallow_clone(marked); array_push(clone, I(9)); }
+        if (clone.is(Kind::Object)) { clone = object_shallow_clone(marked); object_set(clone, atom("z"), I(9)); }
         if (clone.is(Kind::Struct)) {  // D-NEXT-refsem #1: a reference, written in place, never cloned
             struct_add_field(clone, atom("z"), I(9));
             CHECK(clone.heap() == share.heap() && may_hold_identity(clone.heap()));
@@ -844,7 +861,7 @@ int main(int argc, char** argv) {
     const bool large = !(argc > 3 && std::string(argv[3]) == "no-large");
     rng.seed(seed);
     structs();
-    nested_cow(300 * scale);
+    nested_references(300 * scale);
     self_insertion();
     sameness();
     summary_bit(300 * scale);

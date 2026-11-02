@@ -132,6 +132,18 @@ void cycles() {
     expect("splice", "a := [1]\nb := [a]\ntry { a.splice(0, 0, [b]) } catch (e) { print(e.code) }\n"
            "print(a.stringify())\na.splice(0, 0, a)\nprint(a.stringify())\n",
            "runtime.reference_cycle\n[1]\n[1,1]\n");
+    // The receiver as its own splice replacement (B2 fix: the insertion never
+    // reads a vector's own range; the elements before the removal are
+    // inserted, as the copy-on-write register gave; legacy inserts the
+    // elements after the removal, [1,1,3,3]: a B5 decision).
+    expect("splice-self-middle", "a := [1, 2, 3]\na.splice(1, 1, a)\nprint(a.stringify())\n", "[1,1,2,3,3]\n");
+    expect("splice-self-front", "a := [1, 2]\na.splice(0, 0, a)\nprint(a.stringify())\n", "[1,2,1,2]\n");
+    expect("splice-self-end", "a := [1, 2]\na.splice(2, 0, a)\nprint(a.stringify())\n", "[1,2,1,2]\n");
+    expect("splice-self-full", "a := [1, 2, 3]\na.splice(0, 3, a)\nprint(a.stringify())\n", "[1,2,3]\n");
+    expect("splice-self-empty", "a := []\na.splice(0, 0, a)\nprint(a.stringify())\n", "[]\n");
+    expect("splice-self-alias", "a := [1, 2]\nb := a\na.splice(1, 0, b)\nprint(b.stringify())\n", "[1,1,2,2]\n");
+    expect("splice-self-nested", "a := [1]\nc := [a]\ntry { a.splice(0, 0, c) } catch (e) { print(e.code) }\n"
+           "print(a.stringify())\n", "runtime.reference_cycle\n[1]\n");
     expect("through-map", "a := [1]\nm := map()\nm.set(\"k\", a)\ntry { a.push(m) } catch (e) { print(e.code) }\n"
            "print(a.length())\n", "runtime.reference_cycle\n1\n");
     expect("through-cell", "fn(main()) {\n  a := [1]\n  f := () => a.length()\n  b := [f]\n"

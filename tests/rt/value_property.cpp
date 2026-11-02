@@ -22,6 +22,7 @@
 #include "rt/decimal.h"
 #include "rt/heap.h"
 #include "rt/legacy_bridge.h"
+#include "rt/mutation.h"
 #include "rt/number.h"
 #include "rt/string.h"
 #include "rt_test.h"
@@ -29,6 +30,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <cstdlib>
 #include <cstring>
 #include <random>
@@ -46,7 +48,7 @@ std::mt19937_64 rng;
 // random generators actually exercised.
 struct Coverage {
     long equal_number_pairs = 0, equal_cross_kind = 0, big_exponent_operands = 0, big_double_operands = 0;
-    long large_objects = 0, duplicate_rejections = 0, object_index_lookups = 0;
+    long large_objects = 0, duplicate_rejections = 0, object_index_lookups = 0, refused_cycles = 0;
 } coverage;
 
 bool big_exponent(const Value& v) { return v.is(Kind::Decimal) && !number_form(v).big_exponent.empty(); }
@@ -290,65 +292,180 @@ void structural_differential(long iterations) {
     }
 }
 
-// Copy-on-write: random aliasing and mutation must behave exactly like deep
-// copies (the legacy model).
-void cow_model(long sequences) {
+// ---- B2 (b2-refrep.md): the reference model ---------------------------------
+// Arrays and objects are shared references, so the model is a graph of nodes:
+// a slot or an element holding a node holds THE node, and a mutation through
+// one holder is seen through every holder. Every mutation goes through the
+// mutation protocol (rt/mutation.h); a store that would make a node reach
+// itself is refused as a cycle with the receiver unchanged (and the model
+// unchanged). After every step each slot is checked against the model by
+// value (through the legacy oracle) and by identity (one heap object per
+// node, one node per heap object). Replaces the copy-on-write model (a
+// deep-copy model), whose subject, the clone, B2 deletes.
+struct MVal {
+    enum class K { Num, Bool, Null, Node } k = K::Null;
+    double num = 0;
+    bool b = false;
+    std::size_t node = 0;
+};
+struct MNode {
+    bool object = false;
+    std::vector<MVal> items;                       // arrays
+    std::vector<std::pair<std::string, MVal>> kv;  // objects, in order
+};
+struct RefModel {
+    std::vector<MNode> nodes;
+    std::size_t add(bool object) { nodes.push_back(MNode{object, {}, {}}); return nodes.size() - 1; }
+    bool reaches(std::size_t from, std::size_t target) const {
+        std::vector<std::size_t> work{from};
+        std::vector<char> seen(nodes.size(), 0);
+        while (!work.empty()) {
+            const std::size_t n = work.back();
+            work.pop_back();
+            if (n == target) return true;
+            if (seen[n]) continue;
+            seen[n] = 1;
+            for (const MVal& v : nodes[n].items) if (v.k == MVal::K::Node) work.push_back(v.node);
+            for (const auto& e : nodes[n].kv) if (e.second.k == MVal::K::Node) work.push_back(e.second.node);
+        }
+        return false;
+    }
+    RuntimeValue render(const MVal& v) const {
+        switch (v.k) {
+            case MVal::K::Num: return RuntimeValue(v.num);
+            case MVal::K::Bool: return RuntimeValue(v.b);
+            case MVal::K::Null: return RuntimeValue(nullptr);
+            default: break;
+        }
+        const MNode& n = nodes[v.node];
+        if (!n.object) {
+            RuntimeValue out = RuntimeValue::make_array();
+            for (const MVal& item : n.items) out.push_back(render(item));
+            return out;
+        }
+        RuntimeValue out = RuntimeValue::make_object();
+        for (const auto& e : n.kv) out[e.first] = render(e.second);
+        return out;
+    }
+    void put(std::size_t node, const std::string& key, const MVal& v) {
+        for (auto& e : nodes[node].kv) if (e.first == key) { e.second = v; return; }
+        nodes[node].kv.emplace_back(key, v);
+    }
+    bool erase(std::size_t node, const std::string& key) {
+        auto& kv = nodes[node].kv;
+        for (auto it = kv.begin(); it != kv.end(); ++it) if (it->first == key) { kv.erase(it); return true; }
+        return false;
+    }
+};
+MVal node_val(std::size_t n) { MVal v; v.k = MVal::K::Node; v.node = n; return v; }
+MVal num_val(double d) { MVal v; v.k = MVal::K::Num; v.num = d; return v; }
+MVal bool_val(bool b) { MVal v; v.k = MVal::K::Bool; v.b = b; return v; }
+
+// Identity: walks a slot and its model together; a node is always the same
+// heap object and a heap object is always the same node.
+bool same_identity(const Value& v, const MVal& m, const RefModel& model, std::map<std::size_t, const void*>& by_node,
+                   std::map<const void*, std::size_t>& by_heap) {
+    if (m.k != MVal::K::Node) return !(v.is(Kind::Array) || v.is(Kind::Object));
+    if (!(v.is(Kind::Array) || v.is(Kind::Object))) return false;
+    const auto n = by_node.emplace(m.node, v.heap());
+    const auto h = by_heap.emplace(v.heap(), m.node);
+    if (n.first->second != v.heap() || h.first->second != m.node) return false;
+    if (!n.second) return true;  // children already checked
+    const MNode& node = model.nodes[m.node];
+    if (!node.object) {
+        if (array_size(v) != node.items.size()) return false;
+        for (std::size_t k = 0; k < node.items.size(); ++k)
+            if (!same_identity(array_view(v)[k], node.items[k], model, by_node, by_heap)) return false;
+        return true;
+    }
+    if (object_size(v) != node.kv.size()) return false;
+    for (std::size_t k = 0; k < node.kv.size(); ++k)
+        if (!same_identity(object_view(v)[k].second, node.kv[k].second, model, by_node, by_heap)) return false;
+    return true;
+}
+
+void check_slots(const std::vector<Value>& slots, const std::vector<std::size_t>& ms, const RefModel& model) {
+    std::map<std::size_t, const void*> by_node;
+    std::map<const void*, std::size_t> by_heap;
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        CHECK(identical(legacy_of(slots[i]), model.render(node_val(ms[i]))));
+        CHECK(same_identity(slots[i], node_val(ms[i]), model, by_node, by_heap));
+    }
+}
+
+using mutation::Failure;
+const mutation::Env kEnv;
+
+// Arrays: random aliasing, pushes, pops, nesting (a reference: refused as a
+// cycle when y reaches x) and mutation of a nested element in place.
+void reference_model(long sequences) {
     for (long s = 0; s < sequences; ++s) {
         std::vector<Value> slots(4);
-        std::vector<RuntimeValue> model(4);
+        std::vector<std::size_t> ms(4);
+        RefModel model;
         for (std::size_t i = 0; i < 4; ++i) {
-            model[i] = RuntimeValue::make_array();
-            model[i].push_back(RuntimeValue(static_cast<double>(i)));
+            ms[i] = model.add(false);
+            model.nodes[ms[i]].items.push_back(num_val(static_cast<double>(i)));
+            RuntimeValue legacy = RuntimeValue::make_array();
+            legacy.push_back(RuntimeValue(static_cast<double>(i)));
             std::string err;
-            from_legacy(model[i], slots[i], err);
+            from_legacy(legacy, slots[i], err);
         }
         for (int step = 0; step < 40; ++step) {
             const std::size_t x = below(4), y = below(4);
             switch (below(5)) {
-                case 0: slots[x] = slots[y]; model[x] = model[y]; break;
+                case 0: slots[x] = slots[y]; ms[x] = ms[y]; break;  // alias: the same array
                 case 1: {
                     const double v = static_cast<double>(below(100));
-                    array_push(slots[x], Value::number(v));
-                    model[x].push_back(RuntimeValue(v));
+                    CHECK(mutation::push(slots[x], Value::number(v), kEnv).ok());
+                    model.nodes[ms[x]].items.push_back(num_val(v));
                     break;
                 }
-                case 2: if (!model[x].array.empty()) { array_mut(slots[x]).pop_back(); model[x].array.pop_back(); } break;
-                case 3: {  // nest a copy of y inside x, then mutate y
-                    array_push(slots[x], slots[y]);
-                    model[x].push_back(model[y]);
-                    array_push(slots[y], Value::boolean(true));
-                    model[y].push_back(RuntimeValue(true));
+                case 2:
+                    if (!model.nodes[ms[x]].items.empty()) {
+                        CHECK(mutation::pop(slots[x], nullptr, kEnv).ok());
+                        model.nodes[ms[x]].items.pop_back();
+                    }
+                    break;
+                case 3: {  // nest y inside x (a reference), then mutate y
+                    const auto out = mutation::push(slots[x], slots[y], kEnv);
+                    if (model.reaches(ms[y], ms[x])) {
+                        CHECK(out.failure == Failure::Cycle);  // refused; the model is unchanged
+                        ++coverage.refused_cycles;
+                    } else {
+                        CHECK(out.ok());
+                        model.nodes[ms[x]].items.push_back(node_val(ms[y]));
+                    }
+                    CHECK(mutation::push(slots[y], Value::boolean(true), kEnv).ok());
+                    model.nodes[ms[y]].items.push_back(bool_val(true));
                     break;
                 }
-                default: {  // mutate a nested element in place
-                    auto& items = array_mut(slots[x]);
-                    if (!items.empty() && items.back().is(Kind::Array)) {
-                        array_push(items.back(), Value());
-                        model[x].array.back().push_back(RuntimeValue(nullptr));
+                default: {  // mutate a nested element in place: seen through every holder
+                    const auto& items = model.nodes[ms[x]].items;
+                    if (!items.empty() && items.back().k == MVal::K::Node) {
+                        Value child = array_view(slots[x]).back();
+                        CHECK(mutation::push(child, Value(), kEnv).ok());
+                        model.nodes[items.back().node].items.push_back(MVal());
                     }
                 }
             }
-            for (std::size_t i = 0; i < 4; ++i) CHECK(identical(legacy_of(slots[i]), model[i]));
+            check_slots(slots, ms, model);
         }
     }
 }
 
-void legacy_remove(RuntimeValue& object, const std::string& key) {
-    for (auto it = object.object.begin(); it != object.object.end(); ++it)
-        if (it->first == key) { object.object.erase(it); return; }
-}
-
 // Objects: random set / remove / re-add / alias / nest sequences over 4 slots
 // with up to ~70 distinct keys (the index is built from 8 entries and rebuilt
-// on growth and removal), against legacy objects with deep-copy semantics.
-// Every step checks every slot's entries in order and, for the mutated slot,
-// the lookup of every key in the keyspace (present and absent). Every 8
-// steps, equality and hash against a reverse-order rebuild.
+// on growth and removal), against the reference model. Every step checks
+// every slot by value and identity and, for the mutated slot, the lookup of
+// every key in the keyspace (present and absent). Every 8 steps, equality
+// and hash against a reverse-order rebuild.
 void object_model(long sequences) {
     for (long s = 0; s < sequences; ++s) {
         std::vector<Value> slots(4);
-        std::vector<RuntimeValue> model(4);
-        for (std::size_t i = 0; i < 4; ++i) { slots[i] = make_object(); model[i] = RuntimeValue::make_object(); }
+        std::vector<std::size_t> ms(4);
+        RefModel model;
+        for (std::size_t i = 0; i < 4; ++i) { slots[i] = make_object(); ms[i] = model.add(true); }
         const std::size_t keyspace = 4 + below(67);
         for (int step = 0; step < 120; ++step) {
             const std::size_t x = below(4), y = below(4);
@@ -357,40 +474,47 @@ void object_model(long sequences) {
             const std::uint64_t op = below(16);
             if (op < 7) {  // set (insert at end or replace in place)
                 const double v = static_cast<double>(below(1000));
-                object_set(slots[x], k, Value::number(v));
-                model[x][key] = RuntimeValue(v);
+                CHECK(mutation::object_put(slots[x], k, Value::number(v), kEnv).ok());
+                model.put(ms[x], key, num_val(v));
             } else if (op < 10) {  // remove (present or absent)
-                const bool had = model[x].find_member(key) != nullptr;
-                CHECK(object_remove(slots[x], k) == had);
-                legacy_remove(model[x], key);
+                const bool had = model.erase(ms[x], key);
+                const auto out = mutation::object_erase(slots[x], k, kEnv);
+                CHECK(had ? out.ok() : out.failure == Failure::Bounds);
             } else if (op < 12) {  // re-add: remove then set moves the key to the end
-                object_remove(slots[x], k);
-                legacy_remove(model[x], key);
-                object_set(slots[x], k, Value::boolean(true));
-                model[x][key] = RuntimeValue(true);
+                (void)mutation::object_erase(slots[x], k, kEnv);
+                model.erase(ms[x], key);
+                CHECK(mutation::object_put(slots[x], k, Value::boolean(true), kEnv).ok());
+                model.put(ms[x], key, bool_val(true));
             } else if (op < 13) {  // alias
                 slots[x] = slots[y];
-                model[x] = model[y];
-            } else if (op < 14) {  // nest a copy of y in x, then mutate y
-                object_set(slots[x], k, slots[y]);
-                const RuntimeValue snapshot = model[y];  // x may be y: copy before inserting
-                model[x][key] = snapshot;
-                object_set(slots[y], atom("k0"), Value::null());
-                model[y]["k0"] = RuntimeValue(nullptr);
-            } else {  // mutate a nested object through its parent (copy out, set, store back)
+                ms[x] = ms[y];
+            } else if (op < 14) {  // nest y in x (a reference, or a refused cycle), then mutate y
+                const auto out = mutation::object_put(slots[x], k, slots[y], kEnv);
+                if (model.reaches(ms[y], ms[x])) {
+                    CHECK(out.failure == Failure::Cycle);
+                    ++coverage.refused_cycles;
+                } else {
+                    CHECK(out.ok());
+                    model.put(ms[x], key, node_val(ms[y]));
+                }
+                CHECK(mutation::object_put(slots[y], atom("k0"), Value::null(), kEnv).ok());
+                model.put(ms[y], "k0", MVal());
+            } else {  // mutate a nested object in place, through its parent
                 const Value* child = object_get(slots[x], k);
                 if (child && child->is(Kind::Object)) {
-                    Value copy = *child;
-                    object_set(copy, atom("k1"), Value::number(7.0));
-                    object_set(slots[x], k, copy);
-                    model[x][key]["k1"] = RuntimeValue(7.0);
+                    Value nested = *child;
+                    std::size_t node = 0;
+                    for (const auto& e : model.nodes[ms[x]].kv) if (e.first == key) node = e.second.node;
+                    CHECK(mutation::object_put(nested, atom("k1"), Value::number(7.0), kEnv).ok());
+                    model.put(node, "k1", num_val(7.0));
                 }
             }
-            for (std::size_t i = 0; i < 4; ++i) CHECK(identical(legacy_of(slots[i]), model[i]));
+            check_slots(slots, ms, model);
             if (object_size(slots[x]) >= ObjectObject::kIndexThreshold) coverage.object_index_lookups += keyspace;
+            const RuntimeValue want_x = model.render(node_val(ms[x]));
             for (std::size_t j = 0; j < keyspace; ++j) {
                 const Value* got = object_get(slots[x], atom(pool_key(j)));
-                const RuntimeValue* want = model[x].find_member(pool_key(j));
+                const RuntimeValue* want = want_x.find_member(pool_key(j));
                 CHECK((got == nullptr) == (want == nullptr) && (!got || identical(legacy_of(*got), *want)));
             }
             if (step % 8 == 0) {
@@ -412,13 +536,13 @@ int main(int argc, char** argv) {
     std::printf("seed %llu scale %ld\n", static_cast<unsigned long long>(seed), scale);
     numeric_differential(200000 * scale);
     structural_differential(20000 * scale);
-    cow_model(500 * scale);
+    reference_model(500 * scale);
     object_model(300 * scale);
     std::printf("coverage: %ld equal number pairs (%ld cross-kind), %ld with a big-exponent Decimal, "
                 "%ld integral doubles > 2^53; %ld generated objects >= 8 keys, %ld duplicate-key rejections; "
-                "%ld object lookups on indexed objects\n",
+                "%ld object lookups on indexed objects; %ld refused cycle-forming stores\n",
                 coverage.equal_number_pairs, coverage.equal_cross_kind, coverage.big_exponent_operands,
                 coverage.big_double_operands, coverage.large_objects, coverage.duplicate_rejections,
-                coverage.object_index_lookups);
+                coverage.object_index_lookups, coverage.refused_cycles);
     return rt_test::finish("rt value property");
 }

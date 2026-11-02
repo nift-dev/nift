@@ -166,6 +166,11 @@ NIFT_MUTATION_INLINE void commit_array(Value& array, ArrayEdit edit, std::size_t
             break;
         }
         case ArrayEdit::SpliceInsert: {
+            if (keep.heap() == array.heap()) {  // a.splice(i, 0, a): never insert a vector's range into itself
+                const std::vector<Value> own = items;
+                items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), own.begin(), own.end());
+                break;
+            }
             const auto& replacement = array_view(keep);
             items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), replacement.begin(), replacement.end());
             break;

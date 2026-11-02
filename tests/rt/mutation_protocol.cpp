@@ -280,6 +280,40 @@ void cycle_targets_and_bookkeeping() {
     const std::size_t live = live_heap_bytes(), counted = heap_footprint(grow.heap());
     CHECK(m::insert(grow, 0, Value::integer(1), m::Env{}).ok() && heap_footprint(grow.heap()) > counted);
     CHECK(live_heap_bytes() == live - counted + heap_footprint(grow.heap()) && array_size(grow) == 65);
+    // B2: the receiver as its own replacement inserts its elements before the
+    // removal (beginning, middle, end, full range, empty receiver, an alias),
+    // and a replacement holding the receiver is a refused cycle.
+    const auto spliced = [](std::size_t at, std::size_t count, std::size_t n) {
+        Value self = make_array(n);
+        for (std::size_t k = 0; k < n; ++k) array_push(self, Value::integer(static_cast<std::int64_t>(k + 1)));
+        Value alias = self;
+        const bool ok = m::splice(self, at, count, alias, nullptr, m::Env{}).ok();
+        std::string out;
+        for (const Value& v : array_view(self)) out += std::to_string(v.as_int());
+        return ok && self.heap() == alias.heap() ? out : std::string("refused");
+    };
+    CHECK(spliced(0, 0, 2) == "1212" && spliced(1, 1, 3) == "11233" && spliced(2, 0, 2) == "1212");
+    CHECK(spliced(0, 3, 3) == "123" && spliced(0, 0, 0) == "");
+    Value inner = a123();
+    // Operands that are references INTO the receiver's storage (each mutator
+    // copies its operand before the storage can move): push, insert, set,
+    // map_put, set_insert and stack_push of the receiver's own element.
+    {
+        Value r = make_array(1);
+        array_push(r, make_string("an element long enough to live on the heap"));
+        CHECK(m::push(r, array_view(r)[0], m::Env{}).ok() && m::insert(r, 0, array_view(r)[1], m::Env{}).ok());
+        CHECK(m::set(r, 2, array_view(r)[0], m::Env{}).ok() && array_size(r) == 3);
+        for (const Value& v : array_view(r)) CHECK(string_view_of(v) == "an element long enough to live on the heap");
+        Value c = make_collection(CollectionKind::Map);
+        map_set(c, make_string("key"), make_string("a value long enough to live on the heap"));
+        CHECK(m::map_put(c, make_string("other"), collection_view(c)[1], m::Env{}).ok() && collection_size(c) == 2);
+        Value st = make_collection(CollectionKind::Stack);
+        stack_push(st, make_string("an element long enough to live on the heap"));
+        for (int k = 0; k < 20; ++k) CHECK(m::stack_push(st, collection_view(st)[0], m::Env{}).ok());
+        CHECK(collection_size(st) == 21);
+    }
+    Value nesting = array_of({inner});
+    CHECK(m::splice(inner, 0, 0, nesting, nullptr, m::Env{}).failure == Failure::Cycle && array_size(inner) == 3);
     // A successful splice commits once, in place (identity kept).
     Value sp = a123();
     const HeapObject* id = sp.heap();

@@ -1,0 +1,7 @@
+Value array_shallow_clone(const Value& array) {
+    auto* a = new ArrayObject();  // UNSAFE (negative control): not owned while the items are copied
+    a->items = array.heap_as<ArrayObject>()->items;
+    copy_summary(array.heap(), a);
+    heap_retally(a);
+    return Value::adopt(a);
+}

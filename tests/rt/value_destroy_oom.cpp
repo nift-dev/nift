@@ -185,8 +185,9 @@ Value bushy(std::size_t depth, std::size_t fan) {
 
 // ---- Property: failure injected at every allocation index (small graphs) ----
 //
-// A random small DAG with shared copy-on-write children (Value copies of the
-// same object, COW clones that share their children with the original, the
+// A random small DAG with shared children (Value copies of the same object,
+// shallow copies that share their children with the original (B2: explicit;
+// were copy-on-write clones), the
 // same child several times in one parent) and outside references to random
 // nodes. Built twice from the same seed: once to count the allocations the
 // release makes, then once per injection policy (fail every allocation from
@@ -202,7 +203,7 @@ namespace prop {
 struct Node {
     int kind = 0;                // 0 array, 1 object, 2 struct
     std::vector<int> children;   // node ids, in slot order
-    int copy_of = -1;            // COW clone of this node plus one extra child
+    int copy_of = -1;            // shallow copy of this node plus one extra child
 };
 
 struct Graph {
@@ -253,12 +254,15 @@ std::vector<Value> build(const Graph& g) {
     for (std::size_t i = 0; i < g.nodes.size(); ++i) {
         const Node& node = g.nodes[i];
         if (node.copy_of >= 0) {
-            // Shares the object; D-NEXT-refsem: a struct instance is a reference
-            // mutated in place, so its copy is made explicitly (shallow).
-            Value v = built[node.copy_of];
-            if (node.kind == 2) CHECK(shallow_copy(built[node.copy_of], v, kNoCopyLimit) == CopyStatus::Ok);
+            // A shallow copy sharing every child (B2, b2-refrep.md: arrays and
+            // objects are references like struct instances, so the copy is
+            // explicit for every kind; it was the copy-on-write clone for
+            // arrays and objects). The graph the destruction properties run
+            // on is unchanged.
+            Value v;
+            CHECK(shallow_copy(built[node.copy_of], v, kNoCopyLimit) == CopyStatus::Ok);
             const std::size_t slot = node.children.size();
-            add_slot(v, node.kind, slot, built[node.children.back()]);  // COW clone sharing every child
+            add_slot(v, node.kind, slot, built[node.children.back()]);
             // relabel slot 0 (the clone shares its label string until now)
             if (node.kind == 0) array_set(v, 0, make_string(label(int(i))));
             else if (node.kind == 1) object_set(v, key(0), make_string(label(int(i))));

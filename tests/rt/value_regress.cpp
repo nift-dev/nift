@@ -4,6 +4,7 @@
 //   value_regress [depth]     (depth of the deep-destruction test, default 1000000)
 #include "legacy_oracle.h"
 #include "rt/aggregate.h"
+#include "rt/mutation.h"
 #include "rt/compare.h"
 #include "rt/decimal.h"
 #include "rt/handle.h"
@@ -148,18 +149,27 @@ void handles() {
     CHECK(reg.resolve(c) && *static_cast<int*>(reg.resolve(c).get()) == 42 && reg.live() == 1);
 }
 
-// Copy-on-write programs that are within the reference contract (cow.cpp).
+// Self-stores and child-into-parent assignment within the reference
+// contract (cow.cpp). B2 (b2-refrep.md): a self-store is a cycle the
+// protocol refuses before anything changes (replaces the copy-on-write
+// "stores the pre-push snapshot" checks, whose subject, the clone, is gone);
+// assigning a child into its parent stays memory safe.
 void cow_contract_cases() {
     Value a = make_array();
     array_push(a, I(1));
-    array_push(a, a);  // a.push(a): the pushed value is the pre-push snapshot
-    CHECK(array_size(a) == 2 && array_size(array_items(a)[1]) == 1 && array_items(a)[1].heap() != a.heap());
+    CHECK(mutation::push(a, a, mutation::Env{}).failure == mutation::Failure::Cycle);  // a.push(a)
+    CHECK(array_size(a) == 1 && a.refcount() == 1);
     Value o = make_object();
     object_set(o, atom("x"), I(1));
-    object_set(o, atom("self"), o);
-    CHECK(object_size(o) == 2 && object_size(*object_get(o, atom("self"))) == 1);
+    CHECK(mutation::object_put(o, atom("self"), o, mutation::Env{}).failure == mutation::Failure::Cycle);
+    CHECK(object_size(o) == 1 && o.refcount() == 1);
+    {
+        Value child = make_array();
+        array_push(child, I(1));
+        array_push(a, child);
+    }
     a = array_items(a)[1];  // assign a child into its parent
-    CHECK(array_size(a) == 1 && array_items(a)[0].as_int() == 1);
+    CHECK(array_size(a) == 1 && array_items(a)[0].as_int() == 1 && a.refcount() == 1);
     Value m = make_array();
     array_push(m, make_string("a string longer than fourteen"));
     m = std::move(array_mut(m)[0]);  // move a child into its parent
@@ -240,8 +250,11 @@ void strings_and_refcounts() {
     }
     CHECK(v.refcount() == Value::kImmortal);  // releases do not count down an immortal object
     Value m = v;
-    array_push(m, I(1));  // a saturated object is shared: mutation clones
-    CHECK(m.heap() != v.heap() && array_size(v) == 0 && m.refcount() == 1);
+    // B2: mutation writes in place and the count stays saturated (replaces
+    // "a saturated object is shared: mutation clones": the clone is gone).
+    CHECK(mutation::push(m, I(1), mutation::Env{}).ok());
+    CHECK(m.heap() == v.heap() && array_size(v) == 1 && v.refcount() == Value::kImmortal);
+    m = Value();  // the alias is dropped while the count is saturated (no count-down)
     v.heap()->refcount = 1;  // test only: let the object be freed (leak checker)
 }
 
