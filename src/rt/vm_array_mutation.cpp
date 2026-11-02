@@ -22,17 +22,17 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         return fail(note&&in.c!=100?"unknown value or malformed expression: "+note->text:
             std::string(name)+": receiver is not an array");}
 #endif
-    const auto n=array_size(s[Source]);
-    if(in.c==100){if(m==M::Pop&&!n)return fail("pop: array is empty");
+    if(in.c==100){if(m==M::Pop&&!array_size(s[Source]))return fail("pop: array is empty");
         const Note* note=proto->note(&in-proto->code.data());
         return fail("cannot mutate const array: "+std::string(note?note->text:""));}
-    // B1 (rt/mutation.h): stage 2.2, the object's immutability, before bounds.
-    {const Note* note=proto->note(&in-proto->code.data());
-        const auto out=mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view());
-        if(!out.ok())return fail(out.text);}
+    // B1: push is mutation::push (stages 2.1-2.2 there, the same text).
     if(m==M::Push){const Note* note=proto->note(&in-proto->code.data());if(!push_value(s[Source],s[Item],fault,
         note))return false;
         s[Result]=s[Item];return memory_ok(fault);}
+    // B1 (rt/mutation.h): stage 2.2, the object's immutability, before bounds.
+    if(mutation::refuses_mutation(s[Source])){const Note* note=proto->note(&in-proto->code.data());
+        return fail(mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view()).text);}
+    const auto n=array_size(s[Source]);
     std::size_t index=0,count=0;
     if(m==M::Insert||m==M::Remove){if(!natives::number_to_size(s[Item],
         index))return fail(std::string(name)+": invalid index");
@@ -52,8 +52,8 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
     if(m==M::Remove)s[Result]=array_view(s[Source])[index];
     if(m==M::Splice&&in.c!=1){s[Result]=make_array(count);for(std::size_t k=0;k<count;++k)array_push(s[Result],
         array_view(s[Source])[index+k]);}
-    natives::Context context;context.heap_limit=heap_limit_;
-    if(m==M::Sort)return collection_plain_sort(s,context,fault)&&memory_ok(fault);
+    if(m==M::Sort){natives::Context context;context.heap_limit=heap_limit_;  // the only user of a Context
+        return collection_plain_sort(s,context,fault)&&memory_ok(fault);}
     const std::size_t growth=m==M::Insert?1:m==M::Splice&&in.c==1?array_size(s[Keys]):0;
     // Stage 2.5 (no cycle check: arrays are copied, so acyclic by construction).
     if(!mutation::reserve(heap_limit_,mutation::array_reserve_bytes(s[Source],growth)))

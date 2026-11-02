@@ -140,13 +140,17 @@ std::size_t size_mul(std::size_t a, std::size_t b) noexcept {
     return b != 0 && a > kSizeOverflow / b ? kSizeOverflow : a * b;
 }
 
-bool reserve_result(const Context& context, std::size_t bytes) noexcept {
+bool reserve_within(std::size_t heap_limit, std::size_t bytes) noexcept {
     if (bytes >= kMaxResultBytes) return false;  // overflowed, or beyond any std::string
-    if (context.heap_limit == Context::kNoHeapLimit) return true;  // budget disabled
+    if (heap_limit == Context::kNoHeapLimit) return true;  // budget disabled
     // Rounded as the heap string will be counted (terminator, header, granule).
     const std::size_t counted = size_add(bytes, 1 + kHeapGranule + 64);
     const std::size_t live = live_heap_bytes();
-    return live <= context.heap_limit && counted <= context.heap_limit - live;
+    return live <= heap_limit && counted <= heap_limit - live;
+}
+
+bool reserve_result(const Context& context, std::size_t bytes) noexcept {
+    return reserve_within(context.heap_limit, bytes);
 }
 
 bool BudgetedText::reserve(std::size_t bytes) {

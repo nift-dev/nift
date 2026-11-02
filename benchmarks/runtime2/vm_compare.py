@@ -11,6 +11,10 @@ Runs the same workloads (same algorithm, same output) on four engines:
 Groups:
   ops      callgrind marginal instructions per operation (N=4,000 vs 8,000;
            the run.py `ops` methodology and templates) -- the CP11 gate
+  mutation callgrind marginal instructions per iteration of the rest of the
+           mutation protocol (Phase B, B1-perf): element set, pop, insert,
+           map set, set add, stack push/pop; VM only (the receivers are kept
+           small, so each iteration is one protocol call or a fixed pair)
   fib      callgrind marginal instructions per recursive call (fib(10)->fib(12))
   kernels  whole-process wall time (median) and peak RSS: fib(22), fib(25),
            1M-iteration loop, 200k calls; process startup (trivial script)
@@ -35,7 +39,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import run as base  # noqa: E402  (run.py: OPS templates, host fingerprint)
 
-GROUPS = ["ops", "fib", "kernels", "phases", "e2e"]
+GROUPS = ["ops", "mutation", "fib", "kernels", "phases", "e2e"]
 FIB = "fn(fib(n)) { if(n < 2) { return n } return fib(n - 1) + fib(n - 2) }\n"
 PY_FIB = "def fib(n): return n if n < 2 else fib(n-1) + fib(n-2)\n"
 FIB_VALUE = {10: 55, 12: 144, 22: 17711, 25: 75025}
@@ -154,6 +158,30 @@ def g_ops(a, d, emit):
             row[engine] = round((irs[1] - irs[0]) / (n2 - n1))
         emit("ops", name, {"instr": row, "vm_vs_v4.12": round(row["v4.12"] / row["vm"], 2),
                            "vm_vs_cpython": round(row["vm"] / row["cpython"], 2)})
+
+
+# B1-perf (b1-mutation.md): name -> (nift template, golden); {N} = iterations.
+MUTATION_OPS = {
+    "array_set": ("a := [0, 0]\ni := 0\nwhile(i < {N}) {{ a[1] = i; i += 1 }}\nprint(a[1])\n", "{L}"),
+    "array_push_pop": ("a := [0]\ni := 0\nwhile(i < {N}) {{ a.push(i); a.pop(); i += 1 }}\nprint(a.length())\n", "1"),
+    "array_insert_pop": ("a := [0]\ni := 0\nwhile(i < {N}) {{ a.insert(0, i); a.pop(); i += 1 }}\nprint(a[0])\n",
+                         "{L}"),
+    "map_set": ("m := map()\ni := 0\nwhile(i < {N}) {{ m.set(i % 16, i); i += 1 }}\nprint(m.size())\n", "16"),
+    "set_add": ("s := set()\ni := 0\nwhile(i < {N}) {{ s.add(i % 16); i += 1 }}\nprint(s.size())\n", "16"),
+    "stack_push_pop": ("s := stack()\ni := 0\nwhile(i < {N}) {{ s.push(i); s.pop(); i += 1 }}\nprint(s.size())\n",
+                       "0"),
+}
+
+
+def g_mutation(a, d, emit):
+    n1, n2 = 4000, 8000
+    for name, (nt, golden) in MUTATION_OPS.items():
+        irs = []
+        for n in (n1, n2):
+            p = write(d, f"mut_{name}_{n}.f", nt.format(N=n))
+            cmd, env = engine_cmd(a, "vm", p)
+            irs.append(callgrind(cmd, env, golden.format(L=n - 1), f"mutation {name} vm N={n}"))
+        emit("mutation", name, {"instr": {"vm": round((irs[1] - irs[0]) / (n2 - n1))}})
 
 
 def g_fib(a, d, emit):

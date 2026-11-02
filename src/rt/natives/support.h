@@ -76,6 +76,9 @@ inline constexpr std::size_t kMaxResultBytes = static_cast<std::size_t>(1) << 62
 // top of the live total. With the budget disabled (kNoHeapLimit) only the
 // kMaxResultBytes bound applies.
 bool reserve_result(const Context& context, std::size_t bytes) noexcept;
+// The same check against a bare heap limit (the mutation protocol's stage 2.5,
+// rt/mutation.h, which has no Context to build).
+bool reserve_within(std::size_t heap_limit, std::size_t bytes) noexcept;
 
 // The rendering of a non-string renderable scalar (number, bool, null), as
 // append_scalar would append it; numbers are rendered into `buffer`.

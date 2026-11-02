@@ -37,14 +37,18 @@
 //   * 2.4 runs for struct and collection receivers; arrays and objects are
 //     acyclic by construction while they are copied, so it is skipped for
 //     them (closes_cycle itself accepts every aggregate target).
+#include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/heap.h"
+#include "rt/heap_account.h"
 #include "rt/value.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace nift::rt {
@@ -68,27 +72,106 @@ struct Env {
     std::string_view receiver_text;     // the receiver's source text, for the immutable error
 };
 
+// Performance (b1-mutation.md, "B1-perf"): the stage tests on the success
+// path are inline here, one kind compare and one header-bit test, and every
+// refusal is built by an out-of-line cold function in mutation.cpp, so a
+// mutation that passes validation builds no text and no frame for one. The
+// stages, their order and the texts are unchanged.
+#if defined(__GNUC__)
+#define NIFT_MUTATION_COLD __attribute__((cold, noinline))
+#define NIFT_MUTATION_INLINE inline __attribute__((always_inline))
+#else
+#define NIFT_MUTATION_COLD
+#define NIFT_MUTATION_INLINE inline
+#endif
+
 // The kImmutable bit on a value's heap object (false for non-heap values).
-bool is_immutable(const Value& value) noexcept;
+inline bool is_immutable(const Value& value) noexcept { return value.is_heap() && rt::is_immutable(value.heap()); }
 void make_immutable(Value& value) noexcept;
 
 // Stage 2.2.
-bool writes_in_place(const Value& receiver) noexcept;
-Outcome check_mutable(const Value& receiver, std::string_view receiver_text);
+inline bool writes_in_place(const Value& receiver) noexcept {
+    if (receiver.is(Kind::Array) || receiver.is(Kind::Object)) return receiver.refcount() <= 1;
+    return true;
+}
+// True when stage 2.2 refuses the receiver (the B1 transition rule included).
+inline bool refuses_mutation(const Value& receiver) noexcept {
+    return is_immutable(receiver) && writes_in_place(receiver);
+}
+namespace detail {
+// The refusals, built only on failure (cold): the immutable error, and the
+// kind error followed by the immutable one (admit's order: 2.1, then 2.2).
+NIFT_MUTATION_COLD Outcome immutable_failure(const Value& receiver, std::string_view receiver_text);
+NIFT_MUTATION_COLD Outcome admit_failure(const Value& receiver, Kind kind, const char* method, const char* want,
+                                         std::string_view receiver_text);
+NIFT_MUTATION_COLD Outcome bounds_failure(const char* text);
+bool reserve_slow(std::size_t heap_limit, std::size_t bytes) noexcept;  // a non-zero reservation
+} // namespace detail
+inline Outcome check_mutable(const Value& receiver, std::string_view receiver_text) {
+    if (refuses_mutation(receiver)) return detail::immutable_failure(receiver, receiver_text);
+    return {};
+}
+// Stages 2.1 and 2.2 together: the receiver is a `kind` that may be written.
+// Always inlined (also for the M-B1 mutant builds, whose define reaches only
+// mutation.cpp and the unit test: no out-of-line copy for the linker to pick).
+NIFT_MUTATION_INLINE bool admits(const Value& receiver, Kind kind) noexcept {
+#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 4
+    return receiver.is(kind);  // M-B1d: the inline stage 2.2 test is dropped
+#else
+    return receiver.is(kind) && !refuses_mutation(receiver);
+#endif
+}
 // Stage 2.4.
 bool cycle_applies(const Value& receiver) noexcept;
 bool closes_cycle(const HeapObject* receiver, const Value& stored, const CycleGraph& graph);
 // Stage 2.5: the bytes an array or collection mutation reserves before it
 // commits (SIZE_MAX: the size computation overflows), and the reservation.
-std::size_t array_reserve_bytes(const Value& array, std::size_t growth) noexcept;
+inline std::size_t array_reserve_bytes(const Value& array, std::size_t growth) noexcept {
+    const auto& items = array.heap_as<ArrayObject>()->items;
+    const std::size_t n = items.size();
+    if (growth > static_cast<std::size_t>(-1) / (4 * sizeof(Value)) - n) return static_cast<std::size_t>(-1);
+    const std::size_t clone = array.refcount() > 1 ? n : 0;
+    const std::size_t reserve = clone + (growth && n + growth > items.capacity() ? 2 * (n + growth) : 0);
+    return reserve ? reserve * sizeof(Value) + 128 : 0;
+}
 std::size_t collection_reserve_bytes(const Value& collection, std::size_t step) noexcept;
-bool reserve(std::size_t heap_limit, std::size_t bytes) noexcept;
+inline bool reserve(std::size_t heap_limit, std::size_t bytes) noexcept {
+    return bytes == 0 || detail::reserve_slow(heap_limit, bytes);
+}
 
 // Stage 3 + 4 for array edits; the caller has run stage 2.
 enum class ArrayEdit : std::uint8_t { Pop, Remove, Insert, Clear, Reverse, SpliceRemove, SpliceInsert };
 // Remove/SpliceRemove: `index`, `count`; Insert: `operand` at `index`;
 // SpliceInsert: the elements of the array `operand` at `index`.
-void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count, const Value& operand);
+// Inline (B1-perf): each VM case passes a constant edit, so it compiles to
+// that edit alone, as the instruction's own commit did before B1.
+NIFT_MUTATION_INLINE void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,
+                                       const Value& operand) {
+    Value keep = operand;  // the operand may share the receiver's object (a.splice(0, 0, a))
+    auto& items = array_mut(array);  // the copy-on-write clone, or the D9 relocation
+    switch (edit) {
+        case ArrayEdit::Pop: items.pop_back(); break;
+        case ArrayEdit::Remove: items.erase(items.begin() + static_cast<std::ptrdiff_t>(index)); break;
+        case ArrayEdit::Insert:  // moved in: keep is already the copy insert(const&) would make
+            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), static_cast<Value&&>(keep));
+            break;
+        case ArrayEdit::Clear: items.clear(); break;
+        case ArrayEdit::Reverse: std::reverse(items.begin(), items.end()); break;
+        case ArrayEdit::SpliceRemove: {
+            const auto from = items.begin() + static_cast<std::ptrdiff_t>(index);
+            items.erase(from, from + static_cast<std::ptrdiff_t>(count));
+            break;
+        }
+        case ArrayEdit::SpliceInsert: {
+            const auto& replacement = array_view(keep);
+            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), replacement.begin(), replacement.end());
+            break;
+        }
+    }
+#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 3)
+    heap_retally(array.heap());  // M-B1c drops this: the edit's growth is never counted
+#endif
+}
 // Plain sort's single commit: element i of the result is element order[i]
 // (an Int) of the receiver. `order` is a permutation built on the side.
 void commit_permutation(Value& array, std::vector<Value>& order);
@@ -98,8 +181,6 @@ void commit_permutation(Value& array, std::vector<Value>& order);
 std::vector<Value>& sort_storage(Value& array);
 
 // Validated entry points (stages 2-4).
-Outcome push(Value& array, const Value& item, const Env& env);
-Outcome set(Value& array, std::size_t index, const Value& item, const Env& env);
 Outcome insert(Value& array, std::size_t index, const Value& item, const Env& env);
 Outcome remove(Value& array, std::size_t index, Value* removed, const Env& env);
 Outcome pop(Value& array, Value* removed, const Env& env);
@@ -117,5 +198,48 @@ Outcome stack_push(Value& stack, const Value& item, const Env& env);
 Outcome stack_pop(Value& stack, Value* removed, const Env& env);
 // Arrays and collections.
 Outcome clear(Value& receiver, const Env& env);
+
+// push and set, the per-element hot paths, are inline: stages 2.1-2.2 (and
+// set's 2.3) as above, then the commit primitive, whose bookkeeping
+// (note_store, heap_retally, relocate_storage) is unchanged. Neither stores
+// into a cycle-checked receiver (2.4 is skipped for arrays in B1) and both
+// count their growth after the step (no 2.5), as before.
+//
+// `receiver_text` is a string_view, or a callable returning one (the VM's
+// note lookup), and is read only by a refusal, so the success path computes
+// no text. The Env forms are the general entry points.
+namespace detail {
+template <class Text> std::string_view text_of(const Text& text) {
+    if constexpr (std::is_invocable_v<const Text&>) return text();
+    else return std::string_view(text);
+}
+} // namespace detail
+
+template <class Text> NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Text& receiver_text) {
+#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1
+    if (array.is(Kind::Array)) array_push(array, item);  // M-B1a: the commit before the validation
+#endif
+    if (!admits(array, Kind::Array))
+        return detail::admit_failure(array, Kind::Array, "push", "an array", detail::text_of(receiver_text));
+#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1)
+    array_push(array, item);
+#endif
+    return {};
+}
+NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Env& env) {
+    return push(array, item, env.receiver_text);
+}
+
+template <class Text>
+NIFT_MUTATION_INLINE Outcome set(Value& array, std::size_t index, const Value& item, const Text& receiver_text) {
+    if (!admits(array, Kind::Array))
+        return detail::admit_failure(array, Kind::Array, "set", "an array", detail::text_of(receiver_text));
+    if (index >= array.heap_as<ArrayObject>()->items.size()) return detail::bounds_failure("set: index out of range");
+    array_set(array, index, item);
+    return {};
+}
+NIFT_MUTATION_INLINE Outcome set(Value& array, std::size_t index, const Value& item, const Env& env) {
+    return set(array, index, item, env.receiver_text);
+}
 
 } // namespace nift::rt::mutation

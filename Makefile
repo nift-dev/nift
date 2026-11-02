@@ -339,10 +339,11 @@ test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
 # mutator x every validation failure leaves the receiver, the live heap and
 # the refcounts unchanged. The mutants (NIFT_MUTATION_MUTANT: 1 validates
 # push after its commit, 2 skips object_put's immutable check, 3 skips an
-# array edit's heap tally) must each fail it (exit 1).
+# array edit's heap tally; B1-perf: 4 drops the inline stage 2.2 test, 5
+# narrows the hoisted cycle pre-filter) must each fail it (exit 1).
 RT_MUTATION_DIR := $(TEST_DIR)/rt/mutation
 RT_MUTATION_OBJECTS := $(filter-out src/rt/mutation.o,$(RT_VALUE_SOURCES:.cpp=.o)) src/RuntimeValue.o
-RT_MUTATION_MUTANTS := 1 2 3
+RT_MUTATION_MUTANTS := 1 2 3 4 5
 $(RT_MUTATION_DIR)/protocol$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp src/rt/mutation.cpp \

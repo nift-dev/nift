@@ -76,6 +76,23 @@ const std::string& note_text(const Note* note) {
     return note ? note->text : empty;
 }
 
+std::string_view note_view(const Note* note) { return note ? std::string_view(note->text) : std::string_view(); }
+
+// B1-perf: the refusals of the per-element mutators (push_value, set_index),
+// out of line so their success path builds no frame for the error text.
+#if defined(__GNUC__)
+__attribute__((cold, noinline))
+#endif
+bool refused(Fault& fault, const mutation::Outcome& out) { return raise(fault, StopReason::Error, out.text); }
+
+#if defined(__GNUC__)
+__attribute__((cold, noinline))
+#endif
+bool push_kind_error(Fault& fault, const Note* note) {
+    return raise(fault, StopReason::Error,
+                 "unknown value or malformed expression: " + std::string(note ? note->text : ""));
+}
+
 } // namespace
 
 bool session_numeric(const Value& left, const Value& right, Fault& fault) {
@@ -266,10 +283,10 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
         return raise(fault, StopReason::Error,
                      "assignment index does not address an array or object: " + note_text(note));
     }
-    mutation::Env env;  // B1: the protocol (immutability; arrays are not cycle-checked while copied)
-    env.receiver_text = note_text(note);
-    const mutation::Outcome out = mutation::set(object, static_cast<std::size_t>(i), value, env);
-    return out.ok() || raise(fault, StopReason::Error, out.text);
+    // B1: the protocol (immutability; arrays are not cycle-checked while copied)
+    const mutation::Outcome out =
+        mutation::set(object, static_cast<std::size_t>(i), value, [note] { return note_view(note); });
+    return out.ok() || refused(fault, out);
 }
 
 // A noted member read is a path argument of a user call (compiler_call.cpp
@@ -300,14 +317,10 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
 }
 
 bool push_value(Value& array, const Value& value, Fault& fault, const Note* note) {
-    if (!array.is(Kind::Array)) {
-        return raise(fault, StopReason::Error,
-                     "unknown value or malformed expression: " + std::string(note ? note->text : ""));
-    }
-    mutation::Env env;  // B1: the protocol; the growth is counted after the step (memory_ok), as before
-    if (note != nullptr) env.receiver_text = note->text;
-    const mutation::Outcome out = mutation::push(array, value, env);
-    return out.ok() || raise(fault, StopReason::Error, out.text);
+    if (!array.is(Kind::Array)) return push_kind_error(fault, note);
+    // B1: the protocol; the growth is counted after the step (memory_ok), as before
+    const mutation::Outcome out = mutation::push(array, value, [note] { return note_view(note); });
+    return out.ok() || refused(fault, out);
 }
 
 bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault) {

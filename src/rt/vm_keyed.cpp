@@ -53,48 +53,53 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
     // B1: every mutator goes through the mutation protocol (rt/mutation.h):
     // immutability, legacy's argument checks, the cycle check for each stored
     // value (D-NEXT-refsem #4), the budget before growth, then one commit.
-    const mutation::Env env = mutation_env(proto->note(&in - proto->code.data()));
+    // The Env is built only by a mutator (B1-perf: the reads below need none).
+    const auto env = [&] { return mutation_env(proto->note(&in - proto->code.data())); };
     const char* legacy = keyed_cycle_legacy_text(m);
     const auto failed = [&](const mutation::Outcome& out, const Value* stored, const char* text) {
         return mutation_failed(fault, proto, in, out, c.heap(), stored ? *stored : Value(), text ? text : "");
     };
-    mutation::Outcome out;
     switch (m) {
-        case K::MapSet:
+        case K::MapSet: {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 14
             if (natives::collection_key_ok(s[Item]))
                 map_set(c, s[Item], s[Returned]);  // rt-lint: storage-ok R14: the store before the refusal
 #endif
-            out = mutation::map_put(c, s[Item], s[Returned], env);
+            const mutation::Outcome out = mutation::map_put(c, s[Item], s[Returned], env());
             if (!out.ok()) return failed(out, out.operand ? &s[Returned] : &s[Item], out.operand ? legacy : nullptr);
             s[Result] = s[Returned];
             break;
+        }
         case K::MapRemove: case K::SetRemove: {
             Value removed;
-            out = mutation::collection_remove(c, s[Item], &removed, env);
+            const mutation::Outcome out = mutation::collection_remove(c, s[Item], &removed, env());
             if (!out.ok()) return failed(out, nullptr, nullptr);
             s[Result] = m == K::MapRemove ? removed : s[Item];
             break;
         }
-        case K::SetAdd:
-            out = mutation::set_insert(c, s[Item], env);
+        case K::SetAdd: {
+            const mutation::Outcome out = mutation::set_insert(c, s[Item], env());
             if (!out.ok()) return failed(out, &s[Item], nullptr);
             s[Result] = s[Item];
             break;
-        case K::StackPush:
-            out = mutation::stack_push(c, s[Item], env);
+        }
+        case K::StackPush: {
+            const mutation::Outcome out = mutation::stack_push(c, s[Item], env());
             if (!out.ok()) return failed(out, &s[Item], legacy);
             s[Result] = s[Item];
             break;
-        case K::StackPop:
-            out = mutation::stack_pop(c, &s[Result], env);
+        }
+        case K::StackPop: {
+            const mutation::Outcome out = mutation::stack_pop(c, &s[Result], env());
             if (!out.ok()) return failed(out, nullptr, nullptr);
             break;
-        case K::Clear:
-            out = mutation::clear(c, env);
+        }
+        case K::Clear: {
+            const mutation::Outcome out = mutation::clear(c, env());
             if (!out.ok()) return failed(out, nullptr, nullptr);
             s[Result] = Value();
             break;
+        }
         case K::MapGet: {
             const std::ptrdiff_t at = collection_find(c, s[Item]);
             if (at < 0) return fail("get: key not found");
