@@ -223,3 +223,29 @@ of `integ/refsem-a`. Four identities, kept distinct:
 - Rendering ruling (owner): mutex/channel keep the ordinary error; struct rendering is B3
   (required); maps/sets/stacks, functions, atomics, futures assessed in B4, presentation separate
   from serialization, no legacy quirks.
+
+## B1 mutation protocol integration (2026-11-03)
+
+`weekend/r2` fast-forwarded from `d209febd` to `7742a21b` (tree `323992fc`), `cand/b1-perf`.
+Distinct evidence, all kept:
+1. `cand/b1-mutation` `5d4db7fa`/`8975e8eb`: independent ACCEPT (correctness).
+2. Linode `b1-8975e8eb`: all correctness gates pass, but same-machine `bench-rt-vm` showed
+   `ops/array_push` 382 -> 504 Ir/op (+32%): PERFORMANCE FAILURE; not integrated.
+3. `cand/b1-perf` `7742a21b`: attributed (call structure: out-of-line layers, temporaries,
+   eager Env; not validation), fixed without a fast path or second implementation; independent
+   ACCEPT (no behaviour change over ~36,800 differential runs; 13 mutants caught).
+4. Linode `b1p-7742a21b` on the exact tree: all 40 correctness gates exit 0 (incl. full
+   test-rt-vm, refsem/collections sanitize + tsan, all mutant lanes). One extra build-only harness
+   gate (`.build/rt/vm-run`) exited 1 on both candidate and baseline (harness slip; the helper was
+   built through test-rt-vm and for the baseline through bench-rt-vm); it is recorded as failed,
+   not as passing.
+   Same-machine VM benchmark vs `d209febd` (callgrind Ir/op, VM): `array_push` 382 -> 384 and
+   `array_set` 388 -> 413 (both owner-approved residuals; B2 must reach <= 382 / <= 388);
+   push_pop 1440 -> 1422, insert_pop 2462 -> 2421, map_set 1788 -> 1472, set_add 1366 -> 1341,
+   stack_push_pop 2240 -> 2123; all other ops, fib and phase counts identical; kernels within
+   noise. Website build interleaved x3: full build base 1.039/1.053/1.141 s vs B1
+   1.101/1.055/1.051 s; no-op 0.323-0.336 vs 0.322-0.342 s: no regression.
+- Carried to B2: session receiver loss on a failed array mutator (mandatory gate), exclusive
+  protocol, immutability across transfer, map_set throw-safety, frame-owned sort protection,
+  VM-level immutability tests, immutable-before-bounds order, perf recovery. Release diagnostic:
+  budget-stop message must not say "compiler defect".
