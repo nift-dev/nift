@@ -302,3 +302,175 @@ session regression fixture.
   receivers (a stack, scoped), and coroutine mutation while a comparator is suspended (refused).
 
 TSan was run by the reviewer: `test-runtime2-collections-tsan`, 273 checks, 0 warnings.
+
+## B1-perf: the `array_push` regression (cand/b1-perf)
+
+**Finding (Linode `bench-rt-vm`, after the ACCEPT above, kept as recorded):** `ops/array_push`
+382 -> 504 VM instructions per op (+32 %) against `d209febd`; every other op identical. Owner
+decision: optimise B1 on a separate candidate before integration. `cand/b1-perf` branches from
+`8975e8eb`; the B1 commits and the ACCEPT above are unchanged.
+
+### Root cause
+
+Reproduced locally with the `vm_compare.py` methodology (callgrind, marginal Ir per op, N = 4,000
+vs 8,000; same toolchain as Linode, which reported the same 382 / 504): base 382.3, `8975e8eb`
+504.3. `callgrind_annotate` per function (inclusive and exclusive, marginal per op): the whole
++122.0 is in four functions, and nothing below them changed (`array_push` 100.4 inclusive in both,
+with `heap_retally` 39, `unshare` 29, `_M_realloc_insert` 8.4):
+
+| Function (exclusive Ir per op) | base | `8975e8eb` | delta |
+| --- | --- | --- | --- |
+| `push_value` | 38 | 43 | +5 |
+| `mutation::push` | - | 46 | +46 |
+| `mutation::(anon)::admit` | - | 30 | +30 |
+| `mutation::check_mutable` | - | 41 | +41 |
+| everything else | | | 0 |
+
+An instruction-level run (`--dump-instr=yes`, same marginal method) of those four functions,
+classified instruction by instruction:
+
+| Category | Ir per push | Where |
+| --- | --- | --- |
+| Protocol dispatch: three extra out-of-line layers (`push_value -> push -> admit -> check_mutable`) | 69 | prologue/epilogue of `push` (21), `admit` (23), `check_mutable` (25): six callee-saved registers and the stack-protector canary in `admit` and `check_mutable`, because the refusal text (`std::string` concatenation) is built in the same function and GCC does not shrink-wrap it |
+| Call/argument set-up for those layers | 15 | `push_value -> push` 6, `push -> admit` 4, `admit -> check_mutable` 5 |
+| Temporaries: the 48-byte `Outcome` (`std::string` inside) | 14 | zero-initialised in `check_mutable` (6), tested in `push` and `push_value` (4), destroyed in `push_value` (4) |
+| Mutation state: the `Env` | 10 | built in `push_value` on every push (only a refusal reads it) |
+| Validation: repeated kind / ownership checks | 9 | `admit` re-tests the kind `push_value` had just tested (2); `is_immutable` re-decodes `is_heap` for a value already known to be an array (7) |
+| Validation: the `kImmutable` bit itself | 3 | load, `testb`, branch (refcount test only when the bit is set) |
+| Validation: bounds, cycle check, budget | 0 | not run for push (B1 rules) |
+| Refcount operations | 0 | the item copy into `array_push`'s by-value parameter moved from `push_value` to `push` (+1 register move) |
+| Allocations | 0 | |
+| Commit and bookkeeping (`note_store`, `heap_retally`, `relocate_storage`, `kStorageLent`) | 0 | `array_push` unchanged |
+| Register allocation noise | 2 | |
+| **Total** | **122** | |
+
+So the regression is call structure, not validation: 84 Ir of frames and calls, 24 of temporaries,
+9 of duplicated checks, against 3 Ir for the check B1 actually adds. The same pattern (a heavy
+frame on an out-of-line stage function, `Outcome` round trips, an `Env` and a `natives::Context`
+built per call) costs the other mutators too; the microbenchmarks below (new `mutation` group)
+measure them.
+
+### The change (code commit `38de7d10`)
+
+No fast path and no second implementation: every mutation still goes through the same protocol
+functions, stages and order; only where code lives and what the success path builds changed.
+
+- `mutation.h`: the stage tests the success path needs are inline (`admits` = kind compare +
+  `refuses_mutation`; `check_mutable`, `array_reserve_bytes`, `reserve`), and every refusal is
+  built by an out-of-line `cold` function (`detail::immutable_failure`, `admit_failure`,
+  `bounds_failure`; in `mutation.cpp` `failed`, `failed_text`, `cycle_failure`, `budget_failure`,
+  `collection_admit_failure`, `no_field_failure`). A mutation that passes validation builds no text
+  and needs no frame for one.
+- `push` and `set` are inline in `mutation.h` and take the receiver text as a string view or a
+  callable, read only by a refusal (the VM passes its note lookup), so no `Env` is built on their
+  success path. The `Env` forms remain the general entry points.
+- `commit_array` is inline (always): each `ArrayMutate` case passes a constant edit and compiles to
+  that edit alone, as the instruction's own commit did before B1. Only the operand copy for
+  `Insert` is now moved into the vector (the copy `insert(const&)` makes internally anyway).
+- `ArrayMutate`: push is dispatched before the stage 2.2 test (`mutation::push` runs it, same
+  text), so push is no longer checked twice; the array size is read after that test, so the
+  compiler keeps the kind proof; the `natives::Context` is built only for `sort`, its only user.
+- `KeyedMutate`: each `Outcome` is constructed in place (no default construction plus move
+  assignment) and the `Env`, with its note lookup, is built only by a mutator, not by the reads.
+- Stage 2.4: `closes` tests `may_contain_identity(stored)` before calling `closes_cycle`. For a
+  struct or collection receiver (the only ones `cycle_applies` admits) `closes_cycle` is
+  `would_close_cycle`, whose first test is exactly that summary, so the answer is the same; a
+  scalar or plain value makes no call.
+- Stage 2.5: `reserve_slow` checks the budget with `natives::reserve_within(heap_limit, bytes)`,
+  the body of `reserve_result` (which now calls it), instead of constructing a `natives::Context`
+  (a `std::string`, a `shared_ptr` and the host environment) per reservation.
+
+Unchanged: the stage order, every refusal text and failure kind, error precedence (kind, then
+`kImmutable` with the B1 refcount rule, then bounds/arguments, cycle per stored operand in operand
+order, budget), the commit primitives in `aggregate*.cpp` and all bookkeeping, failure atomicity,
+COW, take/put, the name-based checks and the Phase A guard.
+
+**Survives B2.** Nothing here depends on `unshare`, COW or take/put. When B2 merges the
+`ArrayMutate` path with the `mutation::` functions, both already share the inline stage tests,
+`commit_array` and the cold refusals, so the merged path inherits the success-path shape. When B2
+drops the B1 refcount condition from stage 2.2, `refuses_mutation` loses one compare. When B2
+makes the commit primitives private to `mutation.cpp`, the inline `push`/`set`/`commit_array` move
+with them. B2's planned deletion of `unshare` also removes its 29 Ir call from every push.
+
+Size (production, +300/-184): `mutation.h` +132/-8, `mutation.cpp` +107/-140, `vm_ops.cpp`
++25/-12, `vm_keyed.cpp` +18/-13, `vm_array_mutation.cpp` +8/-8, `natives/support.{h,cpp}`
++10/-3. Tests and tools: `vm_compare.py` +29/-1 (the `mutation` group), `Makefile` +3/-2
+(mutants 4 and 5).
+
+### Mutants (`test-rt-mutation-protocol-mutants`, each must exit 1)
+
+| Mutant | Change | Caught by |
+| --- | --- | --- |
+| M-B1a | `push` commits before it validates (now inline in `mutation.h`) | immutable push: receiver changed |
+| M-B1b | `object_put` skips the immutable check | immutable object_put |
+| M-B1c | an array edit's bookkeeping skips `heap_retally` (now inline `commit_array`) | growth tally check |
+| M-B1d (new) | `admits` drops the inline stage 2.2 test | immutable push, set, insert, ... (each refusal case: failure 0 or 3 instead of 2) |
+| M-B1e (new) | the hoisted cycle pre-filter only considers arrays and objects | map_put-key, set_insert (a closure over the receiver is stored, no Cycle) |
+
+The mutant-bearing header functions are always inlined, so the mutant define (which reaches only
+`mutation.cpp` and the unit test) cannot be overridden by a non-mutant out-of-line copy at link
+time.
+
+### Performance (local callgrind, VM instructions per op; same toolchain for all three)
+
+| Workload | base `d209febd` | `8975e8eb` | B1-perf | vs base |
+| --- | --- | --- | --- | --- |
+| `ops/array_push` (Linode gate) | 382 | 504 | 384 | +2 (+0.5 %) |
+| `mutation/array_set` (`a[1] = i`) | 388 | 576 | 413 | +25 |
+| `mutation/array_push_pop` | 1,440 | 1,729 | 1,422 | -18 |
+| `mutation/array_insert_pop` | 2,462 | 2,778 | 2,421 | -41 |
+| `mutation/map_set` | 1,788 | 1,725 | 1,472 | -316 |
+| `mutation/set_add` | 1,366 | 1,546 | 1,341 | -25 |
+| `mutation/stack_push_pop` | 2,240 | 2,404 | 2,123 | -117 |
+| other `ops` (loop, add_local, call, array_index, object_member, string_concat, if_branch) | identical | identical | identical | 0 |
+
+Every mutation workload is at or below the base except two, both explained:
+
+- `array_push` +2 (384.3 vs 382.3; the gate asked for <= 382). Instruction by instruction the
+  B1-perf `push_value` is the base `push_value` plus the stage 2.2 test B1 adds (load of the heap
+  pointer, `testb $0x20`, branch, and one register copy: 4), minus one callee-saved register pair
+  and one jump (3), plus one register move the stack-protector setup forces (1). Nothing of the
+  122-Ir protocol structure remains; the 2 Ir are the new check itself. Getting under 382 would
+  need compensation outside B1's code (`unshare`'s missing shrink-wrap costs 29 Ir per push; B2
+  deletes `unshare`), or a change of the `Outcome` return convention; neither was made. Inlining
+  `push_value` into `Vm::cold` was measured and rejected (400). **Owner decision needed.**
+- `array_set` +25 (413 vs 388; was 576). B1 routed element stores through the commit primitive
+  `array_set` (out of line, by-value item, precise `note_store`) instead of the base's inline
+  `array_mut(...)[i] = v`, which marks the identity summary unconditionally. Matching the base
+  needs either inlining `array_set` (it uses `aggregate_store.h` internals and the R19 mutant's
+  `relocation_due`, so not done in B1) or reverting to the conservative mark. B2's move of the
+  commit primitives into `mutation.cpp` is the natural place. Not in the Linode `ops` gate.
+
+`bench-rt-value` (callgrind Ir; calls the commit primitives directly): copy 4,694,315; push
+13,331,799; index 4,000,214; object set 13,759,136; object get 5,121,141; guard PASS (B1:
+4,694,315; 13,331,799; 4,000,200; 13,759,108; 5,121,113; the +14/+28 are fixed start-up cost).
+`bench-rt-value-cycle` (wall clock, shared host): store_plain 0.58, store_callable 14.70,
+store_handle 9.14, store_nested_identity 34.93 ns; all within budget, PASS.
+
+### Correctness evidence
+
+Code commit `38de7d10`; every step alone through the heavy-job gate, exit codes:
+
+| Gate | Exit |
+| --- | --- |
+| `make nift`; `test-rt-lint` (self-test 8 fixtures; `src/rt` 0 problems) | 0, 0 |
+| `test-rt-mutation-protocol` (79 checks, 60 refusal cases); `-mutants` (M-B1a-e, 5 of 5 caught) | 0 |
+| `test-runtime2-refsem` (463 checks); `-refsem-mutants` (22 caught) | 0, 0 |
+| `test-runtime2-collections` (273); `-collections-mutants` (11 caught) | 0, 0 |
+| `test-runtime2-safety`; `-safety-mutants` (7 caught) | 0, 0 |
+| `test-runtime2-vm-default`, `-cp14b`, `-cp14b-design-mutants` (1-11 detected, 12 unverified comparator profile as before), `-args-cmd`, `-args-cmd-mutants` | 0 each |
+| `test-runtime2-packages`, `-packages-mutants`, `-packages-legacy`; `-coro-module` | 0 each |
+| `test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-cp22`, `test-runtime2-cp23` | 0 each |
+| `test-runtime2-refsem-sanitize` (ASan/UBSan, 1,233 s), `test-runtime2-collections-sanitize` | 0, 0 |
+| `make test-rt-vm` (every prerequisite and recipe line, 4,127 s) | 0 |
+
+Test expectations changed: none. Test infrastructure: two new mutants (`Makefile`
+`RT_MUTATION_MUTANTS`), the `mutation` group in `vm_compare.py`.
+
+**Classify diff** against `d209febd` (the base binary and outputs recorded for B1):
+`NIFT_VM=classify` over every `.f` in `tests/runtime2` (1,816 units): 0 changes; CP25-R
+`classify-all` over the release corpus (589 units; outcome, reason, line, column, reasons, code;
+temporary paths normalised): **0 changes**.
+
+Not run locally: TSan lanes, the Linode workloads. The Linode `bench-rt-vm` rerun (which now
+includes the `mutation` group) is the authoritative number.
