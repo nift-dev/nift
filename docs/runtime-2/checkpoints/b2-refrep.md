@@ -1,0 +1,321 @@
+# B2: the reference representation (cand/b2-refrep)
+
+Status: **candidate**, not reviewed, not integrated. Branch `cand/b2-refrep`, built on
+`weekend/r2` @`919b5669` (B1 integrated). Plan: Phase B plan §3, §5.1-5.4, §5.8 and §6 "B2";
+owner decisions of 2026-11-02/03 (B2 requirements A-F); coordinator rulings of 2026-11-03
+(below). One checkpoint, three ordered commits, each with its own section:
+
+1. the representation switch, A, C, the cycle check reaching arrays and objects, the validation
+   order, F (§§1-9 below);
+2. B and D (§10, to come);
+3. E (§11, to come).
+
+The Phase A guard stays on, legacy (`NIFT_VM=0`) is unchanged, `const` stays binding-only.
+
+## Coordinator rulings (2026-11-03), recorded as binding
+
+1. **Loops (finding 1).** B2 adds the D5 snapshot only where copy-on-write gave one implicitly: a
+   loop over an expression's result and the callback natives. A loop over a binding keeps
+   re-reading the binding live (legacy's model): the full array-loop snapshot, deleting the live
+   path and lazy element locations, and the changed for-s2 expectations (`t26_read_after_shrink_
+   first_iter`, `g6_rebind_longer`, for-mutant M1) move to **B5**, the semantic switch.
+2. **Comparator sort (finding 2).** Stays in place in B2 (its drain-on-error output is kept); E's
+   protection is added in commit 3. The owner's Q7 rule (sort a copy, commit once, catchable error
+   on receiver mutation) is implemented in **B5**.
+3. **`same()` on arrays and objects**: identity, owner-ruled (plan §3). The two fixtures change
+   (§8).
+4. **The compound-assignment take stays** (`g += x` on a global string appends in place); every
+   array/object take is gone; the CP13 hazard note is narrowed to compound operators; a test keeps
+   global string `+=` linear.
+5. **Header bit 4 is the sort-protection bit** (commit 3), with lazy release.
+6. **Structure**: one checkpoint, three commits, gates after each, report after commit 1.
+7. **Array/object constants are immutable** (defensive), provided no reachable behaviour changes.
+
+## 1. Contract (commit 1)
+
+Arrays and objects are shared references inside an isolate, like structs and collections since
+Phase A: copying a `Value` shares the object, and a mutation changes the shared object in place,
+visibly through every alias. Copy-on-write (`unshare`) and the take/put lowering are deleted. With
+the guard on, no admitted program can observe the difference (its soundness claim), so every
+existing expectation is unchanged except the ones listed in §8.
+
+- **Mutation.** Every mutator writes the receiver in its holder (register, global slot, cell,
+  element); nothing is moved out, so no holder is ever null and a refused mutation (ordinary error
+  or caught cycle) leaves every holder intact (owner A).
+- **Validation order** (plan §5.3, owner F3): kind -> immutable -> bounds/arguments -> cycle for
+  each stored value -> budget, for every mutator, `set_index` included (§6).
+- **Cycles.** Stage 2.4 runs for array and object receivers too: `a.push(a)`, a store of a value
+  from which the receiver is reachable (through arrays, objects, collections, fields, closures'
+  cells, payloads) is refused with the catchable `runtime.reference_cycle` before anything changes.
+  The full walk is kept (no unique-root shortcut, plan §5.4 rule ii: not implemented). The O(1)
+  exits are a scalar/string, and a value whose summary bit says it holds no reference and that is
+  not the receiver itself.
+- **Summary bit** (plan §5.1): bit 7 now means "may hold an identity-bearing value **or a nested
+  array or object**", so a flat array of scalars keeps it clear and storing one walks nothing; the
+  walk keeps the bit set while any direct child is a reference and visits an array or object child
+  whenever the target is an array or object (it may be the target even with its own bit clear).
+- **Immutability** (owner C/F3): `kImmutable` refuses every mutation through every alias (the B1
+  refcount-1 rule is gone; no copy-on-write clone can make an immutable value mutable). `args` is
+  immutable in scripts and modules too (it was only in sessions: the script runner rebuilt it with
+  `NewArray`; now followed by the new `MakeImmutable`), and keeps the bit across a thread/parallel
+  transfer (wire flag) and the cooperative spawn copy (`deep_copy_tuple(..., keep_immutable)`).
+  Only `copy()` / `deepcopy()` make mutable copies. Array/object constants are immutable.
+- **Copies.** `copy(x)` of an array or object is a new outer object sharing the contents;
+  `deepcopy` unchanged; `same()` is identity for arrays and objects; `merge` / `merge_deep` build a
+  new object (never the receiver).
+- **Snapshots** (ruling 1): a loop over an expression's result (`IterCheck c = 1`) and every
+  callback native (`CollectionStep` phase 0) iterate an O(n) shallow snapshot taken at entry when
+  anything else holds the array (budget reserved first; a uniquely held value needs none).
+- **Sessions** stop cloning: a statement mutates the bound object itself.
+- **Cooperative spawn** (D7) now copies an argument/global graph that holds only arrays/objects
+  (it copied only when an identity-bearing value was present: arrays were values).
+
+## 2. Clone-site audit (every former copy-on-write reliance)
+
+Every place a `Value` copy acted as a defensive copy, found by deleting `unshare`, reading every
+caller of the storage primitives (`array_push`, `array_set`, `array_mut`, `object_set`,
+`*_slot_mut`, `struct_add_field`, `map_set`, `set_add`, `stack_push`) and every register that holds
+an array across user code:
+
+| Site | Relied on | B2 |
+| --- | --- | --- |
+| `natives/object_methods.cpp` `merge` (`unshare(result)`) | clone of the receiver | `shallow_object(args[0])`: a new object, the receiver untouched (R-B5) |
+| `object_methods.cpp` `merge_deep` (`unshare(merged)` per level) | clone of `left` | `shallow_object(left)` per level |
+| `copy_graph.cpp` `shallow_copy` | returned arrays/objects themselves (COW) | always a new outer array/object (R-B4) |
+| `mutation.h` `array_reserve_bytes` (the clone term) | budget for the COW clone | removed: only growth beyond capacity is reserved |
+| `mutation.cpp` `sort_storage`, `commit_permutation`, `commit_array` (`array_mut`) | `array_mut` cloned a shared receiver | in place |
+| `collection_helpers.cpp` grouping (`append_group`, `object_slot_mut` + `array_push`), `s[Result]`, `s[Keys]`, `seen` | — | fresh results/scratch built by the native: unchanged (audited) |
+| `collection_helpers.cpp` phase 0, `s[Source]` (map/filter/each/reduce/...) | the source register was a value | entry snapshot when shared (R-B3b) |
+| `vm_iter.cpp` / `compiler_loops.cpp`, a loop over an expression result (`state.held`) | the held register was a value | entry snapshot when shared, `IterCheck c = 1` (R-B3) |
+| loops over a binding (live re-read) | — | unchanged (ruling 1; B5) |
+| `cell.cpp` `cell_cached_read` (`Value descriptor = object->value; array_set(descriptor, ...)`) | **COW: a "private copy" of the selector descriptor** | explicit `array_shallow_clone` (without it the cell's own descriptor was rewritten) |
+| `cell.cpp` `copy_cell_location` (two cells sharing one descriptor) | the first cache update separated them | the copy clones the descriptor |
+| `cell.cpp` `replace_path` (`replacement = *previous`, then nested `set`) | clone of each path level | in place, same final graph (the deepest level is validated first) |
+| `vm_coro_ops.cpp` D7 spawn (`shared` only if identity-bearing) | arrays were values | an array/object seed also triggers the graph copy; the copy keeps `kImmutable` |
+| `isolate_snapshot.cpp` constants summary | summary meant identity only | counts arrays/objects (plan 5.1) |
+| constants (`codegen.cpp` pool), struct field initialisers | — | array/object constants are marked immutable (only `sort_by`'s internal directions exist; field initialisers are scalars or fresh collections, `structs.cpp`) |
+| `compiler_invocation.cpp` script `args` (`NewArray`) | — | `MakeImmutable` after it (owner F3) |
+| `ArrayBuilder`, `isolate_task`, `parallel_task_start`, `vm_coro_parallel` seeds, `legacy_bridge`, `json`, `host_env`, `host_fs_nav`, `vm_report` `NewArray`/`ObjectSet` (literals, loop metadata), `vm_iter` key arrays, `vm_array_mutation` splice result, decoders, `session_invocation` | — | fresh values only (audited) |
+| natives whose result is the receiver (`reverse`, `sort`, `push` results) | — | identity unchanged; the guard refuses observing them (`b := a.reverse()` is `reference-guard:shared`, probed) |
+| `vm_ops.cpp` string `+=` (`refcount() == 1`) | the compound take | unchanged (ruling 4) |
+
+## 3. Deleted machinery
+
+- `unshare()` (`aggregate.{h,cpp}`) and its clone (`CloneDeleter`); `array_mut`, `array_push`,
+  `array_set`, `object_mut` relocate (checked builds) and write in place.
+- The array take/put: `OpCode::CellTake` (opcode, `vm_closure.cpp` handler with its pre-take cell
+  cycle check, `cell_take`, coroutine admission lists), `read(take)` / `put` in
+  `compiler_array_mutation.cpp`, the take paths of `compiler_assign.cpp` (element store) and
+  `compiler_stmt_expr.cpp` (push), `global_take`'s cell branch and `check` operand. A read after
+  the operands (as the take did) replaces each take; the write-back remains only for location
+  bindings (loop elements, selectors), which write the element itself.
+- The B1 transition rules: `writes_in_place` (the refcount-1 immutability condition) and the
+  struct/collection-only `cycle_applies`.
+- The cycle walk's `values_` bypass (B1's array/object targets walked every nested array).
+- Kept (ruling 4): `global_take`/`global_put` for compound assignment, `global_taken_` and the
+  exception check. Kept (ruling 1): the live loop path and lazy element locations. Kept (ruling 2):
+  the comparator sort's move of the receiver through `CollectionSort` (commit 3).
+
+New: `array_shallow_clone`, `object_shallow_clone`, `OpCode::MakeImmutable`,
+`TransferGraph::Node::immutable`, `deep_copy_tuple(..., keep_immutable)`, `Vm::entry_snapshot`,
+`IterCheck`'s `c` operand, `CompileLimits::reference_probe` (a non-contractual test switch: no
+guard, no `aliasing` refusal; set only by `tests/rt/refrep_vm.cpp`).
+
+## 4. Owner requirement A: session mutation atomicity (mandatory gate)
+
+Root cause (B1 review F1): a session binding is a cell; an array mutator took the array out of the
+cell (`CellTake` / `global_take`) and an ordinary error (pop on empty, insert/remove/index out of
+range, invalid splice) skipped the put, leaving the binding null. B2 deletes the take: the
+receiver stays in its cell, the instruction mutates it in place, and nothing has to be restored.
+
+Evidence (both lanes run in `test-rt-vm`):
+
+- `tests/runtime2/refrep/refrep_cli.py` (`test-runtime2-refrep-cli`, real `nift -i`, guard on):
+  seven failures in a row on one binding (pop on empty x3, insert, remove, invalid splice, index
+  store) with a closure capturing it; the closure then sees the binding, a later push succeeds,
+  the value persists across statements; a second binding repeats the pattern. Witness: on the
+  `919b5669` binary the same input prints `1` and then fails with "unknown value or malformed
+  expression: a.pop()" and "unexpected operands (compiler defect): element assignment" (the null
+  binding); on B2 every expected line and error is produced.
+- `tests/rt/refrep_vm.cpp` `session_atomicity` (`VmSession`, guard on): repeated failures, a
+  captured reference, later success, persistence, and that a statement mutates the bound object
+  itself (sessions stop cloning).
+- Mutant: R-B2 (copy-on-write resurrected, refsem 24) fails `refrep_vm` (alias-array).
+
+## 5. Owner requirement C: immutability
+
+- B1's transition rules are gone (§3): `kImmutable` refuses through every alias; arrays and
+  objects get stage 2.4.
+- Scripts and modules: the invocation binding is now immutable on the VM path too
+  (`MakeImmutable`); before B2 only the session value carried the bit.
+- Isolate crossings keep it: the transfer wire node carries `immutable` (thread(), parallel
+  async, isolate snapshots, results), applied after the decoder fills the object; the cooperative
+  spawn copy passes `keep_immutable`. `deepcopy()` and `copy()` stay mutable.
+- Tests through real execution (`refrep_vm.cpp`, compiled with the reference probe, since the
+  guard and the `aliasing` refusal stop every alias of `args` in product paths): an alias
+  (`b := args`) refuses push, element store, reverse, remove, a store out of range (validation
+  order), a parameter refuses pop, a closure capture refuses insert; `copy(args)` and
+  `deepcopy(args)` are mutable and leave `args` unchanged; reads and loops work. Transfer through
+  the real `TransferGraph` (aliasing kept, immutable kept, a mutable neighbour stays mutable) and
+  the spawn copy, at the C++ level. The name-based const check still exists (until B5), so
+  `args.push` itself is refused at compile time as before.
+- Mutants: R-B6 (refsem 29, the wire flag dropped) fails `refrep_vm`; M-B1b/M-B1d (protocol
+  immutability) fail `mutation_protocol`.
+- Not reachable from scripts in B2 (guard/name checks): every alias of `args`; module and thread
+  routes are covered at the C++ level only. Recorded for B5's fixtures.
+
+## 6. Validation order (owner F3)
+
+Every mutator now validates kind -> immutable -> bounds/arguments -> cycle (each stored value)
+-> budget. The only mutator that differed was `set_index` (`SetIndex`): bounds, then immutable
+(B1). **Reachability**: an element store whose receiver is immutable needs an immutable array in a
+mutable place; `args[i] = v` is refused at compile time (`invocation-assign:args` / declare-const),
+every alias of `args` is refused by the guard (`aliasing`, `reference-guard:*`), and constants are
+never stored into places that can be indexed. So the reorder changes no reachable behaviour:
+the classify diff and the whole suite are unchanged (§9). Through the reference probe, `b := args;
+b[9] = "z"` now reports "cannot mutate const array: b" (not "index out of range"), and
+`b.remove(9)` likewise (`refrep_vm` args-set-order, args-pop-order).
+
+## 7. Cycle check (plan §5.4)
+
+- Stage 2.4 is `mutation::closes(receiver, stored, graph)`: exits for a scalar/string (one kind
+  compare: the `array_push` hot path pays only that), and for a value whose summary says it holds
+  no reference and is not the receiver itself; then `closes_cycle`: the receiver itself
+  (`a.push(a)`), else the walk with the receiver as an aggregate target and the VM's cycle graph
+  (captures through cells, resource payloads). Splice checks each replacement element (the
+  replacement array itself, even the receiver, is not stored). `push`/`set` (inline), `insert`,
+  `splice`, `object_put`, and the VM's `Push`, `SetIndex`, `ArrayMutate` (insert, splice c = 2 and
+  c = 1) run it; the VM raises the catchable `runtime.reference_cycle` with the existing text.
+- **Rule (ii), the unique-root shortcut, is not implemented** (owner: only with soundness evidence
+  and adversarial mutants). The walk is linear in the reference nodes of the stored graph; flat
+  data is never walked (summary bit), and the B1 `values_` bypass that walked every nested array is
+  gone. R-B1 is therefore not applicable.
+- The pre-take cell check (`CellTake`) is gone: a cycle through a captured array is now found by
+  the protocol from the array target through the cell (`cell_cycle_*` fixtures unchanged; R21
+  re-homed to the protocol as "array/object receivers skip the check" and caught by `refsem` and
+  `refrep_vm`).
+- Under the guard the new array/object refusals are reachable from scripts only where they were
+  before (captured arrays); `refrep_vm` covers direct, nested, element store, insert, splice,
+  through a map and through a cell, and an acyclic shared graph that must be accepted.
+
+## 8. Expectation changes (every one)
+
+| Change | Why | Authority |
+| --- | --- | --- |
+| `collections/approved/same_array.f`, `same_array_self.f` moved to `parity/` (VM now prints legacy's `false` / `true`; `.vm`/`.legacy` goldens deleted) | `same()` is array identity | ruling 3, plan §3 |
+| `collections/parity/same_object.f` moved to `approved/` with `.vm` `true` and `.legacy` (legacy: "same: operands must be identity-bearing values") | `same()` is object identity; legacy errors, so it becomes an approved difference | ruling 3 ("same() on arrays and objects"), plan §3 |
+| `tests/runtime2/cp19/session.cpp` lines 91, 176 (C++): a C++-held copy of a session array now sees the statement's mutation (was: unchanged, the session's copy-on-write clone) | sessions stop cloning | plan §6 B2 ("Sessions stop cloning on statement mutation"); not script-observable |
+| `tests/rt/mutation_protocol.cpp` (C++ unit): the B1 transition-rule checks (refcount-1 immutability escape, `!cycle_applies(array)`, the clone budget) now check B2's rules | the transition rules are removed | owner F3, plan §6 B2 |
+| session receiver loss (no fixture existed; new `refrep_cli.py` witness) | the old behaviour was the defect | owner A |
+
+No script-level expectation changed otherwise (refsem 463, collections 271, every other suite with
+its counts unchanged; classify diff §9). Test infrastructure changed: cp14b design mutant 5's
+injection (the defect "mutation lands on a copy" re-expressed for references), refsem `mutants.sh`
+R21's file, the stale-reference array control (through the VM), new lanes in `test-rt-vm`.
+
+## 9. Owner requirement F: performance (local callgrind, not authoritative; Linode at certification)
+
+Same toolchain, same host, `vm_compare.py --groups ops,mutation` (benchmark definitions
+unchanged): marginal VM instructions per op (N = 4,000 vs 8,000). `d209febd` is the pre-B1 base
+binary, `919b5669` the integrated B1 (B1-perf code, `7742a21b`), B2 = `e30bd6c9`.
+
+| Workload | `d209febd` | `919b5669` | B2 | B2 vs `d209febd` | gate |
+| --- | --- | --- | --- | --- | --- |
+| `ops/array_push` | 382 | 384 | **366** | -16 (-4.2 %) | <= 382: **pass** |
+| `mutation/array_set` | 388 | 413 | **380** | -8 (-2.1 %) | <= 388: **pass** |
+| `mutation/array_push_pop` | 1,440 | 1,422 | 1,286 | -10.7 % | pass |
+| `mutation/array_insert_pop` | 2,462 | 2,421 | 2,195 | -10.8 % | pass |
+| `mutation/map_set` | 1,788 | 1,472 | 1,463 | -18.2 % | pass |
+| `mutation/set_add` | 1,366 | 1,341 | 1,337 | -2.1 % | pass |
+| `mutation/stack_push_pop` | 2,240 | 2,123 | 2,121 | -5.3 % | pass |
+| `ops/loop`, `add_local`, `if_branch` | 117, 188, 249 | same | 117, 188, 248 | 0 | pass |
+| `ops/call`, `array_index`, `object_member`, `string_concat` | 567, 434, 761, 3,309 | same | 565, 436, 763, 3,311 | +-2 Ir (code layout) | pass |
+
+B2 additions (`scratchpad/b2/ops.py`, same marginal method; not new benchmark definitions):
+
+| Workload (plan §7 family) | `d209febd` | `919b5669` | B2 | vs `d209febd` |
+| --- | --- | --- | --- | --- |
+| `for (x : a)` over a binding (iteration; live path, no snapshot) | 629.3 | 631.3 | 613.3 | -2.5 % |
+| `for (x : range(0, N))` (iteration; held result, snapshot check) | 203.4 | 203.4 | 203.4 | 0 (budget +10 %) |
+| `a.map(..).filter(..)` (callback natives; entry snapshot of a shared receiver) | 2,329.4 | 2,331.4 | 2,269.5 | -2.6 % (budget +10 %) |
+| `g.push([i, i])` (nested store: cycle check on an array receiver) | 1,977.5 | 1,980.5 | 1,904.5 | -3.7 % |
+| `g[0] = [i, i]` (nested element store) | 1,435.0 | 1,465.0 | 1,374.0 | -4.2 % |
+
+Where the instructions went: deleting `unshare` removed its call and refcount test from every
+array/object mutation (B1-perf measured 29 Ir per push); the cycle stage costs one kind compare for
+a scalar and one summary-bit test for a flat array. `array_set` first measured 395 with B2's
+`set_index` re-running the kind, immutability and bounds checks before `mutation::set`; `set_index`
+now lets `mutation::set` run the stages once and maps only its refusals to legacy's texts (380).
+The held-loop snapshot first cost +15 % on `for (x : range(...))` because a call's window
+register kept a second reference to the fresh result; the loop now clears that dead temporary
+(one `LoadNull` at loop entry), so a fresh result is held once and is never copied (203.4).
+
+- `bench-rt-value` (callgrind, guard): copy 4,356,363 (-6.4 %), push 9,933,829 (-24.9 %), object
+  set 9,665,170 (-29.8 %), object get 5,123,174 (+0.04 %): **PASS** (locked baseline).
+- `bench-rt-value-cycle` (wall, shared host): store_plain +0.51 ns, store_callable +11.37 ns,
+  store_handle +7.31 ns, store_nested_identity +32.94 ns: **PASS** (all within budget).
+- Website build (`run.py --groups site`, `profile_300_instr_per_page`, callgrind, deterministic):
+  `d209febd` 886,887, `919b5669` 886,881, B2 886,908 Ir per page (+0.002 %): **no regression**
+  (templates never reach the VM; the 2k wall-clock rows are single runs on a shared host and are
+  noise, recorded in `perf/site.jsonl`).
+- 200,000-element stress: the collection/array stress fixtures and the sanitizer lanes ran
+  unchanged in `test-rt-vm` / `-sanitize` (§10); no workload became superlinear.
+
+## 10. Mutants and gates (commit 1, code commit `e30bd6c9`)
+
+New mutants (`make test-rt-refrep-mutants`, each rebuilds one object, must fail `refrep_vm`):
+
+| Mutant | Change | Caught by |
+| --- | --- | --- |
+| R-B2 (refsem 24, `aggregate.cpp`) | copy-on-write resurrected: a shared array is cloned on write | alias-array (and every sharing case) |
+| R-B3 (refsem 27, `vm_iter.cpp`) | a loop over an expression result iterates live | loop-held |
+| R-B3b (refsem 28, `collection_helpers.cpp`) | a callback native iterates its live receiver | map-snapshot |
+| R-B4 (refsem 25, `copy_graph.cpp`) | `copy()` returns the same object | copy-new-outer |
+| R-B5 (refsem 26, `natives/object_methods.cpp`) | `merge` mutates its receiver | merge-new |
+| R-B6 (refsem 29, `isolate_transfer_encode.cpp`) | `kImmutable` lost on an isolate transfer | transfer_immutability |
+| R21 (re-homed to `mutation.cpp`) | array/object receivers skip the cycle check | push-self (refrep), cell_cycle_* (refsem, 12 checks) |
+
+R-B1 (shortcut misuse) is not applicable: no shortcut (§7). R19 kept: every VM-path stale-reference
+control (array now through a VM statement, map, set, stack; plain and churn) aborts with
+heap-use-after-free, and the R19 build misses every one. A's mutant is R-B2 (the session lane);
+C's are R-B6 and M-B1b/d; D (commit 2), E (commit 3) and B's bypass mutant (commit 2) follow.
+
+Gates, each alone through the heavy-job gate, on `e30bd6c9` (exit codes):
+
+| Gate | Result |
+| --- | --- |
+| `make nift`; `test-rt-lint` (8 self-test fixtures; `src/rt` 0 problems) | 0, 0 |
+| `test-rt-mutation-protocol` (89 checks, 63 refusal cases); `-mutants` (M-B1a-e, 5 of 5) | 0 |
+| `test-rt-refrep` (54 checks); `-refrep-mutants` (7 of 7); `test-runtime2-refrep-cli` (6) | 0, 0, 0 |
+| `test-runtime2-refsem` (463 checks); `-refsem-mutants` (22 caught) | 0, 0 |
+| `test-runtime2-collections` (271); `-collections-mutants` (11 caught) | 0, 0 |
+| `test-runtime2-safety` (B0 fixed-seed fuzz: 33,512 programs, seed 1); `-safety-mutants` (7 caught) | 0, 0 |
+| `test-runtime2-vm-default`, `-cp14b`, `-cp14b-design-mutants` (1-11 detected, 12 unverified comparator profile as before), `-args-cmd`, `-args-cmd-mutants` | 0 each |
+| `test-runtime2-packages`, `-packages-mutants`, `-packages-legacy`; `-coro-module` | 0 each |
+| `test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-cp22`, `test-runtime2-cp23` | 0 each |
+| `test-runtime2-refsem-stale-vm` (8 controls, R19 misses all), `-refsem-sanitize`, `-collections-sanitize` | 0, 0, 0 |
+| `make test-rt-vm` (every prerequisite and recipe line, 2,284 s) | 0 |
+
+**Classify diff** against `919b5669` (the B1-perf binary, code-identical), both over this tree's
+tests: `NIFT_VM=classify` over every `.f` in `tests/runtime2` (1,816 units): **0 changes**; CP25-R
+`classify-all` over the release corpus (589 units; outcome, reason, line, column, reasons, code):
+**0 changes**.
+
+Not run locally: TSan lanes, the Linode workloads.
+
+## 11. Size (commit 1)
+
+Production (`src/`): +437 / -295 over 44 files (much of it comments and moved checks); tests and
+Makefile +463 / -71 (the new `refrep_vm.cpp` 250 lines, `refrep_cli.py` 100). Within the plan's
+estimate for the whole of B2 (about 700 changed, 600 deleted); commits 2 and 3 follow.
+
+## 12. Notes for B5 (carried, from this commit)
+
+- The live array/object loop path, lazy element locations and the for-s2 expectations they carry
+  (`t26_read_after_shrink_first_iter`, `g6_rebind_longer`, mutant M1) are B5's (ruling 1).
+- The comparator sort's snapshot-and-single-commit (Q7) is B5's (ruling 2).
+- Reachable only through the reference probe today: every alias of `args`, callback mutation of
+  the receiver, cycles through shared arrays/objects; their B5 fixtures can start from
+  `refrep_vm.cpp`.
+- `merge_deep` shares non-object values of its right operand (by reference, like `copy`'s
+  contents); with the guard on this is unobservable.
