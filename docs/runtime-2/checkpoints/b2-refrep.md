@@ -15,6 +15,8 @@ validation is on the Linode, owner ruling of 2026-11-03):
 | `1b152eaa` | record: commit-2 gates, configurations | 13.8, 14.5 |
 | `8599dbcb` | rulings 5 and 6: identity and probe coverage | 15 |
 | `44734273` | commit 3: E, sort protection | 16 |
+| `94bfce4b` | record: commit table, component map (**reviewed tip: REJECTED**, narrow) | - |
+| `4a9df426`, `8835c252` and this record commit | review repair: H1/H2, M1, M2, L4-L8; record | 17 |
 
 ### Record map by component (owner layout)
 
@@ -25,10 +27,11 @@ validation is on the Linode, owner ruling of 2026-11-03):
 | Immutability (C) | 5 |
 | Validation order and cycles | 6, 7 |
 | Test migration (1b) | 13.1 (retirement table), 13.2 (allocation-failure coverage), 13.6b, 13.8 (configurations) |
-| Single mutation path (B) | 14.1 (structure, compile-fail and its locale fix, lint, M-B2) |
+| Single mutation path (B) | 14.1 (structure, compile-fail and its locale fix, lint, M-B2), 17.2 |
 | Throw safety (D) | 14.2 |
 | Self-splice and aliasing | 13.3 |
-| Sort protection (E) | 16 |
+| Sort protection (E) | 16, 17.3 (typed errors) |
+| Review of `94bfce4b` (REJECT) and repair | 17 (constants re-audit and case table 17.1, publication boundary 17.2, carry-forward 17.5, evidence by tree 17.6) |
 | Probe isolation | 14.3, 15 (probe coverage), 13.8 |
 | Performance (F) | 9 (commit 1), 13.6 (1b), 14.5 (commit 2) |
 | Gates, mutants, R19, pre-existing failures | 10, 13.4, 13.5, 13.6, 13.6a, 14.5, 16.1 |
