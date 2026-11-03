@@ -73,7 +73,7 @@ void struct_add_field(Value& instance, Atom field, Value value);
 namespace mutation {
 class Protocol;
 }
-struct StorageTestAccess;  // tests only (tests/rt/storage_access.h; rt-lint: never in src/)
+struct StorageTestAccess;  // tests/rt/storage_access.h only; rt-lint: test-access-decl
 
 // B2 (b2-refrep.md, owner requirement B): the storage commits on an EXISTING
 // aggregate. Every member is private: the mutation protocol's commit layer
@@ -87,7 +87,7 @@ struct StorageTestAccess;  // tests only (tests/rt/storage_access.h; rt-lint: ne
 // conservatively marked as possibly holding references.
 class Storage {
     friend class mutation::Protocol;
-    friend struct StorageTestAccess;
+    friend struct StorageTestAccess;  // rt-lint: test-access-decl (defined only under tests/)
     static std::vector<Value>& array_mut(Value& array);
     static void array_push(Value& array, Value item);
     static void array_set(Value& array, std::size_t index, Value item);  // index < size

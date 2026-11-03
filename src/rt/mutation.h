@@ -51,9 +51,32 @@
 
 namespace nift::rt {
 class CycleGraph;
+struct Fault;
+namespace natives {
+struct Context;
+}
+// The three sort functions that commit a sort (rt/collection_sort.h,
+// rt/collection_plain_sort.h), declared here so SortKey can befriend them.
+bool collection_sort_init(Value*, const natives::Context&, Fault&, std::size_t site);
+bool collection_sort_resume(Value*, bool answer, bool draining);
+bool collection_plain_sort(Value*, const natives::Context&, Fault&);
 }
 
 namespace nift::rt::mutation {
+
+// B2 (b2-refrep.md 18.1, re-check R1): the authority to use the protocol's
+// sort commits. Defined here, completely, so no translation unit can define
+// it (a second definition does not compile), and required by the commits
+// themselves, so no friendship is involved: a self-defined helper class gains
+// nothing. Its only constructor is private and user-provided (not an
+// aggregate: `SortKey{}` does not compile), and its only friends are the three
+// sort functions, which run after the sort instruction's own stage 2.2.
+class SortKey {
+    SortKey() {}
+    friend bool nift::rt::collection_sort_init(Value*, const natives::Context&, Fault&, std::size_t);
+    friend bool nift::rt::collection_sort_resume(Value*, bool, bool);
+    friend bool nift::rt::collection_plain_sort(Value*, const natives::Context&, Fault&);
+};
 
 enum class Failure : std::uint8_t { None, Kind, Immutable, Bounds, Argument, Cycle, Budget, SortProtected };
 // B2 (owner E): the refusal text of a mutation of an array whose comparator
@@ -168,7 +191,6 @@ NIFT_MUTATION_COLD Outcome cycle_failure(std::size_t operand);
 // (tests/rt/compile_fail: a bypass does not compile; rt-lint storage-write
 // stays as defence in depth). The namespace-level functions below are the
 // same entry points under their B1 names.
-struct SortController;  // rt/sort_controller.h (the comparator and plain sorts only)
 class Protocol {
 public:
     // push and set, the per-element hot paths, are inline: stages 2.1-2.2
@@ -234,24 +256,24 @@ public:
     static Outcome stack_push(Value& stack, const Value& item, const Env& env);
     static Outcome stack_pop(Value& stack, Value* removed, const Env& env);
     static Outcome clear(Value& receiver, const Env& env);
-
-private:
-    // B2 review M1: the sort commits hand out or rewrite a receiver's storage
-    // after the sort instruction's own stage 2.2, so they are private; their
-    // only friend is the sort controller's accessor (rt/sort_controller.h,
-    // included by collection_sort.cpp and collection_plain_sort.cpp only;
-    // rt-lint flags it anywhere else; tests/rt/compile_fail/absent.cpp).
-    friend struct SortController;
+    // B2 review M1, re-check R1: the sort commits hand out or rewrite a
+    // receiver's storage after the sort instruction's own stage 2.2, so each
+    // requires a SortKey (above), which only the three sort functions can make
+    // (tests/rt/compile_fail: absent.cpp, bypass_sort_*.cpp).
     // Plain sort's single commit (after the instruction's stage 2.2 and its
     // incomparable check): element i of the result is element order[i] (an
     // Int) of the receiver. `order` is a permutation built on the side.
-    static void commit_permutation(Value& array, std::vector<Value>& order);
+    static void commit_permutation(const SortKey&, Value& array, std::vector<Value>& order);
     // The comparator sort's working storage: the receiver's own storage, in
     // place, after the sort's stage 2.2 at its start (b2-refrep.md, E).
-    static std::vector<Value>& sort_storage(Value& array);
+    static std::vector<Value>& sort_storage(const SortKey&, Value& array);
     // The same storage while the sort's controller runs (no relocation and no
     // allocation: the drain on an error unwind must not allocate).
-    static std::vector<Value>& sort_items(Value& array) noexcept { return array.heap_as<ArrayObject>()->items; }
+    static std::vector<Value>& sort_items(const SortKey&, Value& array) noexcept {
+        return array.heap_as<ArrayObject>()->items;
+    }
+
+private:
 
     enum class ArrayEdit : std::uint8_t { Pop, Remove, Insert, Clear, Reverse, SpliceRemove, SpliceInsert };
     static void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,

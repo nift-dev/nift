@@ -146,7 +146,7 @@ bool closes_cycle(const HeapObject* receiver, const Value& stored, const CycleGr
 }
 
 
-void Protocol::commit_permutation(Value& array, std::vector<Value>& order) {
+void Protocol::commit_permutation(const SortKey&, Value& array, std::vector<Value>& order) {
     auto& items = Storage::array_mut(array);
     const std::size_t n = items.size();
     for (std::size_t i = 0; i < n; ++i) {  // follow each cycle of the permutation once
@@ -165,7 +165,7 @@ void Protocol::commit_permutation(Value& array, std::vector<Value>& order) {
     heap_retally(array.heap());
 }
 
-std::vector<Value>& Protocol::sort_storage(Value& array) { return Storage::array_mut(array); }
+std::vector<Value>& Protocol::sort_storage(const SortKey&, Value& array) { return Storage::array_mut(array); }
 
 // Stage 3 + 4 for an array edit: one structural change, then the heap tally.
 void Protocol::commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,

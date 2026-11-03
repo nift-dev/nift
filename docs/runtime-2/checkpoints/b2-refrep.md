@@ -18,6 +18,7 @@ validation is on the Linode, owner ruling of 2026-11-03):
 | `94bfce4b` | record: commit table, component map (**reviewed tip: REJECTED**, narrow) | - |
 | `4a9df426`, `8835c252`, `534f9af8` | review repair: H1/H2, M1, M2, L4-L8; record (re-review: ACCEPT-WITH-CONDITIONS) | 17 |
 | the commits after `534f9af8` | re-review conditions C1-C3 and the LOW item; record | 18 |
+| the commit after `eba6ca1f` | re-check R1 (sort key on the commits), R2 (test-access lint), R3 carried; record | 19 |
 
 ### Record map by component (owner layout)
 
@@ -862,7 +863,7 @@ Case table (owner), production fixtures with the guard on unless marked probe:
 | Two calls returning object literals | distinct (`same` false) | `collections/approved/same_object_literal.f` | yes: `true` (fix `false`) |
 | Literal evaluated in a loop | no state between iterations | `refsem/parity/b2_literal_fresh_loop.f` | yes: `2 3 4` |
 | Aliases to one evaluated literal | shared identity (`same` true) | `same_object_literal.f` (`same(a, a)`); probe `literal-alias` | **no, by nature**: the defect adds sharing, so aliases stay identical on R-B7 too. Production refuses the alias forms that could show more (`aliasing`); the probe row is a positive guard, and lost aliasing is what R-B2 (refsem 24, `alias-array`) catches |
-| `copy` / `deepcopy` | new objects sharing (copy) or not (deepcopy) this evaluation's contents | probe `literal-copy` (a push through `copy(x)` is not seen by the next evaluation); `collections/approved/same_object_literal_copy.f` (identity and equality only) | probe: yes (`2 2`, fix `2 1`); the production fixture: **no** (`copy`/`deepcopy` give new outer objects on R-B7 too, and production refuses reaching a copy's member, `aliasing`; legacy rejects the loop form) |
+| `copy` / `deepcopy` | new objects sharing (copy) or not (deepcopy) this evaluation's contents | probe `literal-copy` (a push through `copy(x)` is not seen by the next evaluation); `collections/approved/same_object_literal_copy.f` (identity and equality only) | probe: yes (`2 2`, fix `2 1`); the production fixture: **no** (`copy`/`deepcopy` give new outer objects on R-B7 too, and production refuses reaching a copy's member, `aliasing`, and the loop over a copy, `reference-guard:unresolved`; legacy does run the copy-loop form, the re-check's `rc/c3/p/cp1.f`, printing `2 2`; the form shown first in this row was a wrong program of mine, corrected after the re-check) |
 | Literal built inside a closure | fresh per evaluation | `refsem/parity/b2_literal_fresh_closure.f` | yes: `2 3` |
 | Module function returning a literal | no cross-call leak | `refsem/modules/literal_fresh_module` | yes: `2 3` |
 
@@ -959,7 +960,8 @@ Only the final frozen tree's results count toward certification.
 | `ea082292` | compile-fail fix: clean clone, C and C.UTF-8 PASS | intermediate |
 | `94bfce4b` (commit 3 tip) | review REJECT (H1, H2, M1, M2); Linode intermediate: 39 gates passing, pre-existing failures only | **REJECTED**; intermediate |
 | `534f9af8` (repair tip) | re-review ACCEPT-WITH-CONDITIONS (C1-C3, LOW); Linode run started | intermediate |
-| final frozen tree (after section 18) | focused local checks (18.6); Linode certification pending | the only tree that counts |
+| `eba6ca1f` (conditions tip) | re-check CONDITIONS MET; R1-R3 found; Linode run started (about 20 minutes, stopped) | intermediate |
+| final frozen tree (after section 19) | focused local checks (19.4); Linode certification pending | the only tree that counts |
 
 ### 17.7 Gate status of the repair (focused local checks)
 
@@ -988,8 +990,15 @@ are `collection_sort_init`, `collection_sort_resume` and `collection_plain_sort`
 cases: `bypass_sort_key_{storage,items,commit_permutation}.cpp` (each accessor with a forged key:
 `{}`, `SortKey{}`, `SortKey()`), `bypass_sort_paste.cpp` and `bypass_sort_plain.cpp` (the reviewer's
 two files); `absent.cpp`: `SortKey` is neither default-constructible nor an aggregate outside.
-(A reference forged by a cast is deliberate undefined behaviour, outside what any access check
-can stop.)
+Correction after the re-check (section 19): the closure is to well-formed ordinary code, and
+section 19.1 replaces the friendship with a key on the commits themselves. The routes that still
+pass a key check, as the re-checker found them (`rc/forge/`): a reference to an inactive union
+member holding a `SortKey` (f06, no cast), storage casts, `memcpy` and a null reference (f07, f08,
+f17, f18: deliberate undefined behaviour), and the explicit-instantiation access loophole (f20,
+f21: well-defined C++17, [temp.explicit] performs no access check, which no access-control design
+can close; it opens `Storage` equally). The guarantee: **closed to well-formed ordinary code; the
+remaining routes are deliberate undefined behaviour or a known language loophole, defended by
+lint and review.**
 
 ### 18.2 C2: construction lint on identifier tokens; `check_fresh`; the scope decision
 
@@ -1055,4 +1064,72 @@ wording control PASS); `test-runtime2-refrep-cli`; `test-runtime2-refsem` (474) 
 `-refsem-mutants` (23 caught, R-B7 with 6 failing checks); `test-runtime2-collections` (279) and
 `-collections-mutants` (11): 0 each. CP18 `cow-allocation` (ordinary build): "COW final: 0
 failures", the literal campaigns included. Heavy gates: Linode, on the new tip only.
+
+## 19. Narrow re-check of `eba6ca1f`: CONDITIONS MET, and three new LOW items
+
+The narrow re-check of `eba6ca1f` verified C1, C2, C3 and the LOW item with no regression and
+found R1-R3 (LOW; none reachable from a script). R1 and R2 are fixed in one commit on top of
+`eba6ca1f`; R3 is carried. The Linode run on `eba6ca1f` (about 20 minutes in) is intermediate.
+
+### 19.1 R1: the sort key on the commits themselves (compile time)
+
+`mutation.h` only forward-declared the friend `SortController`, so a translation unit including
+only `mutation.h` could define its own and reach the private sort commits without a key (an ODR
+violation, no diagnostic; the re-checker's `rc/forge/f22` emptied an immutable array). Now
+`SortKey` is defined completely in `mutation.h` (a second definition does not compile), and
+`Protocol::sort_storage`, `sort_items` and `commit_permutation` each require it: no friendship
+remains, so a self-defined helper class gains nothing. `SortController` (`sort_controller.h`) is
+a named forwarder that also takes the key. Chosen: compile-fail, not lint:
+`bypass_sort_redefine.cpp` (f22) fails ("no matching function ... sort_items(Value&)"; it compiles
+against `eba6ca1f`'s `mutation.h`), `bypass_sort_key_redefine.cpp` (a public `SortKey` of one's
+own: "redefinition of class SortKey"); `absent.cpp` asserts each commit is not callable without
+a key. Not closed (as 18.1): f06 (inactive union member), the undefined-behaviour forgeries, and
+the explicit-instantiation loophole.
+
+### 19.2 R2: `StorageTestAccess` outside the test tree fails lint, repository-wide
+
+Since commit 1, `Storage` befriends the forward-declared `StorageTestAccess`, defined only in
+`tests/rt/storage_access.h`; a production translation unit defining it is the program's only
+definition (well-formed) and gets every storage commit (`rc/forge/f23`). Chosen: the second of the
+coordinator's options, because the first (the friend under a test-only macro) makes the class
+definition differ between test and production translation units that link the same objects (an
+ODR difference of its own) and needs the macro on the 28 Makefile build lines that compile the eight test sources using it. `rt-lint.py
+--test-access src include bindings` (in `test-rt-lint`) scans every C/C++ source and header kind,
+`.inc` included, outside `tests/`: the name may appear only on `aggregate.h`'s two declaration
+lines, annotated `rt-lint: test-access-decl`. Control: lint fixture `bad_test_access.cpp` (f23)
+must be flagged on exactly its two lines (self-test, 13 fixtures), and f23 copied under a `src/embed`
+tree is flagged. It is a lint, not a compile-time closure; the compile-time form belongs with the
+builder type (19.3).
+
+### 19.3 R3 carried: rt-lint tokenizer gaps (post-B2 tooling checkpoint)
+
+rt-lint's line scanner misreads these C++14/17 lexical forms, so a construction call can hide
+behind them (re-checker's `rc/lintb/rt/vm_bypass2.cpp`; each compiles under g++ and clang++ with
+`-pedantic` and lints clean; end to end, `rc/m-digit/`: a digit separator before
+`rt::array_push` in `push_value` lints clean, links into `nift`, and refsem fails 5 checks):
+
+| Form | Example |
+| --- | --- |
+| digit separator | `int n = 1'0; array_push(published, x);` (the `'` opens a char literal to the line's end) |
+| raw string | `R"(")"; array_push(...)` |
+| line splice inside the identifier | `array_\` then `push(...)` |
+| digraph paste | `%:%:` (the alternative token for `##`) |
+| annotation text inside a string literal | the annotation is searched on the raw line |
+| raw-string comment desync | `R"(")" "/*"` hides the next lines until a later `"*/"` |
+| `.inc` files are never opened | `src/rt/natives/builtin_list.inc` is the precedent |
+
+Assigned to the post-B2 tooling checkpoint, with the compile-time builder type (18.2), which
+would make the construction lint unnecessary. Now: `test-rt-lint` greps every `.inc` under
+`src/rt` for the construction, sort and test-access names and fails on any (none today).
+
+### 19.4 Gate status (focused local checks)
+
+On the R1/R2 tree (result files `scratchpad/b2/results-r123/`): `nift`; `test-rt-lint` (self-test
+13 fixtures, `src/rt` 0 problems, test-access scan of `src`, `include`, `bindings` 0 problems,
+`.inc` check PASS); `test-rt-protocol-compile-fail` (absent.cpp, 11 bypass cases, control: 13
+PASS); `test-rt-mutation-protocol` (191) and `-mutants` (6 of 6); `test-rt-refrep` (116) and
+`-refrep-mutants` (9 of 9); `test-rt-sort-protection-mutants` (S1, S2, S4, S5; wording control
+PASS); `test-runtime2-refrep-cli`; `test-runtime2-refsem` (474) and `-refsem-mutants` (23);
+`test-runtime2-collections` (279) and `-collections-mutants` (11): 0 each. Heavy gates: Linode,
+on the new tip only.
 

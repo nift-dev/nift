@@ -34,6 +34,8 @@ check bypass_sort_key_items.cpp SortKey
 check bypass_sort_key_commit_permutation.cpp SortKey
 check bypass_sort_paste.cpp items
 check bypass_sort_plain.cpp items
+check bypass_sort_redefine.cpp sort_items
+check bypass_sort_key_redefine.cpp SortKey
 if out=$("$cxx" "${flags[@]}" -fsyntax-only "$dir/control.cpp" 2>&1); then echo "PASS compile-fail control compiles"
 else echo "FAIL compile-fail control does not compile:"; printf '%s\n' "$out" | head -5; fail=1; fi
 exit $fail

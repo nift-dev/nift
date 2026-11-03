@@ -68,19 +68,23 @@ template <class P, class = void> struct can_commit : std::false_type {};
 template <class P> struct can_commit<P, void_t<decltype(&P::commit_array)>> : std::true_type {};
 static_assert(!can_commit<nift::rt::mutation::Protocol>::value, "the protocol's commit is accessible");
 
-// B2 review M1: the sort commits are private (their only friend is the sort
-// controller's accessor, rt/sort_controller.h), and the B1 free re-exports
+// B2 review M1, re-check R1: the protocol's sort commits cannot be called
+// without a SortKey (no friendship involved), and the B1 free re-exports
 // (mutation::sort_storage, mutation::commit_permutation) are gone.
 template <class P, class = void> struct can_sort_storage : std::false_type {};
-template <class P> struct can_sort_storage<P, void_t<decltype(&P::sort_storage)>> : std::true_type {};
+template <class P>
+struct can_sort_storage<P, void_t<decltype(P::sort_storage(std::declval<Value&>()))>> : std::true_type {};
 template <class P, class = void> struct can_sort_items : std::false_type {};
-template <class P> struct can_sort_items<P, void_t<decltype(&P::sort_items)>> : std::true_type {};
+template <class P>
+struct can_sort_items<P, void_t<decltype(P::sort_items(std::declval<Value&>()))>> : std::true_type {};
 template <class P, class = void> struct can_permute : std::false_type {};
-template <class P> struct can_permute<P, void_t<decltype(&P::commit_permutation)>> : std::true_type {};
+template <class P>
+struct can_permute<P, void_t<decltype(P::commit_permutation(std::declval<Value&>(),
+                                                            std::declval<std::vector<Value>&>()))>> : std::true_type {};
 static_assert(!can_sort_storage<nift::rt::mutation::Protocol>::value &&
                   !can_sort_items<nift::rt::mutation::Protocol>::value &&
                   !can_permute<nift::rt::mutation::Protocol>::value,
-              "a sort commit of the protocol is accessible outside the sort controller");
+              "a sort commit of the protocol is callable without a SortKey");
 namespace freecheck {
 using namespace nift::rt::mutation;
 template <class V, class = void> struct has_free_sort_storage : std::false_type {};

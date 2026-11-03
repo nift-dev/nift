@@ -215,13 +215,58 @@ def self_test():
             if at != lines[name]:
                 print(f'FAIL rt-lint self-test {name}: expected lines {sorted(lines[name])}, got {sorted(at)}')
                 failed = True
-    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected)} fixtures')
+    # Re-check R2 control: the test-access scan flags a production definition
+    # (the reviewer's rc/forge/f23) on exactly its two lines.
+    access = {int(p.split(':')[1]) for p in test_access_scan([os.path.join(fixtures, 'bad_test_access.cpp')],
+                                                               skip_tests=False)}
+    if access != {5, 9}:
+        print(f'FAIL rt-lint self-test bad_test_access.cpp: expected lines [5, 9], got {sorted(access)}')
+        failed = True
+    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected) + 1} fixtures')
     return 1 if failed else 0
+
+
+# Re-check R2: Storage befriends StorageTestAccess, which only the test tree
+# defines (tests/rt/storage_access.h). A definition or any reference anywhere
+# else in the repository would grant every storage commit, so outside tests/
+# the name may appear only on the two annotated declaration lines of
+# src/rt/aggregate.h (`rt-lint: test-access-decl`). Scans every C/C++ source
+# and header kind (.inc included) under the given roots.
+TEST_ACCESS = re.compile(r'\bStorageTestAccess\b')
+SOURCE_SUFFIXES = ('.h', '.hh', '.hpp', '.c', '.cc', '.cpp', '.cxx', '.inc', '.ipp', '.tpp', '.m', '.mm')
+
+
+def test_access_scan(roots, skip_tests=True):
+    problems = []
+    for root in roots:
+        if not os.path.exists(root):
+            continue
+        files = [root] if os.path.isfile(root) else sorted(
+            os.path.join(d, f) for d, _, fs in os.walk(root) for f in fs if f.endswith(SOURCE_SUFFIXES))
+        for path in files:
+            parts = os.path.normpath(path).split(os.sep)
+            if skip_tests and 'tests' in parts:
+                continue
+            with open(path, encoding='utf-8', errors='replace') as handle:
+                lines = handle.read().split('\n')
+            in_comment = False
+            for number, line in enumerate(lines, 1):
+                stripped, in_comment = strip(line, in_comment)
+                if TEST_ACCESS.search(stripped) and 'rt-lint: test-access-decl' not in line:
+                    problems.append(f'{path}:{number}: test-access: StorageTestAccess outside tests/ (it would '
+                                    'grant every storage commit)')
+    return problems
 
 
 def main(argv):
     if argv == ['--self-test']:
         return self_test()
+    if argv[:1] == ['--test-access']:
+        problems = test_access_scan(argv[1:] or ['src', 'include', 'bindings'])
+        for problem in problems:
+            print(problem)
+        print(f'{"FAIL" if problems else "PASS"} rt-lint test-access: {len(problems)} problem(s)')
+        return 1 if problems else 0
     problems = lint(argv or ['src/rt'])
     for problem in problems:
         print(problem)

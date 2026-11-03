@@ -636,6 +636,9 @@ test-rt-source-map-tsan:
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test
 	python3 tools/rt-lint.py src/rt
+	python3 tools/rt-lint.py --test-access src include bindings
+	@! grep -rnwE 'array_push|array_build_storage|array_build_set|object_set|object_build_slot|struct_add_field|map_build_set|set_build_add|stack_build_push|SortKey|SortController|StorageTestAccess' --include='*.inc' src/rt || { echo "FAIL rt-lint: a construction or sort name in a .inc file (rt-lint does not scan .inc files: b2-refrep.md 19.3)"; exit 1; }
+	@echo "PASS rt-lint: no construction or sort name in src/rt .inc files"
 
 # ASan+UBSan build of the rt tests (GCC/Clang on Linux or macOS). ASan
 # reserves its shadow memory up front, so this target must run without
