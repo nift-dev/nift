@@ -474,6 +474,13 @@ defect (the commit before the validation) without undefined behaviour of its own
 path binds the same name to the operand by reference (no code change). After the fix: 200 runs of
 `protocol-m1`, every one exit 1; valgrind: no invalid access; mutants 1-5 caught.
 
+Test-infrastructure fix (its own commit, coordinator ruling): `sanitize.py`'s source list gains
+`src/PackageTransaction.cpp` and `src/JsonFile.cpp`; a pre-existing defect, on the release-audit
+list. The identical list, run as a scratch copy of the harness on `f01622cb`, passed
+("PASS CP18 ASan/UBSan: C consumer and allocation controls, both dispatches", both negative
+controls detected, 287 s); the lane itself on the fixed tree runs on the Linode (local sanitizer
+lanes stopped by the owner's ruling).
+
 ### 13.6b Two ports found by the ASan lane on commit 2 (follow-up commit)
 
 `test-rt-value-sanitize` on `ec7c885a` aborted in `value-round2` and `value-d040`: commit 2's

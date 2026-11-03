@@ -23,7 +23,9 @@ sources = sorted({str(p) for pattern in ('src/rt/*.cpp', 'src/rt/natives/*.cpp',
                   for p in Path().glob(pattern)})
 sources += ['src/Sha256.cpp', 'src/JsonSchema.cpp', 'src/ParserHelpers.cpp',
             'src/ParserHostHelpers.cpp', 'src/Process.cpp', 'src/FileSystem.cpp',
-            'src/RuntimeValue.cpp', 'src/embed/program_api.cpp']
+            'src/RuntimeValue.cpp', 'src/embed/program_api.cpp',
+            # src/rt/package_resolve.cpp needs them since bb5dc585 (b2-refrep.md 13.6a)
+            'src/PackageTransaction.cpp', 'src/JsonFile.cpp']
 key = hashlib.sha256(json.dumps(flags).encode() + subprocess.check_output(['g++', '--version']))
 for directory in ('src', 'include'):
     for p in sorted(Path(directory).rglob('*.h')):
