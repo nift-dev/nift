@@ -50,9 +50,9 @@ The Phase A guard stays on, legacy (`NIFT_VM=0`) is unchanged, `const` stays bin
 4. **The compound-assignment take stays** (`g += x` on a global string appends in place); every
    array/object take is gone; the CP13 hazard note is narrowed to compound operators; a test keeps
    global string `+=` linear.
-5. **Header bit 4 is the sort-protection bit** (commit 3), with lazy release.
+5. **Header bit 4 is the sort-protection bit** (commit 3). The ruling said "with lazy release"; the implementation releases deterministically on every exit (section 16), which the review accepted (L7).
 6. **Structure**: one checkpoint, three commits, gates after each, report after commit 1.
-7. **Array/object constants are immutable** (defensive), provided no reachable behaviour changes.
+7. **Array/object constants are immutable** (defensive), provided no reachable behaviour changes. Superseded after the review (H1, section 17): a user-visible array/object constant is a template loaded as a fresh deep copy (`LoadKFresh`) and is not marked; only internal constants (`sort_by`'s directions) are immutable.
 
 ## 1. Contract (commit 1)
 
@@ -82,7 +82,7 @@ existing expectation is unchanged except the ones listed in §8.
   immutable in scripts and modules too (it was only in sessions: the script runner rebuilt it with
   `NewArray`; now followed by the new `MakeImmutable`), and keeps the bit across a thread/parallel
   transfer (wire flag) and the cooperative spawn copy (`deep_copy_tuple(..., keep_immutable)`).
-  Only `copy()` / `deepcopy()` make mutable copies. Array/object constants are immutable.
+  Only `copy()` / `deepcopy()` make mutable copies. Internal array constants (`sort_by` directions) are immutable; a JSON-spelled object literal is a fresh deep copy at every evaluation (section 17, review H1; this line said "array/object constants are immutable" before the review).
 - **Copies.** `copy(x)` of an array or object is a new outer object sharing the contents;
   `deepcopy` unchanged; `same()` is identity for arrays and objects; `merge` / `merge_deep` build a
   new object (never the receiver).
@@ -116,7 +116,7 @@ an array across user code:
 | `cell.cpp` `replace_path` (`replacement = *previous`, then nested `set`) | clone of each path level | in place, same final graph (the deepest level is validated first) |
 | `vm_coro_ops.cpp` D7 spawn (`shared` only if identity-bearing) | arrays were values | an array/object seed also triggers the graph copy; the copy keeps `kImmutable` |
 | `isolate_snapshot.cpp` constants summary | summary meant identity only | counts arrays/objects (plan 5.1) |
-| constants (`codegen.cpp` pool), struct field initialisers | — | array/object constants are marked immutable (only `sort_by`'s internal directions exist; field initialisers are scalars or fresh collections, `structs.cpp`) |
+| constants (`codegen.cpp` pool), struct field initialisers | **corrected after the review (H1/H2)**: the original row said "only `sort_by`'s internal directions exist", which was wrong: a JSON-spelled object literal (`compiler_expr.cpp` `object_literal`) was one pool constant loaded by `LoadK`, shared by every evaluation (under copy-on-write a value; under references shared mutable state, and `same()` true for two evaluations) | `LoadKFresh` (a budget-reserved `deep_copy` of the template) for every array/object constant a program can see; the blanket `mark_immutable` in `FunctionBuilder::constant` is removed and kept only on `sort_by`'s directions (`compiler_collection.cpp`); field initialisers stay scalars or fresh collections (`structs.cpp`). Full re-audit: section 17 |
 | `compiler_invocation.cpp` script `args` (`NewArray`) | — | `MakeImmutable` after it (owner F3) |
 | `ArrayBuilder`, `isolate_task`, `parallel_task_start`, `vm_coro_parallel` seeds, `legacy_bridge`, `json`, `host_env`, `host_fs_nav`, `vm_report` `NewArray`/`ObjectSet` (literals, loop metadata), `vm_iter` key arrays, `vm_array_mutation` splice result, decoders, `session_invocation` | — | fresh values only (audited) |
 | natives whose result is the receiver (`reverse`, `sort`, `push` results) | — | identity unchanged; the guard refuses observing them (`b := a.reverse()` is `reference-guard:shared`, probed) |
@@ -193,8 +193,9 @@ Every mutator now validates kind -> immutable -> bounds/arguments -> cycle (each
 -> budget. The only mutator that differed was `set_index` (`SetIndex`): bounds, then immutable
 (B1). **Reachability**: an element store whose receiver is immutable needs an immutable array in a
 mutable place; `args[i] = v` is refused at compile time (`invocation-assign:args` / declare-const),
-every alias of `args` is refused by the guard (`aliasing`, `reference-guard:*`), and constants are
-never stored into places that can be indexed. So the reorder changes no reachable behaviour:
+every alias of `args` is refused by the guard (`aliasing`, `reference-guard:*`), and an immutable
+constant (only `sort_by`'s internal directions, section 17) is never stored into a place that can be
+indexed. So the reorder changes no reachable behaviour:
 the classify diff and the whole suite are unchanged (§9). Through the reference probe, `b := args;
 b[9] = "z"` now reports "cannot mutate const array: b" (not "index out of range"), and
 `b.remove(9)` likewise (`refrep_vm` args-set-order, args-pop-order).
@@ -336,7 +337,10 @@ estimate for the whole of B2 (about 700 changed, 600 deleted); commits 2 and 3 f
 
 - The live array/object loop path, lazy element locations and the for-s2 expectations they carry
   (`t26_read_after_shrink_first_iter`, `g6_rebind_longer`, mutant M1) are B5's (ruling 1).
-- The comparator sort's snapshot-and-single-commit (Q7) is B5's (ruling 2).
+- The comparator sort's snapshot-and-single-commit (Q7) is B5's (ruling 2). Its tests must cover
+  aliased reads during the sort, not only mutations (review L1, mandatory; section 17.5).
+- Review L2 (`cell.cpp` `replace_path`: residual take, default Env, partial commit) is B5/B6's and
+  L3 (the static `c = 100` validation order) is B5's (section 17.5).
 - Reachable only through the reference probe today: every alias of `args`, callback mutation of
   the receiver, cycles through shared arrays/objects; their B5 fixtures can start from
   `refrep_vm.cpp`.
@@ -790,3 +794,166 @@ checks) and `-mutants` (6 of 6), `test-rt-refrep` (112 checks; production checks
 `test-runtime2-collections` and `-collections-mutants` (11 caught): 0 each. The heavy gates
 (sanitizers, TSan, `test-rt-value`, `test-rt-vm`, safety, VM-default, CP19, the full `make test`,
 classify and perf) are for the Linode.
+
+## 17. Review of `94bfce4b`: REJECT (narrow), and the repair
+
+The independent review of `94bfce4b` (tree `d20fa121`) was a narrow **REJECT**: two semantic
+violations visible in production (H1, H2, one root cause), two required items (M1, M2) and LOW
+items L1-L8. It passed A, C, D, E (including the removed S3), probe isolation, the 1b migration,
+self-splice, the CP18 source-list fix and the compile-fail fix. The REJECT and its evidence stand
+on record; the repair is new commits on top of `94bfce4b` (no history rewritten). The owner
+accepted the REJECT and the repair scope, with refinements (recursive freshness, the case table,
+the M1 publication boundary, typed sort errors, carry-forward owners, evidence by tree).
+
+### 17.1 H1/H2: a compiled constant is a description, not a runtime instance
+
+Finding: a JSON-spelled object literal (`compiler_expr.cpp` `object_literal`) was parsed once
+and loaded with `LoadK` from one pool constant, so every evaluation shared one object: its
+nested arrays were shared mutable state across loop iterations and calls (review `t/d1.f`: B2
+`2 3 4`, base and legacy `2 2 2`; `t/d2.f`), and `same()` answered `true` for two evaluations
+(`t/s3.f`). The blanket `mark_immutable` on array/object constants hid nothing (only the top
+level) and the clone-site audit row "constants" was wrong (corrected in section 2).
+
+Invariant (owner): every evaluation of an array or object literal produces a fresh outer value,
+and every nested aggregate in it is fresh too (recursive freshness); a compiled constant is a
+description, not a runtime instance. Fix:
+
+- `OpCode::LoadKFresh` (cold): `R[a]` = `clone_constant(K[b])` (`copy_graph.cpp`): a new array
+  or object for every node of the constant tree, scalars and strings shared (immutable), the
+  whole footprint reserved against the VM's heap limit first (a budget stop builds nothing).
+  A parsed JSON literal is a tree (no sharing, no cycle), so no identity map is needed (the
+  first version used `deep_copy`: 7,783 Ir per evaluation of a two-key literal; `clone_constant`:
+  4,291; the same literal written so it compiles to construction ops costs 4,569 at `919b5669`
+  and 4,433 now; `919b5669`'s shared `LoadK` 1,887 was the defect's cost). Local callgrind,
+  guidance only; Linode is authoritative. `ops/object_member` evaluates its literal once, outside
+  the loop.
+- `object_literal` emits `LoadKFresh` for an array/object constant (code comment states the
+  invariant at the load site).
+- `FunctionBuilder::constant` no longer marks array/object constants immutable; only the
+  internal `sort_by` directions (`compiler_collection.cpp`) are marked.
+
+Re-audit of every site that loads an aggregate from a constant pool, a cache or a prepared or
+snapshot structure:
+
+| Site | Per-evaluation identity |
+| --- | --- |
+| `compiler_expr.cpp` `object_literal` (JSON-spelled `{...}`) | was shared (H1); now `LoadKFresh` |
+| other object/array literals (`NewObject`/`ObjectSet`, `NewArray`) | fresh by construction |
+| `compiler_expr.cpp` constant expressions (`constant_of`) | numbers, strings, booleans, null only |
+| global initialisers, session statements, module bodies, closures, `obj.get(k, default)` | compiled by the same compiler: the same two literal paths |
+| struct field initialisers (`structs.cpp` `constant`) | scalars, strings, or `map()`/`set()`/`stack()` built per instance by `CallNative` |
+| `sort_by` directions (`compiler_collection.cpp`) | internal, read only by the step, never user-visible: one immutable constant |
+| script/module invocation `args`, `cmd` (`compiler_invocation.cpp`) | `NewArray` of string constants per run, then `MakeImmutable`; `cmd` a string |
+| isolate task wrapper (`isolate_task.cpp` `build_wrapper`: `LoadK` of transferred globals/args) | the wrapper runs once per task; the values are that task's own transfer copies |
+| isolate program snapshot (`isolate_snapshot.cpp`, `constants_from`) | the constant pool is transferred to the task's program as templates; `LoadKFresh` copies per evaluation there too |
+| cell selector descriptors (`cell.cpp`) | internal; private clones (section 2) |
+| session values (`VmSession::value`), prepared/legacy paths | no aggregate is cached for re-evaluation |
+
+Case table (owner), production fixtures with the guard on unless marked probe:
+
+| Case | Required | Covered by |
+| --- | --- | --- |
+| Repeated evaluation of an object literal | fresh each time | `refsem/parity/b2_literal_fresh_call.f`, session `session_literal_fresh` (refsem_a.py) |
+| Repeated evaluation of a nested array literal | no mutation leak | `refsem/parity/b2_literal_fresh_loop.f` (nested array of an object literal); probe `literal-nested-array`, `literal-nested-json` (`refrep_vm.cpp`: production refuses iterating or aliasing the nested element, `lent`/`aliasing`) |
+| Two calls returning object literals | distinct (`same` false) | `collections/approved/same_object_literal.f` |
+| Literal evaluated in a loop | no state between iterations | `refsem/parity/b2_literal_fresh_loop.f` |
+| Aliases to one evaluated literal | shared identity (`same` true) | `same_object_literal.f` (`same(a, a)`); probe `literal-alias` (production refuses `z := x`, `aliasing`) |
+| `copy` / `deepcopy` | new objects, equal contents | `collections/approved/same_object_literal_copy.f` |
+| Literal built inside a closure | fresh per evaluation | `refsem/parity/b2_literal_fresh_closure.f` |
+| Module function returning a literal | no cross-call leak | `refsem/modules/literal_fresh_module` |
+
+Mutant R-B7 (refsem 31, `vm_report.cpp`: `LoadKFresh` loads the shared pool constant again) is
+caught by the refsem suite (5 failing checks) and by `refrep_vm` (`literal-nested-json`).
+
+### 17.2 M1: mutation authority and the publication boundary
+
+Invariant (owner): published, existing aggregates are modified only through the mutation
+protocol; unpublished values under construction may use private construction helpers, with an
+explicit boundary those helpers cannot cross.
+
+- **Sort commits: closed at compile time.** `Protocol::sort_storage`, `sort_items` and
+  `commit_permutation` are private; their only friend is `mutation::SortController`
+  (`rt/sort_controller.h`), included by `collection_sort.cpp` and `collection_plain_sort.cpp`
+  only. The free `mutation::sort_storage` / `commit_permutation` are removed. `absent.cpp`
+  asserts all five are unreachable (each detector fails against `94bfce4b`'s `mutation.h`), and
+  `bypass_sort.cpp` (the reviewer's `Protocol::sort_items(r).clear()`) must fail to compile.
+  rt-lint flags `SortController`, the sort names and `rt/sort_controller.h` in any other file.
+- **Construction: the boundary is "fresh", enforced by lint plus `check_fresh`, not by the type
+  system.** Why not at compile time: the construction functions (`array_push`,
+  `array_build_storage`, `array_build_set`, `object_set`, `object_build_slot`,
+  `struct_add_field`, `map_build_set`, `set_build_add`, `stack_build_push`) take a `Value&`, and a
+  fresh value and a published one have the same type; publication is a run-time property (the
+  constructing code is the only holder: refcount 1, not immutable). Making it a type (a builder
+  returned by `make_*`, consumed by `finish()`) changes about 95 production call sites in 22
+  files and about 230 test call sites: outside B2's scope (reported to the coordinator). The
+  enforcement instead: (1) every production use outside the files that implement the API carries
+  `// rt-lint: storage-ok fresh, <why>` (67 sites, each checked to construct a value the code
+  alone holds and has just made, or a cell's private descriptor, or inside a mutant-only `#if`);
+  rt-lint fails any unannotated use (the publication boundary is the annotation, reviewable per
+  site); (2) `check_fresh` aborts in checked and sanitizer builds if the receiver is shared or
+  immutable (it found two test misuses, 13.6b); (3) M-B2 (refsem 30) is caught behaviourally.
+  The lint fixture `bad_construction.cpp` holds the reviewer's `bypass_public.cpp` cases and must
+  fire on exactly those five lines (rt-lint self-test).
+
+### 17.3 M2: typed sort-protection errors
+
+The catchable `runtime.sort_receiver_mutated` was chosen by matching the message text, so an
+ordinary fatal error that echoed the words became catchable with that code (`t/mag4.f`). Now
+`Fault::sort_protected` is set by `raise_refusal` exactly where an `Outcome` with
+`Failure::SortProtected` is raised (the per-element refusals, `mutation_failed`, the
+`ArrayMutate` stage 2.2, the sort's own stage 2.2), and `Vm::handle_bail` converts on that flag
+only. Tests: `refsem/parity/b2_error_text_not_code.f` (`t/mag4.f`: the fatal error stays fatal,
+as legacy and the base); a wording control (`test-rt-sort-protection-mutants`: `mutation.cpp`
+built with `NIFT_SORT_WORDING_TEST` words the refusal differently, and `refrep_vm` must PASS:
+same catchability and code).
+
+### 17.4 LOW items fixed
+
+- L4: the VM's self-splice copy (`vm_array_mutation.cpp`, c = 2) reserves its storage (stage 2.5)
+  before the copy, after stages 2.1-2.2.
+- L5: `refrep_production.sh` checks that production refuses an object alias with `(aliasing)`
+  (the probe lifts `no_alias` in `compiler_rules.cpp`, which the marker symbol in `compiler.cpp`
+  does not witness); the reviewer's probe-built `nift` runs the program, so the check fails there.
+- L6: `cow_negative.py` dropped the "Outstanding allocations after program destruction delta" stdout
+  conjunct because the retargeted mutant (`array_shallow_clone`, unowned while copying) is no
+  longer reached by the program-API campaign that prints that line (the old ABI program, a COW
+  clone of a shared argument, is refused by the guard); it is reached by the direct clone
+  campaign, whose per-failure leak assertion `outstanding_allocations == empty_allocations` is the
+  one now required in stderr (with exit 1). Requiring the old line would make the control fail to
+  detect a real leak.
+- L7: coordinator ruling 5's "with lazy release" corrected (release is deterministic, section 16).
+- L8: the B1-perf carry item "the map `set` budget case through KeyedMutate" is covered by
+  `tests/runtime2/collections/heap/budget_map.f` (`weekend_collections.py`: `m.set(i, i)` in a
+  statement is a `KeyedMutate` MapSet; with `NIFT_VM_HEAP_BUDGET=2000000` it must stop with exit
+  70, "memory budget exceeded" and no "done"; unbounded it completes).
+
+### 17.5 Carry-forward (deferred LOW items, with owners)
+
+Each is unreachable with the guard on (the reviewer's evidence) and assigned to a release dependency:
+
+| Item | Evidence of unreachability (guard on) | Owner |
+| --- | --- | --- |
+| L1: the in-place comparator sort exposes intermediate state (placeholder `""`/`[]`, duplicates) to an alias read inside the comparator (`t/p5.f`, probe) | the guard refuses the alias; production effect analysis refuses comparator access to the receiver (checked with an admitted-profile build, `t/h1`-`h5`) | **B5, mandatory test**: Q7's sort-a-copy-and-commit-once must cover aliased reads during the sort, not only mutations |
+| L2: `cell.cpp` `replace_path` / `cell_cached_put` moves the owner value out of its cell for the duration (a residual take), uses a default `mutation::Env` (no VM cycle graph, no heap limit), and commits a deeper level before validating the parent (a parent refusal would leave a partial mutation) | not reached from production by the reviewer | **B5/B6**: give it the VM's Env, validate every level first |
+| L3: `ArrayMutate c = 100` (the static const-array path) reports "pop: array is empty" before the immutability error (section 6 named only `set_index`) | `args.pop()` is `reference-guard:unresolved` (`t/ap.f`) | **B5**, with the static path |
+
+### 17.6 Evidence by tree
+
+Only the final frozen tree's results count toward certification.
+
+| Tree | Evidence | Status |
+| --- | --- | --- |
+| `ec7c885a` (commit 2 tip) | Linode run (partial): `test-rt-value-sanitize` failed (two test ports, 13.6b), `test-rt-protocol-compile-fail` failed (locale, 14.1) | intermediate; superseded and stopped |
+| `67527994` | Linode reruns of `test-rt-value-sanitize`, `test-runtime2-cp18-sanitize`, `test-rt-value` | intermediate |
+| `ea082292` | compile-fail fix: clean clone, C and C.UTF-8 PASS | intermediate |
+| `94bfce4b` (commit 3 tip) | review REJECT (H1, H2, M1, M2); Linode intermediate: 39 gates passing, pre-existing failures only | **REJECTED**; intermediate |
+| final frozen tree (this repair) | focused local checks (17.7); Linode certification pending | the only tree that counts |
+
+### 17.7 Gate status of the repair (focused local checks)
+
+`nift`, `test-rt-lint` (0 problems; self-test 10 fixtures), `test-rt-protocol-compile-fail`
+(absent.cpp and 4 bypass cases), `test-rt-mutation-protocol` (191) and `-mutants` (6 of 6),
+`test-rt-refrep` (115 checks; production checks incl. aliasing PASS) and `-refrep-mutants` (9 of
+9 incl. R-B7), `test-rt-sort-protection-mutants` (S1, S2, S4, S5 caught; wording control PASS),
+`test-runtime2-refrep-cli`, `test-runtime2-refsem` (473) and `-refsem-mutants` (23 caught incl.
+31), `test-runtime2-collections` (279) and `-collections-mutants`: 0 each. Heavy gates: Linode.
