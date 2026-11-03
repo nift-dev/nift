@@ -1,0 +1,81 @@
+// B2 (owner requirement B): a structural proof, independent of compiler
+// diagnostics, that a receiver's storage cannot be committed outside the
+// mutation protocol. This file MUST compile: each static_assert detects, by
+// substitution failure, that a removed free commit does not exist (found by
+// argument-dependent lookup on Value, as an ordinary call would find it) and
+// that the Storage commits and the protocol's raw commit are not accessible
+// here (access is checked during substitution). The compile-fail cases beside
+// it (run.sh) show the same through real calls.
+#include "rt/aggregate.h"
+#include "rt/aggregate_collection.h"
+#include "rt/mutation.h"
+
+#include <type_traits>
+#include <utility>
+
+namespace probe {
+using nift::rt::Atom;
+using nift::rt::Value;
+template <class... T> using void_t = void;
+
+// Removed free commits (B1 names): no overload is found for a Value receiver.
+#define NIFT_ABSENT_FREE(name, ...)                                                                   \
+    template <class V, class = void> struct has_##name : std::false_type {};                          \
+    template <class V> struct has_##name<V, void_t<decltype(name(__VA_ARGS__))>>                     \
+        : std::true_type {};
+NIFT_ABSENT_FREE(map_set, std::declval<V&>(), std::declval<V>(), std::declval<V>())
+NIFT_ABSENT_FREE(set_add, std::declval<V&>(), std::declval<V>())
+NIFT_ABSENT_FREE(stack_push, std::declval<V&>(), std::declval<V>())
+NIFT_ABSENT_FREE(stack_pop, std::declval<V&>())
+NIFT_ABSENT_FREE(collection_erase, std::declval<V&>(), std::size_t(0))
+NIFT_ABSENT_FREE(collection_clear, std::declval<V&>())
+NIFT_ABSENT_FREE(array_set, std::declval<V&>(), std::size_t(0), std::declval<V>())
+NIFT_ABSENT_FREE(array_mut, std::declval<V&>())
+NIFT_ABSENT_FREE(array_slot_mut, std::declval<V&>(), std::size_t(0))
+NIFT_ABSENT_FREE(object_remove, std::declval<V&>(), std::declval<Atom>())
+NIFT_ABSENT_FREE(object_slot_mut, std::declval<V&>(), std::declval<Atom>())
+NIFT_ABSENT_FREE(struct_set, std::declval<V&>(), std::declval<Atom>(), std::declval<V>())
+NIFT_ABSENT_FREE(struct_slot_mut, std::declval<V&>(), std::declval<Atom>())
+#undef NIFT_ABSENT_FREE
+static_assert(!has_map_set<Value>::value && !has_set_add<Value>::value && !has_stack_push<Value>::value &&
+                  !has_stack_pop<Value>::value && !has_collection_erase<Value>::value &&
+                  !has_collection_clear<Value>::value,
+              "a removed collection commit is callable outside the protocol");
+static_assert(!has_array_set<Value>::value && !has_array_mut<Value>::value && !has_array_slot_mut<Value>::value &&
+                  !has_object_remove<Value>::value && !has_object_slot_mut<Value>::value &&
+                  !has_struct_set<Value>::value && !has_struct_slot_mut<Value>::value,
+              "a removed array/object/struct commit is callable outside the protocol");
+
+// The Storage commits exist (as private members) but are not accessible here.
+#define NIFT_INACCESSIBLE(name, ...)                                                                   \
+    template <class S, class = void> struct can_##name : std::false_type {};                          \
+    template <class S> struct can_##name<S, void_t<decltype(S::name(std::declval<Value&>(), __VA_ARGS__))>> \
+        : std::true_type {};
+NIFT_INACCESSIBLE(array_set, std::size_t(0), std::declval<Value>())
+NIFT_INACCESSIBLE(array_push, std::declval<Value>())
+NIFT_INACCESSIBLE(map_set, std::declval<Value>(), std::declval<Value>())
+NIFT_INACCESSIBLE(object_set, std::declval<Atom>(), std::declval<Value>())
+#undef NIFT_INACCESSIBLE
+static_assert(!can_array_set<nift::rt::Storage>::value && !can_array_push<nift::rt::Storage>::value &&
+                  !can_map_set<nift::rt::Storage>::value && !can_object_set<nift::rt::Storage>::value,
+              "a Storage commit is accessible outside the protocol");
+
+// The protocol's raw commit (stage 3 without stage 2) is private too.
+template <class P, class = void> struct can_commit : std::false_type {};
+// Its address, so only the function's own access decides (not ArrayEdit's).
+template <class P> struct can_commit<P, void_t<decltype(&P::commit_array)>> : std::true_type {};
+static_assert(!can_commit<nift::rt::mutation::Protocol>::value, "the protocol's commit is accessible");
+
+// Controls (the detectors can say yes): the construction API and a protocol
+// entry point are found and accessible.
+template <class V, class = void> struct has_build : std::false_type {};
+template <class V>
+struct has_build<V, void_t<decltype(map_build_set(std::declval<V&>(), std::declval<V>(), std::declval<V>()))>>
+    : std::true_type {};
+static_assert(has_build<Value>::value, "control: the construction API is not detected");
+template <class V, class = void> struct has_entry : std::false_type {};
+template <class V>
+struct has_entry<V, void_t<decltype(nift::rt::mutation::map_put(std::declval<V&>(), std::declval<V>(), std::declval<V>(),
+                                                                nift::rt::mutation::Env{}))>> : std::true_type {};
+static_assert(has_entry<Value>::value, "control: a protocol entry point is not detected");
+} // namespace probe

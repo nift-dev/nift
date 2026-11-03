@@ -556,6 +556,25 @@ No 1b port assumes B5 is live in production.
   `Storage::array_set` from outside ("is private within this context"), the B1 free `map_set`
   ("not a member"/"not declared"), `Protocol::commit_array` (stage 3 without stage 2, private);
   the control (a protocol entry point) compiles.
+- Host sensitivity found on the Linode (`test-rt-protocol-compile-fail` exit 2 on `ec7c885a`,
+  passing locally): the check matched g++'s diagnostic text, and g++ quotes names with ASCII `'`
+  in the C/POSIX locale (this host: no `LANG`) but with typographic quotes in a UTF-8 locale (the
+  Linode), so `bypass_removed.cpp`'s "'map_set' is not a member" never matched there. Reproduced
+  locally with `LC_ALL=C.UTF-8`. Nothing in the worktree supplied a declaration. Fix: (1)
+  `compile_fail/absent.cpp`, which must COMPILE, proves the property structurally, independent of
+  any diagnostic: substitution-failure detectors `static_assert` that no removed free commit
+  (`map_set`, `set_add`, `stack_push`/`stack_pop`, `collection_erase`/`collection_clear`,
+  `array_set`, `array_mut`, the slot functions, `object_remove`, `struct_set`) is found for a
+  `Value` receiver, that the `Storage` commits and `Protocol::commit_array` are not accessible
+  outside the protocol, with controls that the detectors fire (the construction API and a
+  protocol entry point are detected); (2) the real-call cases run under `LC_ALL=C` and require
+  only a failed compile whose error names the bypassed function (not its wording);
+  `bypass_commit.cpp` passes the edit as `{}`, so its rejection is the commit's own access, not
+  the private `ArrayEdit`'s. Discrimination: `absent.cpp` fails with `storage_access.h`
+  force-included (free commits back: both free-commit asserts fire), with `Storage`'s members
+  public (the access assert fires), and with `commit_array` public (the commit assert fires;
+  the first detector version missed this, because it named the private enum). Result: PASS in the
+  C and C.UTF-8 locales, and from a clean clone (14.4).
 - `rt-lint` (defence in depth): the storage-commit names outside the protocol, and any
   `Storage::` or `StorageTestAccess` use under `src/`, are flagged (fixture `bad_storage.cpp`).
 - Mutant M-B2 (refsem 30, `vm_ops.cpp`): an element store through the construction API on the

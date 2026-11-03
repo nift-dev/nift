@@ -2,6 +2,7 @@
 // stages 2) is private. Must NOT compile ("private" / "within this context").
 #include "rt/mutation.h"
 void bypass(nift::rt::Value& array) {
-    nift::rt::mutation::Protocol::commit_array(array, nift::rt::mutation::Protocol::ArrayEdit::Clear, 0, 0,
-                                               nift::rt::Value());
+    // The edit is passed as {} so the rejection is the commit's own access,
+    // not the (also private) ArrayEdit enumeration's.
+    nift::rt::mutation::Protocol::commit_array(array, {}, 0, 0, nift::rt::Value());
 }
