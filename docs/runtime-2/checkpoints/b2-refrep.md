@@ -500,6 +500,41 @@ binaries. The full lane is part of the Linode run.
 Production: +15 / -3 (`mutation.h`, `vm_array_mutation.cpp`, `aggregate.cpp`). Tests: about
 780 inserted lines, under the 800-line split threshold; no unresolved ownership problem.
 
+### 13.8 Which configuration each ported property runs under (owner refinement: shared identity is not shared mutable state)
+
+Three configurations, kept apart:
+
+- **Representation layer (C++, no compiler, so no guard).** Asserts B2's representation contract
+  (commit 1, plan §3/§5): a `Value` copy shares the heap object, a protocol mutation is seen
+  through every C++ holder, refcounts count every holder, explicit clones are new outer objects,
+  cycles are refused. This is what B2 changes in the runtime; it says nothing about which script
+  programs may observe it.
+- **Production (guard on, the normal compiler).** Asserts only established behaviour plus the
+  approved changes (§8). No script-level assertion has a mutation become visible through an
+  alias: the guard refuses every such program (`reference-guard:*`, `aliasing`), and the tests
+  assert those refusals.
+- **Probe (guard off, `NIFT_RT_REFERENCE_PROBE`, `refrep-vm` only).** Every script-level
+  alias-visibility assertion (B5 semantics, exercised early) lives here.
+
+| Test (property) | Configuration |
+| --- | --- |
+| `value_unit` `arrays_shared`, objects alias check | representation |
+| `value_d040` `nested_references`, self-insertion refusals, `same()` identity, summary bit | representation |
+| `value_property` `reference_model`, object model | representation |
+| `value_regress` self-store refusals, saturation in place | representation |
+| `value_destroy_oom` shared-children DAG | representation |
+| `value_round2` growth through an alias is tallied (13.6b) | representation |
+| `mutation_protocol` (aliasing operands, self-splice, allocation failures) | representation |
+| `cp18/cow_allocation` direct, growth and reference-model campaigns | representation |
+| `cp18/cow_allocation` ABI program, session campaign | production (no alias observed: `a := [n]` local; the session campaign checks recovery, not aliasing) |
+| `cp18/cow_semantics.py` `array-argument` (refused), `array-local` | production |
+| `cp19/ownership_review.cpp` (an evaluated array mutated through the protocol is seen by every C++ holder) | representation, on values produced by the production compiler: C++ holders, not script aliases |
+| `cp19/session.cpp` lines 91, 176 (commit 1): a C++ host's `VmSession::value` copy sees the next statement's mutation | **production, host-visible**: the one production-configuration alias visibility, through the embedding API (not scripts). It is the plan's approved B2 item "sessions stop cloning on statement mutation" (§8); flagged here for the reviewer |
+| `refrep_cli.py` (session atomicity, self-splice refused) | production |
+| `refrep_vm.cpp` every function, `session_atomicity` included | probe (its `VmSession` compiles with the probe objects: the earlier comment "guard on" there was wrong and is corrected in the identity-test commit) |
+
+No 1b port assumes B5 is live in production.
+
 ## 14. Commit 2: one mutation path (B), throw safety (D), probe isolation
 
 ### 14.1 Single mutation path (owner B), enforced structurally
@@ -582,3 +617,44 @@ profile) and the Phase A guard (`reference-guard:argument`).
   same stages in the same order. The protocol mutant builds compile it with the mutant define
   (it inlines the `mutation.h` stages mutants 4 and 5 change), and rt-lint's storage-write rule
   allows it as part of the protocol.
+
+### 14.5 Gates and performance (commit 2: `497e145f`, `4c08861a`, `ec7c885a`)
+
+Milestone commits preserve tested work; none certifies the checkpoint. Gate status per commit:
+
+- `497e145f` (B, D, probe): every gate below passed except `test-rt-lint` (`mutation.cpp` 414
+  lines > 400); fixed by `4c08861a` (the split).
+- `4c08861a`, each alone through the heavy-job gate: `nift`, `test-rt-lint` (0 problems, 8
+  self-test fixtures), `test-rt-protocol-compile-fail` (3 rejected, control compiles),
+  `test-rt-mutation-protocol` (191 checks), `-mutants` (M-B1a-e and 6: 6 of 6),
+  `test-rt-refrep` (62 checks; `test-rt-refrep-production` PASS), `-refrep-mutants` (R-B2-6,
+  R21, M-B2: 8 of 8), `test-runtime2-refrep-cli`, `-refsem`, `-refsem-mutants`, `-collections`,
+  `-collections-mutants`, `-safety`, `-vm-default`, `-cp14b`, `-args-cmd`, `-packages`,
+  `-coro-module`, `test-cp19-functional`, `test-cp19-session-cli`, `test-runtime2-cp22`, `-cp23`,
+  `-refsem-stale-vm`, `test-rt-value`: 0 each. Missed-suite lines (`missed.sh`): all 0 except
+  the pre-existing three (13.4). Classify diff: 1,816 and 589 units, 0 changes. Perf: array_set
+  393 (above F's 388): fixed by `ec7c885a`.
+- `ec7c885a` (tip of commit 2), with restart-safe result files (`scratchpad/b2/results-c2tip/`:
+  tree identity, command, exit status, log checksum per gate): `nift`, `test-rt-lint`,
+  `test-rt-protocol-compile-fail`, `test-rt-refrep`, `test-cp19-functional`,
+  `test-cp19-session-cli`, `test-runtime2-cp22`, `-cp23`, `make test-rt-vm` (2,541 s): 0 each.
+  Missed-suite lines: pre-existing three only. Classify diff: 0 changes. `test-rt-value-sanitize`: exit 2, two unported test calls (13.6b; fixed in `12f486bc`). The other sanitizer and TSan lanes, `test-rt-vm-sanitize` and the full `make test` run on the Linode (owner ruling: heavy validation off this host).
+
+Performance on `ec7c885a` (local callgrind, VM Ir/op; `d209febd` / `919b5669` / 1b `f01622cb` /
+commit 2):
+
+| Workload | `d209febd` | `919b5669` | 1b | commit 2 | F |
+| --- | --- | --- | --- | --- | --- |
+| `ops/array_push` | 382 | 384 | 366 | 368 | <= 382: pass |
+| `mutation/array_set` | 388 | 413 | 380 | 380 | <= 388: pass |
+| `mutation/array_push_pop` | 1,440 | 1,422 | 1,304 | 1,431 | <= base |
+| `mutation/array_insert_pop` | 2,462 | 2,421 | 2,209 | 2,446 | <= base |
+| `mutation/map_set` | 1,788 | 1,472 | 1,463 | 1,497 | <= base |
+| `mutation/set_add` | 1,366 | 1,341 | 1,337 | 1,364 | <= base (2 Ir margin) |
+| `mutation/stack_push_pop` | 2,240 | 2,123 | 2,121 | 2,192 | <= base |
+
+Where commit 2's instructions went: pop, insert and the collection mutators now run the
+protocol's out-of-line entry points (owner B: one implementation) instead of the VM's own inline
+commits, and `append_entry`'s reservation adds a capacity test (owner D). Every workload stays at
+or below `d209febd`; the margins against 1b are recorded for B5's performance work.
+`bench-rt-value`: PASS (copy -6.41 %, push -24.93 %, object set -24.18 %, get +0.03 %).
