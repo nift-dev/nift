@@ -132,11 +132,15 @@ inline void check_not_self(const HeapObject* receiver, const Value& stored) {
 
 // B2 (owner B): the construction API (array_push, object_set,
 // struct_add_field, *_build_*) is for a value its caller alone holds and is
-// still building. Checked builds abort on any other use: a shared or
-// immutable receiver must go through the mutation protocol (rt/mutation.h).
+// still building. Checked builds abort on a shared, immutable or (re-review
+// C2) sort-protected receiver: those must go through the mutation protocol
+// (rt/mutation.h). Its limit: it detects sharing, not publication. A published
+// value held by exactly one holder (a user binding in one register) also has
+// refcount 1 and passes; the boundary there is rt-lint's per-site annotation
+// (b2-refrep.md 17.2, 18).
 inline void check_fresh(const Value& value) {
 #ifdef NIFT_RT_RELOCATE_ON_MUTATION
-    if (value.refcount() != 1 || is_immutable(value.heap())) std::abort();
+    if (value.refcount() != 1 || is_immutable(value.heap()) || is_sort_protected(value.heap())) std::abort();
 #else
     (void)value;
 #endif

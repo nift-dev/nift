@@ -376,6 +376,79 @@ static void session_campaign() {
     CHECK(outstanding_allocations == base_allocations);
 }
 
+// Re-review LOW: a JSON object literal with nested arrays is a template that
+// LoadKFresh clones per evaluation (clone_constant). (1) clone_constant itself,
+// failing every allocation: nothing leaks, `out` stays null (no partially built
+// value escapes), the template is unchanged; on success every node is new.
+// (2) A program evaluating such a literal through the program API, failing every
+// run-time allocation: the run fails cleanly, nothing leaks, the next run is right.
+static void literal_campaign() {
+    using namespace nift::rt;
+    // Built outside the injection.
+    Value inner = make_array(1);
+    array_push(inner, make_string("a nested string long enough for the heap"));
+    Value list = make_array(3);
+    array_push(list, Value::integer(1));
+    array_push(list, inner);
+    array_push(list, make_string("another leaf string long enough for the heap"));
+    Value list2 = make_array(1);
+    array_push(list2, make_string("a third leaf string long enough for the heap"));
+    Value deep = make_object();
+    object_set(deep, keys[2], list2);  // a tree (a parsed literal shares no node)
+    Value tmpl = make_object();
+    object_set(tmpl, keys[0], list);
+    object_set(tmpl, keys[1], deep);
+    const std::string before = shown(tmpl);
+    Value out;
+    campaign("literal clone", [&] {
+        out = Value();
+        Value fresh;
+        try {
+            CHECK(clone_constant(tmpl, fresh, kNoCopyLimit) == CopyStatus::Ok);
+        } catch (...) {
+            CHECK(fresh.is_null());  // nothing partially built escapes
+            throw;
+        }
+        CHECK(shown(fresh) == before && fresh.heap() != tmpl.heap());
+        const Value* a = object_get(fresh, keys[0]);
+        CHECK(a && a->heap() != list.heap() && array_items(*a)[1].heap() != inner.heap());
+        out = Value();
+    }, [&] { return shown(tmpl) == before && out.is_null(); });
+
+    const char* text = "fn(f()) {\n  n := 0\n  for ((k, v) : {\"a\": [1, [2, \"s\"]], \"b\": {\"c\": [3]}}) {\n"
+                       "    n += 1\n  }\n  return n\n}\nprint(f())\nprint(f())\n";
+    nift_source source = {NIFT_SOURCE_TEXT, text, std::strlen(text), "literal.f", 9};
+    nift_program* program = nullptr;
+    nift_program_result* result = nullptr;
+    CHECK(nift_program_compile(&source, &program, &result) == NIFT_OK && program);
+    nift_program_result_free(result);
+    CHECK(nift_program_run(program, 0, 0, 0, &result) == NIFT_OK);  // warm interned names
+    nift_program_result_free(result);
+    const auto compiled_live = live();
+    const auto compiled_allocations = outstanding_allocations;
+    int sites = 0;
+    bool done = false;
+    for (long i = 0; i < 5000 && !done; ++i) {
+        result = nullptr; failed = false; remaining = i;
+        const auto status = nift_program_run(program, 0, 0, 0, &result);
+        remaining = -1;
+        if (failed) { ++sites; CHECK(status == NIFT_ERROR_INTERNAL && !result); }
+        else {
+            done = true;
+            CHECK(status == NIFT_OK && result && nift_program_result_outcome(result) == NIFT_PROGRAM_COMPLETE);
+            nift_string output{};
+            CHECK(nift_program_result_output(result, &output) == NIFT_OK && output.length == 4 &&
+                  std::memcmp(output.data, "2\n2\n", 4) == 0);
+        }
+        nift_program_result_free(result);
+        CHECK(live() == compiled_live);
+        CHECK(outstanding_allocations == compiled_allocations);
+    }
+    nift_program_free(program);
+    CHECK(done && sites > 5);
+    std::printf("literal program: %d run allocation sites; complete %d\n", sites, int(done));
+}
+
 int main() {
     using namespace nift::rt;
     for (int i = 0; i < 10; ++i) { char key[32]; std::snprintf(key,sizeof key,"cow-key-%d",i); keys[i] = atom(key); }
@@ -385,6 +458,7 @@ int main() {
     for (int which = 0; which < 7; ++which) growth_campaign(which);
     reference_model_campaigns();
     session_campaign();
+    literal_campaign();
     std::printf("COW final: %d failures\n",failures);
     std::fflush(stdout);
     return failures ? 1 : 0;

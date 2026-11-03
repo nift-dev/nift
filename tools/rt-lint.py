@@ -47,14 +47,26 @@ STORAGE_WRITE = re.compile(
     r'|\bStorage::|\bStorageTestAccess\b')
 # B2 review M1: the construction API (fresh values only; checked builds abort
 # otherwise) and the protocol's private sort commits. Each use outside the
-# files that implement them needs `// rt-lint: storage-ok fresh <why>` on the
+# files that implement them needs `// rt-lint: storage-ok <label>, <why>` on the
 # line (or alone on the line directly above it) (the value is one the code alone holds and has just made), and the sort
 # accessor (SortController, rt/sort_controller.h) is allowed only in the two
-# sort files.
+# sort files. Labels (re-review C2): `fresh` (a value the code alone holds and
+# has just made), `private-descriptor` (a cell's own selector descriptor,
+# refcount 1, never user-visible), `mutant-only` (inside a test-mutant #if).
+# Re-review C2: identifier tokens, not call syntax, so a qualified
+# (`rt::array_push`), parenthesised (`(array_push)(...)`), address-taken
+# (`&array_build_set`) or `using`-imported reference counts too. Only the
+# storage commits' own names (`Storage::`, `StorageTestAccess::`) are left to
+# the storage-write rule above.
 CONSTRUCTION = re.compile(
-    r'(?<![:.>\w])(array_push|array_build_storage|array_build_set|object_set|object_build_slot|struct_add_field|'
-    r'map_build_set|set_build_add|stack_build_push)\s*\(')
-SORT_ACCESS = re.compile(r'\b(SortController|sort_storage|sort_items|commit_permutation)\b|rt/sort_controller\.h')
+    r'(?<!Storage::)(?<!StorageTestAccess::)\b(array_push|array_build_storage|array_build_set|object_set|'
+    r'object_build_slot|struct_add_field|map_build_set|set_build_add|stack_build_push)\b')
+SORT_ACCESS = re.compile(r'\b(SortController|SortKey|sort_storage|sort_items|commit_permutation)\b')
+SORT_INCLUDE = re.compile(r'#\s*include\s*[<"][^">]*sort_controller\.h')
+ANNOTATION = re.compile(r'rt-lint: storage-ok (fresh|private-descriptor|mutant-only)')
+ANNOTATION_LINE = re.compile(r'\s*// rt-lint: storage-ok (fresh|private-descriptor|mutant-only)')
+# Token pasting can build any of the names above: each use needs `rt-lint: paste-ok <why>`.
+TOKEN_PASTE = re.compile(r'##')
 SORT_ALLOWED = {'collection_sort.cpp', 'collection_plain_sort.cpp', 'sort_controller.h', 'mutation.cpp', 'mutation.h'}
 STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'mutation_collection.cpp', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
                    'aggregate_collection.h', 'aggregate_store.h', 'support.cpp', 'support.h',
@@ -138,12 +150,16 @@ def lint_file(path, problems):
         stripped, in_comment = strip(line, in_comment)
         if storage_checked and 'rt-lint: storage-ok' not in line and STORAGE_WRITE.search(stripped):
             problems.append(f'{path}:{number}: storage-write: aggregate storage written outside the mutation protocol')
-        fresh_ok = 'rt-lint: storage-ok fresh' in line or (number > 1 and lines[number - 2].lstrip().startswith(
-            '// rt-lint: storage-ok fresh'))  # on the line, or a comment line directly above it
-        if storage_checked and not fresh_ok and CONSTRUCTION.search(stripped):
+        annotated = ANNOTATION.search(line) or (number > 1 and ANNOTATION_LINE.match(lines[number - 2]))
+        uses = CONSTRUCTION.findall(stripped)
+        if storage_checked and uses and not annotated:
             problems.append(f'{path}:{number}: storage-write: construction API without `rt-lint: storage-ok fresh`')
-        if os.path.basename(path) not in SORT_ALLOWED and SORT_ACCESS.search(line.split('//')[0]):
+        elif storage_checked and len(uses) > 1:  # one annotation covers one reference
+            problems.append(f'{path}:{number}: storage-write: {len(uses)} construction API references on one line')
+        if os.path.basename(path) not in SORT_ALLOWED and (SORT_ACCESS.search(stripped) or SORT_INCLUDE.search(line)):
             problems.append(f'{path}:{number}: storage-write: the protocol\'s sort commits outside the sort controller')
+        if TOKEN_PASTE.search(stripped) and 'rt-lint: paste-ok' not in line:
+            problems.append(f'{path}:{number}: storage-write: token pasting without `rt-lint: paste-ok`')
     for start, length in function_spans(lines):
         if length > MAX_FUNCTION:
             problems.append(f'{path}:{start}: function-length: function body of {length} lines > {MAX_FUNCTION}')
@@ -180,10 +196,14 @@ def self_test():
                 'bad_concern.cpp': {'one-concern'},
                 'bad_storage.cpp': {'storage-write'}, 'bad_storage.h': set(),
                 'bad_construction.cpp': {'storage-write'}, 'bad_construction.h': set(),
+                'bad_bypass_forms.cpp': {'storage-write'}, 'bad_bypass_forms.h': set(),
                 'good.cpp': set(), 'good.h': set()}
     # B2 review M1: exactly the five bypass lines fire (not the annotated
     # construction of a fresh value, not the protocol call).
-    lines = {'bad_construction.cpp': {6, 7, 8, 9, 10}}
+    lines = {'bad_construction.cpp': {6, 7, 8, 9, 10},
+             # re-review C2: every call form of rr/lint/vm_bypass.cpp, sort_bypass.cpp
+             # and the push_value patch
+             'bad_bypass_forms.cpp': {2, 3, 9, 12, 13, 14, 15, 17, 18, 20, 22, 23, 24}}
     failed = False
     for name, rules in sorted(expected.items()):
         found = {p.split(': ')[1] for p in lint([os.path.join(fixtures, name)])}

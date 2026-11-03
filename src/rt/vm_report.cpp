@@ -169,7 +169,7 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
         case OpCode::CallNative: return native(in, proto, R, output, fault);
         case OpCode::NewArray:
             out = make_array(in.c);
-            // rt-lint: storage-ok fresh, the literal being built
+            // rt-lint: storage-ok fresh, the value NewArray/NewObject just made
             for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);
             break;
         case OpCode::NewObject: out = make_object(); break;
@@ -185,7 +185,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             break;
         case OpCode::ObjectSet: {
             Value value = RK(in.c);
-            object_set(R[in.a], Atom{in.b}, std::move(value));  // rt-lint: storage-ok fresh, the literal being built
+            // rt-lint: storage-ok fresh, the value NewArray/NewObject just made
+            object_set(R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;

@@ -36,7 +36,9 @@ void append_group(Value& object,Atom key,const Value& item) {
     // rt-lint: storage-ok fresh, the native's new result
     if(!object_get(object,key))object_set(object,key,make_array());
     // rt-lint: storage-ok fresh, the native's fresh result
-    Value* group=object_build_slot(object,key);array_push(*group,item);
+    Value* group=object_build_slot(object,key);
+    // rt-lint: storage-ok fresh, the group array the native made just above (held only by its result)
+    array_push(*group,item);
 }
 void short_circuit(Value* s) {
 #if !defined(NIFT_COLLECTION_MUTANT) || NIFT_COLLECTION_MUTANT != 6
@@ -177,9 +179,11 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
         else if(method==M::Count)s[Result]=Value::integer(0);
         else if(method==M::GroupBy||method==M::IndexBy||method==M::Partition||method==M::CountBy||
                 method==M::GroupByEach)s[Result]=make_object();
-        // rt-lint: storage-ok fresh, the native's new result
-        if(method==M::Partition){object_set(s[Result],atom("matched"),make_array());object_set(s[Result],
-            atom("unmatched"),make_array());}
+        if(method==M::Partition){
+            // rt-lint: storage-ok fresh, the native's new result
+            object_set(s[Result],atom("matched"),make_array());
+            // rt-lint: storage-ok fresh, the native's new result
+            object_set(s[Result],atom("unmatched"),make_array());}
         if(method==M::SortBy){const std::size_t width=array_size(s[Directions]);
             if(width&&n>std::size_t(-1)/width/sizeof(Value))return raise(fault,StopReason::Internal,
             "memory budget exceeded");if(!budget(context,n*width*sizeof(Value),fault))return false;

@@ -144,9 +144,9 @@ inline const Note* note_at(const Proto* proto, const Instr* pc) {
 } // namespace
 #define RK(x) (((x) & kConstantBit) ? K[(x) & 0x7fffu] : R[(x)])
 #if NIFT_RT_COMPUTED_GOTO
-#define OP(name) L_##name:
+#define OP(name) L_##name:  // rt-lint: paste-ok dispatch labels
 #define DISPATCH() goto *labels[static_cast<std::size_t>(pc->op)]
-#define CHECKED(name) LC_##name:
+#define CHECKED(name) LC_##name:  // rt-lint: paste-ok dispatch labels
 #define UNCHECKED true
 #else
 #define OP(name) case OpCode::name:
@@ -231,7 +231,7 @@ VmResult Vm::run_loop(std::string& output) {
     if (!reserve_registers(proto->nregs + 1u)) return register_budget_exceeded();
     Value* R = stack_.data(); const Value* K = proto->constants.data(); const Instr* pc = proto->code.data();
 #if NIFT_RT_COMPUTED_GOTO
-#define NIFT_RT_LABEL(name) &&L_##name,
+#define NIFT_RT_LABEL(name) &&L_##name,  // rt-lint: paste-ok dispatch labels
     static const void* const kLabels[] = {NIFT_RT_OPCODES(NIFT_RT_LABEL)};
 #undef NIFT_RT_LABEL
     const void* checked_labels[std::size(kLabels)]; std::copy(std::begin(kLabels), std::end(kLabels), checked_labels);

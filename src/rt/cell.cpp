@@ -83,8 +83,9 @@ bool cell_read(const Value& cell, Value& value, std::string& missing) {
     }
     value = std::move(selected);
     if (CellObject* owner = cell_of(cell); owner && owner->binding_type == kSelectorCell) {
-        array_build_set(owner->value, 5, Value::boolean(true));  // rt-lint: storage-ok fresh, the cell's own descriptor
-        array_build_set(owner->value, 6, anchor);  // rt-lint: storage-ok fresh, the cell's own descriptor
+        // rt-lint: storage-ok private-descriptor, the cell's own
+        array_build_set(owner->value, 5, Value::boolean(true));
+        array_build_set(owner->value, 6, anchor);  // rt-lint: storage-ok private-descriptor, the cell's own
     }
     return true;
 }

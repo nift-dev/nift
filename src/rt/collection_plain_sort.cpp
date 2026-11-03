@@ -30,7 +30,8 @@ bool collection_plain_sort(Value* s,const natives::Context& context,Fault& fault
         return c?c<0:a<b;
     });
     // B1: the one commit (the order was built on the side)
-    mutation::SortController::commit_permutation(s[Source],order);
+    const mutation::SortKey key;
+    mutation::SortController::commit_permutation(key,s[Source],order);
     s[Result]=s[Source];return true;
 }
 }

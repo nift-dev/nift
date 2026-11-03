@@ -284,6 +284,12 @@ void identity() {
     expect("literal-nested-json", "fn(f()) { return {\"a\": [1], \"b\": {\"c\": [2]}} }\nx := f()\nn := x.a\n"
            "n.push(9)\nm := x.b\nq := m.c\nq.push(8)\ny := f()\nprint(y.stringify())\nya := y.a\n"
            "print(same(n, ya))\n", "{\"a\":[1],\"b\":{\"c\":[2]}}\nfalse\n");
+    // Re-review C3 (copy/deepcopy row): copy(x) is a new outer object sharing
+    // x's contents, which are this evaluation's own: a push through the copy is
+    // never seen by a later evaluation (with a shared constant it is).
+    expect("literal-copy", "fn(f()) { return {\"k\": [1]} }\nx := f()\nc := copy(x)\nck := c.k\nck.push(2)\n"
+           "d := deepcopy(x)\ndk := d.k\ndk.push(3)\ny := f()\nprint(x.k.length())\nprint(y.k.length())\n"
+           "print(same(c, x))\nprint(same(d, x))\n", "2\n1\nfalse\nfalse\n");
     expect("literal-alias", "fn(f()) { return {\"a\": [1]} }\nx := f()\nz := x\nn := z.a\nn.push(2)\n"
            "print(same(x, z))\nprint(x.a.length())\n", "true\n2\n");
     expect("id-async", "fn[async](w(x)) { x.push(9); return x.length() }\nfn(main()) {\n  a := [1]\n"

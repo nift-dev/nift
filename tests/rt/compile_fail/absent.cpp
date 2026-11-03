@@ -9,6 +9,7 @@
 #include "rt/aggregate.h"
 #include "rt/aggregate_collection.h"
 #include "rt/mutation.h"
+#include "rt/sort_controller.h"
 
 #include <type_traits>
 #include <vector>
@@ -91,6 +92,13 @@ struct has_free_permute<V, void_t<decltype(commit_permutation(std::declval<V&>()
 static_assert(!has_free_sort_storage<Value>::value && !has_free_permute<Value>::value,
               "a free sort commit is callable outside the protocol");
 }  // namespace freecheck
+
+// Re-review C1: the sort controller's accessors need a SortKey, which code
+// outside the three sort functions cannot make (private, user-provided
+// constructor: not an aggregate, so `SortKey{}` is no way around it either).
+static_assert(!std::is_default_constructible<nift::rt::mutation::SortKey>::value &&
+                  !std::is_aggregate<nift::rt::mutation::SortKey>::value,
+              "a SortKey can be made outside the sort controller");
 
 // Controls (the detectors can say yes): the construction API and a protocol
 // entry point are found and accessible.

@@ -123,6 +123,11 @@ SESSIONS = [
     # at every call, across statements.
     ("session_literal_fresh", 'fn(f()) {\n  n := 0\n  for ((k, v) : {"a": [1]}) {\n    v.push(5)\n'
      '    n = v.length()\n  }\n  return n\n}\nprint(f())\nprint(f())\n', ("parity",)),
+    # Re-review C3: the same within ONE statement (a session's two-statement
+    # form above passes even with the shared constant, R-B7 and 94bfce4b print
+    # 2 2 there; this one prints 2 3 4 on both and 2 2 2 when fresh).
+    ("session_literal_fresh_statement", 'fn(f()) {\n  n := 0\n  for ((k, v) : {"a": [1]}) {\n    v.push(5)\n'
+     '    n = v.length()\n  }\n  return n\n}\nfor (i : range(0, 3)) { print(f()) }\n', ("parity",)),
     ("session_saved_error", 'struct(C){v:=0;fn(fail()){throw error("original")}}\nc:=C()\n'
      'saved:=error("seed");try{c.fail()}catch(e){saved=e}\nprint(saved.message)\nprint(saved.source)\n', ("parity",)),
 ]

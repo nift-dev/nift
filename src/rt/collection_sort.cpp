@@ -27,7 +27,8 @@ State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<Byt
 // sort_storage at init (stage 3, after the instruction's stage 2.2), and
 // sort_items while the controller runs (no relocation, no allocation: drain).
 std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // rt-lint: storage-ok scratch
-std::vector<Value>& receiver_items(Value& v){return mutation::SortController::items(v);}
+using mutation::SortKey;
+std::vector<Value>& receiver_items(const SortKey& k,Value& v){return mutation::SortController::items(k,v);}
 Value moved_empty(Value* s,const Value& v) {
     if(v.is(Kind::Object))return s[sort_slot::EmptyObject];
     if(v.is(Kind::Array))return s[sort_slot::EmptyArray];
@@ -40,16 +41,16 @@ void move(Value* s,std::vector<Value>& src,std::size_t i,std::vector<Value>& dst
     Value empty=moved_empty(s,src[i]);
     dst[j]=std::move(src[i]);src[i]=std::move(empty);
 }
-void save(Value* s,std::size_t i) {
-    auto& a=receiver_items(s[Source]);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
+void save(const SortKey& k,Value* s,std::size_t i) {
+    auto& a=receiver_items(k,s[Source]);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
 }
-void restore(Value* s,std::size_t i){receiver_items(s[Source])[i]=std::move(s[Item]);}
+void restore(const SortKey& k,Value* s,std::size_t i){receiver_items(k,s[Source])[i]=std::move(s[Item]);}
 bool request(Value* s,State& t,const Value& l,const Value& r) {
     s[sort_slot::Left]=l;s[sort_slot::Right]=r;s[More]=Value::boolean(true);t.pending=true;return true;
 }
 // Generate the same fixed chunk/pass operations as libstdc++'s full-buffer
 // __stable_sort_adaptive. Comparison-dependent work stays in resume below.
-bool next(Value* s,State& t) {
+bool next(const SortKey& k,Value* s,State& t) {
     for(;;) {
         if(t.stage<2) {
             t.lo=t.stage? (t.n+1)/2:0;t.hi=t.stage?t.n:(t.n+1)/2;
@@ -78,7 +79,7 @@ bool next(Value* s,State& t) {
             ++t.stage;t.chunk=0;t.pass=0;continue;
         }
         if(t.stage==2) {
-            auto& a=receiver_items(s[Source]);auto& b=scratch(s[Keys]);const auto mid=(t.n+1)/2;
+            auto& a=receiver_items(k,s[Source]);auto& b=scratch(s[Keys]);const auto mid=(t.n+1)/2;
             if(mid<=t.n-mid) {
                 for(std::size_t q=0;q<mid;++q)move(s,a,q,b,q);
                 t.i=0;t.j=mid;t.k=0;t.mid=mid;t.end=t.n;t.op=3;
@@ -100,7 +101,8 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
         sizeof(State)+(2*n+(n+1)/2)*sizeof(Value)+512))
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     // Allocation is allowed here and before a request, never in drain.
-    mutation::SortController::storage(s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
+    const SortKey key;
+    mutation::SortController::storage(key,s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
     s[HashTable]=make_bytes({});auto& bytes=s[HashTable].heap_as<BytesObject>()->data;bytes.resize(sizeof(State));
     new(bytes.data()) State();heap_retally(s[HashTable].heap());
     s[Keys]=make_array((n+1)/2);scratch(s[Keys]).resize((n+1)/2);
@@ -125,6 +127,7 @@ bool collection_sort_active(const Value* s,std::size_t site) {
     return t.magic==0x4350313442534f52ull&&t.site==site&&!t.done;
 }
 bool collection_sort_resume(Value* s,bool answer,bool draining) {
+    const SortKey key;
     auto& t=state(s);
     if(t.done){s[More]=Value::boolean(false);return true;}
     if(!s[Source].is(Kind::Array)||array_size(s[Source])!=t.n)return false;
@@ -135,8 +138,8 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
     s[sort_slot::Left]=Value();s[sort_slot::Right]=Value();
     bool supplied=responding;
     for(;;) {
-        if(!t.op&&!next(s,t))return true;
-        auto& a=receiver_items(s[Source]);auto& b=scratch(s[Keys]);
+        if(!t.op&&!next(key,s,t))return true;
+        auto& a=receiver_items(key,s[Source]);auto& b=scratch(s[Keys]);
         if(t.op==1) {
             if(t.i>=t.end){t.op=0;continue;}
             if(t.phase==0) {
@@ -145,15 +148,15 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
             if(t.phase==1) {
                 if(!supplied)return false;
                 supplied=false;
-                if(answer){save(s,t.i);for(auto q=t.i;q>t.start;--q)move(s,a,q-1,a,q);restore(s,t.start);++t.i;
+                if(answer){save(key,s,t.i);for(auto q=t.i;q>t.start;--q)move(s,a,q-1,a,q);restore(key,s,t.start);++t.i;
                     t.phase=0;continue;}
-                save(s,t.i);t.j=t.i-1;t.k=t.i;t.phase=2;
+                save(key,s,t.i);t.j=t.i-1;t.k=t.i;t.phase=2;
                 return request(s,t,s[Item],a[t.j]);
             }
             if(!supplied)return false;
                 supplied=false;
             if(answer){move(s,a,t.j,a,t.k);t.k=t.j;if(t.j==0)return false;--t.j;return request(s,t,s[Item],a[t.j]);}
-            restore(s,t.k);++t.i;t.phase=0;continue;
+            restore(key,s,t.k);++t.i;t.phase=0;continue;
         }
         if(t.op==2) {
             auto& src=t.srcbuf?b:a;auto& dst=t.dstbuf?b:a;

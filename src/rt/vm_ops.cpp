@@ -296,7 +296,7 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
     // M-B2 (owner B): a bypass commit, the construction API on the receiver
     // instead of the protocol (no immutability, cycle or bookkeeping stages).
     if (integral && static_cast<std::uint64_t>(i) < array_size(object)) {
-        array_build_set(object, static_cast<std::size_t>(i), value);  // rt-lint: storage-ok fresh, mutant M-B2 only
+        array_build_set(object, static_cast<std::size_t>(i), value);  // rt-lint: storage-ok mutant-only, M-B2
         return true;
     }
 #endif
