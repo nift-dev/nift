@@ -351,6 +351,8 @@ separate.
 | `tests/runtime2/cp18/cow_negative.py` + `unsafe_unshare.txt` | ordinary-build control: unsafe `unshare` must fail allocation accounting | retargeted to `array_shallow_clone` with `unsafe_shallow_clone.txt` (new array unowned while items copy); detected in both modes |
 | `tests/runtime2/cp18/sanitize.py` | sanitizer lane over the `unshare` control | same lane over the shallow-clone control |
 | `tests/runtime2/cp18/cow_semantics.py`: `array-admitted` | pinned the COW result `2\n1\n` | `array-argument` (the guard refusal, `reference-guard:argument`) and `array-local` (an admitted mutation with the same output). `array-admitted` already failed at `919b5669` (the guard predates B2) |
+| `tests/rt/value_round2.cpp` `heap_accounting`: "copy-on-write clone is counted" (last at `ec7c885a`; found late, see 13.6b) | a write through a copy is tallied as the clone's storage | growth through an alias (the same array, 1,000 protocol pushes) is tallied |
+| `tests/rt/value_d040.cpp` `tag_masking` struct case: `struct_add_field` on a shared instance (last at `ec7c885a`) | a write to a shared struct lands in place | the receiver form `struct_set` of the existing field (construction stays on fresh values) |
 | `tests/runtime2/cp19/ownership_review.cpp`: COW ownership checks | a holder unchanged by another's mutation | an evaluated result is an owned value; a mutation through the protocol is seen through every holder, each holder keeps the object alive, no holder is null during a mutation |
 
 ### 13.2 New allocation-failure coverage (owner addition; ASan/LSan)
@@ -471,6 +473,20 @@ clean). Fix (`mutation.h`, mutant block only): M-B1a validates a copy of the ope
 defect (the commit before the validation) without undefined behaviour of its own; the production
 path binds the same name to the operand by reference (no code change). After the fix: 200 runs of
 `protocol-m1`, every one exit 1; valgrind: no invalid access; mutants 1-5 caught.
+
+### 13.6b Two ports found by the ASan lane on commit 2 (follow-up commit)
+
+`test-rt-value-sanitize` on `ec7c885a` aborted in `value-round2` and `value-d040`: commit 2's
+construction check (`check_fresh`, checked and sanitizer builds only) found two test calls that
+used the construction API on a shared value: `value_round2`'s "copy-on-write clone is counted"
+(never ported in 1b: without the check its byte bound still held through the array's capacity
+growth, so the ordinary lane passed) and `value_d040`'s struct `struct_add_field` on an alias.
+Both are ported (13.1). Verified with a checked build (`-DNIFT_RT_CHECKED_REFS` on the aggregate
+and protocol sources, the rest ordinary objects): value unit, regress, round 2 (1,030), D-040
+(191,750), property (2,132,609), destroy-OOM, `mutation_protocol` (209) and the CP19 ownership
+review (1,562): 0 failures. The remaining `test-rt-value-sanitize` steps on `ec7c885a` (the 12
+stale-reference controls, property, destroy-OOM both) passed when run from the already built
+binaries. The full lane is part of the Linode run.
 
 ### 13.7 Size (commit 1b)
 

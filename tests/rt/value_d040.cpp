@@ -833,7 +833,8 @@ void tag_masking() {
         if (clone.is(Kind::Array)) { clone = array_shallow_clone(marked); array_push(clone, I(9)); }
         if (clone.is(Kind::Object)) { clone = object_shallow_clone(marked); object_set(clone, atom("z"), I(9)); }
         if (clone.is(Kind::Struct)) {  // D-NEXT-refsem #1: a reference, written in place, never cloned
-            struct_add_field(clone, atom("z"), I(9));
+            // (B2: the receiver form; struct_add_field is construction on a fresh instance)
+            CHECK(struct_set(clone, atom("x"), I(9)));
             CHECK(clone.heap() == share.heap() && may_hold_identity(clone.heap()));
             continue;
         }

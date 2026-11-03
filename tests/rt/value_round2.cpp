@@ -21,6 +21,7 @@
 #include "rt/legacy_bridge.h"
 #include "rt/string.h"
 #include "rt_test.h"
+#include "rt/mutation.h"
 #include "storage_access.h"  // B2: the storage commits (tests only)
 
 #include <cstdio>
@@ -132,9 +133,13 @@ void heap_accounting() {
         Value nested = make_array();
         for (int k = 0; k < 1000; ++k) array_push(nested, make_string(std::string(100, 'z')));
         CHECK(live_heap_bytes() >= before + 20 * 4096 + 1000 * (100 + 16));
+        // B2 (b2-refrep.md 13.1): growth through an alias is counted (replaces
+        // "the copy-on-write clone is counted": the clone is gone, the alias is
+        // the same array, and its storage growth is what the tally must see).
         Value shared = nested;
-        array_push(shared, I(1));  // copy-on-write clone is counted
-        CHECK(live_heap_bytes() >= before + 20 * 4096 + 1000 * (100 + 16) + 1000 * sizeof(Value));
+        for (int k = 0; k < 1000; ++k) CHECK(mutation::push(shared, I(1), mutation::Env{}).ok());
+        CHECK(shared.heap() == nested.heap() && array_size(nested) == 2000);
+        CHECK(live_heap_bytes() >= before + 20 * 4096 + 1000 * (100 + 16) + 2000 * sizeof(Value));
         Value o = make_object();
         for (int k = 0; k < 200; ++k) object_set(o, atom("key" + std::to_string(k)), I(k));
         CHECK(object_remove(o, atom("key7")));
