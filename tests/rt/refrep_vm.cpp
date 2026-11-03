@@ -53,6 +53,7 @@ Ran probe(const std::string& source, const std::vector<std::string>* arguments =
     if (first_opaque_node(*ast, parsed.root) != kNoNode) { r.reason = "opaque"; return r; }
     std::vector<InvocationBinding> invocation;
     CompileLimits limits;
+    limits.cooperative_threads = true;  // thread() as a CP22 cooperative task (identity tests)
     if (arguments) {
         invocation = invocation_bindings("cmd", *arguments);
         limits.invocation = &invocation;
@@ -209,7 +210,8 @@ void transfer_immutability() {
 }
 
 // Owner requirement A: a failed mutation never erases or nulls a session
-// binding (the take is gone). Guard on: an ordinary VmSession.
+// binding (the take is gone). A VmSession of this binary: the probe configuration
+// (production: refrep_cli.py through real `nift -i`).
 void session_atomicity() {
     VmSession session;
     std::string out;
@@ -243,6 +245,66 @@ void session_atomicity() {
 }
 
 
+// Owner rulings 5 and 6 (b2-refrep.md, "identity"): same() is identity for
+// arrays and objects (an alias is the same, a distinct equal value is not,
+// a mutation through an alias keeps identity, copy/deepcopy are distinct),
+// through function arguments, closures and captures, nested mutation, thread
+// and async transfers (one alias-preserving copy: distinct from the source,
+// aliasing kept inside) and a persistent session.
+void identity() {
+    expect("id-array", "a := [1]\nb := a\nc := [1]\nprint(same(a, b))\nprint(same(a, c))\nb.push(2)\n"
+           "print(same(a, b))\nprint(a.length())\nd := copy(a)\ne := deepcopy(a)\nprint(same(a, d))\n"
+           "print(same(a, e))\n", "true\nfalse\ntrue\n2\nfalse\nfalse\n");
+    // Objects: the VM stores elements of arrays only (plain objects have no
+    // script-level store; object_put is covered at the representation layer),
+    // so a mutation through an object alias is shown through a member array.
+    expect("id-object", "o := {\"x\": [1]}\np := o\nq := {\"x\": [1]}\nprint(same(o, p))\nprint(same(o, q))\n"
+           "c := p.x\nc.push(2)\nprint(same(o, p))\nprint(o.x.length())\nd := copy(o)\ne := deepcopy(o)\n"
+           "print(same(o, d))\nprint(same(o, e))\n", "true\nfalse\ntrue\n2\nfalse\nfalse\n");
+    expect("id-argument", "fn(id(x)) { return x }\na := [1]\no := {}\nb := id(a)\np := id(o)\nprint(same(b, a))\n"
+           "print(same(p, o))\n", "true\ntrue\n");
+    expect("id-closure", "fn(main()) {\n  a := [1]\n  o := {\"k\": [1]}\n  f := () => a\n  g := () => o\n"
+           "  h := () => { a.push(2)\n c := o.k\n c.push(2)\n return 0 }\n  h()\n  x := f()\n  y := g()\n"
+           "  print(same(x, a))\n  print(same(y, o))\n  print(a.length())\n  print(o.k.length())\n  return 0\n}\n"
+           "main()\n", "true\ntrue\n2\n2\n");
+    expect("nested-mutation", "a := [[1]]\nb := a[0]\nb.push(2)\nprint(a.stringify())\no := {\"x\": [1]}\nc := o.x\n"
+           "c.push(2)\np := o\nprint(p.x.length())\nr := [{\"k\": [1]}]\ne := r[0]\nd := e.k\nd.push(5)\n"
+           "print(r[0].k.length())\nf := r[0]\nprint(same(e, f))\n", "[[1,2]]\n2\n2\ntrue\n");
+    expect("id-thread", "fn(w(x, y)) {\n  x.push(2)\n  return y.length()\n}\nfn(r(x)) { return x }\na := [1]\n"
+           "t := thread(w, a, a)\nprint(t.join())\nprint(a.length())\nu := thread(r, a)\nb := u.join()\n"
+           "print(same(a, b))\nprint(b.length())\no := {\"k\": 1}\nv := thread(r, o)\nc := v.join()\n"
+           "print(same(o, c))\n", "2\n1\nfalse\n1\nfalse\n");
+    expect("id-async", "fn[async](w(x)) { x.push(9); return x.length() }\nfn(main()) {\n  a := [1]\n"
+           "  f := w(a)\n  a.push(2)\n  print(await f)\n  print(a.length())\n  return 0\n}\nmain()\n", "2\n2\n");
+    // Session persistence (this binary's VmSession compiles with the probe).
+    VmSession session;
+    std::string out;
+    const auto run = [&](const std::string& source) {
+        out.clear();
+        const SessionResult r = session.execute(source, "<session>", out);
+        const bool ok = r.admitted && r.execution.reason == StopReason::None;
+        if (!ok) std::fprintf(stderr, "  session [%s]: refusal '%s' stop %d '%s'\n", source.c_str(),
+                              r.refusal.c_str(), int(r.execution.reason), r.execution.message.c_str());
+        return ok;
+    };
+    CHECK(run("a := [1]") && run("b := a") && run("b.push(2)"));
+    CHECK(session.value("a").heap() == session.value("b").heap() && array_size(session.value("a")) == 2);
+    const auto member = [&](const char* name) -> long {
+        const Value v = session.value(name);
+        const Value* x = v.is(Kind::Object) ? object_get(v, atom("x")) : nullptr;
+        return x && x->is(Kind::Array) ? static_cast<long>(array_size(*x)) : -1;
+    };
+    CHECK(run("o := {\"x\": [1]}") && run("p := o") && run("d := p.x") && run("d.push(2)"));
+    CHECK(session.value("o").heap() == session.value("p").heap() && member("o") == 2);
+    // (sessions refuse same(), builtin-lazy-args: identity is compared directly)
+    CHECK(session.value("a").heap() == session.value("b").heap());
+    CHECK(run("c := copy(a)") && session.value("c").heap() != session.value("a").heap());
+    CHECK(run("g := () => { a.push(3)\n e := o.x\n e.push(3)\n return 0 }") && run("g()"));
+    CHECK(array_size(session.value("b")) == 3 && member("p") == 3);
+    CHECK(run("try { a.push(b) } catch (e) { print(e.code) }") && out == "runtime.reference_cycle\n");
+    CHECK(array_size(session.value("a")) == 3 && session.value("a").heap() == session.value("b").heap());
+}
+
 } // namespace
 
 int main() {
@@ -253,5 +315,6 @@ int main() {
     immutability();
     transfer_immutability();
     session_atomicity();
+    identity();
     return rt_test::finish("refrep-vm");
 }

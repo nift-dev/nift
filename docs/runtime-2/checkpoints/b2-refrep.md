@@ -677,3 +677,30 @@ protocol's out-of-line entry points (owner B: one implementation) instead of the
 commits, and `append_entry`'s reservation adds a capacity test (owner D). Every workload stays at
 or below `d209febd`; the margins against 1b are recorded for B5's performance work.
 `bench-rt-value`: PASS (copy -6.41 %, push -24.93 %, object set -24.18 %, get +0.03 %).
+
+## 15. Identity and probe coverage (owner rulings 5 and 6)
+
+`tests/rt/refrep_vm.cpp` `identity()`, probe configuration only (13.8: production keeps refusing
+every program that could observe an alias, `refrep_cli.py` and the refsem suite):
+
+- arrays and objects: an alias is `same`, a distinct equal value is not, `copy` and `deepcopy`
+  are distinct; a mutation through an alias keeps identity and is seen through both (arrays
+  directly; objects through a member array, because the VM stores elements of arrays only:
+  plain objects have no script-level store, `type:element-assignment`/`static-error:member-assign`,
+  and in-place object writes are covered at the representation layer, `object_put`);
+- through a function argument and return; a closure's capture, read and mutated inside the
+  closure; nested mutation (an element array, an object's member array, an object inside an
+  array, `same(e, f)` on two reads of one element);
+- `thread()` (compiled as a CP22 cooperative task in this test, `cooperative_threads`): two
+  aliased arguments arrive as one alias-preserving copy (the callee's push is seen through its
+  second parameter), the caller's array is unchanged, and a returned array or object is a
+  distinct copy; async: the argument is copied at task creation (D7), so neither side sees the
+  other's push;
+- a persistent `VmSession` across statements: two bindings of one array are one heap object and
+  a push through one is seen through the other; the same for an object through its member
+  array; `copy` is a new object; a closure defined in one statement mutates both in a later one;
+  a cycle through the alias is refused across statements, the receiver unchanged. Sessions refuse
+  `same()` (`builtin-lazy-args:same`), so identity there is compared on the heap objects.
+
+Gate status (local, focused checks only, owner ruling of 2026-11-03): `test-rt-refrep` 79
+checks, 0 failures (production checks PASS); `test-rt-refrep-mutants` 8 of 8; `rt-lint` 0.
