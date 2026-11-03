@@ -1,4 +1,5 @@
 #include "rt/mutation.h"
+#include "rt/mutation_collection.h"
 
 #include "rt/aggregate.h"
 #include "rt/aggregate_store.h"
@@ -12,7 +13,8 @@
 #include <utility>
 
 // The mutation protocol (rt/mutation.h): stage functions, the array edit and
-// sort commits, and the validated entry points. Test-only mutants
+// sort commits, and the validated entry points for arrays, objects and
+// structs (collections: mutation_collection.cpp). Test-only mutants
 // (NIFT_MUTATION_MUTANT, tests/rt/mutation_protocol.cpp): 1 validates push
 // after its commit, 2 skips object_put's immutable check, 3 skips the heap
 // tally of an array edit's bookkeeping, 4 drops the inline stage 2.2 test
@@ -20,6 +22,32 @@
 // mutation.h, always inlined).
 
 namespace nift::rt::mutation {
+
+namespace internal {
+
+// The refusals are built out of line (B1-perf): a validated entry point's
+// success path then needs no frame for their text.
+Outcome failed(Failure failure, std::string text) {
+    Outcome out;
+    out.failure = failure;
+    out.text = std::move(text);
+    return out;
+}
+
+Outcome failed_text(Failure failure, const char* text) { return failed(failure, text); }
+
+Outcome budget_failure() { return failed_text(Failure::Budget, "memory budget exceeded"); }
+
+Outcome collection_admit_failure(const Value& receiver, CollectionKind sub, const char* method,
+                                 std::string_view receiver_text) {
+    if (!receiver.is(Kind::Collection) || collection_kind(receiver) != sub)
+        return failed(Failure::Kind, std::string(method) + ": receiver is not a " + collection_kind_name(sub));
+    return check_mutable(receiver, receiver_text);
+}
+
+} // namespace internal
+
+using namespace internal;
 
 namespace {
 
@@ -39,41 +67,11 @@ const char* receiver_kind_name(const Value& receiver) {
     }
 }
 
-// The refusals are built out of line (B1-perf): a validated entry point's
-// success path then needs no frame for their text.
-NIFT_MUTATION_COLD Outcome failed(Failure failure, std::string text) {
-    Outcome out;
-    out.failure = failure;
-    out.text = std::move(text);
-    return out;
-}
-
-NIFT_MUTATION_COLD Outcome failed_text(Failure failure, const char* text) { return failed(failure, text); }
-
-NIFT_MUTATION_COLD Outcome budget_failure() { return failed_text(Failure::Budget, "memory budget exceeded"); }
-
-NIFT_MUTATION_COLD Outcome collection_admit_failure(const Value& receiver, CollectionKind sub, const char* method,
-                                                    std::string_view receiver_text) {
-    if (!receiver.is(Kind::Collection) || collection_kind(receiver) != sub)
-        return failed(Failure::Kind, std::string(method) + ": receiver is not a " + collection_kind_name(sub));
-    return check_mutable(receiver, receiver_text);
-}
-
 NIFT_MUTATION_COLD Outcome no_field_failure(std::string_view receiver_text) {
     return failed(Failure::Bounds, "struct has no field: " + std::string(receiver_text));
 }
 
-// 2.1 then 2.2: the receiver kind (and collection sub-kind), then immutability.
-NIFT_MUTATION_INLINE bool admits_collection(const Value& receiver, CollectionKind sub) noexcept {
-    return receiver.is(Kind::Collection) && collection_kind(receiver) == sub && !refuses_mutation(receiver);
-}
-
 using detail::cycle_failure;
-
-// 2.4 for one stored operand (rt/mutation.h closes, with the Env's graph).
-NIFT_MUTATION_INLINE bool closes(const Value& receiver, const Value& stored, const Env& env) {
-    return mutation::closes(receiver, stored, env.graph);
-}
 
 // 2.4 for the elements an array operand contributes (splice's replacement):
 // the replacement array is not stored, only its elements, so the receiver
@@ -141,11 +139,6 @@ bool closes_cycle(const HeapObject* receiver, const Value& stored, const CycleGr
 #endif
 }
 
-std::size_t collection_reserve_bytes(const Value& collection, std::size_t step) noexcept {
-    const std::size_t n = collection_item_count(collection);
-    const std::size_t capacity = collection.heap_as<CollectionObject>()->items.capacity();
-    return n + step > capacity ? 2 * (n + step) * sizeof(Value) + 4 * (n + step) * sizeof(std::uint32_t) : 0;
-}
 
 void Protocol::commit_permutation(Value& array, std::vector<Value>& order) {
     auto& items = Storage::array_mut(array);
@@ -339,62 +332,6 @@ Outcome Protocol::field_set(Value& instance, Atom field, const Value& value, con
         return no_field_failure(env.receiver_text);
     if (closes(instance, value, env)) return cycle_failure(0);
     Storage::struct_set(instance, field, value);
-    return {};
-}
-
-Outcome Protocol::map_put(Value& map, const Value& key, const Value& value, const Env& env) {
-    if (!admits_collection(map, CollectionKind::Map))
-        return collection_admit_failure(map, CollectionKind::Map, "set", env.receiver_text);
-    if (!natives::collection_key_ok(key))
-        return failed_text(Failure::Argument, "map: key must be bool, number, or string");
-    if (closes(map, key, env)) return cycle_failure(0);
-    if (closes(map, value, env)) return cycle_failure(1);
-    if (!reserve(env.heap_limit, collection_reserve_bytes(map, 2))) return budget_failure();
-    Storage::map_set(map, key, value);
-    return {};
-}
-
-Outcome Protocol::set_insert(Value& set, const Value& member, const Env& env) {
-    if (!admits_collection(set, CollectionKind::Set))
-        return collection_admit_failure(set, CollectionKind::Set, "add", env.receiver_text);
-    if (!natives::collection_key_ok(member))
-        return failed_text(Failure::Argument, "add: set values must be bool, number, or string");
-    if (closes(set, member, env)) return cycle_failure(0);
-    if (!reserve(env.heap_limit, collection_reserve_bytes(set, 1))) return budget_failure();
-    Storage::set_add(set, member);
-    return {};
-}
-
-Outcome Protocol::collection_remove(Value& collection, const Value& key, Value* removed, const Env& env) {
-    const bool map = collection.is(Kind::Collection) && collection_kind(collection) == CollectionKind::Map;
-    const CollectionKind sub = map ? CollectionKind::Map : CollectionKind::Set;
-    if (!admits_collection(collection, sub))
-        return collection_admit_failure(collection, sub, "remove", env.receiver_text);
-    if (!map && !natives::collection_key_ok(key))
-        return failed_text(Failure::Argument, "remove: set values must be bool, number, or string");
-    const std::ptrdiff_t at = collection_find(collection, key);
-    if (at < 0)  // a missing member: no-op
-        return map ? failed_text(Failure::Bounds, "remove: key not found") : Outcome{};
-    if (removed) *removed = map ? collection_view(collection)[static_cast<std::size_t>(at) * 2 + 1] : key;
-    Storage::collection_erase(collection, static_cast<std::size_t>(at));
-    return {};
-}
-
-Outcome Protocol::stack_push(Value& stack, const Value& item, const Env& env) {
-    if (!admits_collection(stack, CollectionKind::Stack))
-        return collection_admit_failure(stack, CollectionKind::Stack, "push", env.receiver_text);
-    if (closes(stack, item, env)) return cycle_failure(0);
-    if (!reserve(env.heap_limit, collection_reserve_bytes(stack, 1))) return budget_failure();
-    Storage::stack_push(stack, item);
-    return {};
-}
-
-Outcome Protocol::stack_pop(Value& stack, Value* removed, const Env& env) {
-    if (!admits_collection(stack, CollectionKind::Stack))
-        return collection_admit_failure(stack, CollectionKind::Stack, "pop", env.receiver_text);
-    if (collection_size(stack) == 0) return failed_text(Failure::Bounds, "pop: collection is empty");
-    if (removed) *removed = collection_view(stack).back();
-    Storage::stack_pop(stack);
     return {};
 }
 

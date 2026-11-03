@@ -343,19 +343,21 @@ test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
 # narrows the hoisted cycle pre-filter; B2: 6 stores a map key before the
 # allocation that can fail, owner D) must each fail it (exit 1).
 RT_MUTATION_DIR := $(TEST_DIR)/rt/mutation
-# B2: mutant 6 (owner D) lives in aggregate_collection.cpp, built with the
-# same define as mutation.cpp for every mutant.
-RT_MUTATION_OBJECTS := $(filter-out src/rt/mutation.o src/rt/aggregate_collection.o,$(RT_VALUE_SOURCES:.cpp=.o)) \
-	src/RuntimeValue.o
+# B2: mutant 6 (owner D) lives in aggregate_collection.cpp; the protocol's
+# collection entry points are in mutation_collection.cpp (and inline the
+# mutation.h stages mutants 4 and 5 change): both are built with the same
+# define as mutation.cpp for every mutant.
+RT_MUTATION_SOURCES := src/rt/mutation.cpp src/rt/mutation_collection.cpp src/rt/aggregate_collection.cpp
+RT_MUTATION_OBJECTS := $(filter-out $(RT_MUTATION_SOURCES:.cpp=.o),$(RT_VALUE_SOURCES:.cpp=.o)) src/RuntimeValue.o
 RT_MUTATION_MUTANTS := 1 2 3 4 5 6
 $(RT_MUTATION_DIR)/protocol$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
 	mkdir -p "$(RT_MUTATION_DIR)"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp src/rt/mutation.cpp \
-		src/rt/aggregate_collection.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp $(RT_MUTATION_SOURCES) \
+		$(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
 $(RT_MUTATION_DIR)/protocol-m%$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_MUTATION_MUTANT=$* tests/rt/mutation_protocol.cpp \
-		src/rt/mutation.cpp src/rt/aggregate_collection.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+		$(RT_MUTATION_SOURCES) $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
 .PHONY: test-rt-mutation-protocol test-rt-mutation-protocol-mutants
 test-rt-mutation-protocol: $(RT_MUTATION_DIR)/protocol$(EXEEXT)
 	"$(RT_MUTATION_DIR)/protocol$(EXEEXT)"

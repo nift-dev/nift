@@ -16,7 +16,8 @@ Rules
   storage-write    B1 mutation protocol (b1-mutation.md): no direct write to
                    an aggregate's `items`/`entries`/`fields` storage, no raw
                    storage hand-out (array_mut, *_slot_mut) and no call of a
-                   receiver-mutating commit primitive outside rt/mutation.cpp,
+                   receiver-mutating commit primitive outside rt/mutation.cpp (and its
+                   collection half, mutation_collection.cpp),
                    the commit primitives (aggregate*.cpp), the construction
                    builders (natives/support) and the decoders. A line that
                    builds or tears down a fresh value it alone holds may say
@@ -44,7 +45,7 @@ STORAGE_WRITE = re.compile(
     r'|(?<!mutation::)(?<!Protocol::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|'
     r'struct_set|map_set|set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\('
     r'|\bStorage::|\bStorageTestAccess\b')
-STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
+STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'mutation_collection.cpp', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
                    'aggregate_collection.h', 'aggregate_store.h', 'support.cpp', 'support.h',
                    'isolate_transfer_decode.cpp', 'transfer_heap.cpp', 'isolate_snapshot.cpp'}
 LITERAL_COMPARE = re.compile(r'(==|!=)\s*"|"\s*(==|!=)|\bstrn?cmp\s*\(')

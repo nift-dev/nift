@@ -523,6 +523,16 @@ every insertion into a reallocation (quadratic, and a budget estimate of a whole
 insertion): four refsem budget fixtures (`heap/budget_{copy,deepcopy,snapshot,spawn}.f`) stopped
 before their `filled` line. Fixed by the `push_back` growth rule above.
 
+Also found by the gates: the one-call `mutation::splice` (natives, C++ callers) had been rewritten
+as the removal commit followed by the insertion commit, so an allocation failure in the
+insertion left the removal done (CP18 `cow_allocation` growth/splice: "size changed" after a
+failure, 1 site instead of 3), and its budget reservation shrank. Restored commit 1's form: the
+result is built on the side (every allocation, the removed array included, before any change),
+budget reserved for the side copy as before, then swapped into the receiver's own storage
+(identity kept; a self-splice only reads the receiver). After the fix: splice 3 sites, splice-self
+3, "COW final: 0 failures". The VM's two-instruction splice (c = 2 removal, c = 1 insertion, plan
+F2) is unchanged from commit 1.
+
 ### 14.3 Probe isolation (owner ruling 2)
 
 The reference probe is a compile-time test configuration only: `-DNIFT_RT_REFERENCE_PROBE` on
@@ -542,3 +552,10 @@ profile) and the Phase A guard (`reference-guard:argument`).
 - `RT_REFREP_OBJECTS` is spelled out from `RT_VALUE_SOURCES` (`CP19_EXPR_OBJECTS` is defined
   further down the Makefile, so a `:=` copy of it was empty and `refrep-vm` failed to link).
 - `cow_allocation.cpp` builds its fixtures with the construction API (`map_build_set`, ...).
+- `mutation.cpp` grew past rt-lint's 400-line one-concern limit with the restored splice (414):
+  the collection entry points (`map_put`, `set_insert`, `collection_remove`, `stack_push`,
+  `stack_pop`, `collection_reserve_bytes`) moved to `mutation_collection.cpp`, with the refusal
+  builders and stage helpers they share in `mutation_collection.h` (`mutation::internal`); the
+  same stages in the same order. The protocol mutant builds compile it with the mutant define
+  (it inlines the `mutation.h` stages mutants 4 and 5 change), and rt-lint's storage-write rule
+  allows it as part of the protocol.
