@@ -97,17 +97,25 @@ const std::vector<Value>& array_view(const Value& array) { return array.heap_as<
 // The storage is for the caller's own mutation (it relocated first): not a
 // hand-out of the result (review round 2: setting the bit here drained the
 // relocation credit on every VM mutation).
+#if defined(__GNUC__)
+#define NIFT_STORAGE_INLINE inline __attribute__((always_inline))
+#else
+#define NIFT_STORAGE_INLINE inline
+#endif
+
 namespace {
 
 // The storage edits, shared by the protocol's commits (Storage, private) and
-// the construction API (fresh values only).
-std::vector<Value>& raw_items(Value& array) {
+// the construction API (fresh values only). Always inlined into both (B2 F:
+// each caller is the edit itself, as the single B1 function was; the item is
+// forwarded by reference, so no second temporary is made).
+NIFT_STORAGE_INLINE std::vector<Value>& raw_items(Value& array) {
     array_write(array);
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
     return array.heap_as<ArrayObject>()->items;
 }
 
-void append(Value& array, Value item) {
+NIFT_STORAGE_INLINE void append(Value& array, Value&& item) {
     array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
@@ -115,7 +123,7 @@ void append(Value& array, Value item) {
     heap_retally(array.heap());
 }
 
-void replace(Value& array, std::size_t index, Value item) {
+NIFT_STORAGE_INLINE void replace(Value& array, std::size_t index, Value&& item) {
     array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
@@ -203,7 +211,7 @@ const Value* object_get(const Value& object, Atom key) {
 }
 
 namespace {
-void put(Value& object, Atom key, Value value) {
+NIFT_STORAGE_INLINE void put(Value& object, Atom key, Value&& value) {
     ObjectObject& o = object_mut(object);
     check_not_self(&o, value);
     note_store(&o, value);
