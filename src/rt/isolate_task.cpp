@@ -127,7 +127,7 @@ TransferStatus transfer_values(const std::vector<Value>& values, const TransferP
     decoded.clear();
     if (values.empty()) return TransferStatus::Ok;
     Value root = make_array(values.size());
-    for (const Value& value : values) array_push(root, value);
+    for (const Value& value : values) array_push(root, value);  // rt-lint: storage-ok fresh, new root
     TransferGraph graph;
     TransferStatus status = graph.encode(root, source, error);
     if (status != TransferStatus::Ok) return status;

@@ -39,6 +39,7 @@ bool from_document(const Context& context, json::Document& doc, Value& out) {
             for (auto& entry : doc.object) {
                 Value v;
                 if (!from_document(context, entry.second, v)) return false;
+                // rt-lint: storage-ok fresh, new result
                 object_set(object, atom(entry.first), static_cast<Value&&>(v));
             }
             out = static_cast<Value&&>(object);

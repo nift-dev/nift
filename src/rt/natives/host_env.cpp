@@ -90,6 +90,7 @@ Status host_env(const Context& context, const Value* args, std::uint32_t argc, V
         if (!reserve_result(context, accounted))
             return fail_host(call, host::HostStatus::Limit,
                              host_error("limit.exceeded", "env: result exceeds the memory budget"), error);
+        // rt-lint: storage-ok fresh, new result
         object_set(out, atom(text.substr(0, eq)), make_string(text.substr(eq + 1)));
     }
     if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;

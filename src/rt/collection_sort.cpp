@@ -4,6 +4,7 @@
 #include "rt/heap.h"
 #include "rt/heap_account.h"
 #include "rt/mutation.h"
+#include "rt/sort_controller.h"
 #include "rt/string.h"
 #include <algorithm>
 #include <cstring>
@@ -26,7 +27,7 @@ State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<Byt
 // sort_storage at init (stage 3, after the instruction's stage 2.2), and
 // sort_items while the controller runs (no relocation, no allocation: drain).
 std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // rt-lint: storage-ok scratch
-std::vector<Value>& receiver_items(Value& v){return mutation::Protocol::sort_items(v);}
+std::vector<Value>& receiver_items(Value& v){return mutation::SortController::items(v);}
 Value moved_empty(Value* s,const Value& v) {
     if(v.is(Kind::Object))return s[sort_slot::EmptyObject];
     if(v.is(Kind::Array))return s[sort_slot::EmptyArray];
@@ -99,7 +100,7 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
         sizeof(State)+(2*n+(n+1)/2)*sizeof(Value)+512))
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     // Allocation is allowed here and before a request, never in drain.
-    mutation::sort_storage(s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
+    mutation::SortController::storage(s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
     s[HashTable]=make_bytes({});auto& bytes=s[HashTable].heap_as<BytesObject>()->data;bytes.resize(sizeof(State));
     new(bytes.data()) State();heap_retally(s[HashTable].heap());
     s[Keys]=make_array((n+1)/2);scratch(s[Keys]).resize((n+1)/2);
@@ -108,6 +109,7 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
     // aggregate may otherwise grow the runtime destruction worklist. This
     // scratch holds elements, not the source array.
     s[sort_slot::KeepAlive]=make_array(n);
+    // rt-lint: storage-ok fresh, new keep-alive
     for(const Value& value:array_items(s[Source]))array_push(s[sort_slot::KeepAlive],value);
     s[sort_slot::EmptyObject]=make_object();s[sort_slot::EmptyArray]=make_array();
         s[sort_slot::EmptyString]=make_string("");

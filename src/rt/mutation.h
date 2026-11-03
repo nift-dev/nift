@@ -162,13 +162,13 @@ NIFT_MUTATION_COLD Outcome cycle_failure(std::size_t operand);
 // B2 (b2-refrep.md, owner requirement B): the protocol is one class, the only
 // production friend of rt::Storage, whose private members are the storage
 // commits. Every public member is a validated entry point (stages 2-4, in
-// order) or a commit reached only after the caller's validation inside the
-// protocol (the sort commits). The VM's mutating instructions (Push,
+// order); the sort commits are private, for the sort controller only. The VM's mutating instructions (Push,
 // SetIndex, ArrayMutate, KeyedMutate, FieldSet, CollectionSort) and the
 // natives call these; nothing else can reach a receiver's storage
 // (tests/rt/compile_fail: a bypass does not compile; rt-lint storage-write
 // stays as defence in depth). The namespace-level functions below are the
 // same entry points under their B1 names.
+struct SortController;  // rt/sort_controller.h (the comparator and plain sorts only)
 class Protocol {
 public:
     // push and set, the per-element hot paths, are inline: stages 2.1-2.2
@@ -234,6 +234,14 @@ public:
     static Outcome stack_push(Value& stack, const Value& item, const Env& env);
     static Outcome stack_pop(Value& stack, Value* removed, const Env& env);
     static Outcome clear(Value& receiver, const Env& env);
+
+private:
+    // B2 review M1: the sort commits hand out or rewrite a receiver's storage
+    // after the sort instruction's own stage 2.2, so they are private; their
+    // only friend is the sort controller's accessor (rt/sort_controller.h,
+    // included by collection_sort.cpp and collection_plain_sort.cpp only;
+    // rt-lint flags it anywhere else; tests/rt/compile_fail/absent.cpp).
+    friend struct SortController;
     // Plain sort's single commit (after the instruction's stage 2.2 and its
     // incomparable check): element i of the result is element order[i] (an
     // Int) of the receiver. `order` is a permutation built on the side.
@@ -245,7 +253,6 @@ public:
     // allocation: the drain on an error unwind must not allocate).
     static std::vector<Value>& sort_items(Value& array) noexcept { return array.heap_as<ArrayObject>()->items; }
 
-private:
     enum class ArrayEdit : std::uint8_t { Pop, Remove, Insert, Clear, Reverse, SpliceRemove, SpliceInsert };
     static void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,
                              const Value& operand);
@@ -287,7 +294,5 @@ inline Outcome collection_remove(Value& c, const Value& k, Value* removed, const
 inline Outcome stack_push(Value& s, const Value& v, const Env& e) { return Protocol::stack_push(s, v, e); }
 inline Outcome stack_pop(Value& s, Value* removed, const Env& e) { return Protocol::stack_pop(s, removed, e); }
 inline Outcome clear(Value& r, const Env& e) { return Protocol::clear(r, e); }  // arrays and collections
-inline void commit_permutation(Value& a, std::vector<Value>& order) { Protocol::commit_permutation(a, order); }
-inline std::vector<Value>& sort_storage(Value& a) { return Protocol::sort_storage(a); }
 
 } // namespace nift::rt::mutation

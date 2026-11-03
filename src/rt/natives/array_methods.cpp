@@ -298,7 +298,8 @@ Status arr_from_entries(const Context&, const Value* args, std::uint32_t argc, V
         if (!generated_key(*key, "from_entries", rendered, error)) return Status::Error;
         const Atom name = atom(rendered);
         if (object_get(result, name)) return fail(error, "from_entries: duplicate generated key '" + rendered + "'");
-        object_set(result, name, *value);  // result is fresh: `entry`, `key`, `value` stay valid
+        // rt-lint: storage-ok fresh, result is fresh: `entry`, `key`, `value` stay valid
+        object_set(result, name, *value);
     }
     out = static_cast<Value&&>(result);
     return Status::Ok;

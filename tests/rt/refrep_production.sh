@@ -43,5 +43,13 @@ out=$(cd "$tmp" && NIFT_VM=require "$nift" guard.f 2>&1); rc=$?
 if [ $rc -eq 0 ] || ! printf '%s' "$out" | grep -q 'reference-guard'; then
   echo "FAIL: production reference guard not applied: rc=$rc $out"; fail=1
 else echo "PASS production keeps the reference guard ($(printf '%s' "$out" | grep -o '(reference-guard[^)]*)' | head -1))"; fi
+# Review L5: the probe also lifts the legacy location-alias refusal (compiler_rules.cpp
+# no_alias), which the marker symbol (compiler.cpp) does not witness: production must
+# still refuse an object alias with exactly `aliasing`.
+printf 'o := {"k": 1}\nc := o\nprint(c.k)\n' > "$tmp/alias.f"
+out=$(cd "$tmp" && NIFT_VM=require "$nift" alias.f 2>&1); rc=$?
+if [ $rc -eq 0 ] || ! printf '%s' "$out" | grep -q '(aliasing)'; then
+  echo "FAIL: production location-alias refusal not applied: rc=$rc $out"; fail=1
+else echo "PASS production keeps the location-alias refusal (aliasing)"; fi
 [ $fail -eq 0 ] && echo "PASS reference probe: test configuration only (absent from $(basename "$nift") and $(basename "$lib"))"
 exit $fail

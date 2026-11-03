@@ -66,7 +66,7 @@ bool task_op_allowed(OpCode op) {
         case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq:
         case OpCode::JmpNotNe: case OpCode::JmpIncLt: case OpCode::Call: case OpCode::CallNative:
         case OpCode::Return: case OpCode::ReturnNull: case OpCode::NewArray: case OpCode::NewObject:
-        case OpCode::MakeImmutable:
+        case OpCode::MakeImmutable: case OpCode::LoadKFresh:
         case OpCode::ObjectSet: case OpCode::GetIndex: case OpCode::SetIndex: case OpCode::GetMember:
         case OpCode::Push: case OpCode::Length: case OpCode::GetGlobal: case OpCode::GetGlobalChecked:
         case OpCode::SetGlobal: case OpCode::MarkGlobal: case OpCode::CheckGlobal: case OpCode::LoadFunction:

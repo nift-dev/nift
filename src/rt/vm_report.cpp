@@ -3,6 +3,7 @@
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
+#include "rt/copy_graph.h"
 #include "rt/error.h"
 #include "rt/heap.h"
 #include "rt/cell.h"
@@ -168,13 +169,23 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
         case OpCode::CallNative: return native(in, proto, R, output, fault);
         case OpCode::NewArray:
             out = make_array(in.c);
+            // rt-lint: storage-ok fresh, the literal being built
             for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);
             break;
         case OpCode::NewObject: out = make_object(); break;
         case OpCode::MakeImmutable: mutation::make_immutable(R[in.a]); return true;
+        case OpCode::LoadKFresh:  // B2 (b2-refrep.md 17, H1): a constant is a description; every
+                                  // evaluation is a new graph, each nested aggregate fresh (clone_constant)
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 31
+            out = K[in.b];  // R-B7: the literal is the one shared pool constant again
+#else
+            if (clone_constant(K[in.b], out, heap_limit_) != CopyStatus::Ok)
+                return raise(fault, StopReason::Internal, "memory budget exceeded");
+#endif
+            break;
         case OpCode::ObjectSet: {
             Value value = RK(in.c);
-            object_set(R[in.a], Atom{in.b}, std::move(value));
+            object_set(R[in.a], Atom{in.b}, std::move(value));  // rt-lint: storage-ok fresh, the literal being built
             return true;
         }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;

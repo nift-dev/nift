@@ -31,7 +31,7 @@ bool Vm::mutation_failed(Fault& fault, const Proto* proto, const Instr& in, cons
                          const HeapObject* receiver, const Value& stored, const std::string& legacy_text) {
     using mutation::Failure;
     if (outcome.failure == Failure::Budget) return raise(fault, StopReason::Internal, "memory budget exceeded");
-    if (outcome.failure != Failure::Cycle) return raise(fault, StopReason::Error, outcome.text);
+    if (outcome.failure != Failure::Cycle) return raise_refusal(fault, outcome);
     const std::string text = !legacy_text.empty() && legacy_reference_cycle(receiver, stored)
                                  ? legacy_text
                                  : std::string("reference cycle: the stored value would contain itself");
@@ -63,7 +63,8 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
         case K::MapSet: {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 14
             if (natives::collection_key_ok(s[Item]))
-                map_build_set(c, s[Item], s[Returned]);  // R14: the store before the refusal (bypasses the protocol)
+                // rt-lint: storage-ok fresh, R14: the store before the refusal (bypasses the protocol)
+                map_build_set(c, s[Item], s[Returned]);
 #endif
             const mutation::Outcome out = mutation::map_put(c, s[Item], s[Returned], env());
             if (!out.ok()) return failed(out, out.operand ? &s[Returned] : &s[Item], out.operand ? legacy : nullptr);

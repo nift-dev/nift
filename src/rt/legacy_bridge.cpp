@@ -48,7 +48,7 @@ bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::strin
         }
         Value v;
         if (!convert_from(entry.second, v, error, depth + 1)) return false;
-        object_set(out, key, static_cast<Value&&>(v));
+        object_set(out, key, static_cast<Value&&>(v));  // rt-lint: storage-ok fresh, the new conversion
     }
     return true;
 }
@@ -75,7 +75,7 @@ bool convert_from(const nift::RuntimeValue& legacy, Value& out, std::string& err
             for (const auto& item : legacy.array) {
                 Value v;
                 if (!convert_from(item, v, error, depth + 1)) return false;
-                array_push(out, static_cast<Value&&>(v));
+                array_push(out, static_cast<Value&&>(v));  // rt-lint: storage-ok fresh, the new conversion
             }
             return true;
         }

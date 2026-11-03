@@ -53,8 +53,9 @@ bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string
             Value seeds = make_array();
             const auto g = record->program->main().nregs;
             for (std::size_t i = 0; i < g; ++i)
+                // rt-lint: storage-ok fresh, new seeds
                 array_push(seeds, i < record->input.globals.size() ? record->input.globals[i] : Value());
-            for (const auto& v : record->input.args) array_push(seeds, v);
+            for (const auto& v : record->input.args) array_push(seeds, v);  // rt-lint: storage-ok fresh, new seeds
             if (record->input.seed_graph.encode(seeds, *record->proto_map, error) != TransferStatus::Ok) return false;
             record->input.has_seed_graph = true;
             record->input.argc = record->input.args.size();

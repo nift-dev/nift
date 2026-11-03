@@ -34,7 +34,8 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
         s[Result]=s[Item];return memory_ok(fault);}
     // B1 (rt/mutation.h): stage 2.2, the object's immutability, before bounds.
     if(mutation::refuses_mutation(s[Source])){const Note* note=proto->note(&in-proto->code.data());
-        return fail(mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view()).text);}
+        return raise_refusal(fault,
+            mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view()));}
     // B2 (owner B): the arguments are converted with legacy's texts, then the
     // protocol's entry point runs the remaining stages (bounds, cycle for each
     // stored value, budget) and the one commit: there is no second
@@ -66,8 +67,12 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
                 count))return fail("splice: invalid index/count");
                 const auto n=array_size(s[Source]);index=std::min(index,n);count=std::min(count,n-index);
                 s[Index]=Value::integer(index);s[Length]=Value::integer(count);
-                // a.splice(i, k, a): the replacement is the receiver before the removal.
-                if(in.c==2&&s[Keys].is_heap()&&s[Keys].heap()==s[Source].heap())s[Keys]=array_shallow_clone(s[Keys]);
+                // a.splice(i, k, a): the replacement is the receiver before the removal. The
+                // copy's storage is reserved first (stage 2.5; review L4), after 2.1-2.2 above.
+                if(in.c==2&&s[Keys].is_heap()&&s[Keys].heap()==s[Source].heap()){
+                    if(!mutation::reserve(heap_limit_,n*sizeof(Value)+128))
+                        return raise(fault,StopReason::Internal,"memory budget exceeded");
+                    s[Keys]=array_shallow_clone(s[Keys]);}
                 out=mutation::Protocol::splice_remove(s[Source],index,count,in.c==2?&s[Keys]:nullptr,&s[Result],env);
             } else {
                 index=static_cast<std::size_t>(s[Index].as_int());

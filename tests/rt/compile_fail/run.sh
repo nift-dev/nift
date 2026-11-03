@@ -28,6 +28,7 @@ check() { local f=$1 name=$2
 check bypass_storage.cpp array_set
 check bypass_removed.cpp map_set
 check bypass_commit.cpp commit_array
+check bypass_sort.cpp sort_items
 if out=$("$cxx" "${flags[@]}" -fsyntax-only "$dir/control.cpp" 2>&1); then echo "PASS compile-fail control compiles"
 else echo "FAIL compile-fail control does not compile:"; printf '%s\n' "$out" | head -5; fail=1; fi
 exit $fail

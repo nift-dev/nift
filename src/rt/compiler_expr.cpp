@@ -313,7 +313,15 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
             std::uint16_t k = 0;
             if (!fb_->constant(parsed, k)) return builder_ok();
             fb_->set_offset(node.begin);
-            fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(k & ~kConstantBit));
+            // B2 (b2-refrep.md section 17, review H1). Invariant: a compiled
+            // constant is a description, not a runtime instance. Arrays and
+            // objects are references, so an aggregate constant is a template
+            // and every evaluation loads a new deep copy (budget reserved
+            // first): the outer value and every nested array or object in it
+            // are fresh (recursive freshness), never the shared pool object.
+            const bool aggregate = parsed.is(Kind::Array) || parsed.is(Kind::Object);
+            fb_->emit(aggregate ? OpCode::LoadKFresh : OpCode::LoadK, dst,
+                      static_cast<std::uint16_t>(k & ~kConstantBit));
             return true;
         }
     }

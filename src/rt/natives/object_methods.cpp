@@ -34,8 +34,8 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
         if (what == Listing::Keys) { result.push(make_string(atom_text(entry.first))); continue; }
         if (what == Listing::Values) { result.push(entry.second); continue; }
         Value pair = make_object();
-        object_set(pair, key_atom, make_string(atom_text(entry.first)));
-        object_set(pair, value_atom, entry.second);
+        object_set(pair, key_atom, make_string(atom_text(entry.first)));  // rt-lint: storage-ok fresh, new result
+        object_set(pair, value_atom, entry.second);  // rt-lint: storage-ok fresh, new result
         result.push(static_cast<Value&&>(pair));
     }
     out = result.finish();
@@ -46,6 +46,7 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
 // of merge/merge_deep before the other side's entries are applied.
 Value shallow_object(const Value& source) {
     Value out = make_object();
+    // rt-lint: storage-ok fresh, new result
     for (const auto& entry : object_view(source)) object_set(out, entry.first, entry.second);
     return out;
 }
@@ -62,9 +63,9 @@ bool merge_deep(const Value& left, const Value& right, Value& result, int level,
             const Value inner = *existing;  // copied out: object_set below invalidates `existing`
             Value child;
             if (!merge_deep(inner, entry.second, child, level + 1, error)) return false;
-            object_set(merged, entry.first, static_cast<Value&&>(child));
+            object_set(merged, entry.first, static_cast<Value&&>(child));  // rt-lint: storage-ok fresh, new result
         } else {
-            object_set(merged, entry.first, entry.second);
+            object_set(merged, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
         }
     }
     result = static_cast<Value&&>(merged);
@@ -186,6 +187,7 @@ Status obj_merge(const Context&, const Value* args, std::uint32_t argc, Value& o
 #else
     Value result = shallow_object(args[0]);
 #endif
+    // rt-lint: storage-ok fresh, new result
     for (const auto& entry : object_entries(args[1])) object_set(result, entry.first, entry.second);
     out = static_cast<Value&&>(result);
     return Status::Ok;
@@ -211,7 +213,7 @@ Status obj_pick(const Context&, const Value* args, std::uint32_t argc, Value& ou
     for (std::string_view pattern : wanted)
         for (const auto& entry : entries)
             if (!object_get(result, entry.first) && key_matches(pattern, atom_text(entry.first)))
-                object_set(result, entry.first, entry.second);
+                object_set(result, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
     out = static_cast<Value&&>(result);
     return Status::Ok;
 }
@@ -225,7 +227,7 @@ Status obj_omit(const Context&, const Value* args, std::uint32_t argc, Value& ou
         bool drop = false;
         for (std::string_view pattern : wanted)
             if (key_matches(pattern, atom_text(entry.first))) { drop = true; break; }
-        if (!drop) object_set(result, entry.first, entry.second);
+        if (!drop) object_set(result, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
     }
     out = static_cast<Value&&>(result);
     return Status::Ok;

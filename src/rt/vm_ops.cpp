@@ -32,6 +32,11 @@ bool raise(Fault& fault, StopReason reason, std::string message) {
     return false;
 }
 
+bool raise_refusal(Fault& fault, const mutation::Outcome& out) {
+    fault.sort_protected = out.failure == mutation::Failure::SortProtected;
+    return raise(fault, StopReason::Error, out.text);
+}
+
 bool internal(Fault& fault, const char* what) {
     return raise(fault, StopReason::Internal, std::string("unexpected operands (compiler defect): ") + what);
 }
@@ -86,7 +91,7 @@ __attribute__((cold, noinline))
 bool refused(Fault& fault, const mutation::Outcome& out) {
     if (out.failure == mutation::Failure::Cycle)  // a caller without a catchable path (C++ tests)
         return raise(fault, StopReason::Error, "reference cycle: the stored value would contain itself");
-    return raise(fault, StopReason::Error, out.text);
+    return raise_refusal(fault, out);
 }
 
 #if defined(__GNUC__)
@@ -291,7 +296,7 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
     // M-B2 (owner B): a bypass commit, the construction API on the receiver
     // instead of the protocol (no immutability, cycle or bookkeeping stages).
     if (integral && static_cast<std::uint64_t>(i) < array_size(object)) {
-        array_build_set(object, static_cast<std::size_t>(i), value);
+        array_build_set(object, static_cast<std::size_t>(i), value);  // rt-lint: storage-ok fresh, mutant M-B2 only
         return true;
     }
 #endif

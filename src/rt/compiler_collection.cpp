@@ -2,6 +2,7 @@
 #include "rt/collection.h"
 #include "rt/aggregate.h"
 #include "rt/literal.h"
+#include "rt/mutation.h"
 #include "rt/string.h"
 
 // rt-lint: cold-file compile-time collection loop lowering
@@ -69,8 +70,10 @@ bool UnitCompiler::collection_call(const Node& node,std::uint16_t dst,int method
                 Value decoded;if(!decode_string_literal(text(direction),decoded))return fail(node,"method:sort_by");
                 desc=string_view_of(decoded)=="desc";
             }
-            array_push(directions,Value::boolean(desc));
+            array_push(directions,Value::boolean(desc));  // rt-lint: storage-ok fresh, new directions
         }
+        // An internal constant, read only by the step (never user-visible): immutable.
+        mutation::make_immutable(directions);
         std::uint16_t constant=0;if(!fb_->constant(directions,constant))return false;
         fb_->emit(OpCode::LoadK,state+Directions,constant&0x7fffu);
     }

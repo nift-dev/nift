@@ -379,7 +379,8 @@ test-rt-vm: test-rt-mutation-protocol-mutants
 RT_REFREP_DIR := $(TEST_DIR)/rt/refrep
 RT_REFREP_MUTANTS := 24:src/rt/aggregate.cpp 25:src/rt/copy_graph.cpp 26:src/rt/natives/object_methods.cpp \
 	27:src/rt/vm_iter.cpp 28:src/rt/collection_helpers.cpp 29:src/rt/isolate_transfer_encode.cpp \
-	21:src/rt/mutation.cpp 30:src/rt/vm_ops.cpp
+	21:src/rt/mutation.cpp 30:src/rt/vm_ops.cpp \
+	31:src/rt/vm_report.cpp
 RT_REFREP_PROBE_SOURCES := src/rt/compiler.cpp src/rt/compiler_rules.cpp src/rt/compiler_collection_sort.cpp
 RT_REFREP_PROBE_OBJECTS := $(patsubst src/rt/%.cpp,$(RT_REFREP_DIR)/probe/%.o,$(RT_REFREP_PROBE_SOURCES))
 # CP19_EXPR_OBJECTS (defined further down, so spelled out) with the probe objects.
@@ -415,7 +416,9 @@ test-rt-vm: test-rt-refrep-mutants
 # completion, S2 unwind and S4 run exit (and destruction) keep the protection;
 # S5 never sets it. (No S3: a cooperative task cannot hold a protection across
 # its teardown, the program is refused; a parallel task's VM releases at its
-# run exit, S4.)
+# run exit, S4.) Then the review-M2 control: mutation.cpp built with
+# NIFT_SORT_WORDING_TEST words the refusal differently, and refrep_vm must
+# still PASS (same catchability and code: no classification by text).
 RT_SORT_MUTANTS := 1 2 4 5
 .PHONY: test-rt-sort-protection-mutants
 test-rt-sort-protection-mutants: test-rt-refrep
@@ -429,6 +432,14 @@ test-rt-sort-protection-mutants: test-rt-refrep
 			echo "FAIL sort-protection mutant S$$n survived"; exit 1; fi; \
 		echo "PASS sort-protection mutant S$$n caught: $$(grep -m1 'case' "$(RT_REFREP_DIR)/s$$n.log")"; \
 		rm -f "$(RT_REFREP_DIR)/refrep-s$$n$(EXEEXT)" "$(RT_REFREP_DIR)/s$$n.o"; done
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SORT_WORDING_TEST -c src/rt/mutation.cpp -o "$(RT_REFREP_DIR)/wording.o"
+	@objs=$$(printf '%s\n' $(RT_REFREP_OBJECTS) | grep -vx src/rt/mutation.o); \
+		$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $$objs "$(RT_REFREP_DIR)/wording.o" $(LDLIBS) \
+			-o "$(RT_REFREP_DIR)/refrep-wording$(EXEEXT)" || exit 2; \
+		if "$(RT_REFREP_DIR)/refrep-wording$(EXEEXT)" > "$(RT_REFREP_DIR)/wording.log" 2>&1; then \
+			echo "PASS sort-protection wording control: reworded refusal keeps its kind, catchability and code"; \
+		else cat "$(RT_REFREP_DIR)/wording.log"; echo "FAIL sort-protection wording control"; exit 1; fi; \
+		rm -f "$(RT_REFREP_DIR)/refrep-wording$(EXEEXT)" "$(RT_REFREP_DIR)/wording.o"
 test-rt-vm: test-rt-sort-protection-mutants
 # B2 (owner B): a storage commit outside the mutation protocol does not compile.
 .PHONY: test-rt-protocol-compile-fail

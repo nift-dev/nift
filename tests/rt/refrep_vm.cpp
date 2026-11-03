@@ -277,6 +277,15 @@ void identity() {
            "t := thread(w, a, a)\nprint(t.join())\nprint(a.length())\nu := thread(r, a)\nb := u.join()\n"
            "print(same(a, b))\nprint(b.length())\no := {\"k\": 1}\nv := thread(r, o)\nc := v.join()\n"
            "print(same(o, c))\n", "2\n1\nfalse\n1\nfalse\n");
+    // Review H1 (case table; probe rows: production refuses these aliases, `lent`/`aliasing`):
+    // a literal is a description, every evaluation a new graph, nested aggregates included.
+    expect("literal-nested-array", "fn(f()) { return [[1], [2]] }\nx := f()\ne := x[0]\ne.push(9)\ny := f()\n"
+           "print(y.stringify())\nprint(same(x, y))\n", "[[1],[2]]\nfalse\n");
+    expect("literal-nested-json", "fn(f()) { return {\"a\": [1], \"b\": {\"c\": [2]}} }\nx := f()\nn := x.a\n"
+           "n.push(9)\nm := x.b\nq := m.c\nq.push(8)\ny := f()\nprint(y.stringify())\nya := y.a\n"
+           "print(same(n, ya))\n", "{\"a\":[1],\"b\":{\"c\":[2]}}\nfalse\n");
+    expect("literal-alias", "fn(f()) { return {\"a\": [1]} }\nx := f()\nz := x\nn := z.a\nn.push(2)\n"
+           "print(same(x, z))\nprint(x.a.length())\n", "true\n2\n");
     expect("id-async", "fn[async](w(x)) { x.push(9); return x.length() }\nfn(main()) {\n  a := [1]\n"
            "  f := w(a)\n  a.push(2)\n  print(await f)\n  print(a.length())\n  return 0\n}\nmain()\n", "2\n2\n");
     // Session persistence (this binary's VmSession compiles with the probe).

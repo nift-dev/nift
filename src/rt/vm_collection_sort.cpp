@@ -93,7 +93,7 @@ bool Vm::op_collection_sort(const Instr& in,Value* R,Fault& fault,const Proto* p
         const Note* note=proto->note(&in-proto->code.data());
         const auto out=mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view());
         const auto site=static_cast<std::size_t>(&in-proto->code.data());
-        if(!out.ok())ok=raise(fault,StopReason::Error,out.text);
+        if(!out.ok())ok=raise_refusal(fault,out);
         else{protect_sort(s[Source],static_cast<std::size_t>(s-stack_.data()),site);
             ok=collection_sort_init(s,context,fault,site);}}
     else if(!s[Returned].is(Kind::Bool))ok=raise(fault,StopReason::Error,"sort: comparator must return bool");

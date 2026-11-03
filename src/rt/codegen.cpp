@@ -48,11 +48,6 @@ bool FunctionBuilder::constant(const Value& value, std::uint16_t& index) {
     }
     if (pool.size() >= kMaxConstants) { error_ = "too many constants"; return false; }
     pool.push_back(value);
-    // B2 (b2-refrep.md, defensive): an array or object constant is shared by
-    // every evaluation of its LoadK, so it is immutable (a mutation would be
-    // refused, never seen by a later evaluation). No reachable program loads
-    // one into a mutable place (the audit: sort_by's internal directions).
-    if (value.is(Kind::Array) || value.is(Kind::Object)) mark_immutable(pool.back().heap());
     index = static_cast<std::uint16_t>((pool.size() - 1) | kConstantBit);
     return true;
 }

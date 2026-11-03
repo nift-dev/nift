@@ -44,6 +44,11 @@ struct Fault {
     std::string code;
     bool catchable = false;
     bool use_call_site = false;  // diagnostic position belongs to the active call site
+    // B2 (owner E, review M2): the protocol refused a mutation because the
+    // receiver's comparator sort is running (Failure::SortProtected). Set only
+    // where that outcome is raised (raise_refusal); Vm::handle_bail turns it
+    // into the catchable runtime.sort_receiver_mutated. Never inferred from text.
+    bool sort_protected = false;
 };
 
 inline constexpr std::int64_t kSafeInteger = std::int64_t(1) << 53;
@@ -59,6 +64,12 @@ int vm_mutant();
 
 bool raise(Fault& fault, StopReason reason, std::string message);
 bool internal(Fault& fault, const char* what);
+namespace mutation {
+struct Outcome;
+}
+// An ordinary refusal of the mutation protocol (not a cycle or a budget stop):
+// the Error with its text, marking a sort-protection refusal (Fault::sort_protected).
+bool raise_refusal(Fault& fault, const mutation::Outcome& out);
 
 // Legacy's large_num: an exact big number or |n| >= 2^53.
 bool is_large(const Value& value);

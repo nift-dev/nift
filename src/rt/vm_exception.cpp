@@ -42,11 +42,11 @@ bool Vm::handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K,
                      std::size_t& base, const Instr*& pc) {
     if (fault.large) note_large(pc, fault);
     // B2 (owner E): the protocol's refusal of a mutation of an array whose
-    // comparator sort is running is a catchable Error with its own code,
-    // whichever instruction or native raised the refusal text (the protocol
-    // is the only source of that text, rt/mutation.h).
-    if (fault.reason == StopReason::Error && !fault.catchable &&
-        fault.message.find(mutation::kSortReceiverMutated) != std::string::npos)
+    // comparator sort is running is a catchable Error with its own code. The
+    // kind is carried structurally (Fault::sort_protected, set by
+    // raise_refusal where Failure::SortProtected is raised), never inferred
+    // from the message (review M2: a message can echo any source text).
+    if (fault.reason == StopReason::Error && !fault.catchable && fault.sort_protected)
         raise_catchable(fault, "runtime.sort_receiver_mutated", fault.message, proto,
                         report_offset(fault, proto, pc));
 #if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)

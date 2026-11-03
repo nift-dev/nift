@@ -57,6 +57,7 @@ namespace nift::rt {
     X(NewArray)   /* R[a] = [R[b] .. R[b+c-1]]                                  */                    \
     X(NewObject)  /* R[a] = {}                                                  */                    \
     X(MakeImmutable) /* R[a]'s object refuses every mutation (B2: injected args) */                 \
+    X(LoadKFresh) /* R[a] = a deep copy of K[b] (B2: an array/object literal, fresh per evaluation) */ \
     X(ObjectSet)  /* R[a][atom b] = R[c] (object literal construction)          */                    \
     X(GetIndex)   /* R[a] = R[b][RK[c]]                                         */                    \
     X(SetIndex)   /* R[a][RK[b]] = RK[c]                                        */                    \

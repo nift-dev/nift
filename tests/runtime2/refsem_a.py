@@ -119,6 +119,10 @@ SESSIONS = [
     # method from an earlier statement, caught and saved, keeps its message and
     # source (the 16-bit session kinds turned `c` into a string, so the
     # statement was refused and `saved` kept its seed).
+    # B2 review H1: a session function's JSON-spelled object literal is fresh
+    # at every call, across statements.
+    ("session_literal_fresh", 'fn(f()) {\n  n := 0\n  for ((k, v) : {"a": [1]}) {\n    v.push(5)\n'
+     '    n = v.length()\n  }\n  return n\n}\nprint(f())\nprint(f())\n', ("parity",)),
     ("session_saved_error", 'struct(C){v:=0;fn(fail()){throw error("original")}}\nc:=C()\n'
      'saved:=error("seed");try{c.fail()}catch(e){saved=e}\nprint(saved.message)\nprint(saved.source)\n', ("parity",)),
 ]

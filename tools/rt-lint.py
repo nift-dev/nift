@@ -45,6 +45,17 @@ STORAGE_WRITE = re.compile(
     r'|(?<!mutation::)(?<!Protocol::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|'
     r'struct_set|map_set|set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\('
     r'|\bStorage::|\bStorageTestAccess\b')
+# B2 review M1: the construction API (fresh values only; checked builds abort
+# otherwise) and the protocol's private sort commits. Each use outside the
+# files that implement them needs `// rt-lint: storage-ok fresh <why>` on the
+# line (or alone on the line directly above it) (the value is one the code alone holds and has just made), and the sort
+# accessor (SortController, rt/sort_controller.h) is allowed only in the two
+# sort files.
+CONSTRUCTION = re.compile(
+    r'(?<![:.>\w])(array_push|array_build_storage|array_build_set|object_set|object_build_slot|struct_add_field|'
+    r'map_build_set|set_build_add|stack_build_push)\s*\(')
+SORT_ACCESS = re.compile(r'\b(SortController|sort_storage|sort_items|commit_permutation)\b|rt/sort_controller\.h')
+SORT_ALLOWED = {'collection_sort.cpp', 'collection_plain_sort.cpp', 'sort_controller.h', 'mutation.cpp', 'mutation.h'}
 STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'mutation_collection.cpp', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
                    'aggregate_collection.h', 'aggregate_store.h', 'support.cpp', 'support.h',
                    'isolate_transfer_decode.cpp', 'transfer_heap.cpp', 'isolate_snapshot.cpp'}
@@ -127,6 +138,12 @@ def lint_file(path, problems):
         stripped, in_comment = strip(line, in_comment)
         if storage_checked and 'rt-lint: storage-ok' not in line and STORAGE_WRITE.search(stripped):
             problems.append(f'{path}:{number}: storage-write: aggregate storage written outside the mutation protocol')
+        fresh_ok = 'rt-lint: storage-ok fresh' in line or (number > 1 and lines[number - 2].lstrip().startswith(
+            '// rt-lint: storage-ok fresh'))  # on the line, or a comment line directly above it
+        if storage_checked and not fresh_ok and CONSTRUCTION.search(stripped):
+            problems.append(f'{path}:{number}: storage-write: construction API without `rt-lint: storage-ok fresh`')
+        if os.path.basename(path) not in SORT_ALLOWED and SORT_ACCESS.search(line.split('//')[0]):
+            problems.append(f'{path}:{number}: storage-write: the protocol\'s sort commits outside the sort controller')
     for start, length in function_spans(lines):
         if length > MAX_FUNCTION:
             problems.append(f'{path}:{start}: function-length: function body of {length} lines > {MAX_FUNCTION}')
@@ -162,13 +179,22 @@ def self_test():
                 'bad_concern.h': {'one-concern'},
                 'bad_concern.cpp': {'one-concern'},
                 'bad_storage.cpp': {'storage-write'}, 'bad_storage.h': set(),
+                'bad_construction.cpp': {'storage-write'}, 'bad_construction.h': set(),
                 'good.cpp': set(), 'good.h': set()}
+    # B2 review M1: exactly the five bypass lines fire (not the annotated
+    # construction of a fresh value, not the protocol call).
+    lines = {'bad_construction.cpp': {6, 7, 8, 9, 10}}
     failed = False
     for name, rules in sorted(expected.items()):
         found = {p.split(': ')[1] for p in lint([os.path.join(fixtures, name)])}
         if found != rules:
             print(f'FAIL rt-lint self-test {name}: expected {sorted(rules)}, got {sorted(found)}')
             failed = True
+        if name in lines:
+            at = {int(p.split(':')[1]) for p in lint([os.path.join(fixtures, name)])}
+            if at != lines[name]:
+                print(f'FAIL rt-lint self-test {name}: expected lines {sorted(lines[name])}, got {sorted(at)}')
+                failed = True
     print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected)} fixtures')
     return 1 if failed else 0
 

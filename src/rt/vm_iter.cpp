@@ -82,7 +82,9 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
 #else
         const bool reverse = kind == CollectionKind::Stack;
 #endif
+        // rt-lint: storage-ok fresh, new key/snapshot array
         if (reverse) for (std::size_t k = items.size(); k-- > 0;) array_push(array, items[k]);
+        // rt-lint: storage-ok fresh, new key/snapshot array
         else for (const Value& item : items) array_push(array, item);
         source = std::move(array);  // R[a] is the loop's own snapshot register
         return memory_ok(fault);
@@ -149,6 +151,7 @@ bool Vm::op_object_keys(const Instr& in, Value* R, Fault& fault) {
     if (source.is(Kind::Collection) && collection_kind(source) == CollectionKind::Map) {  // D-063: typed keys
         const auto& items = collection_view(source);
         Value keys = make_array(items.size() / 2);
+        // rt-lint: storage-ok fresh, new key/snapshot array
         for (std::size_t k = 0; k < items.size(); k += 2) array_push(keys, items[k]);
         R[in.a] = std::move(keys);
         return true;
@@ -158,8 +161,10 @@ bool Vm::op_object_keys(const Instr& in, Value* R, Fault& fault) {
     Value keys = make_array(entries.size());
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 7
     for (std::size_t k = entries.size(); k-- > 0;)  // M6: object order changed
+        // rt-lint: storage-ok fresh, new key/snapshot array
         array_push(keys, make_string(atom_text(entries[k].first)));
 #else
+    // rt-lint: storage-ok fresh, new key/snapshot array
     for (const auto& entry : entries) array_push(keys, make_string(atom_text(entry.first)));
 #endif
     R[in.a] = std::move(keys);

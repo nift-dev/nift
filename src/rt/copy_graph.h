@@ -41,4 +41,11 @@ CopyStatus deep_copy(const Value& source, Value& out, std::size_t heap_limit);
 CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit,
                            bool keep_immutable = false);
 
+// B2 (b2-refrep.md 17, review H1): the per-evaluation copy of an array/object
+// constant (a parsed JSON literal: a tree of arrays and objects whose leaves are
+// scalars and strings, no sharing, no cycle). A new array/object for every node
+// (recursive freshness), leaves shared (immutable); the whole footprint is
+// reserved against `heap_limit` first. Cheaper than deep_copy (no identity map).
+CopyStatus clone_constant(const Value& source, Value& out, std::size_t heap_limit);
+
 } // namespace nift::rt

@@ -34,8 +34,9 @@ declare -A FILE=(
   [21]=src/rt/mutation.cpp            # B2: array/object receivers skip the cycle check (the B1 transition rule; was: the take's pre-check)
   [22]=src/rt/compiler_array_mutation.cpp  # a splice stores its removal before the replacement's cycle check
   [23]=src/rt/compiler_array_mutation.cpp  # only a captured splice evaluates its arguments first (review round 4)
+  [31]=src/rt/vm_report.cpp           # B2 review H1: an object literal loads the one shared pool constant (no fresh copy)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 31)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

@@ -347,7 +347,7 @@ VmResult Vm::run_loop(std::string& output) {
     OP(ErrorNew) { if (!op_error_new(*pc, R, fault)) FAIL(); NEXT(); }
     OP(ErrorJson) { if (!op_error_json(*pc, R, fault)) FAIL(); NEXT(); }
     OP(Nop) OP(Div) OP(Not) OP(Truth) OP(Neg) OP(Pos) OP(CallNative) OP(NewArray) OP(NewObject) OP(MakeImmutable)
-    OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NewStruct)
+    OP(LoadKFresh) OP(ObjectSet) OP(TypeMeet) OP(GetIndex) OP(SetIndex) OP(GetMember) OP(Push) OP(Length) OP(NewStruct)
     OP(StructAdd) OP(FieldGet) OP(FieldSet) OP(CheckField) {
         if (!cold(*pc, proto, note_at(proto, pc), R, K, output, fault) || !memory_ok(fault))
             FAIL();

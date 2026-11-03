@@ -128,6 +128,7 @@ private:
     static void fill_shallow(const Value& source, Value& copy) {
         if (source.is(Kind::Collection)) { copy = collection_shallow_clone(source); return; }
         if (source.is(Kind::Struct)) {
+            // rt-lint: storage-ok fresh, the new copy
             for (const auto& f : struct_fields(source)) struct_add_field(copy, f.first, f.second);
             return;
         }
@@ -136,10 +137,13 @@ private:
 #endif
     void fill(const Value& source, Value& copy) const {
         if (source.is(Kind::Array)) {
+            // rt-lint: storage-ok fresh, the new copy
             for (const Value& item : array_items(source)) array_push(copy, mapped(item));
         } else if (source.is(Kind::Object)) {
+            // rt-lint: storage-ok fresh, the new copy
             for (const auto& entry : object_entries(source)) object_set(copy, entry.first, mapped(entry.second));
         } else if (source.is(Kind::Struct)) {
+            // rt-lint: storage-ok fresh, the new copy
             for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, mapped(field.second));
         } else {
             const auto& items = collection_items(source);
@@ -148,11 +152,13 @@ private:
             // inserted in order, the index is rebuilt as the source's.
             if (kind == CollectionKind::Map) {
                 for (std::size_t k = 0; k + 1 < items.size(); k += 2)
-                    map_build_set(copy, items[k], mapped(items[k + 1]));  // fresh copy
+                    map_build_set(copy, items[k], mapped(items[k + 1]));  // rt-lint: storage-ok fresh, fresh copy
             } else if (kind == CollectionKind::Set) {
-                for (const Value& member : items) set_build_add(copy, mapped(member));  // fresh copy
+                // rt-lint: storage-ok fresh, fresh copy
+                for (const Value& member : items) set_build_add(copy, mapped(member));
             } else {
-                for (const Value& item : items) stack_build_push(copy, mapped(item));  // fresh copy
+                // rt-lint: storage-ok fresh, fresh copy
+                for (const Value& item : items) stack_build_push(copy, mapped(item));
             }
         }
     }
@@ -177,6 +183,7 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
     if (source.is(Kind::Struct)) {
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
         Value copy = make_struct(struct_type(source), struct_fields(source).size());
+        // rt-lint: storage-ok fresh, the new copy
         for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, field.second);
         out = std::move(copy);
         return CopyStatus::Ok;
@@ -191,7 +198,9 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
         return CopyStatus::Ok;
 #endif
         Value copy = source.is(Kind::Array) ? make_array(array_size(source)) : make_object();
+        // rt-lint: storage-ok fresh, the new copy
         if (source.is(Kind::Array)) for (const Value& item : array_view(source)) array_push(copy, item);
+        // rt-lint: storage-ok fresh, the new copy
         else for (const auto& entry : object_view(source)) object_set(copy, entry.first, entry.second);
         out = std::move(copy);
         return CopyStatus::Ok;
@@ -206,6 +215,43 @@ CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, s
     if (!graph.discover(values, count, heap_limit)) return CopyStatus::Budget;
     graph.link(keep_immutable);
     for (std::size_t k = 0; k < count; ++k) out[k] = graph.mapped(values[k]);
+    return CopyStatus::Ok;
+}
+
+namespace {
+std::size_t constant_bytes(const Value& v) {
+    if (v.is(Kind::Array)) {
+        std::size_t bytes = estimate(v.heap());
+        for (const Value& item : array_view(v)) bytes += constant_bytes(item);
+        return bytes;
+    }
+    if (v.is(Kind::Object)) {
+        std::size_t bytes = estimate(v.heap());
+        for (const auto& entry : object_view(v)) bytes += constant_bytes(entry.second);
+        return bytes;
+    }
+    return 0;
+}
+Value clone_tree(const Value& v) {
+    if (v.is(Kind::Array)) {
+        const auto& items = array_view(v);
+        Value copy = make_array(items.size());
+        for (const Value& item : items) array_push(copy, clone_tree(item));  // rt-lint: storage-ok fresh, the copy
+        return copy;
+    }
+    if (v.is(Kind::Object)) {
+        Value copy = make_object();
+        // rt-lint: storage-ok fresh, the copy
+        for (const auto& entry : object_view(v)) object_set(copy, entry.first, clone_tree(entry.second));
+        return copy;
+    }
+    return v;  // a scalar or a string: immutable, shared
+}
+} // namespace
+
+CopyStatus clone_constant(const Value& source, Value& out, std::size_t heap_limit) {
+    if (!fits(constant_bytes(source), heap_limit)) return CopyStatus::Budget;
+    out = clone_tree(source);
     return CopyStatus::Ok;
 }
 

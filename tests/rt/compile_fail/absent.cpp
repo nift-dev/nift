@@ -11,6 +11,7 @@
 #include "rt/mutation.h"
 
 #include <type_traits>
+#include <vector>
 #include <utility>
 
 namespace probe {
@@ -65,6 +66,31 @@ template <class P, class = void> struct can_commit : std::false_type {};
 // Its address, so only the function's own access decides (not ArrayEdit's).
 template <class P> struct can_commit<P, void_t<decltype(&P::commit_array)>> : std::true_type {};
 static_assert(!can_commit<nift::rt::mutation::Protocol>::value, "the protocol's commit is accessible");
+
+// B2 review M1: the sort commits are private (their only friend is the sort
+// controller's accessor, rt/sort_controller.h), and the B1 free re-exports
+// (mutation::sort_storage, mutation::commit_permutation) are gone.
+template <class P, class = void> struct can_sort_storage : std::false_type {};
+template <class P> struct can_sort_storage<P, void_t<decltype(&P::sort_storage)>> : std::true_type {};
+template <class P, class = void> struct can_sort_items : std::false_type {};
+template <class P> struct can_sort_items<P, void_t<decltype(&P::sort_items)>> : std::true_type {};
+template <class P, class = void> struct can_permute : std::false_type {};
+template <class P> struct can_permute<P, void_t<decltype(&P::commit_permutation)>> : std::true_type {};
+static_assert(!can_sort_storage<nift::rt::mutation::Protocol>::value &&
+                  !can_sort_items<nift::rt::mutation::Protocol>::value &&
+                  !can_permute<nift::rt::mutation::Protocol>::value,
+              "a sort commit of the protocol is accessible outside the sort controller");
+namespace freecheck {
+using namespace nift::rt::mutation;
+template <class V, class = void> struct has_free_sort_storage : std::false_type {};
+template <class V> struct has_free_sort_storage<V, void_t<decltype(sort_storage(std::declval<V&>()))>> : std::true_type {};
+template <class V, class = void> struct has_free_permute : std::false_type {};
+template <class V>
+struct has_free_permute<V, void_t<decltype(commit_permutation(std::declval<V&>(), std::declval<std::vector<V>&>()))>>
+    : std::true_type {};
+static_assert(!has_free_sort_storage<Value>::value && !has_free_permute<Value>::value,
+              "a free sort commit is callable outside the protocol");
+}  // namespace freecheck
 
 // Controls (the detectors can say yes): the construction API and a protocol
 // entry point are found and accessible.
