@@ -1,4 +1,5 @@
 #include "rt/compiler.h"
+#include "rt/reference_probe.h"
 #include "rt/session_alias.h"
 #include "rt/session_history.h"
 #include "rt/session_shape.h"
@@ -17,6 +18,10 @@
 #include "rt/unit_check.h"
 
 #include <unordered_set>
+
+#if defined(NIFT_RT_REFERENCE_PROBE)
+extern "C" const char nift_rt_reference_probe_build[] = "B2 reference probe (test configuration)";
+#endif
 
 namespace nift::rt {
 
@@ -305,7 +310,6 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     compiler.set_session(limits.session, limits.invocation);
     if (expression_result) compiler.expression_result();
     compiler.set_parallel_tasks(limits.parallel_tasks);
-    compiler.set_reference_probe(limits.reference_probe);
     auto program = std::make_unique<Program>();
     if (!compiler.compile_program(root, *program)) {
         result.reason = compiler.reason();
@@ -329,7 +333,11 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     }
     // D-NEXT-refsem: the Phase A forward-compatibility guard (reference_guard.h),
     // on a unit the compiler otherwise admits (earlier refusals keep their reason).
-    if (!limits.reference_probe &&
+#if defined(NIFT_RT_REFERENCE_PROBE)  // B2 test configuration only (rt/reference_probe.h)
+    if (false &&
+#else
+    if (
+#endif
         !check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset,
                                limits.session ? &limits.session->capture_initializers : nullptr)) {
         result.positioned = true;

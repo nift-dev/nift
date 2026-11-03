@@ -39,7 +39,6 @@ public:
     void set_session(SessionCompileContext* session, const std::vector<InvocationBinding>* invocation = nullptr);
     void expression_result() { expression_result_ = true; }
     void set_parallel_tasks(bool enabled) { parallel_tasks_ = enabled; }
-    void set_reference_probe(bool enabled) { reference_probe_ = enabled; }
     void set_module_names(const std::vector<std::string_view>* names) { module_names_ = names; }
 private:
     SessionCompileContext* session_ = nullptr; const std::vector<InvocationBinding>* invocation_ = nullptr;
@@ -339,7 +338,7 @@ private:
     mutable std::vector<std::shared_ptr<const TextType>> text_types_;  // text_type_at memo, per NodeId
     std::vector<std::unordered_set<std::string_view>> assigned_fn_;   // collect_assigned per function body
     mutable bool unknown_hit_ = false;
-    bool parallel_tasks_ = false, reference_probe_ = false;  // reference_probe: CompileLimits (tests only)
+    bool parallel_tasks_ = false;
     const Ast& ast_;
     const UnitPlan& plan_;
     const UnitKinds& kinds_;

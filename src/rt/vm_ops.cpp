@@ -287,6 +287,14 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
     if (!object.is(Kind::Array) || !key.is_number()) return internal(fault, "element assignment");
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 30
+    // M-B2 (owner B): a bypass commit, the construction API on the receiver
+    // instead of the protocol (no immutability, cycle or bookkeeping stages).
+    if (integral && static_cast<std::uint64_t>(i) < array_size(object)) {
+        array_build_set(object, static_cast<std::size_t>(i), value);
+        return true;
+    }
+#endif
     // mutation::set runs the stages in order (immutable, bounds, cycle) and
     // commits; only its refusals are mapped to legacy's texts here.
     const mutation::Outcome out = mutation::set(object, integral ? static_cast<std::size_t>(i) : array_size(object),

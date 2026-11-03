@@ -148,11 +148,11 @@ private:
             // inserted in order, the index is rebuilt as the source's.
             if (kind == CollectionKind::Map) {
                 for (std::size_t k = 0; k + 1 < items.size(); k += 2)
-                    map_set(copy, items[k], mapped(items[k + 1]));  // rt-lint: storage-ok fresh copy
+                    map_build_set(copy, items[k], mapped(items[k + 1]));  // fresh copy
             } else if (kind == CollectionKind::Set) {
-                for (const Value& member : items) set_add(copy, mapped(member));  // rt-lint: storage-ok fresh copy
+                for (const Value& member : items) set_build_add(copy, mapped(member));  // fresh copy
             } else {
-                for (const Value& item : items) stack_push(copy, mapped(item));  // rt-lint: storage-ok fresh copy
+                for (const Value& item : items) stack_build_push(copy, mapped(item));  // fresh copy
             }
         }
     }

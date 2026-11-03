@@ -10,14 +10,35 @@
 #include "rt/copy_graph.h"
 #include "rt/heap_account.h"
 #include "rt/mutation.h"
+#include "rt/compare.h"
 #include "rt/string.h"
 #include "rt/value_cycle.h"
 #include "rt_test.h"
+#include "storage_access.h"  // B2: the storage commits (tests only)
 
+#include <cstdlib>
 #include <cstring>
+#include <new>
 #include <functional>
 #include <string>
 #include <vector>
+
+// Owner requirement D (b2-refrep.md): a deterministic allocation failure,
+// injected at the k-th allocation of one insertion (k = 0, 1, ... until the
+// insertion completes), must leave the collection unchanged.
+static long fail_after = -1;
+static bool injected = false;
+void* operator new(std::size_t bytes) {
+    if (fail_after == 0) { fail_after = -1; injected = true; throw std::bad_alloc(); }
+    if (fail_after > 0) --fail_after;
+    if (void* p = std::malloc(bytes ? bytes : 1)) return p;
+    throw std::bad_alloc();
+}
+void* operator new[](std::size_t bytes) { return ::operator new(bytes); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete[](void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
 
 using namespace nift::rt;
 namespace m = nift::rt::mutation;
@@ -322,6 +343,89 @@ void cycle_targets_and_bookkeeping() {
     CHECK(sp.heap() == id && array_size(sp) == 4 && array_size(removed) == 1);
 }
 
+// The observable state of a collection: its items (identity and value), and
+// that every key/member is found through the index.
+struct Contents {
+    std::vector<Value> items;
+    bool operator==(const Contents& o) const {
+        if (items.size() != o.items.size()) return false;
+        for (std::size_t k = 0; k < items.size(); ++k)
+            if (!equal(items[k], o.items[k]) || items[k].kind() != o.items[k].kind()) return false;
+        return true;
+    }
+};
+Contents contents_of(const Value& c) {
+    Contents out;
+    out.items = collection_view(c);
+    return out;
+}
+bool consistent(const Value& c) {
+    const auto& items = collection_view(c);
+    const CollectionKind kind = collection_kind(c);
+    if (kind == CollectionKind::Map && items.size() % 2 != 0) return false;  // a key without its value
+    if (kind == CollectionKind::Stack) return true;
+    const std::size_t stride = kind == CollectionKind::Map ? 2 : 1;
+    for (std::size_t k = 0; k < items.size(); k += stride)
+        if (collection_find(c, items[k]) != static_cast<std::ptrdiff_t>(k / stride)) return false;
+    return true;
+}
+
+// One insertion, failed at each allocation in turn, then completed.
+void allocation_campaign(const char* name, CollectionKind kind, int prefill,
+                         const std::function<m::Outcome(Value&)>& insert) {
+    int sites = 0;
+    bool completed = false;
+    for (long k = 0; k < 64 && !completed; ++k) {
+        Value c = make_collection(kind);
+        for (int i = 0; i < prefill; ++i) {
+            if (kind == CollectionKind::Map) map_set(c, Value::integer(i), make_string("value"));
+            else if (kind == CollectionKind::Set) set_add(c, Value::integer(i));
+            else stack_push(c, Value::integer(i));
+        }
+        const Contents before = contents_of(c);
+        injected = false;
+        fail_after = k;
+        bool threw = false;
+        try {
+            const m::Outcome out = insert(c);
+            CHECK(out.ok());
+        } catch (const std::bad_alloc&) {
+            threw = true;
+        }
+        fail_after = -1;
+        if (threw) {
+            ++sites;
+            const bool unchanged = contents_of(c) == before && consistent(c);
+            CHECK(injected && unchanged);
+            if (!unchanged) std::fprintf(stderr, "  allocation %s: failure at allocation %ld changed the collection\n",
+                                         name, k);
+        } else {
+            completed = true;
+            CHECK(consistent(c) && collection_item_count(c) > before.items.size());
+        }
+    }
+    CHECK(completed && sites >= 1);
+    std::printf("allocation failure %s: %d injected sites, completed %d\n", name, sites, int(completed));
+}
+
+void allocation_failures() {
+    const m::Env e;
+    const auto mput = [&](Value& c) { return m::map_put(c, Value::integer(1000), make_string("new value"), e); };
+    const auto sadd = [&](Value& c) { return m::set_insert(c, Value::integer(1000), e); };
+    const auto spush = [&](Value& c) { return m::stack_push(c, Value::integer(1000), e); };
+    // Every prefill makes the insertion allocate (each case requires at least
+    // one injected site): the storage is full (it grows as push_back grows it,
+    // so at 0, 1, 2, 4, 8, 16 entries for a set or stack and at 0, 1, 2, 4, 8,
+    // 16 entries of a map's key/value pairs), or the insertion builds the
+    // first index (the 8th entry, kIndexThreshold) of a map or set.
+    for (int prefill : {0, 2, 4, 7, 8, 16}) {
+        const std::string tag = std::to_string(prefill);
+        allocation_campaign(("map_put/" + tag).c_str(), CollectionKind::Map, prefill, mput);
+        allocation_campaign(("set_insert/" + tag).c_str(), CollectionKind::Set, prefill, sadd);
+        if (prefill != 7) allocation_campaign(("stack_push/" + tag).c_str(), CollectionKind::Stack, prefill, spush);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -330,6 +434,7 @@ int main() {
     keyed_matrix();
     aliases_and_copies();
     cycle_targets_and_bookkeeping();
+    allocation_failures();
     std::printf("mutation protocol: %d refusal cases\n", cases);
     return rt_test::finish("mutation-protocol");
 }

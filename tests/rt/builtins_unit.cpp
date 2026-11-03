@@ -13,6 +13,7 @@
 #include "rt/natives/json_methods.h"
 #include "rt/natives/object_methods.h"
 #include "rt/natives/support.h"
+#include "storage_access.h"  // B2: the storage commits (tests only)
 
 #include <cmath>
 #include <cstring>

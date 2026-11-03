@@ -340,18 +340,22 @@ test-rt-isolate-transfer-unit: $(RT_ISOLATE_TRANSFER_UNIT)
 # the refcounts unchanged. The mutants (NIFT_MUTATION_MUTANT: 1 validates
 # push after its commit, 2 skips object_put's immutable check, 3 skips an
 # array edit's heap tally; B1-perf: 4 drops the inline stage 2.2 test, 5
-# narrows the hoisted cycle pre-filter) must each fail it (exit 1).
+# narrows the hoisted cycle pre-filter; B2: 6 stores a map key before the
+# allocation that can fail, owner D) must each fail it (exit 1).
 RT_MUTATION_DIR := $(TEST_DIR)/rt/mutation
-RT_MUTATION_OBJECTS := $(filter-out src/rt/mutation.o,$(RT_VALUE_SOURCES:.cpp=.o)) src/RuntimeValue.o
-RT_MUTATION_MUTANTS := 1 2 3 4 5
+# B2: mutant 6 (owner D) lives in aggregate_collection.cpp, built with the
+# same define as mutation.cpp for every mutant.
+RT_MUTATION_OBJECTS := $(filter-out src/rt/mutation.o src/rt/aggregate_collection.o,$(RT_VALUE_SOURCES:.cpp=.o)) \
+	src/RuntimeValue.o
+RT_MUTATION_MUTANTS := 1 2 3 4 5 6
 $(RT_MUTATION_DIR)/protocol$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp src/rt/mutation.cpp \
-		$(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+		src/rt/aggregate_collection.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
 $(RT_MUTATION_DIR)/protocol-m%$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_MUTATION_MUTANT=$* tests/rt/mutation_protocol.cpp \
-		src/rt/mutation.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
+		src/rt/mutation.cpp src/rt/aggregate_collection.cpp $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
 .PHONY: test-rt-mutation-protocol test-rt-mutation-protocol-mutants
 test-rt-mutation-protocol: $(RT_MUTATION_DIR)/protocol$(EXEEXT)
 	"$(RT_MUTATION_DIR)/protocol$(EXEEXT)"
@@ -364,26 +368,39 @@ test-rt-mutation-protocol-mutants: test-rt-mutation-protocol \
 test-rt-vm: test-rt-mutation-protocol-mutants
 
 # B2 reference representation (docs/runtime-2/checkpoints/b2-refrep.md):
-# arrays and objects shared, snapshots, array/object cycles, `args`
-# immutability and session receiver atomicity, through real VM execution
-# (tests/rt/refrep_vm.cpp; the non-contractual CompileLimits::reference_probe).
+# arrays and objects shared, snapshots, array/object cycles, identity, `args`
+# immutability and session receiver atomicity, through real VM execution in
+# the TEST configuration: tests/rt/refrep_vm.cpp links compiler objects built
+# with -DNIFT_RT_REFERENCE_PROBE (rt/reference_probe.h; no guard). The
+# production configuration never contains it (test-rt-refrep-production).
 # Each mutant rebuilds one object with -DNIFT_REFSEM_MUTANT=n and must fail it.
 RT_REFREP_DIR := $(TEST_DIR)/rt/refrep
 RT_REFREP_MUTANTS := 24:src/rt/aggregate.cpp 25:src/rt/copy_graph.cpp 26:src/rt/natives/object_methods.cpp \
 	27:src/rt/vm_iter.cpp 28:src/rt/collection_helpers.cpp 29:src/rt/isolate_transfer_encode.cpp \
-	21:src/rt/mutation.cpp
+	21:src/rt/mutation.cpp 30:src/rt/vm_ops.cpp
+RT_REFREP_PROBE_SOURCES := src/rt/compiler.cpp src/rt/compiler_rules.cpp src/rt/compiler_collection_sort.cpp
+RT_REFREP_PROBE_OBJECTS := $(patsubst src/rt/%.cpp,$(RT_REFREP_DIR)/probe/%.o,$(RT_REFREP_PROBE_SOURCES))
+# CP19_EXPR_OBJECTS (defined further down, so spelled out) with the probe objects.
+RT_REFREP_OBJECTS := $(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o) \
+	$(RT_REFREP_PROBE_OBJECTS)
+$(RT_REFREP_DIR)/probe/%.o: src/rt/%.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_REFERENCE_PROBE -c $< -o $@
 $(RT_REFREP_DIR)/refrep_vm.o: tests/rt/refrep_vm.cpp $(RT_VALUE_HEADERS)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -c tests/rt/refrep_vm.cpp -o $@
-$(RT_REFREP_DIR)/refrep-vm$(EXEEXT): $(RT_REFREP_DIR)/refrep_vm.o $(CP19_EXPR_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
-.PHONY: test-rt-refrep test-rt-refrep-mutants
-test-rt-refrep: $(RT_REFREP_DIR)/refrep-vm$(EXEEXT)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_REFERENCE_PROBE -c tests/rt/refrep_vm.cpp -o $@
+$(RT_REFREP_DIR)/refrep-vm$(EXEEXT): $(RT_REFREP_DIR)/refrep_vm.o $(RT_REFREP_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $(RT_REFREP_OBJECTS) $(LDLIBS) -o $@
+.PHONY: test-rt-refrep test-rt-refrep-mutants test-rt-refrep-production
+test-rt-refrep: $(RT_REFREP_DIR)/refrep-vm$(EXEEXT) test-rt-refrep-production
 	"$(RT_REFREP_DIR)/refrep-vm$(EXEEXT)"
+# Owner ruling 2: the production configuration has no reference probe.
+test-rt-refrep-production: $(TARGET) $(SHARED_LIB) $(RT_REFREP_DIR)/refrep-vm$(EXEEXT)
+	bash tests/rt/refrep_production.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(SHARED_LIB)" "$(RT_REFREP_DIR)/refrep-vm$(EXEEXT)"
 test-rt-refrep-mutants: test-rt-refrep
 	@for pair in $(RT_REFREP_MUTANTS); do n=$${pair%%:*}; src=$${pair#*:}; obj=$${src%.cpp}.o; \
 		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_REFSEM_MUTANT=$$n -c $$src -o "$(RT_REFREP_DIR)/m$$n.o" || exit 2; \
-		objs=$$(printf '%s\n' $(CP19_EXPR_OBJECTS) | grep -vx "$$obj"); \
+		objs=$$(printf '%s\n' $(RT_REFREP_OBJECTS) | grep -vx "$$obj"); \
 		$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $$objs "$(RT_REFREP_DIR)/m$$n.o" $(LDLIBS) \
 			-o "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" || exit 2; \
 		if "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" > "$(RT_REFREP_DIR)/m$$n.log" 2>&1; then \
@@ -391,6 +408,11 @@ test-rt-refrep-mutants: test-rt-refrep
 		echo "PASS refrep mutant $$n ($$src) caught: $$(grep -m1 'case' "$(RT_REFREP_DIR)/m$$n.log")"; \
 		rm -f "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" "$(RT_REFREP_DIR)/m$$n.o"; done
 test-rt-vm: test-rt-refrep-mutants
+# B2 (owner B): a storage commit outside the mutation protocol does not compile.
+.PHONY: test-rt-protocol-compile-fail
+test-rt-protocol-compile-fail:
+	bash tests/rt/compile_fail/run.sh "$(CXX)" $(CPPFLAGS) $(CXXFLAGS)
+test-rt-vm: test-rt-protocol-compile-fail
 .PHONY: test-runtime2-refrep-cli
 test-runtime2-refrep-cli: $(TARGET)
 	$(PYTHON) tests/runtime2/refrep/refrep_cli.py --nift "$(CURDIR)/$(TARGET)"

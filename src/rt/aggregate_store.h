@@ -130,6 +130,18 @@ inline void check_not_self(const HeapObject* receiver, const Value& stored) {
 #endif
 }
 
+// B2 (owner B): the construction API (array_push, object_set,
+// struct_add_field, *_build_*) is for a value its caller alone holds and is
+// still building. Checked builds abort on any other use: a shared or
+// immutable receiver must go through the mutation protocol (rt/mutation.h).
+inline void check_fresh(const Value& value) {
+#ifdef NIFT_RT_RELOCATE_ON_MUTATION
+    if (value.refcount() != 1 || is_immutable(value.heap())) std::abort();
+#else
+    (void)value;
+#endif
+}
+
 // Hot path (every push/set): scalars and strings are decided by one compare,
 // since every kind that can carry identity sorts at or after Kind::Array.
 // B2 (plan 5.1): a nested array or object is a reference too, so storing one

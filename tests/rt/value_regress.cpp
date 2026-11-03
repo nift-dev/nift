@@ -13,6 +13,7 @@
 #include "rt/number.h"
 #include "rt/string.h"
 #include "rt_test.h"
+#include "storage_access.h"  // B2: the storage commits (tests only)
 
 #include <cmath>
 #include <cstdlib>

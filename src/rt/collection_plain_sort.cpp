@@ -20,7 +20,7 @@ bool collection_plain_sort(Value* s,const natives::Context& context,Fault& fault
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     s[HashTable]=make_array(n);
     for(std::size_t i=0;i<n;++i)array_push(s[HashTable],Value::integer(i));
-    auto& order=array_mut(s[HashTable]);  // rt-lint: storage-ok the fresh scratch order
+    auto& order=array_build_storage(s[HashTable]);  // the fresh scratch order
     std::sort(order.begin(),order.end(),[&](const Value& x,const Value& y) {
         const auto a=static_cast<std::size_t>(x.as_int()),b=static_cast<std::size_t>(y.as_int());
         int c=0;

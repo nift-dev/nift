@@ -207,7 +207,7 @@ void append_scalar(const Value& value, std::string& out) {
     }
 }
 
-ArrayBuilder::ArrayBuilder(std::size_t reserve) : array_(make_array(reserve)), items_(&array_mut(array_)) {}
+ArrayBuilder::ArrayBuilder(std::size_t reserve) : array_(make_array(reserve)), items_(&array_build_storage(array_)) {}
 
 void ArrayBuilder::push(Value item) { items_->push_back(static_cast<Value&&>(item)); }
 

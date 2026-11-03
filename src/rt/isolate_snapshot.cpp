@@ -38,7 +38,7 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
     std::size_t constant_total = 0;
     for (const auto& proto : source.protos) constant_total += proto->constants.size();
     Value constants = make_array(constant_total);
-    std::vector<Value>& items = array_mut(constants);
+    std::vector<Value>& items = array_build_storage(constants);
     bool holds_identity = false;
     for (std::size_t i = 0; i < source.protos.size(); ++i) {
         const auto& src = *source.protos[i]; auto& dst = *copy->protos[i];
@@ -57,7 +57,7 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         std::uint32_t wire = std::numeric_limits<std::uint32_t>::max();
         (void)map.index_of(&src, wire); input.proto_wires.push_back(wire);
     }
-    // array_mut marks raw storage conservatively; keep the exact summary
+    // array_build_storage marks raw storage conservatively; keep the exact summary
     // that per-element stores would have left (aggregate.h; B2: a nested
     // array or object marks it too).
     if (!holds_identity) clear_may_hold_identity(constants.heap());

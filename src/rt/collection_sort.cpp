@@ -20,7 +20,12 @@ struct State {
     bool srcbuf=false,dstbuf=false,pending=false,done=false;
 };
 State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<BytesObject>()->data.data());}
-std::vector<Value>& raw(Value& v){return v.heap_as<ArrayObject>()->items;}
+// The sort's own scratch arrays (Keys, Directions: made at init, held only
+// here). The receiver's storage comes from the protocol (b2-refrep.md, B):
+// sort_storage at init (stage 3, after the instruction's stage 2.2), and
+// sort_items while the controller runs (no relocation, no allocation: drain).
+std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // rt-lint: storage-ok scratch
+std::vector<Value>& receiver_items(Value& v){return mutation::Protocol::sort_items(v);}
 Value moved_empty(Value* s,const Value& v) {
     if(v.is(Kind::Object))return s[sort_slot::EmptyObject];
     if(v.is(Kind::Array))return s[sort_slot::EmptyArray];
@@ -34,9 +39,9 @@ void move(Value* s,std::vector<Value>& src,std::size_t i,std::vector<Value>& dst
     dst[j]=std::move(src[i]);src[i]=std::move(empty);
 }
 void save(Value* s,std::size_t i) {
-    auto& a=raw(s[Source]);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
+    auto& a=receiver_items(s[Source]);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
 }
-void restore(Value* s,std::size_t i){raw(s[Source])[i]=std::move(s[Item]);}
+void restore(Value* s,std::size_t i){receiver_items(s[Source])[i]=std::move(s[Item]);}
 bool request(Value* s,State& t,const Value& l,const Value& r) {
     s[sort_slot::Left]=l;s[sort_slot::Right]=r;s[More]=Value::boolean(true);t.pending=true;return true;
 }
@@ -71,7 +76,7 @@ bool next(Value* s,State& t) {
             ++t.stage;t.chunk=0;t.pass=0;continue;
         }
         if(t.stage==2) {
-            auto& a=raw(s[Source]);auto& b=raw(s[Keys]);const auto mid=(t.n+1)/2;
+            auto& a=receiver_items(s[Source]);auto& b=scratch(s[Keys]);const auto mid=(t.n+1)/2;
             if(mid<=t.n-mid) {
                 for(std::size_t q=0;q<mid;++q)move(s,a,q,b,q);
                 t.i=0;t.j=mid;t.k=0;t.mid=mid;t.end=t.n;t.op=3;
@@ -96,8 +101,8 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
     mutation::sort_storage(s[Source]);  // B1: the working copy (b1-mutation.md, sort receiver)
     s[HashTable]=make_bytes({});auto& bytes=s[HashTable].heap_as<BytesObject>()->data;bytes.resize(sizeof(State));
     new(bytes.data()) State();heap_retally(s[HashTable].heap());
-    s[Keys]=make_array((n+1)/2);raw(s[Keys]).resize((n+1)/2);
-    s[Directions]=make_array(n);raw(s[Directions]).resize(n);
+    s[Keys]=make_array((n+1)/2);scratch(s[Keys]).resize((n+1)/2);
+    s[Directions]=make_array(n);scratch(s[Directions]).resize(n);
     mark_may_hold_identity(s[Directions].heap());
     mark_may_hold_identity(s[Keys].heap());
     // Keep each input graph alive through drain: releasing a dying broad
@@ -127,7 +132,7 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
     // refs includes Source only: callers transfer the receiver in and out.
     if(s[Source].heap()->refcount>1) {
         if(!s[Directions].is(Kind::Array)||array_size(s[Directions])!=t.n)return false;
-        auto& spare=raw(s[Directions]);const auto& a=raw(s[Source]);
+        auto& spare=scratch(s[Directions]);const auto& a=receiver_items(s[Source]);
         for(std::size_t i=0;i<t.n;++i)spare[i]=a[i];
         s[Source]=std::move(s[Directions]);
     }
@@ -136,7 +141,7 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
     bool supplied=responding;
     for(;;) {
         if(!t.op&&!next(s,t))return true;
-        auto& a=raw(s[Source]);auto& b=raw(s[Keys]);
+        auto& a=receiver_items(s[Source]);auto& b=scratch(s[Keys]);
         if(t.op==1) {
             if(t.i>=t.end){t.op=0;continue;}
             if(t.phase==0) {

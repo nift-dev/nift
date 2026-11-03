@@ -476,3 +476,69 @@ path binds the same name to the operand by reference (no code change). After the
 
 Production: +15 / -3 (`mutation.h`, `vm_array_mutation.cpp`, `aggregate.cpp`). Tests: about
 780 inserted lines, under the 800-line split threshold; no unresolved ownership problem.
+
+## 14. Commit 2: one mutation path (B), throw safety (D), probe isolation
+
+### 14.1 Single mutation path (owner B), enforced structurally
+
+- The storage commits on an existing aggregate (`array_mut`, `array_push`/`array_set` on a
+  receiver, the slot functions, `object_set`/`object_remove`, `struct_set`, `map_set`, `set_add`,
+  `collection_erase`, `stack_push`/`stack_pop`, `collection_clear`) are private static members of
+  `rt::Storage` (`aggregate.h`). Its only production friend is `mutation::Protocol`, whose entry
+  points run the stages (kind, immutable, bounds/arguments, cycle, budget) before calling one; so
+  a receiver's storage can be written only after the protocol's validation. The second friend is
+  `StorageTestAccess` (`tests/rt/storage_access.h`), for the storage-level unit tests only.
+- Construction stays public and is separate: `array_push`, `object_set`, `array_build_storage`,
+  `array_build_set`, `object_build_slot`, `map_build_set`, `set_build_add`, `stack_build_push` on
+  a FRESH value (refcount 1, not immutable; checked builds abort otherwise, `check_fresh`).
+- The VM's array instructions (`ArrayMutate`: insert, remove, pop, clear, reverse, splice c = 0/1/2)
+  call the protocol's entry points (`vm_array_mutation.cpp`), no longer their own commits. The
+  comparator sort reaches the receiver's storage through `Protocol::sort_items`/`sort_storage`.
+- Compile-fail tests (`make test-rt-protocol-compile-fail`, `tests/rt/compile_fail/run.sh`):
+  `Storage::array_set` from outside ("is private within this context"), the B1 free `map_set`
+  ("not a member"/"not declared"), `Protocol::commit_array` (stage 3 without stage 2, private);
+  the control (a protocol entry point) compiles.
+- `rt-lint` (defence in depth): the storage-commit names outside the protocol, and any
+  `Storage::` or `StorageTestAccess` use under `src/`, are flagged (fixture `bad_storage.cpp`).
+- Mutant M-B2 (refsem 30, `vm_ops.cpp`): an element store through the construction API on the
+  receiver (no immutability, cycle or bookkeeping stage); caught by `refrep_vm`.
+
+### 14.2 Throw safety (owner D)
+
+`map_set`, `set_add` and `stack_push` give the strong guarantee: every step that can throw (the
+checked-build relocation, the storage reservation, a rebuilt key index) runs before the first
+observable change, or is undone (`aggregate_collection.cpp` `append_entry`). The storage is
+reserved before the append and grown as `push_back` grows it (`size + max(size, n)`, so the
+capacities, heap accounting and amortised cost are unchanged); a new index is built on the side
+and swapped in; a failed index build pops the appended entry. Hashing and comparing keys cannot
+throw. Deterministic test (`mutation_protocol.cpp` `allocation_failures`): a global `operator
+new` that fails the k-th allocation of one insertion, k = 0, 1, ... until it completes, for
+`map_put`, `set_insert`, `stack_push` at prefills where the insertion must allocate (storage full,
+first index, index growth): after every injected failure the collection is unchanged (items,
+identity, every key found through the index) and never holds a key without its value. Mutant 6
+(`aggregate_collection.cpp`: the key appended before the reservation) is caught.
+
+Found by the gates while writing it: the first version reserved exactly `size + n`, which turned
+every insertion into a reallocation (quadratic, and a budget estimate of a whole new buffer per
+insertion): four refsem budget fixtures (`heap/budget_{copy,deepcopy,snapshot,spawn}.f`) stopped
+before their `filled` line. Fixed by the `push_back` growth rule above.
+
+### 14.3 Probe isolation (owner ruling 2)
+
+The reference probe is a compile-time test configuration only: `-DNIFT_RT_REFERENCE_PROBE` on
+`compiler.cpp`, `compiler_rules.cpp`, `compiler_collection_sort.cpp` (no guard, no `aliasing`
+refusal, no comparator-sort profile refusal), built into `.build/rt/refrep/probe/` and linked only
+into `refrep-vm`. `CompileLimits::reference_probe` (commit 1's runtime field) is deleted: no
+runtime flag, environment variable, argument, `CompileLimits` field or embedded API reaches it.
+`make test-rt-refrep-production` (`tests/rt/refrep_production.sh`) checks: only the two refrep
+rules define the macro (no production flags); neither `nift` nor `libnift_c.so` contains the
+probe build's marker symbol (`nift_rt_reference_probe_build`) or text, while the probe binary does
+(control); and behaviourally, the production CLI keeps the comparator-sort refusal
+(`method:sort`, before anything runs, on this toolchain's libstdc++ 20240904, outside the admitted
+profile) and the Phase A guard (`reference-guard:argument`).
+
+### 14.4 Infrastructure fixes in this commit
+
+- `RT_REFREP_OBJECTS` is spelled out from `RT_VALUE_SOURCES` (`CP19_EXPR_OBJECTS` is defined
+  further down the Makefile, so a `:=` copy of it was empty and `refrep-vm` failed to link).
+- `cow_allocation.cpp` builds its fixtures with the construction API (`map_build_set`, ...).

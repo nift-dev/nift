@@ -198,9 +198,9 @@ static void growth_campaign(int which) {
                                                                   which == 4 ? CollectionKind::Set : CollectionKind::Stack);
             for (int k = 0; k < 4; ++k) {
                 if (which < 3 || which == 6) array_push(r,make_string("an element long enough for the heap"));
-                else if (which == 3) map_set(r,Value::integer(k),make_string("a value long enough for the heap"));
-                else if (which == 4) set_add(r,Value::integer(k));
-                else stack_push(r,Value::integer(k));
+                else if (which == 3) map_build_set(r,Value::integer(k),make_string("a value long enough for the heap"));
+                else if (which == 4) set_build_add(r,Value::integer(k));
+                else stack_build_push(r,Value::integer(k));
             }
             const bool array = which < 3 || which == 6;
             const std::size_t size = array ? array_size(r) : collection_item_count(r);
@@ -277,7 +277,7 @@ static nift::rt::Value shared_graph() {
     Value st = make_struct(type_name);
     struct_add_field(st,keys[1],obj);
     Value map = make_collection(CollectionKind::Map);
-    map_set(map,Value::integer(1),leaf);
+    map_build_set(map,Value::integer(1),leaf);
     auto* f = new FunctionObject();
     Value closure = Value::adopt(f);
     f->upvalues.push_back(make_cell(leaf,-1));

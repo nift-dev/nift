@@ -23,6 +23,7 @@
 #include "rt/string.h"
 #include "rt/value.h"
 #include "rt_test.h"
+#include "storage_access.h"  // B2: the storage commits (tests only)
 
 #ifdef NIFT_RT_DESTROY_LOCAL
 #define NIFT_RT_DESTROY_LOCAL_FOR_TEST NIFT_RT_DESTROY_LOCAL

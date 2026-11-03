@@ -63,7 +63,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
         case K::MapSet: {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 14
             if (natives::collection_key_ok(s[Item]))
-                map_set(c, s[Item], s[Returned]);  // rt-lint: storage-ok R14: the store before the refusal
+                map_build_set(c, s[Item], s[Returned]);  // R14: the store before the refusal (bypasses the protocol)
 #endif
             const mutation::Outcome out = mutation::map_put(c, s[Item], s[Returned], env());
             if (!out.ok()) return failed(out, out.operand ? &s[Returned] : &s[Item], out.operand ? legacy : nullptr);

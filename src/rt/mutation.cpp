@@ -147,8 +147,8 @@ std::size_t collection_reserve_bytes(const Value& collection, std::size_t step) 
     return n + step > capacity ? 2 * (n + step) * sizeof(Value) + 4 * (n + step) * sizeof(std::uint32_t) : 0;
 }
 
-void commit_permutation(Value& array, std::vector<Value>& order) {
-    auto& items = array_mut(array);
+void Protocol::commit_permutation(Value& array, std::vector<Value>& order) {
+    auto& items = Storage::array_mut(array);
     const std::size_t n = items.size();
     for (std::size_t i = 0; i < n; ++i) {  // follow each cycle of the permutation once
         if (static_cast<std::size_t>(order[i].as_int()) == i) continue;
@@ -166,9 +166,43 @@ void commit_permutation(Value& array, std::vector<Value>& order) {
     heap_retally(array.heap());
 }
 
-std::vector<Value>& sort_storage(Value& array) { return array_mut(array); }
+std::vector<Value>& Protocol::sort_storage(Value& array) { return Storage::array_mut(array); }
 
-Outcome insert(Value& array, std::size_t index, const Value& item, const Env& env) {
+// Stage 3 + 4 for an array edit: one structural change, then the heap tally.
+void Protocol::commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,
+                            const Value& operand) {
+    Value keep = operand;  // the operand may share the receiver's object (a.splice(0, 0, a))
+    auto& items = Storage::array_mut(array);  // in place, after the checked-build D9 relocation
+    switch (edit) {
+        case ArrayEdit::Pop: items.pop_back(); break;
+        case ArrayEdit::Remove: items.erase(items.begin() + static_cast<std::ptrdiff_t>(index)); break;
+        case ArrayEdit::Insert:  // moved in: keep is already the copy insert(const&) would make
+            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), static_cast<Value&&>(keep));
+            break;
+        case ArrayEdit::Clear: items.clear(); break;
+        case ArrayEdit::Reverse: std::reverse(items.begin(), items.end()); break;
+        case ArrayEdit::SpliceRemove: {
+            const auto from = items.begin() + static_cast<std::ptrdiff_t>(index);
+            items.erase(from, from + static_cast<std::ptrdiff_t>(count));
+            break;
+        }
+        case ArrayEdit::SpliceInsert: {
+            if (keep.heap() == array.heap()) {  // a.splice(i, 0, a): never insert a vector's range into itself
+                const std::vector<Value> own = items;
+                items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), own.begin(), own.end());
+                break;
+            }
+            const auto& replacement = array_view(keep);
+            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), replacement.begin(), replacement.end());
+            break;
+        }
+    }
+#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 3)
+    heap_retally(array.heap());  // M-B1c drops this: the edit's growth is never counted
+#endif
+}
+
+Outcome Protocol::insert(Value& array, std::size_t index, const Value& item, const Env& env) {
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "insert", "an array", env.receiver_text);
     if (index > array_size(array)) return failed_text(Failure::Bounds, "insert: index out of range");
@@ -178,7 +212,7 @@ Outcome insert(Value& array, std::size_t index, const Value& item, const Env& en
     return {};
 }
 
-Outcome remove(Value& array, std::size_t index, Value* removed, const Env& env) {
+Outcome Protocol::remove(Value& array, std::size_t index, Value* removed, const Env& env) {
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "remove", "an array", env.receiver_text);
     if (index >= array_size(array)) return failed_text(Failure::Bounds, "remove: index out of range");
@@ -188,7 +222,7 @@ Outcome remove(Value& array, std::size_t index, Value* removed, const Env& env) 
     return {};
 }
 
-Outcome pop(Value& array, Value* removed, const Env& env) {
+Outcome Protocol::pop(Value& array, Value* removed, const Env& env) {
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "pop", "an array", env.receiver_text);
     if (array_size(array) == 0) return failed_text(Failure::Bounds, "pop: array is empty");
@@ -198,7 +232,7 @@ Outcome pop(Value& array, Value* removed, const Env& env) {
     return {};
 }
 
-Outcome reverse(Value& array, const Env& env) {
+Outcome Protocol::reverse(Value& array, const Env& env) {
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "reverse", "an array", env.receiver_text);
     if (!reserve(env.heap_limit, array_reserve_bytes(array, 0))) return budget_failure();
@@ -206,9 +240,46 @@ Outcome reverse(Value& array, const Env& env) {
     return {};
 }
 
-// One commit: the result is built on the side and swapped in.
-Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& replacement, Value* removed,
-               const Env& env) {
+// The removal half: stages 2.1-2.3 (the replacement's kind and, 2.4, its
+// elements, when given: the VM's c = 2 and the one-call splice validate the
+// replacement before anything changes), then the removal.
+Outcome Protocol::splice_remove(Value& array, std::size_t index, std::size_t count, const Value* replacement,
+                                Value* removed, const Env& env) {
+    if (!admits(array, Kind::Array))
+        return detail::admit_failure(array, Kind::Array, "splice", "an array", env.receiver_text);
+    if (replacement && !replacement->is(Kind::Array))
+        return failed_text(Failure::Argument, "splice: replacements must be an array");
+    if (replacement && elements_close(array, *replacement, env)) return cycle_failure(0);
+    const std::size_t n = array_size(array);
+    index = std::min(index, n);
+    count = std::min(count, n - index);
+    if (removed) {
+        Value cut = make_array(count);
+        for (std::size_t k = 0; k < count; ++k) array_push(cut, array_view(array)[index + k]);
+        *removed = std::move(cut);
+    }
+    if (!reserve(env.heap_limit, array_reserve_bytes(array, 0))) return budget_failure();
+    commit_array(array, ArrayEdit::SpliceRemove, index, count, Value());
+    return {};
+}
+
+// The insertion half: the replacement's elements at `index` (<= size).
+Outcome Protocol::splice_insert(Value& array, std::size_t index, const Value& replacement, const Env& env) {
+    if (!admits(array, Kind::Array))
+        return detail::admit_failure(array, Kind::Array, "splice", "an array", env.receiver_text);
+    if (!replacement.is(Kind::Array)) return failed_text(Failure::Argument, "splice: replacements must be an array");
+    if (index > array_size(array)) return failed_text(Failure::Bounds, "splice: index out of range");
+    if (elements_close(array, replacement, env)) return cycle_failure(0);
+    const std::size_t growth = array_reserve_bytes(array, array_size(replacement));
+    if (!reserve(env.heap_limit, growth)) return budget_failure();
+    commit_array(array, ArrayEdit::SpliceInsert, index, 0, replacement);
+    return {};
+}
+
+// Every stage for the whole splice first (the insertion's budget included),
+// then the two commits: a refused splice changes nothing.
+Outcome Protocol::splice(Value& array, std::size_t index, std::size_t count, const Value& replacement,
+                         Value* removed, const Env& env) {
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "splice", "an array", env.receiver_text);
     if (!replacement.is(Kind::Array)) return failed_text(Failure::Argument, "splice: replacements must be an array");
@@ -222,6 +293,10 @@ Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& 
     if (growth == static_cast<std::size_t>(-1) ||
         !reserve(env.heap_limit, growth + (n + added) * sizeof(Value) + 128))
         return budget_failure();
+    // The result is built on the side (every allocation before any change:
+    // owner D's strong guarantee) and swapped in. The receiver itself may be
+    // the replacement (a.splice(i, k, a)): only its elements before the
+    // removal are read, never written while read.
     std::vector<Value> side;
     side.reserve(n - count + added);
     Value cut = make_array(count);
@@ -231,13 +306,13 @@ Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& 
         if (k < index + count) array_push(cut, items[k]);
         else side.push_back(items[k]);
     }
-    array_mut(array).swap(side);  // the swap: the receiver's own storage, identity kept
+    Storage::array_mut(array).swap(side);  // the receiver's own storage, identity kept
     heap_retally(array.heap());
     if (removed) *removed = std::move(cut);
     return {};
 }
 
-Outcome object_put(Value& object, Atom key, const Value& value, const Env& env) {
+Outcome Protocol::object_put(Value& object, Atom key, const Value& value, const Env& env) {
 #if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 2
     if (!object.is(Kind::Object)) return failed_text(Failure::Kind, "set: receiver is not an object");  // M-B1b
 #else
@@ -245,29 +320,29 @@ Outcome object_put(Value& object, Atom key, const Value& value, const Env& env) 
         return detail::admit_failure(object, Kind::Object, "set", "an object", env.receiver_text);
 #endif
     if (closes(object, value, env)) return cycle_failure(0);
-    object_set(object, key, value);
+    Storage::object_set(object, key, value);
     return {};
 }
 
-Outcome object_erase(Value& object, Atom key, const Env& env) {
+Outcome Protocol::object_erase(Value& object, Atom key, const Env& env) {
     if (!admits(object, Kind::Object))
         return detail::admit_failure(object, Kind::Object, "remove", "an object", env.receiver_text);
     if (object_find(object, key) == nullptr) return failed_text(Failure::Bounds, "remove: key not found");
-    object_remove(object, key);
+    Storage::object_remove(object, key);
     return {};
 }
 
-Outcome field_set(Value& instance, Atom field, const Value& value, const Env& env) {
+Outcome Protocol::field_set(Value& instance, Atom field, const Value& value, const Env& env) {
     if (!admits(instance, Kind::Struct))
         return detail::admit_failure(instance, Kind::Struct, "field", "a struct", env.receiver_text);
     if (struct_get(instance, field) == nullptr)
         return no_field_failure(env.receiver_text);
     if (closes(instance, value, env)) return cycle_failure(0);
-    struct_set(instance, field, value);
+    Storage::struct_set(instance, field, value);
     return {};
 }
 
-Outcome map_put(Value& map, const Value& key, const Value& value, const Env& env) {
+Outcome Protocol::map_put(Value& map, const Value& key, const Value& value, const Env& env) {
     if (!admits_collection(map, CollectionKind::Map))
         return collection_admit_failure(map, CollectionKind::Map, "set", env.receiver_text);
     if (!natives::collection_key_ok(key))
@@ -275,22 +350,22 @@ Outcome map_put(Value& map, const Value& key, const Value& value, const Env& env
     if (closes(map, key, env)) return cycle_failure(0);
     if (closes(map, value, env)) return cycle_failure(1);
     if (!reserve(env.heap_limit, collection_reserve_bytes(map, 2))) return budget_failure();
-    map_set(map, key, value);
+    Storage::map_set(map, key, value);
     return {};
 }
 
-Outcome set_insert(Value& set, const Value& member, const Env& env) {
+Outcome Protocol::set_insert(Value& set, const Value& member, const Env& env) {
     if (!admits_collection(set, CollectionKind::Set))
         return collection_admit_failure(set, CollectionKind::Set, "add", env.receiver_text);
     if (!natives::collection_key_ok(member))
         return failed_text(Failure::Argument, "add: set values must be bool, number, or string");
     if (closes(set, member, env)) return cycle_failure(0);
     if (!reserve(env.heap_limit, collection_reserve_bytes(set, 1))) return budget_failure();
-    set_add(set, member);
+    Storage::set_add(set, member);
     return {};
 }
 
-Outcome collection_remove(Value& collection, const Value& key, Value* removed, const Env& env) {
+Outcome Protocol::collection_remove(Value& collection, const Value& key, Value* removed, const Env& env) {
     const bool map = collection.is(Kind::Collection) && collection_kind(collection) == CollectionKind::Map;
     const CollectionKind sub = map ? CollectionKind::Map : CollectionKind::Set;
     if (!admits_collection(collection, sub))
@@ -301,32 +376,32 @@ Outcome collection_remove(Value& collection, const Value& key, Value* removed, c
     if (at < 0)  // a missing member: no-op
         return map ? failed_text(Failure::Bounds, "remove: key not found") : Outcome{};
     if (removed) *removed = map ? collection_view(collection)[static_cast<std::size_t>(at) * 2 + 1] : key;
-    collection_erase(collection, static_cast<std::size_t>(at));
+    Storage::collection_erase(collection, static_cast<std::size_t>(at));
     return {};
 }
 
-Outcome stack_push(Value& stack, const Value& item, const Env& env) {
+Outcome Protocol::stack_push(Value& stack, const Value& item, const Env& env) {
     if (!admits_collection(stack, CollectionKind::Stack))
         return collection_admit_failure(stack, CollectionKind::Stack, "push", env.receiver_text);
     if (closes(stack, item, env)) return cycle_failure(0);
     if (!reserve(env.heap_limit, collection_reserve_bytes(stack, 1))) return budget_failure();
-    rt::stack_push(stack, item);
+    Storage::stack_push(stack, item);
     return {};
 }
 
-Outcome stack_pop(Value& stack, Value* removed, const Env& env) {
+Outcome Protocol::stack_pop(Value& stack, Value* removed, const Env& env) {
     if (!admits_collection(stack, CollectionKind::Stack))
         return collection_admit_failure(stack, CollectionKind::Stack, "pop", env.receiver_text);
     if (collection_size(stack) == 0) return failed_text(Failure::Bounds, "pop: collection is empty");
     if (removed) *removed = collection_view(stack).back();
-    rt::stack_pop(stack);
+    Storage::stack_pop(stack);
     return {};
 }
 
-Outcome clear(Value& receiver, const Env& env) {
+Outcome Protocol::clear(Value& receiver, const Env& env) {
     if (receiver.is(Kind::Collection)) {
         Outcome out = check_mutable(receiver, env.receiver_text);
-        if (out.ok()) collection_clear(receiver);
+        if (out.ok()) Storage::collection_clear(receiver);
         return out;
     }
     if (!admits(receiver, Kind::Array))

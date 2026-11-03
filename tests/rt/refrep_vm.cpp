@@ -1,9 +1,10 @@
 // B2 reference representation (docs/runtime-2/checkpoints/b2-refrep.md): the
 // representation exercised through real VM execution. The Phase A guard is
-// still on for every product path, so these programs are compiled with the
-// non-contractual test switch CompileLimits::reference_probe (no guard, no
-// legacy location-alias refusal); the session cases (owner requirement A)
-// run through an ordinary VmSession, guard on.
+// still on for every product path, so this binary is the test configuration:
+// it links compiler objects built with -DNIFT_RT_REFERENCE_PROBE
+// (rt/reference_probe.h: no guard, no legacy location-alias refusal), a
+// compile-time configuration that no production build contains. Production
+// behaviour (guard on) is covered by the ordinary suites and refrep_cli.py.
 //
 // Mutants that must fail it (Makefile test-rt-refrep-mutants):
 //   R-B2 (refsem 24) copy-on-write resurrected for arrays (aggregate.cpp)
@@ -19,6 +20,7 @@
 #include "rt/isolate_transfer.h"
 #include "rt/mutation.h"
 #include "rt/parser.h"
+#include "rt/reference_probe.h"
 #include "rt/session.h"
 #include "rt/session_invocation.h"
 #include "rt/source_map.h"
@@ -51,7 +53,6 @@ Ran probe(const std::string& source, const std::vector<std::string>* arguments =
     if (first_opaque_node(*ast, parsed.root) != kNoNode) { r.reason = "opaque"; return r; }
     std::vector<InvocationBinding> invocation;
     CompileLimits limits;
-    limits.reference_probe = true;
     if (arguments) {
         invocation = invocation_bindings("cmd", *arguments);
         limits.invocation = &invocation;
@@ -241,9 +242,11 @@ void session_atomicity() {
     CHECK(session.value("a").heap() == before.heap() && array_size(before) == 2);
 }
 
+
 } // namespace
 
 int main() {
+    CHECK(nift_rt_reference_probe_build[0] != 0);  // the test configuration is linked
     representation();
     snapshots();
     cycles();

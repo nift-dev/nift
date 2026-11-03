@@ -142,80 +142,6 @@ inline bool reserve(std::size_t heap_limit, std::size_t bytes) noexcept {
     return bytes == 0 || detail::reserve_slow(heap_limit, bytes);
 }
 
-// Stage 3 + 4 for array edits; the caller has run stage 2.
-enum class ArrayEdit : std::uint8_t { Pop, Remove, Insert, Clear, Reverse, SpliceRemove, SpliceInsert };
-// Remove/SpliceRemove: `index`, `count`; Insert: `operand` at `index`;
-// SpliceInsert: the elements of the array `operand` at `index`.
-// Inline (B1-perf): each VM case passes a constant edit, so it compiles to
-// that edit alone, as the instruction's own commit did before B1.
-NIFT_MUTATION_INLINE void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,
-                                       const Value& operand) {
-    Value keep = operand;  // the operand may share the receiver's object (a.splice(0, 0, a))
-    auto& items = array_mut(array);  // in place (B2), after the checked-build D9 relocation
-    switch (edit) {
-        case ArrayEdit::Pop: items.pop_back(); break;
-        case ArrayEdit::Remove: items.erase(items.begin() + static_cast<std::ptrdiff_t>(index)); break;
-        case ArrayEdit::Insert:  // moved in: keep is already the copy insert(const&) would make
-            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), static_cast<Value&&>(keep));
-            break;
-        case ArrayEdit::Clear: items.clear(); break;
-        case ArrayEdit::Reverse: std::reverse(items.begin(), items.end()); break;
-        case ArrayEdit::SpliceRemove: {
-            const auto from = items.begin() + static_cast<std::ptrdiff_t>(index);
-            items.erase(from, from + static_cast<std::ptrdiff_t>(count));
-            break;
-        }
-        case ArrayEdit::SpliceInsert: {
-            if (keep.heap() == array.heap()) {  // a.splice(i, 0, a): never insert a vector's range into itself
-                const std::vector<Value> own = items;
-                items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), own.begin(), own.end());
-                break;
-            }
-            const auto& replacement = array_view(keep);
-            items.insert(items.begin() + static_cast<std::ptrdiff_t>(index), replacement.begin(), replacement.end());
-            break;
-        }
-    }
-#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 3)
-    heap_retally(array.heap());  // M-B1c drops this: the edit's growth is never counted
-#endif
-}
-// Plain sort's single commit: element i of the result is element order[i]
-// (an Int) of the receiver. `order` is a permutation built on the side.
-void commit_permutation(Value& array, std::vector<Value>& order);
-// The comparator sort's working storage: the receiver's own storage (B2: in
-// place; b2-refrep.md, "comparator sort").
-std::vector<Value>& sort_storage(Value& array);
-
-// Validated entry points (stages 2-4).
-Outcome insert(Value& array, std::size_t index, const Value& item, const Env& env);
-Outcome remove(Value& array, std::size_t index, Value* removed, const Env& env);
-Outcome pop(Value& array, Value* removed, const Env& env);
-Outcome reverse(Value& array, const Env& env);
-Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& replacement, Value* removed,
-               const Env& env);
-Outcome object_put(Value& object, Atom key, const Value& value, const Env& env);
-Outcome object_erase(Value& object, Atom key, const Env& env);
-Outcome field_set(Value& instance, Atom field, const Value& value, const Env& env);
-Outcome map_put(Value& map, const Value& key, const Value& value, const Env& env);
-Outcome set_insert(Value& set, const Value& member, const Env& env);
-// Map: the entry for `key` (removed: its value); set: the member (missing: no-op).
-Outcome collection_remove(Value& collection, const Value& key, Value* removed, const Env& env);
-Outcome stack_push(Value& stack, const Value& item, const Env& env);
-Outcome stack_pop(Value& stack, Value* removed, const Env& env);
-// Arrays and collections.
-Outcome clear(Value& receiver, const Env& env);
-
-// push and set, the per-element hot paths, are inline: stages 2.1-2.2 (and
-// set's 2.3), 2.4 (B2: the inline exits of `closes`, so a scalar costs one
-// compare), then the commit primitive, whose bookkeeping (note_store,
-// heap_retally, relocate_storage) is unchanged. Both count their growth after
-// the step (no 2.5), as before.
-//
-// `receiver_text` is a string_view, or a callable returning one (the VM's
-// note lookup), and is read only by a refusal, so the success path computes
-// no text. `graph` is the VM's cycle graph (null: the default). The Env forms
-// are the general entry points.
 namespace detail {
 template <class Text> std::string_view text_of(const Text& text) {
     if constexpr (std::is_invocable_v<const Text&>) return text();
@@ -224,44 +150,135 @@ template <class Text> std::string_view text_of(const Text& text) {
 NIFT_MUTATION_COLD Outcome cycle_failure(std::size_t operand);
 } // namespace detail
 
+// B2 (b2-refrep.md, owner requirement B): the protocol is one class, the only
+// production friend of rt::Storage, whose private members are the storage
+// commits. Every public member is a validated entry point (stages 2-4, in
+// order) or a commit reached only after the caller's validation inside the
+// protocol (the sort commits). The VM's mutating instructions (Push,
+// SetIndex, ArrayMutate, KeyedMutate, FieldSet, CollectionSort) and the
+// natives call these; nothing else can reach a receiver's storage
+// (tests/rt/compile_fail: a bypass does not compile; rt-lint storage-write
+// stays as defence in depth). The namespace-level functions below are the
+// same entry points under their B1 names.
+class Protocol {
+public:
+    // push and set, the per-element hot paths, are inline: stages 2.1-2.2
+    // (and set's 2.3), 2.4 (the inline exits of `closes`, so a scalar costs
+    // one compare), then the commit, whose bookkeeping (note_store,
+    // heap_retally, relocate_storage) is unchanged; both count their growth
+    // after the step (no 2.5), as before. `receiver_text` is a string_view or
+    // a callable returning one (read only by a refusal); `graph` is the VM's
+    // cycle graph (null: the default).
+    template <class Text>
+    static NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Text& receiver_text,
+                                             const CycleGraph* graph) {
+#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1
+        // M-B1a: the commit before the validation. The mutant validates a copy of
+        // the operand (B2: the operand may be an element of the receiver itself,
+        // which the early commit can move), so it fails the checks, never with
+        // undefined behaviour of its own.
+        const Value operand = item;
+        if (array.is(Kind::Array)) Storage::array_push(array, operand);
+#else
+        const Value& operand = item;
+#endif
+        if (!admits(array, Kind::Array))
+            return detail::admit_failure(array, Kind::Array, "push", "an array", detail::text_of(receiver_text));
+        if (closes(array, operand, graph)) return detail::cycle_failure(0);
+#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1)
+        Storage::array_push(array, operand);
+#endif
+        return {};
+    }
+    // Stage 2.3 for set: the index is in range (the caller maps the refusal
+    // to legacy's text).
+    template <class Text>
+    static NIFT_MUTATION_INLINE Outcome set(Value& array, std::size_t index, const Value& item,
+                                            const Text& receiver_text, const CycleGraph* graph) {
+        if (!admits(array, Kind::Array))
+            return detail::admit_failure(array, Kind::Array, "set", "an array", detail::text_of(receiver_text));
+        if (index >= array.heap_as<ArrayObject>()->items.size())
+            return detail::bounds_failure("set: index out of range");
+        if (closes(array, item, graph)) return detail::cycle_failure(0);
+        Storage::array_set(array, index, item);
+        return {};
+    }
+    static Outcome insert(Value& array, std::size_t index, const Value& item, const Env& env);
+    static Outcome remove(Value& array, std::size_t index, Value* removed, const Env& env);
+    static Outcome pop(Value& array, Value* removed, const Env& env);
+    static Outcome reverse(Value& array, const Env& env);
+    // splice = splice_remove (validating the replacement first, when given)
+    // then splice_insert: the VM's two instructions (Phase A F2: every
+    // argument is evaluated, then the removal, then the insertion). `index`
+    // and `count` are clamped to the array.
+    static Outcome splice(Value& array, std::size_t index, std::size_t count, const Value& replacement,
+                          Value* removed, const Env& env);
+    static Outcome splice_remove(Value& array, std::size_t index, std::size_t count, const Value* replacement,
+                                 Value* removed, const Env& env);
+    static Outcome splice_insert(Value& array, std::size_t index, const Value& replacement, const Env& env);
+    static Outcome object_put(Value& object, Atom key, const Value& value, const Env& env);
+    static Outcome object_erase(Value& object, Atom key, const Env& env);
+    static Outcome field_set(Value& instance, Atom field, const Value& value, const Env& env);
+    static Outcome map_put(Value& map, const Value& key, const Value& value, const Env& env);
+    static Outcome set_insert(Value& set, const Value& member, const Env& env);
+    static Outcome collection_remove(Value& collection, const Value& key, Value* removed, const Env& env);
+    static Outcome stack_push(Value& stack, const Value& item, const Env& env);
+    static Outcome stack_pop(Value& stack, Value* removed, const Env& env);
+    static Outcome clear(Value& receiver, const Env& env);
+    // Plain sort's single commit (after the instruction's stage 2.2 and its
+    // incomparable check): element i of the result is element order[i] (an
+    // Int) of the receiver. `order` is a permutation built on the side.
+    static void commit_permutation(Value& array, std::vector<Value>& order);
+    // The comparator sort's working storage: the receiver's own storage, in
+    // place, after the sort's stage 2.2 at its start (b2-refrep.md, E).
+    static std::vector<Value>& sort_storage(Value& array);
+    // The same storage while the sort's controller runs (no relocation and no
+    // allocation: the drain on an error unwind must not allocate).
+    static std::vector<Value>& sort_items(Value& array) noexcept { return array.heap_as<ArrayObject>()->items; }
+
+private:
+    enum class ArrayEdit : std::uint8_t { Pop, Remove, Insert, Clear, Reverse, SpliceRemove, SpliceInsert };
+    static void commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,
+                             const Value& operand);
+};
+
+// The entry points under their B1 names.
 template <class Text>
 NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Text& receiver_text,
                                   const CycleGraph* graph = nullptr) {
-#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1
-    // M-B1a: the commit before the validation. The mutant validates a copy of
-    // the operand (B2: the operand may be an element of the receiver itself,
-    // which the early commit can move), so it fails the checks, never with
-    // undefined behaviour of its own.
-    const Value operand = item;
-    if (array.is(Kind::Array)) array_push(array, operand);
-#else
-    const Value& operand = item;
-#endif
-    if (!admits(array, Kind::Array))
-        return detail::admit_failure(array, Kind::Array, "push", "an array", detail::text_of(receiver_text));
-    if (closes(array, operand, graph)) return detail::cycle_failure(0);
-#if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1)
-    array_push(array, operand);
-#endif
-    return {};
+    return Protocol::push(array, item, receiver_text, graph);
 }
 NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Env& env) {
-    return push(array, item, env.receiver_text, env.graph);
+    return Protocol::push(array, item, env.receiver_text, env.graph);
 }
-
-// Stage 2.3 for set: the index is in range (the caller reports legacy's text).
 template <class Text>
 NIFT_MUTATION_INLINE Outcome set(Value& array, std::size_t index, const Value& item, const Text& receiver_text,
                                  const CycleGraph* graph = nullptr) {
-    if (!admits(array, Kind::Array))
-        return detail::admit_failure(array, Kind::Array, "set", "an array", detail::text_of(receiver_text));
-    if (index >= array.heap_as<ArrayObject>()->items.size()) return detail::bounds_failure("set: index out of range");
-    if (closes(array, item, graph)) return detail::cycle_failure(0);
-    array_set(array, index, item);
-    return {};
+    return Protocol::set(array, index, item, receiver_text, graph);
 }
 NIFT_MUTATION_INLINE Outcome set(Value& array, std::size_t index, const Value& item, const Env& env) {
-    return set(array, index, item, env.receiver_text, env.graph);
+    return Protocol::set(array, index, item, env.receiver_text, env.graph);
 }
+inline Outcome insert(Value& a, std::size_t i, const Value& v, const Env& e) { return Protocol::insert(a, i, v, e); }
+inline Outcome remove(Value& a, std::size_t i, Value* out, const Env& e) { return Protocol::remove(a, i, out, e); }
+inline Outcome pop(Value& a, Value* removed, const Env& e) { return Protocol::pop(a, removed, e); }
+inline Outcome reverse(Value& a, const Env& e) { return Protocol::reverse(a, e); }
+inline Outcome splice(Value& a, std::size_t i, std::size_t n, const Value& r, Value* removed, const Env& e) {
+    return Protocol::splice(a, i, n, r, removed, e);
+}
+inline Outcome object_put(Value& o, Atom k, const Value& v, const Env& e) { return Protocol::object_put(o, k, v, e); }
+inline Outcome object_erase(Value& o, Atom k, const Env& e) { return Protocol::object_erase(o, k, e); }
+inline Outcome field_set(Value& s, Atom f, const Value& v, const Env& e) { return Protocol::field_set(s, f, v, e); }
+inline Outcome map_put(Value& m, const Value& k, const Value& v, const Env& e) { return Protocol::map_put(m, k, v, e); }
+inline Outcome set_insert(Value& s, const Value& m, const Env& e) { return Protocol::set_insert(s, m, e); }
+// Map: the entry for `key` (removed: its value); set: the member (missing: no-op).
+inline Outcome collection_remove(Value& c, const Value& k, Value* removed, const Env& e) {
+    return Protocol::collection_remove(c, k, removed, e);
+}
+inline Outcome stack_push(Value& s, const Value& v, const Env& e) { return Protocol::stack_push(s, v, e); }
+inline Outcome stack_pop(Value& s, Value* removed, const Env& e) { return Protocol::stack_pop(s, removed, e); }
+inline Outcome clear(Value& r, const Env& e) { return Protocol::clear(r, e); }  // arrays and collections
+inline void commit_permutation(Value& a, std::vector<Value>& order) { Protocol::commit_permutation(a, order); }
+inline std::vector<Value>& sort_storage(Value& a) { return Protocol::sort_storage(a); }
 
 } // namespace nift::rt::mutation

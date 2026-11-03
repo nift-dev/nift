@@ -97,13 +97,17 @@ const std::vector<Value>& array_view(const Value& array) { return array.heap_as<
 // The storage is for the caller's own mutation (it relocated first): not a
 // hand-out of the result (review round 2: setting the bit here drained the
 // relocation credit on every VM mutation).
-std::vector<Value>& array_mut(Value& array) {
+namespace {
+
+// The storage edits, shared by the protocol's commits (Storage, private) and
+// the construction API (fresh values only).
+std::vector<Value>& raw_items(Value& array) {
     array_write(array);
     mark_may_hold_identity(array.heap());  // raw storage: anything may be stored
     return array.heap_as<ArrayObject>()->items;
 }
 
-void array_push(Value& array, Value item) {
+void append(Value& array, Value item) {
     array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
@@ -111,16 +115,37 @@ void array_push(Value& array, Value item) {
     heap_retally(array.heap());
 }
 
-void array_set(Value& array, std::size_t index, Value item) {
+void replace(Value& array, std::size_t index, Value item) {
     array_write(array);
     check_not_self(array.heap(), item);
     note_store(array.heap(), item);
     array.heap_as<ArrayObject>()->items[index] = static_cast<Value&&>(item);
 }
 
-Value* array_slot_mut(Value& array, std::size_t index) {
+} // namespace
+
+std::vector<Value>& Storage::array_mut(Value& array) { return raw_items(array); }
+void Storage::array_push(Value& array, Value item) { append(array, static_cast<Value&&>(item)); }
+void Storage::array_set(Value& array, std::size_t index, Value item) {
+    replace(array, index, static_cast<Value&&>(item));
+}
+Value* Storage::array_slot_mut(Value& array, std::size_t index) {
     if (index >= array_size(array)) return nullptr;
-    return &array_mut(array)[index];
+    return &raw_items(array)[index];
+}
+
+// Construction (B2, owner B): fresh values only, checked in checked builds.
+std::vector<Value>& array_build_storage(Value& array) {
+    check_fresh(array);
+    return raw_items(array);
+}
+void array_push(Value& array, Value item) {
+    check_fresh(array);
+    append(array, static_cast<Value&&>(item));
+}
+void array_build_set(Value& array, std::size_t index, Value item) {
+    check_fresh(array);
+    replace(array, index, static_cast<Value&&>(item));
 }
 
 std::size_t array_size(const Value& array) { return array.heap_as<ArrayObject>()->items.size(); }
@@ -177,7 +202,8 @@ const Value* object_get(const Value& object, Atom key) {
     return at < 0 ? nullptr : &o->entries[static_cast<std::size_t>(at)].second;
 }
 
-void object_set(Value& object, Atom key, Value value) {
+namespace {
+void put(Value& object, Atom key, Value value) {
     ObjectObject& o = object_mut(object);
     check_not_self(&o, value);
     note_store(&o, value);
@@ -195,7 +221,26 @@ void object_set(Value& object, Atom key, Value value) {
     heap_retally(object.heap());
 }
 
-bool object_remove(Value& object, Atom key) {
+Value* member_slot(Value& object, Atom key) {
+    if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
+    ObjectObject& o = object_mut(object);
+    mark_may_hold_identity(&o);  // the slot is for the caller's own store: not a hand-out
+    return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
+}
+} // namespace
+
+void Storage::object_set(Value& object, Atom key, Value value) { put(object, key, static_cast<Value&&>(value)); }
+Value* Storage::object_slot_mut(Value& object, Atom key) { return member_slot(object, key); }
+void object_set(Value& object, Atom key, Value value) {
+    check_fresh(object);
+    put(object, key, static_cast<Value&&>(value));
+}
+Value* object_build_slot(Value& object, Atom key) {
+    check_fresh(object);
+    return member_slot(object, key);
+}
+
+bool Storage::object_remove(Value& object, Atom key) {
     if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return false;
     ObjectObject& o = object_mut(object);
     const std::ptrdiff_t at = find_position(o, key);
@@ -203,13 +248,6 @@ bool object_remove(Value& object, Atom key) {
     rebuild_index(o);
     heap_retally(object.heap());
     return true;
-}
-
-Value* object_slot_mut(Value& object, Atom key) {
-    if (find_position(*object.heap_as<ObjectObject>(), key) < 0) return nullptr;
-    ObjectObject& o = object_mut(object);
-    mark_may_hold_identity(&o);  // the slot is for the caller's own store: not a hand-out
-    return &o.entries[static_cast<std::size_t>(find_position(o, key))].second;
 }
 
 Value make_struct(Atom type_name, std::size_t reserve) {
@@ -237,6 +275,7 @@ const Value* struct_get(const Value& instance, Atom field) {
 
 // Structs are references (D-NEXT-refsem #1, #4): in place, never cloned.
 void struct_add_field(Value& instance, Atom field, Value value) {
+    check_fresh(instance);  // construction only (B2, owner B)
     relocate_storage(instance.heap());
     check_not_self(instance.heap(), value);
     note_store(instance.heap(), value);
@@ -244,7 +283,7 @@ void struct_add_field(Value& instance, Atom field, Value value) {
     heap_retally(instance.heap());
 }
 
-bool struct_set(Value& instance, Atom field, Value value) {
+bool Storage::struct_set(Value& instance, Atom field, Value value) {
     if (field_position(*instance.heap_as<StructObject>(), field) < 0) return false;
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 2
     if (instance.refcount() > 1) {  // R2: a shared instance is copied on write (the old value semantics)
@@ -262,7 +301,7 @@ bool struct_set(Value& instance, Atom field, Value value) {
     return true;
 }
 
-Value* struct_slot_mut(Value& instance, Atom field) {
+Value* Storage::struct_slot_mut(Value& instance, Atom field) {
     if (field_position(*instance.heap_as<StructObject>(), field) < 0) return nullptr;
     relocate_storage(instance.heap());
     auto* s = instance.heap_as<StructObject>();

@@ -4,7 +4,9 @@
 #include "rt/compare.h"
 #include "rt/heap_account.h"
 
+#include <algorithm>
 #include <memory>
+#include <new>
 
 // Map/set/stack storage (D-063) with reference semantics (D-NEXT-refsem #1):
 // every mutator changes the shared object in place.
@@ -19,18 +21,27 @@ std::size_t stride(const CollectionObject& c) { return c.sub == CollectionKind::
 std::size_t entries(const CollectionObject& c) { return c.items.size() / stride(c); }
 const Value& key_at(const CollectionObject& c, std::size_t entry) { return c.items[entry * stride(c)]; }
 
-void reindex(CollectionObject& c) {
+// The key index of `c`'s items, built into `out` (may throw: nothing of `c`
+// changes), empty below the threshold.
+void build_index(const CollectionObject& c, std::vector<std::uint32_t>& out) {
     const std::size_t n = entries(c);
-    if (!keyed(c) || n < CollectionObject::kIndexThreshold) { c.index.clear(); return; }
+    out.clear();
+    if (!keyed(c) || n < CollectionObject::kIndexThreshold) return;
     std::size_t capacity = 16;
     while (capacity < n * 2) capacity <<= 1;
-    c.index.assign(capacity, 0);
+    out.assign(capacity, 0);
     const std::size_t mask = capacity - 1;
     for (std::size_t i = 0; i < n; ++i) {
         std::size_t slot = static_cast<std::size_t>(hash(key_at(c, i))) & mask;
-        while (c.index[slot] != 0) slot = (slot + 1) & mask;
-        c.index[slot] = static_cast<std::uint32_t>(i + 1);
+        while (out[slot] != 0) slot = (slot + 1) & mask;
+        out[slot] = static_cast<std::uint32_t>(i + 1);
     }
+}
+
+void reindex(CollectionObject& c) {
+    std::vector<std::uint32_t> fresh;
+    build_index(c, fresh);
+    c.index.swap(fresh);
 }
 
 std::ptrdiff_t find_entry(const CollectionObject& c, const Value& key) {
@@ -46,17 +57,6 @@ std::ptrdiff_t find_entry(const CollectionObject& c, const Value& key) {
         if (at == 0) return -1;
         if (equal(key_at(c, at - 1), key)) return static_cast<std::ptrdiff_t>(at - 1);
     }
-}
-
-// A new entry was appended: index it (or build the index at the threshold).
-void index_appended(CollectionObject& c) {
-    const std::size_t n = entries(c);
-    if (n == CollectionObject::kIndexThreshold || n * 2 > c.index.size()) { reindex(c); return; }
-    if (c.index.empty()) return;
-    const std::size_t mask = c.index.size() - 1;
-    std::size_t slot = static_cast<std::size_t>(hash(key_at(c, n - 1))) & mask;
-    while (c.index[slot] != 0) slot = (slot + 1) & mask;
-    c.index[slot] = static_cast<std::uint32_t>(n);
 }
 
 // In place (D-NEXT-refsem #1): never cloned, whoever else holds the object.
@@ -94,59 +94,140 @@ std::ptrdiff_t collection_find(const Value& collection, const Value& key) {
     return find_entry(*collection.heap_as<CollectionObject>(), key);
 }
 
-void map_set(Value& map, Value key, Value value) {
+namespace {
+
+// Owner requirement D (b2-refrep.md): every step that can throw (the
+// checked-build relocation, the storage reservation, a rebuilt key index)
+// runs before the first observable change, or is undone: a failed insertion
+// leaves the collection unchanged and never holds a key without its value.
+// Hashing and comparison of the keys (bool, number, string, callable) cannot
+// throw. NIFT_MUTATION_MUTANT 6 appends the key before reserving (the defect
+// the allocation-failure test, tests/rt/mutation_protocol.cpp, must see).
+
+// The index after an append of `added` entries: in place (no allocation) or a
+// new index built on the side (may throw) and swapped in.
+void index_after_append(CollectionObject& c, std::size_t added) {
+    const std::size_t n = entries(c);
+    if (n >= CollectionObject::kIndexThreshold && (n - added < CollectionObject::kIndexThreshold ||
+                                                   n * 2 > c.index.size())) {
+        std::vector<std::uint32_t> fresh;  // built on the side (may throw), then swapped in
+        build_index(c, fresh);
+        c.index.swap(fresh);
+        return;
+    }
+    for (std::size_t k = n - added; k < n; ++k) {
+        if (c.index.empty()) return;
+        const std::size_t mask = c.index.size() - 1;
+        std::size_t slot = static_cast<std::size_t>(hash(key_at(c, k))) & mask;
+        while (c.index[slot] != 0) slot = (slot + 1) & mask;
+        c.index[slot] = static_cast<std::uint32_t>(k + 1);
+    }
+}
+
+// The storage for `extra` more values, allocated before any change and
+// grown as push_back grows it (libstdc++: size + max(size, n)), so the
+// capacities, the heap accounting and the amortised cost are push_back's.
+void reserve_for(std::vector<Value>& items, std::size_t extra) {
+    if (items.size() + extra <= items.capacity()) return;
+    items.reserve(items.size() + std::max(items.size(), extra));
+}
+
+// Appends `values` (a map's key and value, or one member) atomically.
+template <std::size_t N> void append_entry(Value& collection, Value (&values)[N]) {
+    CollectionObject& c = collection_mut(collection);
+#if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 6
+    c.items.push_back(values[0]);  // D mutant: the key lands before the reservation that may throw
+    c.items.pop_back();
+    c.items.push_back(values[0]);
+    if (N > 1) reserve_for(c.items, N - 1);
+    for (std::size_t k = 1; k < N; ++k) c.items.push_back(static_cast<Value&&>(values[k]));
+#else
+    reserve_for(c.items, N);  // the only storage allocation: before any change
+    for (Value& v : values) c.items.push_back(static_cast<Value&&>(v));  // no allocation: cannot throw
+#endif
+    if (c.sub != CollectionKind::Stack) {
+        try {
+            index_after_append(c, 1);
+        } catch (...) {
+            for (std::size_t k = 0; k < N; ++k) c.items.pop_back();  // undone: the collection is unchanged
+            throw;
+        }
+    }
+    for (std::size_t k = c.items.size() - N; k < c.items.size(); ++k) {
+        check_not_self(&c, c.items[k]);
+        note_store(&c, c.items[k]);
+    }
+#if !(defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 5)
+    heap_retally(collection.heap());  // M5 drops this: the growth is never counted
+#endif
+}
+
+void put_entry(Value& map, Value key, Value value) {
     const std::ptrdiff_t at = find_entry(*map.heap_as<CollectionObject>(), key);
-    CollectionObject& c = collection_mut(map);
-    check_not_self(&c, value);
-    note_store(&c, value);
-    if (at >= 0) {
+    if (at >= 0) {  // replace in place: no allocation
+        CollectionObject& c = collection_mut(map);
+        check_not_self(&c, value);
+        note_store(&c, value);
         c.items[static_cast<std::size_t>(at) * 2 + 1] = static_cast<Value&&>(value);
         heap_retally(map.heap());
         return;
     }
-    note_store(&c, key);  // a key may be a callable or a collection holding one
-    c.items.push_back(static_cast<Value&&>(key));
-    c.items.push_back(static_cast<Value&&>(value));
-    index_appended(c);
-#if !(defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 5)
-    heap_retally(map.heap());  // M5 drops this: the map's growth is never counted
-#endif
+    Value pair[2] = {static_cast<Value&&>(key), static_cast<Value&&>(value)};
+    append_entry(map, pair);
 }
 
-void set_add(Value& set, Value member) {
+void add_member(Value& set, Value member) {
     if (find_entry(*set.heap_as<CollectionObject>(), member) >= 0) return;
-    CollectionObject& c = collection_mut(set);
-    check_not_self(&c, member);
-    note_store(&c, member);  // members may be callables or collections
-    c.items.push_back(static_cast<Value&&>(member));
-    index_appended(c);
-    heap_retally(set.heap());
+    Value one[1] = {static_cast<Value&&>(member)};
+    append_entry(set, one);
 }
 
-void collection_erase(Value& collection, std::size_t position) {
+void push_item(Value& stack, Value item) {
+    Value one[1] = {static_cast<Value&&>(item)};
+    append_entry(stack, one);
+}
+
+} // namespace
+
+void Storage::map_set(Value& map, Value key, Value value) {
+    put_entry(map, static_cast<Value&&>(key), static_cast<Value&&>(value));
+}
+void Storage::set_add(Value& set, Value member) { add_member(set, static_cast<Value&&>(member)); }
+void Storage::stack_push(Value& stack, Value item) { push_item(stack, static_cast<Value&&>(item)); }
+
+void map_build_set(Value& map, Value key, Value value) {
+    check_fresh(map);
+    put_entry(map, static_cast<Value&&>(key), static_cast<Value&&>(value));
+}
+void set_build_add(Value& set, Value member) {
+    check_fresh(set);
+    add_member(set, static_cast<Value&&>(member));
+}
+void stack_build_push(Value& stack, Value item) {
+    check_fresh(stack);
+    push_item(stack, static_cast<Value&&>(item));
+}
+
+void Storage::collection_erase(Value& collection, std::size_t position) {
     CollectionObject& c = collection_mut(collection);
     const std::size_t s = stride(c);
     c.items.erase(c.items.begin() + static_cast<std::ptrdiff_t>(position * s),
                   c.items.begin() + static_cast<std::ptrdiff_t>(position * s + s));
-    reindex(c);
+    try {
+        reindex(c);
+    } catch (const std::bad_alloc&) {
+        c.index.clear();  // no index: lookups scan linearly, still exact (the next append rebuilds it)
+    }
     heap_retally(collection.heap());
 }
 
-void stack_push(Value& stack, Value item) {
-    CollectionObject& c = collection_mut(stack);
-    check_not_self(&c, item);
-    note_store(&c, item);
-    c.items.push_back(static_cast<Value&&>(item));
-    heap_retally(stack.heap());
-}
-
-void stack_pop(Value& stack) {
+void Storage::stack_pop(Value& stack) {
     CollectionObject& c = collection_mut(stack);
     c.items.pop_back();
     heap_retally(stack.heap());
 }
 
-void collection_clear(Value& collection) {
+void Storage::collection_clear(Value& collection) {
     CollectionObject& c = collection_mut(collection);
     c.items.clear();
     c.index.clear();

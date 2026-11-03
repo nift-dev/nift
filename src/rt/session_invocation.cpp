@@ -15,7 +15,7 @@ std::vector<InvocationBinding> invocation_bindings(const std::string& command,
     auto args = make_array(arguments.size());
     for (const auto& argument : arguments) array_push(args, make_string(argument));
 #if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 2  // test-only: a wrong value (args_cmd/mutants.sh)
-    if (!arguments.empty()) array_mut(args).pop_back();  // rt-lint: storage-ok construction
+    if (!arguments.empty()) array_build_storage(args).pop_back();  // construction
 #endif
     std::vector<InvocationBinding> out;
     auto install = [&](std::string name, Value value, infer_detail::TyRef shape) {

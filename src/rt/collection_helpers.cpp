@@ -34,7 +34,7 @@ bool generated_key(M m,const Value& value,Atom& key,Fault& f) {
 }
 void append_group(Value& object,Atom key,const Value& item) {
     if(!object_get(object,key))object_set(object,key,make_array());
-    Value* group=object_slot_mut(object,key);array_push(*group,item);  // rt-lint: storage-ok fresh result
+    Value* group=object_build_slot(object,key);array_push(*group,item);  // the native's fresh result
 }
 void short_circuit(Value* s) {
 #if !defined(NIFT_COLLECTION_MUTANT) || NIFT_COLLECTION_MUTANT != 6
@@ -116,7 +116,7 @@ bool sorted_keys(Value* s,const natives::Context& context,Fault& f) {
     if(!budget(context,n*sizeof(Value),f))return false;
     s[HashTable]=make_array(n);
     for(std::size_t i=0;i<n;++i)array_push(s[HashTable],Value::integer(i));
-    auto& order=array_mut(s[HashTable]);  // rt-lint: storage-ok fresh scratch
+    auto& order=array_build_storage(s[HashTable]);  // fresh scratch
     const auto& keys=array_items(s[Keys]);const auto& directions=array_items(s[Directions]);bool failed=false;
     std::sort(order.begin(),order.end(),[&](const Value& left,const Value& right){
         const auto a=static_cast<std::size_t>(left.as_int()),b=static_cast<std::size_t>(right.as_int());

@@ -1,10 +1,11 @@
 #include "rt/compiler_collection_sort.h"
+#include "rt/reference_probe.h"
 #include "rt/collection_sort.h"
 #include "rt/collection_effects.h"
 namespace nift::rt::detail {
 bool UnitCompiler::comparator_sort(const Node& node,std::uint16_t dst,const Binding& binding) {
     using namespace collection_slot;
-#if !defined(__GLIBCXX__) || __GLIBCXX__ != 20260321
+#if (!defined(__GLIBCXX__) || __GLIBCXX__ != 20260321) && !defined(NIFT_RT_REFERENCE_PROBE)
     return fail(node,"method:sort");
 #endif
     const Node& receiver=ast_.at(ast_.at(node.a).a);

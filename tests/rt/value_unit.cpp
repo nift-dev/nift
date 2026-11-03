@@ -8,6 +8,7 @@
 #include "rt/number.h"
 #include "rt/string.h"
 #include "rt_test.h"
+#include "storage_access.h"  // B2: the storage commits (tests only)
 
 #include <cmath>
 #include <cstdlib>
@@ -71,7 +72,7 @@ void arrays_shared() {
     array_push(a, I(2));
     Value b = a;  // O(1) copy: the same array
     CHECK(a.heap() == b.heap() && a.refcount() == 2);
-    array_push(b, I(3));  // in place: a sees it
+    array_append(b, I(3));  // in place: a sees it
     CHECK(a.heap() == b.heap() && array_size(a) == 3 && array_size(b) == 3 && a.refcount() == 2);
     array_mut(b)[0] = S("z");
     CHECK(equal(array_items(b)[0], S("z")) && equal(array_items(a)[0], S("z")));
@@ -100,9 +101,9 @@ void objects() {
     object_set(p, kb, I(1));
     CHECK(equal(o, p) && hash(o) == hash(p));
     Value q = o;  // B2: objects are references (replaced: o unchanged under copy-on-write)
-    object_set(q, kb, I(9));
+    object_put(q, kb, I(9));
     CHECK(object_get(o, kb)->as_int() == 9 && q.heap() == o.heap());
-    object_set(q, kb, I(1));
+    object_put(q, kb, I(1));
     // Indexed lookup beyond the linear threshold, including removal.
     Value big = make_object();
     for (int i = 0; i < 300; ++i) object_set(big, atom("k" + std::to_string(i)), I(i));

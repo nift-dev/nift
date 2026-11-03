@@ -38,14 +38,16 @@ const std::vector<Value>& array_items(const Value& array);
 const std::vector<Value>& array_view(const Value& array);
 const std::vector<std::pair<Atom, Value>>& object_view(const Value& object);
 const Value* object_find(const Value& object, Atom key);
-// Raw storage of the array itself (B2: never a clone): the array is
-// conservatively marked as possibly holding references (rt/heap.h); prefer
-// array_set for one slot.
-std::vector<Value>& array_mut(Value& array);
-void array_push(Value& array, Value item);
-// Replaces element `index` (< size), in place.
-void array_set(Value& array, std::size_t index, Value item);
 std::size_t array_size(const Value& array);
+
+// Construction (B2, owner B): building a FRESH value the caller alone holds
+// (refcount 1, not immutable; checked builds abort otherwise). An existing
+// aggregate is mutated only through the mutation protocol (rt/mutation.h),
+// whose commits are the private members of Storage below.
+void array_push(Value& array, Value item);
+// Raw storage of a fresh array (marked as possibly holding references).
+std::vector<Value>& array_build_storage(Value& array);
+void array_build_set(Value& array, std::size_t index, Value item);
 
 Value make_object();
 // B2: a new outer array/object with the same elements (identity kept), O(n).
@@ -54,34 +56,54 @@ Value object_shallow_clone(const Value& object);
 std::size_t object_size(const Value& object);
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object);
 const Value* object_get(const Value& object, Atom key);
-// Inserts at the end or replaces in place (insertion order is kept).
+// Construction: inserts at the end or replaces in place (order kept).
 void object_set(Value& object, Atom key, Value value);
-bool object_remove(Value& object, Atom key);
+Value* object_build_slot(Value& object, Atom key);  // null when `key` is missing
 
 // Struct instances (D-NEXT-refsem #1): fields in declaration order (private
-// ones included). Every Value holding an instance refers to the same object:
-// struct_set and struct_slot_mut mutate it in place, visibly through every
-// alias (never cloned). struct_add_field is for construction; struct_set
-// replaces an existing field and returns false when the struct has no such
-// field. A store that would make the instance reachable from itself must be
-// refused by the caller before it is made (rt/value_cycle.h).
+// ones included). Every Value holding an instance refers to the same object;
+// the protocol mutates it in place, visibly through every alias (never
+// cloned). struct_add_field is construction.
 Value make_struct(Atom type_name, std::size_t reserve = 0);
 Atom struct_type(const Value& instance);
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
 const Value* struct_get(const Value& instance, Atom field);
 void struct_add_field(Value& instance, Atom field, Value value);
-bool struct_set(Value& instance, Atom field, Value value);
 
-// In-place mutation of nested places (`a[0].push(x)`, `o["k"]["m"] = v`,
-// `s.q.v = 5`): each returns the child slot of an aggregate (written in
-// place: B2, the aggregate is shared by every alias). The returned pointer follows the
-// lifetime contract above (any later mutation of the parent invalidates it),
-// and the parent is conservatively marked as possibly holding identity-bearing
-// values, since the caller may store anything into the slot.
-// Null when the index is out of range, the key or field is missing.
-Value* array_slot_mut(Value& array, std::size_t index);
-Value* object_slot_mut(Value& object, Atom key);
-Value* struct_slot_mut(Value& instance, Atom field);
+namespace mutation {
+class Protocol;
+}
+struct StorageTestAccess;  // tests only (tests/rt/storage_access.h; rt-lint: never in src/)
+
+// B2 (b2-refrep.md, owner requirement B): the storage commits on an EXISTING
+// aggregate. Every member is private: the mutation protocol's commit layer
+// (mutation::Protocol, rt/mutation.h) is the only production friend, so a
+// receiver's storage can be written only after the protocol's validation
+// (kind, immutability, bounds, cycle, budget). The second friend is the
+// storage-level unit tests' accessor, which no production file may name.
+// Bookkeeping (note_store, heap_retally, checked-build relocation) is the
+// same as construction's. The slot functions return the child slot of an
+// aggregate (null when missing) for a nested in-place store; the parent is
+// conservatively marked as possibly holding references.
+class Storage {
+    friend class mutation::Protocol;
+    friend struct StorageTestAccess;
+    static std::vector<Value>& array_mut(Value& array);
+    static void array_push(Value& array, Value item);
+    static void array_set(Value& array, std::size_t index, Value item);  // index < size
+    static Value* array_slot_mut(Value& array, std::size_t index);
+    static void object_set(Value& object, Atom key, Value value);
+    static bool object_remove(Value& object, Atom key);
+    static Value* object_slot_mut(Value& object, Atom key);
+    static bool struct_set(Value& instance, Atom field, Value value);  // false: no such field
+    static Value* struct_slot_mut(Value& instance, Atom field);
+    static void map_set(Value& map, Value key, Value value);
+    static void set_add(Value& set, Value member);
+    static void collection_erase(Value& collection, std::size_t position);
+    static void stack_push(Value& stack, Value item);
+    static void stack_pop(Value& stack);
+    static void collection_clear(Value& collection);
+};
 
 // O(1): an identity-bearing value (a callable, a handle, a cell, a future, a
 // struct instance or a collection: D-NEXT-refsem makes the last two shared

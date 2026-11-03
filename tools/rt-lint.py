@@ -20,7 +20,11 @@ Rules
                    the commit primitives (aggregate*.cpp), the construction
                    builders (natives/support) and the decoders. A line that
                    builds or tears down a fresh value it alone holds may say
-                   `// rt-lint: storage-ok <why>`.
+                   `// rt-lint: storage-ok <why>`. B2 (owner B): the commits
+                   are private members of rt::Storage whose only production
+                   friend is mutation::Protocol, so a bypass does not compile
+                   (tests/rt/compile_fail); this rule is defence in depth and
+                   also flags any `Storage::` or `StorageTestAccess` use.
 
 Usage: rt-lint.py [paths...]   (default: src/rt)
        rt-lint.py --self-test  (each rule must fire on tests/rt/lint_fixtures)
@@ -37,8 +41,9 @@ STORAGE_WRITE = re.compile(
     r'heap_as<\s*(ArrayObject|ObjectObject|StructObject|CollectionObject)\s*>\s*\(\s*\)\s*->\s*'
     r'(items|entries|fields)\b\s*(\[[^\]]*\])?\s*(=(?!=)|\.\s*(push_back|emplace_back|insert|erase|clear|resize|'
     r'pop_back|swap|assign|emplace)\s*\()'
-    r'|(?<!mutation::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|struct_set|map_set|'
-    r'set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\(')
+    r'|(?<!mutation::)(?<!Protocol::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|'
+    r'struct_set|map_set|set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\('
+    r'|\bStorage::|\bStorageTestAccess\b')
 STORAGE_ALLOWED = {'mutation.cpp', 'mutation.h', 'aggregate.cpp', 'aggregate.h', 'aggregate_collection.cpp',
                    'aggregate_collection.h', 'aggregate_store.h', 'support.cpp', 'support.h',
                    'isolate_transfer_decode.cpp', 'transfer_heap.cpp', 'isolate_snapshot.cpp'}
