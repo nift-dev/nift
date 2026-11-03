@@ -16,7 +16,8 @@ validation is on the Linode, owner ruling of 2026-11-03):
 | `8599dbcb` | rulings 5 and 6: identity and probe coverage | 15 |
 | `44734273` | commit 3: E, sort protection | 16 |
 | `94bfce4b` | record: commit table, component map (**reviewed tip: REJECTED**, narrow) | - |
-| `4a9df426`, `8835c252` and this record commit | review repair: H1/H2, M1, M2, L4-L8; record | 17 |
+| `4a9df426`, `8835c252`, `534f9af8` | review repair: H1/H2, M1, M2, L4-L8; record (re-review: ACCEPT-WITH-CONDITIONS) | 17 |
+| the commits after `534f9af8` | re-review conditions C1-C3 and the LOW item; record | 18 |
 
 ### Record map by component (owner layout)
 
@@ -854,19 +855,24 @@ snapshot structure:
 
 Case table (owner), production fixtures with the guard on unless marked probe:
 
-| Case | Required | Covered by |
-| --- | --- | --- |
-| Repeated evaluation of an object literal | fresh each time | `refsem/parity/b2_literal_fresh_call.f`, session `session_literal_fresh` (refsem_a.py) |
-| Repeated evaluation of a nested array literal | no mutation leak | `refsem/parity/b2_literal_fresh_loop.f` (nested array of an object literal); probe `literal-nested-array`, `literal-nested-json` (`refrep_vm.cpp`: production refuses iterating or aliasing the nested element, `lent`/`aliasing`) |
-| Two calls returning object literals | distinct (`same` false) | `collections/approved/same_object_literal.f` |
-| Literal evaluated in a loop | no state between iterations | `refsem/parity/b2_literal_fresh_loop.f` |
-| Aliases to one evaluated literal | shared identity (`same` true) | `same_object_literal.f` (`same(a, a)`); probe `literal-alias` (production refuses `z := x`, `aliasing`) |
-| `copy` / `deepcopy` | new objects, equal contents | `collections/approved/same_object_literal_copy.f` |
-| Literal built inside a closure | fresh per evaluation | `refsem/parity/b2_literal_fresh_closure.f` |
-| Module function returning a literal | no cross-call leak | `refsem/modules/literal_fresh_module` |
+| Case | Required | Covered by | Fails on R-B7 / `94bfce4b`? |
+| --- | --- | --- | --- |
+| Repeated evaluation of an object literal | fresh each time | `refsem/parity/b2_literal_fresh_call.f`; session `session_literal_fresh_statement` (refsem_a.py, one statement) | yes: `[1,5] [1,5,5]`; session `2 3 4` (fix `2 2 2`) |
+| Repeated evaluation of a nested array literal | no mutation leak | `refsem/parity/b2_literal_fresh_loop.f` (the nested array of an object literal); probe `literal-nested-json` (depth two and more) | yes: `2 3 4`; probe output differs |
+| Two calls returning object literals | distinct (`same` false) | `collections/approved/same_object_literal.f` | yes: `true` (fix `false`) |
+| Literal evaluated in a loop | no state between iterations | `refsem/parity/b2_literal_fresh_loop.f` | yes: `2 3 4` |
+| Aliases to one evaluated literal | shared identity (`same` true) | `same_object_literal.f` (`same(a, a)`); probe `literal-alias` | **no, by nature**: the defect adds sharing, so aliases stay identical on R-B7 too. Production refuses the alias forms that could show more (`aliasing`); the probe row is a positive guard, and lost aliasing is what R-B2 (refsem 24, `alias-array`) catches |
+| `copy` / `deepcopy` | new objects sharing (copy) or not (deepcopy) this evaluation's contents | probe `literal-copy` (a push through `copy(x)` is not seen by the next evaluation); `collections/approved/same_object_literal_copy.f` (identity and equality only) | probe: yes (`2 2`, fix `2 1`); the production fixture: **no** (`copy`/`deepcopy` give new outer objects on R-B7 too, and production refuses reaching a copy's member, `aliasing`; legacy rejects the loop form) |
+| Literal built inside a closure | fresh per evaluation | `refsem/parity/b2_literal_fresh_closure.f` | yes: `2 3` |
+| Module function returning a literal | no cross-call leak | `refsem/modules/literal_fresh_module` | yes: `2 3` |
 
 Mutant R-B7 (refsem 31, `vm_report.cpp`: `LoadKFresh` loads the shared pool constant again) is
-caught by the refsem suite (5 failing checks) and by `refrep_vm` (`literal-nested-json`).
+caught by the refsem suite (6 failing checks: the call, closure and loop parity cases, the module
+case, and the one-statement session case with its session summary) and by `refrep_vm` (`literal-nested-json`,
+`literal-copy`). Re-review C3: the first sessions row (`session_literal_fresh`, two statements)
+passed on R-B7 and on `94bfce4b` (`2 2`), so it tested nothing; it is kept as a parity case and
+the one-statement case now covers the row. Each row was re-run on the fix, R-B7 and `94bfce4b`
+(table).
 
 ### 17.2 M1: mutation authority and the publication boundary
 
@@ -882,7 +888,9 @@ explicit boundary those helpers cannot cross.
   `bypass_sort.cpp` (the reviewer's `Protocol::sort_items(r).clear()`) must fail to compile.
   rt-lint flags `SortController`, the sort names and `rt/sort_controller.h` in any other file.
 - **Construction: the boundary is "fresh", enforced by lint plus `check_fresh`, not by the type
-  system.** Why not at compile time: the construction functions (`array_push`,
+  system** (superseded in part by section 18: the sort side is now a passkey, the lint matches
+  identifier tokens, and the "why not" below is a scope decision, not an impossibility). Why not
+  at compile time (as first argued): the construction functions (`array_push`,
   `array_build_storage`, `array_build_set`, `object_set`, `object_build_slot`,
   `struct_add_field`, `map_build_set`, `set_build_add`, `stack_build_push`) take a `Value&`, and a
   fresh value and a published one have the same type; publication is a run-time property (the
@@ -950,7 +958,8 @@ Only the final frozen tree's results count toward certification.
 | `67527994` | Linode reruns of `test-rt-value-sanitize`, `test-runtime2-cp18-sanitize`, `test-rt-value` | intermediate |
 | `ea082292` | compile-fail fix: clean clone, C and C.UTF-8 PASS | intermediate |
 | `94bfce4b` (commit 3 tip) | review REJECT (H1, H2, M1, M2); Linode intermediate: 39 gates passing, pre-existing failures only | **REJECTED**; intermediate |
-| final frozen tree (this repair) | focused local checks (17.7); Linode certification pending | the only tree that counts |
+| `534f9af8` (repair tip) | re-review ACCEPT-WITH-CONDITIONS (C1-C3, LOW); Linode run started | intermediate |
+| final frozen tree (after section 18) | focused local checks (18.6); Linode certification pending | the only tree that counts |
 
 ### 17.7 Gate status of the repair (focused local checks)
 
@@ -960,3 +969,90 @@ Only the final frozen tree's results count toward certification.
 9 incl. R-B7), `test-rt-sort-protection-mutants` (S1, S2, S4, S5 caught; wording control PASS),
 `test-runtime2-refrep-cli`, `test-runtime2-refsem` (473) and `-refsem-mutants` (23 caught incl.
 31), `test-runtime2-collections` (279) and `-collections-mutants`: 0 each. Heavy gates: Linode.
+
+## 18. Re-review of `534f9af8`: ACCEPT-WITH-CONDITIONS, and the conditions
+
+The re-review of `534f9af8` (tree `a1399e9a`) resolved H1, H2, M2 and L4-L8 and set three
+conditions (C1-C3) and one LOW item; fixed in new commits on top of `534f9af8` (no rewrite). The
+Linode run on `534f9af8` is intermediate evidence (17.6).
+
+### 18.1 C1: the sort storage closed at compile time (passkey)
+
+`rt/sort_controller.h` re-exported the private sort commits through a public struct, so any file
+including it could clear a published array (`rr/lint/sort_plain.cpp`), and `rr/lint/sort_bypass.cpp`
+(an include path spelled `rt//sort_controller.h`, a token-pasted name) passed rt-lint. Now every
+`SortController` function takes a `mutation::SortKey`, whose only constructor is private and
+user-provided (a defaulted one would leave `SortKey` an aggregate in C++17, so `SortKey{}` would
+compile from anywhere: verified, and `absent.cpp` asserts `!is_aggregate`) and whose only friends
+are `collection_sort_init`, `collection_sort_resume` and `collection_plain_sort`. Compile-fail
+cases: `bypass_sort_key_{storage,items,commit_permutation}.cpp` (each accessor with a forged key:
+`{}`, `SortKey{}`, `SortKey()`), `bypass_sort_paste.cpp` and `bypass_sort_plain.cpp` (the reviewer's
+two files); `absent.cpp`: `SortKey` is neither default-constructible nor an aggregate outside.
+(A reference forged by a cast is deliberate undefined behaviour, outside what any access check
+can stop.)
+
+### 18.2 C2: construction lint on identifier tokens; `check_fresh`; the scope decision
+
+- rt-lint's construction rule now matches the identifier anywhere in code (comments and strings
+  stripped), so a qualified (`rt::array_push`), parenthesised (`(array_push)(...)`), address-taken
+  (`&array_build_set`) or `using`-imported reference counts. A line may hold one construction
+  reference (one annotation covers one reference: the reviewer's "blanket annotation" form
+  fails). Token pasting (`##`) needs `rt-lint: paste-ok` (the VM's three dispatch-label macros);
+  the `sort_controller.h` include is matched on the raw line. Fixture `bad_bypass_forms.cpp`
+  holds every `rr/lint/vm_bypass.cpp` form, the `sort_bypass.cpp` lines and the reviewer's
+  `push_value` patch; the self-test requires exactly its 13 flagged lines. The reviewer's
+  `push_value` patch applied to `vm_ops.cpp` now fails rt-lint.
+- Labels re-checked at every site: `fresh` (a value the code alone holds and has just made),
+  `private-descriptor` (`cell.cpp`: the cell's own selector descriptor, refcount 1, never
+  user-visible, written after its creation: not fresh), `mutant-only` (inside a test-mutant `#if`:
+  `vm_keyed.cpp` R14, `vm_ops.cpp` M-B2). Three reasons were made precise (`vm_report.cpp`
+  `NewArray`/`ObjectSet`, `vm_struct.cpp` `StructAdd`, `session_invocation.cpp`).
+- `check_fresh` (checked and sanitizer builds) also refuses a sort-protected receiver. Its limit,
+  stated plainly: it detects sharing, not publication; a published value held by one holder (a
+  user binding in one register) has refcount 1 and passes. So the construction boundary is the
+  lint's per-site annotation plus this run-time check of sharing.
+- Scope decision (not an impossibility): a compile-time construction capability (a builder or
+  passkey type returned by `make_*` and consumed by `finish()`) is feasible; it touches about 95
+  production call sites in 22 files and about 230 test call sites, so it is proposed as a later
+  tooling item for the owner to schedule, outside B2.
+
+### 18.3 C3: the case table re-checked against the defect
+
+See the table in 17.1 (new column): every row's covering test was run on the fix, on R-B7 and on
+the rejected `94bfce4b`. The sessions row now uses one statement (`session_literal_fresh_statement`:
+`2 3 4` on R-B7 and `94bfce4b`, `2 2 2` on the fix); the copy row gained the probe `literal-copy`;
+the alias row cannot fail on the defect by its nature (it adds sharing), stated in the table.
+
+### 18.4 LOW: allocation failure in `LoadKFresh`
+
+`cow_allocation.cpp` `literal_campaign`: `clone_constant` of a nested template (object, object,
+arrays, strings) failed at each of its 11 allocation sites (nothing leaks, the output stays null:
+no partially built value escapes, the template unchanged; on success every node is new), and a
+program evaluating a nested JSON literal twice through the program API failed at each of its 43
+run-time allocation sites (internal error, no result, nothing leaks; the next run prints `2 2`).
+The ASan/LSan run of this campaign is the CP18 sanitizer lane (Linode).
+
+### 18.5 INFO from the re-review (no change)
+
+- Retained literals now cost heap on every evaluation: `rr/p/bud1.f` (2,000 retained
+  `{"a": [...2,000 ints...]}`) stops under a 2 MB budget where `919b5669` completed (it kept
+  2,000 references to one constant). This follows from the freshness ruling and matches legacy's
+  model; a non-retained loop (`bud2.f`) is unaffected.
+- `parallel_task_start.cpp` `finite_timer_body` does not admit `LoadKFresh`: a timer task whose
+  body builds a JSON literal no longer qualifies for the finite-timer helping path (conservative,
+  not a semantic change).
+- An extra effect of H1: `thread()` tasks looping over a literal (`rr/p/i1.f`) leaked state
+  across tasks on `94bfce4b` (`9 9 9`); the fix gives `6 6 6`, as `919b5669` and legacy.
+
+### 18.6 Gate status (focused local checks)
+
+On the conditions tree (result files `scratchpad/b2/results-cond/`): `nift`; `test-rt-lint`
+(self-test 12 fixtures, `src/rt` 0 problems); `test-rt-protocol-compile-fail` (absent.cpp, 9
+bypass cases, control: 11 PASS); `test-rt-mutation-protocol` (191) and `-mutants` (6 of 6);
+`test-rt-refrep` (116 checks; production checks PASS) and `-refrep-mutants` (9 of 9, R-B7 caught
+by `literal-nested-json` and `literal-copy`); `test-rt-sort-protection-mutants` (S1, S2, S4, S5;
+wording control PASS); `test-runtime2-refrep-cli`; `test-runtime2-refsem` (474) and
+`-refsem-mutants` (23 caught, R-B7 with 6 failing checks); `test-runtime2-collections` (279) and
+`-collections-mutants` (11): 0 each. CP18 `cow-allocation` (ordinary build): "COW final: 0
+failures", the literal campaigns included. Heavy gates: Linode, on the new tip only.
+
