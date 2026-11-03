@@ -55,7 +55,12 @@ class CycleGraph;
 
 namespace nift::rt::mutation {
 
-enum class Failure : std::uint8_t { None, Kind, Immutable, Bounds, Argument, Cycle, Budget };
+enum class Failure : std::uint8_t { None, Kind, Immutable, Bounds, Argument, Cycle, Budget, SortProtected };
+// B2 (owner E): the refusal text of a mutation of an array whose comparator
+// sort is running (Failure::SortProtected). The VM raises it as the catchable
+// runtime.sort_receiver_mutated (Vm::handle_bail); no other source emits it.
+inline constexpr const char* kSortReceiverMutated =
+    "sort receiver mutated: the array is being sorted by a comparator sort";
 
 struct Outcome {
     Failure failure = Failure::None;
@@ -88,7 +93,11 @@ inline bool is_immutable(const Value& value) noexcept { return value.is_heap() &
 void make_immutable(Value& value) noexcept;
 
 // Stage 2.2: true when the receiver refuses every mutation (whoever holds it).
-inline bool refuses_mutation(const Value& receiver) noexcept { return is_immutable(receiver); }
+// B2 (owner E): also while a comparator sort of the array runs (kSortProtected);
+// one test of the tag byte either way.
+inline bool refuses_mutation(const Value& receiver) noexcept {
+    return receiver.is_heap() && (receiver.heap()->tag & (kImmutable | kSortProtected)) != 0;
+}
 namespace detail {
 // The refusals, built only on failure (cold): the immutable error, and the
 // kind error followed by the immutable one (admit's order: 2.1, then 2.2).

@@ -49,6 +49,9 @@ public:
     bool contains(const std::string& name) const;
     Value value(const std::string& name) const;
     std::size_t binding_count() const;
+    // B2 (owner E): the comparator-sort protections the session's VM holds
+    // (zero between statements: every run exit releases them).
+    std::size_t sort_protections() const;
     std::uint64_t executions() const { return executions_; }
     std::uint64_t refusals() const { return refusals_; }
     std::size_t retained_code_units() const;

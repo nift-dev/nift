@@ -57,6 +57,19 @@ inline constexpr std::uint8_t kStorageLent = 0x40;
 inline constexpr std::uint8_t kImmutable = 0x20;
 inline bool is_immutable(const HeapObject* object) noexcept { return (object->tag & kImmutable) != 0; }
 inline void mark_immutable(HeapObject* object) noexcept { object->tag |= kImmutable; }
+// B2 (b2-refrep.md, owner requirement E): bit 4, "an in-place comparator
+// sort of this array is running". Set when the sort starts, and cleared
+// deterministically when it ends, whatever the exit (completion, the drain on
+// an unwind, a stop, the end of a session statement, a parallel task's run, the VM's
+// destruction): the Vm's sort-protection registry (rt/vm.h) owns every set
+// bit. While it is set the mutation protocol refuses every mutation of the
+// array (a catchable runtime.sort_receiver_mutated), whoever holds it.
+inline constexpr std::uint8_t kSortProtected = 0x10;
+inline bool is_sort_protected(const HeapObject* object) noexcept { return (object->tag & kSortProtected) != 0; }
+inline void mark_sort_protected(HeapObject* object) noexcept { object->tag |= kSortProtected; }
+inline void clear_sort_protected(HeapObject* object) noexcept {
+    object->tag = static_cast<std::uint8_t>(object->tag & ~kSortProtected);
+}
 inline bool may_hold_identity(const HeapObject* object) noexcept { return (object->tag & kMayHoldIdentity) != 0; }
 inline void mark_may_hold_identity(HeapObject* object) noexcept { object->tag |= kMayHoldIdentity; }
 inline void clear_may_hold_identity(HeapObject* object) noexcept {

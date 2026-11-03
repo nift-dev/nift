@@ -92,6 +92,8 @@ void make_immutable(Value& value) noexcept {
 namespace detail {
 
 Outcome immutable_failure(const Value& receiver, std::string_view receiver_text) {
+    if (!is_immutable(receiver) && receiver.is_heap() && is_sort_protected(receiver.heap()))
+        return failed(Failure::SortProtected, kSortReceiverMutated);
     return failed(Failure::Immutable, std::string("cannot mutate const ") + receiver_kind_name(receiver) + ": " +
                                           std::string(receiver_text));
 }

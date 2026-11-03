@@ -102,6 +102,7 @@ std::size_t VmSession::binding_count() const {
     return namespace_.structures.size() + std::count_if(namespace_.symbols.begin(), namespace_.symbols.end(),
                          [](const auto& symbol) { return symbol.defined; });
 }
+std::size_t VmSession::sort_protections() const { return vm_ ? vm_->sort_protections() : 0; }
 void VmSession::refresh(SessionCompileContext& pending) {
     auto& symbols = pending.symbols;
     for (auto& symbol : symbols) {

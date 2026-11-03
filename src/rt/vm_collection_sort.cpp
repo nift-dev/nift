@@ -4,6 +4,9 @@
 #include "rt/aggregate.h"
 #include "rt/cell.h"
 #include "rt/heap.h"
+#include "rt/mutation.h"
+#include "rt/vm_coro.h"
+#include <atomic>
 #include <new>
 namespace nift::rt {
 #ifdef NIFT_COLLECTION_ALLOC_TEST
@@ -25,6 +28,62 @@ Value* source(Value* stack,Value* R,const Instr& in) {
     return cell&&cell->binding_type!=kSelectorCell?&cell->value:nullptr;
 }
 }
+// B2 (owner requirement E): the sort-protection registry (rt/vm.h).
+namespace {
+// Process-wide counts, for tests that check a release across VMs (a parallel
+// task's isolate VM): protections currently set, and protections ever set.
+std::atomic<std::size_t> live_protections{0}, started_protections{0};
+template <class List> void release_at(List& list,std::size_t k) noexcept {
+    clear_sort_protected(list[k].receiver.heap());
+    list.erase(list.begin()+static_cast<std::ptrdiff_t>(k));
+    live_protections.fetch_sub(1,std::memory_order_relaxed);
+}
+}
+std::size_t Vm::live_sort_protections() noexcept {return live_protections.load(std::memory_order_relaxed);}
+std::size_t Vm::started_sort_protections() noexcept {return started_protections.load(std::memory_order_relaxed);}
+const Value* Vm::sort_protected(std::size_t k) const noexcept {
+    return k<sort_protection_.size()?&sort_protection_[k].receiver:nullptr;
+}
+std::uint32_t Vm::running_task() const noexcept {return coro_?coro_->current:0;}
+void Vm::protect_sort(const Value& receiver,std::size_t slot,std::size_t site) {
+    sort_protection_.push_back(SortProtection{receiver,running_task(),slot,site});  // may throw: before the bit
+    live_protections.fetch_add(1,std::memory_order_relaxed);
+    started_protections.fetch_add(1,std::memory_order_relaxed);
+#if !(defined(NIFT_SORT_MUTANT) && NIFT_SORT_MUTANT == 5)  // S5: the receiver is never protected
+    mark_sort_protected(receiver.heap());
+#endif
+}
+void Vm::release_sort(std::size_t slot) noexcept {
+#if !(defined(NIFT_SORT_MUTANT) && NIFT_SORT_MUTANT == 1)  // S1: completion keeps the protection
+    const std::uint32_t task=running_task();
+    for(std::size_t k=sort_protection_.size();k--;)
+        if(sort_protection_[k].task==task&&sort_protection_[k].slot==slot){release_at(sort_protection_,k);return;}
+#else
+    (void)slot;
+#endif
+}
+// After an unwind: every protection of the running task whose controller is
+// no longer active (drained to completion, or its registers unwound).
+void Vm::sweep_sort_protection() noexcept {
+#if !(defined(NIFT_SORT_MUTANT) && NIFT_SORT_MUTANT == 2)  // S2: an unwind keeps the protection
+    const std::uint32_t task=running_task();
+    for(std::size_t k=sort_protection_.size();k--;) {
+        const SortProtection& p=sort_protection_[k];
+        if(p.task!=task)continue;
+        const bool live=p.slot+sort_slot::Count<=stack_.size()&&collection_sort_active(stack_.data()+p.slot,p.site);
+        if(!live)release_at(sort_protection_,k);
+    }
+#endif
+}
+// Every exit of a run (a stop, the end of a session statement, an exception,
+// a parallel task's isolate run) and the destructor. A cooperative task never
+// holds one across its teardown: a coroutine program with a comparator sort is
+// refused under the cooperative model (coro-collection-callback).
+void Vm::release_sort_protection() noexcept {
+#if !(defined(NIFT_SORT_MUTANT) && NIFT_SORT_MUTANT == 4)  // S4: run exit / destruction keeps the protection
+    for(std::size_t k=sort_protection_.size();k--;)release_at(sort_protection_,k);
+#endif
+}
 bool Vm::op_collection_sort(const Instr& in,Value* R,Fault& fault,const Proto* proto) {
     Value* place=source(stack_.data(),R,in);if(!place)return internal(fault,"sort location");
     Value* s=R+in.a;s[Source]=std::move(*place);
@@ -33,20 +92,16 @@ bool Vm::op_collection_sort(const Instr& in,Value* R,Fault& fault,const Proto* p
     if((in.c&15)==0) {  // B1: stage 2.2 before the sort starts (rt/mutation.h)
         const Note* note=proto->note(&in-proto->code.data());
         const auto out=mutation::check_mutable(s[Source],note?std::string_view(note->text):std::string_view());
-        ok=out.ok()?collection_sort_init(s,context,fault,static_cast<std::size_t>(&in-proto->code.data())):
-            raise(fault,StopReason::Error,out.text);}
+        const auto site=static_cast<std::size_t>(&in-proto->code.data());
+        if(!out.ok())ok=raise(fault,StopReason::Error,out.text);
+        else{protect_sort(s[Source],static_cast<std::size_t>(s-stack_.data()),site);
+            ok=collection_sort_init(s,context,fault,site);}}
     else if(!s[Returned].is(Kind::Bool))ok=raise(fault,StopReason::Error,"sort: comparator must return bool");
     else if(!collection_sort_resume(s,s[Returned].as_bool(),false))ok=internal(fault,"sort controller");
     *place=std::move(s[Source]);
     if(!ok)return false;
+    if(!s[More].as_bool())release_sort(static_cast<std::size_t>(s-stack_.data()));  // completed
     s[Returned]=Value();
-    if(s[More].as_bool()&&s[Directions].is_null()) {
-        const auto n=array_size(*place);
-        if(!natives::reserve_result(context,sizeof(ArrayObject)+n*sizeof(Value)))return internal(fault,
-            "memory budget exceeded");
-        s[Directions]=make_array(n);s[Directions].heap_as<ArrayObject>()->items.resize(n);  // rt-lint: storage-ok fresh
-        mark_may_hold_identity(s[Directions].heap());
-    }
     return memory_ok(fault);
 }
 bool Vm::drain_collection_boundaries(const Fault&,std::size_t retained_depth,

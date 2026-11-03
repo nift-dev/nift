@@ -402,7 +402,9 @@ Every mutator with an aliasing operand:
 - `test-runtime2-cp18`: `combined_cp14b.py` (`b := a` refused, `reference-guard:inflow`, the
   same compiler at `919b5669`); `cow_semantics.py` struct-copy case admitted on both `919b5669`
   and this tree (left failing, recorded).
-- `test-cp19-r1`: `eval_entry.py` unresolved-name check fails with the `919b5669` binary.
+- `test-cp19-r1`: `eval_entry.py` unresolved-name check fails with the `919b5669` binary. Release-audit item (coordinator, from the Linode run): the assertion expects
+  `NIFT_VM=require` in the refusal text, which now says `NIFT_VM=0 nift eval`: a stale test after
+  the VM-default change, not a product defect; not fixed in B2.
 
 ### 13.5 R19 (documented negative control)
 
@@ -704,3 +706,64 @@ every program that could observe an alias, `refrep_cli.py` and the refsem suite)
 
 Gate status (local, focused checks only, owner ruling of 2026-11-03): `test-rt-refrep` 79
 checks, 0 failures (production checks PASS); `test-rt-refrep-mutants` 8 of 8; `rt-lint` 0.
+
+## 16. Commit 3: sort protection (owner requirement E)
+
+While an in-place comparator sort runs, its receiver is protected: header bit 4
+(`kSortProtected`, `heap.h`; bit 4 was unused, the kind uses bits 0-3) plus a per-VM registry
+(`Vm::sort_protection_` of `SortProtection` records, `rt/vm_sort_protection.h`: the receiver,
+the running task, the controller's registers and call site; process-wide counts of protections
+set now and ever, for tests that check a release in another VM). `mutation::refuses_mutation` tests `kImmutable | kSortProtected` in one tag-byte test, so
+every protocol entry point (and the VM's own stage 2.2 checks, which call it) refuses any
+mutation of the receiver through any holder; the refusal (`Failure::SortProtected`, text
+`mutation::kSortReceiverMutated`) is raised by the VM as the catchable
+`runtime.sort_receiver_mutated` (`Vm::handle_bail`, which converts exactly that protocol text;
+the code is registered as recoverable). The sort itself continues. A recursive sort of the same
+receiver is such a mutation (refused at its own stage 2.2); a nested sort of a different array
+works. The copy-on-write detach into a spare buffer is deleted from `collection_sort_resume`
+(the receiver is sorted in place whoever holds it), with the spare's allocations; the budget
+reservation formula is unchanged (now an over-estimate).
+
+Release is deterministic, never lazy, on every exit path:
+
+| Exit | Release | Direct check (`refrep_vm.cpp` `sort_protection`) | Mutant |
+| --- | --- | --- | --- |
+| completion | `op_collection_sort` when `More` turns false | registry 1 and bit set at a print inside the comparator; registry 0 and bit clear at the print right after the sort | S1 |
+| a catchable error out of the comparator (drained) | `unwind()`: after the drain, every protection whose controller is no longer active | registry 0 and bit clear at the first print of the `catch` | S2 |
+| the receiver mutated inside the comparator, caught outside | same | same | S2 |
+| a mutation caught inside the comparator | none: the sort goes on (still protected) | registry 1 and bit set at the `catch`'s print; sorted result | S5 |
+| a stop (a non-bool answer) | every exit of `Vm::run` (a scope guard) | registry 0 and bit clear after the run | S4 |
+| task teardown (an async task's sort fails uncaught) | the task runs in its own isolate VM (the production model, `parallel_tasks`), whose `Vm::run` exit releases it | at main's `catch` print: process-wide live protections 0, main's registry 0; at least one protection was started | S4 |
+| an exception out of the run (the VM's shutdown path) | the `Vm::run` scope guard; also `~Vm` | bit clear after the exception, registry 0 | S4 |
+| the end of a session statement | `Vm::run` exit (each statement is one run) | `VmSession::sort_protections()` 0 and bit clear after the statement; the next statement mutates the array | S4 |
+
+The checks read the registry and the header at the moment each exit completes, through the VM's
+synchronous output flush (`flush_threshold` 0: the test's callback runs at each print), never
+by attempting a further mutation. Mutants (`make test-rt-sort-protection-mutants`, each a build
+of `vm_collection_sort.cpp` with `NIFT_SORT_MUTANT`): S1 completion keeps the protection (caught
+by sort-complete), S2 the unwind sweep keeps it (sort-error), S4 run exit and destruction keep it
+(sort-stop, also sort-task and sort-session), S5 the bit is never set (sort-complete): each fails
+`refrep_vm`. There is no cooperative task-teardown release: under the cooperative model a
+coroutine program with a comparator sort is refused (`coro-collection-callback`), so no
+cooperative task can hold a protection across its teardown; a release there would be unreachable
+code, and its mutant could not be caught (it was written first and removed for that reason).
+
+Reachability: on this toolchain the production VM refuses the comparator sort at compile time
+(`method:sort`, libstdc++ outside the admitted profile), and the guard refuses aliasing the
+receiver; so E is exercised in the probe configuration, which lifts that refusal (14.3).
+
+`Vm::run` is now a wrapper holding the release guard around the unchanged dispatch loop
+(`Vm::run_loop`), so the release covers every exit including exceptions, within rt-lint's
+function-length limit.
+
+
+### 16.1 Gate status (commit 3; focused local checks only, owner ruling of 2026-11-03)
+
+On the commit-3 tree (result files `scratchpad/b2/results-c3/`, tree identity per gate): `nift`,
+`test-rt-lint` (0 problems), `test-rt-protocol-compile-fail`, `test-rt-mutation-protocol` (191
+checks) and `-mutants` (6 of 6), `test-rt-refrep` (112 checks; production checks PASS) and
+`-refrep-mutants` (8 of 8), `test-rt-sort-protection-mutants` (S1, S2, S4, S5 caught),
+`test-runtime2-refrep-cli`, `test-runtime2-refsem` and `-refsem-mutants`,
+`test-runtime2-collections` and `-collections-mutants` (11 caught): 0 each. The heavy gates
+(sanitizers, TSan, `test-rt-value`, `test-rt-vm`, safety, VM-default, CP19, the full `make test`,
+classify and perf) are for the Linode.

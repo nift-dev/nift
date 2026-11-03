@@ -142,6 +142,9 @@ bool is_recoverable_code(std::string_view code) {
         return true;
     // D-NEXT-refsem #4: a refused reference cycle (the receiver is unchanged).
     if (code == "runtime.reference_cycle") return true;
+    // B2 (owner E): a mutation of an array while its comparator sort runs
+    // (refused before anything changes; the sort continues).
+    if (code == "runtime.sort_receiver_mutated") return true;
     // CP17 handle statuses classed Recoverable (D-035 runtime.handle_closed).
     if (handle_code_recoverable(code)) return true;
     for (std::uint16_t i = 0; i < static_cast<std::uint16_t>(BuiltinId::Count); ++i)

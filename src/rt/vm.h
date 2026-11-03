@@ -37,6 +37,7 @@
 #include "rt/source_map.h"
 #include "rt/mutation.h"
 #include "rt/value_cycle.h"
+#include "rt/vm_sort_protection.h"
 #include "rt/vm_ops.h"
 
 #include <cstddef>
@@ -169,7 +170,7 @@ public:
     Vm(const Vm&) = delete;
     Vm& operator=(const Vm&) = delete;
     VmResult finish_session_resources(bool cancelled = false);
-    VmResult run(std::string& output);
+    VmResult run(std::string& output);  // releases every sort protection on any exit (B2, owner E)
     VmResult run_session_unit(const Program& unit, const std::vector<const Proto*>& linked, std::string& output);
     void clear_session_execution();
     void retire_session_slots(const std::vector<std::uint16_t>& slots);
@@ -191,6 +192,11 @@ public:
         return std::move(uncaught_error_);
     }
 
+    // B2 (owner E, rt/vm_sort_protection.h), for tests: this VM's protected receivers; process-wide counts.
+    std::size_t sort_protections() const noexcept { return sort_protection_.size(); }
+    const Value* sort_protected(std::size_t k) const noexcept;
+    static std::size_t live_sort_protections() noexcept;
+    static std::size_t started_sort_protections() noexcept;
     // CP22 coroutines (vm_coro.h): the scheduler of a program with async code.
     struct Coro;
     struct CoroDelete { void operator()(Coro* coro) const noexcept; };
@@ -347,8 +353,15 @@ private:
     std::shared_ptr<const TransferProtoMap> transfer_map_owner_;
     const TransferProtoMap* transfer_map_ = nullptr;
 
+    VmResult run_loop(std::string& output);  // run()'s dispatch loop
     bool drain_collection_boundaries(const Fault&, std::size_t retained_depth,
                                       const Proto*, std::size_t base, const Instr* pc);
+    std::vector<SortProtection> sort_protection_;  // B2 (owner E): vm_collection_sort.cpp
+    std::uint32_t running_task() const noexcept;
+    void protect_sort(const Value& receiver, std::size_t slot, std::size_t site);
+    void release_sort(std::size_t slot) noexcept;
+    void sweep_sort_protection() noexcept;
+    void release_sort_protection() noexcept;
     bool program_has_collection_boundaries_ = false;
     const Program& program_;
     VmOptions options_;

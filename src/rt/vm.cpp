@@ -218,7 +218,13 @@ bool Vm::op_meta_global(const Instr& in, Value* R, Fault& fault, const Proto* pr
     }
 }
 
+// B2 (owner E): every exit of a run (a stop, a session statement's end, an exception) releases its sorts.
 VmResult Vm::run(std::string& output) {
+    struct SortRelease { Vm& vm; ~SortRelease() { vm.release_sort_protection(); } } sort_release{*this};
+    return run_loop(output);
+}
+
+VmResult Vm::run_loop(std::string& output) {
     VmResult result; Fault fault; coro_output_ = &output;
     const Proto* proto = protos_.front();
     std::size_t base = 0;

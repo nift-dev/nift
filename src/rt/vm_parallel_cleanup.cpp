@@ -9,6 +9,7 @@ namespace nift::rt {
 // before the HandleTable shuts down, so no worker can use a resource that is
 // being closed; the table shutdown is CP19's (it may be a persistent session's).
 Vm::~Vm() {
+    release_sort_protection();  // B2 (owner E): no protected receiver outlives its VM
     coro_abort_parallel();
     handle_table_.shutdown_noexcept();
 }

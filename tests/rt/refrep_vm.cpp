@@ -15,10 +15,12 @@
 //   R-B6 (refsem 29) kImmutable lost on an isolate transfer (isolate_transfer_encode.cpp)
 //   R21 (refsem 21)  array/object receivers skip the cycle check (mutation.cpp)
 #include "rt/aggregate.h"
+#include "rt/heap.h"
 #include "rt/compiler.h"
 #include "rt/copy_graph.h"
 #include "rt/isolate_transfer.h"
 #include "rt/mutation.h"
+#include "rt/parallel_task.h"
 #include "rt/parser.h"
 #include "rt/reference_probe.h"
 #include "rt/session.h"
@@ -29,6 +31,7 @@
 #include "rt_test.h"
 
 #include <cstdio>
+#include <stdexcept>
 #include <memory>
 #include <string>
 #include <vector>
@@ -305,6 +308,177 @@ void identity() {
     CHECK(array_size(session.value("a")) == 3 && session.value("a").heap() == session.value("b").heap());
 }
 
+// Owner requirement E (b2-refrep.md, "sort protection"): while a comparator
+// sort runs, its receiver is protected (kSortProtected, the Vm registry) and
+// any mutation of it through any holder is the catchable
+// runtime.sort_receiver_mutated; a nested sort of another array works. Every
+// exit path is checked DIRECTLY, on the registry and the receiver's header,
+// at the moment the exit completes: through the VM's synchronous output
+// flush (flush_threshold 0), at a print placed right after the exit, and
+// after the run for the exits that end it. Mutants S1-S5 must fail here.
+struct Watch {
+    const Vm* vm = nullptr;
+    const VmSession* session = nullptr;
+    Value receiver;                 // captured from the registry inside the comparator
+    std::vector<std::string> lines;
+    std::vector<std::size_t> protections;  // the registry size at each line
+    std::vector<int> protected_bit;        // the receiver's bit at each line (-1: none captured)
+    std::vector<std::size_t> live;         // process-wide live protections at each line (every VM)
+    const char* throw_at = nullptr;        // a line that throws from the flush (an exception exit)
+};
+bool sort_bit(const Value& v) { return v.is_heap() && is_sort_protected(v.heap()); }
+void on_flush(std::string& output, void* context) {
+    auto& w = *static_cast<Watch*>(context);
+    std::size_t start = 0;
+    while (start < output.size()) {
+        const std::size_t end = output.find('\n', start);
+        const std::string line = output.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        start = end == std::string::npos ? output.size() : end + 1;
+        const std::size_t count = w.vm ? w.vm->sort_protections() : w.session->sort_protections();
+        if (w.vm && w.receiver.is_null() && count > 0) w.receiver = *w.vm->sort_protected(0);
+        w.lines.push_back(line);
+        w.protections.push_back(count);
+        w.protected_bit.push_back(w.receiver.is_null() ? -1 : int(sort_bit(w.receiver)));
+        w.live.push_back(Vm::live_sort_protections());
+        if (w.throw_at && line == w.throw_at) { output.clear(); throw std::runtime_error("flush exit"); }
+    }
+    output.clear();
+}
+// Runs `source` with the probe and the watch; the receiver captured at the
+// first line printed while a sort is protected.
+VmResult watched(const std::string& source, Watch& w, bool* threw = nullptr, bool parallel = false) {
+    auto ast = std::make_unique<Ast>(source);
+    const ParseResult parsed = parse_script(*ast);
+    CHECK(parsed.ok);
+    CompileLimits limits;
+    limits.parallel_tasks = parallel;  // the production default model: tasks in their own isolate VM
+    CompileResult compiled = compile_unit(*ast, parsed.root, limits);
+    CHECK(compiled.program != nullptr);
+    if (!compiled.program) { std::fprintf(stderr, "  refused: %s\n", compiled.reason.c_str()); return {}; }
+    const SourceMap map = SourceMap::single("t.f", source);
+    VmOptions options;
+    options.source_map = &map;
+    options.flush_threshold = 0;
+    options.flush = on_flush;
+    options.flush_context = &w;
+    if (parallel) options.parallel = std::make_shared<ParallelRuntime>(1);
+    VmResult result;
+    {
+        Vm vm(*compiled.program, options);
+        w.vm = &vm;
+        std::string out;
+        try {
+            result = vm.run(out);
+            on_flush(out, &w);
+        } catch (const std::runtime_error&) {
+            if (threw) *threw = true;
+        }
+        // After the run (every exit): nothing protected, the receiver released.
+        CHECK(vm.sort_protections() == 0);
+        w.vm = nullptr;
+    }
+    return result;
+}
+// The line `name` was printed with the registry at `count` and the
+// receiver's bit at `bit`.
+bool line_state(const Watch& w, const std::string& name, std::size_t count, int bit) {
+    for (std::size_t k = 0; k < w.lines.size(); ++k)
+        if (w.lines[k] == name) return w.protections[k] == count && w.protected_bit[k] == bit;
+    return false;
+}
+void report(const char* name, const Watch& w, bool ok) {
+    CHECK(ok);
+    if (ok) return;
+    std::fprintf(stderr, "  case %s:", name);
+    for (std::size_t k = 0; k < w.lines.size(); ++k)
+        std::fprintf(stderr, " [%s reg=%zu bit=%d]", w.lines[k].c_str(), w.protections[k], w.protected_bit[k]);
+    std::fprintf(stderr, "\n");
+}
+
+void sort_protection() {
+    {   // Completion: protected inside the comparator, released when the sort returns.
+        Watch w;
+        const VmResult r = watched("a := [3, 1, 2]\na.sort((x, y) => { print(\"in\")\n return x < y })\n"
+                                   "print(\"after\")\nprint(a.stringify())\n", w);
+        report("sort-complete", w, r.reason == StopReason::None && line_state(w, "in", 1, 1) &&
+               line_state(w, "after", 0, 0) && !w.lines.empty() && w.lines.back() == "[1,2,3]");
+    }
+    {   // A mutation through an alias inside the comparator: catchable, the sort continues.
+        Watch w;
+        const VmResult r = watched("a := [3, 1, 2]\nb := a\na.sort((x, y) => {\n"
+                                   " try { b.push(9) } catch (e) { print(e.code) }\n"
+                                   " try { b[0] = 7 } catch (e) { print(\"set\") }\n"
+                                   " try { b.sort((p, q) => p < q) } catch (e) { print(\"nested\") }\n"
+                                   " c := [2, 1]\n c.sort((p, q) => p < q)\n"
+                                   " return x < y })\nprint(\"after\")\nprint(a.stringify())\n", w);
+        report("sort-mutated", w, r.reason == StopReason::None && line_state(w, "runtime.sort_receiver_mutated", 1, 1) &&
+               line_state(w, "set", 1, 1) && line_state(w, "nested", 1, 1) && line_state(w, "after", 0, 0) &&
+               w.lines.back() == "[1,2,3]");
+    }
+    {   // A catchable error out of the comparator: drained, released before the handler runs.
+        Watch w;
+        const VmResult r = watched("a := [3, 1, 2]\ntry { a.sort((x, y) => { print(\"in\")\n throw error(\"boom\") }) }"
+                                   " catch (e) { print(\"caught\") }\nprint(a.length())\n", w);
+        report("sort-error", w, r.reason == StopReason::None && line_state(w, "in", 1, 1) &&
+               line_state(w, "caught", 0, 0) && w.lines.back() == "3");
+    }
+    {   // The receiver's mutation, uncaught in the comparator, caught outside the sort.
+        Watch w;
+        const VmResult r = watched("a := [3, 1, 2]\nb := a\ntry { a.sort((x, y) => { print(\"in\")\n b.pop()\n"
+                                   " return x < y }) } catch (e) { print(e.code) }\nprint(a.length())\n", w);
+        report("sort-mutated-out", w, r.reason == StopReason::None && line_state(w, "in", 1, 1) &&
+               line_state(w, "runtime.sort_receiver_mutated", 0, 0) && w.lines.back() == "3");
+    }
+    {   // A stop inside the comparator (a non-bool answer): released when the run ends.
+        Watch w;
+        const VmResult r = watched("a := [3, 1, 2]\na.sort((x, y) => { print(\"in\")\n return 1 })\n", w);
+        report("sort-stop", w, r.reason == StopReason::Error && line_state(w, "in", 1, 1) &&
+               !w.receiver.is_null() && !sort_bit(w.receiver));
+    }
+    {   // A task's teardown (the production model: an async task runs in its own isolate VM; its
+        // sort fails uncaught): by main's catch, the task VM has released it (every VM's count).
+        Watch w;
+        const std::size_t started = Vm::started_sort_protections();
+        const VmResult r = watched("fn[async](t(g)) { g.sort((x, y) => { throw error(\"boom\") })\n"
+                                   " return 0 }\nfn(main()) {\n  f := t([3, 1, 2])\n"
+                                   "  try { await f } catch (e) { print(\"caught\") }\n  return 0\n}\nmain()\n", w,
+                                   nullptr, true);
+        bool ok = r.reason == StopReason::None && Vm::started_sort_protections() > started;
+        bool seen = false;
+        for (std::size_t k = 0; k < w.lines.size(); ++k)
+            if (w.lines[k] == "caught") { seen = true; ok = ok && w.live[k] == 0 && w.protections[k] == 0; }
+        report("sort-task", w, ok && seen && Vm::live_sort_protections() == 0);
+    }
+    {   // An exception out of the run (the VM's shutdown path): released when run() exits.
+        Watch w;
+        w.throw_at = "in";
+        bool threw = false;
+        watched("a := [3, 1, 2]\na.sort((x, y) => { print(\"in\")\n return x < y })\n", w, &threw);
+        report("sort-exception", w, threw && !w.receiver.is_null() && !sort_bit(w.receiver));
+    }
+    {   // The end of a session statement: the next statement sees the receiver released.
+        Watch w;
+        VmOptions options;
+        options.flush_threshold = 0;
+        options.flush = on_flush;
+        options.flush_context = &w;
+        VmSession session(options);
+        w.session = &session;
+        std::string out;
+        const auto run = [&](const std::string& source) { return session.execute(source, "<session>", out); };
+        CHECK(run("a := [3, 1, 2]").execution.reason == StopReason::None);
+        const auto stopped = run("a.sort((x, y) => { print(\"in\")\n return 1 })");  // a stop in the comparator
+        const Value a = session.value("a");
+        report("sort-session", w, stopped.execution.reason == StopReason::Error && line_state(w, "in", 1, -1) &&
+               session.sort_protections() == 0 && !sort_bit(a));
+        CHECK(run("try { a.sort((x, y) => { print(\"in2\")\n throw error(\"x\") }) } catch (e) { print(\"c2\") }")
+                  .execution.reason == StopReason::None);
+        report("sort-session-catch", w, line_state(w, "in2", 1, -1) && line_state(w, "c2", 0, -1) &&
+               session.sort_protections() == 0 && !sort_bit(session.value("a")));
+        CHECK(run("a.push(4)").execution.reason == StopReason::None && array_size(session.value("a")) == 4);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -316,5 +490,6 @@ int main() {
     transfer_immutability();
     session_atomicity();
     identity();
+    sort_protection();
     return rt_test::finish("refrep-vm");
 }

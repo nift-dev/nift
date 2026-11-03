@@ -2,6 +2,7 @@
 
 #include "rt/error.h"
 #include "rt/heap.h"
+#include "rt/mutation.h"
 #include "rt/string.h"
 #include "rt/vm.h"
 
@@ -40,6 +41,14 @@ bool Vm::pop_handlers_for_frame(std::size_t depth, Fault& fault) {
 bool Vm::handle_bail(Fault& fault, VmResult& result, Value*& R, const Value*& K, const Proto*& proto,
                      std::size_t& base, const Instr*& pc) {
     if (fault.large) note_large(pc, fault);
+    // B2 (owner E): the protocol's refusal of a mutation of an array whose
+    // comparator sort is running is a catchable Error with its own code,
+    // whichever instruction or native raised the refusal text (the protocol
+    // is the only source of that text, rt/mutation.h).
+    if (fault.reason == StopReason::Error && !fault.catchable &&
+        fault.message.find(mutation::kSortReceiverMutated) != std::string::npos)
+        raise_catchable(fault, "runtime.sort_receiver_mutated", fault.message, proto,
+                        report_offset(fault, proto, pc));
 #if defined(NIFT_EXC_MUTANT) && (NIFT_EXC_MUTANT == 1 || NIFT_EXC_MUTANT == 5)
     if (fault.reason == StopReason::Error && !fault.catchable) {
         SourceOrigin origin;
@@ -245,6 +254,9 @@ bool Vm::unwind(Fault& fault, Value*& R, const Value*& K, const Proto*& proto, s
     R[handler.catch_reg] = std::move(fault.error);
     fault = Fault{};
     pc = proto->code.data() + handler.catch_pc;
+    // B2 (owner E): a comparator sort the unwind drained, or whose registers
+    // it cleared, has ended: its receiver is released before the handler runs.
+    if (!sort_protection_.empty()) sweep_sort_protection();
     return true;
 }
 

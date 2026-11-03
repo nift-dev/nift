@@ -20,8 +20,9 @@ struct State {
     bool srcbuf=false,dstbuf=false,pending=false,done=false;
 };
 State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<BytesObject>()->data.data());}
-// The sort's own scratch arrays (Keys, Directions: made at init, held only
-// here). The receiver's storage comes from the protocol (b2-refrep.md, B):
+// The sort's own scratch array (Keys: made at init, held only here; B2: no
+// spare for a copy-on-write detach, the budget reservation below unchanged).
+// The receiver's storage comes from the protocol (b2-refrep.md, B):
 // sort_storage at init (stage 3, after the instruction's stage 2.2), and
 // sort_items while the controller runs (no relocation, no allocation: drain).
 std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // rt-lint: storage-ok scratch
@@ -102,12 +103,10 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
     s[HashTable]=make_bytes({});auto& bytes=s[HashTable].heap_as<BytesObject>()->data;bytes.resize(sizeof(State));
     new(bytes.data()) State();heap_retally(s[HashTable].heap());
     s[Keys]=make_array((n+1)/2);scratch(s[Keys]).resize((n+1)/2);
-    s[Directions]=make_array(n);scratch(s[Directions]).resize(n);
-    mark_may_hold_identity(s[Directions].heap());
     mark_may_hold_identity(s[Keys].heap());
     // Keep each input graph alive through drain: releasing a dying broad
     // aggregate may otherwise grow the runtime destruction worklist. This
-    // scratch holds elements, never the source array (which would force COW).
+    // scratch holds elements, not the source array.
     s[sort_slot::KeepAlive]=make_array(n);
     for(const Value& value:array_items(s[Source]))array_push(s[sort_slot::KeepAlive],value);
     s[sort_slot::EmptyObject]=make_object();s[sort_slot::EmptyArray]=make_array();
@@ -127,15 +126,9 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
     auto& t=state(s);
     if(t.done){s[More]=Value::boolean(false);return true;}
     if(!s[Source].is(Kind::Array)||array_size(s[Source])!=t.n)return false;
-    // A callback may keep an ordinary D-040 value copy of the receiver. Detach
-    // into the already reserved spare without allocating or changing that copy.
-    // refs includes Source only: callers transfer the receiver in and out.
-    if(s[Source].heap()->refcount>1) {
-        if(!s[Directions].is(Kind::Array)||array_size(s[Directions])!=t.n)return false;
-        auto& spare=scratch(s[Directions]);const auto& a=receiver_items(s[Source]);
-        for(std::size_t i=0;i<t.n;++i)spare[i]=a[i];
-        s[Source]=std::move(s[Directions]);
-    }
+    // B2 (b2-refrep.md, owner E): the receiver is sorted in place whoever
+    // holds it (the copy-on-write detach into a spare is gone); while the sort
+    // runs, kSortProtected refuses every mutation of it (Vm sort protection).
     const bool responding=t.pending;t.pending=false;
     s[sort_slot::Left]=Value();s[sort_slot::Right]=Value();
     bool supplied=responding;

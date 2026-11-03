@@ -410,6 +410,26 @@ test-rt-refrep-mutants: test-rt-refrep
 		echo "PASS refrep mutant $$n ($$src) caught: $$(grep -m1 'case' "$(RT_REFREP_DIR)/m$$n.log")"; \
 		rm -f "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" "$(RT_REFREP_DIR)/m$$n.o"; done
 test-rt-vm: test-rt-refrep-mutants
+# B2 (owner E): each sort-protection mutant (NIFT_SORT_MUTANT, all in
+# vm_collection_sort.cpp) must fail refrep_vm's direct release checks: S1
+# completion, S2 unwind and S4 run exit (and destruction) keep the protection;
+# S5 never sets it. (No S3: a cooperative task cannot hold a protection across
+# its teardown, the program is refused; a parallel task's VM releases at its
+# run exit, S4.)
+RT_SORT_MUTANTS := 1 2 4 5
+.PHONY: test-rt-sort-protection-mutants
+test-rt-sort-protection-mutants: test-rt-refrep
+	@for n in $(RT_SORT_MUTANTS); do \
+		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SORT_MUTANT=$$n -c src/rt/vm_collection_sort.cpp \
+			-o "$(RT_REFREP_DIR)/s$$n.o" || exit 2; \
+		objs=$$(printf '%s\n' $(RT_REFREP_OBJECTS) | grep -vx src/rt/vm_collection_sort.o); \
+		$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $$objs "$(RT_REFREP_DIR)/s$$n.o" $(LDLIBS) \
+			-o "$(RT_REFREP_DIR)/refrep-s$$n$(EXEEXT)" || exit 2; \
+		if "$(RT_REFREP_DIR)/refrep-s$$n$(EXEEXT)" > "$(RT_REFREP_DIR)/s$$n.log" 2>&1; then \
+			echo "FAIL sort-protection mutant S$$n survived"; exit 1; fi; \
+		echo "PASS sort-protection mutant S$$n caught: $$(grep -m1 'case' "$(RT_REFREP_DIR)/s$$n.log")"; \
+		rm -f "$(RT_REFREP_DIR)/refrep-s$$n$(EXEEXT)" "$(RT_REFREP_DIR)/s$$n.o"; done
+test-rt-vm: test-rt-sort-protection-mutants
 # B2 (owner B): a storage commit outside the mutation protocol does not compile.
 .PHONY: test-rt-protocol-compile-fail
 test-rt-protocol-compile-fail:
