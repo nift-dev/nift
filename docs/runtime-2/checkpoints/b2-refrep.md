@@ -3,12 +3,35 @@
 Status: **candidate**, not reviewed, not integrated. Branch `cand/b2-refrep`, built on
 `weekend/r2` @`919b5669` (B1 integrated). Plan: Phase B plan §3, §5.1-5.4, §5.8 and §6 "B2";
 owner decisions of 2026-11-02/03 (B2 requirements A-F); coordinator rulings of 2026-11-03
-(below). One checkpoint, three ordered commits, each with its own section:
+(below). One checkpoint in ordered milestone commits (none certifies the checkpoint; heavy
+validation is on the Linode, owner ruling of 2026-11-03):
 
-1. the representation switch, A, C, the cycle check reaching arrays and objects, the validation
-   order, F (§§1-9 below);
-2. B and D (§10, to come);
-3. E (§11, to come).
+| Commit | Content | Sections |
+| --- | --- | --- |
+| `e30bd6c9`, `a85e1f4a` | commit 1: representation switch, A, C, cycle check, validation order, F | 1-12 |
+| `e65d4b64`, `f01622cb`, `12f486bc` | 1b: test migration (and two late ports) | 13 |
+| `67527994` | test infrastructure: CP18 sanitizer source list | 13.6a |
+| `497e145f`, `4c08861a`, `ec7c885a`, `ea082292` | commit 2: B, D, probe isolation (and fixes) | 14 |
+| `1b152eaa` | record: commit-2 gates, configurations | 13.8, 14.5 |
+| `8599dbcb` | rulings 5 and 6: identity and probe coverage | 15 |
+| `44734273` | commit 3: E, sort protection | 16 |
+
+### Record map by component (owner layout)
+
+| Component | Sections |
+| --- | --- |
+| Representation switch | 1 (contract), 2 (clone-site audit), 3 (deleted machinery), 8 (expectation changes), 12 (B5 notes) |
+| Session atomicity (A) | 4 |
+| Immutability (C) | 5 |
+| Validation order and cycles | 6, 7 |
+| Test migration (1b) | 13.1 (retirement table), 13.2 (allocation-failure coverage), 13.6b, 13.8 (configurations) |
+| Single mutation path (B) | 14.1 (structure, compile-fail and its locale fix, lint, M-B2) |
+| Throw safety (D) | 14.2 |
+| Self-splice and aliasing | 13.3 |
+| Sort protection (E) | 16 |
+| Probe isolation | 14.3, 15 (probe coverage), 13.8 |
+| Performance (F) | 9 (commit 1), 13.6 (1b), 14.5 (commit 2) |
+| Gates, mutants, R19, pre-existing failures | 10, 13.4, 13.5, 13.6, 13.6a, 14.5, 16.1 |
 
 The Phase A guard stays on, legacy (`NIFT_VM=0`) is unchanged, `const` stays binding-only.
 
