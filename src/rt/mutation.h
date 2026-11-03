@@ -228,13 +228,20 @@ template <class Text>
 NIFT_MUTATION_INLINE Outcome push(Value& array, const Value& item, const Text& receiver_text,
                                   const CycleGraph* graph = nullptr) {
 #if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1
-    if (array.is(Kind::Array)) array_push(array, item);  // M-B1a: the commit before the validation
+    // M-B1a: the commit before the validation. The mutant validates a copy of
+    // the operand (B2: the operand may be an element of the receiver itself,
+    // which the early commit can move), so it fails the checks, never with
+    // undefined behaviour of its own.
+    const Value operand = item;
+    if (array.is(Kind::Array)) array_push(array, operand);
+#else
+    const Value& operand = item;
 #endif
     if (!admits(array, Kind::Array))
         return detail::admit_failure(array, Kind::Array, "push", "an array", detail::text_of(receiver_text));
-    if (closes(array, item, graph)) return detail::cycle_failure(0);
+    if (closes(array, operand, graph)) return detail::cycle_failure(0);
 #if !(defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 1)
-    array_push(array, item);
+    array_push(array, operand);
 #endif
     return {};
 }

@@ -451,6 +451,27 @@ Pending at this commit (run next and recorded in a following commit): the saniti
 `test-rt-value-sanitize`, `test-runtime2-cp18-sanitize`, `test-cp19-r1-sanitize`,
 `test-runtime2-refsem-sanitize`, `test-runtime2-collections-sanitize`, and `make test-rt-vm`.
 
+### 13.6a Sanitizer lanes, `test-rt-vm`, and a nondeterministic mutant (follow-up commit)
+
+Sanitizer lanes on `e65d4b64`, each alone, sanitizer build directories cleared between lanes:
+`test-rt-value-sanitize` 0 (3,858 s), `test-cp19-r1-sanitize` 0, `test-runtime2-refsem-sanitize`
+0, `test-runtime2-collections-sanitize` 0. `test-runtime2-cp18-sanitize` fails to link, before
+B2 too (13.4): `tests/runtime2/cp18/sanitize.py`'s source list lacks `src/PackageTransaction.cpp`
+and `src/JsonFile.cpp`, which `src/rt/package_resolve.cpp` has needed since `bb5dc585` (an
+ancestor of `919b5669` and `d209febd`, whose `sanitize.py` has the same list).
+
+`test-rt-vm` on `e65d4b64` failed: `test-rt-mutation-protocol-mutants` reported "M-B1 mutant 1
+not caught (exit 139)". M-B1a (commit before validation) is caught by its failed checks, but this
+commit's new aliasing case (an operand that is an element of the receiver itself) made the
+mutant's own validation read the operand after its early commit had moved the storage: undefined
+behaviour in the mutant build only, a segmentation fault in about 1 run of 6 (address-layout
+dependent; valgrind: an invalid read in `cycle_targets_and_bookkeeping`). Production validates
+before the commit and `array_push` copies its by-value operand first (ASan run of the same test:
+clean). Fix (`mutation.h`, mutant block only): M-B1a validates a copy of the operand, keeping its
+defect (the commit before the validation) without undefined behaviour of its own; the production
+path binds the same name to the operand by reference (no code change). After the fix: 200 runs of
+`protocol-m1`, every one exit 1; valgrind: no invalid access; mutants 1-5 caught.
+
 ### 13.7 Size (commit 1b)
 
 Production: +15 / -3 (`mutation.h`, `vm_array_mutation.cpp`, `aggregate.cpp`). Tests: about
