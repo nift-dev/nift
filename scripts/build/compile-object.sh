@@ -25,7 +25,8 @@
 # the production marker NIFT_PRODUCTION_TU, or a #define/#undef of a test-only
 # switch (NIFT_*MUTANT*, *TEST*, *PROBE*, *HOOK*, *BYPASS*) other than the
 # reviewed defaults, fails the object. Before it, the command line may neither
-# undefine the marker nor set a test-only switch.
+# undefine the marker nor set a test-only switch other than the -D names of its
+# own rt-obj configuration (check-production-tu.py documents both sets).
 set -u
 production=0
 if [ "${1:-}" = --production ]; then production=1; shift; fi
@@ -40,21 +41,9 @@ id=$(config_id "$@")
 depflag=-MMD
 [ "$production" = 1 ] && depflag=-MD
 if [ "$production" = 1 ]; then
-  prev=
-  for arg in "$@"; do
-    if [ "$arg" = -UNIFT_PRODUCTION_TU ] || { [ "$prev" = -U ] && [ "$arg" = NIFT_PRODUCTION_TU ]; }; then
-      echo "error: production object $out: the command line undefines NIFT_PRODUCTION_TU (tooling.md 3)" >&2
-      exit 1
-    fi
-    # re-review N3: a test-only switch never reaches a production object
-    name=
-    case "$prev" in -D|-U) name=$arg ;; *) case "$arg" in -D?*|-U?*) name=${arg#-?} ;; esac ;; esac
-    if [ -n "$name" ] && printf '%s\n' "${name%%=*}" | grep -Eqx 'NIFT_\w*(MUTANT|TEST|PROBE|HOOK|BYPASS)\w*'; then
-      echo "error: production object $out: the command line sets the test-only switch ${name%%=*} (tooling.md 3)" >&2
-      exit 1
-    fi
-    prev=$arg
-  done
+  # the command line: no undefinition of the marker, no test-only switch other
+  # than its own rt-obj configuration's (check-production-tu.py --args)
+  python3 "$(dirname "$0")/check-production-tu.py" --args "$out" "$@" || exit 1
 fi
 if ! "$@" $depflag -MP -MF "$tmp.d" -MT "$out" -o "$tmp"; then
   rm -f "$tmp" "$tmp.d"

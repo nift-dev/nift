@@ -23,10 +23,27 @@ included, to its real path:
     whitespace, then LF, CR LF or a lone CR), CR LF and lone CR read as line
     ends, `%:` read as `#`, comments allowed between the directive's tokens.
     It fails on an #undef of NIFT_PRODUCTION_TU (the production marker,
-    review F4) and on a #define or #undef of a test-only switch (re-review
-    N3: the mutant, test, probe, hook and bypass macros, which test builds set
-    on their own command lines, never in a production object), except the
-    reviewed default definitions in DEFAULTS.
+    review F4) and on a #define or #undef of a test-only switch, except the
+    reviewed default definitions in DEFAULTS, matched by their exact directive
+    text, value included (check C3).
+
+The test-only switches (re-review N3, check C2) are the NIFT_* names matching
+TEST_ONLY (mutant, test, probe, hook and bypass macros, the builder-mutant
+hooks), the source-only measurement switches in SOURCE_ONLY, and every NIFT_*
+name any Makefile rule passes with -D (read from the Makefile at each run, so
+a new test or configuration define is covered without an edit here). On a
+production command line (check-production-tu.py --args) they are refused too,
+in every spelling the drivers accept (-D, -U, -D NAME, -Wp,-D..., -Xpreprocessor,
+--define-macro, --undefine-macro), except the defines its own rt-obj
+configuration passes: CONFIG_DEFINES, read from the Makefile's RT_OBJ_CONFIG
+lines (an object under .build/rt-obj/<config>/ may carry exactly its
+configuration's -D names, on the command line only, never in source).
+
+Supported production configuration (check C7): the system include directories
+are those the compiler path reports with no other flags; a compiler wrapper
+(ccache) or a flag that moves them (--sysroot, -stdlib, -nostdinc, an
+-isystem outside the repository) is not supported for production compiles: its
+headers are refused as outside the repository.
 
 The text check is conservative: such a directive inside a string literal or a
 disabled #if block fails too.
@@ -38,52 +55,74 @@ import subprocess
 import sys
 
 TEST_ONLY = re.compile(r'NIFT_\w*(MUTANT|TEST|PROBE|HOOK|BYPASS)\w*|NIFT_RT_BUILDER_(RELEASE|TRANSFER)$')
-# (repository path, macro): the reviewed in-source definitions of test-only
-# switches. Each is an "off" default (`#ifndef X` / `#define X 0`) or, in
-# rt/build.h, the definition of the builder-mutant hooks themselves.
+SOURCE_ONLY = {'NIFT_RT_BUILDER_UNCHECKED'}  # measurement only: drops the spent-builder check
+# (repository path, the directive's normalised text): the reviewed in-source
+# definitions of test-only switches: "off" defaults under #ifndef (value
+# included), the production values of two test-sized constants, and, in
+# rt/build.h, the builder-mutant hooks themselves.
 DEFAULTS = {
-    ('src/rt/compiler_coro_loops.cpp', 'NIFT_CORO_MUTANT'),
-    ('src/rt/compiler_coro_admit.cpp', 'NIFT_CORO_MODULE_MUTANT'),
-    ('src/rt/compiler_coro_admit.cpp', 'NIFT_CORO_MUTANT'),
-    ('src/rt/compiler_coro_module_effects.h', 'NIFT_CORO_MODULE_MUTANT'),
-    ('src/rt/vm_coro.h', 'NIFT_CORO_MUTANT'),
-    ('src/rt/compiler_coro.cpp', 'NIFT_CORO_MUTANT'),
-    ('src/rt/build.h', 'NIFT_RT_BUILDER_RELEASE'),
-    ('src/rt/build.h', 'NIFT_RT_BUILDER_TRANSFER'),
+    ('src/rt/compiler_coro_loops.cpp', '#define NIFT_CORO_MUTANT 0'),
+    ('src/rt/compiler_coro_admit.cpp', '#define NIFT_CORO_MODULE_MUTANT 0'),
+    ('src/rt/compiler_coro_admit.cpp', '#define NIFT_CORO_MUTANT 0'),
+    ('src/rt/compiler_coro_module_effects.h', '#define NIFT_CORO_MODULE_MUTANT 0'),
+    ('src/rt/vm_coro.h', '#define NIFT_CORO_MUTANT 0'),
+    ('src/rt/compiler_coro.cpp', '#define NIFT_CORO_MUTANT 0'),
+    ('src/rt/build.h', '#define NIFT_RT_BUILDER_RELEASE(v) (v)'),
+    ('src/rt/build.h', '#define NIFT_RT_BUILDER_RELEASE(v) static_cast<Value&&>(v)'),
+    ('src/rt/build.h', '#define NIFT_RT_BUILDER_TRANSFER(v) (v)'),
+    ('src/rt/build.h', '#define NIFT_RT_BUILDER_TRANSFER(v) static_cast<Value&&>(v)'),
+    ('src/rt/heap_account.cpp', '#define NIFT_RT_SATURATED_SLOTS 256'),
+    ('src/rt/value.cpp', '#define NIFT_RT_DESTROY_LOCAL 32'),
 }
 BLANK = r'(?:[ \t\f\v]|/\*.*?\*/)'
-DIRECTIVE = re.compile(r'^' + BLANK + r'*#' + BLANK + r'*(define|undef)' + BLANK + r'+([A-Za-z_]\w*)',
+DIRECTIVE = re.compile(r'^' + BLANK + r'*#' + BLANK + r'*(define|undef)' + BLANK + r'+([A-Za-z_]\w*)([^\n]*)',
                        re.M | re.S)
+MAKE_DEFINE = re.compile(r'-D\s*(NIFT_[A-Za-z0-9_]+)')
+RT_OBJ_CONFIG = re.compile(r'^\$\(eval \$\(call RT_OBJ_CONFIG,([\w-]+),(.*)\)\)\s*$', re.M)
+
+
+def makefile_switches(root):
+    """(every NIFT_* name a Makefile rule passes with -D, {rt-obj config: its -D names})."""
+    text = open(os.path.join(root, 'Makefile')).read()
+    configs = {name: set(MAKE_DEFINE.findall(flags)) for name, flags in RT_OBJ_CONFIG.findall(text)}
+    return set(MAKE_DEFINE.findall(text)), configs
+
+
+def test_only(name, makefile_names):
+    return bool(TEST_ONLY.match(name)) or name in SOURCE_ONLY or name in makefile_names
+
+
+def directive_text(kind, name, rest):
+    rest = re.sub(r'/\*.*?\*/', ' ', rest, flags=re.S).split('//')[0]
+    return ' '.join(f'#{kind} {name}{rest}'.split())
 SPLICE = re.compile(rb'\\[ \t\f\v]*(?:\r\n|\r|\n)')
 
 
-def deps_of(depfile):
-    text = open(depfile, encoding='utf-8', errors='surrogateescape').read()
-    text = text.replace('\\\n', ' ')
-    names, cur, i, seen_colon = [], [], 0, False
-    while i < len(text):
-        c = text[i]
-        if c == '\\' and i + 1 < len(text) and text[i + 1] in ' #\\':
-            cur.append(text[i + 1]); i += 2; continue
-        if c == '$' and text.startswith('$$', i):
+def deps_of(depfile, out):
+    """The prerequisites of OUT's rule: the first logical line of the -MD file
+    (continuations joined), its `OUT:` target dropped, split with make's escapes
+    (a space is `\\ `, `#` is `\\#`, `$` is `$$`). Check C1: a dependency whose
+    own name ends in `:` is a dependency, not the start of the -MP rules."""
+    text = open(depfile, encoding='utf-8', errors='surrogateescape').read().replace('\\\n', ' ')
+    line = text.split('\n', 1)[0]
+    if not line.startswith(out + ':'):
+        raise SystemExit(f'error: {depfile}: the dependency list does not start with {out}:')
+    line = line[len(out) + 1:]
+    names, cur, i = [], [], 0
+    while i < len(line):
+        c = line[i]
+        if c == '\\' and i + 1 < len(line) and line[i + 1] in ' #\\':
+            cur.append(line[i + 1]); i += 2; continue
+        if c == '$' and line.startswith('$$', i):
             cur.append('$'); i += 2; continue
-        if c in ' \t\n':
+        if c in ' \t':
             if cur:
                 names.append(''.join(cur)); cur = []
             i += 1; continue
         cur.append(c); i += 1
     if cur:
         names.append(''.join(cur))
-    out = []
-    for n in names:  # the first rule's prerequisites (-MP phony rules repeat them)
-        if n.endswith(':'):
-            if seen_colon:
-                break
-            seen_colon = True
-            continue
-        if seen_colon:
-            out.append(n)
-    return out
+    return names
 
 
 def system_dirs(compiler, lang, cache_dir):
@@ -124,12 +163,108 @@ def normalised(data):
     return data.decode('utf-8', errors='replace')
 
 
+def command_switches(args):
+    """(kind, name) for every macro the arguments define (D) or undefine (U), in
+    each spelling GCC and Clang accept (check C5)."""
+    found, i = [], 0
+    args = list(args)
+    while i < len(args):
+        a = args[i]
+        nxt = args[i + 1] if i + 1 < len(args) else ''
+        if a in ('-D', '-U'):
+            found.append((a[1], nxt)); i += 2; continue
+        if a.startswith(('-D', '-U')):
+            found.append((a[1], a[2:])); i += 1; continue
+        if a.startswith('-Wp,'):
+            found += command_switches(a[4:].split(',')); i += 1; continue
+        if a == '-Xpreprocessor':
+            rest = [nxt]
+            if nxt in ('-D', '-U') and i + 3 < len(args) + 1 and args[i + 2:i + 3] == ['-Xpreprocessor']:
+                rest.append(args[i + 3] if i + 3 < len(args) else ''); i += 2
+            found += command_switches(rest); i += 2; continue
+        for long_form, kind in (('--define-macro', 'D'), ('--undefine-macro', 'U')):
+            if a == long_form:
+                found.append((kind, nxt)); i += 1; break
+            if a.startswith(long_form + '='):
+                found.append((kind, a[len(long_form) + 1:])); break
+        i += 1
+    return [(k, n.split('=', 1)[0]) for k, n in found]
+
+
+def config_of(out):
+    m = re.match(r'(?:.*/)?\.build/rt-obj/([\w-]+)/', out)
+    return m.group(1) if m else None
+
+
+def check_args(out, args, root):
+    names, configs = makefile_switches(root)
+    allowed = configs.get(config_of(out), set())
+    problems = []
+    for kind, name in command_switches(args):
+        if name == 'NIFT_PRODUCTION_TU' and kind == 'U':
+            problems.append('the command line undefines NIFT_PRODUCTION_TU')
+        elif test_only(name, names) and not (kind == 'D' and name in allowed):
+            problems.append(f'the command line sets the test-only switch {name}'
+                            + (f' (its configuration {config_of(out)} may pass only '
+                               f'{", ".join(sorted(allowed)) or "none"})' if config_of(out) else ''))
+    for p in problems[:3]:
+        print(f'error: production object {out}: {p} (tooling.md 3)', file=sys.stderr)
+    return 1 if problems else 0
+
+
+def self_test(root):
+    """The refused set and the allowances follow the Makefile and the sources."""
+    fail = []
+    names, configs = makefile_switches(root)
+    for known in ('NIFT_RT_NO_CYCLE_CHECK', 'NIFT_RT_DESTROY_LOCAL', 'NIFT_SOURCEMAP_COUNTER',
+                  'NIFT_RT_SATURATED_SLOTS', 'NIFT_REFSEM_MUTANT', 'NIFT_RT_VM_SWITCH', 'NIFT_RT_CHECKED_REFS'):
+        if known not in names:
+            fail.append(f'{known} not read from the Makefile')
+    if len(configs) < 9:
+        fail.append(f'only {len(configs)} RT_OBJ_CONFIG lines read')
+    for config, defines in configs.items():
+        if not defines <= names:
+            fail.append(f'{config}: {defines - names} not in the Makefile set')
+    for rel, line in sorted(DEFAULTS):
+        text = normalised(open(os.path.join(root, rel), 'rb').read())
+        if not any(directive_text(k, n, r) == line for k, n, r in DIRECTIVE.findall(text)):
+            fail.append(f'DEFAULTS entry missing from {rel}: {line}')
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, 'x.d')
+        with open(d, 'w') as handle:
+            handle.write('o.o: a.cpp m: b\\ c.h \\\n  d$$.h e\\#f.h\n\nm:\n\nb\\ c.h:\n')
+        if deps_of(d, 'o.o') != ['a.cpp', 'm:', 'b c.h', 'd$.h', 'e#f.h']:
+            fail.append(f'deps_of: {deps_of(d, "o.o")}')
+    cases = {('-DNIFT_REFSEM_MUTANT=26',): [('D', 'NIFT_REFSEM_MUTANT')],
+             ('-D', 'NIFT_X'): [('D', 'NIFT_X')],
+             ('-Wp,-DNIFT_A,-UNIFT_B',): [('D', 'NIFT_A'), ('U', 'NIFT_B')],
+             ('-Xpreprocessor', '-DNIFT_C'): [('D', 'NIFT_C')],
+             ('--define-macro=NIFT_E=1',): [('D', 'NIFT_E')],
+             ('--define-macro', 'NIFT_F'): [('D', 'NIFT_F')],
+             ('--undefine-macro', 'NIFT_PRODUCTION_TU'): [('U', 'NIFT_PRODUCTION_TU')]}
+    for args, want in cases.items():
+        if command_switches(args) != want:
+            fail.append(f'command_switches{args} = {command_switches(args)}')
+    for f in fail:
+        print(f'FAIL production-tu self-test: {f}')
+    table = '; '.join(f'{c}: {", ".join(sorted(d)) or "none"}' for c, d in sorted(configs.items()))
+    print(('FAIL' if fail else 'PASS') + f' production-tu self-test: {len(names)} Makefile -D switches refused in '
+          f'production sources; command-line allowances by rt-obj configuration: {table}')
+    return 1 if fail else 0
+
+
 def main():
+    if sys.argv[1:2] == ['--self-test']:
+        return self_test(os.path.realpath('.'))
+    if sys.argv[1:2] == ['--args']:
+        return check_args(sys.argv[2], sys.argv[3:], os.path.realpath('.'))
     out, depfile, compiler, lang = sys.argv[1:5]
     root = os.path.realpath('.')
     sysdirs = system_dirs(compiler, lang, os.path.join(root, '.build', 'obj-config'))
     problems = []
-    for dep in deps_of(depfile):
+    makefile_names, _ = makefile_switches(root)
+    for dep in deps_of(depfile, out):
         real = os.path.realpath(dep)
         rel = os.path.relpath(real, root)
         if rel.startswith('..' + os.sep) or rel == '..':
@@ -145,10 +280,10 @@ def main():
         except OSError as error:
             problems.append(f'cannot read its dependency {rel}: {error}')
             continue
-        for kind, name in DIRECTIVE.findall(text):
+        for kind, name, rest in DIRECTIVE.findall(text):
             if name == 'NIFT_PRODUCTION_TU' and kind == 'undef':
                 problems.append(f'undefines the production marker NIFT_PRODUCTION_TU in: {rel}')
-            elif TEST_ONLY.match(name) and (kind == 'undef' or (rel, name) not in DEFAULTS):
+            elif test_only(name, makefile_names) and (rel, directive_text(kind, name, rest)) not in DEFAULTS:
                 problems.append(f'{kind}s the test-only switch {name} in: {rel} (test builds set it on their '
                                 'command line)')
     for p in problems[:3]:

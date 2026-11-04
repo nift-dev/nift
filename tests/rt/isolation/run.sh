@@ -16,7 +16,7 @@ restore_all() {
   for f in "${saved[@]}"; do cp -p "$work/$(echo "$f" | tr / _).orig" "$f"; touch "$f"; done; saved=()
   rm -rf src/rt/tests src/rt/natives/probe.hxx src/rt/natives/probe.def minifypp/include/probe_access.h \
          src/rt/natives/probe_undef.h src/rt/natives/probe_system.h src/rt/natives/probe_n.h \
-         "src/rt/natives/probe dir" "src/rt/natives/probe'q.h"
+         "src/rt/natives/probe dir" "src/rt/natives/probe'q.h" "src/rt/natives/m:"
 }
 # case NAME OBJECT EXPECT   (the plant has been applied; EXPECT: a regex of the diagnostic)
 case_() {
@@ -144,6 +144,23 @@ rm -f src/rt/natives/probe_n.h
 n4 n4-absolute-outside "$work/outside.h" 'outside the repository'
 printf '#pragma once\n#include "../../../tests/rt/rt_test.h"\n' > "src/rt/natives/probe'q.h"
 n4 n6-quote-in-path "rt/natives/probe'q.h" 'depends on the test tree'
+# check C1: a dependency whose name ends in ':' (ck/plants.diff, first hunk)
+save src/rt/natives/object_methods.cpp
+printf '#define NIFT_REFSEM_MUTANT 26\n' > "src/rt/natives/m:"
+{ printf '#include "rt/natives/m:"\n'; cat "$work/src_rt_natives_object_methods.cpp.orig"; } > src/rt/natives/object_methods.cpp
+case_ c1-colon-in-name src/rt/natives/object_methods.o 'defines the test-only switch NIFT_REFSEM_MUTANT in: src/rt/natives/m:'
+# check C2: a configuration switch defined in source (ck/nocycle.diff)
+save src/rt/vm_closure.cpp
+{ printf '#define NIFT_RT_NO_CYCLE_CHECK\n'; cat "$work/src_rt_vm_closure.cpp.orig"; } > src/rt/vm_closure.cpp
+case_ c2-config-switch-in-source src/rt/vm_closure.o 'defines the test-only switch NIFT_RT_NO_CYCLE_CHECK'
+# check C3: a reviewed default with another value
+save src/rt/compiler_coro.cpp
+sed -i 's/^#define NIFT_CORO_MUTANT 0$/#define NIFT_CORO_MUTANT 18/' src/rt/compiler_coro.cpp
+grep -q '^#define NIFT_CORO_MUTANT 18$' src/rt/compiler_coro.cpp || { echo "FAIL isolation c3: plant not applied"; fail=1; }
+case_ c3-default-value-changed src/rt/compiler_coro.o 'defines the test-only switch NIFT_CORO_MUTANT'
+# the refused set and the configuration allowances follow the Makefile
+if out=$(python3 scripts/build/check-production-tu.py --self-test); then echo "$out"
+else echo "$out"; fail=1; fi
 
 # control: a harmless plant in the same file builds, so the cases above fail
 # for their content, not for the harness
@@ -153,7 +170,8 @@ if make src/rt/vm_ops.o > "$work/control.log" 2>&1; then echo "PASS isolation co
 else echo "FAIL isolation control: the control plant does not build"; tail -5 "$work/control.log"; fail=1; fi
 restore_all
 # leave the production objects as they were
-make src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o > "$work/rebuild.log" 2>&1 || { echo "FAIL isolation: rebuild after restore"; fail=1; }
+make src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o src/rt/vm_closure.o \
+  src/rt/compiler_coro.o > "$work/rebuild.log" 2>&1 || { echo "FAIL isolation: rebuild after restore"; fail=1; }
 git diff --quiet -- src markuppp minifypp || { echo "FAIL isolation: the tree was not restored"; fail=1; }
 echo "$( [ $fail = 0 ] && echo PASS || echo FAIL ) isolation: production cannot reach the storage-level test helpers"
 exit $fail

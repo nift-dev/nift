@@ -45,14 +45,18 @@ namespace nift::rt { class Value; }
 std::vector<nift::rt::Value>& nift_probe_mut(nift::rt::Value&)
     asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE") __attribute__((weak));
 void* nift_probe_weak(nift::rt::Value& v) { return &nift_probe_mut(v); }'
-WEAK_B='#include <vector>
-namespace nift::rt { class Value; }
-std::vector<nift::rt::Value>& nift_probe_mut2(nift::rt::Value&) asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE");
+# check C6: g++ 13 does not apply #pragma weak to an asm-labelled declaration;
+# an extern "C" declaration of the mangled name takes it (nm: w)
+WEAK_B='extern "C" void* _ZN4nift2rt7Storage9array_mutERNS0_5ValueE(void*);
 #pragma weak _ZN4nift2rt7Storage9array_mutERNS0_5ValueE
-void* nift_probe_weak2(nift::rt::Value& v) { return &nift_probe_mut2(v); }'
+void* nift_probe_weak2(void* v) { return _ZN4nift2rt7Storage9array_mutERNS0_5ValueE(v); }'
 for form in attribute pragma; do
   [ "$form" = attribute ] && plant=$WEAK_A || plant=$WEAK_B
   printf '\n%s\n' "$plant" >> src/Hooks.cpp
+  make src/Hooks.o > "$work/weak-$form-obj.log" 2>&1 || { echo "FAIL sort-forgery 3 ($form): the plant does not compile"; fail=1; }
+  if nm -u src/Hooks.o | grep -Eq '^ *[wv] _ZN4nift2rt7Storage9array_mutERNS0_5ValueE$'; then
+    echo "PASS sort-forgery 3 ($form): the planted reference is weak (nm: $(nm -u src/Hooks.o | grep -E '^ *[wv] _ZN4nift2rt7Storage9array_mut' | awk '{print $1}'))"
+  else echo "FAIL sort-forgery 3 ($form): the planted reference is not weak, so this case shows nothing"; fail=1; fi
   if make nift > "$work/weak-$form.log" 2>&1; then echo "FAIL sort-forgery 3 ($form): nift linked a weak reference to Storage::array_mut"; fail=1
   elif grep -q 'src/Hooks.o nift::rt::Storage::array_mut' "$work/weak-$form.log"; then
     echo "PASS sort-forgery 3 ($form): make nift refuses a weak reference to Storage::array_mut from src/Hooks.o"
