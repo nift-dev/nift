@@ -44,12 +44,12 @@ WEAK_A='#include <vector>
 namespace nift::rt { class Value; }
 std::vector<nift::rt::Value>& nift_probe_mut(nift::rt::Value&)
     asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE") __attribute__((weak));
-void nift_probe_weak(nift::rt::Value& v) { nift_probe_mut(v).clear(); }'
+void* nift_probe_weak(nift::rt::Value& v) { return &nift_probe_mut(v); }'
 WEAK_B='#include <vector>
 namespace nift::rt { class Value; }
 std::vector<nift::rt::Value>& nift_probe_mut2(nift::rt::Value&) asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE");
 #pragma weak _ZN4nift2rt7Storage9array_mutERNS0_5ValueE
-void nift_probe_weak2(nift::rt::Value& v) { nift_probe_mut2(v).clear(); }'
+void* nift_probe_weak2(nift::rt::Value& v) { return &nift_probe_mut2(v); }'
 for form in attribute pragma; do
   [ "$form" = attribute ] && plant=$WEAK_A || plant=$WEAK_B
   printf '\n%s\n' "$plant" >> src/Hooks.cpp
