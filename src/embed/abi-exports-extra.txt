@@ -1,0 +1,4 @@
+# Tooling checkpoint (component 6): symbols libnift_c.so exports beyond the
+# functions declared in include/nift/c_abi.h. Each needs a documented reason.
+# One symbol per line; text after '#' is the reason.
+nift_ffi_callback_i64_trampoline  # extern "C" FFI callback trampoline (src/ParserExpression.cpp), exported before this checkpoint and part of the frozen ABI 1.1 surface checked by tests/v46_b4_cp8_embedding_abi.sh

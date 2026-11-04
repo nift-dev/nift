@@ -55,6 +55,9 @@ else
 		SHARED_LIB := libnift_c.so
 		LDLIBS += -ldl
 		LIBFFI_SHARED_LINK_FLAGS := -Wl,--exclude-libs,ALL -Wl,-Bsymbolic
+		# Tooling checkpoint (component 6): export exactly the documented
+		# embedding ABI (GNU ld version script generated from include/nift/c_abi.h).
+		LIBNIFT_C_EXPORTS := yes
 	endif
 endif
 
@@ -1526,8 +1529,37 @@ libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
 	ar rcs $@ $(C_ABI_CORE) $@.ffi/ffi_*.o
 	rm -rf $@.ffi
 
-libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A)
-	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
+# Tooling checkpoint (component 6, docs/runtime-2/checkpoints/tooling.md): on
+# Linux the shared library exports exactly the documented embedding ABI, the
+# functions declared in include/nift/c_abi.h plus the documented exceptions of
+# src/embed/abi-exports-extra.txt, through a GNU ld version script generated
+# from them (every other symbol local); make test-c-abi-symbols checks the
+# result. macOS (.dylib) and Windows (mingw) keep their previous export
+# behaviour (tooling.md 6: remaining before a cross-platform release).
+ABI_EXPORT_MAP := $(TEST_DIR)/abi/libnift_c.map
+$(ABI_EXPORT_MAP): include/nift/c_abi.h src/embed/abi-exports-extra.txt scripts/check_abi_symbols.py
+	mkdir -p $(dir $@)
+	python3 scripts/check_abi_symbols.py --write-map $@ include/nift/c_abi.h --extra src/embed/abi-exports-extra.txt --cc "$(CC)"
+ifeq ($(LIBNIFT_C_EXPORTS),yes)
+LIBNIFT_C_EXPORT_DEPS := $(ABI_EXPORT_MAP)
+LIBNIFT_C_EXPORT_FLAGS := -Wl,--version-script=$(ABI_EXPORT_MAP)
+endif
+
+libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
+	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) $(LIBNIFT_C_EXPORT_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
+
+# The exported inventory (exact equality with tests/abi/libnift_c.symbols: no
+# extra export, no documented symbol missing), its negative controls, and an
+# external consumer built outside the tree that links the library dynamically.
+.PHONY: test-c-abi-symbols
+test-c-abi-symbols: $(SHARED_LIB) $(ABI_EXPORT_MAP) $(C_ABI_PIC) $(LIBFFI_A)
+	@if [ "$(LIBNIFT_C_EXPORTS)" != yes ]; then echo "test-c-abi-symbols: Linux only (macOS/Windows exports unchanged: tooling.md 6)"; exit 0; fi
+	python3 scripts/check_abi_symbols.py $(SHARED_LIB) include/nift/c_abi.h tests/abi/libnift_c.symbols \
+		--extra src/embed/abi-exports-extra.txt --cc "$(CC)"
+	bash tests/abi/inventory_selftest.sh "$(CXX)" "$(CXXFLAGS)" "$(LIBFFI_SHARED_LINK_FLAGS)" $(ABI_EXPORT_MAP) \
+		$(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
+	bash tests/abi/external_consumer.sh $(SHARED_LIB) "$(CC)"
+test-embed: test-c-abi-symbols
 
 # macOS dynamic library: relocatable @rpath install name so a consumer that
 # links it can load it from an installed prefix without absolute paths.
