@@ -39,7 +39,9 @@ for o in "$@"; do
       echo "error: check-symbol-refs.sh: $o is LTO bytecode nm did not read" >&2; exit 1
     fi
   fi
-  sed 's/^ *U //' "$errs.u" | grep -E "$RESTRICTED" | sed -E 's/\(.*//' | sed "s|^|$rel |" >> "$errs"
+  # re-review N1: every class nm -u lists is a reference (U, and the weak w and
+  # v, which a static link binds to the strong definition)
+  sed -nE 's/^ *[A-Za-z] //p' "$errs.u" | grep -E "$RESTRICTED" | sed -E 's/\(.*//' | sed "s|^|$rel |" >> "$errs"
 done
 have=$(sort -u "$errs")
 extra=$(comm -13 <(echo "$want") <(echo "$have"))

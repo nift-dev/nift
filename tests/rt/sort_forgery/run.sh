@@ -8,7 +8,9 @@
 #   2. dynamic: a program with the forged unit, linked against the built
 #      libnift_c.so, fails to link (the commit is not exported, component 6);
 #      control: against the same objects linked without the version script it
-#      links (the route RECHECK2 demonstrated).
+#      links (the route RECHECK2 demonstrated);
+#   3. (re-review N1) a weak reference, by attribute or #pragma weak, planted
+#      into src/Hooks.cpp also fails make nift at the allowlist.
 #   run.sh   (from the repository root, after `make nift libnift_c.so`)
 set -u
 export LC_ALL=C
@@ -35,6 +37,28 @@ elif grep -q 'src/Hooks.o nift::rt::mutation::Protocol::sort_storage' "$work/sta
   echo "PASS sort-forgery 1: make nift refuses the link (src/Hooks.o references Protocol::sort_storage outside the allowlist)"
 else echo "FAIL sort-forgery 1: failed for another reason:"; grep -m3 -i error "$work/static.log"; fail=1; fi
 restore
+# 3. re-review N1 (rr/e3-weak.diff): a weak undefined reference (an asm label with
+# __attribute__((weak)), or #pragma weak) binds to the strong commit in a static
+# link; it is a reference all the same, and must fail the allowlist
+WEAK_A='#include <vector>
+namespace nift::rt { class Value; }
+std::vector<nift::rt::Value>& nift_probe_mut(nift::rt::Value&)
+    asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE") __attribute__((weak));
+void nift_probe_weak(nift::rt::Value& v) { nift_probe_mut(v).clear(); }'
+WEAK_B='#include <vector>
+namespace nift::rt { class Value; }
+std::vector<nift::rt::Value>& nift_probe_mut2(nift::rt::Value&) asm("_ZN4nift2rt7Storage9array_mutERNS0_5ValueE");
+#pragma weak _ZN4nift2rt7Storage9array_mutERNS0_5ValueE
+void nift_probe_weak2(nift::rt::Value& v) { nift_probe_mut2(v).clear(); }'
+for form in attribute pragma; do
+  [ "$form" = attribute ] && plant=$WEAK_A || plant=$WEAK_B
+  printf '\n%s\n' "$plant" >> src/Hooks.cpp
+  if make nift > "$work/weak-$form.log" 2>&1; then echo "FAIL sort-forgery 3 ($form): nift linked a weak reference to Storage::array_mut"; fail=1
+  elif grep -q 'src/Hooks.o nift::rt::Storage::array_mut' "$work/weak-$form.log"; then
+    echo "PASS sort-forgery 3 ($form): make nift refuses a weak reference to Storage::array_mut from src/Hooks.o"
+  else echo "FAIL sort-forgery 3 ($form): failed for another reason:"; grep -m3 -i error "$work/weak-$form.log"; fail=1; fi
+  restore
+done
 make nift > "$work/rebuild.log" 2>&1 || { echo "FAIL sort-forgery: nift does not rebuild after restore"; fail=1; }
 # 2. dynamic: libnift_c.so
 printf 'namespace nift::rt { class Value; }\nvoid nift_probe_hijack(nift::rt::Value&);\nint main() { return 0; }\nvoid (*keep)(nift::rt::Value&) = nift_probe_hijack;\n' > "$work/main.cpp"
