@@ -56,7 +56,7 @@ STORAGE_WRITE = re.compile(
     r'pop_back|swap|assign|emplace)\s*\()'
     r'|(?<!mutation::)(?<!Protocol::)(?<!Construction::)\b(array_mut|array_slot_mut|object_slot_mut|struct_slot_mut|array_set|object_remove|'
     r'struct_set|map_set|set_add|collection_erase|stack_push|stack_pop|collection_clear)\s*\('
-    r'|\bStorage::|\bStorageTestAccess\b')
+    r'|\bStorage\b|\bStorageTestAccess\b')
 # B2 review M1: the construction API (fresh values only; checked builds abort
 # otherwise) and the protocol's private sort commits. Each use outside the
 # files that implement them needs `// rt-lint: storage-ok <label>, <why>` on the
@@ -73,6 +73,14 @@ STORAGE_WRITE = re.compile(
 CONSTRUCTION = re.compile(
     r'(?<!Storage::)(?<!StorageTestAccess::)\b(array_push|array_build_storage|array_build_set|object_set|'
     r'object_build_slot|struct_add_field|map_build_set|set_build_add|stack_build_push)\b')
+# Tooling review F1: component 2 made the primitives private members of
+# rt::Construction (src/rt/build.h) and renamed six of them; the in-place tier
+# names them `Construction::<primitive>(key, ...)`. Any `Construction` token
+# (qualified call, alias, using-declaration, address) is one construction
+# reference, whatever the member's name, so a rename cannot drop coverage; the
+# self-test checks every member declared in build.h (and every Storage member
+# declared in aggregate.h) is flagged.
+CONSTRUCTION_CLASS = re.compile(r'\bConstruction\b(?:\s*::\s*[A-Za-z_]\w*)?')
 SORT_ACCESS = re.compile(r'\b(SortController|SortKey|sort_storage|sort_items|commit_permutation)\b')
 SORT_INCLUDE = re.compile(r'#\s*include\s*[<"][^">]*sort_controller\.h')
 ANNOTATION = re.compile(r'rt-lint: storage-ok (fresh|private-descriptor|mutant-only)')
@@ -150,7 +158,9 @@ def splice(text):
     out, where = [], []
     line = start = 1
     pos = 0
-    for m in re.finditer(r'\\\r?\n|\n', text):
+    # Tooling review F2: GCC and Clang splice a backslash followed by horizontal
+    # whitespace and a newline too (with a warning only).
+    for m in re.finditer(r'\\[ \t\f\v]*\r?\n|\n', text):
         seg = text[pos:m.start()]
         out.append(seg)
         where.extend([start] * len(seg))
@@ -266,14 +276,23 @@ ANNOTATION_ANY = re.compile(r'rt-lint: (storage-ok [a-z-]+|storage-ok|paste-ok|t
 CONSTRUCTION_LABELS = ('storage-ok fresh', 'storage-ok private-descriptor', 'storage-ok mutant-only')
 
 
+def construction_uses(line):
+    """The construction references on a line of code: each `Construction` token
+    (with its member, if qualified) and each B2 free-function name."""
+    qualified = CONSTRUCTION_CLASS.findall(line)
+    return qualified + CONSTRUCTION.findall(CONSTRUCTION_CLASS.sub(' ', line))
+
+
+def normalised(code_line):
+    return ' '.join(code_line.split())
+
+
 def boundary_file(path, rel, text, problems, annotations, rules):
     """The boundary rules on one file (rel: its repository path, which the
-    allowlists name). Adds every annotation found to annotations[(rel, label)]."""
+    allowlists name). Adds every annotation found to
+    annotations[(rel, label, the normalised code it covers)]."""
     code, comment, include = lex(text)
     labels = [set(ANNOTATION_ANY.findall(c)) for c in comment]
-    for number, found in enumerate(ANNOTATION_ANY.findall(c) for c in comment):
-        for label in found:
-            annotations[(rel, label)] = annotations.get((rel, label), 0) + 1
     storage_checked = rel not in STORAGE_ALLOWED
     for index, line in enumerate(code):
         number = index + 1
@@ -283,7 +302,7 @@ def boundary_file(path, rel, text, problems, annotations, rules):
         storage_ok = any(l.startswith('storage-ok') for l in here)
         if 'storage' in rules and storage_checked and not storage_ok and STORAGE_WRITE.search(line):
             problems.append(f'{path}:{number}: storage-write: aggregate storage written outside the mutation protocol')
-        uses = CONSTRUCTION.findall(line)
+        uses = construction_uses(line)
         annotated = any(l in CONSTRUCTION_LABELS for l in here | above)
         if 'storage' in rules and storage_checked and uses and not annotated:
             problems.append(f'{path}:{number}: storage-write: construction API without `rt-lint: storage-ok fresh`')
@@ -303,6 +322,25 @@ def boundary_file(path, rel, text, problems, annotations, rules):
             if 'test-access-decl' in here and rel not in TEST_ACCESS_ALLOWED:
                 problems.append(f'{path}:{number}: test-access: `rt-lint: test-access-decl` outside '
                                 f'{" and ".join(sorted(TEST_ACCESS_ALLOWED))}')
+        # Tooling review F1: every annotation must cover a reference the lint
+        # checks, on its own line or (alone on a comment-only line) the next one;
+        # the manifest pins it by the normalised code of that line, so an
+        # unneeded annotation cannot be kept, and none can move to another site
+        # without a manifest edit.
+        for label in ANNOTATION_ANY.findall(comment[index]):
+            target = index if line.strip() or index + 1 >= len(code) else index + 1
+            covered = code[target]
+            if label.startswith('storage-ok'):
+                used = bool(construction_uses(covered)) or (target == index and bool(STORAGE_WRITE.search(covered)))
+            elif label == 'paste-ok':
+                used = target == index and bool(TOKEN_PASTE.search(covered))
+            else:
+                used = target == index and bool(TEST_ACCESS.search(covered))
+            if not used:
+                problems.append(f'{path}:{number}: annotation-unused: `rt-lint: {label}` covers no reference '
+                                'the lint checks')
+            key = (rel, label, normalised(covered))
+            annotations[key] = annotations.get(key, 0) + 1
     return include
 
 
@@ -319,9 +357,13 @@ def repo_rel(path, root):
     return os.path.relpath(os.path.abspath(path), os.path.abspath(root)).replace(os.sep, '/')
 
 
-def skipped(rel):
-    """Only the top-level tests/ tree (and what lies outside the root) is not production source."""
-    return rel == 'tests' or rel.startswith(('tests/', '../')) or rel.startswith('third_party/')
+def skipped(rel, included=False):
+    """Only the top-level tests/ tree (and what lies outside the root) is not
+    production source; third_party/ is walked only into what a scanned file
+    includes (tooling review F11: src/Sha256.cpp includes a vendored header)."""
+    if rel == 'tests' or rel.startswith(('tests/', '../')):
+        return True
+    return not included and (rel == 'third_party' or rel.startswith('third_party/'))
 
 
 def resolve_include(header, including, root):
@@ -341,44 +383,54 @@ def boundary_scan(roots, root='.', rules=('storage', 'test-access')):
         if not os.path.exists(start):
             continue
         if os.path.isfile(start):
-            queue.append(start)
+            queue.append((start, False))
             continue
-        for d, dirs, fs in os.walk(start):
+        # Symlinked directories are followed, as the Makefile's wildcards follow
+        # them (tooling review F11); each real directory once.
+        walked = set()
+        for d, dirs, fs in os.walk(start, followlinks=True):
+            real = os.path.realpath(d)
+            if real in walked:
+                dirs[:] = []
+                continue
+            walked.add(real)
             dirs[:] = sorted(x for x in dirs if not skipped(repo_rel(os.path.join(d, x), root)))
-            queue.extend(os.path.join(d, f) for f in sorted(fs) if f.endswith(SOURCE_SUFFIXES))
-    problems, annotations, seen = [], {}, set()
+            queue.extend((os.path.join(d, f), False) for f in sorted(fs) if f.endswith(SOURCE_SUFFIXES))
+    problems, annotations, seen, real_seen = [], {}, set(), set()
     while queue:
-        path = queue.pop(0)
+        path, included = queue.pop(0)
         rel = repo_rel(path, root)
-        if rel in seen or skipped(rel):
+        if os.path.realpath(path) in real_seen or skipped(rel, included):
             continue
+        real_seen.add(os.path.realpath(path))
         seen.add(rel)
         with open(path, encoding='utf-8', errors='replace') as handle:
             text = handle.read()
         for header in boundary_file(path, rel, text, problems, annotations, rules).values():
             found = resolve_include(header, path, root)
             if found:
-                queue.append(found)
+                queue.append((found, True))
     return problems, annotations, seen
 
 
 def manifest_check(annotations, manifest):
-    """Every annotation pinned by path, label and count: an annotation that is not
-    listed, a listed one that is gone, and a changed count each fail."""
+    """Every annotation pinned by path, label and the normalised code of the line it
+    covers (`path | label | code`, one line per annotation): an annotation not
+    listed, a listed one gone, or one moved to another line each fail."""
     want = {}
     with open(manifest) as handle:
         for line in handle:
-            line = line.split('#', 1)[0].strip()
-            if line:
-                rel, rest = line.split(None, 1)
-                label, count = rest.rsplit(None, 1)
-                want[(rel, label)] = int(count)
+            if not line.strip() or line.lstrip().startswith('#'):
+                continue
+            rel, label, covered = (part.strip() for part in line.rstrip('\n').split(' | ', 2))
+            key = (rel, label, normalised(covered))
+            want[key] = want.get(key, 0) + 1
     problems = []
     for key in sorted(set(want) | set(annotations)):
         have, need = annotations.get(key, 0), want.get(key, 0)
         if have != need:
-            problems.append(f'{key[0]}: annotation-manifest: `rt-lint: {key[1]}` {have} time(s), '
-                            f'{manifest} allows {need}')
+            problems.append(f'{key[0]}: annotation-manifest: `rt-lint: {key[1]}` on `{key[2]}` {have} time(s), '
+                            f'{manifest} lists {need}')
     return problems
 
 
@@ -497,8 +549,9 @@ def self_test():
     # statement split after one annotation), rc/m-digit's push_value line, a raw
     # string with a delimiter over three lines, an annotation inside a raw
     # string, a splice inside `Storage::`, and a line under a code line's annotation;
-    # each must fire on exactly its line.
-    lexical = {'bad_lexical.cpp': {2, 3, 7, 8, 10, 14, 17, 18, 19, 26, 29, 35, 36, 39, 40, 43},
+    # tooling review F2: backslash, blanks, newline splitting `Construction`,
+    # `StorageTestAccess` and `##` (46, 48, 51). Each must fire on exactly its line.
+    lexical = {'bad_lexical.cpp': {2, 3, 7, 8, 10, 14, 17, 18, 19, 26, 29, 35, 36, 39, 40, 43, 46, 48, 51},
                'bad_lexical_inc.inc': {2}}
     found = {}
     for problem in boundary_scan(['bad_lexical.cpp'], fixtures)[0]:
@@ -529,7 +582,9 @@ def self_test():
                      'src/embed/t3_digraph.cpp': {2, 4}, 'src/embed/t4_splice.cpp': {2, 4},
                      'src/embed/t5_digit.cpp': {2, 3}, 'src/embed/t6_raw.cpp': {2, 3}, 'src/embed/x.def': {2, 3},
                      'src/embed/x.hxx': {2, 3}, 'src/embed/x.inc': {2, 3}, 'src/embed/x.ipp': {2, 3},
-                     'src/rt/tests/helper.h': {4, 5}, 'src/tests/helper.h': {4, 5}}
+                     'src/rt/tests/helper.h': {4, 5}, 'src/tests/helper.h': {4, 5},
+                     # tooling review F11: a symlinked directory, an included third_party header
+                     'src/rt/linked/linked.cpp': {2}, 'third_party/lib/inc.h': {2}}
     problems, annotations, files = boundary_scan(list(BOUNDARY_ROOTS), tree)
     got_access, got_storage = {}, {}
     for problem in problems:
@@ -545,7 +600,8 @@ def self_test():
     location = {(repo_rel(p.split(':')[0], tree), int(p.split(':')[1]))
                 for p in problems if 'test-access-decl` outside' in p}
     if location != {('src/embed/aggregate.h', 4), ('src/embed/t1_annot.cpp', 2), ('src/embed/t1_annot.cpp', 6)} or 'src/embed/noext' not in files or 'tests/ok_helper.h' in files or \
-            'src/rt/aggregate.h' not in files or 'src/rt/build.h' not in files:
+            'src/rt/aggregate.h' not in files or 'src/rt/build.h' not in files or \
+            'third_party/lib/unincluded.h' in files:
         print(f'FAIL rt-lint self-test tree: location {sorted(location)}, files {sorted(files)}')
         failed = True
     # The manifest: exact as written; a missing, an extra and a changed entry each fail.
@@ -554,14 +610,63 @@ def self_test():
         print(f'FAIL rt-lint self-test manifest: {manifest_check(annotations, manifest)}')
         failed = True
     changed = dict(annotations)
-    changed[('src/rt/aggregate.h', 'test-access-decl')] += 1
-    changed[('src/embed/x.ipp', 'storage-ok fresh')] = 1
-    del changed[('src/embed/aggregate.h', 'test-access-decl')]
-    if len(manifest_check(changed, manifest)) != 3:
-        print(f'FAIL rt-lint self-test manifest mutations: {manifest_check(changed, manifest)}')
+    changed[('src/rt/aggregate.h', 'test-access-decl', 'struct StorageTestAccess;')] += 1
+    changed[('src/embed/x.ipp', 'storage-ok fresh', 'x')] = 1
+    del changed[('src/embed/aggregate.h', 'test-access-decl', 'struct StorageTestAccess;')]
+    # tooling review F1: an annotation moved to another line of the same file
+    moved = dict(annotations)
+    key = ('src/embed/t1_annot.cpp', 'test-access-decl', 'namespace nift::rt { struct StorageTestAccess {')
+    moved[key] -= 1
+    moved[('src/embed/t1_annot.cpp', 'test-access-decl', '};')] = 1
+    if len(manifest_check(changed, manifest)) != 3 or len(manifest_check(moved, manifest)) != 2:
+        print(f'FAIL rt-lint self-test manifest mutations: {manifest_check(changed, manifest)} '
+              f'{manifest_check(moved, manifest)}')
         failed = True
-    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected) + 4} fixtures'
-          f' (bad_lexical, tree: {len(files)} files over {len(BOUNDARY_ROOTS)} roots, manifest and 3 mutations)')
+    # Tooling review F1: the in-place tier (lint1/src/rt/probe.cpp): every
+    # renamed primitive, an alias of the class, an unneeded annotation.
+    inplace = {int(p.split(':')[1]) for p in boundary_scan(['bad_inplace.cpp'], fixtures)[0]}
+    if inplace != {6, 7, 9, 11, 12, 13, 14, 15, 16, 20}:
+        print(f'FAIL rt-lint self-test bad_inplace.cpp: expected [6, 7, 9, 11-16, 20], got {sorted(inplace)}')
+        failed = True
+    # The name lists follow the declarations: every member of rt::Construction
+    # (src/rt/build.h) and of rt::Storage (src/rt/aggregate.h, aggregate_collection.h)
+    # is flagged when a unit outside the allowlist names it, so a rename or a new
+    # primitive cannot drop out of the lint.
+    declared = {}
+    for header, cls in (('src/rt/build.h', 'Construction'), ('src/rt/aggregate.h', 'Storage')):
+        with open(os.path.join(REPO, header)) as handle:
+            body = re.search(r'\nclass ' + cls + r' \{(.*?)\n\};', handle.read(), re.S)
+        declared[cls] = set(re.findall(r'\bstatic\b[^;{(]*?\b([a-z_][a-z0-9_]*)\s*\(', body.group(1))) if body else set()
+    missed = []
+    for cls, names in declared.items():
+        for name in sorted(names):
+            probe = []
+            boundary_file('probe.cpp', 'src/rt/probe.cpp', f'void f() {{ {cls}::{name}(x); }}\n', probe, {},
+                          ('storage',))
+            if not probe:
+                missed.append(f'{cls}::{name}')
+    if len(declared['Construction']) < 9 or len(declared['Storage']) < 9 or missed:
+        print(f'FAIL rt-lint self-test declarations: {sorted((k, len(v)) for k, v in declared.items())}, '
+              f'not flagged: {missed}')
+        failed = True
+    # The re-checker's end-to-end plant (tooling review F1, reproducer 2): one
+    # unannotated in-place call in the real collection_helpers.cpp, case M::Map.
+    with open(os.path.join(REPO, 'src/rt/collection_helpers.cpp')) as handle:
+        real = handle.read().split('\n')
+    anchor = [i for i, l in enumerate(real) if 'case M::Map:' in l]
+    planted = real[:anchor[0] + 1] + ['Construction::array_storage(bk,s[Returned]).clear();'] + real[anchor[0] + 1:] \
+        if anchor else real
+    clean, plant = [], []
+    boundary_file('collection_helpers.cpp', 'src/rt/collection_helpers.cpp', '\n'.join(real), clean, {}, ('storage',))
+    boundary_file('collection_helpers.cpp', 'src/rt/collection_helpers.cpp', '\n'.join(planted), plant, {},
+                  ('storage',))
+    if not anchor or clean or [int(p.split(':')[1]) for p in plant] != [anchor[0] + 2]:
+        print(f'FAIL rt-lint self-test collection_helpers plant: clean {clean}, planted {plant}')
+        failed = True
+    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected) + 5} fixtures'
+          f' (bad_lexical, bad_inplace, tree: {len(files)} files over {len(BOUNDARY_ROOTS)} roots, manifest and'
+          f' 4 mutations; {len(declared["Construction"])} Construction and {len(declared["Storage"])} Storage'
+          f' members flagged; the collection_helpers plant)')
     return 1 if failed else 0
 
 

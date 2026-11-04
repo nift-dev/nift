@@ -26,7 +26,7 @@ State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<Byt
 // The receiver's storage comes from the protocol (b2-refrep.md, B):
 // sort_storage at init (stage 3, after the instruction's stage 2.2), and
 // sort_items while the controller runs (no relocation, no allocation: drain).
-std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // rt-lint: storage-ok scratch
+std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // the native's own scratch array
 using mutation::SortKey;
 std::vector<Value>& receiver_items(const SortKey& k,Value& v){return mutation::SortController::items(k,v);}
 Value moved_empty(Value* s,const Value& v) {

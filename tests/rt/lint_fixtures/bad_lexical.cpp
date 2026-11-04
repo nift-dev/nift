@@ -42,4 +42,12 @@ array_mut(published).clear();
     Value fresh = make_array(1); array_push(fresh, x);  // rt-lint: storage-ok fresh, this line only
     array_push(published, x);
 }
+void b11(Value& published, const Value& x) {  // tooling review F2: backslash, blanks, newline is a splice
+    Construct\  
+ion::array_storage(key, published).clear();
+    Storage\	
+TestAccess::clear(published); (void)x;
+}
+#define CAT3(a, b) a #\ 
+# b
 }  // namespace nift::rt

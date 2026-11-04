@@ -1,5 +1,7 @@
-# The fixture tree's annotation manifest: every annotation in the tree, so only
-# the location rule (not the manifest) fails on the misplaced ones.
-src/rt/aggregate.h        test-access-decl  1
-src/embed/aggregate.h     test-access-decl  1
-src/embed/t1_annot.cpp    test-access-decl  2
+# The fixture tree's annotation manifest (path | label | covered code): every
+# annotation in the tree, so only the location rule (not the manifest) fails on
+# the misplaced ones.
+src/rt/aggregate.h | test-access-decl | struct StorageTestAccess;
+src/embed/aggregate.h | test-access-decl | struct StorageTestAccess;
+src/embed/t1_annot.cpp | test-access-decl | namespace nift::rt { struct StorageTestAccess {
+src/embed/t1_annot.cpp | test-access-decl | void h1(nift::rt::Value& v) { nift::rt::StorageTestAccess::clear(v); }

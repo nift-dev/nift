@@ -1,24 +1,51 @@
-# Tooling checkpoint (component 5): every rt-lint boundary annotation in the
-# production roots (src, include, bindings, markuppp, minifypp), by repository
-# path, label and count. `rt-lint.py --boundary` (test-rt-lint) fails when an
-# annotation appears that is not listed here, when a listed one is gone, and
-# when a count changes: adding one is a reviewed edit of this file. Each
-# storage-ok site is in docs/runtime-2/checkpoints/tooling.md section 2 (the
-# in-place passkey table) or b2-refrep.md section 18.
-#
-# path                                label                          count
-src/embed/program_api.cpp             paste-ok                       1
-src/rt/aggregate.h                    test-access-decl               2
-src/rt/build.h                        test-access-decl               3
-src/rt/cell.cpp                       storage-ok private-descriptor  2
-src/rt/collection_helpers.cpp         storage-ok fresh               15
-src/rt/collection_plain_sort.cpp      storage-ok fresh               2
-src/rt/collection_sort.cpp            storage-ok fresh               1
-src/rt/collection_sort.cpp            storage-ok scratch             1
-src/rt/copy_graph.cpp                 storage-ok fresh               7
-src/rt/natives/object_methods.cpp     storage-ok mutant-only         1
-src/rt/vm.cpp                         paste-ok                       3
-src/rt/vm_keyed.cpp                   storage-ok mutant-only         1
-src/rt/vm_ops.cpp                     storage-ok mutant-only         1
-src/rt/vm_report.cpp                  storage-ok fresh               1
-src/rt/vm_struct.cpp                  storage-ok fresh               1
+# Tooling checkpoint (component 5; tooling review F1): every rt-lint boundary
+# annotation in the production roots (src, include, bindings, markuppp,
+# minifypp), one line per annotation: repository path | label | the normalised
+# code of the line it covers (its own line, or the next one when the annotation
+# stands alone on a comment line). `rt-lint.py --boundary` (test-rt-lint) fails
+# when an annotation appears that is not listed here, when a listed one is gone,
+# and when one covers another line: adding or moving one is a reviewed edit of
+# this file. An annotation must also cover a reference the lint checks
+# (annotation-unused). Each storage-ok site is in
+# docs/runtime-2/checkpoints/tooling.md section 2.4 or b2-refrep.md section 18.
+src/embed/program_api.cpp | paste-ok | #define PROGRAM_VIEW(name, field) nift_status nift_program_result_##name(const nift_program_result* r, nift_string* out) { return view(r, r ? &r->field : nullptr, out); }
+src/rt/aggregate.h | test-access-decl | friend struct StorageTestAccess;
+src/rt/aggregate.h | test-access-decl | struct StorageTestAccess;
+src/rt/build.h | test-access-decl | #pragma GCC poison StorageTestAccess
+src/rt/build.h | test-access-decl | friend struct StorageTestAccess;
+src/rt/build.h | test-access-decl | static_assert(!test_access_detail::complete<StorageTestAccess>::value,
+src/rt/cell.cpp | storage-ok private-descriptor | Construction::array_set(key, owner->value, 5, Value::boolean(true));
+src/rt/cell.cpp | storage-ok private-descriptor | Construction::array_set(key, owner->value, 6, anchor);
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,*group,item);
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,s[Keys],r);
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,s[Keys],r);break;
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,s[Result],s[Item]);break;
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::object_set(bk,s[Result],key,Value::integer(n+1));}
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::object_set(bk,s[Result],key,s[Item]);}
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::object_set(key,s[Result],atom(""),make_array());
+src/rt/collection_helpers.cpp | storage-ok fresh | Construction::object_set(key,s[Result],atom(""),make_array());}
+src/rt/collection_helpers.cpp | storage-ok fresh | Value* group=Construction::object_slot(bk,object,key);
+src/rt/collection_helpers.cpp | storage-ok fresh | auto& order=Construction::array_storage(bk,s[HashTable]);
+src/rt/collection_helpers.cpp | storage-ok fresh | case M::Map: Construction::array_push(bk,s[Result],r);break;
+src/rt/collection_helpers.cpp | storage-ok fresh | for(const Value& i:order)Construction::array_push(bk,s[Result],
+src/rt/collection_helpers.cpp | storage-ok fresh | for(std::size_t i=0;i<n;++i)Construction::array_push(bk,s[HashTable],Value::integer(i));
+src/rt/collection_helpers.cpp | storage-ok fresh | if(!object_get(object,key))Construction::object_set(bk,object,key,make_array());
+src/rt/collection_helpers.cpp | storage-ok fresh | if(m==M::Filter&&yes)Construction::array_push(bk,s[Result],s[Item]);
+src/rt/collection_plain_sort.cpp | storage-ok fresh | auto& order=Construction::array_storage(build_key,s[HashTable]);
+src/rt/collection_plain_sort.cpp | storage-ok fresh | for(std::size_t i=0;i<n;++i)Construction::array_push(build_key,s[HashTable],Value::integer(i));
+src/rt/collection_sort.cpp | storage-ok fresh | for(const Value& value:array_items(s[Source]))Construction::array_push(build_key,s[sort_slot::KeepAlive],value);
+src/rt/copy_graph.cpp | storage-ok fresh | Construction::map_set(key_, copy, items[k], mapped(items[k + 1]));
+src/rt/copy_graph.cpp | storage-ok fresh | Construction::object_set(key_, copy, entry.first, mapped(entry.second));
+src/rt/copy_graph.cpp | storage-ok fresh | Construction::struct_add_field(key_, copy, field.first, mapped(field.second));
+src/rt/copy_graph.cpp | storage-ok fresh | for (const Value& item : array_items(source)) Construction::array_push(key_, copy, mapped(item));
+src/rt/copy_graph.cpp | storage-ok fresh | for (const Value& item : items) Construction::stack_push(key_, copy, mapped(item));
+src/rt/copy_graph.cpp | storage-ok fresh | for (const Value& member : items) Construction::set_add(key_, copy, mapped(member));
+src/rt/copy_graph.cpp | storage-ok fresh | for (const auto& f : struct_fields(source)) Construction::struct_add_field(key_, copy, f.first, f.second);
+src/rt/natives/object_methods.cpp | storage-ok mutant-only | for (const auto& entry : object_entries(args[1])) Construction::object_set(key, result, entry.first, entry.second);
+src/rt/vm.cpp | paste-ok | #define CHECKED(name) LC_##name:
+src/rt/vm.cpp | paste-ok | #define NIFT_RT_LABEL(name) &&L_##name,
+src/rt/vm.cpp | paste-ok | #define OP(name) L_##name:
+src/rt/vm_keyed.cpp | storage-ok mutant-only | Construction::map_set(key, c, s[Item], s[Returned]);
+src/rt/vm_ops.cpp | storage-ok mutant-only | Construction::array_set(key, object, static_cast<std::size_t>(i), value);
+src/rt/vm_report.cpp | storage-ok fresh | Construction::object_set(key, R[in.a], Atom{in.b}, std::move(value));
+src/rt/vm_struct.cpp | storage-ok fresh | Construction::struct_add_field(key, R[in.a], Atom{in.b}, rk(R, K, in.c));
