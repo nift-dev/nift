@@ -258,7 +258,9 @@ functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `
   in-tree, `pic`, `san`, `san-lifetime`, `tsan` and `rt-obj/*` rules). A test translation unit (a
   source under `tests/`) is never compiled with it. The header defines `NIFT_PRODUCTION_TU` and
   nothing else.
-- **In a marked unit, `src/rt/aggregate.h` ends** (after the unchanged class `Storage`) by
+- **In a marked unit, `src/rt/aggregate.h` ends** (since component 2, this tail is at the end of
+  `src/rt/build.h`, which `aggregate.h` includes last, so it still follows every use of the name
+  whichever header comes first) (after the unchanged class `Storage`) by
   asserting that `StorageTestAccess` is not yet a complete type, then poisoning the name
   (`#pragma GCC poison`, GCC and Clang): any later definition, declaration or use of the name,
   however spelt (token pasting, the `%:%:` digraph, a line splice) and wherever it comes from (the
@@ -435,3 +437,228 @@ Commit `f0bd7214`; gate files under `gates/c4/`: `test-rt-protocol-compile-fail`
 bypass cases, control), `test-rt-lint`, `test-rt-sort-forgery`, `test-rt-sort-protection-mutants`
 (S1, S2, S4, S5 caught; wording control), `test-rt-mutation-protocol` (191), `test-runtime2-collections`
 (279), `test-rt-refrep` (116 checks; production checks PASS): all exit 0.
+
+## 2. Compile-time builder type (construction, publication, mutation)
+
+### 2.1 The contract
+
+- **Construction** of a fresh aggregate goes through a builder (`src/rt/build.h`, included at the end
+  of `rt/aggregate.h`, so every unit that sees the aggregates sees the complete builder
+  definitions): `build::Array` (element by element, the heap tally per push, as the former
+  `array_push`), `build::ArrayBulk` (the natives' bulk form: one raw-storage hand-out at
+  construction, plain appends, the tally when asked; what `natives::ArrayBuilder` always did, now
+  a thin wrapper), `build::Object`, `build::Struct`. A builder is move-only, cannot be assigned, has
+  no constructor from an existing `Value` (`build::Array::shallow_clone(source)` makes a new array
+  from a source's elements, as `array_shallow_clone` did), and offers reads of its own value only
+  (`size()`, `get()`), never a reference into its storage.
+- **Publication** is `std::move(builder).publish()` (rvalue-qualified, so it cannot be written by
+  accident on an lvalue): the value moves out and the builder is left holding nothing (a null
+  `Value`; `ArrayBulk` also a null storage pointer). From then on no use of the builder, through
+  the builder itself, a moved-from copy, a reference or a pointer to it, before or after any number
+  of moves, can reach the published value: **that is guaranteed by the builder being empty, not by
+  a compile error** (C++ cannot reject a use after a move). Checked builds (sanitizers,
+  `NIFT_RT_CHECKED_REFS`: the condition of `aggregate_store.h`, mirrored in `build.h` and asserted
+  equal in `aggregate.cpp`) abort on such a use; release builds do not check (it cost 10 to 20
+  instructions per literal or native result, 2.6) and a use dereferences the builder's own null
+  value. Publication never allocates (tested under injection).
+- **Mutation** of a published value only through `mutation::Protocol` (unchanged).
+- **The primitives** are the former free construction functions, out of line and unchanged except
+  that the stored value is taken by rvalue reference: every entry point (a builder operation, a
+  key forwarder, a test shim) still takes it by value first, so the caller's argument is built
+  exactly where the former by-value parameter was and no `Value` is moved more than before (the
+  first version forwarded by value twice: up to +88 instructions per JSON literal, 2.6). They are
+  private members of `rt::Construction`, reachable only by the builders, the storage-level tests'
+  accessor (2.5), and an `InPlaceKey` holder (2.4, inline forwarders: the key costs nothing).
+
+### 2.2 Guarantee layers
+
+| Layer | What it guarantees | Where |
+| --- | --- | --- |
+| compile time | no free construction function exists; the primitives are private; a builder cannot be copied, assigned or made from an existing `Value`; `publish()` needs an rvalue; the key cannot be made, copied, byte-copied or destroyed outside its owners | `absent.cpp` (structural, SFINAE), nine compile-fail cases (2.5) |
+| structural | a published or moved-from builder holds no reference to anything | `build.h`; `test-rt-build` (refcount 1 after publication, observed contents) |
+| link time | only the reviewed objects reference the primitives, so a unit forging `Construction`, a builder, an owner or the key does not link `nift`/`libnift_c` | `tests/abi/restricted-symbol-refs.txt` (34 construction pairs added, 49 in all), component 4's check |
+| run time | `check_fresh`: checked builds abort if a construction receiver is shared, immutable or sort-protected (both tiers); checked builds abort on a spent builder | `aggregate_store.h`, `build.h`; the sanitizer lanes (Linode) |
+| lint | an in-place site keeps its `rt-lint: storage-ok <label>` annotation; builder sites need none (no construction token remains) | `tools/rt-lint.py` (the storage-write rule now also skips `Construction::`, which the construction rule covers) |
+
+### 2.3 Migration, site by site
+
+Every production construction site of `1e23b13e` (79 references in 25 files; the 95 of the B2
+estimate counted declarations and the implementing files). Categories (coordinator): **(a)** private
+construction, unreachable by anyone else until published: a builder; **(b)** construction with an
+intermediate reference (another reference, register, cell, callback argument or snapshot could see
+the value before it is complete): reasoned individually; **(c)** incremental construction across VM
+instructions, callbacks or resumable native state: the bounded in-place exceptions (2.4). For every
+(a) site the four properties are the same and are stated once: **ownership** (the builder is a
+local of the same function as the former local `Value`, destroyed at the same scope exit, so a
+partial value is released at the same point on every early return and on unwinding), **reference
+identity** (the same elements are stored, by copy or move exactly as before, and the published
+value is the same new object), **allocation sequence** (the builder's constructor is the same
+`make_*` call at the same statement, each operation is the same primitive, `publish()` allocates
+nothing), and **observable behaviour** (unchanged: the value first becomes observable at the same
+statement, the assignment of the published value). The first-observable column names that
+statement; it is the same statement as before in every row.
+
+| # | Site (new) | Old code | New form | Cat. | First observable (old = new) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `vm_report.cpp:172` `Vm::cold` NewArray | `out = make_array(c); array_push(out, R[b+k])` | `build::Array array(c); array.push(...); out = publish` | a | `R[a] = out` after the switch | `out` is `cold()`'s local |
+| 2 | `vm_report.cpp:195` `Vm::cold` ObjectSet | `object_set(R[a], key, v)` | `Construction::object_set(key, R[a], ...)` | c | the instruction that consumes `R[a]` after the last ObjectSet | 2.4 E1 |
+| 3 | `vm_struct.cpp:33` `Vm::struct_op` StructAdd | `struct_add_field(R[a], f, v)` | `Construction::struct_add_field(key, R[a], ...)` | c | after the last StructAdd | 2.4 E2 |
+| 4 | `vm_iter.cpp:79` collection snapshot for `@for` | `Value array = make_array(n); array_push(array, items[k])` | `build::Array array(n); push; source = publish` | a | `source = ...` (the loop's own register) | stack order kept (reverse) |
+| 5 | `vm_iter.cpp:151` `op_object_keys` (map) | `Value keys = make_array(n/2); array_push` | `build::Array keys(n/2); push; R[a] = publish` | a | `R[a] = ...` | |
+| 6 | `vm_iter.cpp:158` `op_object_keys` (object; FOR mutant M6 form too) | same | same | a | `R[a] = ...` | |
+| 7 | `vm_coro_parallel.cpp:56` task seeds | `Value seeds = make_array(g+argc); array_push x3 loops` | `build::Array seed_builder(g+argc); push; seeds = publish` | a | `graph.encode(seeds, ...)` | |
+| 8 | `parallel_task_start.cpp:53` task seeds | `Value seeds = make_array(); array_push` | builder; `seeds = publish` | a | `encode(seeds, ...)` | |
+| 9 | `isolate_task.cpp:129` transfer root | `Value root = make_array(n); array_push` | builder; `root = publish` | a | `graph.encode(root, ...)` | |
+| 10 | `isolate_snapshot.cpp:40` constants array | `make_array(total)`, `array_build_storage`, `items.push_back`, `clear_may_hold_identity` | `build::ArrayBulk(total)`, `append`, `holds_no_reference()`, publish | a | `encode(constants, ...)` | the same raw storage, no tally, the same summary bit |
+| 11 | `mutation.cpp:256` `splice_remove` removed items | `Value cut = make_array(count); array_push` | builder; `*removed = publish` | a | `*removed = ...` | |
+| 12 | `mutation.cpp:301` `splice` removed items | `Value cut = make_array(count)` ... `array_push(cut, ...)` ... `*removed = cut` | builder ... `if (removed) *removed = publish` | a | `*removed = ...` | without `removed`, freed at return as before |
+| 13 | `aggregate.cpp:303` `Storage::struct_set` (REFSEM mutant R2 only) | `make_struct; struct_add_field; instance = copy` | `build::Struct`; `instance = publish` | a | `instance = ...` | mutant-only code |
+| 14 | `compiler_collection.cpp:65` sort_by directions | `Value directions = make_array(n); array_push` | builder; `directions = publish` | a | `make_immutable`, then the constant pool | |
+| 15 | `session_invocation.cpp:15` invocation `args` | `make_array(n); array_push`; ARGSCMD mutant 2: `array_build_storage(args).pop_back()` | builder; mutant: `drop_last()`; `args = publish` | a | the binding `install` | |
+| 16 | `cell.cpp:90,92` `cell_read` cache fields | `array_build_set(owner->value, 5/6, ...)` | `Construction::array_set(key, owner->value, ...)` | b | never user-visible (the cell's private descriptor) | 2.4 E8 |
+| 17 | `cell.cpp:114` `cell_cached_read` descriptor copy | `Value d = array_shallow_clone(src); array_build_set(d, 0, x); make_cell(d)` | `build::Array::shallow_clone(src); set(0, x); make_cell(publish)` | a | `make_cell(...)` (and never user-visible) | |
+| 18 | `copy_graph.cpp:147-170` `GraphCopy::fill` (array, object, struct, map, set, stack) | `array_push(copy, mapped(item))` etc. on the shells | `Construction::...(key_, copy, ...)` | b | the parent's fill (post-order) or the result | 2.4 E6 |
+| 19 | `copy_graph.cpp:138` `fill_shallow` (REFSEM mutant R9 only) | `struct_add_field(copy, ...)` | `Construction::struct_add_field(key_, ...)` | b | mutant-only | 2.4 E6 |
+| 20 | `copy_graph.cpp:195` `shallow_copy` struct | `make_struct; struct_add_field; out = copy` | `build::Struct`; `out = publish` | a | `out = ...` | |
+| 21 | `copy_graph.cpp:210,214` `shallow_copy` array/object | `copy = array ? make_array(n) : make_object(); array_push / object_set` | `build::Array` or `build::Object`; `out = publish` | a | `out = ...` | the same allocation per kind |
+| 22 | `copy_graph.cpp:251,256` `clone_tree` (`clone_constant`, LoadKFresh) | `Value copy = make_array(n); array_push(copy, clone_tree(item)); return copy` | builder; `push(clone_tree(item))`; `return publish` | a | the caller's push, finally `out` | child cloned before the push, as before |
+| 23 | `legacy_bridge.cpp:43` `object_from_legacy` | `out = make_object(); ... object_set(out, ...)`; failures return with the partial object in `out` | builder; `out = Value()` right after it (the old release point of `out`'s previous value); `out = publish` on success and before each failure return | a | `from_legacy`'s caller, after return | the partial value reaches `out` on every path, as before |
+| 24 | `legacy_bridge.cpp:78` `convert_from` array | `out = make_array(n); array_push(out, v)`; failure returns with the partial array | the same pattern as 23 | a | after return | |
+| 25 | `natives/support.cpp` `ArrayBuilder` (every array-returning native: slice, split, keys, values, entries, map of json arrays, ...) | `make_array(n)` + `array_build_storage` once; `items_->push_back`; stride `heap_retally`; `finish`: tally, move | `build::ArrayBulk`: the same calls in the same order | a | `finish()`'s return | |
+| 26 | `natives/object_methods.cpp:36` `listing` entries pair | `Value pair = make_object(); object_set x2; result.push(pair)` | `build::Object pair; set x2; result.push(publish)` | a | `result.push(...)` | |
+| 27 | `natives/object_methods.cpp:47` `shallow_object` | returned a `Value` that callers kept filling | returns the `build::Object` (moved); callers publish | a | the caller's publish | |
+| 28 | `natives/object_methods.cpp:58` `merge_deep` | `Value merged = shallow_object(left); object_get(merged, k); object_set(merged, ...)` | `build::Object merged`; `merged.get(k)`; `merged.set(...)`; `result = publish` | a | `result = ...` after the loop | the read of `existing` and the copy-out `inner` unchanged; recursion takes `inner`, never the builder |
+| 29 | `natives/object_methods.cpp:191` `obj_merge` | `Value result = shallow_object(args[0]); object_set(...)` | builder; `out = publish` | a | `out = ...` | `args[1]` may be the receiver: read only |
+| 30 | `natives/object_methods.cpp:186` `obj_merge` (REFSEM mutant R-B5 only: merge mutates its receiver) | `Value result = args[0]; object_set(result, ...)` | `Construction::object_set(key, result, ...)` | b | mutant-only | 2.4 E9 |
+| 31 | `natives/object_methods.cpp:212` `obj_pick` | `Value result = make_object(); object_get/object_set` | builder `get`/`set`; publish | a | `out = ...` | |
+| 32 | `natives/object_methods.cpp:227` `obj_omit` | same | same | a | `out = ...` | |
+| 33 | `natives/array_methods.cpp:291` `from_entries` | `Value result = make_object(); object_get; object_set(result, name, *value)` | builder; `out = publish` | a | `out = ...` | `entry`, `key`, `value` point into the argument, not the result |
+| 34 | `natives/json_methods.cpp:38` `from_document` object | `Value object = make_object(); object_set` | builder; `out = publish` | a | `out = ...` | failure returns drop the local, as before |
+| 35 | `natives/host_env.cpp:84` `host_env` | `out = make_object(); ... object_set(out, ...)`; the budget failure returns with the partial object in `out` | builder; `out = Value()`; `out = publish` before the failure return and at the end | a | the VM's call site, after return (`out` is `builtin()`'s local) | as 23 |
+| 36 | `natives/host_fs_internal.h:139` stat-object result | `out = make_object(); object_set x3` | builder; `out = Value()`; `out = publish` | a | after return | no failure path between |
+| 37 | `natives/host_fs_nav.cpp:54,85` `ls` results | `out = make_array(n); array_push` | builder; `out = Value()`; `out = publish` (before `finish_host`, as before) | a | after return | |
+| 38 | `collection_helpers.cpp:41-45` `append_group` | `object_set(object, k, make_array())`, `object_build_slot`, `array_push(*group, item)` | `Construction::...(bk, ...)` | c | the native's last phase (the result slot) | 2.4 E3 |
+| 39 | `collection_helpers.cpp:59-112` `consume` (map, filter, sort_by keys, unique_by, index_by, count_by, group_by_each) | `array_push(s[Result] / s[Keys], ...)`, `object_set(s[Result], ...)` | `Construction::...(bk, ...)` | c | the native's last phase | 2.4 E3 |
+| 40 | `collection_helpers.cpp:117` `group_by_each` `seen` | `Value seen = make_object(); object_get/object_set` | `build::Object seen` (never published) | a | never (a local set) | |
+| 41 | `collection_helpers.cpp:134,135,158` `sorted_keys` | `array_push(s[HashTable], i)`, `array_build_storage`, `std::sort` over it, `array_push(s[Result], ...)` | `Construction::...(bk, ...)` | b/c | never (scratch) / the last phase (result) | 2.4 E3: a raw storage reference is held across `std::sort` |
+| 42 | `collection_helpers.cpp:195,197` partition result | `object_set(s[Result], "matched"/"unmatched", make_array())` | `Construction::object_set(key, ...)` | c | the last phase | 2.4 E3 |
+| 43 | `collection_sort.cpp:116` keep-alive | `array_push(s[KeepAlive], value)` | `Construction::array_push(build_key, ...)` | c | never (scratch held by the native's state) | 2.4 E4 |
+| 44 | `collection_plain_sort.cpp:25,27` order scratch | `array_push(s[HashTable], i)`, `array_build_storage`, `std::sort` | `Construction::...(build_key, ...)` | b | never (scratch) | 2.4 E5 |
+| 45 | `vm_keyed.cpp:68` `op_keyed_mutate` (REFSEM mutant R14 only) | `map_build_set(c, k, v)` before the refusal | `Construction::map_set(key, c, ...)` | b | mutant-only (a deliberate bypass on a published receiver) | 2.4 E9 |
+| 46 | `vm_ops.cpp:301` `set_index` (REFSEM mutant M-B2 only) | `array_build_set(object, i, value)` | `Construction::array_set(key, object, ...)` | b | mutant-only (as 45) | 2.4 E9 |
+
+Rows 16, 18, 19, 30, 41, 44, 45, 46 are (b): each keeps the in-place form, reasoned in 2.4. No (a)
+site needed a change of ownership, publication point or allocation behaviour; none of its output
+can differ.
+
+### 2.4 The bounded in-place exceptions
+
+Each exception holds the key in its named owner (the only functions that can make one: a
+`friend` of `build::InPlaceKey`, `build.h`), and each production use is listed here. Guarantees,
+separately: **compile time**: only the owner can make the key (`absent.cpp`, `build_key_forge.cpp`,
+`build_key_bitcast.cpp`, `build_key_copy.cpp`); **link time**: only the listed objects reference the
+primitives behind it; **run time**: `check_fresh` (checked builds) aborts if the receiver is
+shared, immutable or sort-protected; **lint**: the site keeps its `rt-lint: storage-ok` annotation.
+It is a structural narrowing of who may construct in place, not a builder proof of freshness:
+freshness at these sites rests, as before, on the owner's invariant, `check_fresh` and the tests
+named.
+
+| Id | Owner (holds the key) | Site | Why no builder | Publication boundary | Regression coverage (cannot modify a published receiver) |
+| --- | --- | --- | --- | --- | --- |
+| E1 | `Vm::cold` | `vm_report.cpp:195` ObjectSet | the object is built in a VM register across instructions (`NewObject`, then one `ObjectSet` per key, values computed in between); a builder cannot live in a register | the instruction after the last `ObjectSet` that reads `R[a]` (the compiler emits the literal into a register no binding names until it is complete) | refsem `b2_literal_fresh_*`, session `session_literal_fresh_statement`, collections `same_object_literal`; refsem mutant R-B7 (fresh literals); `check_fresh` in the sanitizer lanes |
+| E2 | `Vm::struct_op` | `vm_struct.cpp:33` StructAdd | as E1, for a struct (`NewStruct`, then `StructAdd` per field) | after the last `StructAdd` | the struct suites (refsem `semantics-structs`, `test-rt-vm`), `check_fresh` |
+| E3 | `collection_step` | `collection_helpers.cpp` (rows 38, 39, 41, 42) | the result, keys and hash-table slots of a resumable native are built across callback suspensions (one element per resume) and, for `sort_by`, sorted through a raw storage reference; no builder survives a suspension | the native's last phase returns `s[Result]`; scratch slots are never returned | collections suite (279) and its 11 mutants, refsem; B2's D5 snapshot rule (the receiver is cloned when shared, so a callback mutating it does not reach the iteration) |
+| E4 | `collection_sort_init` | `collection_sort.cpp:116` keep-alive | a slot of the comparator sort's resumable state | never returned (scratch) | sort-protection mutants (S1, S2, S4, S5), refrep sort cases |
+| E5 | `collection_plain_sort` | `collection_plain_sort.cpp:25,27` order | a raw storage reference is held across `std::sort`, then the permutation commits through the protocol | never returned (scratch) | collections sort cases, `test-rt-sort-forgery` (the commit) |
+| E6 | `deep_copy_tuple` | `copy_graph.cpp` `GraphCopy::fill` (rows 18, 19) | the shells are created first and held in the identity map (`copies_`) so a DAG keeps its sharing; each is filled in post-order before any parent holds it | the parent's fill, or the returned roots | `test-rt-build` (deep_copy under allocation injection: the source unchanged, the DAG kept, nothing leaks), refsem (copy, deepcopy), CP18 transfer campaigns (Linode) |
+| E7 | (none: row 17 became a builder) | | | | |
+| E8 | `cell_read` | `cell.cpp:90,92` | updates two cache fields of a selector cell's own descriptor after its creation (not a new value at all) | never user-visible | refsem cells (`cell_cycle_*`), refrep cell cases; B2 carried item L2 (`cell.cpp`) unchanged |
+| E9 | `Vm` (`op_keyed_mutate`), `set_index`, `natives::obj_merge` | rows 30, 45, 46 | test mutants only (REFSEM R14, M-B2 30, R-B5 26): each is a deliberate bypass of the protocol on a published receiver, which the mutant gates must catch | not compiled in production | `test-runtime2-refsem-mutants` (each caught) |
+
+### 2.5 Tests
+
+- `make test-rt-build` (`tests/rt/build_unit.cpp`, in `certify-targets`), built three ways from one
+  small, explicit source set so each variant is consistent throughout: release (204 checks),
+  checked (`NIFT_RT_CHECKED_REFS`, 240 checks), and the two mutants. It covers:
+  - publish, then reuse (push, set, append, add, publish twice) for every builder kind;
+  - repeated moves (a builder moved twice; each moved-from one reused);
+  - publication through a reference to the builder, then reuse through a pointer;
+  - allocation failure at every allocation of a nested construction (an object holding an array, a
+    struct and a bulk array, each from its own builder, published into the parent): no partial
+    value escapes, nothing leaks (allocator and live-heap counts), 18 failing sites (24 checked);
+  - publication and the bulk tally allocate nothing (the next allocation set to fail);
+  - graph construction under injection: `clone_constant` (builders: 11 sites) and `deep_copy` (the
+    in-place key: 28 sites) of a DAG: no leak, the source unchanged, the DAG kept by `deep_copy`;
+  - destruction of unpublished builders on every failure path (the leak checks above; publication
+    itself cannot fail).
+  A reuse runs in a forked child that snapshots the published value (size, refcount, every element)
+  and reports on every exit path (return, SIGSEGV, SIGABRT) whether it changed; release and checked
+  must report "unchanged, the reuse faulted or aborted".
+- Builder mutants (the gate requires each to fail and to show at least one observed change):
+  **B-M1** (`NIFT_RT_BUILDER_MUTANT=1`: `publish()` copies the value out and the builder keeps it,
+  so storage authority is retained after publication): 17 failures, 7 of them observed changes to
+  the published value (push, set, publish twice, append, Object, Struct, alias); **B-M2** (`=2`: a
+  move copies, so the moved-from builder keeps the value): 7 failures, 4 observed changes.
+- Compile-fail (`test-rt-protocol-compile-fail`, each must not compile, matched on its specific
+  diagnostic): `build_copy.cpp`, `build_assign.cpp`, `build_from_value.cpp` (reconstruct over a
+  published value), `build_publish_lvalue.cpp`, `build_free_function.cpp` (the former
+  `array_push` on a published value; compiles on `1e23b13e`), `build_primitive.cpp`,
+  `build_key_forge.cpp`, `build_key_bitcast.cpp`, `build_key_copy.cpp`; `absent.cpp` asserts the same
+  structurally (no free construction function, the primitives inaccessible, the builder and key
+  traits, publish only on an rvalue). Fixture change, stated: `absent.cpp`'s control "the
+  construction API is detected" named the free `map_build_set`, which this component removes; it
+  now names `build::Array::push` (the control's purpose, that the detector can say yes, is
+  unchanged).
+- Tests construct through shims with the former names (`tests/rt/storage_access.h`:
+  `array_push`, `object_set`, ... over `StorageTestAccess`, the poisoned test friend of component
+  3); test bodies are unchanged, twelve test sources gained the include.
+
+### 2.6 Performance (local callgrind, guidance only; Linode is authoritative)
+
+`ops,mutation` (`benchmarks/runtime2/vm_compare.py`) and the construction paths
+(`scratchpad/tooling/perf/build_paths.py`: marginal instructions per loop iteration, N = 2,000 vs
+4,000, `NIFT_VM=require`, output checked), against `1e23b13e` (identical to `c1f43300` on every
+path):
+
+| Path (Ir per iteration) | `1e23b13e` | builders, first version | spent check on, forwarding fixed | final (`f93441af`) |
+| --- | --- | --- | --- | --- |
+| JSON object literal (`LoadKFresh`, `clone_constant`) | 4,381 | 4,469 (+88) | 4,397 (+16) | 4,381 (0) |
+| array literal (`NewArray`) | 1,611 | 1,649 (+38) | 1,624 (+13) | 1,614 (+3) |
+| object literal with computed values (`NewObject`, `ObjectSet`: in place) | 2,559 | 2,569 (+10) | 2,563 (+4) | 2,560 (+1) |
+| `keys()` (`ArrayBulk`) | 2,179 | 2,240 (+61) | 2,192 (+13) | 2,180 (+1) |
+| `entries()` (`ArrayBulk` + `Object`) | 4,406 | 4,491 (+85) | 4,429 (+23) | 4,407 (+1) |
+| `map()` (resumable native: in place) | 7,453 | 7,482 (+29) | 7,462 (+9) | 7,453 (0) |
+| `split()` (`ArrayBulk`) | 2,940 | 3,024 (+84) | 2,961 (+21) | 2,941 (+1) |
+| `merge()` (`Object`) | 2,583 | 2,606 (+23) | 2,591 (+8) | 2,585 (+2) |
+
+What moved the numbers: the first version passed each stored value by value twice (an extra
+`Value` move per element) and the key forwarders added another; fixed by taking the stored value
+by rvalue reference in the out-of-line primitives. The spent-builder check cost 10 to 20 per literal
+or native result, so it runs in checked builds only (coordinator ruling). `map()`'s +9 was the key
+object made at `collection_step`'s entry (a stack slot on every phase); it is now made only in the
+branches that construct. An unchecked build was measured separately to attribute the check's cost.
+
+`ops,mutation`, `c1f43300` versus `f93441af` (Ir/op): loop 117/117, add_local 188/188, call
+566/566, array_index 436/436, array_push 368/367, object_member 762/762, string_concat 3,314/3,312,
+if_branch 249/249; array_set 380/381, array_push_pop 1,431/1,430, array_insert_pop 2,446/2,446,
+map_set 1,498/1,496, set_add 1,365/1,363, stack_push_pop 2,192/2,190. An intermediate tree had
+map_set +20, set_add +11, stack_push_pop +22: the collection primitives' rvalue-reference form had
+broken the code GCC shares between them and Storage's protocol commits; with the former signatures
+`aggregate_collection.o` is the former object with the two names swapped (2.1). The website build (the
+legacy template engine) does not run the scripting compiler or the VM and does not reach these
+paths; the site group is measured on Linode.
+
+### 2.7 Gates
+
+Final component tree `f93441af` (code: `fa10fc9b`, then the collection-signature fix and the
+run-time layer test); `nift` sha256 `de382d75...`. Gate files under `gates/c2/` (an earlier full
+run on `fa10fc9b` is kept under `gates/c2-first/`), all exit 0: `nift`, `test-rt-build`
+(release 204, checked 242, B-M1 and B-M2 caught by observed changes),
+`test-rt-protocol-compile-fail` (absent.cpp, 22 bypass and build cases, control), `test-rt-lint`,
+`test-c-abi-symbols` (exports unchanged: 73), `test-rt-mutation-protocol` (191) and `-mutants`,
+`test-rt-refrep` (116) and `-refrep-mutants`, `test-rt-sort-protection-mutants`,
+`test-runtime2-refrep-cli`, `test-runtime2-refsem` (474) and `-refsem-mutants` (including R-B7,
+R14, M-B2 30, R-B5 26, R9, R2), `test-runtime2-collections` (279) and `-collections-mutants`,
+`test-rt-sort-forgery`, `test-rt-isolation`, `test-production-deps`, the CP18 C program (1,044)
+and Python ctypes (70). Heavy lanes (the full `test-rt-value`, `test-rt-vm`, the sanitizer lanes,
+where the spent-builder check and `check_fresh` are live, CP18 allocation campaigns): Linode.
