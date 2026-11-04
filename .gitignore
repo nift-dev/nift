@@ -2,6 +2,8 @@
 *.o
 *.obj
 *.d
+# Tooling checkpoint (component 1): per-object configuration sidecars (scripts/build/compile-object.sh)
+*.cfg
 *.exe
 *.pdb
 /.build/
