@@ -77,8 +77,14 @@ sanitize` 7 times under ASan/UBSan.
   identity. Since the fix the in-tree signature has a fixed path and the identity writes the output
   root as `$TEST_DIR`, so a make with another TEST_DIR reuses the in-tree objects; with that, a
   make with only TEST_DIR or a mutant selector (`CLOSURE_MUTANT`, `FOR_MUTANT`) on its command
-  line is supported alongside the default configuration, and `make -k test` followed by `make
-  nift` rebuilds nothing; see "Linode certification fixes".)
+  line is supported alongside the default configuration *while the in-tree objects are current*
+  (re-check N4: it reuses them, it does not rebuild them). With an out-of-repo TEST_DIR and a stale
+  in-tree object, that make rebuilds the object with its libffi headers outside the repository,
+  which `compile-object.sh --production` refuses (a dependency outside the repository and the
+  compiler's system directories): refused, not mixed. `make TEST_DIR=<tmp> nift` relinks the
+  in-tree `nift` against the temporary libffi build: unsupported (the result is not guaranteed to
+  be the default binary; build `nift` with the default TEST_DIR). `make -k test` followed by
+  `make nift` rebuilds nothing; see "Linode certification fixes".)
 - **Permanent gate (owner):** `make test-build-reuse` runs `check-build-reuse.sh` (about 40 minutes
   on 2 cores) and is in `certify-targets`. Without `clang++`, the compiler row uses a wrapper of
   `g++` with another path and `--version`, which is a compiler-identity change as the signature
@@ -931,3 +937,13 @@ Process: the local focused gate set now also runs the mutant harness lanes that 
 variants (`test-runtime2-packages-mutants`, `test-runtime2-args-cmd-mutants`,
 `test-runtime2-cp14b-design-mutants`, `test-runtime2-kind-bits`,
 `test-runtime2-closures-s1-mutants`, `test-runtime2-for-s2-mutants`) and the relocated-root check.
+
+### Re-check fixes (re-review of `fcb011c3`)
+
+| Item | Fix or record | Evidence |
+| --- | --- | --- |
+| N1 (regression): `make clean nift` in one invocation: the parse-time signature had no rule, `clean` deleted it, make fell back to its built-in `%.o: %.cpp` rule (276 objects without the guard or a sidecar), and the link refused all 291 | every signature file (the object sets' and the three libffi toolchain signatures) has a rule without prerequisites that writes it when it is missing, so `make -q` stays 0; the built-in `%.o` rules for `.cpp`, `.c` and `.cc` are cancelled, so a production object cannot compile outside its rule | `make clean nift` and `make distclean nift` (one invocation each) give `nift` `de382d75`, every object through `compile-object.sh` with a matching sidecar, `make -q nift` 0; both are checks in `check-build-reuse.sh` |
+| N2: `make -n`/`make -q` wrote signature files | under `-n` or `-q` (read from MAKEFLAGS) nothing is written: the would-be content is compared, and each file that would change is made out of date (`FORCE`), so the plan shows the rebuild; `make -q TEST_DIR=X` creates nothing under X | `make -n CXXFLAGS=... nift` plans 291 compiles and leaves `default.flags` unchanged; the next default `make -q nift` is 0 |
+| N3: `write-signature.sh` returned the last group's status only | the exit status covers every group | |
+| N4 (record) | section 1 corrected: a TEST_DIR-only make is supported while the in-tree objects are current; an out-of-repo TEST_DIR with a stale in-tree object is refused (its libffi headers are outside the repository); `make TEST_DIR=<tmp> nift` (relinking the in-tree `nift` against the temporary libffi) is unsupported | |
+| gate tree state (reviewer's note) | `test-rt-isolation` and `test-rt-sort-forgery` rebuilt their planted objects (byte-identical, newer mtimes), leaving `make -q nift` 1; both now restore the sources with their own mtimes and put back the objects, sidecars, dependency files (and, for sort-forgery, `nift`) they saved, then require the restored objects (`make -q`) to be up to date | the `make-q-nift` gate runs after them |
