@@ -19,6 +19,8 @@
 #              reproducer), and an object whose sidecar another compile wrote
 #              (the sidecar names the default configuration, the object is
 #              another's) is refused
+#   relocated  make TEST_DIR=<tmp> reuses the in-tree objects (none rebuilt);
+#              make -q / make -n see an up-to-date tree as up to date
 #   parallel   concurrent makes of different configurations in one tree, and
 #              of one configuration sharing objects: every object, sidecar and
 #              dependency file identical to a clean build of its own
@@ -190,5 +192,24 @@ for round in 1 2; do
     pass "parallel round $round: 5 concurrent makes over 3 configurations ($C1, $C2 from clean, default with $(echo $victims | wc -w) shared objects deleted): every object, sidecar and .d identical to its own configuration's clean build, no temporaries"
   else bad "parallel round $round: rc=$rcs leftovers=[$leftovers]"; fi
 done
+
+# --- relocated output root and dry runs (Linode certification of 4e97e34e,
+# items 1 and 4) ---
+# A make with another TEST_DIR (the mutant provenance harness's trusted rebuild)
+# reuses the in-tree objects: none is rebuilt or rewritten, and the default
+# link still passes its configuration check afterwards. And an up-to-date tree
+# is up to date for `make -q` and plans no link under `make -n` (the currency
+# check of the packages and args/cmd mutant harnesses).
+build_default || bad "relocated: default build failed"
+dmanifest > "$out/A3.txt"
+reloc=$(mktemp -d)
+M -j2 TEST_DIR="$reloc" "$reloc/rt/value-unit" || bad "relocated: make TEST_DIR=$reloc failed"
+dmanifest > "$out/A3-relocated.txt"; rm -rf "$reloc"
+if cmp -s "$out/A3.txt" "$out/A3-relocated.txt" && M .build/rt/value-unit nift; then
+  pass "relocated: make TEST_DIR=<tmp> reused every in-tree object (none rebuilt or rewritten); the default links pass"
+else bad "relocated: the in-tree objects changed under another TEST_DIR"; fi
+if make -q nift && ! make -s -n nift | grep -qE -- ' -o nift$'; then
+  pass "dry run: an up-to-date tree is up to date for make -q nift, and make -n nift plans no link"
+else bad "dry run: make -q nift or make -n nift sees an up-to-date tree as stale"; fi
 
 exit $fail

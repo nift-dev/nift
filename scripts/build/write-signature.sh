@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tooling checkpoint (component 1): the configuration signature of an object
-# set.  write-signature.sh FILE COMPILER [ARGS...] [--- COMPILER [ARGS...]]...
+# set.  write-signature.sh FILE COMPILER [ARGS...] [--- COMPILER [ARGS...]]... [@@@ FILE ...]
 # FILE holds each compile template's identity (config-id.sh: the compiler's
 # resolved path, a hash of its full --version output, the exact flags). It is
 # rewritten only when its content changes, so an unchanged configuration never
@@ -8,15 +8,25 @@
 # flags or defines makes FILE newer than every object (each object depends on
 # it) and forces a rebuild. Each process writes its own temporary file.
 set -u
-file=$1; shift
+# Several signatures in one call (one $(shell) in the Makefile at parse time,
+# Linode item 1): FILE ARGS... [@@@ FILE ARGS...]...
 . "$(dirname "$0")/config-id.sh"
-mkdir -p "$(dirname "$file")"
-t="$file.tmp.$$"
-: > "$t"
+write_one() {
+  local file=$1; shift
+  mkdir -p "$(dirname "$file")"
+  local t="$file.tmp.$$"
+  : > "$t"
+  while [ $# -gt 0 ]; do
+    local part=()
+    while [ $# -gt 0 ] && [ "$1" != --- ]; do part+=("$1"); shift; done
+    [ $# -gt 0 ] && shift
+    [ ${#part[@]} -gt 0 ] && config_text "${part[@]}" >> "$t"
+  done
+  if cmp -s "$file" "$t"; then rm -f "$t"; else mv -f "$t" "$file"; fi
+}
 while [ $# -gt 0 ]; do
-  part=()
-  while [ $# -gt 0 ] && [ "$1" != --- ]; do part+=("$1"); shift; done
+  group=()
+  while [ $# -gt 0 ] && [ "$1" != @@@ ]; do group+=("$1"); shift; done
   [ $# -gt 0 ] && shift
-  [ ${#part[@]} -gt 0 ] && config_text "${part[@]}" >> "$t"
+  [ ${#group[@]} -gt 0 ] && write_one "${group[@]}"
 done
-if cmp -s "$file" "$t"; then rm -f "$t"; else mv -f "$t" "$file"; fi

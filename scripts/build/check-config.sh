@@ -6,7 +6,8 @@
 #   check-config.sh --sets TEST_DIR OBJECT...
 #     (tooling review F7, on every link of a signed object set) every OBJECT of
 #     a signed set was built by its set's configuration: an in-tree object by
-#     TEST_DIR/obj-config/default.flags, TEST_DIR/{pic,san,san-lifetime,tsan}/
+#     the in-tree signature (NIFT_INTREE_SIGNATURE, .build/obj-config/default.flags
+#     whatever TEST_DIR is: the in-tree objects do not live in TEST_DIR), TEST_DIR/{pic,san,san-lifetime,tsan}/
 #     by TEST_DIR/obj-config/<set>.flags, TEST_DIR/rt-obj/<config>/ by that
 #     directory's .flags (the C++ or the C template, by the source's suffix);
 #     other objects under TEST_DIR (private mutant and probe objects) carry no
@@ -37,7 +38,7 @@ check() {
 }
 # block_ids FILE: the identity of each compile template in a signature file
 block_ids() {
-  awk -v dir="$tmpd" '/^nift-object-config-v3$/ { n++ } { print > (dir "/block" n) }' "$1"
+  awk -v dir="$tmpd" '/^nift-object-config-v4$/ { n++ } { print > (dir "/block" n) }' "$1"
   for b in "$tmpd"/block*; do sha256sum < "$b" | cut -d' ' -f1; done
   rm -f "$tmpd"/block*
 }
@@ -53,7 +54,7 @@ if [ "${1:-}" = --sets ]; then
         rest=${o#"$test_dir"/}; set_dir=${rest%%/*}
         sig="$test_dir/obj-config/$set_dir.flags"; stem=${rest#*/} ;;
       "$test_dir"/*|/*|../*) continue ;;
-      *) sig="$test_dir/obj-config/default.flags"; stem=$o ;;
+      *) sig=${NIFT_INTREE_SIGNATURE:-.build/obj-config/default.flags}; stem=$o ;;
     esac
     if [ ! -f "$sig" ]; then check "$o" missing-signature; continue; fi
     [ -n "${ids[$sig]:-}" ] || ids[$sig]=$(block_ids "$sig" | tr '\n' ' ')

@@ -134,25 +134,29 @@ $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
 # Each make writes its own temporary file ($@.tmp.<pid>): concurrent makes
 # (make certify runs targets in parallel) used to share $@.tmp, and one's mv
 # could find the other's file already moved (FLAKY test-contracts @f1334c7).
-LIBFFI_SIGNATURE := $(LIBFFI_BUILD)/.nift-toolchain-signature
-$(LIBFFI_SIGNATURE): FORCE
-	@mkdir -p "$(LIBFFI_BUILD)"
-	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
-
-SAN_LIBFFI_SIGNATURE := $(SAN_LIBFFI_BUILD)/.nift-toolchain-signature
-$(SAN_LIBFFI_SIGNATURE): FORCE
-	@mkdir -p "$(SAN_LIBFFI_BUILD)"
-	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
-
-TSAN_LIBFFI_SIGNATURE := $(TSAN_LIBFFI_BUILD)/.nift-toolchain-signature
-$(TSAN_LIBFFI_SIGNATURE): FORCE
-	@mkdir -p "$(TSAN_LIBFFI_BUILD)"
-	@t="$@.tmp.$$$$"; printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$$t" && { if cmp -s "$@" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$@"; fi; }
+# Linode certification of 4e97e34e, item 1: written when the Makefile is read
+# (the $(shell) at its end, the same content as the former FORCE recipe), so
+# `make -q`/`make -n` see an unchanged toolchain as unchanged (component 1 made
+# libffi's installed headers depend on the stamp, which made the FORCE recipe
+# reach every object that includes them). The signature now lives beside the
+# build directory, not in it: the build script removes that directory before a
+# rebuild, which used to delete the signature and leave the stamp older than
+# its rewritten signature for good. The stamp recipes touch the stamp and then
+# the installed headers, so signature <= stamp <= headers after every run and
+# `make -q nift` holds on an up-to-date tree.
+LIBFFI_SIGNATURE := $(LIBFFI_BUILD).nift-toolchain-signature
+LIBFFI_SIGNATURE_TEXT = $(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)
+SAN_LIBFFI_SIGNATURE := $(SAN_LIBFFI_BUILD).nift-toolchain-signature
+SAN_LIBFFI_SIGNATURE_TEXT = $(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)
+TSAN_LIBFFI_SIGNATURE := $(TSAN_LIBFFI_BUILD).nift-toolchain-signature
+TSAN_LIBFFI_SIGNATURE_TEXT = $(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)
+nift_write_text = mkdir -p "$(dir $(1))" && t="$(1).tmp.$$$$" && printf '%s\n' "$(2)" > "$$t" && { if cmp -s "$(1)" "$$t"; then rm -f "$$t"; else mv -f "$$t" "$(1)"; fi; }
 
 # The stamp is a real sentinel: libffi is bootstrapped only when the script,
 # provenance, or toolchain signature changed, not on every make.
 $(LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
+	touch "$@" && touch "$(LIBFFI_INCLUDE)/ffi.h" "$(LIBFFI_INCLUDE)/ffitarget.h"
 
 $(LIBFFI_A): | $(LIBFFI_STAMP)
 # Tooling checkpoint (component 1): libffi's installed headers are generated
@@ -170,12 +174,14 @@ $(PARSER_OBJECTS) $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES)): | $(L
 
 $(SAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(SAN_LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
+	touch "$@" && touch "$(SAN_LIBFFI_INCLUDE)/ffi.h" "$(SAN_LIBFFI_INCLUDE)/ffitarget.h"
 
 $(SAN_LIBFFI_A): | $(SAN_LIBFFI_STAMP)
 $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(PARSER_SOURCES)): | $(SAN_LIBFFI_STAMP)
 
 $(TSAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(TSAN_LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
+	touch "$@" && touch "$(TSAN_LIBFFI_INCLUDE)/ffi.h" "$(TSAN_LIBFFI_INCLUDE)/ffitarget.h"
 
 $(TSAN_LIBFFI_A): | $(TSAN_LIBFFI_STAMP)
 $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
@@ -190,9 +196,16 @@ $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
 # storage-level test helpers unreachable), and every production object with
 # compile-object.sh --production (no dependency in tests/).
 PRODUCTION_GUARD := -include src/build/production_tu.h
-OBJ_SIGNATURE := $(TEST_DIR)/obj-config/default.flags
-$(OBJ_SIGNATURE): FORCE
-	@bash scripts/build/write-signature.sh "$@" $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS)
+# Linode certification of 4e97e34e (items 1 and 4): the signatures are written
+# when the Makefile is read (one $(shell) at its end, NIFT_SIGNATURES), not by a
+# FORCE recipe, so `make -q`/`make -n` see an up-to-date tree as up to date; and
+# the in-tree objects' signature lives at a fixed path, not under TEST_DIR (they
+# are not in TEST_DIR), so `make TEST_DIR=/tmp/x TARGET` reuses them.
+OBJ_SIGNATURE := .build/obj-config/default.flags
+OBJ_SIGNATURE_ARGS = $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS)
+NIFT_SIGNATURES += OBJ_SIGNATURE
+export NIFT_TEST_DIR := $(TEST_DIR)
+export NIFT_INTREE_SIGNATURE := $(OBJ_SIGNATURE)
 
 %.o: %.cpp $(OBJ_SIGNATURE)
 	bash scripts/build/compile-object.sh --production $@ -- $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -c $<
@@ -276,8 +289,9 @@ RT_TEST_DEPFLAGS = -MMD -MP -MF "$@.d" -MT "$@"
 define RT_OBJ_CONFIG
 RT_OBJFLAGS_$(1) = $(2)
 RT_OBJECTS_$(1) := $$(patsubst %.cpp,$(TEST_DIR)/rt-obj/$(1)/%.o,$$(RT_UNIT_SOURCES))
-$(TEST_DIR)/rt-obj/$(1)/.flags: FORCE
-	@bash scripts/build/write-signature.sh "$$@" $$(CXX) $$(PRODUCTION_GUARD) $$(CPPFLAGS) $$(RT_OBJFLAGS_$(1))
+RT_SIG_$(1) := $(TEST_DIR)/rt-obj/$(1)/.flags
+RT_SIG_$(1)_ARGS = $$(CXX) $$(PRODUCTION_GUARD) $$(CPPFLAGS) $$(RT_OBJFLAGS_$(1))
+NIFT_SIGNATURES += RT_SIG_$(1)
 $(TEST_DIR)/rt-obj/$(1)/%.o: %.cpp $(TEST_DIR)/rt-obj/$(1)/.flags | $$(LIBFFI_STAMP)
 	bash scripts/build/compile-object.sh --production $$@ -- $$(CXX) $$(PRODUCTION_GUARD) $$(CPPFLAGS) $$(RT_OBJFLAGS_$(1)) -c $$<
 -include $$(patsubst %.o,%.d,$$(RT_OBJECTS_$(1)))
@@ -1620,8 +1634,9 @@ C_ABI_CORE := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
 C_ABI_PIC := $(patsubst %.o,$(TEST_DIR)/pic/%.o,$(C_ABI_CORE))
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
-$(TEST_DIR)/obj-config/pic.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -fPIC --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC
+PIC_SIG := $(TEST_DIR)/obj-config/pic.flags
+PIC_SIG_ARGS = $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -fPIC --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC
+NIFT_SIGNATURES += PIC_SIG
 $(TEST_DIR)/pic/%.o: %.cpp $(TEST_DIR)/obj-config/pic.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $<
 
@@ -2774,8 +2789,9 @@ benchmark-cp28: $(TARGET)
 
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
-$(TEST_DIR)/obj-config/san.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS)
+SAN_SIG := $(TEST_DIR)/obj-config/san.flags
+SAN_SIG_ARGS = $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS)
+NIFT_SIGNATURES += SAN_SIG
 $(TEST_DIR)/san/%.o: %.cpp $(TEST_DIR)/obj-config/san.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -c $<
 
@@ -2794,8 +2810,9 @@ test-sanitize: $(SAN_TARGET)
 LIFETIME_RUN = env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
-$(TEST_DIR)/obj-config/san-lifetime.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS)
+SAN_LIFETIME_SIG := $(TEST_DIR)/obj-config/san-lifetime.flags
+SAN_LIFETIME_SIG_ARGS = $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS)
+NIFT_SIGNATURES += SAN_LIFETIME_SIG
 $(TEST_DIR)/san-lifetime/%.o: %.cpp $(TEST_DIR)/obj-config/san-lifetime.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) -c $<
 
@@ -2864,8 +2881,9 @@ test-pagination-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(SAN_TARGET)" tests/pagination_sanitizer_smoke.sh
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
-$(TEST_DIR)/obj-config/tsan.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" $(CXX) $(PRODUCTION_GUARD) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS)
+TSAN_SIG := $(TEST_DIR)/obj-config/tsan.flags
+TSAN_SIG_ARGS = $(CXX) $(PRODUCTION_GUARD) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS)
+NIFT_SIGNATURES += TSAN_SIG
 $(TEST_DIR)/tsan/%.o: %.cpp $(TEST_DIR)/obj-config/tsan.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CXX) $(PRODUCTION_GUARD) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -c $<
 
@@ -5268,3 +5286,15 @@ test-runtime2-packages-legacy: $(TARGET)
 	NIFT_VM=0 $(MAKE) --no-print-directory test-v44-packages
 	$(PYTHON) tests/runtime2/packages/packages.py --nift "$(CURDIR)/$(TARGET)" --only l
 test-rt-vm: test-runtime2-packages
+
+# Linode certification of 4e97e34e, item 1: every object set's configuration
+# signature (write-signature.sh: rewritten only when its content changes), at
+# parse time, in one call. A failure stops make (no signature, no build).
+NIFT_LIBFFI_SIGNATURE_STATUS := $(shell $(call nift_write_text,$(LIBFFI_SIGNATURE),$(LIBFFI_SIGNATURE_TEXT)) && $(call nift_write_text,$(SAN_LIBFFI_SIGNATURE),$(SAN_LIBFFI_SIGNATURE_TEXT)) && $(call nift_write_text,$(TSAN_LIBFFI_SIGNATURE),$(TSAN_LIBFFI_SIGNATURE_TEXT)) && echo ok)
+ifneq ($(NIFT_LIBFFI_SIGNATURE_STATUS),ok)
+$(error writing the libffi toolchain signatures failed)
+endif
+NIFT_SIGNATURE_STATUS := $(shell NIFT_TEST_DIR='$(TEST_DIR)' bash scripts/build/write-signature.sh $(foreach s,$(NIFT_SIGNATURES),$($(s)) $($(s)_ARGS) @@@) && echo ok)
+ifneq ($(NIFT_SIGNATURE_STATUS),ok)
+$(error writing the object configuration signatures failed (scripts/build/write-signature.sh))
+endif
