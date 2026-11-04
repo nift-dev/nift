@@ -294,7 +294,7 @@ functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `
   `make nift` uses), requires failure with the expected diagnostic, restores the tree byte for
   byte, and requires a harmless control plant to build. Both gates are in `certify-targets`.
 - The B2 lint (`rt-lint.py --test-access`) stays as defence in depth; its hardening is component
-  5. The poison and assertion lines in `aggregate.h` carry the existing annotation until then.
+  5 (done: section 5, `--boundary`). The poison and assertion lines in `aggregate.h` carry the existing annotation until then.
 
 ### 3.3 Evidence
 
@@ -349,6 +349,8 @@ under `gates/c3/`.
 - macOS and Windows export lists for the embedding library (section 6.4).
 - Binding builds outside the Makefile compile production sources without `PRODUCTION_GUARD`
   (section 3.4).
+- rt-lint limits: computed includes, non-paste macro-built names, the alias form, unscanned
+  non-production directories (section 5.3).
 
 ## 4. SortKey and sort declarations
 
@@ -662,3 +664,109 @@ R14, M-B2 30, R-B5 26, R9, R2), `test-runtime2-collections` (279) and `-collecti
 `test-rt-sort-forgery`, `test-rt-isolation`, `test-production-deps`, the CP18 C program (1,044)
 and Python ctypes (70). Heavy lanes (the full `test-rt-value`, `test-rt-vm`, the sanitizer lanes,
 where the spent-builder check and `check_fresh` are live, CP18 allocation campaigns): Linode.
+
+## 5. Lint hardening (the documented gaps only)
+
+Scope (coordinator ruling): the gaps recorded against rt-lint, nothing more: the seven R3 tokenizer
+gaps (b2-refrep.md 19.3, the re-checker's `rc/lintb/rt/vm_bypass2.cpp`, `bypass_inc.inc` and
+`rc/m-digit`), and RECHECK2's `rc2/lint2` findings (annotation text accepted anywhere, basename
+allowlists, roots and suffixes not scanned, nested `tests/` directories skipped). The style rules
+(function length, line length, string compare, one concern) are unchanged. After component 2 the
+construction names no longer exist as free functions (a call does not compile), and after
+component 3 a production `StorageTestAccess` does not compile; the lint stays as defence in depth
+and the reviewable record of every in-place site.
+
+### 5.1 What changed (`tools/rt-lint.py`)
+
+- **`lex()`, the source as the compiler reads it.** Translation phase 2 first: every line splice
+  is removed, so `array_\` + `push(` is one identifier; a spliced logical line is reported on the
+  physical line it starts on. Then the phase 3 forms: `//` and `/* */` comments; string and
+  character literals (contents blanked); raw strings (`R`, `u8R`, `uR`, `UR`, `LR`, any valid
+  delimiter, over any number of lines), so `R"(")"` or `R"(")" "/*"` no longer desynchronises the
+  scan; pp-numbers, so the digit separator of `1'0` (and `0x1'Fp+2'0`) is not a character literal;
+  the digraphs `%:` and `%:%:` (read as `#` and `##`, so `a %:%: b` is a token paste and
+  `%:include` an include); the header name of each `#include`. Per physical line it returns the
+  code, the comment text and the included header name.
+- **Annotations are read only from comments**: on the line, or on a comment-only line directly
+  above it (as before); text inside a string or raw string is not an annotation.
+- **Allowlists by repository path**: `STORAGE_ALLOWED`, `SORT_ALLOWED` and the new
+  `TEST_ACCESS_ALLOWED` name `src/rt/...` paths (`src/rt/natives/support.*` for the array
+  builder); a file with an allowed basename elsewhere is checked.
+- **`rt-lint: test-access-decl` only in `src/rt/aggregate.h` and `src/rt/build.h`**; anywhere else
+  the annotation itself is a problem, and the name on that line is still flagged.
+- **`--boundary`** (in `test-rt-lint`, replacing `--test-access src include bindings` and the B2
+  `.inc` grep): the storage-write, construction, sort, paste and test-access rules over `src`,
+  `include`, `bindings`, `markuppp` and `minifypp`; every directory below them, nested `tests/`
+  included (`src/tests/`, `src/rt/tests/`); only the top-level `tests/` (and `third_party/`) is
+  skipped; every C/C++ suffix (`.h .hh .hpp .hxx .h++ .c .cc .cpp .cxx .c++ .inc .ipp .tpp .tcc
+  .ixx .cppm .def .m .mm`); and every file a scanned file `#include`s, whatever its suffix
+  (resolved against the including file's directory and the build's include roots). Today: 687
+  files (`src` 615, `markuppp` 38, `minifypp` 12, `bindings` 11, `include` 10, plus
+  `jsonic/include/json.h` through an include; 3 `.inc`, 15 `.c`, 2 `.cc`), 0 problems.
+- **Annotation manifest** `tools/rt-lint-annotations.txt`: every boundary annotation
+  (`storage-ok <label>`, `paste-ok`, `test-access-decl`) by path, label and count (42 today, 15
+  entries). An annotation not listed, a listed one gone, or a changed count fails `--boundary`;
+  a new in-place site is a reviewed edit of the manifest.
+- **One source edit**: `src/embed/program_api.cpp`'s `PROGRAM_VIEW` macro (C API accessor names
+  built with `##`, found by the wider scan) gains a `/* rt-lint: paste-ok ... */` comment on its
+  `#define` line; `program_api.o` is byte-identical and `nift` is unchanged (`de382d75...`).
+
+### 5.2 Gap by gap
+
+| Gap (source) | Before | Now | Fixture |
+| --- | --- | --- | --- |
+| digit separator `1'0` (R3, `rc/m-digit`) | rest of line read as a char literal | pp-number | `bad_lexical.cpp` 7, 29 |
+| raw string `R"(")"` (R3) | quote desync | raw string skipped | 8, 36; `tree/src/embed/t6_raw.cpp` |
+| splice inside a name (R3, rc2 t4) | two halves, no match | phase 2 first | 10, 40; `t4_splice.cpp` |
+| digraph paste `%:%:` (R3, rc2 t3) | not a paste | `##` | 2; `t3_digraph.cpp` |
+| annotation text in a string (R3) | raw line searched | comments only | 14, 36 |
+| raw-string comment desync (R3) | lines hidden until `"*/"` | raw string skipped | 17, 18, 19 |
+| `.inc` never opened (R3) | B2 grep of `src/rt/*.inc` only | every suffix, every include | `bad_lexical_inc.inc` 2; `x.inc`, `x.ipp`, `x.hxx`, `x.def` |
+| annotation accepted anywhere (rc2 t1) | any file | `aggregate.h`, `build.h` only | `t1_annot.cpp` 2, 6; `src/embed/aggregate.h` 4 |
+| basename allowlists | `support.h` etc. anywhere | repository paths | `src/embed/build.h` 3 (flagged), `src/rt/build.h` (passes) |
+| roots `markuppp`, `minifypp` not scanned (rc2) | `src include bindings` | all five | `markuppp/src/*.cpp`, `minifypp/include/minify_extra.h` |
+| nested `tests/` skipped (rc2) | any `tests` path component | top-level `tests/` only | `src/tests/helper.h`, `src/rt/tests/helper.h` flagged; `tests/ok_helper.h` skipped |
+| no-suffix file | never opened | opened when included | `src/embed/noext` (via `includes_noext.cpp`) |
+
+The fixture `tests/rt/lint_fixtures/bad_lexical.cpp` holds `vm_bypass2.cpp`'s b1 to b8 (b4's pasted
+name is caught at its `#define`, b7 through the `.inc` it includes, b8's second statement after one
+annotation), the `rc/m-digit` `push_value` line, a raw string with a delimiter over three lines, an
+annotation inside a raw string, a splice inside `Storage::`, and a line under a code line's
+annotation; the self-test requires exactly lines 2, 3, 7, 8, 10, 14, 17, 18, 19, 26, 29, 35, 36,
+39, 40, 43 and the `.inc`'s line 2. `tests/rt/lint_fixtures/tree/` is `rc2/lint2`'s `src`,
+`markuppp` and `minifypp` files byte for byte plus the path, location, suffix and root controls
+above; the self-test requires the exact test-access and storage-write lines of all 25 scanned
+files, the three misplaced annotations, that `noext` is scanned and `tests/ok_helper.h` is not, the
+tree's own manifest clean, and three manifest mutations (a count changed, an unlisted annotation,
+a listed one gone) each failing. Every earlier fixture and its expected lines are unchanged. Run on
+the re-checker's own trees: `rc/lintb/rt` fires on every form of `vm_bypass2.cpp` and on
+`bypass_inc.inc` (12 problems; the B2 lint found 1, b8's second statement); `rc2/lint2` flags every file in the five roots (16
+test-access lines; t2 and t3 at their pasting `#define`); `rc/m-digit/vm_ops.cpp` line 349 is
+flagged.
+
+**Lint mutants** (`scratchpad/tooling/lint-mutants.py`, a local evidence script: each removes one
+lexer step or rule and requires the self-test to fail): no splice handling, no digit separator,
+no raw string, no `%:%:`, annotations from the raw line, annotation above any line, basename
+allowlist, `test-access-decl` anywhere, no location rule, nested `tests/` skipped, no include
+following, `.h`/`.cpp` only, manifest ignoring unlisted annotations: 13 of 13 caught.
+
+### 5.3 Limits (recorded, not closed)
+
+- A lint, not a compiler: it does not run the preprocessor. A computed include (`#include MACRO`)
+  is not followed; a construction name built by a macro other than token pasting (for example an
+  object-like macro that expands to `array_push`) is caught only at the paste or by the compiler
+  (after component 2 the free names do not exist). The alias form (`rc/lintb/rt/vm_alias.h`: one
+  annotated `auto& build_push = array_push;`, then unannotated uses) passes the per-line rule; the
+  manifest pins the annotation, and component 2 makes the aliased name unresolvable.
+- Not scanned: `benchmarks/`, `tools/`, `jsonic/` (except what production includes), top-level
+  files, and an unincluded file with no C/C++ suffix: none of these is compiled into `nift` or
+  `libnift_c`. `rc2/lint2`'s `benchmarks/x.h`, `tools/x.h` and `top.h` are outside the roots.
+- Trigraphs (removed in C++17) are not translated.
+
+### 5.4 Gates
+
+Code commit `eb3ebb1b`; gate files under `gates/c5/`, all exit 0: `nift` (sha256 `de382d75...`,
+unchanged), `test-rt-lint` (self-test 16 fixtures; `src/rt` 0 problems; boundary 0 problems in
+687 files, 42 annotations against the manifest), `rt-lint-mutants` (13 of 13), `test-c-abi-symbols`
+(73 exports), `test-rt-isolation`. No production object changes, so the runtime gates of section
+2.7 stand; nothing for Linode beyond the combined-tree certification.
