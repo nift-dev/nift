@@ -217,3 +217,102 @@ On this host, commit `eea0e8ba`; gate files under `gates/c6/` (`test-go-binding`
   symbol. Needs a `.def` file generated from the same list (or `--exclude-all-symbols` plus the
   list), and the inventory test with `objdump -p`.
 - Both need their own CI runner; neither was built or tested here.
+
+## 3. Test-helper isolation (structural)
+
+### 3.1 Problem
+
+`rt::Storage` befriends the storage-level unit tests' accessor `StorageTestAccess`, defined only by
+`tests/rt/storage_access.h`. B2 guarded this with a repository-wide lint, which RECHECK2 bypassed
+(N1: `#include "../../tests/rt/storage_access.h"` from a production file and a call of its free
+functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `minifypp/`, nested
+`tests` directories and some suffixes unscanned).
+
+### 3.2 Change
+
+- **The production marker.** Every production C++ translation unit is compiled with
+  `PRODUCTION_GUARD` (`-include src/build/production_tu.h`): every object of `nift`, `libnift_c`,
+  the sanitizer and TSan `nift` builds, and the runtime object sets that test binaries link (the
+  in-tree, `pic`, `san`, `san-lifetime`, `tsan` and `rt-obj/*` rules). A test translation unit (a
+  source under `tests/`) is never compiled with it. The header defines `NIFT_PRODUCTION_TU` and
+  nothing else.
+- **In a marked unit, `src/rt/aggregate.h` ends** (after the unchanged class `Storage`) by
+  asserting that `StorageTestAccess` is not yet a complete type, then poisoning the name
+  (`#pragma GCC poison`, GCC and Clang): any later definition, declaration or use of the name,
+  however spelt (token pasting, the `%:%:` digraph, a line splice) and wherever it comes from (the
+  unit's own text or any header, of any suffix, under any directory), is a compile error. The
+  assertion closes the one ordering route the poison alone leaves: a definition before
+  `aggregate.h` whose member template names `Storage` only when instantiated after it (control 2
+  below compiles without the assertion).
+- **No macro is involved.** An earlier design (the friend named through a macro defined before the
+  poison) was rejected after a probe: Clang accepts `#pragma push_macro`/`pop_macro` restoring the
+  macro after its `#undef`, which reopened the name (GCC refuses). Force-including `aggregate.h`
+  itself was rejected too: it changed the code generated for units that do not include it
+  (template instantiation order in `Hooks.o`, `Parser.o`, `Minify.o`). The marker changes no
+  object (below).
+- **`Storage` is the same in test and production units**: the class is unchanged; the
+  production-only tail is a `static_assert` and a pragma after it (B2's ODR objection to a
+  test-only friend does not apply).
+- **`tests/rt/storage_access.h`** refuses to compile (`#error`) where `NIFT_PRODUCTION_TU` is
+  defined; that is the N1 diagnostic. Undefining the marker first gains nothing, since the header
+  itself names the poisoned identifier.
+- **Dependency check per object** (`compile-object.sh --production`, every production rule, C
+  objects too): after the compile, every path in the compiler's dependency list (the whole include
+  closure, resolved by the compiler, so no spelling, macro or relative path hides one) is resolved
+  against the repository root, and a path under the top-level `tests/` fails the object. This
+  catches any test header, not only `storage_access.h`.
+- **Gate `test-production-deps`** (`scripts/build/check-production-deps.sh`): takes every production
+  compile command from `make -n -B` of `nift`, `libnift_c.so`, `.build/nift-sanitize`,
+  `.build/nift-sanitize-lifetime` and `.build/nift-tsan`, runs each with `-M` (system headers
+  included) and fails on any dependency in `tests/`.
+- **Gate `test-rt-isolation`** (`tests/rt/isolation/run.sh`): plants each reproducer into a real
+  production source, builds that object with its real production rule (`make OBJECT`, the command
+  `make nift` uses), requires failure with the expected diagnostic, restores the tree byte for
+  byte, and requires a harmless control plant to build. Both gates are in `certify-targets`.
+- The B2 lint (`rt-lint.py --test-access`) stays as defence in depth; its hardening is component
+  5. The poison and assertion lines in `aggregate.h` carry the existing annotation until then.
+
+### 3.3 Evidence
+
+Commit `7d3bf612` (code) and `68ce8e1a` (the ordering case moved into a unit that includes
+`aggregate.h`; the first run, kept as `test-rt-isolation-7d3bf612-FAILED-order-case.log`, planted it
+in `src/Hooks.cpp`, which never includes `aggregate.h`, so it reached nothing and built). Gate files
+under `gates/c3/`.
+
+- Production unchanged: with the guard, all 291 in-tree objects are byte-identical to
+  `c1f43300`'s, `nift` is `3062f229...`, and `libnift_c.so` is byte-identical to component 6's.
+  Test binaries that include `storage_access.h` still build and pass (`value-unit` 83 checks,
+  `value-regress` 280).
+- `test-rt-isolation`, every case does not build:
+
+  | Case | Plant (RECHECK2 reproducer) | Object | Diagnostic |
+  | --- | --- | --- | --- |
+  | N1 | `#include "../../tests/rt/storage_access.h"` and a call of `array_append` in `push_value` (`rc2/m-include`) | `src/rt/vm_ops.o` | `#error ... test-only header` |
+  | N1, another test header | `#include "../tests/rt/rt_test.h"` | `src/Hooks.o` | `depends on the test tree: tests/rt/rt_test.h` |
+  | N2a | a definition with `rt-lint: test-access-decl` in `src/Hooks.cpp` (`rc2/m-outside` probe C) | `src/Hooks.o` | poisoned |
+  | N2b | a definition in `markuppp/src/Markup.cpp` (probe B) | `markuppp/src/Markup.o` | poisoned |
+  | N2b, header | a definition in a new header under `minifypp/include`, included by `Minify.cpp` | `minifypp/src/Minify.o` | poisoned |
+  | N2c | a definition in `src/rt/tests/helper.h` (a nested `tests` directory) | `src/rt/vm_ops.o` | poisoned |
+  | N2d | the definition in `.hxx` and `.def` files, included | `src/rt/vm_ops.o` | poisoned |
+  | R3 | the name built by `##`, by `%:%:`, and split by a line splice | `src/rt/vm_ops.o` | poisoned |
+  | ordering | a definition before the includes, used after them through a template | `src/rt/vm_ops.o` | static assertion |
+  | control | a harmless function in the same file | `src/rt/vm_ops.o` | builds |
+
+- Load-bearing controls (`logs/c3/load-bearing-controls.txt`): the N2b plant compiles without the
+  guard and fails with it; the ordering plant compiles with an `aggregate.h` lacking the assertion
+  and fails with the real one.
+- `test-production-deps`: PASS, 1,468 production compile commands (in-tree, `pic`, `san`,
+  `san-lifetime`, `tsan`; C and C++), no dependency in `tests/` (300 s). Negative control
+  (`logs/c3/production-deps-negative.log`): with `#include "../tests/rt/rt_test.h"` planted in
+  `src/Hooks.cpp` it fails naming `src/Hooks.cpp -> tests/rt/rt_test.h`; the tree was restored.
+
+### 3.4 Limits, stated plainly
+
+- A unit that never includes `aggregate.h` but writes its own definition of class `Storage` (a
+  forged header: the g20 class of RECHECK2, an ODR violation that needs no diagnostic) is outside
+  what any header can stop; component 4's link-time symbol allowlist covers it for the static
+  `nift` link, and component 6 for the shared library.
+- Binding builds outside the Makefile (`bindings/python` `setup.py`/`build.sh`,
+  `bindings/node/build.sh`) compile the production sources with their own command lines, without
+  the guard. Their artefacts are not `nift` or `libnift_c`; giving them the guard is a binding-build
+  item (with the release audit's binding source-list item).
