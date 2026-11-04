@@ -52,6 +52,12 @@ EXCLUSIVE = {
     "test-node-binding": "builds bindings/node/build (shared native module)",
     "test-python-binding": "builds the bindings/python extension module",
     "test-minify": "writes minifypp/.build via a sub-make",
+    # Tooling checkpoint (docs/runtime-2/checkpoints/tooling.md 1, 3): these
+    # rebuild the shared in-tree objects under other configurations, or plant
+    # reproducers into production sources, through a script (no make on the
+    # recipe line, so recipe_runs_make() does not see it).
+    "test-build-reuse": "rebuilds the shared in-tree objects under other compilers, flags and defines (A->B->A)",
+    "test-rt-isolation": "plants reproducers into production sources and rebuilds their objects",
 }
 
 # Load-sensitive measurements (owner review of D-012): targets whose pass/fail

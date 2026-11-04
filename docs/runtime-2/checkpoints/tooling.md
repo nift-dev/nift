@@ -54,6 +54,24 @@ sanitize` 7 times under ASan/UBSan.
   alongside is its own directory (`RT_OBJ_CONFIG`). One window remains, stated plainly: between
   the check and the linker reading the objects, another make with other flags could rename a new
   object into place; the certification runner never runs two configurations on one directory.
+- **Parallel-safety scope.** Supported: concurrent builds of different configurations, each in its
+  own `.build/rt-obj/<config>/` (and the separate `pic`, `san`, `san-lifetime`, `tsan` sets), and
+  concurrent builds of one configuration sharing objects (atomic renames). Unsupported:
+  concurrent builds of different configurations that share the in-tree object directory (for
+  example `make CXXFLAGS=... X` alongside a default `make Y`); the link check turns that into a
+  failed link rather than a mixed binary, except in the check-to-link window. `scripts/certify.py`
+  never does the unsupported case: every make it starts, the phase-0 prebuild and each target, is
+  `make [-k -jN] TARGET...` with no variable on the command line (`run_target`, `cmd = ["make",
+  target]`; the prebuild call in `main`), in one inherited environment from which `clean_env()`
+  removes `MAKEFLAGS`, `MFLAGS`, `MAKELEVEL` and `MAKEOVERRIDES`, so all its makes share one
+  configuration. Targets that rebuild the shared objects under other configurations
+  (`test-build-reuse`) or plant sources (`test-rt-isolation`) are in its `EXCLUSIVE` table and run
+  alone. The Linode certification harness runs `certify.py` or plain `make TARGET` the same way
+  (coordinator); it is not in this repository.
+- **Permanent gate (owner):** `make test-build-reuse` runs `check-build-reuse.sh` (about 40 minutes
+  on 2 cores) and is in `certify-targets`. Without `clang++`, the compiler row uses a wrapper of
+  `g++` with another path and `--version`, which is a compiler-identity change as the signature
+  sees it.
 - Generated inputs: the tree has no generated sources or headers. The one generated include
   directory is vendored libffi's install tree, rebuilt when its signature changes; objects that
   include its headers depend on them through the compiler's dependency files.
@@ -165,7 +183,9 @@ ABI of `include/nift/c_abi.h`.
   object changes (`include/` stays byte-identical, as `tests/v46_b4_cp8_embedding_abi.sh` requires),
   so the code inside the library and the `nift` executable are untouched.
 - `make test-c-abi-symbols` (added to `test-embed`):
-  - inventory: the exported dynamic symbols (`nm -D --defined-only`) must equal
+  - inventory: read from the built library's dynamic symbol table (`nm -D --defined-only` on
+    `libnift_c.so`, the same set as `readelf --dyn-syms` defined entries), not from the linker
+    map: the exported dynamic symbols must equal
     `tests/abi/libnift_c.symbols` (checked in for review) exactly, every function declared in
     `c_abi.h` must be exported, and the list must equal the declared functions plus the exceptions
     file; so any extra export and any missing documented symbol fails;
@@ -202,8 +222,10 @@ On this host, commit `eea0e8ba`; gate files under `gates/c6/` (`test-go-binding`
   build fails, for a pre-existing reason unrelated to this component: its source list
   `src/rt/host-sources.txt` (unchanged since `c1f43300`) does not name
   `src/rt/handles/table_teardown.cpp`, so the extension does not load (`undefined symbol
-  ...HandleTable::shutdown_noexcept`); it never loads `libnift_c.so`. Reported to the
-  coordinator as a source-list defect (the CP18 class), not fixed here. The C# binding loads the shared library through P/Invoke of C ABI names
+  ...HandleTable::shutdown_noexcept`); it never loads `libnift_c.so`. Out of this checkpoint
+  (owner): a **release-blocker audit item**, every supported binding (Go, C#, Node, Python) must
+  build and pass before release; this one needs `src/rt/handles/table_teardown.cpp` (and a check
+  of the whole list against what the C ABI links). The C# binding loads the shared library through P/Invoke of C ABI names
   only; `dotnet` is not installed here: Linode.
 - `nift` executable: unchanged (sha256 `3062f229...`); its link is not touched.
 
@@ -316,3 +338,12 @@ under `gates/c3/`.
   `bindings/node/build.sh`) compile the production sources with their own command lines, without
   the guard. Their artefacts are not `nift` or `libnift_c`; giving them the guard is a binding-build
   item (with the release audit's binding source-list item).
+
+## Carried items (release audit)
+
+- **Release blocker (owner, 2026-11-04):** every supported binding must build before release. Found
+  here: the Python binding's source list `src/rt/host-sources.txt` lacks
+  `src/rt/handles/table_teardown.cpp` (section 6.3); pre-existing, unchanged since `c1f43300`.
+- macOS and Windows export lists for the embedding library (section 6.4).
+- Binding builds outside the Makefile compile production sources without `PRODUCTION_GUARD`
+  (section 3.4).

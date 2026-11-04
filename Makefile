@@ -1567,6 +1567,15 @@ test-rt-isolation: $(TARGET)
 test-production-deps: $(LIBFFI_STAMP) $(SAN_LIBFFI_STAMP) $(TSAN_LIBFFI_STAMP)
 	bash scripts/build/check-production-deps.sh "$(TEST_DIR)/production-deps"
 certify-targets: test-rt-isolation test-production-deps
+# Tooling checkpoint (component 1): the build-object reuse evidence as a
+# permanent gate (owner): dependency accuracy, clean/incremental equivalence,
+# A->B->A per signature input, link-time refusal of a mixed object, concurrent
+# makes of different configurations. About 40 minutes on 2 cores; exclusive in
+# certify.py (it rebuilds the shared in-tree objects under other configurations).
+.PHONY: test-build-reuse
+test-build-reuse: $(TARGET)
+	bash scripts/build/check-build-reuse.sh "$(TEST_DIR)/build-reuse"
+certify-targets: test-build-reuse
 .PHONY: test-c-abi-symbols
 test-c-abi-symbols: $(SHARED_LIB) $(ABI_EXPORT_MAP) $(C_ABI_PIC) $(LIBFFI_A)
 	@if [ "$(LIBNIFT_C_EXPORTS)" != yes ]; then echo "test-c-abi-symbols: Linux only (macOS/Windows exports unchanged: tooling.md 6)"; exit 0; fi
