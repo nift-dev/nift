@@ -150,6 +150,14 @@ $(LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
 
 $(LIBFFI_A): | $(LIBFFI_STAMP)
+# Tooling checkpoint (component 1): libffi's installed headers are generated
+# inputs, named only by the compiler dependency files of the objects that
+# include them. Making the stamp their prerequisite makes make read their
+# mtimes after a reinstall in the same run (under -j the objects otherwise
+# rebuilt one run late, after a libffi signature change).
+$(LIBFFI_INCLUDE)/ffi.h $(LIBFFI_INCLUDE)/ffitarget.h: $(LIBFFI_STAMP) ;
+$(SAN_LIBFFI_INCLUDE)/ffi.h $(SAN_LIBFFI_INCLUDE)/ffitarget.h: $(SAN_LIBFFI_STAMP) ;
+$(TSAN_LIBFFI_INCLUDE)/ffi.h $(TSAN_LIBFFI_INCLUDE)/ffitarget.h: $(TSAN_LIBFFI_STAMP) ;
 
 LDLIBS += $(LIBFFI_A)
 
