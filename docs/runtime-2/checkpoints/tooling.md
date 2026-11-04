@@ -266,8 +266,13 @@ functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `
   whichever header comes first) (after the unchanged class `Storage`) by
   asserting that `StorageTestAccess` is not yet a complete type, then poisoning the name
   (`#pragma GCC poison`, GCC and Clang): any later definition, declaration or use of the name,
-  however spelt (token pasting, the `%:%:` digraph, a line splice) and wherever it comes from (the
-  unit's own text or any header, of any suffix, under any directory), is a compile error. The
+  spelt directly or built after the poison (token pasting, the `%:%:` digraph, a line splice) and
+  wherever it comes from (the unit's own text or any header, of any suffix, under any directory),
+  is a compile error. (Re-review N5, corrected from "however spelt": a macro defined *before* the
+  poison, `#define NIFT_TA StorageTestAccess` or `#define StorageTestAccess Other`, expands past
+  it, as GCC documents; neither the poison nor the assertion stops it. The lint catches both, at
+  the `StorageTestAccess` token on the `#define` line; recorded as a limit of the compile-time
+  layer, "Re-review fixes".) The
   assertion closes the one ordering route the poison alone leaves: a definition before
   `aggregate.h` whose member template names `Storage` only when instantiated after it (control 2
   below compiles without the assertion).
@@ -584,9 +589,10 @@ a cast (`*reinterpret_cast<const InPlaceKey*>(&c)`, review `x/k1_cast.cpp`) or a
 member (`x/k2_union.cpp`), and the explicit-instantiation access rule ([temp.explicit]), which
 reaches the private primitives, and `Storage`'s commits, with no key at all (`x/k3_inst.cpp`,
 `x/k4_storage.cpp`; B2 recorded it as INFO for `Storage` and `Protocol`); each is written
-deliberately in source, compiles under g++ and clang++, and is caught by the lint (any
-`Construction` or `Storage` token outside the allowed files) and, in checked builds, by
-`check_fresh`; **link time**: only the listed objects reference the
+deliberately in source and compiles under g++ and clang++; which layer catches which route is
+in the table of "Re-review fixes" (re-review N2, corrected: an asm label or mangled name names no
+`Construction` or `Storage` token; the lint now flags any mangled `nift::rt` name instead), and
+checked builds' `check_fresh` stops a write to a published receiver whatever the route; **link time**: only the listed objects reference the
 primitives behind it; **run time**: `check_fresh` (checked builds) aborts if the receiver is
 shared, immutable or sort-protected; **lint**: the site keeps its `rt-lint: storage-ok` annotation.
 It is a structural narrowing of who may construct in place, not a builder proof of freshness:
@@ -603,7 +609,7 @@ named.
 | E6 | `deep_copy_tuple` | `copy_graph.cpp` `GraphCopy::fill` (rows 18, 19) | the shells are created first and held in the identity map (`copies_`) so a DAG keeps its sharing; each is filled in post-order before any parent holds it | the parent's fill, or the returned roots | `test-rt-build` (deep_copy under allocation injection: the source unchanged, the DAG kept, nothing leaks), refsem (copy, deepcopy), CP18 transfer campaigns (Linode) |
 | E7 | (none: row 17 became a builder) | | | | |
 | E8 | `cell_read` | `cell.cpp:90,92` | updates two cache fields of a selector cell's own descriptor after its creation (not a new value at all) | never user-visible | refsem cells (`cell_cycle_*`), refrep cell cases; B2 carried item L2 (`cell.cpp`) unchanged |
-| E9 | `Vm::op_keyed_mutate`, `set_index`, `natives::obj_merge` | rows 30, 45, 46 | test mutants only (REFSEM R14, M-B2 30, R-B5 26): each is a deliberate bypass of the protocol on a published receiver, which the mutant gates must catch | not compiled in production, and (review F3) a friend of the key only in its own mutant build (`NIFT_REFSEM_MUTANT` 14, 30, 26) | `test-runtime2-refsem-mutants` (each caught) |
+| E9 | `Vm::op_keyed_mutate`, `set_index`, `natives::obj_merge` | rows 30, 45, 46 | test mutants only (REFSEM R14, M-B2 30, R-B5 26): each is a deliberate bypass of the protocol on a published receiver, which the mutant gates must catch | not compiled in production, and (review F3) a friend of the key only in its own mutant build (`NIFT_REFSEM_MUTANT` 14, 30, 26); re-review N3: the switch is a macro, so a production object that defines it, or any test-only switch, in source or on its command line is refused (`compile-object.sh --production`) | `test-runtime2-refsem-mutants` (each caught) |
 
 ### 2.5 Tests
 
@@ -833,3 +839,48 @@ matches g++ diagnostics, as before).
 Lint mutants (local evidence, `scratchpad/tooling/lint-mutants.py`): 19 of 19 caught, the 13 of
 section 5 plus F2 (splice without blanks), F1 (no `Construction` token rule, no
 `annotation-unused` rule, manifest by count) and F11 (no symlinks, `third_party/` never).
+
+## Re-review fixes (narrow re-review of `5e156911`)
+
+One bounded round (coordinator ruling, owner guidance: tooling must not become another B2): the
+findings below are fixed in commits on top of `5e156911`; any deliberate-source route still open
+after them is recorded as a limit, not chased further. Probes cited as `rr/`, `rrlint/` and
+`rrlint2/` are the re-reviewer's, under the session scratchpad `review-tooling/`.
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| N1 (mandatory): `check-symbol-refs.sh` dropped weak undefined references (`nm` class `w`, `v`), so the link layer failed open from any object | every class `nm -u` lists is a reference | `test-rt-sort-forgery` case 3: a weak `Storage::array_mut` reference planted into `src/Hooks.cpp`, by `__attribute__((weak))` (the `rr/e3-weak.diff` form) and by `#pragma weak`, fails `make nift` at the allowlist; `rr/w_weak.o` is refused |
+| N2: asm labels and mangled names carry no lint token | the boundary lint flags any identifier or string literal spelling a mangled `nift::rt` name (`_Z...4nift2rt`): an `asm`/`__asm__`/`__asm` label, `#pragma weak`, an `extern "C"` declaration so named; production code has none | fixture `bad_mangled.cpp` (`rr/e1-asm.diff`, the weak form, `rrlint/src/rt/v4_asm.cpp`): exactly its 5 lines; `rrlint/src/rt/v4_asm.cpp` flagged; lint mutants 21 of 21 (L20, L21 new) |
+| N3: a `#define NIFT_REFSEM_MUTANT 26` in a production source turned a mutant, and its key friendship, on in release | `compile-object.sh --production` refuses, in any repository dependency, a `#define` or `#undef` of a test-only switch (`NIFT_*` names containing `MUTANT`, `TEST`, `PROBE`, `HOOK` or `BYPASS`, and the builder-mutant hooks `NIFT_RT_BUILDER_RELEASE`/`TRANSFER`), except the 8 reviewed definitions (the `#define NIFT_CORO*_MUTANT 0` off defaults and the hooks in `rt/build.h`), and refuses `-D`/`-U` of one on the command line; test builds keep setting them on their own command lines (none of them uses `--production`) | `test-rt-isolation`: `n3-mutant-define-in-unit` (`rr/e2-mutant-define.diff`), `n3-test-switch-in-header` (`NIFT_SORT_WORDING_TEST`), `n3-switch-command-line` |
+| N4: the scanner missed a lone CR, a backslash-CR splice, a UTF-8 BOM, a path with a space, and headers outside the repository | the checks move to `scripts/build/check-production-tu.py`: the `-MD` list parsed with make's escapes; each dependency resolved through symlinks; one outside the repository and outside the compiler's own system include directories (`COMPILER -x LANG -E -v`, without the command's flags; cached per compiler under `.build/obj-config/`) fails; each repository file read with a leading BOM dropped, splices with LF, CR LF or a lone CR removed, CR LF and lone CR as line ends, `%:` as `#` | `test-rt-isolation`: `n4-lone-cr`, `n4-backslash-cr-splice`, `n4-utf8-bom`, `n4-space-in-path`, `n4-symlink-outside`, `n4-absolute-outside`; every one of the 295 existing in-tree production dependency lists passes |
+| N6: a quote in a dependency's name stopped `xargs` | fixed with N4 (no `xargs`; the list is parsed) | `test-rt-isolation` `n6-quote-in-path` (a header named `probe'q.h` that includes a test header) |
+| N5 (record) | a macro defined before the poison expands past it (`rr/probes/p1_macro_before.cpp`, `p2_rename.cpp`); 3.2 corrected ("however spelt"); the lint catches both at the `#define` line's `StorageTestAccess` token; the compile-time and link layers do not | |
+| N7 (record) | the F7 row's "256 link and archive rules that have object prerequisites" overstates: 256 rules carry `check-config.sh --sets`, about 100 of them have no `.o` prerequisite (they compile sources directly, so `$(filter %.o,$^)` is empty and the check is a no-op), and the mutant loops (`test-rt-refrep-mutants`, `test-rt-sort-protection-mutants`) link `$(RT_REFREP_OBJECTS)` in a shell loop outside `$^`, covered only through their dependency on `refrep-vm`, whose rule checks the same objects. The re-review found no unchecked consumer of signed objects; a link outside make (a hand-run compiler, the binding builds) is not checked | |
+| N8 (record) | the F1 row's "none can move to a new site" means: none can move to a line of different text; identical lines in one file (the two `Construction::array_push(bk,s[Keys],r);` in `collection_helpers.cpp`) are interchangeable, and a pinned line continued on the next line (`for(const Value& i:order)Construction::array_push(bk,s[Result],`) pins only its first line | |
+| N9 (record) | a forged `class VmInPlace` in a unit that does not include `rt/vm_in_place.h` constructs a key (`rr/probes/k8_forge_vminplace.cpp`): an ODR violation, the forged-header class of 3.4 and 4.3; the lint catches it (`Construction` on the call) | |
+
+The F4 row's "read as the preprocessor reads it" holds since N4 for the forms listed there; the
+F5 row's "fails closed" and 2.2's "does not link" hold since N1. The scanner stays a text check:
+a directive written so that only full preprocessing reveals it (built by macro expansion, which
+`#define`/`#undef` cannot be) is not a form the language allows, and a header outside the
+repository cannot be reviewed, so it is refused rather than scanned.
+
+### What each layer catches (deliberate-source routes, as of this round)
+
+| Route | Compile time | Object scan (`--production`) | Link (`check-symbol-refs.sh`) | Lint (`--boundary`) | Run time (checked builds) |
+| --- | --- | --- | --- | --- | --- |
+| a free or private primitive called by name | refused | | refused outside the allowlisted objects | flagged | `check_fresh` |
+| an in-place key made outside its owners | refused | | (inside an allowlisted object: no) | flagged | `check_fresh` |
+| a key forged by cast or union member (`x/k1`, `x/k2`) | compiles | | not inside allowlisted objects | flagged (`Construction` token) | `check_fresh` |
+| explicit-instantiation access to a primitive or commit (`x/k3`, `x/k4`) | compiles | | refused outside the allowlisted objects | flagged (`Construction`/`Storage` token) | `check_fresh` |
+| a forged `VmInPlace`, `Storage`, `SortKey` or `Protocol` (ODR) | compiles | | refused outside the allowlisted objects (static `nift`); not exported from `libnift_c.so` | flagged | `check_fresh` |
+| an asm label or mangled name, strong or weak (N1, N2) | compiles | | refused outside the allowlisted objects (weak too, since N1) | flagged (since N2) | `check_fresh` |
+| `StorageTestAccess` defined in production | poisoned or asserted | | | flagged | |
+| ... through a macro defined before the poison (N5) | compiles | | not inside allowlisted objects | flagged | `check_fresh` |
+| `#undef NIFT_PRODUCTION_TU`, a test-only switch defined (N3, N4) | compiles | refused | | | |
+| a test header included from production | `#error` (storage_access.h) | refused | | | |
+| a header outside the repository (N4) | compiles | refused (unless a compiler system directory) | | not scanned | |
+
+No layer refuses a route that is compiled into an allowlisted object and spelt with none of the
+lint's tokens; the remaining guard there is review and `check_fresh` in the sanitizer lanes
+(Linode). These are accepted limits of this checkpoint.
