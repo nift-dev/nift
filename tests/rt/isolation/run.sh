@@ -14,7 +14,8 @@ fail=0; saved=()
 save() { cp -p "$1" "$work/$(echo "$1" | tr / _).orig"; saved+=("$1"); }
 restore_all() {
   for f in "${saved[@]}"; do cp -p "$work/$(echo "$f" | tr / _).orig" "$f"; touch "$f"; done; saved=()
-  rm -rf src/rt/tests src/rt/natives/probe.hxx src/rt/natives/probe.def minifypp/include/probe_access.h
+  rm -rf src/rt/tests src/rt/natives/probe.hxx src/rt/natives/probe.def minifypp/include/probe_access.h \
+         src/rt/natives/probe_undef.h src/rt/natives/probe_system.h
 }
 # case NAME OBJECT EXPECT   (the plant has been applied; EXPECT: a regex of the diagnostic)
 case_() {
@@ -82,6 +83,29 @@ save src/rt/vm_ops.cpp
   cat "$work/src_rt_vm_ops.cpp.orig"
   printf '\nnamespace nift::rt { void nift_probe_order_use(Value& v) { nift_probe_order<Storage>(v); } }\n'; } > src/rt/vm_ops.cpp
 case_ order-definition-first src/rt/vm_ops.o 'defined in a production translation unit'
+
+# Tooling review F4: the marker undefined before rt/aggregate.h (x/i1_undef.cpp,
+# the re-checker's vm_ops.cpp plant): in the unit itself, in a header it
+# includes (spelt with a comment and a backslash-blank-newline splice), and on
+# the command line
+save src/rt/vm_ops.cpp
+{ printf '#undef NIFT_PRODUCTION_TU\n'; cat "$work/src_rt_vm_ops.cpp.orig"; printf '\n%s\n' "$DEF"; } > src/rt/vm_ops.cpp
+case_ f4-undef-in-unit src/rt/vm_ops.o 'undefines the production marker'
+save src/rt/vm_ops.cpp
+printf '#pragma once\n# /* x */ undef NIFT_PRODUCTION_\\ \nTU\n' > src/rt/natives/probe_undef.h
+{ printf '#include "rt/natives/probe_undef.h"\n'; cat "$work/src_rt_vm_ops.cpp.orig"; printf '\n%s\n' "$DEF"; } > src/rt/vm_ops.cpp
+case_ f4-undef-in-header src/rt/vm_ops.o 'undefines the production marker'
+if out=$(bash scripts/build/compile-object.sh --production "$work/cl.o" -- g++ -include src/build/production_tu.h \
+         -UNIFT_PRODUCTION_TU -Isrc -Iinclude -std=c++17 -c src/rt/atom.cpp 2>&1); then
+  echo "FAIL isolation f4-undef-command-line: built"; fail=1
+elif printf '%s\n' "$out" | grep -q 'command line undefines NIFT_PRODUCTION_TU'; then
+  echo "PASS isolation f4-undef-command-line: refused (-UNIFT_PRODUCTION_TU)"
+else echo "FAIL isolation f4-undef-command-line: $out"; fail=1; fi
+# Tooling review F6: a test header behind `#pragma GCC system_header` (x/sysh)
+save src/rt/vm_ops.cpp
+printf '#pragma once\n#pragma GCC system_header\n#include "../../../tests/rt/rt_test.h"\n' > src/rt/natives/probe_system.h
+printf '\n#include "rt/natives/probe_system.h"\n' >> src/rt/vm_ops.cpp
+case_ f6-system-header src/rt/vm_ops.o 'depends on the test tree'
 
 # control: a harmless plant in the same file builds, so the cases above fail
 # for their content, not for the harness

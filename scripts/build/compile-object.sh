@@ -14,6 +14,16 @@
 # dependency the compiler recorded (the complete include closure, resolved by
 # the compiler, so no spelling, macro or relative path hides one) is resolved
 # against the repository root; one under tests/ fails the build.
+# Tooling review F6: production dependencies are recorded with -MD (every
+# header), not -MMD, so a header marked `#pragma GCC system_header` (and what
+# it includes) is in the list and in make's dependencies.
+# Tooling review F4: the production marker (src/build/production_tu.h) is a
+# macro, so a unit could undefine it before rt/aggregate.h and lose the
+# poison and the assertion. A production object fails when its command line
+# undefines the marker (-U) or when any of its dependencies inside the
+# repository contains an undef directive for it: the text read as the
+# preprocessor reads it (line splices, including backslash-blank-newline,
+# removed; %: read as #; comments allowed between the tokens).
 set -u
 production=0
 if [ "${1:-}" = --production ]; then production=1; shift; fi
@@ -25,14 +35,37 @@ mkdir -p "$(dirname "$out")"
 tmp="$out.tmp.$$"
 base="${out%.o}"
 id=$(config_id "$@")
-if ! "$@" -MMD -MP -MF "$tmp.d" -MT "$out" -o "$tmp"; then
+depflag=-MMD
+[ "$production" = 1 ] && depflag=-MD
+if [ "$production" = 1 ]; then
+  prev=
+  for arg in "$@"; do
+    if [ "$arg" = -UNIFT_PRODUCTION_TU ] || { [ "$prev" = -U ] && [ "$arg" = NIFT_PRODUCTION_TU ]; }; then
+      echo "error: production object $out: the command line undefines NIFT_PRODUCTION_TU (tooling.md 3)" >&2
+      exit 1
+    fi
+    prev=$arg
+  done
+fi
+if ! "$@" $depflag -MP -MF "$tmp.d" -MT "$out" -o "$tmp"; then
   rm -f "$tmp" "$tmp.d"
   exit 1
 fi
 if [ "$production" = 1 ]; then
   root=$(pwd -P)
-  bad=$(sed -e 's/\\$//' -e 's/^[^ ]*: *//' "$tmp.d" | tr ' ' '\n' | grep -v '^$' |
-        xargs -r realpath -m --relative-to="$root" 2>/dev/null | grep '^tests/' | sort -u | head -3)
+  deps=$(sed -e 's/\\$//' -e 's/^[^ ]*: *//' "$tmp.d" | tr ' ' '\n' | grep -v '^$' |
+         xargs -r realpath -m --relative-to="$root" 2>/dev/null | sort -u)
+  bad=$(printf '%s\n' "$deps" | grep '^tests/' | head -3)
+  undef=$(printf '%s\n' "$deps" | grep -v -e '^\.\./' -e '^/' -e '^$' | xargs -r perl -0777 -ne '
+    s/\\[ \t\f\v]*\r?\n//g; s/%:/#/g;
+    my $c = qr{(?:[ \t\f\v]|/\*.*?\*/)};
+    print "$ARGV\n" if /^$c*#$c*undef$c+NIFT_PRODUCTION_TU\b/ms;' | head -3)
+  if [ -n "$undef" ]; then
+    echo "error: production object $out undefines the production marker NIFT_PRODUCTION_TU in: $(echo $undef)" \
+         "(tooling.md 3)" >&2
+    rm -f "$tmp" "$tmp.d"
+    exit 1
+  fi
   if [ -n "$bad" ]; then
     echo "error: production object $out depends on the test tree: $(echo $bad)" \
          "(test helpers are unreachable from production: tooling.md 3)" >&2
