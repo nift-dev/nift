@@ -347,3 +347,91 @@ under `gates/c3/`.
 - macOS and Windows export lists for the embedding library (section 6.4).
 - Binding builds outside the Makefile compile production sources without `PRODUCTION_GUARD`
   (section 3.4).
+
+## 4. SortKey and sort declarations
+
+### 4.1 N3: the byte-copy route (closed)
+
+RECHECK2 N3: `SortKey` was trivially copyable, so `__builtin_bit_cast(SortKey, ...)` (C++20
+`std::bit_cast`) made a key in well-defined code, and, as an implicit-lifetime type, a key "existed"
+in `malloc`'d or `char` storage under C++20 rules. `SortKey` (`src/rt/mutation.h`) now has a
+user-provided private destructor and deleted copy (so no implicit move):
+
+- not trivially copyable: the bit cast does not compile (`bypass_sort_key_bitcast.cpp`:
+  "`__builtin_bit_cast` destination type `SortKey` is not trivially copyable");
+- no copy or move: a key cannot be copied out of a forged lvalue into a real object
+  (`bypass_sort_key_copy.cpp`: "use of deleted function `SortKey(const SortKey&)`");
+- not implicit-lifetime: no `SortKey` object exists in `malloc`'d or `char` storage, so using one
+  from there is undefined behaviour again;
+- `absent.cpp` asserts: not trivially copyable, not copy or move constructible, not trivially
+  destructible, not destructible outside its friends.
+- The two new cases discriminate: both compile against `c1f43300`'s `mutation.h`, and `absent.cpp`'s
+  new assertion fails there (`logs/c4-discrimination.txt`). Unlike RECHECK2 I1, they match the
+  specific diagnostic ("not trivially copyable", "deleted function ... SortKey"), not any error
+  that names `SortKey`.
+- Cost: the key is only ever bound to `const SortKey&`; `nift` objects are byte-identical to
+  `c1f43300`'s except `collection_plain_sort.o`, where one equality compare before `je`, at the
+  function's entry (the incomparable-check setup, not the sort loop), has its register operands
+  swapped (`cmp %rcx,%rax` versus `cmp %rax,%rcx`): same instruction count, the same meaning. `nift`
+  sha256 is therefore `5f511e2c...` from this component on.
+
+### 4.2 By-value (prvalue) keys: not adopted
+
+The coordinator's ruling allowed passing the key by value as a prvalue (which would also refuse
+the `malloc`'d-lvalue and inactive-union-member forms, since a forged lvalue cannot initialise a
+by-value parameter without a copy) if the hot-loop instructions and callgrind stayed the same. It
+fails earlier, for a structural reason: only a friend of `SortKey` can create a prvalue key, and
+B2's key passes through `mutation::SortController` (a struct in `rt/sort_controller.h`) and through
+anonymous-namespace helpers of `collection_sort.cpp` (`receiver_items`, `save`, `restore`,
+`next`). Making `SortController` a friend reopens the f22 route (a unit that does not include
+`sort_controller.h` defines its own `SortController` and makes keys with no undefined behaviour at
+all); anonymous-namespace functions cannot be befriended from a header; and removing
+`SortController` changes B2's approved compile-fail fixtures `bypass_sort_paste.cpp` and
+`bypass_sort_plain.cpp` (their expected diagnostics name `SortController::items`). So only N3 is
+applied, as the ruling's fallback says. Remaining deliberate-source routes, recorded:
+
+- `*static_cast<const SortKey*>(std::malloc(1))` bound to the `const SortKey&` parameter: compiles;
+  undefined behaviour (no `SortKey` object there).
+- a reference to an inactive union member of type `SortKey` (the union needs a user-provided
+  destructor now): compiles; it binds a reference to storage where no `SortKey` lives
+  ([basic.life] permits forming such a reference; the commits never access the key).
+- Coverage: the out-of-line commits (`sort_storage`, `commit_permutation`) are also covered by the
+  link-time allowlist below; `sort_items` is inline, so a forged call to it leaves no symbol, and
+  only the lint (`SortKey`, `sort_items` tokens; extended to every production root by component 5)
+  sees it.
+
+### 4.3 N4: the duplicate-declaration route (not closable by the language; refused at link time)
+
+RECHECK2 N4 (rc2/forge/g20): a unit that does not include `rt/mutation.h` declares its own public
+`SortKey` and `Protocol::sort_storage` with the real mangled name and calls the real out-of-line
+commit. That is an ODR violation of `SortKey` and `Protocol`: ill-formed, no diagnostic required
+([basic.def.odr]); no compiler refuses it and no header can, because the unit never sees the real
+declarations (`test-rt-sort-forgery` case 0 compiles it). So it is closed where the unit meets the
+real code, at link time:
+
+- **Static links** (`nift`, `libnift_c.a`, `libnift_c.so`): `scripts/build/check-symbol-refs.sh`
+  lists every object's undefined references to the restricted symbols (`rt::Storage`'s members,
+  `Protocol::sort_storage`, `sort_items`, `commit_permutation`, `commit_array`) and fails the link
+  on any (object, symbol) pair outside the reviewed allowlist `tests/abi/restricted-symbol-refs.txt`
+  (15 pairs today: the protocol's commit layer in `mutation.o` and `mutation_collection.o`, the two
+  sort files' commits, and the protocol's inline array commits expanded in `cell.o` and `vm_ops.o`).
+  A new reference, forged or legitimate, needs review.
+- **Dynamic links**: `libnift_c.so` does not export these symbols (component 6), so a forged unit
+  linked against it has an undefined reference.
+- `make test-rt-sort-forgery` (`tests/rt/sort_forgery/run.sh`, in `certify-targets`, exclusive):
+  case 0, the forged unit compiles (the language does not refuse it); case 1, planted into
+  `src/Hooks.cpp`, `make nift` fails at the allowlist (`src/Hooks.o
+  nift::rt::mutation::Protocol::sort_storage`); case 2, linked against `libnift_c.so` it does not
+  link (undefined reference to `Protocol::sort_storage`); control, against the same objects linked
+  without the version script it links (the route RECHECK2 demonstrated).
+- Not covered: a forged unit that reimplements a commit's body instead of calling it (for example
+  writing `heap_as<ArrayObject>()->items` directly); that is the raw-layout route, a known boundary
+  (Carried items) with lint coverage only. The g05 route (defining one of the three friend
+  functions with its exact signature) already fails the static link ("multiple definition").
+
+### 4.4 Gates
+
+Commit `f0bd7214`; gate files under `gates/c4/`: `test-rt-protocol-compile-fail` (absent.cpp, 13
+bypass cases, control), `test-rt-lint`, `test-rt-sort-forgery`, `test-rt-sort-protection-mutants`
+(S1, S2, S4, S5 caught; wording control), `test-rt-mutation-protocol` (191), `test-runtime2-collections`
+(279), `test-rt-refrep` (116 checks; production checks PASS): all exit 0.
