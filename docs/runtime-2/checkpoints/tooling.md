@@ -70,7 +70,15 @@ sanitize` 7 times under ASan/UBSan.
   configuration. Targets that rebuild the shared objects under other configurations
   (`test-build-reuse`) or plant sources (`test-rt-isolation`) are in its `EXCLUSIVE` table and run
   alone. The Linode certification harness runs `certify.py` or plain `make TARGET` the same way
-  (coordinator); it is not in this repository.
+  (coordinator); it is not in this repository. (Linode certification of `4e97e34e`, corrected: the
+  project's own suite did run the unsupported case: the mutant provenance harness's trusted
+  rebuild, `make TEST_DIR=<tmp> CLOSURE_MUTANT=n ...`, found the in-tree signature under its own
+  TEST_DIR and an identity that named TEST_DIR, and rebuilt the in-tree objects under another
+  identity. Since the fix the in-tree signature has a fixed path and the identity writes the output
+  root as `$TEST_DIR`, so a make with another TEST_DIR reuses the in-tree objects; with that, a
+  make with only TEST_DIR or a mutant selector (`CLOSURE_MUTANT`, `FOR_MUTANT`) on its command
+  line is supported alongside the default configuration, and `make -k test` followed by `make
+  nift` rebuilds nothing; see "Linode certification fixes".)
 - **Permanent gate (owner):** `make test-build-reuse` runs `check-build-reuse.sh` (about 40 minutes
   on 2 cores) and is in `certify-targets`. Without `clang++`, the compiler row uses a wrapper of
   `g++` with another path and `--version`, which is a compiler-identity change as the signature
@@ -899,3 +907,27 @@ recorded class and is recorded, not chased.
 | C5 (fixed): `-Wp,-D...` and `--define-macro` were not checked | the command-line check reads `-D`/`-U` (joined or separate), `-Wp,` lists, `-Xpreprocessor`, `--define-macro`/`--undefine-macro` (joined or separate) | the self-test's argument cases |
 | C4 (record) | the mangled-name lint matches per literal: a label split across adjacent literals or written with `\x` escapes passes it; outside an allowlisted object the link layer refuses it, inside one only review and `check_fresh` (checked builds) stop it; the per-layer table row now says "partly flagged" | `ck/v9_split.cpp` |
 | C7 (record, supported configuration) | the system-directory probe runs the compiler path alone; a wrapper (`ccache`) and flags that move the system directories (`--sysroot`, `-stdlib`, `-nostdinc`, an `-isystem` outside the repository) are not supported for production compiles (their headers are refused as outside the repository) | |
+
+## Linode certification fixes (certification of `4e97e34e` failed)
+
+Certification of `4e97e34e` (tree `b667e183`) found regressions caused by this checkpoint. Each is
+fixed or classified below; evidence from the Linode logs (`tcert-4e97e34e/out/`) and from local
+reproduction (result files under the session scratchpad `tooling/gates/linode-fix/` and
+`tooling/lanes/`).
+
+| Item | Cause | Fix | Evidence |
+| --- | --- | --- | --- |
+| 1: `test-runtime2-packages-mutants`, `test-runtime2-args-cmd-mutants`: "./nift is not current" | (a) component 1's signature files were written by `FORCE` recipes, so `make -n`/`make -q` always planned every object and the link; (b) component 1's edge from libffi's installed headers to its stamp, with the stamp older than its signature for good (the build script removes its directory, signature included, before a rebuild), kept `ParserExpression.o` and the link planned; (c) the harnesses read the compile line in the old `$(CXX) ... -c SRC -o OBJ` form, which component 1's `compile-object.sh` rules no longer print | (a) every signature (`write-signature.sh`, one batched call) and the three libffi toolchain signatures are written when the Makefile is read, rewritten only when their content changes; no `FORCE`; (b) the libffi signatures live beside their build directories, and each stamp recipe touches the stamp and then the installed headers (signature <= stamp <= headers); (c) the two harnesses (and three unwired scripts: `scripts/consumer_snapshot_mutations.py`, `scripts/v411_hardening_mutations.py`, `tests/build_identity_probes.py`) turn a `compile-object.sh` plan line back into the plain compiler command (`plain_compile`) and build the mutant object directly, outside the production wrapper | `make -q nift` 0 and `make -n nift` plans nothing on an up-to-date tree; packages mutants 16 of 16 caught, args/cmd mutants 5 of 5; `check-build-reuse.sh` gains the dry-run check |
+| 2: `test-runtime2-cp14b-design-mutants`: "anchor is not unique" | mutant 1's anchor named the former free `array_push(s[Result],r)`; component 2 made the line `Construction::array_push(bk,s[Result],r)` (0 matches; the message said "not unique" for any count other than 1) | the anchor names the new line and injects the same defect (the element, not the callback's result, is pushed); the message gives the count | all 11 verified design mutants detected, mutant 1 (`ignored-callback-result`) included; mutant 12 UNVERIFIED (comparator coverage on an unverified libstdc++ profile, the harness's own skip). The same migration broke `builtins_mutants.py` M8 (not in a gate): its anchor now names the builder lines and builds the same wrong order (the right operand's keys last); not run here (its differential build needs `builtins_diff`, which fails before this checkpoint: b2-refrep.md 13.4) |
+| 3: `test-rt-vm` line 371 "FAIL kind bits alias" | not a failure: the line is the output of the kind-bits *mutant*, which the target runs as `! .build/rt/kind-bits-mutant` (it must fail); the target passed (`PASS kind bits distinct`, then the mutant's expected FAIL) | none | `test-runtime2-kind-bits` exit 0 |
+| 3: closure mutant 1 "trusted mutant rebuild failed" (timed out after 300 s); 3: `.build/for-mutants/nift-1` link refused | item 4: the trusted rebuild under `TEST_DIR=<tmp>` rebuilt all in-tree objects (timeout), under another identity (the for-mutant link then refused 59 of them) | item 4 | `test-runtime2-closures-s1-mutants` and `test-runtime2-for-s2-mutants` exit 0; the in-tree objects and sidecars byte-identical before and after the mutant lanes |
+| 4: after `make -k test`, `make nift` refused 59 objects | `tests/runtime2/mutant_provenance.py` runs `make -s -C repo TEST_DIR=<tmp> CLOSURE_MUTANT=n <tmp>/closure-mutants/nift-n` (and `FOR_MUTANT`); with the in-tree signature at `$(TEST_DIR)/obj-config/default.flags` and `-I$(TEST_DIR)/libffi/...` in the identity, that make saw a new signature and another configuration and recompiled the in-tree objects into the source tree. It is the only make invocation in `tests/` and `scripts/` with a variable override that reaches the in-tree object set (searched: every `make ... VAR=` and `$(MAKE) ... VAR=`; the Makefile's own `CLOSURE_MUTANT`/`FOR_MUTANT` sub-makes select private mutant directories only) | the in-tree signature path is fixed (`.build/obj-config/default.flags`, `NIFT_INTREE_SIGNATURE` for `check-config.sh --sets`), and the identity (format v4) writes the value of TEST_DIR as `$TEST_DIR` in every argument; every object is rebuilt once more on the first make (the identity text changed) | `make TEST_DIR=<tmp> <tmp>/rt/value-unit` reuses every in-tree object (none rebuilt or rewritten), then `make -q nift` is 0; `check-build-reuse.sh` gains the relocated-root check (Linode, with `test-build-reuse`). The full `make -k test` then `make nift` sequence is a Linode item |
+| 5: `test-embed` at `test-runtime2-cp18-switch` | `combined_cp14b.py`: `collections.f:7:6: reference-guard:inflow`, the signature recorded as pre-existing in b2-refrep.md 13.4 | none (not caused by this checkpoint) | the Linode log, lines 125-136 |
+| 6: `test-bindings` | `test-binding-warnings` (Node headers not set), `go-binding` (`go` missing), `csharp-binding` (`dotnet` missing), `node-binding` (Node headers missing): environment; `python-binding`: undefined `HandleTable::shutdown_noexcept`, the release-blocker source-list item (6.3, carried items) | none | none new |
+| 6: `test-rt-vm-sanitize` | only `test-runtime2-cp14b-sanitize` failed (its own link of the `.build/cp14b/san` objects, `build_sanitizer.py`), the expected one | none | none new |
+| also failing, not new | `test-cp19-r1` (`eval_entry.py` unresolved-name text) and `test-rt-builtins` (`builtins_diff`): both pre-existing (b2-refrep.md 13.4) | none | |
+
+Process: the local focused gate set now also runs the mutant harness lanes that build `nift`
+variants (`test-runtime2-packages-mutants`, `test-runtime2-args-cmd-mutants`,
+`test-runtime2-cp14b-design-mutants`, `test-runtime2-kind-bits`,
+`test-runtime2-closures-s1-mutants`, `test-runtime2-for-s2-mutants`) and the relocated-root check.
