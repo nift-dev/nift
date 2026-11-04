@@ -24,6 +24,7 @@
 #include "rt/value.h"
 
 #include <cstddef>
+#include <type_traits>
 #include <vector>
 
 namespace nift::rt {
@@ -121,6 +122,21 @@ inline bool may_contain_identity(const Value& value) noexcept {
         default: return false;
     }
 }
+
+#ifdef NIFT_PRODUCTION_TU
+// Tooling checkpoint (component 3, src/build/production_tu.h): in a production
+// translation unit the storage-level tests' accessor is unreachable. No
+// definition may precede this header (an earlier definition could otherwise
+// name Storage through a template instantiated later), and after it the name is
+// poisoned: any later definition, declaration or use is a compile error.
+namespace test_access_detail {
+template <class T, class = void> struct complete : std::false_type {};
+template <class T> struct complete<T, decltype(void(sizeof(T)))> : std::true_type {};
+} // namespace test_access_detail
+static_assert(!test_access_detail::complete<StorageTestAccess>::value,  // rt-lint: test-access-decl
+              "the storage-level tests' accessor is defined in a production translation unit");
+#pragma GCC poison StorageTestAccess  // rt-lint: test-access-decl
+#endif
 
 } // namespace nift::rt
 

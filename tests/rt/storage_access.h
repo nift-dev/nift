@@ -6,6 +6,9 @@
 // production friend is mutation::Protocol). This header defines Storage's
 // second friend and the B1 free-function names over it. rt-lint flags any use
 // of StorageTestAccess under src/.
+#ifdef NIFT_PRODUCTION_TU
+#error "tests/rt/storage_access.h is a test-only header: a production translation unit cannot include it (tooling.md 3)"
+#endif
 #include "rt/aggregate.h"
 
 #include <cstddef>
