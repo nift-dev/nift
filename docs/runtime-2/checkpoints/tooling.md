@@ -51,9 +51,12 @@ sanitize` 7 times under ASan/UBSan.
   configurations share a directory, the in-tree objects (one configuration at a time, as
   `make nift` always was), can never link a mixture: a concurrent make with other flags on that
   directory makes the link fail instead. The supported way to build another configuration
-  alongside is its own directory (`RT_OBJ_CONFIG`). One window remains, stated plainly: between
-  the check and the linker reading the objects, another make with other flags could rename a new
-  object into place; the certification runner never runs two configurations on one directory.
+  alongside is its own directory (`RT_OBJ_CONFIG`). (Review F7, corrected: the check now runs
+  on every link and archive of a signed set, and the sidecar holds the object's sha256, so a
+  sidecar and an object from two different compiles are refused as a pair; see "Review fixes".)
+  One window remains, stated plainly: between the check and the linker reading the objects,
+  another make with other flags could rename a new object and its sidecar into place; the
+  certification runner never runs two configurations on one directory.
 - **Parallel-safety scope.** Supported: concurrent builds of different configurations, each in its
   own `.build/rt-obj/<config>/` (and the separate `pic`, `san`, `san-lifetime`, `tsan` sets), and
   concurrent builds of one configuration sharing objects (atomic renames). Unsupported:
@@ -268,8 +271,11 @@ functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `
   assertion closes the one ordering route the poison alone leaves: a definition before
   `aggregate.h` whose member template names `Storage` only when instantiated after it (control 2
   below compiles without the assertion).
-- **No macro is involved.** An earlier design (the friend named through a macro defined before the
-  poison) was rejected after a probe: Clang accepts `#pragma push_macro`/`pop_macro` restoring the
+- **The friend is not named through a macro.** (Review F4, corrected: the guard itself is the
+  macro `NIFT_PRODUCTION_TU`; undefining it before `aggregate.h` removed the poison and the
+  assertion, and is now refused by `compile-object.sh --production`, see "Review fixes".) An
+  earlier design (the friend named through a macro defined before the poison) was rejected after a
+  probe: Clang accepts `#pragma push_macro`/`pop_macro` restoring the
   macro after its `#undef`, which reopened the name (GCC refuses). Force-including `aggregate.h`
   itself was rejected too: it changed the code generated for units that do not include it
   (template instantiation order in `Hooks.o`, `Parser.o`, `Minify.o`). The marker changes no
@@ -278,10 +284,12 @@ functions, into `nift`; N2: the annotation accepted anywhere, and `markuppp/`, `
   production-only tail is a `static_assert` and a pragma after it (B2's ODR objection to a
   test-only friend does not apply).
 - **`tests/rt/storage_access.h`** refuses to compile (`#error`) where `NIFT_PRODUCTION_TU` is
-  defined; that is the N1 diagnostic. Undefining the marker first gains nothing, since the header
-  itself names the poisoned identifier.
+  defined; that is the N1 diagnostic. Undefining the marker after `aggregate.h` gains nothing,
+  since the header itself names the poisoned identifier; undefining it before (review F4) is
+  refused at the object (see "Review fixes").
 - **Dependency check per object** (`compile-object.sh --production`, every production rule, C
-  objects too): after the compile, every path in the compiler's dependency list (the whole include
+  objects too): after the compile, every path in the compiler's dependency list (`-MD` since review
+  F6: system headers and headers behind `#pragma GCC system_header` included) (the whole include
   closure, resolved by the compiler, so no spelling, macro or relative path hides one) is resolved
   against the repository root, and a path under the top-level `tests/` fails the object. This
   catches any test header, not only `storage_access.h`.
@@ -419,7 +427,12 @@ real code, at link time:
   on any (object, symbol) pair outside the reviewed allowlist `tests/abi/restricted-symbol-refs.txt`
   (15 pairs today: the protocol's commit layer in `mutation.o` and `mutation_collection.o`, the two
   sort files' commits, and the protocol's inline array commits expanded in `cell.o` and `vm_ops.o`).
-  A new reference, forged or legitimate, needs review.
+  A new reference, forged or legitimate, needs review. Its granularity is the (object, symbol)
+  pair (review F5): within an object already allowed a symbol it cannot tell one use from
+  another (a builder's from an in-place or forged one), so it adds nothing inside the 20-odd
+  builder users; there the compile-time key and the lint are the guards. Since review F5 it fails
+  closed: no objects, an `nm` failure or diagnostic, or an empty listing of an LTO object fail the
+  link.
 - **Dynamic links**: `libnift_c.so` does not export these symbols (component 6), so a forged unit
   linked against it has an undefined reference.
 - `make test-rt-sort-forgery` (`tests/rt/sort_forgery/run.sh`, in `certify-targets`, exclusive):
@@ -452,7 +465,11 @@ bypass cases, control), `test-rt-lint`, `test-rt-sort-forgery`, `test-rt-sort-pr
   a thin wrapper), `build::Object`, `build::Struct`. A builder is move-only, cannot be assigned, has
   no constructor from an existing `Value` (`build::Array::shallow_clone(source)` makes a new array
   from a source's elements, as `array_shallow_clone` did), and offers reads of its own value only
-  (`size()`, `get()`), never a reference into its storage.
+  (`size()`, `get()`), never a writable reference into its storage. (Review F10, corrected:
+  `build::Object::get(key)` returns a `const Value*` into the builder's own object, used by
+  `obj_merge`'s `shallow_object` merge and two natives to test a key; it grants no write, and is
+  valid only until the builder's next `set` or its `publish`, as for any pointer from
+  `object_get`; no caller keeps it past the statement.)
 - **Publication** is `std::move(builder).publish()` (rvalue-qualified, so it cannot be written by
   accident on an lvalue): the value moves out and the builder is left holding nothing (a null
   `Value`; `ArrayBulk` also a null storage pointer). From then on no use of the builder, through
@@ -476,11 +493,11 @@ bypass cases, control), `test-rt-lint`, `test-rt-sort-forgery`, `test-rt-sort-pr
 
 | Layer | What it guarantees | Where |
 | --- | --- | --- |
-| compile time | no free construction function exists; the primitives are private; a builder cannot be copied, assigned or made from an existing `Value`; `publish()` needs an rvalue; the key cannot be made, copied, byte-copied or destroyed outside its owners | `absent.cpp` (structural, SFINAE), nine compile-fail cases (2.5) |
+| compile time | no free construction function exists; the primitives are private; a builder cannot be copied, assigned or made from an existing `Value`; `publish()` needs an rvalue; the key cannot be constructed, copied or byte-copied outside its owners (a reference to one can be forged, and explicit instantiation reaches the primitives: 2.4) | `absent.cpp` (structural, SFINAE), eleven compile-fail cases (2.5, review fixes) |
 | structural | a published or moved-from builder holds no reference to anything | `build.h`; `test-rt-build` (refcount 1 after publication, observed contents) |
-| link time | only the reviewed objects reference the primitives, so a unit forging `Construction`, a builder, an owner or the key does not link `nift`/`libnift_c` | `tests/abi/restricted-symbol-refs.txt` (34 construction pairs added, 49 in all), component 4's check |
+| link time | only the reviewed objects reference the primitives, so a unit outside them forging `Construction`, a builder, an owner or the key does not link `nift`/`libnift_c`; inside an object allowed a primitive (every builder user is allowed `Construction::array_push`, for example) the (object, symbol) check cannot tell a builder use from an in-place or forged one (review F5) | `tests/abi/restricted-symbol-refs.txt` (34 construction pairs added, 49 in all), component 4's check |
 | run time | `check_fresh`: checked builds abort if a construction receiver is shared, immutable or sort-protected (both tiers); checked builds abort on a spent builder | `aggregate_store.h`, `build.h`; the sanitizer lanes (Linode) |
-| lint | an in-place site keeps its `rt-lint: storage-ok <label>` annotation; builder sites need none (no construction token remains) | `tools/rt-lint.py` (the storage-write rule now also skips `Construction::`, which the construction rule covers) |
+| lint | an in-place site keeps its `rt-lint: storage-ok <label>` annotation; builder sites need none (no construction token remains) | `tools/rt-lint.py`: any `Construction` token is a construction reference (review F1, corrected: the B2 name list had missed the six renamed primitives); each annotation pinned by the line it covers (section 5) |
 
 ### 2.3 Migration, site by site
 
@@ -524,7 +541,7 @@ statement; it is the same statement as before in every row.
 | 20 | `copy_graph.cpp:195` `shallow_copy` struct | `make_struct; struct_add_field; out = copy` | `build::Struct`; `out = publish` | a | `out = ...` | |
 | 21 | `copy_graph.cpp:210,214` `shallow_copy` array/object | `copy = array ? make_array(n) : make_object(); array_push / object_set` | `build::Array` or `build::Object`; `out = publish` | a | `out = ...` | the same allocation per kind |
 | 22 | `copy_graph.cpp:251,256` `clone_tree` (`clone_constant`, LoadKFresh) | `Value copy = make_array(n); array_push(copy, clone_tree(item)); return copy` | builder; `push(clone_tree(item))`; `return publish` | a | the caller's push, finally `out` | child cloned before the push, as before |
-| 23 | `legacy_bridge.cpp:43` `object_from_legacy` | `out = make_object(); ... object_set(out, ...)`; failures return with the partial object in `out` | builder; `out = Value()` right after it (the old release point of `out`'s previous value); `out = publish` on success and before each failure return | a | `from_legacy`'s caller, after return | the partial value reaches `out` on every path, as before |
+| 23 | `legacy_bridge.cpp:43` `object_from_legacy` | `out = make_object(); ... object_set(out, ...)`; failures return with the partial object in `out` | builder; `out = Value()` right after it (the old release point of `out`'s previous value); `out = publish` on success and before each failure return | a | `from_legacy`'s caller, after return | the partial value reaches `out` on every return, as before (review F10, corrected: on an exception path, `bad_alloc` in a push, `out` is now null where it held the partial value; rows 24, 35, 36 and 37 likewise; `from_legacy` has no caller in `src/` outside the file, and no caller reads `out` after an exception) |
 | 24 | `legacy_bridge.cpp:78` `convert_from` array | `out = make_array(n); array_push(out, v)`; failure returns with the partial array | the same pattern as 23 | a | after return | |
 | 25 | `natives/support.cpp` `ArrayBuilder` (every array-returning native: slice, split, keys, values, entries, map of json arrays, ...) | `make_array(n)` + `array_build_storage` once; `items_->push_back`; stride `heap_retally`; `finish`: tally, move | `build::ArrayBulk`: the same calls in the same order | a | `finish()`'s return | |
 | 26 | `natives/object_methods.cpp:36` `listing` entries pair | `Value pair = make_object(); object_set x2; result.push(pair)` | `build::Object pair; set x2; result.push(publish)` | a | `result.push(...)` | |
@@ -555,10 +572,21 @@ can differ.
 
 ### 2.4 The bounded in-place exceptions
 
-Each exception holds the key in its named owner (the only functions that can make one: a
-`friend` of `build::InPlaceKey`, `build.h`), and each production use is listed here. Guarantees,
-separately: **compile time**: only the owner can make the key (`absent.cpp`, `build_key_forge.cpp`,
-`build_key_bitcast.cpp`, `build_key_copy.cpp`); **link time**: only the listed objects reference the
+Each exception holds the key in its named owner (the only functions that can construct one: a
+`friend` of `build::InPlaceKey`, `build.h`; for the VM, the members `Vm::cold` and
+`Vm::struct_op` through `VmInPlace`, `rt/vm_in_place.h`, not the whole class, since review F3;
+the mutant-only owners are friends only in their mutant builds), and each production use is
+listed here. Guarantees, separately: **compile time**: only the owner can construct the key
+(`absent.cpp`, `build_key_forge.cpp`, `build_key_bitcast.cpp`, `build_key_copy.cpp`,
+`build_key_vm_member.cpp`, `build_key_mutant_owner.cpp`). What it does not refuse (review F3), the
+same deliberate-source class as `mutation::SortKey`'s (4.1, 4.2): a reference to a key forged by
+a cast (`*reinterpret_cast<const InPlaceKey*>(&c)`, review `x/k1_cast.cpp`) or as an inactive union
+member (`x/k2_union.cpp`), and the explicit-instantiation access rule ([temp.explicit]), which
+reaches the private primitives, and `Storage`'s commits, with no key at all (`x/k3_inst.cpp`,
+`x/k4_storage.cpp`; B2 recorded it as INFO for `Storage` and `Protocol`); each is written
+deliberately in source, compiles under g++ and clang++, and is caught by the lint (any
+`Construction` or `Storage` token outside the allowed files) and, in checked builds, by
+`check_fresh`; **link time**: only the listed objects reference the
 primitives behind it; **run time**: `check_fresh` (checked builds) aborts if the receiver is
 shared, immutable or sort-protected; **lint**: the site keeps its `rt-lint: storage-ok` annotation.
 It is a structural narrowing of who may construct in place, not a builder proof of freshness:
@@ -575,7 +603,7 @@ named.
 | E6 | `deep_copy_tuple` | `copy_graph.cpp` `GraphCopy::fill` (rows 18, 19) | the shells are created first and held in the identity map (`copies_`) so a DAG keeps its sharing; each is filled in post-order before any parent holds it | the parent's fill, or the returned roots | `test-rt-build` (deep_copy under allocation injection: the source unchanged, the DAG kept, nothing leaks), refsem (copy, deepcopy), CP18 transfer campaigns (Linode) |
 | E7 | (none: row 17 became a builder) | | | | |
 | E8 | `cell_read` | `cell.cpp:90,92` | updates two cache fields of a selector cell's own descriptor after its creation (not a new value at all) | never user-visible | refsem cells (`cell_cycle_*`), refrep cell cases; B2 carried item L2 (`cell.cpp`) unchanged |
-| E9 | `Vm` (`op_keyed_mutate`), `set_index`, `natives::obj_merge` | rows 30, 45, 46 | test mutants only (REFSEM R14, M-B2 30, R-B5 26): each is a deliberate bypass of the protocol on a published receiver, which the mutant gates must catch | not compiled in production | `test-runtime2-refsem-mutants` (each caught) |
+| E9 | `Vm::op_keyed_mutate`, `set_index`, `natives::obj_merge` | rows 30, 45, 46 | test mutants only (REFSEM R14, M-B2 30, R-B5 26): each is a deliberate bypass of the protocol on a published receiver, which the mutant gates must catch | not compiled in production, and (review F3) a friend of the key only in its own mutant build (`NIFT_REFSEM_MUTANT` 14, 30, 26) | `test-runtime2-refsem-mutants` (each caught) |
 
 ### 2.5 Tests
 
@@ -697,16 +725,20 @@ and the reviewable record of every in-place site.
 - **`--boundary`** (in `test-rt-lint`, replacing `--test-access src include bindings` and the B2
   `.inc` grep): the storage-write, construction, sort, paste and test-access rules over `src`,
   `include`, `bindings`, `markuppp` and `minifypp`; every directory below them, nested `tests/`
-  included (`src/tests/`, `src/rt/tests/`); only the top-level `tests/` (and `third_party/`) is
-  skipped; every C/C++ suffix (`.h .hh .hpp .hxx .h++ .c .cc .cpp .cxx .c++ .inc .ipp .tpp .tcc
+  included (`src/tests/`, `src/rt/tests/`); symlinked directories followed (review F11); only the
+  top-level `tests/` is skipped, and `third_party/` is scanned only where a scanned file includes
+  it (review F11: `src/Sha256.cpp`'s vendored header); every C/C++ suffix (`.h .hh .hpp .hxx .h++ .c .cc .cpp .cxx .c++ .inc .ipp .tpp .tcc
   .ixx .cppm .def .m .mm`); and every file a scanned file `#include`s, whatever its suffix
   (resolved against the including file's directory and the build's include roots). Today: 687
   files (`src` 615, `markuppp` 38, `minifypp` 12, `bindings` 11, `include` 10, plus
   `jsonic/include/json.h` through an include; 3 `.inc`, 15 `.c`, 2 `.cc`), 0 problems.
 - **Annotation manifest** `tools/rt-lint-annotations.txt`: every boundary annotation
-  (`storage-ok <label>`, `paste-ok`, `test-access-decl`) by path, label and count (42 today, 15
-  entries). An annotation not listed, a listed one gone, or a changed count fails `--boundary`;
-  a new in-place site is a reviewed edit of the manifest.
+  (`storage-ok <label>`, `paste-ok`, `test-access-decl`) by path, label and count (42 at
+  `df7eb54e`). An annotation not listed, a listed one gone, or a changed count fails `--boundary`.
+  (Review F1, corrected: at `df7eb54e` the claim "a new in-place site is a reviewed edit of the
+  manifest" did not hold for the six renamed primitives, which no rule matched; since the fix the
+  manifest pins each annotation by path, label and the normalised code of the line it covers, 41
+  lines, and an annotation that covers no checked reference fails; see "Review fixes".)
 - **One source edit**: `src/embed/program_api.cpp`'s `PROGRAM_VIEW` macro (C API accessor names
   built with `##`, found by the wider scan) gains a `/* rt-lint: paste-ok ... */` comment on its
   `#define` line; `program_api.o` is byte-identical and `nift` is unchanged (`de382d75...`).
@@ -758,9 +790,9 @@ following, `.h`/`.cpp` only, manifest ignoring unlisted annotations: 13 of 13 ca
   (after component 2 the free names do not exist). The alias form (`rc/lintb/rt/vm_alias.h`: one
   annotated `auto& build_push = array_push;`, then unannotated uses) passes the per-line rule; the
   manifest pins the annotation, and component 2 makes the aliased name unresolvable.
-- Not scanned: `benchmarks/`, `tools/`, `jsonic/` (except what production includes), top-level
-  files, and an unincluded file with no C/C++ suffix: none of these is compiled into `nift` or
-  `libnift_c`. `rc2/lint2`'s `benchmarks/x.h`, `tools/x.h` and `top.h` are outside the roots.
+- Not scanned: `benchmarks/`, `tools/`, `jsonic/` and `third_party/` (except what production
+  includes: review F11), top-level files, and an unincluded file with no C/C++ suffix: none of
+  these is compiled into `nift` or `libnift_c` (except through the includes followed). `rc2/lint2`'s `benchmarks/x.h`, `tools/x.h` and `top.h` are outside the roots.
 - Trigraphs (removed in C++17) are not translated.
 
 ### 5.4 Gates
@@ -770,3 +802,34 @@ unchanged), `test-rt-lint` (self-test 16 fixtures; `src/rt` 0 problems; boundary
 687 files, 42 annotations against the manifest), `rt-lint-mutants` (13 of 13), `test-c-abi-symbols`
 (73 exports), `test-rt-isolation`. No production object changes, so the runtime gates of section
 2.7 stand; nothing for Linode beyond the combined-tree certification.
+
+## Review fixes (independent review of `df7eb54e`)
+
+The review (combined ACCEPT-WITH-CONDITIONS; component 5 REJECT as delivered) found no change of
+semantics, behaviour or expectations. These commits on top of `df7eb54e` fix or record each
+finding; history is not rewritten. Probes cited as `x/...` and `lintN/` are the reviewer's, under
+the session scratchpad `review-tooling/`.
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| F1 HIGH: the six renamed primitives (`Construction::array_storage`, `array_set`, `object_slot`, `map_set`, `set_add`, `stack_push`) matched no lint rule; 11 pinned annotations covered unchecked lines | any `Construction` token is a construction reference and any `Storage` token a storage reference, so the lists cannot fall behind a rename; the self-test reads every static member declared in `class Construction` (build.h, 9) and `class Storage` (aggregate.h, 15) and requires each to be flagged; an annotation must cover a checked reference (`annotation-unused`); the manifest pins each annotation by path, label and the normalised code of the line it covers (41 lines), so none can move to a new site or stay unneeded; the pre-existing `storage-ok scratch` in `collection_sort.cpp:29` covered nothing the lint checks (a raw-layout hand-out: the known raw-layout route, 4.3) and is now a plain comment (object unchanged); the other 10 now sit on checked lines | `bad_inplace.cpp` (`lint1/src/rt/probe.cpp`: every primitive, `using C = Construction`, an unneeded annotation); the self-test plants the reviewer's `Construction::array_storage(bk,s[Returned]).clear();` into the real `collection_helpers.cpp` after `case M::Map:` and requires exactly that line flagged (and the real file clean); `lint1` flags all 7 lines |
+| F2: backslash, blanks, newline is a splice to GCC and Clang, not to `lex()` | `splice()` matches `\\[ \t\f\v]*\r?\n` | `bad_lexical.cpp` 46 (`Construct\␠␠⏎ion::`), 48 (`Storage\⇥⏎TestAccess`), 51 (`#\␠⏎#`); `lint4/` flags all three forms |
+| F3: `friend class Vm`; mutant-only owners friends in production; forgery routes not recorded for the key | `InPlaceKey` befriends `VmInPlace` (`rt/vm_in_place.h`), which befriends exactly `Vm::cold` and `Vm::struct_op` (and `Vm::op_keyed_mutate` only under `NIFT_REFSEM_MUTANT == 14`); `set_index` and `obj_merge` are friends only under their mutant values (30, 26); the key's destructor is public (an owner's local is destroyed in its scope) and user-provided; 2.2 and 2.4 now list the cast, union and explicit-instantiation routes as the deliberate-source class of `SortKey` | compile-fail `build_key_vm_member.cpp` (`x/k5_vm.cpp`), `build_key_mutant_owner.cpp` (`x/k6_objmerge.cpp`); `absent.cpp` asserts not default-constructible, not aggregate, not trivially copyable or destructible, no copy or move; every production object and `nift` byte-identical before and after (`de382d75`, `vm_report.o`, `vm_struct.o`, `vm_keyed.o` compared); the R14, R-B5 and M-B2 mutant units compile |
+| F4: `#undef NIFT_PRODUCTION_TU` before `aggregate.h` removes the poison and the assertion; 3.2 claims wrong | `compile-object.sh --production` refuses an object whose command line undefines the marker (`-U`) or any of whose in-repository dependencies holds an undef directive for it, read as the preprocessor reads it (splices including backslash-blank-newline removed, `%:` as `#`, comments allowed between the tokens; a conservative text check: such a directive in a string or a disabled `#if` block is refused too); 3.2 corrected | `test-rt-isolation` cases `f4-undef-in-unit` (the reviewer's `vm_ops.cpp` plant, `x/i1_undef.cpp`), `f4-undef-in-header` (`# /* x */ undef NIFT_PRODUCTION_\␠⏎TU` in an included header), `f4-undef-command-line` |
+| F5: `check-symbol-refs.sh` fails open on `nm` errors; the (object, symbol) limit | fails closed: no objects, an `nm` failure or any diagnostic other than "no symbols", an empty listing of an object with LTO sections, an object `readelf` cannot read; the limit is stated in the script, 2.2 and 4.3 | a missing object, a non-ELF file and an empty object list each fail; the 290 in-tree objects pass |
+| F6 LOW: `#pragma GCC system_header` hides a test include from `-MMD` | production objects record dependencies with `-MD` (every header; the compile command and the signature are unchanged) | `test-rt-isolation` case `f6-system-header` (`x/sysh`) |
+| F7: the configuration check missed most links; sidecar and object renamed separately | `check-config.sh --sets` runs first on every link and archive rule of the Makefile that has object prerequisites (256 rules: `nift`, `libnift_c.a`, `libnift_c.so`, the sanitizer and TSan `nift`, every test and mutant link), and checks each object of a signed set against its set's signature (in-tree: `default.flags`; `pic`, `san`, `san-lifetime`, `tsan`; each `rt-obj/<config>`), the C or C++ template by the source's suffix; private mutant and probe objects carry no signature (F8, 1.4). The sidecar now holds the object's sha256 beside the identity (format v3: every object rebuilt once, the second one-time rebuild of this checkpoint), so a sidecar and an object from two compiles never pass as a pair. Remaining window: a consistent object-and-sidecar pair of another configuration renamed in between the check and the link (unsupported case only; `certify.py` never does it) | `check-build-reuse.sh` gains the reviewer's `-O1` archive reproducer (`libnift_c.a` refused) and a sidecar beside another compile's object (refused); run locally as a focused check (below); the full `test-build-reuse` runs on Linode |
+| F8 LOW (record) | not changed: compiler environment variables (`CPATH`, `CPLUS_INCLUDE_PATH`, `GCC_EXEC_PREFIX`, `COMPILER_PATH`, `SOURCE_DATE_EPOCH`) are not in the identity; `LDFLAGS`/`LDLIBS` changes and a source removed from a list do not relink (pre-existing); an object rewritten by another tool keeps a stale sidecar only if the tool also writes a matching sidecar (the sha256 now refuses a bare object rewrite); the private mutant, probe, CP20-CP22 and session-mutant object rules have no signature and no dependency file (pre-existing, 1.4) | |
+| F9 LOW: two changed objects unlisted | 27 of 291 in-tree objects differ from `c1f43300` (the reviewer's count): 25 of the 26 objects whose source component 2 changed (one compiles to the same object; `collection_plain_sort.o` differs by one swapped `cmp` operand, read only by `je`), and `src/rt/session.o` and `src/rt/isolate_transfer_decode.o`, which differ only in section and COMDAT order (template instantiation order from `build.h`'s inline code): same section set, identical per-section disassembly, identical `.rodata` and `.data` | the reviewer's `tools/secdiff.py` |
+| F10 LOW: record and controls | 2.1 (`build::Object::get()` is a `const Value*` into the builder's object, valid until its next `set` or `publish`) and row 23 ("on every return"; the exception path) corrected; `absent.cpp`'s free-function detector gets a positive control through the same macro (`array_size`); `build_publish_lvalue.cpp` matches the lvalue diagnostic (g++ "discards qualifiers", clang "rvalue ref-qualifier") and `control.cpp` compiles `std::move(builder).publish()` | `test-rt-protocol-compile-fail` |
+| F11 LOW: symlinked directories; `third_party/` includes | the scan follows symlinked directories (each real directory once) and scans a `third_party/` header that a scanned file includes (689 files today) | fixture tree: `src/rt/linked -> ../../elsewhere`, `third_party/lib/inc.h` (scanned), `third_party/lib/unincluded.h` (not); `lint5/` flags `src/rt/sub/x.cpp` |
+| F13 (provenance) | the gate script refuses to start on a tree with modified tracked files and records `git status` before and after in each result file | gate files under `gates/review/` |
+
+Not changed (no finding requires it): F11's `test-production-deps` command-count range (the gate
+still requires a non-empty list; recorded), F12 (component 6 controls and the header parser's
+one-declarator form; recorded), Clang wording in `tests/rt/compile_fail/run.sh` (the harness
+matches g++ diagnostics, as before).
+
+Lint mutants (local evidence, `scratchpad/tooling/lint-mutants.py`): 19 of 19 caught, the 13 of
+section 5 plus F2 (splice without blanks), F1 (no `Construction` token rule, no
+`annotation-unused` rule, manifest by count) and F11 (no symlinks, `third_party/` never).
