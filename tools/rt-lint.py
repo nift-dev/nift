@@ -80,6 +80,7 @@ CONSTRUCTION = re.compile(
 # reference, whatever the member's name, so a rename cannot drop coverage; the
 # self-test checks every member declared in build.h (and every Storage member
 # declared in aggregate.h) is flagged.
+MANGLED = re.compile(r'_Z[A-Za-z0-9_]*?4nift2rt')
 CONSTRUCTION_CLASS = re.compile(r'\bConstruction\b(?:\s*::\s*[A-Za-z_]\w*)?')
 SORT_ACCESS = re.compile(r'\b(SortController|SortKey|sort_storage|sort_items|commit_permutation)\b')
 SORT_INCLUDE = re.compile(r'#\s*include\s*[<"][^">]*sort_controller\.h')
@@ -176,9 +177,10 @@ def splice(text):
     return ''.join(out), where, line
 
 
-def lex(text):
+def lex(text, literals=None):
     """Return (code, comment, include): per physical line (index 0 is line 1), the
-    code with literal contents blanked, the comment text, and {line: header name}."""
+    code with literal contents blanked, the comment text, and {line: header name}.
+    With `literals` (a dict), each string literal's contents go to literals[line]."""
     s, where, phys = splice(text)
     n = len(s)
     code = [[] for _ in range(phys + 1)]
@@ -228,6 +230,8 @@ def lex(text):
                     delim = s[j + 1:paren]
                     end = s.find(')' + delim + '"', paren + 1)
                     end = n if end < 0 else end + len(delim) + 2
+                    if literals is not None:
+                        literals.setdefault(where[j], []).append(s[paren + 1:end])
                     emit('""', j)
                     j = end
                     continue
@@ -236,6 +240,8 @@ def lex(text):
                 k += 2 if s[k] == '\\' else 1
             if INCLUDE_DIRECTIVE.match(line_code(j)):
                 include[where[j]] = s[j + 1:k]
+            elif literals is not None:
+                literals.setdefault(where[j], []).append(s[j + 1:k])
             emit('""', j)
             j = k + 1
             continue
@@ -291,7 +297,8 @@ def boundary_file(path, rel, text, problems, annotations, rules):
     """The boundary rules on one file (rel: its repository path, which the
     allowlists name). Adds every annotation found to
     annotations[(rel, label, the normalised code it covers)]."""
-    code, comment, include = lex(text)
+    literals = {}
+    code, comment, include = lex(text, literals)
     labels = [set(ANNOTATION_ANY.findall(c)) for c in comment]
     storage_checked = rel not in STORAGE_ALLOWED
     for index, line in enumerate(code):
@@ -312,6 +319,12 @@ def boundary_file(path, rel, text, problems, annotations, rules):
         sort_include = header is not None and os.path.basename(os.path.normpath(header)) == 'sort_controller.h'
         if 'storage' in rules and rel not in SORT_ALLOWED and (SORT_ACCESS.search(line) or sort_include):
             problems.append(f'{path}:{number}: storage-write: the protocol\'s sort commits outside the sort controller')
+        # Re-review N2: an asm label or an identifier spelt as a mangled nift::rt
+        # name (`_ZN4nift2rt...`) reaches any symbol past access control and
+        # names no `Construction` or `Storage` token; production code never needs one.
+        if 'storage' in rules and (MANGLED.search(line) or any(MANGLED.search(l) for l in literals.get(number, ()))):
+            problems.append(f'{path}:{number}: storage-write: a mangled nift::rt symbol name (an asm label or '
+                            'a declaration spelt with it) bypasses access control')
         if 'storage' in rules and TOKEN_PASTE.search(line) and 'paste-ok' not in here:
             problems.append(f'{path}:{number}: storage-write: token pasting without `rt-lint: paste-ok`')
         if 'test-access' in rules:
@@ -628,6 +641,11 @@ def self_test():
     if inplace != {6, 7, 9, 11, 12, 13, 14, 15, 16, 20}:
         print(f'FAIL rt-lint self-test bad_inplace.cpp: expected [6, 7, 9, 11-16, 20], got {sorted(inplace)}')
         failed = True
+    # Re-review N2: asm labels, #pragma weak and identifiers spelt as mangled nift::rt names.
+    mangled = {int(p.split(':')[1]) for p in boundary_scan(['bad_mangled.cpp'], fixtures)[0]}
+    if mangled != {6, 7, 8, 9, 10}:
+        print(f'FAIL rt-lint self-test bad_mangled.cpp: expected [6-10], got {sorted(mangled)}')
+        failed = True
     # The name lists follow the declarations: every member of rt::Construction
     # (src/rt/build.h) and of rt::Storage (src/rt/aggregate.h, aggregate_collection.h)
     # is flagged when a unit outside the allowlist names it, so a rename or a new
@@ -663,8 +681,8 @@ def self_test():
     if not anchor or clean or [int(p.split(':')[1]) for p in plant] != [anchor[0] + 2]:
         print(f'FAIL rt-lint self-test collection_helpers plant: clean {clean}, planted {plant}')
         failed = True
-    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected) + 5} fixtures'
-          f' (bad_lexical, bad_inplace, tree: {len(files)} files over {len(BOUNDARY_ROOTS)} roots, manifest and'
+    print('FAIL rt-lint self-test' if failed else f'PASS rt-lint self-test: {len(expected) + 6} fixtures'
+          f' (bad_lexical, bad_inplace, bad_mangled, tree: {len(files)} files over {len(BOUNDARY_ROOTS)} roots, manifest and'
           f' 4 mutations; {len(declared["Construction"])} Construction and {len(declared["Storage"])} Storage'
           f' members flagged; the collection_helpers plant)')
     return 1 if failed else 0
