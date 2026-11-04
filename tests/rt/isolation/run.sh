@@ -9,11 +9,23 @@
 set -u
 export LC_ALL=C
 repo=$(pwd -P)
-work=$(mktemp -d "${TMPDIR:-/tmp}/nift-isolation.XXXXXX"); trap 'restore_all; rm -rf "$work"' EXIT
+work=$(mktemp -d "${TMPDIR:-/tmp}/nift-isolation.XXXXXX"); trap 'restore_all; restore_objects; rm -rf "$work"' EXIT
 fail=0; saved=()
+# The objects the cases rebuild (re-check note): saved with their sidecars and
+# dependency files, mtimes included, and put back at the end, so the tree is
+# left exactly as it was (`make -q nift` still 0); sources are restored with
+# their own mtimes (cp -p, no touch).
+OBJS="src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o
+      src/rt/vm_closure.o src/rt/compiler_coro.o"
+mkdir -p "$work/objs"
+for o in $OBJS; do for f in "$o" "${o%.o}.cfg" "${o%.o}.d"; do cp -p "$f" "$work/objs/$(echo "$f" | tr / _)"; done; done
+restore_objects() {
+  for o in $OBJS; do for f in "$o" "${o%.o}.cfg" "${o%.o}.d"; do
+    [ -f "$work/objs/$(echo "$f" | tr / _)" ] && cp -p "$work/objs/$(echo "$f" | tr / _)" "$f"; done; done
+}
 save() { cp -p "$1" "$work/$(echo "$1" | tr / _).orig"; saved+=("$1"); }
 restore_all() {
-  for f in "${saved[@]}"; do cp -p "$work/$(echo "$f" | tr / _).orig" "$f"; touch "$f"; done; saved=()
+  for f in "${saved[@]}"; do cp -p "$work/$(echo "$f" | tr / _).orig" "$f"; done; saved=()
   rm -rf src/rt/tests src/rt/natives/probe.hxx src/rt/natives/probe.def minifypp/include/probe_access.h \
          src/rt/natives/probe_undef.h src/rt/natives/probe_system.h src/rt/natives/probe_n.h \
          "src/rt/natives/probe dir" "src/rt/natives/probe'q.h" "src/rt/natives/m:"
@@ -169,9 +181,11 @@ printf '\nnamespace nift::rt { int nift_isolation_control() { return 1; } }\n' >
 if make src/rt/vm_ops.o > "$work/control.log" 2>&1; then echo "PASS isolation control: a harmless plant builds"
 else echo "FAIL isolation control: the control plant does not build"; tail -5 "$work/control.log"; fail=1; fi
 restore_all
-# leave the production objects as they were
-make src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o src/rt/vm_closure.o \
-  src/rt/compiler_coro.o > "$work/rebuild.log" 2>&1 || { echo "FAIL isolation: rebuild after restore"; fail=1; }
+# leave the production objects as they were (the saved objects, sidecars and
+# dependency files, mtimes included)
+restore_objects
+# shellcheck disable=SC2086
+make -q $OBJS || { echo "FAIL isolation: the restored objects are not up to date"; fail=1; }
 git diff --quiet -- src markuppp minifypp || { echo "FAIL isolation: the tree was not restored"; fail=1; }
 echo "$( [ $fail = 0 ] && echo PASS || echo FAIL ) isolation: production cannot reach the storage-level test helpers"
 exit $fail

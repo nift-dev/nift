@@ -21,6 +21,7 @@
 #              another's) is refused
 #   relocated  make TEST_DIR=<tmp> reuses the in-tree objects (none rebuilt);
 #              make -q / make -n see an up-to-date tree as up to date
+#   clean      make clean nift and make distclean nift, each one invocation
 #   parallel   concurrent makes of different configurations in one tree, and
 #              of one configuration sharing objects: every object, sidecar and
 #              dependency file identical to a clean build of its own
@@ -211,5 +212,16 @@ else bad "relocated: the in-tree objects changed under another TEST_DIR"; fi
 if make -q nift && ! make -s -n nift | grep -qE -- ' -o nift$'; then
   pass "dry run: an up-to-date tree is up to date for make -q nift, and make -n nift plans no link"
 else bad "dry run: make -q nift or make -n nift sees an up-to-date tree as stale"; fi
+
+# --- clean and build in one invocation (re-check N1): the signatures are
+# recreated in the same run, no object falls back to make's built-in rule, and
+# nift is the same binary with every object carrying its sidecar ---
+ref=$(sha256sum nift | cut -d' ' -f1)
+for c in clean distclean; do
+  if make -j2 "$c" nift > "$out/$c-nift.log" 2>&1 && [ "$(sha256sum nift | cut -d' ' -f1)" = "$ref" ] && \
+     bash scripts/build/check-config.sh --sets .build $(var CLI_OBJECTS) && make -q nift; then
+    pass "make $c nift: nift ${ref:0:16} rebuilt identically, every object with its sidecar, make -q nift 0"
+  else bad "make $c nift ($c-nift.log)"; fi
+done
 
 exit $fail

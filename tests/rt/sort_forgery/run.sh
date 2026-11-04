@@ -17,8 +17,13 @@ export LC_ALL=C
 here=tests/rt/sort_forgery
 work=$(mktemp -d "${TMPDIR:-/tmp}/nift-sort-forgery.XXXXXX")
 cp -p src/Hooks.cpp "$work/Hooks.cpp.orig"
-restore() { cp -p "$work/Hooks.cpp.orig" src/Hooks.cpp; touch src/Hooks.cpp; }
-trap 'restore; rm -rf "$work"' EXIT
+# The source and (re-check note) the object, its sidecar and dependency file and
+# nift are put back with their mtimes, so the tree is left as it was (`make -q
+# nift` still 0); the plants rebuild src/Hooks.o, and every planted link fails.
+for f in src/Hooks.o src/Hooks.cfg src/Hooks.d nift; do cp -p "$f" "$work/$(basename "$f").keep"; done
+restore() { cp -p "$work/Hooks.cpp.orig" src/Hooks.cpp; }
+restore_objects() { for f in src/Hooks.o src/Hooks.cfg src/Hooks.d nift; do cp -p "$work/$(basename "$f").keep" "$f"; done; }
+trap 'restore; restore_objects; rm -rf "$work"' EXIT
 fail=0
 var() { make -s -f Makefile -f - pv <<MK 2>/dev/null
 pv: ; @echo \$($1)
@@ -63,7 +68,8 @@ for form in attribute pragma; do
   else echo "FAIL sort-forgery 3 ($form): failed for another reason:"; grep -m3 -i error "$work/weak-$form.log"; fail=1; fi
   restore
 done
-make nift > "$work/rebuild.log" 2>&1 || { echo "FAIL sort-forgery: nift does not rebuild after restore"; fail=1; }
+restore_objects
+make -q nift || { echo "FAIL sort-forgery: nift is not up to date after the restore"; fail=1; }
 # 2. dynamic: libnift_c.so
 printf 'namespace nift::rt { class Value; }\nvoid nift_probe_hijack(nift::rt::Value&);\nint main() { return 0; }\nvoid (*keep)(nift::rt::Value&) = nift_probe_hijack;\n' > "$work/main.cpp"
 # shellcheck disable=SC2086

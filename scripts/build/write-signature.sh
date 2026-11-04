@@ -13,20 +13,32 @@ set -u
 . "$(dirname "$0")/config-id.sh"
 write_one() {
   local file=$1; shift
-  mkdir -p "$(dirname "$file")"
-  local t="$file.tmp.$$"
-  : > "$t"
+  local t
+  if [ -n "${NIFT_SIGNATURE_CHECK_ONLY:-}" ]; then
+    t=$(mktemp) || return 1
+  else
+    mkdir -p "$(dirname "$file")" || return 1
+    t="$file.tmp.$$"
+    : > "$t" || return 1
+  fi
   while [ $# -gt 0 ]; do
     local part=()
     while [ $# -gt 0 ] && [ "$1" != --- ]; do part+=("$1"); shift; done
     [ $# -gt 0 ] && shift
-    [ ${#part[@]} -gt 0 ] && config_text "${part[@]}" >> "$t"
+    if [ ${#part[@]} -gt 0 ]; then config_text "${part[@]}" >> "$t" || { rm -f "$t"; return 1; }; fi
   done
-  if cmp -s "$file" "$t"; then rm -f "$t"; else mv -f "$t" "$file"; fi
+  if cmp -s "$file" "$t"; then rm -f "$t"
+  elif [ -n "${NIFT_SIGNATURE_CHECK_ONLY:-}" ]; then rm -f "$t"; printf '%s\n' "$file"   # would change
+  else mv -f "$t" "$file" || return 1; fi
 }
+# Every group is written (or, with NIFT_SIGNATURE_CHECK_ONLY, checked: the
+# files whose content would change are printed, nothing is written: make -n and
+# make -q); the exit status is non-zero if any group fails (re-check N3).
+rc=0
 while [ $# -gt 0 ]; do
   group=()
   while [ $# -gt 0 ] && [ "$1" != @@@ ]; do group+=("$1"); shift; done
   [ $# -gt 0 ] && shift
-  [ ${#group[@]} -gt 0 ] && write_one "${group[@]}"
+  if [ ${#group[@]} -gt 0 ]; then write_one "${group[@]}" || rc=1; fi
 done
+exit $rc

@@ -5288,8 +5288,20 @@ test-runtime2-packages-legacy: $(TARGET)
 test-rt-vm: test-runtime2-packages
 
 # Linode certification of 4e97e34e, item 1: every object set's configuration
-# signature (write-signature.sh: rewritten only when its content changes), at
-# parse time, in one call. A failure stops make (no signature, no build).
+# signature (write-signature.sh: rewritten only when its content changes) and
+# the libffi toolchain signatures, when the Makefile is read, in one call each;
+# the status covers every file (a failure stops make: no signature, no build).
+# Under make -n or make -q (re-check N2) nothing is written: the files whose
+# content would change are only made out of date (FORCE), so the plan shows the
+# rebuild and a later default make is not misled. Each file also has a rule
+# without prerequisites (re-check N1), which recreates it when a recipe in the
+# same run deleted it (`make clean nift`).
+NIFT_DRY := $(if $(findstring n,$(firstword -$(MAKEFLAGS)))$(findstring q,$(firstword -$(MAKEFLAGS))),1)
+nift_check_text = printf '%s\n' "$(2)" | cmp -s "$(1)" - || echo "$(1)"
+ifeq ($(NIFT_DRY),1)
+NIFT_STALE_SIGNATURES := $(shell { $(call nift_check_text,$(LIBFFI_SIGNATURE),$(LIBFFI_SIGNATURE_TEXT)); $(call nift_check_text,$(SAN_LIBFFI_SIGNATURE),$(SAN_LIBFFI_SIGNATURE_TEXT)); $(call nift_check_text,$(TSAN_LIBFFI_SIGNATURE),$(TSAN_LIBFFI_SIGNATURE_TEXT)); NIFT_SIGNATURE_CHECK_ONLY=1 NIFT_TEST_DIR='$(TEST_DIR)' bash scripts/build/write-signature.sh $(foreach s,$(NIFT_SIGNATURES),$($(s)) $($(s)_ARGS) @@@); })
+$(NIFT_STALE_SIGNATURES): FORCE
+else
 NIFT_LIBFFI_SIGNATURE_STATUS := $(shell $(call nift_write_text,$(LIBFFI_SIGNATURE),$(LIBFFI_SIGNATURE_TEXT)) && $(call nift_write_text,$(SAN_LIBFFI_SIGNATURE),$(SAN_LIBFFI_SIGNATURE_TEXT)) && $(call nift_write_text,$(TSAN_LIBFFI_SIGNATURE),$(TSAN_LIBFFI_SIGNATURE_TEXT)) && echo ok)
 ifneq ($(NIFT_LIBFFI_SIGNATURE_STATUS),ok)
 $(error writing the libffi toolchain signatures failed)
@@ -5298,3 +5310,21 @@ NIFT_SIGNATURE_STATUS := $(shell NIFT_TEST_DIR='$(TEST_DIR)' bash scripts/build/
 ifneq ($(NIFT_SIGNATURE_STATUS),ok)
 $(error writing the object configuration signatures failed (scripts/build/write-signature.sh))
 endif
+endif
+define NIFT_SIGNATURE_RULE
+$$($(1)):
+	@NIFT_TEST_DIR='$$(TEST_DIR)' bash scripts/build/write-signature.sh $$@ $$($(1)_ARGS)
+endef
+$(foreach s,$(NIFT_SIGNATURES),$(eval $(call NIFT_SIGNATURE_RULE,$(s))))
+$(LIBFFI_SIGNATURE):
+	@$(call nift_write_text,$@,$(LIBFFI_SIGNATURE_TEXT))
+$(SAN_LIBFFI_SIGNATURE):
+	@$(call nift_write_text,$@,$(SAN_LIBFFI_SIGNATURE_TEXT))
+$(TSAN_LIBFFI_SIGNATURE):
+	@$(call nift_write_text,$@,$(TSAN_LIBFFI_SIGNATURE_TEXT))
+# Re-check N1: a production object never falls back to make's built-in rules
+# (which would compile it without PRODUCTION_GUARD, compile-object.sh or a
+# sidecar): the built-in %.o rules for C and C++ sources are cancelled.
+%.o: %.cpp
+%.o: %.c
+%.o: %.cc
