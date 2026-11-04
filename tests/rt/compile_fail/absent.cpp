@@ -103,6 +103,16 @@ static_assert(!has_free_sort_storage<Value>::value && !has_free_permute<Value>::
 static_assert(!std::is_default_constructible<nift::rt::mutation::SortKey>::value &&
                   !std::is_aggregate<nift::rt::mutation::SortKey>::value,
               "a SortKey can be made outside the sort controller");
+// Tooling checkpoint (component 4, RECHECK2 N3): not trivially copyable (no
+// bit_cast), not implicit-lifetime (a non-trivial destructor: no key appears in
+// malloc'd or char storage), no copy or move, and not destructible outside its
+// friends.
+static_assert(!std::is_trivially_copyable<nift::rt::mutation::SortKey>::value &&
+                  !std::is_copy_constructible<nift::rt::mutation::SortKey>::value &&
+                  !std::is_move_constructible<nift::rt::mutation::SortKey>::value &&
+                  !std::is_trivially_destructible<nift::rt::mutation::SortKey>::value &&
+                  !std::is_destructible<nift::rt::mutation::SortKey>::value,
+              "a SortKey can be byte-copied, copied, moved or destroyed outside the sort functions");
 
 // Controls (the detectors can say yes): the construction API and a protocol
 // entry point are found and accessible.

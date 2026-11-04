@@ -73,6 +73,15 @@ namespace nift::rt::mutation {
 // sort functions, which run after the sort instruction's own stage 2.2.
 class SortKey {
     SortKey() {}
+    // Tooling checkpoint (component 4, RECHECK2 N3): a user-provided
+    // destructor and no copy or move. SortKey is then not trivially copyable,
+    // so __builtin_bit_cast/std::bit_cast to it do not compile, and not an
+    // implicit-lifetime type, so malloc'd or char-buffer storage is never a
+    // SortKey object; with no copy, a key cannot be copied out of a forged
+    // lvalue. Zero cost: the key is only ever bound to `const SortKey&`.
+    ~SortKey() {}
+    SortKey(const SortKey&) = delete;
+    SortKey& operator=(const SortKey&) = delete;
     friend bool nift::rt::collection_sort_init(Value*, const natives::Context&, Fault&, std::size_t);
     friend bool nift::rt::collection_sort_resume(Value*, bool, bool);
     friend bool nift::rt::collection_plain_sort(Value*, const natives::Context&, Fault&);

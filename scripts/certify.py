@@ -58,6 +58,7 @@ EXCLUSIVE = {
     # recipe line, so recipe_runs_make() does not see it).
     "test-build-reuse": "rebuilds the shared in-tree objects under other compilers, flags and defines (A->B->A)",
     "test-rt-isolation": "plants reproducers into production sources and rebuilds their objects",
+    "test-rt-sort-forgery": "plants the forged-header reproducer into src/Hooks.cpp and relinks nift",
 }
 
 # Load-sensitive measurements (owner review of D-012): targets whose pass/fail

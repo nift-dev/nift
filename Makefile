@@ -120,9 +120,10 @@ FORCE:
 # The shipped CLI is the REDUCED object set (no src/embed/*). Plain `make`
 # therefore builds only the ordinary Nift CLI; the embedding library and every
 # language binding are explicit, optional targets.
-$(TARGET): $(CLI_OBJECTS) $(LIBFFI_A)
+$(TARGET): $(CLI_OBJECTS) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(filter-out $(MARKUP_C_OBJECTS),$(CLI_OBJECTS))
 	@bash scripts/build/check-config.sh $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -- $(MARKUP_C_OBJECTS)
+	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(CLI_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
 
 # Toolchain/build signature the libffi stamp depends on. Regenerated cheaply
@@ -1529,6 +1530,7 @@ $(TEST_DIR)/pic/%.o: %.c $(TEST_DIR)/obj-config/pic.flags
 # src/rt/handles/types.o would otherwise silently overwrite libffi's types.o
 # (ffi_type_* definitions) and break static consumers.
 libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
+	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(C_ABI_CORE)
 	rm -rf $@ $@.ffi && mkdir -p $@.ffi
 	cd $@.ffi && ar x $(abspath $(LIBFFI_A)) && for m in *.o; do mv "$$m" "ffi_$$m"; done
 	ar rcs $@ $(C_ABI_CORE) $@.ffi/ffi_*.o
@@ -1551,6 +1553,7 @@ LIBNIFT_C_EXPORT_FLAGS := -Wl,--version-script=$(ABI_EXPORT_MAP)
 endif
 
 libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
+	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(C_ABI_PIC)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) $(LIBNIFT_C_EXPORT_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
 
 # The exported inventory (exact equality with tests/abi/libnift_c.symbols: no
@@ -1561,6 +1564,13 @@ libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
 # reproducers (and the R3 spellings) into real production sources and requires
 # each object's production rule to fail; test-production-deps runs every
 # production compile command with -M and fails on any dependency in tests/.
+# Tooling checkpoint (component 4, RECHECK2 N4): the forged-header route to the
+# sort commits is refused at the static nift link (symbol-reference allowlist)
+# and at a dynamic link against libnift_c.so (not exported).
+.PHONY: test-rt-sort-forgery
+test-rt-sort-forgery: $(TARGET) $(SHARED_LIB) $(C_ABI_PIC) $(LIBFFI_A)
+	bash tests/rt/sort_forgery/run.sh
+certify-targets: test-rt-sort-forgery
 .PHONY: test-rt-isolation test-production-deps
 test-rt-isolation: $(TARGET)
 	bash tests/rt/isolation/run.sh

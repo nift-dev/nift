@@ -1,0 +1,24 @@
+# Tooling checkpoint (component 4): the reviewed undefined references to the
+# storage commits, one "OBJECT SYMBOL" pair per line (object relative to its
+# object directory, symbol demangled without parameters). checked by
+# scripts/build/check-symbol-refs.sh at the nift, libnift_c.so and
+# libnift_c.a links. Each pair is a protocol commit layer or a protocol inline
+# function (rt/mutation.h) expanded in that object:
+#   mutation.o, mutation_collection.o: the protocol's commit layer
+#   collection_sort.o, collection_plain_sort.o: the sort commits, with a SortKey
+#   cell.o, vm_ops.o: Protocol's inline array commits (rt/mutation.h) expanded there
+src/rt/cell.o nift::rt::Storage::array_set
+src/rt/collection_plain_sort.o nift::rt::mutation::Protocol::commit_permutation
+src/rt/collection_sort.o nift::rt::mutation::Protocol::sort_storage
+src/rt/mutation.o nift::rt::Storage::array_mut
+src/rt/mutation.o nift::rt::Storage::collection_clear
+src/rt/mutation.o nift::rt::Storage::object_remove
+src/rt/mutation.o nift::rt::Storage::object_set
+src/rt/mutation.o nift::rt::Storage::struct_set
+src/rt/mutation_collection.o nift::rt::Storage::collection_erase
+src/rt/mutation_collection.o nift::rt::Storage::map_set
+src/rt/mutation_collection.o nift::rt::Storage::set_add
+src/rt/mutation_collection.o nift::rt::Storage::stack_pop
+src/rt/mutation_collection.o nift::rt::Storage::stack_push
+src/rt/vm_ops.o nift::rt::Storage::array_push
+src/rt/vm_ops.o nift::rt::Storage::array_set
