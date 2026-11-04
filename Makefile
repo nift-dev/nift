@@ -712,12 +712,15 @@ test-rt-source-map-tsan: $(RT_OBJECTS_tsan-sourcemap-counter)
 		tests/rt/source_map_unit.cpp $(RT_OBJECTS_tsan-sourcemap-counter) -o "$(TEST_DIR)/rt-tsan/source-map"
 	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/source-map"
 
+# Tooling checkpoint (component 5): --boundary runs the storage, construction,
+# sort, paste and test-access rules over every production root, every suffix and
+# every included file, read as the compiler reads them, with each annotation
+# pinned by tools/rt-lint-annotations.txt (it replaces the B2 .inc grep and the
+# --test-access scan, b2-refrep.md 19.3).
 test-rt-lint:
 	python3 tools/rt-lint.py --self-test
 	python3 tools/rt-lint.py src/rt
-	python3 tools/rt-lint.py --test-access src include bindings
-	@! grep -rnwE 'array_push|array_build_storage|array_build_set|object_set|object_build_slot|struct_add_field|map_build_set|set_build_add|stack_build_push|SortKey|SortController|StorageTestAccess' --include='*.inc' src/rt || { echo "FAIL rt-lint: a construction or sort name in a .inc file (rt-lint does not scan .inc files: b2-refrep.md 19.3)"; exit 1; }
-	@echo "PASS rt-lint: no construction or sort name in src/rt .inc files"
+	python3 tools/rt-lint.py --boundary src include bindings markuppp minifypp
 
 # ASan+UBSan build of the rt tests (GCC/Clang on Linux or macOS). ASan
 # reserves its shadow memory up front, so this target must run without

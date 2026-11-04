@@ -128,7 +128,7 @@ nift_program_outcome nift_program_result_outcome(const nift_program_result* resu
 }
 int nift_program_result_returned(const nift_program_result* result) { return result && result->returned; }
 int nift_program_result_catchable(const nift_program_result* result) { return result && result->catchable; }
-#define PROGRAM_VIEW(name, field) \
+#define PROGRAM_VIEW(name, field) /* rt-lint: paste-ok the C API accessor names */ \
     nift_status nift_program_result_##name(const nift_program_result* r, nift_string* out) { \
         return view(r, r ? &r->field : nullptr, out); \
     }

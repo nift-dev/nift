@@ -1,0 +1,24 @@
+# Tooling checkpoint (component 5): every rt-lint boundary annotation in the
+# production roots (src, include, bindings, markuppp, minifypp), by repository
+# path, label and count. `rt-lint.py --boundary` (test-rt-lint) fails when an
+# annotation appears that is not listed here, when a listed one is gone, and
+# when a count changes: adding one is a reviewed edit of this file. Each
+# storage-ok site is in docs/runtime-2/checkpoints/tooling.md section 2 (the
+# in-place passkey table) or b2-refrep.md section 18.
+#
+# path                                label                          count
+src/embed/program_api.cpp             paste-ok                       1
+src/rt/aggregate.h                    test-access-decl               2
+src/rt/build.h                        test-access-decl               3
+src/rt/cell.cpp                       storage-ok private-descriptor  2
+src/rt/collection_helpers.cpp         storage-ok fresh               15
+src/rt/collection_plain_sort.cpp      storage-ok fresh               2
+src/rt/collection_sort.cpp            storage-ok fresh               1
+src/rt/collection_sort.cpp            storage-ok scratch             1
+src/rt/copy_graph.cpp                 storage-ok fresh               7
+src/rt/natives/object_methods.cpp     storage-ok mutant-only         1
+src/rt/vm.cpp                         paste-ok                       3
+src/rt/vm_keyed.cpp                   storage-ok mutant-only         1
+src/rt/vm_ops.cpp                     storage-ok mutant-only         1
+src/rt/vm_report.cpp                  storage-ok fresh               1
+src/rt/vm_struct.cpp                  storage-ok fresh               1
