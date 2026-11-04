@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # Tooling checkpoint (component 1): evidence for build-object reuse.
 #   check-build-reuse.sh OUTDIR
-# Run from the repository root after `make nift`. Checks, each logged under
-# OUTDIR and summarised as PASS/FAIL lines on stdout (exit 1 on any FAIL):
-#   deps      touching a header rebuilds exactly the objects whose compiler
-#             dependency file names it (and relinks the binaries), nothing else
-#   equiv     clean and incremental builds give byte-identical objects and
-#             binaries (default and one define configuration)
-#   negative  a changed flag or define rebuilds the object (no stale reuse),
-#             and restoring the flags restores the identical object
-#   separate  a define configuration's object differs from the default one
-#   parallel  three concurrent makes in one tree, sharing objects: every object
-#             and binary identical to the serial build, no temporary left over
-# Builds only; it runs no test binary (the coordinator's Linode run does).
+# Run from the repository root after `make nift`. Each check prints a PASS or
+# FAIL line (exit 1 on any FAIL); logs and manifests go to OUTDIR. Builds only:
+# no test binary is run (the full lanes run on Linode).
+#   deps       touching a header rebuilds exactly the objects whose compiler
+#              dependency file names it; a source only its own object; a
+#              further make does nothing
+#   equiv      clean and incremental builds are byte-identical
+#   A->B->A    for each signature input (compiler identity, flags, a feature
+#              define, a generated input, a header edit): building B rebuilds
+#              every affected object (no A object reused), and building A again
+#              reproduces the first A build byte for byte (objects, sidecars,
+#              dependency files, binaries), reusing none of B's objects
+#   mixing     an object of another configuration in a directory is refused at
+#              link time (check-config.sh), never linked
+#   parallel   concurrent makes of different configurations in one tree, and
+#              of one configuration sharing objects: every object, sidecar and
+#              dependency file identical to a clean build of its own
+#              configuration, no temporary left
 set -u
 out=${1:?usage: check-build-reuse.sh OUTDIR}
 mkdir -p "$out"
@@ -20,132 +26,137 @@ fail=0
 pass() { echo "PASS build-reuse $1"; }
 bad() { echo "FAIL build-reuse $1"; fail=1; }
 M() { make "$@" >>"$out/make.log" 2>&1; }
+var() { make -s -f Makefile -f - print-var <<EOF 2>/dev/null
+print-var: ; @echo \$($1)
+EOF
+}
 
+DOBJ=$(var RT_UNIT_OBJECTS)
+GEN_OBJ=src/ParserExpression.o            # the one object that includes libffi's generated headers
 DEFAULT_BINS=".build/rt/value-unit .build/rt/atom-budget .build/rt/native-budget"
-CFG=no-cycle-check
-CFG_BIN=.build/rt/value-cycle-bench-off
-objs_default() { make -s -f Makefile -f - print-objs <<'EOF' 2>/dev/null
-print-objs: ; @echo $(RT_UNIT_OBJECTS)
-EOF
-}
-objs_cfg() { make -s -f Makefile -f - print-objs <<EOF 2>/dev/null
-print-objs: ; @echo \$(RT_OBJECTS_$CFG)
-EOF
-}
-DOBJ=$(objs_default); COBJ=$(objs_cfg)
-[ -n "$DOBJ" ] && [ -n "$COBJ" ] || { bad "setup: cannot list the object sets"; exit 1; }
-manifest() { sha256sum $DOBJ $COBJ $DEFAULT_BINS $CFG_BIN 2>/dev/null | sort -k2; }
+C1=no-cycle-check; C1_BIN=.build/rt/value-cycle-bench-off
+C2=saturated-slots; C2_BIN=.build/rt/heap-account-oom
+C1OBJ=$(var RT_OBJECTS_$C1); C2OBJ=$(var RT_OBJECTS_$C2)
+[ -n "$DOBJ" ] && [ -n "$C1OBJ" ] && [ -n "$C2OBJ" ] || { bad "setup: cannot list the object sets"; exit 1; }
+side() { for o in "$@"; do echo "$o" "${o%.o}.cfg" "${o%.o}.d"; done; }
+manifest() { sha256sum $(side "$@") 2>/dev/null | sort -k2; }
+DSET="$DOBJ $GEN_OBJ"
+dmanifest() { { manifest $DSET; sha256sum $DEFAULT_BINS; } | sort -k2; }
+mtimes() { stat -c '%n %Y' "$@" | sort; }
+changed() { diff <(echo "$1") <(echo "$2") | sed -n 's/^> \(\S*\) .*/\1/p' | sort; }
+build_default() { M -j2 $DEFAULT_BINS $GEN_OBJ "$@"; }
 
-# --- clean build (only the configuration directory and the binaries; the
-# default objects are `make nift`'s, rebuilt clean here too) ---
-rm -f $DOBJ ${DOBJ//.o/.d} $DEFAULT_BINS $CFG_BIN
-rm -rf ".build/rt-obj/$CFG"
+# --- clean build of the default configuration ---
+rm -f $(side $DSET) $DEFAULT_BINS
 start=$(date +%s)
-M -j2 $DEFAULT_BINS $CFG_BIN || bad "clean build failed (make.log)"
-echo "clean build seconds: $(( $(date +%s) - start ))" > "$out/timing-clean.txt"
-manifest > "$out/manifest-clean.txt"
+build_default || bad "clean build failed (make.log)"
+echo "default clean build seconds: $(( $(date +%s) - start ))" > "$out/timing.txt"
+dmanifest > "$out/A1.txt"
 
-# --- deps: touch one header; exactly the objects naming it rebuild ---
+# --- deps ---
 hdr=src/rt/value_cycle.h
 sleep 1; touch "$hdr"
-expect=$(grep -l "$hdr" $(for o in $DOBJ $COBJ; do echo "${o%.o}.d"; done) | sed 's/\.d$/.o/' | sort)
-before=$(stat -c '%n %Y' $DOBJ $COBJ | sort)
-M -j2 $DEFAULT_BINS $CFG_BIN || bad "incremental build failed"
-after=$(stat -c '%n %Y' $DOBJ $COBJ | sort)
-rebuilt=$(diff <(echo "$before") <(echo "$after") | sed -n 's/^> \(\S*\) .*/\1/p' | sort)
-printf '%s\n' "$expect" > "$out/deps-expected.txt"; printf '%s\n' "$rebuilt" > "$out/deps-rebuilt.txt"
-if [ -n "$expect" ] && [ "$expect" = "$rebuilt" ]; then
-  pass "deps: touching $hdr rebuilt exactly the $(echo "$expect" | wc -l) objects whose .d names it"
-else bad "deps: rebuilt set differs from the dependency files (deps-*.txt)"; fi
-# a source file: only its own object
+expect=$(grep -l "$hdr" $(for o in $DSET; do echo "${o%.o}.d"; done) | sed 's/\.d$/.o/' | sort)
+b=$(mtimes $DSET); build_default || bad "incremental build failed"; a=$(mtimes $DSET)
+got=$(changed "$b" "$a")
+[ -n "$expect" ] && [ "$expect" = "$got" ] && \
+  pass "deps: touching $hdr rebuilt exactly the $(echo "$expect" | wc -l) objects whose .d names it" || \
+  bad "deps: rebuilt set differs from the dependency files"
 sleep 1; touch src/rt/aggregate.cpp
-before=$(stat -c '%n %Y' $DOBJ $COBJ | sort)
-M -j2 $DEFAULT_BINS $CFG_BIN || bad "incremental build failed"
-after=$(stat -c '%n %Y' $DOBJ $COBJ | sort)
-rebuilt=$(diff <(echo "$before") <(echo "$after") | sed -n 's/^> \(\S*\) .*/\1/p' | sort | tr '\n' ' ')
-if [ "$rebuilt" = "src/rt/aggregate.o .build/rt-obj/$CFG/src/rt/aggregate.o " ] || \
-   [ "$rebuilt" = ".build/rt-obj/$CFG/src/rt/aggregate.o src/rt/aggregate.o " ]; then
-  pass "deps: touching src/rt/aggregate.cpp rebuilt only its object in each configuration"
-else bad "deps: touching aggregate.cpp rebuilt: $rebuilt"; fi
-# nothing to do afterwards (make -q cannot answer this: the signature files
-# are FORCE targets that always run; they rewrite nothing when unchanged)
-before=$(stat -c '%n %Y' $DOBJ $COBJ $DEFAULT_BINS $CFG_BIN | sort)
-M -j2 $DEFAULT_BINS $CFG_BIN || bad "no-op build failed"
-after=$(stat -c '%n %Y' $DOBJ $COBJ $DEFAULT_BINS $CFG_BIN | sort)
-[ "$before" = "$after" ] && pass "deps: a further make rebuilds and relinks nothing" || \
-  bad "deps: a no-op make rebuilt: $(diff <(echo "$before") <(echo "$after") | grep '^>' | head -3)"
+b=$(mtimes $DSET); build_default || bad "incremental build failed"; a=$(mtimes $DSET)
+[ "$(changed "$b" "$a" | tr '\n' ' ')" = "src/rt/aggregate.o " ] && \
+  pass "deps: touching src/rt/aggregate.cpp rebuilt only its object" || bad "deps: aggregate.cpp rebuilt more"
+b=$(mtimes $DSET $DEFAULT_BINS); build_default || bad "no-op build failed"; a=$(mtimes $DSET $DEFAULT_BINS)
+[ "$b" = "$a" ] && pass "deps: a further make rebuilds and relinks nothing" || bad "deps: a no-op make rebuilt something"
+dmanifest > "$out/A1-incremental.txt"
+cmp -s "$out/A1.txt" "$out/A1-incremental.txt" && \
+  pass "equiv: clean and incremental byte-identical ($(wc -l < "$out/A1.txt") files: objects, sidecars, .d, binaries)" || \
+  bad "equiv: clean and incremental differ"
 
-# --- equiv: incremental result == clean result ---
-manifest > "$out/manifest-incremental.txt"
-if cmp -s "$out/manifest-clean.txt" "$out/manifest-incremental.txt"; then
-  pass "equiv: $(wc -l < "$out/manifest-clean.txt") objects and binaries byte-identical (clean vs incremental)"
-else bad "equiv: clean and incremental differ (manifest-*.txt)"; fi
-
-# --- negative control: a changed flag/define is never served by a stale object ---
-# Rebuilt is shown by the object's mtime (a define the file never reads gives
-# a byte-identical object, so a hash alone cannot show a rebuild); a flag that
-# changes code generation (-O1) shows the stale object would differ.
-mt() { stat -c %Y "$1"; }
-o=src/rt/value.o; h0=$(sha256sum < $o); t0=$(mt $o); sleep 1
-M "$o" CXXFLAGS="-std=c++17 -O1 -Wall -Wextra -pedantic -pthread" || bad "negative: build"
-h1=$(sha256sum < $o); t1=$(mt $o)
-if grep -q -- '-O1 ' .build/obj-config/default.flags && [ "$t1" != "$t0" ] && [ "$h1" != "$h0" ]; then
-  pass "negative: CXXFLAGS -O2 -> -O1 rebuilds the default object (signature updated; the object differs)"
-else bad "negative: a CXXFLAGS change did not rebuild $o"; fi
-sleep 1
-M "$o" CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TOOLING_NEGATIVE_CONTROL" || bad "negative: build"
-t2=$(mt $o)
-grep -q NIFT_TOOLING_NEGATIVE_CONTROL .build/obj-config/default.flags && [ "$t2" != "$t1" ] && \
-  pass "negative: an added define rebuilds the default object (mtime; value.cpp does not read it)" || \
-  bad "negative: an added define did not rebuild $o"
-M "$o" || bad "negative: rebuild"
-[ "$(sha256sum < $o)" = "$h0" ] && pass "negative: restoring the flags rebuilds the original object (byte-identical)" || \
-  bad "negative: restored object differs"
-# the configuration directory: vm_closure.cpp is the object NIFT_RT_NO_CYCLE_CHECK changes
-co=.build/rt-obj/$CFG/src/rt/vm_closure.o; c0=$(sha256sum < $co); ct0=$(mt $co); sleep 1
-M "$co" "RT_OBJFLAGS_$CFG=-std=c++17 -O2 -Wall -Wextra -pedantic -pthread" || bad "negative: cfg build"
-c1=$(sha256sum < $co)
-[ "$(mt $co)" != "$ct0" ] && [ "$c1" != "$c0" ] && [ "$c1" = "$(sha256sum < src/rt/vm_closure.o)" ] && \
-  pass "negative: dropping -DNIFT_RT_NO_CYCLE_CHECK rebuilds the $CFG object (now equal to the default one)" || \
-  bad "negative: $CFG define change did not rebuild"
-M "$co" || bad "negative: cfg rebuild"
-[ "$(sha256sum < $co)" = "$c0" ] && pass "negative: restored $CFG object byte-identical" || bad "negative: $CFG restore differs"
-# the old Makefile (c1f43300) would have reused the stale object: shown for the record
-if git show c1f43300:Makefile > "$out/old.mk" 2>/dev/null; then
-  if make -q -f "$out/old.mk" "$o" CXXFLAGS="-std=c++17 -O1" 2>/dev/null; then
-    echo "INFO build-reuse negative: c1f43300's Makefile considers $o up to date under different CXXFLAGS (the hazard the signature closes)"
-  fi
+# --- A -> B -> A for each signature input ---
+# $1 label, $2 the objects B must rebuild ("all" or a list), then B's make arguments
+aba() {
+  local label=$1 must=$2; shift 2
+  local t0 t1 t2 rebuilt_b rebuilt_a want n
+  sleep 1; t0=$(mtimes $DSET)
+  build_default "$@" || { bad "$label: B build failed"; return; }
+  t1=$(mtimes $DSET); rebuilt_b=$(changed "$t0" "$t1")
+  manifest $DSET > "$out/B-$label.txt"
+  if [ "$must" = all ]; then want=$(echo $DSET | tr ' ' '\n' | sort); else want=$(echo $must | tr ' ' '\n' | sort); fi
+  n=$(comm -12 <(grep '\.o$' "$out/A1.txt" | sort) <(grep '\.o$' "$out/B-$label.txt" | sort) | wc -l)
+  if [ "$rebuilt_b" = "$want" ]; then
+    pass "$label: B rebuilt exactly the $(echo "$want" | wc -l) affected objects ($n of them happen to be the same bytes as A)"
+  else bad "$label: B rebuilt $(echo "$rebuilt_b" | grep -c .) objects, expected $(echo "$want" | wc -l)"; fi
+  sleep 1
+  build_default || { bad "$label: A rebuild failed"; return; }
+  t2=$(mtimes $DSET); rebuilt_a=$(changed "$t1" "$t2")
+  dmanifest > "$out/A2-$label.txt"
+  if [ "$rebuilt_a" = "$want" ] && cmp -s "$out/A1.txt" "$out/A2-$label.txt"; then
+    pass "$label: A again rebuilt every object B built (none of B's reused) and is byte-identical to the first A"
+  else bad "$label: second A differs from the first or reused B objects ($out/A2-$label.txt)"; fi
+}
+aba compiler all CXX=clang++
+aba flags all CXXFLAGS="-std=c++17 -O1 -Wall -Wextra -pedantic -pthread"
+aba define all CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TOOLING_PROBE"
+# generated input: libffi's installed headers, regenerated by its build when
+# its signature (LIBFFI_CFLAGS) changes; only the objects including them rebuild
+aba generated "$GEN_OBJ" LIBFFI_CFLAGS="-O2 -fPIC -Wno-deprecated-declarations -DNIFT_TOOLING_PROBE"
+# a header dependency edit (content change, then the original content back)
+hdr=src/rt/value_cycle.h; cp "$hdr" "$out/hdr.orig"
+hdr_users=$(grep -l "$hdr" $(for o in $DSET; do echo "${o%.o}.d"; done) | sed 's/\.d$/.o/' | sort | tr '\n' ' ')
+sleep 1; t0=$(mtimes $DSET)
+printf '\n// tooling build-reuse probe\ninline int nift_tooling_header_probe() { return 1; }\n' >> "$hdr"
+build_default || bad "header: B build failed"
+t1=$(mtimes $DSET)
+[ "$(changed "$t0" "$t1" | tr '\n' ' ')" = "$hdr_users" ] && \
+  pass "header: editing $hdr rebuilt exactly its $(echo $hdr_users | wc -w) dependent objects" || bad "header: B rebuilt another set"
+sleep 1; cp "$out/hdr.orig" "$hdr"; touch "$hdr"
+build_default || bad "header: A build failed"
+t2=$(mtimes $DSET); dmanifest > "$out/A2-header.txt"
+[ "$(changed "$t1" "$t2" | tr '\n' ' ')" = "$hdr_users" ] && cmp -s "$out/A1.txt" "$out/A2-header.txt" && \
+  pass "header: restoring it rebuilt the same objects, byte-identical to the first A" || bad "header: A differs"
+git diff --quiet -- "$hdr" || bad "header: $hdr not restored"
+# the old Makefile (c1f43300) would have reused stale objects: for the record
+if git show c1f43300:Makefile > "$out/old.mk" 2>/dev/null && \
+   make -q -f "$out/old.mk" src/rt/value.o CXXFLAGS="-std=c++17 -O1" 2>/dev/null; then
+  echo "INFO build-reuse: c1f43300's Makefile considers src/rt/value.o up to date under other CXXFLAGS (the hazard closed here)"
 fi
-M -j2 $DEFAULT_BINS $CFG_BIN || bad "relink after the negative control"
 
-# --- separate: configurations never mix ---
-differ=$(for x in $COBJ; do y=${x#.build/rt-obj/$CFG/}; cmp -s "$x" "$y" || echo "$y"; done)
-echo "$differ" > "$out/separate-differing.txt"
-if [ -n "$differ" ] && ! cmp -s ".build/rt-obj/$CFG/src/rt/vm_closure.o" src/rt/vm_closure.o; then
-  pass "separate: the $CFG objects are its own ($(echo "$differ" | wc -l) differ from the default set: $(echo $differ))"
-else bad "separate: no $CFG object differs from the default set"; fi
-manifest > "$out/manifest-after-negative.txt"
-cmp -s "$out/manifest-clean.txt" "$out/manifest-after-negative.txt" && \
-  pass "equiv: after the negative controls every object and binary is again byte-identical to the clean build" || \
-  bad "equiv: tree differs after the negative controls"
+# --- mixing: an object of another configuration is refused at link ---
+M -j2 $C1_BIN || bad "mixing: $C1 build failed"
+o=src/rt/vm_closure.o; cp "$o" "$out/keep.o"; cp "${o%.o}.cfg" "$out/keep.cfg"
+cp ".build/rt-obj/$C1/$o" "$o"; cp ".build/rt-obj/$C1/${o%.o}.cfg" "${o%.o}.cfg"; touch "$o"
+rm -f .build/rt/value-unit
+if make .build/rt/value-unit > "$out/mixing.log" 2>&1; then bad "mixing: a $C1 object was linked into a default binary"
+elif grep -q 'check-config: 1 of' "$out/mixing.log"; then
+  pass "mixing: a $C1 object placed in the default directory is refused at link ($(grep -o 'check-config: [^;]*' "$out/mixing.log"))"
+else bad "mixing: the link failed for another reason (mixing.log)"; fi
+cp "$out/keep.o" "$o"; cp "$out/keep.cfg" "${o%.o}.cfg"; touch "$o"
+build_default || bad "mixing: restore failed"
+dmanifest > "$out/A2-mixing.txt"; cmp -s "$out/A1.txt" "$out/A2-mixing.txt" || bad "mixing: restore differs"
 
-# --- parallel: three concurrent makes sharing objects ---
-for round in 1 2 3; do
+# --- parallel ---
+# references: a clean serial build of each configuration
+rm -rf ".build/rt-obj/$C1" ".build/rt-obj/$C2"
+M -j2 $C1_BIN && manifest $C1OBJ > "$out/ref-$C1.txt" || bad "parallel: $C1 reference build failed"
+M -j2 $C2_BIN && manifest $C2OBJ > "$out/ref-$C2.txt" || bad "parallel: $C2 reference build failed"
+for round in 1 2; do
   victims=$(echo $DOBJ | tr ' ' '\n' | awk -v r=$round 'NR % 9 == r')
-  rm -f $victims $DEFAULT_BINS
-  ( make .build/rt/value-unit >"$out/par-$round-a.log" 2>&1; echo $? > "$out/par-$round-a.rc" ) &
-  pa=$!
-  ( make .build/rt/atom-budget >"$out/par-$round-b.log" 2>&1; echo $? > "$out/par-$round-b.rc" ) &
-  pb=$!
-  ( make .build/rt/native-budget >"$out/par-$round-c.log" 2>&1; echo $? > "$out/par-$round-c.rc" ) &
-  pc=$!
-  wait $pa $pb $pc
-  rcs="$(cat "$out/par-$round-a.rc" "$out/par-$round-b.rc" "$out/par-$round-c.rc" | tr '\n' ' ')"
-  leftovers=$(find src markuppp minifypp .build/rt -name '*.tmp.*' 2>/dev/null | head -5)
-  manifest > "$out/manifest-par-$round.txt"
-  if [ "$rcs" = "0 0 0 " ] && [ -z "$leftovers" ] && cmp -s "$out/manifest-clean.txt" "$out/manifest-par-$round.txt"; then
-    pass "parallel round $round: 3 concurrent makes, $(echo $victims | wc -w) shared objects rebuilt, all identical, no temporaries"
-  else bad "parallel round $round: rc=$rcs leftovers=[$leftovers] (manifest-par-$round.txt)"; fi
+  rm -rf ".build/rt-obj/$C1" ".build/rt-obj/$C2"; rm -f $(side $victims) $DEFAULT_BINS $C1_BIN $C2_BIN
+  pids=""
+  for t in $C1_BIN $C2_BIN .build/rt/value-unit .build/rt/atom-budget .build/rt/native-budget; do
+    ( make "$t" > "$out/par-$round-$(basename "$t").log" 2>&1; echo $? > "$out/par-$round-$(basename "$t").rc" ) &
+    pids="$pids $!"
+  done
+  wait $pids
+  rcs=$(cat "$out"/par-$round-*.rc | tr -d '\n')
+  leftovers=$(find src markuppp minifypp .build/rt .build/rt-obj -name '*.tmp.*' 2>/dev/null | head -3)
+  manifest $C1OBJ > "$out/par-$round-$C1.txt"; manifest $C2OBJ > "$out/par-$round-$C2.txt"
+  dmanifest > "$out/par-$round-default.txt"
+  if [ "$rcs" = 00000 ] && [ -z "$leftovers" ] && cmp -s "$out/ref-$C1.txt" "$out/par-$round-$C1.txt" && \
+     cmp -s "$out/ref-$C2.txt" "$out/par-$round-$C2.txt" && cmp -s "$out/A1.txt" "$out/par-$round-default.txt"; then
+    pass "parallel round $round: 5 concurrent makes over 3 configurations ($C1, $C2 from clean, default with $(echo $victims | wc -w) shared objects deleted): every object, sidecar and .d identical to its own configuration's clean build, no temporaries"
+  else bad "parallel round $round: rc=$rcs leftovers=[$leftovers]"; fi
 done
 
 exit $fail

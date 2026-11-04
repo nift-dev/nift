@@ -118,6 +118,8 @@ FORCE:
 # therefore builds only the ordinary Nift CLI; the embedding library and every
 # language binding are explicit, optional targets.
 $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(filter-out $(MARKUP_C_OBJECTS),$(CLI_OBJECTS))
+	@bash scripts/build/check-config.sh $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -- $(MARKUP_C_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
 
 # Toolchain/build signature the libffi stamp depends on. Regenerated cheaply
@@ -172,7 +174,7 @@ $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
 # configuration. Each object is compiled atomically (concurrent makes).
 OBJ_SIGNATURE := $(TEST_DIR)/obj-config/default.flags
 $(OBJ_SIGNATURE): FORCE
-	@bash scripts/build/write-signature.sh "$@" "$(CXX)" "$(CPPFLAGS)|$(CXXFLAGS)|$(CC)|$(CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)"
+	@bash scripts/build/write-signature.sh "$@" $(CXX) $(CPPFLAGS) $(CXXFLAGS) --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS)
 
 %.o: %.cpp $(OBJ_SIGNATURE)
 	bash scripts/build/compile-object.sh $@ -- $(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $<
@@ -254,7 +256,7 @@ define RT_OBJ_CONFIG
 RT_OBJFLAGS_$(1) = $(2)
 RT_OBJECTS_$(1) := $$(patsubst %.cpp,$(TEST_DIR)/rt-obj/$(1)/%.o,$$(RT_UNIT_SOURCES))
 $(TEST_DIR)/rt-obj/$(1)/.flags: FORCE
-	@bash scripts/build/write-signature.sh "$$@" "$$(CXX)" "$$(CPPFLAGS)|$$(RT_OBJFLAGS_$(1))"
+	@bash scripts/build/write-signature.sh "$$@" $$(CXX) $$(CPPFLAGS) $$(RT_OBJFLAGS_$(1))
 $(TEST_DIR)/rt-obj/$(1)/%.o: %.cpp $(TEST_DIR)/rt-obj/$(1)/.flags | $$(LIBFFI_STAMP)
 	bash scripts/build/compile-object.sh $$@ -- $$(CXX) $$(CPPFLAGS) $$(RT_OBJFLAGS_$(1)) -c $$<
 -include $$(patsubst %.o,%.d,$$(RT_OBJECTS_$(1)))
@@ -273,71 +275,85 @@ $(eval $(call RT_OBJ_CONFIG,tsan-sourcemap-counter,$$(RT_HANDLE_TSAN_FLAGS) -DNI
 
 $(RT_VALUE_UNIT): tests/rt/value_unit.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_PROPERTY): tests/rt/value_property.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_property.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_REGRESS): tests/rt/value_regress.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_regress.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_BENCH): tests/rt/value_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_bench.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 .PHONY: test-rt-value test-rt-lint test-rt-value-sanitize bench-rt-value
 # RT_VALUE_SEED / RT_VALUE_SCALE vary the randomised suite (default seed is fixed).
 $(RT_VALUE_ROUND2): tests/rt/value_round2.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_round2.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # D-040 value semantics (L7 step 2.1/2.7a): structs as COW values, nested
 # copy-on-write model, same(), identity summary bit, cycle checker.
 $(RT_VALUE_D040): tests/rt/value_d040.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_d040.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # Memory investigation C1: releasing a value needs no memory (failing
 # operator new; permanent regression for the destroy_oom reproducer).
 $(RT_VALUE_DESTROY_OOM): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_UNIT_OBJECTS) -o "$@"
 # A one-slot in-frame buffer: small graphs reach the spill and the
 # pointer-reversal fallback at every injected allocation failure.
 $(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_destroy-local)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_destroy-local) -- $(RT_OBJECTS_destroy-local)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_destroy-local) -o "$@"
 
 # The exact side table never allocates; a full table reports over budget
 # (one-slot build; reserves ~2 GiB of address space, never touched).
 $(RT_HEAP_ACCOUNT_OOM): tests/rt/heap_account_oom.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_saturated-slots)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_saturated-slots) -- $(RT_OBJECTS_saturated-slots)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_SATURATED_SLOTS=1 $(RT_TEST_DEPFLAGS) tests/rt/heap_account_oom.cpp $(RT_OBJECTS_saturated-slots) -o "$@"
 
 # Memory investigation C2: interned atoms count against the heap budget.
 $(RT_ATOM_BUDGET): tests/rt/atom_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/atom_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # Memory investigation C3: natives check the budget before allocating results.
 $(RT_NATIVE_BUDGET): tests/rt/native_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/native_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # C3 follow-up: a heap limit of 0 means no room, never "disabled".
 $(RT_HEAP_LIMIT_ZERO): tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_cycle_bench.cpp $(RT_UNIT_OBJECTS) -o "$@"
 $(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_no-cycle-check)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_no-cycle-check) -- $(RT_OBJECTS_no-cycle-check)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK $(RT_TEST_DEPFLAGS) tests/rt/value_cycle_bench.cpp $(RT_OBJECTS_no-cycle-check) -o "$@"
 .PHONY: bench-rt-value-cycle test-rt-heap-saturation test-rt-memory-c1 test-rt-memory-c2
 # Memory investigation C2 end to end: new atoms count against the budget.
@@ -587,6 +603,7 @@ test-cp23-shared-unit-sanitize: $(TEST_DIR)/rt-san/cp23-shared-unit
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_sourcemap-counter)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_sourcemap-counter) -- $(RT_OBJECTS_sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread $(RT_TEST_DEPFLAGS) \
 		tests/rt/source_map_unit.cpp $(RT_OBJECTS_sourcemap-counter) -o "$@"
 
@@ -666,12 +683,14 @@ test-rt-error-oom-sanitize:
 
 test-rt-source-map-sanitize: $(RT_OBJECTS_san-sourcemap-counter)
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san-sourcemap-counter) -- $(RT_OBJECTS_san-sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread \
 		tests/rt/source_map_unit.cpp $(RT_OBJECTS_san-sourcemap-counter) -o "$(TEST_DIR)/rt-san/source-map"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/source-map"
 
 test-rt-source-map-tsan: $(RT_OBJECTS_tsan-sourcemap-counter)
 	mkdir -p "$(TEST_DIR)/rt-tsan"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_tsan-sourcemap-counter) -- $(RT_OBJECTS_tsan-sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) -DNIFT_SOURCEMAP_COUNTER \
 		tests/rt/source_map_unit.cpp $(RT_OBJECTS_tsan-sourcemap-counter) -o "$(TEST_DIR)/rt-tsan/source-map"
 	ulimit -f 100000; TSAN_OPTIONS=halt_on_error=1 timeout 900 "$(TEST_DIR)/rt-tsan/source-map"
@@ -691,12 +710,19 @@ test-rt-value-sanitize: $(RT_OBJECTS_san) $(RT_OBJECTS_san-destroy-local)
 	@if [ "$$(ulimit -v)" != unlimited ]; then \
 		echo "test-rt-value-sanitize: run without ulimit -v (ASan shadow memory; found $$(ulimit -v) KiB)"; exit 1; fi
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-unit"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_property.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-property"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_regress.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-regress"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_round2.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-round2"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_d040.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-d040"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/value-destroy-oom"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san-destroy-local) -- $(RT_OBJECTS_san-destroy-local)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -DNIFT_RT_DESTROY_LOCAL=1 tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_san-destroy-local) -o "$(TEST_DIR)/rt-san/value-destroy-oom-small"
 	"$(TEST_DIR)/rt-san/value-unit"
 	"$(TEST_DIR)/rt-san/value-regress"
@@ -814,6 +840,7 @@ RT_VM_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) tests/rt/rt_vm_tool.h src/
 
 $(RT_VM_UNIT): tests/rt/vm_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # The prepared-parser port against legacy's own parser (src/Ast.cpp).
@@ -825,16 +852,19 @@ $(RT_VM_PREPARED): tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/
 RT_VM_GLOBALS := $(TEST_DIR)/rt/vm-globals-unit$(EXEEXT)
 $(RT_VM_GLOBALS): tests/rt/vm_globals_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_globals_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # CP12 phase B: the module graph and loader (D-041; rt/module_graph.h).
 RT_VM_MODULES := $(TEST_DIR)/rt/vm-modules-unit$(EXEEXT)
 $(RT_VM_MODULES): tests/rt/vm_modules_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_modules_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_run.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
@@ -880,10 +910,13 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 # sanitized nift (both engines in one sanitized binary).
 test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(RT_OBJECTS_san)
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/vm-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-unit"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_globals_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/vm-globals-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-globals-unit"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_modules_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/vm-modules-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/vm-modules-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$(TEST_DIR)/rt-san/vm-prepared-parse"
@@ -990,17 +1023,20 @@ RT_HOST_LIST_EXPECTED := src/PageObserver.cpp src/rt/handle.cpp src/rt/value.cpp
 RT_HOST_NATIVE_UNIT := $(TEST_DIR)/rt/host-native-unit$(EXEEXT)
 $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/host_observer_native.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # CP17 N2: Host-level observer parity (real PageObserver over a test RenderHost).
 RT_N2_PARITY_UNIT := $(TEST_DIR)/rt/n2-observer-parity$(EXEEXT)
 $(RT_N2_PARITY_UNIT): tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp src/PageObserver.o $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS) src/PageObserver.o
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/n2_observer_parity.cpp $(RT_UNIT_OBJECTS) src/PageObserver.o -o "$@"
 
 RT_STREAM_GUARD_UNIT := $(TEST_DIR)/rt/stream-resource-guards$(EXEEXT)
 $(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/stream_resource_guards.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # CP17 x CP13B decision B: the unwound-frame file release rule, linked against
@@ -1008,15 +1044,18 @@ $(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES)
 RT_UNWIND_RELEASE_UNIT := $(TEST_DIR)/rt/unwind-file-release$(EXEEXT)
 $(RT_UNWIND_RELEASE_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 RT_UNWIND_RELEASE_SAN_UNIT := $(TEST_DIR)/rt-san/unwind-file-release
 $(RT_UNWIND_RELEASE_SAN_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) $(RT_OBJECTS_san-pthread)
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san-pthread) -- $(RT_OBJECTS_san-pthread)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_TEST_DEPFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_OBJECTS_san-pthread) -o "$@"
 
 RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
 $(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp $(RT_OBJECTS_san-pthread)
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san-pthread) -- $(RT_OBJECTS_san-pthread)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_TEST_DEPFLAGS) tests/rt/host_observer_native.cpp $(RT_OBJECTS_san-pthread) -o "$@"
 .PHONY: test-runtime2-cp17-sanitize
 test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT) $(RT_UNWIND_RELEASE_SAN_UNIT)
@@ -1460,7 +1499,7 @@ C_ABI_PIC := $(patsubst %.o,$(TEST_DIR)/pic/%.o,$(C_ABI_CORE))
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
 $(TEST_DIR)/obj-config/pic.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" "$(CXX)" "$(CPPFLAGS) $(CXXFLAGS) -fPIC|$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC|$$($(CC) --version 2>/dev/null | head -1)"
+	@bash scripts/build/write-signature.sh "$@" $(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC --- $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC
 $(TEST_DIR)/pic/%.o: %.cpp $(TEST_DIR)/obj-config/pic.flags
 	bash scripts/build/compile-object.sh $@ -- $(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $<
 
@@ -2497,7 +2536,7 @@ benchmark-cp28: $(TARGET)
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
 $(TEST_DIR)/obj-config/san.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" "$(CXX)" "$(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS)|$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)"
+	@bash scripts/build/write-signature.sh "$@" $(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS)
 $(TEST_DIR)/san/%.o: %.cpp $(TEST_DIR)/obj-config/san.flags
 	bash scripts/build/compile-object.sh $@ -- $(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -c $<
 
@@ -2516,7 +2555,7 @@ LIFETIME_RUN = env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
 $(TEST_DIR)/obj-config/san-lifetime.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" "$(CXX)" "$(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS)|$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)"
+	@bash scripts/build/write-signature.sh "$@" $(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS)
 $(TEST_DIR)/san-lifetime/%.o: %.cpp $(TEST_DIR)/obj-config/san-lifetime.flags
 	bash scripts/build/compile-object.sh $@ -- $(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) -c $<
 
@@ -2583,7 +2622,7 @@ test-pagination-sanitize: $(SAN_TARGET)
 
 # Tooling checkpoint (component 1): configuration signature, atomic compile.
 $(TEST_DIR)/obj-config/tsan.flags: FORCE
-	@bash scripts/build/write-signature.sh "$@" "$(CXX)" "$(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS)|$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)"
+	@bash scripts/build/write-signature.sh "$@" $(CXX) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) --- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS)
 $(TEST_DIR)/tsan/%.o: %.cpp $(TEST_DIR)/obj-config/tsan.flags
 	bash scripts/build/compile-object.sh $@ -- $(CXX) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -c $<
 
@@ -4172,6 +4211,7 @@ test-runtime2-kind-bits: $(KIND_BITS_UNIT) $(KIND_BITS_MUTANT)
 CLOSURE_CYCLE_STRESS := $(TEST_DIR)/rt/closure-cycle-stress$(EXEEXT)
 $(CLOSURE_CYCLE_STRESS): tests/rt/closure_cycle_stress.cpp $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp $(RT_UNIT_OBJECTS)
 	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/closure_cycle_stress.cpp $(RT_UNIT_OBJECTS) -o "$@"
 .PHONY: test-runtime2-closure-cycle-stress
 test-runtime2-closure-cycle-stress: $(CLOSURE_CYCLE_STRESS)
@@ -4393,6 +4433,7 @@ test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
 	$(PYTHON) tests/runtime2/cp22/print_order.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-cp22-sanitize: $(SAN_TARGET) $(RT_OBJECTS_san)
 	mkdir -p "$(TEST_DIR)/rt-san"
+	@bash scripts/build/check-config.sh $(CXX) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_OBJECTS_san) \
 		-o "$(TEST_DIR)/rt-san/coro-unit"
 	ulimit -f 100000; NIFT_VM_COOPERATIVE_THREADS=1 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \

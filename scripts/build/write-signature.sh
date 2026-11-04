@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # Tooling checkpoint (component 1): the configuration signature of an object
-# directory.  write-signature.sh FILE COMPILER CONFIG
-# FILE holds the compiler identity and the exact compile flags of the objects
-# built against it. It is rewritten only when its content changes, so an
-# unchanged configuration never invalidates the objects, while any change of
-# compiler, flags or defines makes FILE newer than every object (each object
-# depends on it) and forces a rebuild: no stale object of another
-# configuration is ever reused. Each process writes its own temporary file
-# (concurrent makes, as LIBFFI_SIGNATURE).
+# set.  write-signature.sh FILE COMPILER [ARGS...] [--- COMPILER [ARGS...]]...
+# FILE holds each compile template's identity (config-id.sh: the compiler's
+# resolved path, a hash of its full --version output, the exact flags). It is
+# rewritten only when its content changes, so an unchanged configuration never
+# invalidates the objects, while any change of compiler, compiler version,
+# flags or defines makes FILE newer than every object (each object depends on
+# it) and forces a rebuild. Each process writes its own temporary file.
 set -u
-file=$1 cxx=$2 config=$3
+file=$1; shift
+. "$(dirname "$0")/config-id.sh"
 mkdir -p "$(dirname "$file")"
 t="$file.tmp.$$"
-printf '%s\n%s\n%s\n' "$cxx" "$($cxx --version 2>/dev/null | head -1)" "$config" > "$t" || exit 1
+: > "$t"
+while [ $# -gt 0 ]; do
+  part=()
+  while [ $# -gt 0 ] && [ "$1" != --- ]; do part+=("$1"); shift; done
+  [ $# -gt 0 ] && shift
+  [ ${#part[@]} -gt 0 ] && config_text "${part[@]}" >> "$t"
+done
 if cmp -s "$file" "$t"; then rm -f "$t"; else mv -f "$t" "$file"; fi
