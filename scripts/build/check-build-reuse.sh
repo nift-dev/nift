@@ -215,10 +215,12 @@ else bad "dry run: make -q nift or make -n nift sees an up-to-date tree as stale
 
 # --- clean and build in one invocation (re-check N1): the signatures are
 # recreated in the same run, no object falls back to make's built-in rule, and
-# nift is the same binary with every object carrying its sidecar ---
+# nift is the same binary with every object carrying its sidecar. Serial: with
+# -j, make may run the clean and the build at once, the documented unsupported
+# concurrent make + make clean ---
 ref=$(sha256sum nift | cut -d' ' -f1)
 for c in clean distclean; do
-  if make -j2 "$c" nift > "$out/$c-nift.log" 2>&1 && [ "$(sha256sum nift | cut -d' ' -f1)" = "$ref" ] && \
+  if make "$c" nift > "$out/$c-nift.log" 2>&1 && [ "$(sha256sum nift | cut -d' ' -f1)" = "$ref" ] && \
      bash scripts/build/check-config.sh --sets .build $(var CLI_OBJECTS) && make -q nift; then
     pass "make $c nift: nift ${ref:0:16} rebuilt identically, every object with its sidecar, make -q nift 0"
   else bad "make $c nift ($c-nift.log)"; fi
