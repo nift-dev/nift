@@ -73,10 +73,15 @@ case_ r3-digraph-paste src/rt/vm_ops.o "$POISON"
 save src/rt/vm_ops.cpp
 printf '\nnamespace nift::rt { struct StorageTest\\\nAccess { static void c(Value& v) { Storage::array_mut(v).clear(); } }; }\n' >> src/rt/vm_ops.cpp
 case_ r3-line-splice src/rt/vm_ops.o "$POISON"
-# ordering: a definition before the file's own first include
-save src/Hooks.cpp
-{ printf 'namespace nift::rt { struct Value; struct StorageTestAccess { template <class S> static void c(Value& v) { S::array_mut(v).clear(); } }; }\n'; cat "$work/src_Hooks.cpp.orig"; } > src/Hooks.cpp
-case_ order-definition-first src/Hooks.o "$POISON"
+# ordering: a definition before rt/aggregate.h (a member template naming
+# Storage only when instantiated, used after the include through a name that
+# is not the poisoned one); the completeness assertion in aggregate.h fires
+save src/rt/vm_ops.cpp
+{ printf 'namespace nift::rt { class Value; struct StorageTestAccess { template <class S, class V> static void c(V& v) { S::array_mut(v).clear(); } };\n'
+  printf 'template <class S, class V> void nift_probe_order(V& v) { StorageTestAccess::c<S>(v); } }\n'
+  cat "$work/src_rt_vm_ops.cpp.orig"
+  printf '\nnamespace nift::rt { void nift_probe_order_use(Value& v) { nift_probe_order<Storage>(v); } }\n'; } > src/rt/vm_ops.cpp
+case_ order-definition-first src/rt/vm_ops.o 'defined in a production translation unit'
 
 # control: a harmless plant in the same file builds, so the cases above fail
 # for their content, not for the harness
