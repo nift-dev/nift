@@ -137,3 +137,83 @@ Test sources, expectations and fixtures; the binaries' link inputs other than th
 form; the remaining test rules that compile small, explicit source lists (handle, error-oom,
 mutant and probe builds, which have their own defines and already used private objects or a few
 files).
+
+## 6. `libnift_c.so` symbol visibility
+
+(Section numbers follow the component numbers; commit order is 1, 6, 3, 4, 2, 5.)
+
+### 6.1 Problem
+
+`libnift_c.so` exported every symbol with default visibility: 5,527 dynamic symbols, 2,355 of them
+`nift::rt::` internals, plus the legacy engine, inline and template instantiations, and three
+internal `extern "C"` signal handlers named `nift_host_*`. The documented interface
+(`docs/handover/CP10-C-ABI-DESIGN.md`: "the shared library exports only the ABI symbols") is the C
+ABI of `include/nift/c_abi.h`.
+
+### 6.2 Change
+
+- The allowed export list is built from the documented public embedding API, not from a name
+  prefix: `scripts/check_abi_symbols.py --write-map` reads `include/nift/c_abi.h` through the C
+  preprocessor, takes every declared function (72), adds the documented exceptions of
+  `src/embed/abi-exports-extra.txt` (one: `nift_ffi_callback_i64_trampoline`, the FFI callback
+  trampoline, exported before and part of the frozen ABI 1.1 surface of
+  `tests/v46_b4_cp8_embedding_abi.sh`), and writes `.build/abi/libnift_c.map`: a GNU ld version
+  script naming each of the 73 symbols exactly, everything else `local`. It is an anonymous version
+  node: visibility only, no symbol versions, so a consumer resolves exactly as before. The map is
+  regenerated whenever the header, the exceptions file or the script changes.
+- Only the link of `libnift_c.so` changes (Linux: `-Wl,--version-script=`); no source, header or
+  object changes (`include/` stays byte-identical, as `tests/v46_b4_cp8_embedding_abi.sh` requires),
+  so the code inside the library and the `nift` executable are untouched.
+- `make test-c-abi-symbols` (added to `test-embed`):
+  - inventory: the exported dynamic symbols (`nm -D --defined-only`) must equal
+    `tests/abi/libnift_c.symbols` (checked in for review) exactly, every function declared in
+    `c_abi.h` must be exported, and the list must equal the declared functions plus the exceptions
+    file; so any extra export and any missing documented symbol fails;
+  - negative controls (`tests/abi/inventory_selftest.sh`, throw-away links of the same objects): a
+    library without the version script fails (5,451 symbols that are not part of the ABI), and one
+    whose map lacks `nift_engine_render_text` fails naming it;
+  - external consumer (`tests/abi/external_consumer.sh`, `tests/abi/external_consumer.c`): copies
+    `c_abi.h`, the program and the built `libnift_c.so` into a fresh directory outside the
+    repository, compiles there with `cc -std=c99 -Werror` against the copied header only, links
+    with `-lnift_c` (dynamic: `NEEDED libnift_c.so`, no `nift_*` symbol defined in the
+    executable), and runs it with a minimal environment: version, engine bindings, context, render
+    with a template, partial, text render, evaluate, execute with captured stdout, the program API
+    (compile, run, output, return value, syntax error) and every free function.
+
+### 6.3 Evidence
+
+On this host, commit `eea0e8ba`; gate files under `gates/c6/` (`test-go-binding` and
+`test-python-binding` ran on the same content before it was committed).
+
+- Exported dynamic symbols: 5,527 before (the same objects linked without the script), 73 after,
+  equal to the inventory. Every `nift_*` symbol exported before is still exported except the three
+  internal signal handlers `nift_host_exit_handler`, `nift_host_signal_handler`,
+  `nift_host_sigchld` (`src/rt/host/process_signals.cpp`: installed by address with `sigaction` and
+  `atexit` inside the library, declared in no public header, referenced by nothing outside that
+  file); hiding them changes nothing for the library (installed handlers are function pointers).
+- `make test-c-abi-symbols`: inventory PASS (73 = 72 declared + 1 exception), both negative
+  controls PASS, external consumer: 37 checks, 0 failures; 34 `nift_*` symbols resolved from the
+  library at run time.
+- Consumers that load the shared library dynamically: the CP18 C program (`tests/runtime2/cp18/
+  program.c`, `-lnift_c`): 1,044 checks, 0 failures; the CP18 Python ctypes test: 70 checks. The Go
+  binding (`make test-go-binding`, `go test -race`): ok; it links `libnift_c.a` statically
+  (`-Wl,-Bstatic -lnift_c` in the generated `nift.pc`), as do the Python and Node bindings (they
+  compile the sources themselves), so the version script does not reach them; the Python binding
+  build fails, for a pre-existing reason unrelated to this component: its source list
+  `src/rt/host-sources.txt` (unchanged since `c1f43300`) does not name
+  `src/rt/handles/table_teardown.cpp`, so the extension does not load (`undefined symbol
+  ...HandleTable::shutdown_noexcept`); it never loads `libnift_c.so`. Reported to the
+  coordinator as a source-list defect (the CP18 class), not fixed here. The C# binding loads the shared library through P/Invoke of C ABI names
+  only; `dotnet` is not installed here: Linode.
+- `nift` executable: unchanged (sha256 `3062f229...`); its link is not touched.
+
+### 6.4 Scope: Linux only; remaining before a cross-platform release
+
+- Linux (GNU ld): done here.
+- macOS (`libnift_c.dylib`): unchanged; still exports every external symbol. Needs
+  `-Wl,-exported_symbols_list` generated from the same list (with the leading underscore), and the
+  same inventory test with `nm -gU`.
+- Windows (mingw `libnift_c.so` DLL): unchanged; with no `dllexport` anywhere GNU ld exports every
+  symbol. Needs a `.def` file generated from the same list (or `--exclude-all-symbols` plus the
+  list), and the inventory test with `objdump -p`.
+- Both need their own CI runner; neither was built or tested here.
