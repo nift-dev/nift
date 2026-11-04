@@ -17,13 +17,15 @@
 # Tooling review F6: production dependencies are recorded with -MD (every
 # header), not -MMD, so a header marked `#pragma GCC system_header` (and what
 # it includes) is in the list and in make's dependencies.
-# Tooling review F4: the production marker (src/build/production_tu.h) is a
-# macro, so a unit could undefine it before rt/aggregate.h and lose the
-# poison and the assertion. A production object fails when its command line
-# undefines the marker (-U) or when any of its dependencies inside the
-# repository contains an undef directive for it: the text read as the
-# preprocessor reads it (line splices, including backslash-blank-newline,
-# removed; %: read as #; comments allowed between the tokens).
+# Tooling review F4, re-review N3, N4, N6: after the compile,
+# check-production-tu.py parses the dependency list with make's escapes,
+# refuses a dependency in tests/ or outside the repository and the compiler's
+# system include directories, and reads every repository dependency as the
+# preprocessor does (BOM, splices with LF, CR LF or lone CR, %:): an #undef of
+# the production marker NIFT_PRODUCTION_TU, or a #define/#undef of a test-only
+# switch (NIFT_*MUTANT*, *TEST*, *PROBE*, *HOOK*, *BYPASS*) other than the
+# reviewed defaults, fails the object. Before it, the command line may neither
+# undefine the marker nor set a test-only switch.
 set -u
 production=0
 if [ "${1:-}" = --production ]; then production=1; shift; fi
@@ -44,6 +46,13 @@ if [ "$production" = 1 ]; then
       echo "error: production object $out: the command line undefines NIFT_PRODUCTION_TU (tooling.md 3)" >&2
       exit 1
     fi
+    # re-review N3: a test-only switch never reaches a production object
+    name=
+    case "$prev" in -D|-U) name=$arg ;; *) case "$arg" in -D?*|-U?*) name=${arg#-?} ;; esac ;; esac
+    if [ -n "$name" ] && printf '%s\n' "${name%%=*}" | grep -Eqx 'NIFT_\w*(MUTANT|TEST|PROBE|HOOK|BYPASS)\w*'; then
+      echo "error: production object $out: the command line sets the test-only switch ${name%%=*} (tooling.md 3)" >&2
+      exit 1
+    fi
     prev=$arg
   done
 fi
@@ -52,23 +61,12 @@ if ! "$@" $depflag -MP -MF "$tmp.d" -MT "$out" -o "$tmp"; then
   exit 1
 fi
 if [ "$production" = 1 ]; then
-  root=$(pwd -P)
-  deps=$(sed -e 's/\\$//' -e 's/^[^ ]*: *//' "$tmp.d" | tr ' ' '\n' | grep -v '^$' |
-         xargs -r realpath -m --relative-to="$root" 2>/dev/null | sort -u)
-  bad=$(printf '%s\n' "$deps" | grep '^tests/' | head -3)
-  undef=$(printf '%s\n' "$deps" | grep -v -e '^\.\./' -e '^/' -e '^$' | xargs -r perl -0777 -ne '
-    s/\\[ \t\f\v]*\r?\n//g; s/%:/#/g;
-    my $c = qr{(?:[ \t\f\v]|/\*.*?\*/)};
-    print "$ARGV\n" if /^$c*#$c*undef$c+NIFT_PRODUCTION_TU\b/ms;' | head -3)
-  if [ -n "$undef" ]; then
-    echo "error: production object $out undefines the production marker NIFT_PRODUCTION_TU in: $(echo $undef)" \
-         "(tooling.md 3)" >&2
-    rm -f "$tmp" "$tmp.d"
-    exit 1
-  fi
-  if [ -n "$bad" ]; then
-    echo "error: production object $out depends on the test tree: $(echo $bad)" \
-         "(test helpers are unreachable from production: tooling.md 3)" >&2
+  # re-review N4, N6: the dependency list is parsed with make's escapes and
+  # each file read as the compiler reads it (check-production-tu.py)
+  src=; prev=
+  for arg in "$@"; do [ "$prev" = -c ] && src=$arg; prev=$arg; done
+  lang=c++; case "$src" in *.c) lang=c ;; esac
+  if ! python3 "$(dirname "$0")/check-production-tu.py" "$out" "$tmp.d" "$1" "$lang"; then
     rm -f "$tmp" "$tmp.d"
     exit 1
   fi

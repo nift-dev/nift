@@ -15,7 +15,8 @@ save() { cp -p "$1" "$work/$(echo "$1" | tr / _).orig"; saved+=("$1"); }
 restore_all() {
   for f in "${saved[@]}"; do cp -p "$work/$(echo "$f" | tr / _).orig" "$f"; touch "$f"; done; saved=()
   rm -rf src/rt/tests src/rt/natives/probe.hxx src/rt/natives/probe.def minifypp/include/probe_access.h \
-         src/rt/natives/probe_undef.h src/rt/natives/probe_system.h
+         src/rt/natives/probe_undef.h src/rt/natives/probe_system.h src/rt/natives/probe_n.h \
+         "src/rt/natives/probe dir" "src/rt/natives/probe'q.h"
 }
 # case NAME OBJECT EXPECT   (the plant has been applied; EXPECT: a regex of the diagnostic)
 case_() {
@@ -107,6 +108,43 @@ printf '#pragma once\n#pragma GCC system_header\n#include "../../../tests/rt/rt_
 printf '\n#include "rt/natives/probe_system.h"\n' >> src/rt/vm_ops.cpp
 case_ f6-system-header src/rt/vm_ops.o 'depends on the test tree'
 
+# Re-review N3 (rr/e2-mutant-define.diff): a test-only switch defined in source
+# would turn a test mutant (and its in-place key friendship) on in production
+save src/rt/natives/object_methods.cpp
+{ printf '#define NIFT_REFSEM_MUTANT 26\n'; cat "$work/src_rt_natives_object_methods.cpp.orig"; } > src/rt/natives/object_methods.cpp
+case_ n3-mutant-define-in-unit src/rt/natives/object_methods.o 'defines the test-only switch NIFT_REFSEM_MUTANT'
+save src/rt/vm_ops.cpp
+printf '#pragma once\n#define NIFT_SORT_WORDING_TEST\n' > src/rt/natives/probe_n.h
+printf '\n#include "rt/natives/probe_n.h"\n' >> src/rt/vm_ops.cpp
+case_ n3-test-switch-in-header src/rt/vm_ops.o 'defines the test-only switch NIFT_SORT_WORDING_TEST'
+if out=$(bash scripts/build/compile-object.sh --production "$work/cl2.o" -- g++ -include src/build/production_tu.h \
+         -DNIFT_REFSEM_MUTANT=26 -Isrc -Iinclude -std=c++17 -c src/rt/atom.cpp 2>&1); then
+  echo "FAIL isolation n3-switch-command-line: built"; fail=1
+elif printf '%s\n' "$out" | grep -q 'command line sets the test-only switch NIFT_REFSEM_MUTANT'; then
+  echo "PASS isolation n3-switch-command-line: refused (-DNIFT_REFSEM_MUTANT=26)"
+else echo "FAIL isolation n3-switch-command-line: $out"; fail=1; fi
+# Re-review N4, N6: the marker undefined in spellings the compiler reads as
+# directives, and dependencies the scan cannot review
+n4() { local name=$1 header=$2 expect=$3; shift 3
+  save src/rt/vm_ops.cpp
+  printf '\n#include "%s"\n' "$header" >> src/rt/vm_ops.cpp
+  case_ "$name" src/rt/vm_ops.o "$expect"
+}
+printf 'int nift_probe_cr;\r#undef NIFT_PRODUCTION_TU\r' > src/rt/natives/probe_n.h
+n4 n4-lone-cr rt/natives/probe_n.h 'undefines the production marker'
+printf '#un\\\rdef NIFT_PRODUCTION_TU\n' > src/rt/natives/probe_n.h
+n4 n4-backslash-cr-splice rt/natives/probe_n.h 'undefines the production marker'
+printf '\xef\xbb\xbf#undef NIFT_PRODUCTION_TU\n' > src/rt/natives/probe_n.h
+n4 n4-utf8-bom rt/natives/probe_n.h 'undefines the production marker'
+mkdir -p "src/rt/natives/probe dir"; printf '#undef NIFT_PRODUCTION_TU\n' > "src/rt/natives/probe dir/sp.h"
+n4 n4-space-in-path "rt/natives/probe dir/sp.h" 'undefines the production marker'
+printf '#pragma once\n' > "$work/outside.h"; ln -sf "$work/outside.h" src/rt/natives/probe_n.h
+n4 n4-symlink-outside rt/natives/probe_n.h 'outside the repository'
+rm -f src/rt/natives/probe_n.h
+n4 n4-absolute-outside "$work/outside.h" 'outside the repository'
+printf '#pragma once\n#include "../../../tests/rt/rt_test.h"\n' > "src/rt/natives/probe'q.h"
+n4 n6-quote-in-path "rt/natives/probe'q.h" 'depends on the test tree'
+
 # control: a harmless plant in the same file builds, so the cases above fail
 # for their content, not for the harness
 save src/rt/vm_ops.cpp
@@ -115,7 +153,7 @@ if make src/rt/vm_ops.o > "$work/control.log" 2>&1; then echo "PASS isolation co
 else echo "FAIL isolation control: the control plant does not build"; tail -5 "$work/control.log"; fail=1; fi
 restore_all
 # leave the production objects as they were
-make src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o > "$work/rebuild.log" 2>&1 || { echo "FAIL isolation: rebuild after restore"; fail=1; }
+make src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o > "$work/rebuild.log" 2>&1 || { echo "FAIL isolation: rebuild after restore"; fail=1; }
 git diff --quiet -- src markuppp minifypp || { echo "FAIL isolation: the tree was not restored"; fail=1; }
 echo "$( [ $fail = 0 ] && echo PASS || echo FAIL ) isolation: production cannot reach the storage-level test helpers"
 exit $fail
