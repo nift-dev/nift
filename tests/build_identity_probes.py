@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build diagnostic-only standalone/native failure controls after ordinary make."""
+import re
 from pathlib import Path
 import subprocess, shlex, os, shutil
 root=Path(__file__).resolve().parent.parent;out=root/'.build/identity';out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
@@ -16,6 +17,8 @@ for source,filename,extra in [('tests/identity_catalogue_probe.cpp','probe',['sr
 # Windows build and these standalone controls use UCRT64 g++ from PATH.
 make_compiler=['CXX='+compiler] if os.name=='nt' else []
 lines=subprocess.check_output(['make',*make_compiler,'-n','-W','src/ProjectInfo.cpp','nift'+suffix],cwd=root,text=True).splitlines()
+# tooling checkpoint (component 1): the plain compiler command of a compile-object.sh line
+lines=[re.sub(r'^bash scripts/build/compile-object\.sh (?:--production )?(\S+) -- (.*) -c (\S+)$', r'\2 -c \3 -o \1', x) for x in lines]
 compile=shlex.split(next(x for x in lines if '-c src/ProjectInfo.cpp ' in x));link=shlex.split(next(x for x in reversed(lines) if x.endswith(' -o nift'+suffix)))
 compile=[str(out/'ProjectInfo-fault.o') if x=='src/ProjectInfo.o' else x for x in compile];compile.insert(1,'-DNIFT_TEST_IDENTITY_PUBLICATION');subprocess.run(compile,cwd=root,check=True)
 link=[str(out/'ProjectInfo-fault.o') if x=='src/ProjectInfo.o' else str(out/('nift-fault'+suffix)) if x=='nift'+suffix else x for x in link];subprocess.run(link,cwd=root,check=True)

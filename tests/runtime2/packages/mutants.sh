@@ -28,6 +28,12 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+# Tooling checkpoint (component 1): the build plan's compile line is
+# `bash scripts/build/compile-object.sh --production OBJ -- CXX ARGS -c SRC`;
+# plain_compile prints the compiler command it runs, `CXX ARGS -MMD -c SRC -o OBJ`
+# (the form this harness substitutes into; the mutant object is not a
+# production object, so it is compiled directly, outside compile-object.sh).
+plain_compile() { sed -nE 's#^bash scripts/build/compile-object\.sh (--production )?([^ ]+) -- (.*) -c ([^ ]+)$#\3 -MMD -c \4 -o \2#p'; }
 if make -s -n nift | grep -qE -- " -o nift$"; then
     echo "FAIL packages mutants: ./nift is not current (run make nift)" >&2; exit 1
 fi
@@ -41,7 +47,7 @@ for spec in 1:src/rt/package_resolve.cpp 2:src/rt/package_resolve.cpp 3:src/Pack
     n=${spec%%:*}; one=${spec#*:}
     obj=${one%.cpp}.o; mobj="$TMP/m$n-$(basename "$obj")"
     plan=$(make -s -n nift -W "$one")
-    c=$(grep -F -- " -c $one -o $obj" <<<"$plan" | head -1)
+    c=$(plain_compile <<<"$plan" | grep -F -- " -c $one -o $obj" | head -1 || true)
     link=$(grep -E -- " -o nift$" <<<"$plan" | tail -1)
     if [ -z "$c" ] || [ -z "$link" ]; then echo "FAIL mutant $n: no build plan for $one (harness failure)" >&2; exit 1; fi
     c=${c/ -c $one -o $obj/ -DNIFT_PACKAGES_MUTANT=$n -MF $TMP/m.d -c $one -o $mobj}

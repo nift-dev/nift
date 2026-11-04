@@ -39,10 +39,16 @@ MUTANTS = [
      "if (at == std::string_view::npos) { if (!push(text.substr(pos))) return Status::Memory; break; }",
      "if (at == std::string_view::npos) { if (pos < text.size() && !push(text.substr(pos))) return Status::Memory; "
      "break; }"),
+    # Tooling checkpoint (component 2): merge builds its result with build::Object
+    # (no removal); the mutant builds the same wrong order directly: the left
+    # entries the right one does not replace, then the right entries.
     ("M8 merge moves replaced keys to the end", "object_methods.cpp",
-     "for (const auto& entry : object_entries(args[1])) object_set(result, entry.first, entry.second);",
-     "for (const auto& entry : object_entries(args[1])) { object_remove(result, entry.first); "
-     "object_set(result, entry.first, entry.second); }"),
+     "    build::Object result = shallow_object(args[0]);\n"
+     "    for (const auto& entry : object_entries(args[1])) result.set(entry.first, entry.second);",
+     "    build::Object result;\n"
+     "    for (const auto& entry : object_entries(args[0])) if (!object_get(args[1], entry.first)) "
+     "result.set(entry.first, entry.second);\n"
+     "    for (const auto& entry : object_entries(args[1])) result.set(entry.first, entry.second);"),
     ("M9 to_int rejects a leading plus", "string_methods.cpp",
      "if (text.front() == '+') text.remove_prefix(1);", ""),
     ("M10 unique keeps duplicates", "array_methods.cpp",

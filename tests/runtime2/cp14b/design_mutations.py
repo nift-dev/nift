@@ -46,11 +46,14 @@ MUTANTS=[
 ('premature-comparator-unwind','vm_collection_sort',9,[DRAIN+'; print(n)']),
 ]
 def substitute(source,old,new):
-    if source.count(old)!=1:raise RuntimeError('Injection anchor is not unique: '+old)
+    if source.count(old)!=1:raise RuntimeError(f'Injection anchor is not unique ({source.count(old)} matches): '+old)
     return source.replace(old,new)
 def inject(number,source):
     if number==1:
-        source=substitute(source,'case M::Map: array_push(s[Result],r);break;','case M::Map: array_push(s[Result],s[Item]);break;')
+        # Tooling checkpoint (component 2): the result slot is filled in place
+        # through the resumable native's key (tooling.md 2.4, E3); the mutant
+        # is unchanged: the element, not the callback's result, is pushed.
+        source=substitute(source,'case M::Map: Construction::array_push(bk,s[Result],r);break;','case M::Map: Construction::array_push(bk,s[Result],s[Item]);break;')
         return substitute(source,'case M::Reduce:s[Result]=r;break;','case M::Reduce:s[Result]=s[Item];break;')
     if number==4:return substitute(source,'desc=string_view_of(decoded)=="desc";','desc=false;')
     if number==5:

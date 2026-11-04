@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Disposable incremental source mutants. Production sources/objects/binary are never edited."""
-import argparse, hashlib, json, pathlib, shlex, subprocess, tempfile, time
+import re,argparse, hashlib, json, pathlib, shlex, subprocess, tempfile, time
 p=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--family',choices=['incremental'],default='incremental');a=p.parse_args()
 repo=pathlib.Path(__file__).resolve().parents[1]
 native_target=repo/('nift.exe' if (repo/'nift.exe').exists() else 'nift')
@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='nift-v411-mutants-') as td:
   plans={}
   for filename in ['ProjectInfo.cpp','CLI.cpp','Hooks.cpp']:
    plan=run(['make','-n','-W','src/'+filename]);assert plan.returncode==0,plan.stderr
-   lines=plan.stdout.splitlines();compile_line=next(x for x in lines if '-c src/'+filename+' ' in x);link_line=next(x for x in reversed(lines) if ' -o '+native_target.name in x)
+   lines=[re.sub(r'^bash scripts/build/compile-object\.sh (?:--production )?(\S+) -- (.*) -c (\S+)$', r'\2 -c \3 -o \1', x) for x in plan.stdout.splitlines()];compile_line=next(x for x in lines if '-c src/'+filename+' ' in x);link_line=next(x for x in reversed(lines) if ' -o '+native_target.name in x)
    plans[filename]=(shlex.split(compile_line),shlex.split(link_line))
   prefix='bool ProjectInfo::dependency_changed(const fs::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& page_info_status, const json::Document& snapshots, const std::string& name) const {'
   mutants=[('content-invalidation','ProjectInfo.cpp',prefix,prefix+'\n    if(dependency.parent_path().filename()=="content")return false;',['content']),
