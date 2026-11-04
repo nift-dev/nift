@@ -1,6 +1,10 @@
 #include "rt/aggregate.h"
 
 #include "rt/aggregate_store.h"
+// Tooling 2: the builders' spent check (rt/build.h) runs exactly in checked builds.
+#if defined(NIFT_RT_RELOCATE_ON_MUTATION) != defined(NIFT_RT_BUILDER_CHECKED)
+#error "rt/build.h and rt/aggregate_store.h disagree on checked builds"
+#endif
 #include "rt/compare.h"
 #include "rt/heap_account.h"
 
@@ -143,15 +147,15 @@ Value* Storage::array_slot_mut(Value& array, std::size_t index) {
 }
 
 // Construction (B2, owner B): fresh values only, checked in checked builds.
-std::vector<Value>& array_build_storage(Value& array) {
+std::vector<Value>& Construction::array_storage(Value& array) {
     check_fresh(array);
     return raw_items(array);
 }
-void array_push(Value& array, Value item) {
+void Construction::array_push(Value& array, Value&& item) {
     check_fresh(array);
     append(array, static_cast<Value&&>(item));
 }
-void array_build_set(Value& array, std::size_t index, Value item) {
+void Construction::array_set(Value& array, std::size_t index, Value&& item) {
     check_fresh(array);
     replace(array, index, static_cast<Value&&>(item));
 }
@@ -239,11 +243,11 @@ Value* member_slot(Value& object, Atom key) {
 
 void Storage::object_set(Value& object, Atom key, Value value) { put(object, key, static_cast<Value&&>(value)); }
 Value* Storage::object_slot_mut(Value& object, Atom key) { return member_slot(object, key); }
-void object_set(Value& object, Atom key, Value value) {
+void Construction::object_set(Value& object, Atom key, Value&& value) {
     check_fresh(object);
     put(object, key, static_cast<Value&&>(value));
 }
-Value* object_build_slot(Value& object, Atom key) {
+Value* Construction::object_slot(Value& object, Atom key) {
     check_fresh(object);
     return member_slot(object, key);
 }
@@ -282,7 +286,7 @@ const Value* struct_get(const Value& instance, Atom field) {
 }
 
 // Structs are references (D-NEXT-refsem #1, #4): in place, never cloned.
-void struct_add_field(Value& instance, Atom field, Value value) {
+void Construction::struct_add_field(Value& instance, Atom field, Value&& value) {
     check_fresh(instance);  // construction only (B2, owner B)
     relocate_storage(instance.heap());
     check_not_self(instance.heap(), value);
@@ -296,9 +300,9 @@ bool Storage::struct_set(Value& instance, Atom field, Value value) {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 2
     if (instance.refcount() > 1) {  // R2: a shared instance is copied on write (the old value semantics)
         const auto* source = instance.heap_as<StructObject>();
-        Value copy = make_struct(source->type_name, source->fields.size());
-        for (const auto& f : source->fields) struct_add_field(copy, f.first, f.second);
-        instance = std::move(copy);
+        build::Struct copy(source->type_name, source->fields.size());
+        for (const auto& f : source->fields) copy.add(f.first, f.second);
+        instance = std::move(copy).publish();
     }
 #endif
     relocate_storage(instance.heap());

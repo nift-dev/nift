@@ -37,8 +37,7 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
     // push_back reallocates, so the heap tally make_array recorded stays exact.
     std::size_t constant_total = 0;
     for (const auto& proto : source.protos) constant_total += proto->constants.size();
-    Value constants = make_array(constant_total);
-    std::vector<Value>& items = array_build_storage(constants);
+    build::ArrayBulk constant_builder(constant_total);
     bool holds_identity = false;
     for (std::size_t i = 0; i < source.protos.size(); ++i) {
         const auto& src = *source.protos[i]; auto& dst = *copy->protos[i];
@@ -52,15 +51,16 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         input.constant_counts.push_back(src.constants.size());
         for (const auto& v : src.constants) {
             holds_identity = holds_identity || v.is(Kind::Array) || v.is(Kind::Object) || may_contain_identity(v);
-            items.push_back(v);
+            constant_builder.append(v);
         }
         std::uint32_t wire = std::numeric_limits<std::uint32_t>::max();
         (void)map.index_of(&src, wire); input.proto_wires.push_back(wire);
     }
-    // array_build_storage marks raw storage conservatively; keep the exact summary
+    // the bulk builder marks raw storage conservatively; keep the exact summary
     // that per-element stores would have left (aggregate.h; B2: a nested
     // array or object marks it too).
-    if (!holds_identity) clear_may_hold_identity(constants.heap());
+    if (!holds_identity) constant_builder.holds_no_reference();
+    const Value constants = std::move(constant_builder).publish();
     if (input.constants_graph.encode(constants, map, error) != TransferStatus::Ok) return false;
     auto& table = AtomTable::current();
     for (auto id : used_atoms) {

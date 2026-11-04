@@ -50,12 +50,12 @@ bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string
     if (!record->input.has_program_snapshot) {
         if (!record->program || !record->proto_map) { error = "missing task program/map"; return false; }
         if (!record->input.has_seed_graph) {
-            Value seeds = make_array();
+            build::Array seed_builder;
             const auto g = record->program->main().nregs;
             for (std::size_t i = 0; i < g; ++i)
-                // rt-lint: storage-ok fresh, new seeds
-                array_push(seeds, i < record->input.globals.size() ? record->input.globals[i] : Value());
-            for (const auto& v : record->input.args) array_push(seeds, v);  // rt-lint: storage-ok fresh, new seeds
+                seed_builder.push(i < record->input.globals.size() ? record->input.globals[i] : Value());
+            for (const auto& v : record->input.args) seed_builder.push(v);
+            const Value seeds = std::move(seed_builder).publish();
             if (record->input.seed_graph.encode(seeds, *record->proto_map, error) != TransferStatus::Ok) return false;
             record->input.has_seed_graph = true;
             record->input.argc = record->input.args.size();

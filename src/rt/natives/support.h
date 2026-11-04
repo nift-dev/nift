@@ -3,6 +3,7 @@
 // a port of the legacy helper it names (RuntimeValue.cpp, ParserExpression.cpp).
 #include "rt/natives/builtin.h"
 #include "rt/string.h"
+#include "rt/aggregate.h"  // rt/build.h: build::ArrayBulk
 #include "rt/value.h"
 
 #include <cstddef>
@@ -138,8 +139,7 @@ public:
     Value finish();
 
 private:
-    Value array_;
-    std::vector<Value>* items_;
+    build::ArrayBulk array_;  // tooling 2: the bulk builder (the same operations as before)
 };
 
 // Value of a count or index (legacy numbers; Int here, rendered identically).

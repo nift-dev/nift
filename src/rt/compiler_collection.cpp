@@ -62,7 +62,7 @@ bool UnitCompiler::collection_call(const Node& node,std::uint16_t dst,int method
     if(once&&!expr_to(args[0],state+Callback))return false;
     const std::uint32_t selectors=sort_by?(node.count==1?1:node.count/2):1;
     if(sort_by) {
-        Value directions=make_array(selectors);
+        build::Array direction_builder(selectors);
         for(std::uint32_t k=0;k<selectors;++k){
             bool desc=false;
             if(node.count>1){const Node& direction=ast_.at(args[k*2+1]);
@@ -70,8 +70,9 @@ bool UnitCompiler::collection_call(const Node& node,std::uint16_t dst,int method
                 Value decoded;if(!decode_string_literal(text(direction),decoded))return fail(node,"method:sort_by");
                 desc=string_view_of(decoded)=="desc";
             }
-            array_push(directions,Value::boolean(desc));  // rt-lint: storage-ok fresh, new directions
+            direction_builder.push(Value::boolean(desc));
         }
+        Value directions=std::move(direction_builder).publish();
         // An internal constant, read only by the step (never user-visible): immutable.
         mutation::make_immutable(directions);
         std::uint16_t constant=0;if(!fb_->constant(directions,constant))return false;

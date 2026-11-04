@@ -253,9 +253,9 @@ Outcome Protocol::splice_remove(Value& array, std::size_t index, std::size_t cou
     index = std::min(index, n);
     count = std::min(count, n - index);
     if (removed) {
-        Value cut = make_array(count);
-        for (std::size_t k = 0; k < count; ++k) array_push(cut, array_view(array)[index + k]);
-        *removed = std::move(cut);
+        build::Array cut(count);
+        for (std::size_t k = 0; k < count; ++k) cut.push(array_view(array)[index + k]);
+        *removed = std::move(cut).publish();
     }
     if (!reserve(env.heap_limit, array_reserve_bytes(array, 0))) return budget_failure();
     commit_array(array, ArrayEdit::SpliceRemove, index, count, Value());
@@ -298,16 +298,16 @@ Outcome Protocol::splice(Value& array, std::size_t index, std::size_t count, con
     // removal are read, never written while read.
     std::vector<Value> side;
     side.reserve(n - count + added);
-    Value cut = make_array(count);
+    build::Array cut(count);
     for (std::size_t k = 0; k < index; ++k) side.push_back(items[k]);
     for (const Value& v : array_view(replacement)) side.push_back(v);
     for (std::size_t k = index; k < n; ++k) {
-        if (k < index + count) array_push(cut, items[k]);
+        if (k < index + count) cut.push(items[k]);
         else side.push_back(items[k]);
     }
     Storage::array_mut(array).swap(side);  // the receiver's own storage, identity kept
     heap_retally(array.heap());
-    if (removed) *removed = std::move(cut);
+    if (removed) *removed = std::move(cut).publish();
     return {};
 }
 

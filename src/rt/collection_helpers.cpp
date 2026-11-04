@@ -32,13 +32,17 @@ bool generated_key(M m,const Value& value,Atom& key,Fault& f) {
         std::string(collection_names[static_cast<unsigned>(m)])+": generated key must be string, number, or bool");
     std::string rendered;natives::append_scalar(value,rendered);key=atom(rendered);return true;
 }
-void append_group(Value& object,Atom key,const Value& item) {
+// Tooling 2 (in place, tooling.md 2.4): s[Result], s[Keys] and s[HashTable] are
+// the resumable native's own state slots, built across callback suspensions (no
+// builder survives a suspension); the key comes from collection_step.
+using Key=build::InPlaceKey;
+void append_group(const Key& bk,Value& object,Atom key,const Value& item) {
     // rt-lint: storage-ok fresh, the native's new result
-    if(!object_get(object,key))object_set(object,key,make_array());
+    if(!object_get(object,key))Construction::object_set(bk,object,key,make_array());
     // rt-lint: storage-ok fresh, the native's fresh result
-    Value* group=object_build_slot(object,key);
+    Value* group=Construction::object_slot(bk,object,key);
     // rt-lint: storage-ok fresh, the group array the native made just above (held only by its result)
-    array_push(*group,item);
+    Construction::array_push(bk,*group,item);
 }
 void short_circuit(Value* s) {
 #if !defined(NIFT_COLLECTION_MUTANT) || NIFT_COLLECTION_MUTANT != 6
@@ -47,11 +51,12 @@ void short_circuit(Value* s) {
     (void)s;
 #endif
 }
-bool consume(M m,Value* s,const natives::Context&,Fault& f) {
+bool consume(const Key& bk,M m,Value* s,const natives::Context&,Fault& f) {
     const Value& r=s[Returned];
     const std::string_view name=collection_names[static_cast<unsigned>(m)];
     switch(m) {
-        case M::Map: array_push(s[Result],r);break;  // rt-lint: storage-ok fresh, the native's new result
+        // rt-lint: storage-ok fresh, the native's new result
+        case M::Map: Construction::array_push(bk,s[Result],r);break;
         case M::Reduce:s[Result]=r;break;
         case M::Filter:case M::Any:case M::All:case M::Find:case M::FindIndex:case M::Count:case M::Partition: {
             #if !defined(NIFT_COLLECTION_MUTANT) || NIFT_COLLECTION_MUTANT != 5
@@ -62,17 +67,18 @@ bool consume(M m,Value* s,const natives::Context&,Fault& f) {
 #else
             const bool yes=r.as_bool();
 #endif
-            if(m==M::Filter&&yes)array_push(s[Result],s[Item]);  // rt-lint: storage-ok fresh, the native's new result
+            // rt-lint: storage-ok fresh, the native's new result
+            if(m==M::Filter&&yes)Construction::array_push(bk,s[Result],s[Item]);
             else if(m==M::Any&&yes){s[Result]=Value::boolean(true);short_circuit(s);}
             else if(m==M::All&&!yes){s[Result]=Value::boolean(false);short_circuit(s);}
             else if((m==M::Find||m==M::FindIndex)&&yes){s[Result]=m==M::Find?s[Item]:s[Index];short_circuit(s);}
             else if(m==M::Count&&yes)s[Result]=Value::integer(s[Result].as_int()+1);
-            else if(m==M::Partition)append_group(s[Result],atom(yes?"matched":"unmatched"),s[Item]);
+            else if(m==M::Partition)append_group(bk,s[Result],atom(yes?"matched":"unmatched"),s[Item]);
             break;
         }
         case M::SortBy:
             if(!scalar_key(r))return error(f,"sort_by: key must be scalar");
-            array_push(s[Keys],r);break;  // rt-lint: storage-ok fresh, the native's new result
+            Construction::array_push(bk,s[Keys],r);break;  // rt-lint: storage-ok fresh, the native's new result
         case M::MinBy:case M::MaxBy: {
             if(!scalar_key(r))return error(f,std::string(name)+": key must be scalar");
             if(s[Index].as_int()==0){s[Keys]=r;s[Result]=s[Item];break;}
@@ -88,42 +94,45 @@ bool consume(M m,Value* s,const natives::Context&,Fault& f) {
             for(;;slot=(slot+1)&mask){std::memcpy(&pos,table.data()+slot*sizeof(pos),sizeof(pos));if(!pos)break;
                 if(equal(array_items(s[Keys])[pos-1],r))return true;}
             // rt-lint: storage-ok fresh, the native's new result
-            array_push(s[Keys],r);pos=array_size(s[Keys]);std::memcpy(table.data()+slot*sizeof(pos),&pos,
-                sizeof(pos));array_push(s[Result],s[Item]);break;  // rt-lint: storage-ok fresh, the native's new result
+            Construction::array_push(bk,s[Keys],r);
+            pos=array_size(s[Keys]);std::memcpy(table.data()+slot*sizeof(pos),&pos,sizeof(pos));
+            // rt-lint: storage-ok fresh, the native's new result
+            Construction::array_push(bk,s[Result],s[Item]);break;
         }
         case M::GroupBy:case M::IndexBy:case M::CountBy: {
             if(m==M::GroupBy&&!scalar_key(r))return error(f,"group_by: key must be scalar");
             Atom key;if(!generated_key(m,r,key,f))return false;
-            if(m==M::GroupBy)append_group(s[Result],key,s[Item]);
+            if(m==M::GroupBy)append_group(bk,s[Result],key,s[Item]);
             else if(m==M::IndexBy){if(object_get(s[Result],key))return error(f,
+                "index_by: duplicate generated key '"+std::string(atom_text(key))+"'");
                 // rt-lint: storage-ok fresh, the native's new result
-                "index_by: duplicate generated key '"+std::string(atom_text(key))+"'");object_set(s[Result],key,
-                s[Item]);}
+                Construction::object_set(bk,s[Result],key,s[Item]);}
             else {const Value* count=object_get(s[Result],key);const std::int64_t n=count?count->as_int():0;
-                object_set(s[Result],key,Value::integer(n+1));}  // rt-lint: storage-ok fresh, the native's new result
+                // rt-lint: storage-ok fresh, the native's new result
+                Construction::object_set(bk,s[Result],key,Value::integer(n+1));}
             break;
         }
         case M::GroupByEach: {
             if(!r.is(Kind::Array))return error(f,"group_by_each: selector must return an array");
-            Value seen=make_object();
+            build::Object seen;
             for(const Value& k:array_items(r)) {Atom key;if(!generated_key(m,k,key,f))return false;
 #if !defined(NIFT_COLLECTION_MUTANT) || NIFT_COLLECTION_MUTANT != 8
-                if(object_get(seen,key))continue;
+                if(seen.get(key))continue;
 #endif
-                object_set(seen,key,Value::boolean(true));  // rt-lint: storage-ok fresh, the native's new result
-                append_group(s[Result],key,s[Item]);}break;
+                seen.set(key,Value::boolean(true));
+                append_group(bk,s[Result],key,s[Item]);}break;
         }
         default:return raise(f,StopReason::Internal,"collection method");
     }
     return true;
 }
-bool sorted_keys(Value* s,const natives::Context& context,Fault& f) {
+bool sorted_keys(const Key& bk,Value* s,const natives::Context& context,Fault& f) {
     const std::size_t n=static_cast<std::size_t>(s[Length].as_int()),width=array_size(s[Directions]);
     if(!budget(context,n*sizeof(Value),f))return false;
     s[HashTable]=make_array(n);
     // rt-lint: storage-ok fresh, the native's new result
-    for(std::size_t i=0;i<n;++i)array_push(s[HashTable],Value::integer(i));
-    auto& order=array_build_storage(s[HashTable]);  // rt-lint: storage-ok fresh, fresh scratch
+    for(std::size_t i=0;i<n;++i)Construction::array_push(bk,s[HashTable],Value::integer(i));
+    auto& order=Construction::array_storage(bk,s[HashTable]);  // rt-lint: storage-ok fresh, fresh scratch
     const auto& keys=array_items(s[Keys]);const auto& directions=array_items(s[Directions]);bool failed=false;
     std::sort(order.begin(),order.end(),[&](const Value& left,const Value& right){
         const auto a=static_cast<std::size_t>(left.as_int()),b=static_cast<std::size_t>(right.as_int());
@@ -146,7 +155,8 @@ bool sorted_keys(Value* s,const natives::Context& context,Fault& f) {
     });
     if(failed)return error(f,"sort_by: keys must be comparable and homogeneous");
     // rt-lint: storage-ok fresh, the native's new result
-    for(const Value& i:order)array_push(s[Result],array_items(s[Source])[static_cast<std::size_t>(i.as_int())]);
+    for(const Value& i:order)Construction::array_push(bk,s[Result],
+        array_items(s[Source])[static_cast<std::size_t>(i.as_int())]);
     return true;
 }
 } // namespace
@@ -180,10 +190,11 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
         else if(method==M::GroupBy||method==M::IndexBy||method==M::Partition||method==M::CountBy||
                 method==M::GroupByEach)s[Result]=make_object();
         if(method==M::Partition){
+            const build::InPlaceKey key;  // tooling.md 2.4: this native's own state slots
             // rt-lint: storage-ok fresh, the native's new result
-            object_set(s[Result],atom("matched"),make_array());
+            Construction::object_set(key,s[Result],atom("matched"),make_array());
             // rt-lint: storage-ok fresh, the native's new result
-            object_set(s[Result],atom("unmatched"),make_array());}
+            Construction::object_set(key,s[Result],atom("unmatched"),make_array());}
         if(method==M::SortBy){const std::size_t width=array_size(s[Directions]);
             if(width&&n>std::size_t(-1)/width/sizeof(Value))return raise(fault,StopReason::Internal,
             "memory budget exceeded");if(!budget(context,n*width*sizeof(Value),fault))return false;
@@ -196,10 +207,13 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
     }
     if(phase==1){const auto i=s[Index].as_int();const bool more=i<s[Length].as_int();
         s[More]=Value::boolean(more);if(more)s[Item]=array_items(s[Source])[static_cast<std::size_t>(i)];return true;}
-    if(phase==2||phase==4){if(!consume(method,s,context,fault))return false;if(phase==2){
+    // tooling.md 2.4: the key is made only where this native's state slots are built
+    if(phase==2||phase==4){
+        {const build::InPlaceKey key;if(!consume(key,method,s,context,fault))return false;}
+        if(phase==2){
         s[Index]=Value::integer(s[Index].as_int()+1);s[Returned]=Value();s[Item]=Value();}return true;}
     if(phase==5){s[Index]=Value::integer(s[Index].as_int()+1);s[Returned]=Value();s[Item]=Value();return true;}
-    if(phase==3)return method!=M::SortBy||sorted_keys(s,context,fault);
+    if(phase==3){const build::InPlaceKey key;return method!=M::SortBy||sorted_keys(key,s,context,fault);}
     return raise(fault,StopReason::Internal,"collection phase");
 }
 } // namespace nift::rt

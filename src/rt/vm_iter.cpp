@@ -76,17 +76,15 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
             return raise(fault, StopReason::Error, "array @for syntax is @for(item : array){...}");
         const auto& items = collection_view(source);
         if (!reserve_snapshot(items.size(), fault)) return false;
-        Value array = make_array(items.size());
+        build::Array array(items.size());
 #if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 7
         const bool reverse = false;  // M7: a stack iterated bottom first
 #else
         const bool reverse = kind == CollectionKind::Stack;
 #endif
-        // rt-lint: storage-ok fresh, new key/snapshot array
-        if (reverse) for (std::size_t k = items.size(); k-- > 0;) array_push(array, items[k]);
-        // rt-lint: storage-ok fresh, new key/snapshot array
-        else for (const Value& item : items) array_push(array, item);
-        source = std::move(array);  // R[a] is the loop's own snapshot register
+        if (reverse) for (std::size_t k = items.size(); k-- > 0;) array.push(items[k]);
+        else for (const Value& item : items) array.push(item);
+        source = std::move(array).publish();  // R[a] is the loop's own snapshot register
         return memory_ok(fault);
     }
     switch (in.b) {
@@ -150,24 +148,21 @@ bool Vm::op_object_keys(const Instr& in, Value* R, Fault& fault) {
     const Value& source = R[in.b];
     if (source.is(Kind::Collection) && collection_kind(source) == CollectionKind::Map) {  // D-063: typed keys
         const auto& items = collection_view(source);
-        Value keys = make_array(items.size() / 2);
-        // rt-lint: storage-ok fresh, new key/snapshot array
-        for (std::size_t k = 0; k < items.size(); k += 2) array_push(keys, items[k]);
-        R[in.a] = std::move(keys);
+        build::Array keys(items.size() / 2);
+        for (std::size_t k = 0; k < items.size(); k += 2) keys.push(items[k]);
+        R[in.a] = std::move(keys).publish();
         return true;
     }
     if (!source.is(Kind::Object)) return internal(fault, "object keys source");
     const auto& entries = object_view(source);
-    Value keys = make_array(entries.size());
+    build::Array keys(entries.size());
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 7
     for (std::size_t k = entries.size(); k-- > 0;)  // M6: object order changed
-        // rt-lint: storage-ok fresh, new key/snapshot array
-        array_push(keys, make_string(atom_text(entries[k].first)));
+        keys.push(make_string(atom_text(entries[k].first)));
 #else
-    // rt-lint: storage-ok fresh, new key/snapshot array
-    for (const auto& entry : entries) array_push(keys, make_string(atom_text(entry.first)));
+    for (const auto& entry : entries) keys.push(make_string(atom_text(entry.first)));
 #endif
-    R[in.a] = std::move(keys);
+    R[in.a] = std::move(keys).publish();
     return true;
 }
 

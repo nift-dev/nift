@@ -34,6 +34,21 @@ struct StorageTestAccess {
     static void stack_push(Value& s, Value v) { Storage::stack_push(s, static_cast<Value&&>(v)); }
     static void stack_pop(Value& s) { Storage::stack_pop(s); }
     static void collection_clear(Value& c) { Storage::collection_clear(c); }
+    // Tooling checkpoint (component 2): the construction primitives behind the
+    // builders (rt/build.h), for the tests' construction shims below.
+    static void build_array_push(Value& a, Value v) { Construction::array_push(a, static_cast<Value&&>(v)); }
+    static std::vector<Value>& build_array_storage(Value& a) { return Construction::array_storage(a); }
+    static void build_array_set(Value& a, std::size_t i, Value v) { Construction::array_set(a, i, static_cast<Value&&>(v)); }
+    static void build_object_set(Value& o, Atom k, Value v) { Construction::object_set(o, k, static_cast<Value&&>(v)); }
+    static Value* build_object_slot(Value& o, Atom k) { return Construction::object_slot(o, k); }
+    static void build_struct_add_field(Value& s, Atom f, Value v) {
+        Construction::struct_add_field(s, f, static_cast<Value&&>(v));
+    }
+    static void build_map_set(Value& m, Value k, Value v) {
+        Construction::map_set(m, static_cast<Value&&>(k), static_cast<Value&&>(v));
+    }
+    static void build_set_add(Value& s, Value v) { Construction::set_add(s, static_cast<Value&&>(v)); }
+    static void build_stack_push(Value& s, Value v) { Construction::stack_push(s, static_cast<Value&&>(v)); }
 };
 
 // The commits under their B1 names (receiver forms: no freshness check).
@@ -56,5 +71,26 @@ inline void collection_clear(Value& c) { StorageTestAccess::collection_clear(c);
 // construction and require a fresh value).
 inline void array_append(Value& a, Value v) { StorageTestAccess::array_push(a, static_cast<Value&&>(v)); }
 inline void object_put(Value& o, Atom k, Value v) { StorageTestAccess::object_set(o, k, static_cast<Value&&>(v)); }
+
+// Tooling checkpoint (component 2): the former free construction functions,
+// for the tests only (test bodies unchanged). Production constructs through the
+// builders of rt/build.h, and cannot reach these (tooling.md 3: this header does
+// not compile in a production unit). The same primitives, freshness checks
+// included (checked builds abort unless the receiver is fresh).
+inline void array_push(Value& a, Value v) { StorageTestAccess::build_array_push(a, static_cast<Value&&>(v)); }
+inline std::vector<Value>& array_build_storage(Value& a) { return StorageTestAccess::build_array_storage(a); }
+inline void array_build_set(Value& a, std::size_t i, Value v) {
+    StorageTestAccess::build_array_set(a, i, static_cast<Value&&>(v));
+}
+inline void object_set(Value& o, Atom k, Value v) { StorageTestAccess::build_object_set(o, k, static_cast<Value&&>(v)); }
+inline Value* object_build_slot(Value& o, Atom k) { return StorageTestAccess::build_object_slot(o, k); }
+inline void struct_add_field(Value& s, Atom f, Value v) {
+    StorageTestAccess::build_struct_add_field(s, f, static_cast<Value&&>(v));
+}
+inline void map_build_set(Value& m, Value k, Value v) {
+    StorageTestAccess::build_map_set(m, static_cast<Value&&>(k), static_cast<Value&&>(v));
+}
+inline void set_build_add(Value& s, Value v) { StorageTestAccess::build_set_add(s, static_cast<Value&&>(v)); }
+inline void stack_build_push(Value& s, Value v) { StorageTestAccess::build_stack_push(s, static_cast<Value&&>(v)); }
 
 } // namespace nift::rt

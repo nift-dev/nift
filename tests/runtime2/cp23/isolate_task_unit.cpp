@@ -5,6 +5,7 @@
 #include "rt/future.h"
 #include "rt/isolate_task.h"
 #include "rt/string.h"
+#include "../../rt/storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "rt_test.h"
 
 #include <cstdint>

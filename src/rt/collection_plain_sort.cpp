@@ -20,8 +20,11 @@ bool collection_plain_sort(Value* s,const natives::Context& context,Fault& fault
        !natives::reserve_result(context,n*sizeof(Value)*(s[Source].refcount()>1?2:1)+128))
         return raise(fault,StopReason::Internal,"memory budget exceeded");
     s[HashTable]=make_array(n);
-    for(std::size_t i=0;i<n;++i)array_push(s[HashTable],Value::integer(i));  // rt-lint: storage-ok fresh, new scratch
-    auto& order=array_build_storage(s[HashTable]);  // rt-lint: storage-ok fresh, the fresh scratch order
+    const build::InPlaceKey build_key;  // tooling.md 2.4: this native's own scratch slot
+    // rt-lint: storage-ok fresh, new scratch
+    for(std::size_t i=0;i<n;++i)Construction::array_push(build_key,s[HashTable],Value::integer(i));
+    // rt-lint: storage-ok fresh, the fresh scratch order
+    auto& order=Construction::array_storage(build_key,s[HashTable]);
     std::sort(order.begin(),order.end(),[&](const Value& x,const Value& y) {
         const auto a=static_cast<std::size_t>(x.as_int()),b=static_cast<std::size_t>(y.as_int());
         int c=0;

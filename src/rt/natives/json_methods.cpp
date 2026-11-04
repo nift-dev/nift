@@ -35,14 +35,13 @@ bool from_document(const Context& context, json::Document& doc, Value& out) {
             return true;
         }
         case json::Type::Object: {
-            Value object = make_object();
+            build::Object object;
             for (auto& entry : doc.object) {
                 Value v;
                 if (!from_document(context, entry.second, v)) return false;
-                // rt-lint: storage-ok fresh, new result
-                object_set(object, atom(entry.first), static_cast<Value&&>(v));
+                object.set(atom(entry.first), static_cast<Value&&>(v));
             }
-            out = static_cast<Value&&>(object);
+            out = std::move(object).publish();
             return !context.over_budget();
         }
     }

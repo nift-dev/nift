@@ -39,6 +39,16 @@ check bypass_sort_key_redefine.cpp SortKey
 # Tooling checkpoint (component 4, RECHECK2 N3): byte-copy and copy-out of a forged key
 check bypass_sort_key_bitcast.cpp 'not trivially copyable'
 check bypass_sort_key_copy.cpp 'deleted function.*SortKey'
+# Tooling checkpoint (component 2): construction only through builders and the in-place key
+check build_copy.cpp 'deleted function.*build::Array::Array(const'
+check build_assign.cpp 'deleted function.*build::Array::operator='
+check build_from_value.cpp "Array(nift::rt::Value)' is private"
+check build_publish_lvalue.cpp 'publish'
+check build_free_function.cpp "'array_push' was not declared"
+check build_primitive.cpp 'Construction::array_push.*private'
+check build_key_forge.cpp 'InPlaceKey::InPlaceKey().*private'
+check build_key_bitcast.cpp 'not trivially copyable'
+check build_key_copy.cpp 'deleted function.*InPlaceKey'
 if out=$("$cxx" "${flags[@]}" -fsyntax-only "$dir/control.cpp" 2>&1); then echo "PASS compile-fail control compiles"
 else echo "FAIL compile-fail control does not compile:"; printf '%s\n' "$out" | head -5; fail=1; fi
 exit $fail

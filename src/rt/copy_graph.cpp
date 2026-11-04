@@ -50,8 +50,14 @@ Value shell(const Value& v) {
     return make_collection(collection_kind(v));
 }
 
+// Tooling 2 (in place, tooling.md 2.4): the shells are created first (so every
+// node of a DAG maps to one copy) and filled in post-order afterwards, each
+// before any parent holds it; a shell is not a builder's value because the
+// identity map (copies_) holds it from creation, so the fill takes the key of
+// deep_copy_tuple, the owner.
 class GraphCopy {
 public:
+    explicit GraphCopy(const build::InPlaceKey& key) : key_(key) {}
     // Phase 1: every reachable object once (iterative; no recursion depth),
     // its copied children, and the budget for all of them before anything is
     // allocated.
@@ -125,11 +131,11 @@ public:
 
 private:
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 9
-    static void fill_shallow(const Value& source, Value& copy) {
+    void fill_shallow(const Value& source, Value& copy) const {
         if (source.is(Kind::Collection)) { copy = collection_shallow_clone(source); return; }
         if (source.is(Kind::Struct)) {
             // rt-lint: storage-ok fresh, the new copy
-            for (const auto& f : struct_fields(source)) struct_add_field(copy, f.first, f.second);
+            for (const auto& f : struct_fields(source)) Construction::struct_add_field(key_, copy, f.first, f.second);
             return;
         }
         copy = source;
@@ -138,13 +144,15 @@ private:
     void fill(const Value& source, Value& copy) const {
         if (source.is(Kind::Array)) {
             // rt-lint: storage-ok fresh, the new copy
-            for (const Value& item : array_items(source)) array_push(copy, mapped(item));
+            for (const Value& item : array_items(source)) Construction::array_push(key_, copy, mapped(item));
         } else if (source.is(Kind::Object)) {
-            // rt-lint: storage-ok fresh, the new copy
-            for (const auto& entry : object_entries(source)) object_set(copy, entry.first, mapped(entry.second));
+            for (const auto& entry : object_entries(source))
+                // rt-lint: storage-ok fresh, the new copy
+                Construction::object_set(key_, copy, entry.first, mapped(entry.second));
         } else if (source.is(Kind::Struct)) {
-            // rt-lint: storage-ok fresh, the new copy
-            for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, mapped(field.second));
+            for (const auto& field : struct_fields(source))
+                // rt-lint: storage-ok fresh, the new copy
+                Construction::struct_add_field(key_, copy, field.first, mapped(field.second));
         } else {
             const auto& items = collection_items(source);
             const CollectionKind kind = collection_kind(source);
@@ -152,17 +160,19 @@ private:
             // inserted in order, the index is rebuilt as the source's.
             if (kind == CollectionKind::Map) {
                 for (std::size_t k = 0; k + 1 < items.size(); k += 2)
-                    map_build_set(copy, items[k], mapped(items[k + 1]));  // rt-lint: storage-ok fresh, fresh copy
+                    // rt-lint: storage-ok fresh, fresh copy
+                    Construction::map_set(key_, copy, items[k], mapped(items[k + 1]));
             } else if (kind == CollectionKind::Set) {
                 // rt-lint: storage-ok fresh, fresh copy
-                for (const Value& member : items) set_build_add(copy, mapped(member));
+                for (const Value& member : items) Construction::set_add(key_, copy, mapped(member));
             } else {
                 // rt-lint: storage-ok fresh, fresh copy
-                for (const Value& item : items) stack_build_push(copy, mapped(item));
+                for (const Value& item : items) Construction::stack_push(key_, copy, mapped(item));
             }
         }
     }
 
+    const build::InPlaceKey& key_;
     std::vector<const Value*> sources_;
     std::vector<std::vector<std::size_t>> children_;
     std::unordered_map<const HeapObject*, std::size_t> index_;
@@ -182,10 +192,9 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
     }
     if (source.is(Kind::Struct)) {
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
-        Value copy = make_struct(struct_type(source), struct_fields(source).size());
-        // rt-lint: storage-ok fresh, the new copy
-        for (const auto& field : struct_fields(source)) struct_add_field(copy, field.first, field.second);
-        out = std::move(copy);
+        build::Struct copy(struct_type(source), struct_fields(source).size());
+        for (const auto& field : struct_fields(source)) copy.add(field.first, field.second);
+        out = std::move(copy).publish();
         return CopyStatus::Ok;
     }
     if (source.is(Kind::Array) || source.is(Kind::Object)) {
@@ -197,12 +206,15 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
         out = source;  // R-B4: copy() returns the same object
         return CopyStatus::Ok;
 #endif
-        Value copy = source.is(Kind::Array) ? make_array(array_size(source)) : make_object();
-        // rt-lint: storage-ok fresh, the new copy
-        if (source.is(Kind::Array)) for (const Value& item : array_view(source)) array_push(copy, item);
-        // rt-lint: storage-ok fresh, the new copy
-        else for (const auto& entry : object_view(source)) object_set(copy, entry.first, entry.second);
-        out = std::move(copy);
+        if (source.is(Kind::Array)) {
+            build::Array copy(array_size(source));
+            for (const Value& item : array_view(source)) copy.push(item);
+            out = std::move(copy).publish();
+        } else {
+            build::Object copy;
+            for (const auto& entry : object_view(source)) copy.set(entry.first, entry.second);
+            out = std::move(copy).publish();
+        }
         return CopyStatus::Ok;
     }
     out = source;  // scalars, strings, identities
@@ -211,7 +223,8 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
 
 CopyStatus deep_copy_tuple(const Value* values, std::size_t count, Value* out, std::size_t heap_limit,
                            bool keep_immutable) {
-    GraphCopy graph;
+    const build::InPlaceKey key;  // tooling.md 2.4: the post-order fill
+    GraphCopy graph(key);
     if (!graph.discover(values, count, heap_limit)) return CopyStatus::Budget;
     graph.link(keep_immutable);
     for (std::size_t k = 0; k < count; ++k) out[k] = graph.mapped(values[k]);
@@ -235,15 +248,14 @@ std::size_t constant_bytes(const Value& v) {
 Value clone_tree(const Value& v) {
     if (v.is(Kind::Array)) {
         const auto& items = array_view(v);
-        Value copy = make_array(items.size());
-        for (const Value& item : items) array_push(copy, clone_tree(item));  // rt-lint: storage-ok fresh, the copy
-        return copy;
+        build::Array copy(items.size());
+        for (const Value& item : items) copy.push(clone_tree(item));
+        return std::move(copy).publish();
     }
     if (v.is(Kind::Object)) {
-        Value copy = make_object();
-        // rt-lint: storage-ok fresh, the copy
-        for (const auto& entry : object_view(v)) object_set(copy, entry.first, clone_tree(entry.second));
-        return copy;
+        build::Object copy;
+        for (const auto& entry : object_view(v)) copy.set(entry.first, clone_tree(entry.second));
+        return std::move(copy).publish();
     }
     return v;  // a scalar or a string: immutable, shared
 }

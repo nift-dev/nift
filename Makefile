@@ -1567,6 +1567,35 @@ libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
 # Tooling checkpoint (component 4, RECHECK2 N4): the forged-header route to the
 # sort commits is refused at the static nift link (symbol-reference allowlist)
 # and at a dynamic link against libnift_c.so (not exported).
+# Tooling checkpoint (component 2): the builder contract (tests/rt/build_unit.cpp)
+# in a release and a checked (NIFT_RT_CHECKED_REFS) build, and the two builder
+# mutants, which must be caught by an observed change to a published value
+# (B-M1: publish keeps the value; B-M2: a move copies). Each variant compiles
+# its whole, small source set with its own defines (no configuration mixing).
+BUILD_UNIT_SOURCES := src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/value.cpp src/rt/heap_account.cpp \
+	src/rt/string.cpp src/rt/atom.cpp src/rt/copy_graph.cpp src/rt/compare.cpp src/rt/decimal.cpp src/rt/number.cpp
+BUILD_UNIT_VARIANTS := release checked mutant-1 mutant-2
+BUILD_UNIT_DEFINES_release :=
+BUILD_UNIT_DEFINES_checked := -DNIFT_RT_CHECKED_REFS
+BUILD_UNIT_DEFINES_mutant-1 := -DNIFT_RT_BUILDER_MUTANT=1
+BUILD_UNIT_DEFINES_mutant-2 := -DNIFT_RT_BUILDER_MUTANT=2
+BUILD_UNIT_BINS := $(foreach v,$(BUILD_UNIT_VARIANTS),$(TEST_DIR)/rt/build-unit-$(v))
+$(BUILD_UNIT_BINS): $(TEST_DIR)/rt/build-unit-%: tests/rt/build_unit.cpp $(BUILD_UNIT_SOURCES)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(BUILD_UNIT_DEFINES_$*) $(RT_TEST_DEPFLAGS) \
+		tests/rt/build_unit.cpp $(BUILD_UNIT_SOURCES) -o "$@"
+.PHONY: test-rt-build
+test-rt-build: $(BUILD_UNIT_BINS)
+	"$(TEST_DIR)/rt/build-unit-release"
+	"$(TEST_DIR)/rt/build-unit-checked"
+	@set -e; for m in 1 2; do \
+	  if "$(TEST_DIR)/rt/build-unit-mutant-$$m" > "$(TEST_DIR)/rt/build-unit-mutant-$$m.log" 2>&1; then \
+	    echo "FAIL builder mutant B-M$$m not caught"; exit 1; fi; \
+	  n=$$(grep -c 'child exit 50' "$(TEST_DIR)/rt/build-unit-mutant-$$m.log" || true); \
+	  if [ "$$n" -eq 0 ]; then echo "FAIL builder mutant B-M$$m failed without an observed change to a published value"; exit 1; fi; \
+	  echo "PASS builder mutant B-M$$m caught: $$n observed changes to a published value ($$(tail -1 "$(TEST_DIR)/rt/build-unit-mutant-$$m.log"))"; \
+	done
+certify-targets: test-rt-build
 .PHONY: test-rt-sort-forgery
 test-rt-sort-forgery: $(TARGET) $(SHARED_LIB) $(C_ABI_PIC) $(LIBFFI_A)
 	bash tests/rt/sort_forgery/run.sh

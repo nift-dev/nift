@@ -33,10 +33,10 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
     for (const auto& entry : entries) {
         if (what == Listing::Keys) { result.push(make_string(atom_text(entry.first))); continue; }
         if (what == Listing::Values) { result.push(entry.second); continue; }
-        Value pair = make_object();
-        object_set(pair, key_atom, make_string(atom_text(entry.first)));  // rt-lint: storage-ok fresh, new result
-        object_set(pair, value_atom, entry.second);  // rt-lint: storage-ok fresh, new result
-        result.push(static_cast<Value&&>(pair));
+        build::Object pair;
+        pair.set(key_atom, make_string(atom_text(entry.first)));
+        pair.set(value_atom, entry.second);
+        result.push(std::move(pair).publish());
     }
     out = result.finish();
     return Status::Ok;
@@ -44,10 +44,9 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
 
 // A new object with `source`'s entries (shared values), in order: the result
 // of merge/merge_deep before the other side's entries are applied.
-Value shallow_object(const Value& source) {
-    Value out = make_object();
-    // rt-lint: storage-ok fresh, new result
-    for (const auto& entry : object_view(source)) object_set(out, entry.first, entry.second);
+build::Object shallow_object(const Value& source) {
+    build::Object out;
+    for (const auto& entry : object_view(source)) out.set(entry.first, entry.second);
     return out;
 }
 
@@ -56,19 +55,19 @@ Value shallow_object(const Value& source) {
 bool merge_deep(const Value& left, const Value& right, Value& result, int level, std::string& error) {
     if (level > 64) { error = "merge_deep: maximum merge depth exceeded"; return false; }
     if (!(left.is(Kind::Object) && right.is(Kind::Object))) { result = right; return true; }
-    Value merged = shallow_object(left);  // B2: a new object (`right` may be `left`'s object)
+    build::Object merged = shallow_object(left);  // B2: a new object (`right` may be `left`'s object)
     for (const auto& entry : object_entries(right)) {
-        const Value* existing = object_get(merged, entry.first);
+        const Value* existing = merged.get(entry.first);
         if (existing && existing->is(Kind::Object) && entry.second.is(Kind::Object)) {
-            const Value inner = *existing;  // copied out: object_set below invalidates `existing`
+            const Value inner = *existing;  // copied out: merged.set below invalidates `existing`
             Value child;
             if (!merge_deep(inner, entry.second, child, level + 1, error)) return false;
-            object_set(merged, entry.first, static_cast<Value&&>(child));  // rt-lint: storage-ok fresh, new result
+            merged.set(entry.first, static_cast<Value&&>(child));
         } else {
-            object_set(merged, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
+            merged.set(entry.first, entry.second);
         }
     }
-    result = static_cast<Value&&>(merged);
+    result = std::move(merged).publish();
     return true;
 }
 
@@ -184,12 +183,15 @@ Status obj_merge(const Context&, const Value* args, std::uint32_t argc, Value& o
     // first, since `args[1]` may be the receiver's object (o.merge(o)).
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 26
     Value result = args[0];  // R-B5: merge mutates its receiver
-#else
-    Value result = shallow_object(args[0]);
-#endif
-    // rt-lint: storage-ok fresh, new result
-    for (const auto& entry : object_entries(args[1])) object_set(result, entry.first, entry.second);
+    const build::InPlaceKey key;  // test mutant only (tooling.md 2.4)
+    // rt-lint: storage-ok mutant-only, R-B5
+    for (const auto& entry : object_entries(args[1])) Construction::object_set(key, result, entry.first, entry.second);
     out = static_cast<Value&&>(result);
+#else
+    build::Object result = shallow_object(args[0]);
+    for (const auto& entry : object_entries(args[1])) result.set(entry.first, entry.second);
+    out = std::move(result).publish();
+#endif
     return Status::Ok;
 }
 
@@ -207,14 +209,14 @@ Status obj_pick(const Context&, const Value* args, std::uint32_t argc, Value& ou
     if (!receiver(args, argc)) return internal(error, "pick receiver");
     std::vector<std::string_view> wanted;
     if (key_patterns(args, argc, "pick", wanted, error) != Status::Ok) return Status::Error;
-    Value result = make_object();
+    build::Object result;
     const auto& entries = object_entries(args[0]);
     // In pattern order; each key at most once (the first pattern that matches it).
     for (std::string_view pattern : wanted)
         for (const auto& entry : entries)
-            if (!object_get(result, entry.first) && key_matches(pattern, atom_text(entry.first)))
-                object_set(result, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
-    out = static_cast<Value&&>(result);
+            if (!result.get(entry.first) && key_matches(pattern, atom_text(entry.first)))
+                result.set(entry.first, entry.second);
+    out = std::move(result).publish();
     return Status::Ok;
 }
 
@@ -222,14 +224,14 @@ Status obj_omit(const Context&, const Value* args, std::uint32_t argc, Value& ou
     if (!receiver(args, argc)) return internal(error, "omit receiver");
     std::vector<std::string_view> wanted;
     if (key_patterns(args, argc, "omit", wanted, error) != Status::Ok) return Status::Error;
-    Value result = make_object();
+    build::Object result;
     for (const auto& entry : object_entries(args[0])) {
         bool drop = false;
         for (std::string_view pattern : wanted)
             if (key_matches(pattern, atom_text(entry.first))) { drop = true; break; }
-        if (!drop) object_set(result, entry.first, entry.second);  // rt-lint: storage-ok fresh, new result
+        if (!drop) result.set(entry.first, entry.second);
     }
-    out = static_cast<Value&&>(result);
+    out = std::move(result).publish();
     return Status::Ok;
 }
 

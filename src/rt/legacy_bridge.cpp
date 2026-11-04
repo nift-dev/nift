@@ -39,17 +39,21 @@ bool convert_from(const nift::RuntimeValue& legacy, Value& out, std::string& err
 bool convert_to(const Value& value, nift::RuntimeValue& out, std::string& error, std::size_t depth);
 
 bool object_from_legacy(const nift::RuntimeValue& legacy, Value& out, std::string& error, std::size_t depth) {
-    out = make_object();
+    // The partial object reaches `out` on every return, as before (tooling.md 2.3).
+    build::Object object;
+    out = Value();  // released at the same point as by the former `out = make_object()`
     for (const auto& entry : legacy.object) {
         const Atom key = atom(entry.first);
-        if (object_get(out, key)) {  // see legacy_bridge.h: rt objects have unique keys
+        if (object.get(key)) {  // see legacy_bridge.h: rt objects have unique keys
             error = "object has duplicate key '" + entry.first + "'";
+            out = std::move(object).publish();
             return false;
         }
         Value v;
-        if (!convert_from(entry.second, v, error, depth + 1)) return false;
-        object_set(out, key, static_cast<Value&&>(v));  // rt-lint: storage-ok fresh, the new conversion
+        if (!convert_from(entry.second, v, error, depth + 1)) { out = std::move(object).publish(); return false; }
+        object.set(key, static_cast<Value&&>(v));
     }
+    out = std::move(object).publish();
     return true;
 }
 
@@ -71,12 +75,14 @@ bool convert_from(const nift::RuntimeValue& legacy, Value& out, std::string& err
             out = make_bytes(legacy.bytes ? *legacy.bytes : std::vector<std::uint8_t>{});
             return true;
         case nift::RuntimeType::Array: {
-            out = make_array(legacy.array.size());
+            build::Array array(legacy.array.size());
+            out = Value();  // released where the former `out = make_array(...)` released it
             for (const auto& item : legacy.array) {
                 Value v;
-                if (!convert_from(item, v, error, depth + 1)) return false;
-                array_push(out, static_cast<Value&&>(v));  // rt-lint: storage-ok fresh, the new conversion
+                if (!convert_from(item, v, error, depth + 1)) { out = std::move(array).publish(); return false; }
+                array.push(static_cast<Value&&>(v));
             }
+            out = std::move(array).publish();
             return true;
         }
         case nift::RuntimeType::Object: return object_from_legacy(legacy, out, error, depth);

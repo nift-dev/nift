@@ -12,13 +12,12 @@ std::vector<InvocationBinding> invocation_bindings(const std::string& command,
     auto strings = infer_detail::kinds_ty(kKindString);
     auto array_type = std::make_shared<infer_detail::Ty>();
     array_type->kinds = kKindArray; array_type->elem = strings;
-    auto args = make_array(arguments.size());
-    // rt-lint: storage-ok fresh, new args
-    for (const auto& argument : arguments) array_push(args, make_string(argument));
+    build::Array arg_builder(arguments.size());
+    for (const auto& argument : arguments) arg_builder.push(make_string(argument));
 #if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 2  // test-only: a wrong value (args_cmd/mutants.sh)
-    // rt-lint: storage-ok fresh, the args array made above
-    if (!arguments.empty()) array_build_storage(args).pop_back();
+    if (!arguments.empty()) arg_builder.drop_last();
 #endif
+    auto args = std::move(arg_builder).publish();
     std::vector<InvocationBinding> out;
     auto install = [&](std::string name, Value value, infer_detail::TyRef shape) {
         InvocationBinding binding;

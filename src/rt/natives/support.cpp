@@ -207,21 +207,20 @@ void append_scalar(const Value& value, std::string& out) {
     }
 }
 
-ArrayBuilder::ArrayBuilder(std::size_t reserve) : array_(make_array(reserve)), items_(&array_build_storage(array_)) {}
+ArrayBuilder::ArrayBuilder(std::size_t reserve) : array_(reserve) {}
 
-void ArrayBuilder::push(Value item) { items_->push_back(static_cast<Value&&>(item)); }
+void ArrayBuilder::push(Value item) { array_.append(static_cast<Value&&>(item)); }
 
 bool ArrayBuilder::push(const Context& context, Value item) {
-    items_->push_back(static_cast<Value&&>(item));
-    if (items_->size() % Context::kBudgetStride != 0) return true;
-    heap_retally(array_.heap());
+    array_.append(static_cast<Value&&>(item));
+    if (array_.size() % Context::kBudgetStride != 0) return true;
+    array_.tally();
     return !context.over_budget();
 }
 
 Value ArrayBuilder::finish() {
-    heap_retally(array_.heap());
-    items_ = nullptr;
-    return static_cast<Value&&>(array_);
+    array_.tally();
+    return std::move(array_).publish();
 }
 
 bool generated_key(const Value& key, std::string_view name, std::string& rendered, std::string& error) {

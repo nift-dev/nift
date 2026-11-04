@@ -111,8 +111,9 @@ bool collection_sort_init(Value* s,const natives::Context& context,Fault& fault,
     // aggregate may otherwise grow the runtime destruction worklist. This
     // scratch holds elements, not the source array.
     s[sort_slot::KeepAlive]=make_array(n);
+    const build::InPlaceKey build_key;  // tooling.md 2.4: this native's own keep-alive slot
     // rt-lint: storage-ok fresh, new keep-alive
-    for(const Value& value:array_items(s[Source]))array_push(s[sort_slot::KeepAlive],value);
+    for(const Value& value:array_items(s[Source]))Construction::array_push(build_key,s[sort_slot::KeepAlive],value);
     s[sort_slot::EmptyObject]=make_object();s[sort_slot::EmptyArray]=make_array();
         s[sort_slot::EmptyString]=make_string("");
     auto& t=state(s);t.n=n;t.site=site;

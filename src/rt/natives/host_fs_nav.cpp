@@ -51,9 +51,10 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
             return fail_host(call, host::HostStatus::Limit,
                              host_error("limit.exceeded", "ls: result exceeds the memory budget"), error);
         }
-        out = make_array(matches.size());
-        // rt-lint: storage-ok fresh, new result
-        for (std::string& match : matches) array_push(out, make_string(std::move(match)));
+        build::Array result(matches.size());
+        out = Value();  // released where the former `out = make_array(...)` released it
+        for (std::string& match : matches) result.push(make_string(std::move(match)));
+        out = std::move(result).publish();
         if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
         return Status::Ok;
     } else {
@@ -81,8 +82,10 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
     }
     // Legacy records a directory listing's result as its entry count.
     if (finish_host(call, std::to_string(names.size()), host::Observation{}, error) != Status::Ok) return Status::Error;
-    out = make_array(names.size());
-    for (const std::string& name : names) array_push(out, make_string(name));  // rt-lint: storage-ok fresh, new result
+    build::Array result(names.size());
+    out = Value();  // released where the former `out = make_array(...)` released it
+    for (const std::string& name : names) result.push(make_string(name));
+    out = std::move(result).publish();
     return Status::Ok;
 }
 

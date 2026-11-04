@@ -22,3 +22,42 @@ src/rt/mutation_collection.o nift::rt::Storage::stack_pop
 src/rt/mutation_collection.o nift::rt::Storage::stack_push
 src/rt/vm_ops.o nift::rt::Storage::array_push
 src/rt/vm_ops.o nift::rt::Storage::array_set
+# Tooling checkpoint (component 2): references to the construction primitives
+# behind the builders and the in-place key (rt/build.h). Each object is a
+# builder user or an in-place owner (tooling.md 2.3, 2.4); a new object here
+# needs review (a unit forging Construction, a builder or the key fails the
+# link otherwise).
+src/rt/cell.o nift::rt::Construction::array_set
+src/rt/collection_helpers.o nift::rt::Construction::array_push
+src/rt/collection_helpers.o nift::rt::Construction::array_storage
+src/rt/collection_helpers.o nift::rt::Construction::object_set
+src/rt/collection_helpers.o nift::rt::Construction::object_slot
+src/rt/collection_plain_sort.o nift::rt::Construction::array_push
+src/rt/collection_plain_sort.o nift::rt::Construction::array_storage
+src/rt/collection_sort.o nift::rt::Construction::array_push
+src/rt/compiler_collection.o nift::rt::Construction::array_push
+src/rt/copy_graph.o nift::rt::Construction::array_push
+src/rt/copy_graph.o nift::rt::Construction::map_set
+src/rt/copy_graph.o nift::rt::Construction::object_set
+src/rt/copy_graph.o nift::rt::Construction::set_add
+src/rt/copy_graph.o nift::rt::Construction::stack_push
+src/rt/copy_graph.o nift::rt::Construction::struct_add_field
+src/rt/isolate_snapshot.o nift::rt::Construction::array_storage
+src/rt/isolate_task.o nift::rt::Construction::array_push
+src/rt/legacy_bridge.o nift::rt::Construction::array_push
+src/rt/legacy_bridge.o nift::rt::Construction::object_set
+src/rt/mutation.o nift::rt::Construction::array_push
+src/rt/natives/array_methods.o nift::rt::Construction::object_set
+src/rt/natives/host_env.o nift::rt::Construction::object_set
+src/rt/natives/host_fs_nav.o nift::rt::Construction::array_push
+src/rt/natives/host_fs_read.o nift::rt::Construction::object_set
+src/rt/natives/json_methods.o nift::rt::Construction::object_set
+src/rt/natives/object_methods.o nift::rt::Construction::object_set
+src/rt/natives/support.o nift::rt::Construction::array_storage
+src/rt/parallel_task_start.o nift::rt::Construction::array_push
+src/rt/session_invocation.o nift::rt::Construction::array_push
+src/rt/vm_coro_parallel.o nift::rt::Construction::array_push
+src/rt/vm_iter.o nift::rt::Construction::array_push
+src/rt/vm_report.o nift::rt::Construction::array_push
+src/rt/vm_report.o nift::rt::Construction::object_set
+src/rt/vm_struct.o nift::rt::Construction::struct_add_field

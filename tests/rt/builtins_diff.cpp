@@ -12,6 +12,7 @@
 
 #include "rt/natives/builtin.h"
 #include "rt/natives/json_methods.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "Sha256.h"
 
 #include <cctype>

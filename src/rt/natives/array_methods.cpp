@@ -288,7 +288,7 @@ Status arr_from_entries(const Context&, const Value* args, std::uint32_t argc, V
     if (!items) return internal(error, "from_entries receiver");
     if (!no_arguments(argc, "from_entries", error)) return Status::Error;
     const Atom key_atom = atom("key"), value_atom = atom("value");
-    Value result = make_object();
+    build::Object result;
     std::string rendered;
     for (const Value& entry : *items) {
         const Value* key = entry.is(Kind::Object) && object_size(entry) == 2 ? object_get(entry, key_atom) : nullptr;
@@ -297,11 +297,10 @@ Status arr_from_entries(const Context&, const Value* args, std::uint32_t argc, V
             return fail(error, "from_entries: each entry must be an object containing exactly key and value");
         if (!generated_key(*key, "from_entries", rendered, error)) return Status::Error;
         const Atom name = atom(rendered);
-        if (object_get(result, name)) return fail(error, "from_entries: duplicate generated key '" + rendered + "'");
-        // rt-lint: storage-ok fresh, result is fresh: `entry`, `key`, `value` stay valid
-        object_set(result, name, *value);
+        if (result.get(name)) return fail(error, "from_entries: duplicate generated key '" + rendered + "'");
+        result.set(name, *value);  // `entry`, `key`, `value` stay valid: result is a new object
     }
-    out = static_cast<Value&&>(result);
+    out = std::move(result).publish();
     return Status::Ok;
 }
 

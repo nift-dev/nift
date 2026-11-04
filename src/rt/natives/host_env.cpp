@@ -80,19 +80,23 @@ Status host_env(const Context& context, const Value* args, std::uint32_t argc, V
     host::HostCall call(context.host, host::HostOp::EnvAll, "env");
     call.set_arg("");
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
-    out = make_object();
+    // The partial result reaches `out` on every return, as before (tooling.md 2.3).
+    build::Object result;
+    out = Value();  // released where the former `out = make_object()` released it
     std::size_t accounted = 0;
     for (char** entry = environment_block(); entry && *entry; ++entry) {
         const std::string text(*entry);
         const std::size_t eq = text.find('=');
         if (eq == std::string::npos || eq == 0) continue;
         accounted = size_add(accounted, text.size() + 64);
-        if (!reserve_result(context, accounted))
+        if (!reserve_result(context, accounted)) {
+            out = std::move(result).publish();
             return fail_host(call, host::HostStatus::Limit,
                              host_error("limit.exceeded", "env: result exceeds the memory budget"), error);
-        // rt-lint: storage-ok fresh, new result
-        object_set(out, atom(text.substr(0, eq)), make_string(text.substr(eq + 1)));
+        }
+        result.set(atom(text.substr(0, eq)), make_string(text.substr(eq + 1)));
     }
+    out = std::move(result).publish();
     if (finish_host(call, std::string(), host::Observation{}, error) != Status::Ok) return Status::Error;
     return Status::Ok;
 }

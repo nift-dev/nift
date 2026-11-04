@@ -83,9 +83,13 @@ bool cell_read(const Value& cell, Value& value, std::string& missing) {
     }
     value = std::move(selected);
     if (CellObject* owner = cell_of(cell); owner && owner->binding_type == kSelectorCell) {
+        // Tooling 2 (in place, tooling.md 2.4): the cell's own selector descriptor,
+        // never user-visible, updated after its creation (not a builder's value).
+        const build::InPlaceKey key;
         // rt-lint: storage-ok private-descriptor, the cell's own
-        array_build_set(owner->value, 5, Value::boolean(true));
-        array_build_set(owner->value, 6, anchor);  // rt-lint: storage-ok private-descriptor, the cell's own
+        Construction::array_set(key, owner->value, 5, Value::boolean(true));
+        // rt-lint: storage-ok private-descriptor, the cell's own
+        Construction::array_set(key, owner->value, 6, anchor);
     }
     return true;
 }
@@ -107,9 +111,9 @@ bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
     // a later replacement of its source slot. Preserve that owner explicitly.
     // B2: a private copy of the descriptor (an explicit clone: arrays are
     // references, so writing the shared one would change this cell's).
-    Value descriptor = array_shallow_clone(object->value);
-    array_build_set(descriptor, 0, parts[6]);  // rt-lint: storage-ok fresh, a private descriptor copy
-    Value cached = make_cell(std::move(descriptor), kSelectorCell);
+    build::Array descriptor = build::Array::shallow_clone(object->value);
+    descriptor.set(0, parts[6]);
+    Value cached = make_cell(std::move(descriptor).publish(), kSelectorCell);
     return cell_read(cached, value, missing);
 }
 

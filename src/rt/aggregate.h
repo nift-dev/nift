@@ -41,14 +41,10 @@ const std::vector<std::pair<Atom, Value>>& object_view(const Value& object);
 const Value* object_find(const Value& object, Atom key);
 std::size_t array_size(const Value& array);
 
-// Construction (B2, owner B): building a FRESH value the caller alone holds
-// (refcount 1, not immutable; checked builds abort otherwise). An existing
-// aggregate is mutated only through the mutation protocol (rt/mutation.h),
-// whose commits are the private members of Storage below.
-void array_push(Value& array, Value item);
-// Raw storage of a fresh array (marked as possibly holding references).
-std::vector<Value>& array_build_storage(Value& array);
-void array_build_set(Value& array, std::size_t index, Value item);
+// Construction of a FRESH value: rt/build.h (builders; tooling checkpoint,
+// component 2). An existing aggregate is mutated only through the mutation
+// protocol (rt/mutation.h), whose commits are the private members of Storage
+// below.
 
 Value make_object();
 // B2: a new outer array/object with the same elements (identity kept), O(n).
@@ -57,19 +53,15 @@ Value object_shallow_clone(const Value& object);
 std::size_t object_size(const Value& object);
 const std::vector<std::pair<Atom, Value>>& object_entries(const Value& object);
 const Value* object_get(const Value& object, Atom key);
-// Construction: inserts at the end or replaces in place (order kept).
-void object_set(Value& object, Atom key, Value value);
-Value* object_build_slot(Value& object, Atom key);  // null when `key` is missing
 
 // Struct instances (D-NEXT-refsem #1): fields in declaration order (private
 // ones included). Every Value holding an instance refers to the same object;
 // the protocol mutates it in place, visibly through every alias (never
-// cloned). struct_add_field is construction.
+// cloned). Construction: rt/build.h (build::Struct).
 Value make_struct(Atom type_name, std::size_t reserve = 0);
 Atom struct_type(const Value& instance);
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
 const Value* struct_get(const Value& instance, Atom field);
-void struct_add_field(Value& instance, Atom field, Value value);
 
 namespace mutation {
 class Protocol;
@@ -123,21 +115,8 @@ inline bool may_contain_identity(const Value& value) noexcept {
     }
 }
 
-#ifdef NIFT_PRODUCTION_TU
-// Tooling checkpoint (component 3, src/build/production_tu.h): in a production
-// translation unit the storage-level tests' accessor is unreachable. No
-// definition may precede this header (an earlier definition could otherwise
-// name Storage through a template instantiated later), and after it the name is
-// poisoned: any later definition, declaration or use is a compile error.
-namespace test_access_detail {
-template <class T, class = void> struct complete : std::false_type {};
-template <class T> struct complete<T, decltype(void(sizeof(T)))> : std::true_type {};
-} // namespace test_access_detail
-static_assert(!test_access_detail::complete<StorageTestAccess>::value,  // rt-lint: test-access-decl
-              "the storage-level tests' accessor is defined in a production translation unit");
-#pragma GCC poison StorageTestAccess  // rt-lint: test-access-decl
-#endif
 
 } // namespace nift::rt
 
 #include "rt/aggregate_collection.h"  // IWYU pragma: export
+#include "rt/build.h"  // IWYU pragma: export (builders; the production-unit tail)

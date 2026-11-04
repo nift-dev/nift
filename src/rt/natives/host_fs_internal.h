@@ -136,13 +136,14 @@ inline Status metadata_op(const Context& context, const Value* args, std::uint32
         return Status::Ok;
     }
     if (finish_host(call, type_label(info), obs, error) != Status::Ok) return Status::Error;
-    out = make_object();
-    object_set(out, atom("exists"), Value::boolean(info.exists));  // rt-lint: storage-ok fresh, new result
+    build::Object result;
+    out = Value();  // released where the former `out = make_object()` released it
+    result.set(atom("exists"), Value::boolean(info.exists));
     if (info.exists) {
-        object_set(out, atom("type"), make_string(info.type));  // rt-lint: storage-ok fresh, new result
-        // rt-lint: storage-ok fresh, new result
-        if (info.type == "file") object_set(out, atom("size"), Value::integer(static_cast<std::int64_t>(info.size)));
+        result.set(atom("type"), make_string(info.type));
+        if (info.type == "file") result.set(atom("size"), Value::integer(static_cast<std::int64_t>(info.size)));
     }
+    out = std::move(result).publish();
     return Status::Ok;
 }
 

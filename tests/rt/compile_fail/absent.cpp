@@ -114,13 +114,83 @@ static_assert(!std::is_trivially_copyable<nift::rt::mutation::SortKey>::value &&
                   !std::is_destructible<nift::rt::mutation::SortKey>::value,
               "a SortKey can be byte-copied, copied, moved or destroyed outside the sort functions");
 
+// Tooling checkpoint (component 2): construction only through a builder or an
+// in-place key. The former free construction functions do not exist; the
+// primitives behind the builders are private; a builder cannot be copied,
+// assigned, or made from an existing Value; publish() needs an rvalue builder;
+// and the in-place key cannot be made, copied, byte-copied or destroyed here.
+#define NIFT_ABSENT_BUILD(name, ...)                                                                  \
+    template <class V, class = void> struct has_##name : std::false_type {};                          \
+    template <class V> struct has_##name<V, void_t<decltype(name(__VA_ARGS__))>>                     \
+        : std::true_type {};
+NIFT_ABSENT_BUILD(array_push, std::declval<V&>(), std::declval<V>())
+NIFT_ABSENT_BUILD(array_build_storage, std::declval<V&>())
+NIFT_ABSENT_BUILD(array_build_set, std::declval<V&>(), std::size_t(0), std::declval<V>())
+NIFT_ABSENT_BUILD(object_set, std::declval<V&>(), std::declval<Atom>(), std::declval<V>())
+NIFT_ABSENT_BUILD(object_build_slot, std::declval<V&>(), std::declval<Atom>())
+NIFT_ABSENT_BUILD(struct_add_field, std::declval<V&>(), std::declval<Atom>(), std::declval<V>())
+NIFT_ABSENT_BUILD(map_build_set, std::declval<V&>(), std::declval<V>(), std::declval<V>())
+NIFT_ABSENT_BUILD(set_build_add, std::declval<V&>(), std::declval<V>())
+NIFT_ABSENT_BUILD(stack_build_push, std::declval<V&>(), std::declval<V>())
+#undef NIFT_ABSENT_BUILD
+static_assert(!has_array_push<Value>::value && !has_array_build_storage<Value>::value &&
+                  !has_array_build_set<Value>::value && !has_object_set<Value>::value &&
+                  !has_object_build_slot<Value>::value && !has_struct_add_field<Value>::value &&
+                  !has_map_build_set<Value>::value && !has_set_build_add<Value>::value &&
+                  !has_stack_build_push<Value>::value,
+              "a free construction function on a Value exists");
+template <class C, class = void> struct can_construct_push : std::false_type {};
+template <class C>
+struct can_construct_push<C, void_t<decltype(C::array_push(std::declval<Value&>(), std::declval<Value>()))>>
+    : std::true_type {};
+template <class C, class = void> struct can_construct_storage : std::false_type {};
+template <class C>
+struct can_construct_storage<C, void_t<decltype(C::array_storage(std::declval<Value&>()))>> : std::true_type {};
+template <class C, class = void> struct can_construct_object : std::false_type {};
+template <class C>
+struct can_construct_object<C, void_t<decltype(C::object_set(std::declval<Value&>(), std::declval<Atom>(),
+                                                             std::declval<Value>()))>> : std::true_type {};
+static_assert(!can_construct_push<nift::rt::Construction>::value &&
+                  !can_construct_storage<nift::rt::Construction>::value &&
+                  !can_construct_object<nift::rt::Construction>::value,
+              "a construction primitive is reachable without a builder or an in-place key");
+using nift::rt::build::Array;
+using nift::rt::build::ArrayBulk;
+using nift::rt::build::InPlaceKey;
+using nift::rt::build::Object;
+using nift::rt::build::Struct;
+static_assert(!std::is_copy_constructible<Array>::value && !std::is_copy_assignable<Array>::value &&
+                  !std::is_move_assignable<Array>::value && std::is_nothrow_move_constructible<Array>::value &&
+                  !std::is_constructible<Array, Value>::value && !std::is_constructible<Array, const Value&>::value &&
+                  !std::is_constructible<Array, Value&>::value,
+              "build::Array can be copied, assigned, or made from an existing Value");
+static_assert(!std::is_copy_constructible<ArrayBulk>::value && !std::is_move_assignable<ArrayBulk>::value &&
+                  !std::is_constructible<ArrayBulk, Value&>::value && !std::is_copy_constructible<Object>::value &&
+                  !std::is_move_assignable<Object>::value && !std::is_constructible<Object, Value&>::value &&
+                  !std::is_copy_constructible<Struct>::value && !std::is_move_assignable<Struct>::value &&
+                  !std::is_constructible<Struct, Value&>::value,
+              "a builder can be copied, assigned, or made from an existing Value");
+template <class B, class = void> struct can_publish_lvalue : std::false_type {};
+template <class B> struct can_publish_lvalue<B, void_t<decltype(std::declval<B&>().publish())>> : std::true_type {};
+template <class B, class = void> struct can_publish_rvalue : std::false_type {};
+template <class B> struct can_publish_rvalue<B, void_t<decltype(std::declval<B&&>().publish())>> : std::true_type {};
+static_assert(!can_publish_lvalue<Array>::value && !can_publish_lvalue<ArrayBulk>::value &&
+                  !can_publish_lvalue<Object>::value && !can_publish_lvalue<Struct>::value &&
+                  can_publish_rvalue<Array>::value,
+              "publish() is callable on an lvalue builder (it must be std::move(builder).publish())");
+static_assert(!std::is_default_constructible<InPlaceKey>::value && !std::is_aggregate<InPlaceKey>::value &&
+                  !std::is_trivially_copyable<InPlaceKey>::value && !std::is_copy_constructible<InPlaceKey>::value &&
+                  !std::is_move_constructible<InPlaceKey>::value && !std::is_destructible<InPlaceKey>::value,
+              "an InPlaceKey can be made, copied, byte-copied or destroyed outside its owners");
+
 // Controls (the detectors can say yes): the construction API and a protocol
 // entry point are found and accessible.
-template <class V, class = void> struct has_build : std::false_type {};
-template <class V>
-struct has_build<V, void_t<decltype(map_build_set(std::declval<V&>(), std::declval<V>(), std::declval<V>()))>>
-    : std::true_type {};
-static_assert(has_build<Value>::value, "control: the construction API is not detected");
+// (Tooling checkpoint, component 2: the construction API is the builders of
+// rt/build.h; the free construction functions are gone, asserted above.)
+template <class B, class = void> struct has_build : std::false_type {};
+template <class B>
+struct has_build<B, void_t<decltype(std::declval<B&>().push(std::declval<Value>()))>> : std::true_type {};
+static_assert(has_build<nift::rt::build::Array>::value, "control: the construction API is not detected");
 template <class V, class = void> struct has_entry : std::false_type {};
 template <class V>
 struct has_entry<V, void_t<decltype(nift::rt::mutation::map_put(std::declval<V&>(), std::declval<V>(), std::declval<V>(),

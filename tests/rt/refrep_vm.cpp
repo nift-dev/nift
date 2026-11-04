@@ -28,6 +28,7 @@
 #include "rt/source_map.h"
 #include "rt/unit_check.h"
 #include "rt/vm.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "rt_test.h"
 
 #include <cstdio>

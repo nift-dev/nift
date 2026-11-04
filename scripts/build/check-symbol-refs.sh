@@ -14,7 +14,7 @@
 # relative to their object directory (.build/<set>/ is dropped).
 set -u
 allow=$1; shift
-RESTRICTED='^nift::rt::(Storage::|mutation::Protocol::(sort_storage|sort_items|commit_permutation|commit_array)\()'
+RESTRICTED='^nift::rt::(Storage::|Construction::|mutation::Protocol::(sort_storage|sort_items|commit_permutation|commit_array)\()'
 want=$(grep -v '^#' "$allow" | grep -v '^$' | sort -u)
 have=$(for o in "$@"; do
   rel=$(echo "$o" | sed -E 's|^\.build/[^/]+/||')

@@ -53,11 +53,12 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     future->parallel = record;
     heap_retally(future);
     const Value future_value = Value::adopt(future);
-    Value seeds = make_array(g + argc);
-    for (const Value& value : globals) array_push(seeds, value);  // rt-lint: storage-ok fresh, new seeds
-    for (std::uint16_t k = 0; k < argc; ++k) array_push(seeds, R[in.a + k]);  // rt-lint: storage-ok fresh, new seeds
+    build::Array seed_builder(g + argc);
+    for (const Value& value : globals) seed_builder.push(value);
+    for (std::uint16_t k = 0; k < argc; ++k) seed_builder.push(R[in.a + k]);
     record->input.has_function = function.is(Kind::Function);
-    if (record->input.has_function) array_push(seeds, function);  // rt-lint: storage-ok fresh, new seeds
+    if (record->input.has_function) seed_builder.push(function);
+    const Value seeds = std::move(seed_builder).publish();
     TransferGraph graph;
     std::string error;
     const TransferStatus encoded = graph.encode(seeds, *coro.parallel_map, error);

@@ -25,8 +25,14 @@ const Value& rk(const Value* R, const Value* K, std::uint16_t x) {
 bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault, const Proto* proto) {
     switch (in.op) {
         case OpCode::NewStruct: R[in.a] = make_struct(Atom{in.b}); return true;
-        // rt-lint: storage-ok fresh, the instance NewStruct just made
-        case OpCode::StructAdd: struct_add_field(R[in.a], Atom{in.b}, rk(R, K, in.c)); return true;
+        // Tooling 2 (in place, tooling.md 2.4): the instance NewStruct made in this
+        // register, filled field by field across instructions.
+        case OpCode::StructAdd: {
+            const build::InPlaceKey key;
+            // rt-lint: storage-ok fresh, the instance NewStruct just made
+            Construction::struct_add_field(key, R[in.a], Atom{in.b}, rk(R, K, in.c));
+            return true;
+        }
         case OpCode::FieldGet: {
             const Value& instance = R[in.b];
             const Value* field = instance.is(Kind::Struct) ? struct_get(instance, Atom{in.c}) : nullptr;

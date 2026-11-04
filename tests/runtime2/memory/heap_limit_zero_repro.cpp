@@ -13,6 +13,7 @@
 #include "rt/natives/string_methods.h"
 #include "rt/natives/support.h"
 #include "rt/string.h"
+#include "../../rt/storage_access.h"  // tooling 2: the construction shims (tests only)
 #include <cstdio>
 #include <string>
 using namespace nift::rt;

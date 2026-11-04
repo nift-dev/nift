@@ -18,6 +18,7 @@
 #include "rt/natives/builtin.h"
 #include "rt/natives/json_methods.h"
 #include "rt/string.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 
 #include <valgrind/callgrind.h>
 

@@ -10,6 +10,7 @@
 // Output: one line per workload, `name ns_per_store`.
 #include "rt/aggregate.h"
 #include "rt/value_cycle.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 
 #include <chrono>
 #include <cstdio>

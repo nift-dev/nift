@@ -9,6 +9,7 @@
 #include "rt/isolate_transfer.h"
 #include "rt/parallel_task.h"
 #include "rt/string.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "rt_test.h"
 
 #include <cstdint>

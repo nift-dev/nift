@@ -9,6 +9,7 @@
 #include "rt/aggregate.h"
 #include "rt/atom.h"
 #include "rt/string.h"
+#include "storage_access.h"  // tooling 2: the construction shims (tests only)
 
 #include <cstdio>
 #include <cstring>

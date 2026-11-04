@@ -12,6 +12,7 @@
 #include "rt/heap_account.h"
 #include "rt/isolate_task.h"
 #include "rt/parallel_task.h"
+#include "../../rt/storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "rt_test.h"
 #include "rt_vm_tool.h"
 

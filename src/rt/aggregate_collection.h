@@ -31,14 +31,11 @@ const std::vector<Value>& collection_view(const Value& collection);
 std::size_t collection_item_count(const Value& collection);
 // Map/set: the entry (map) or member (set) position of `key`, or -1.
 std::ptrdiff_t collection_find(const Value& collection, const Value& key);
-// Construction of a FRESH collection (B2, owner B; rt/aggregate.h): map
-// insert-or-replace, set add-unless-present, stack push. An existing
-// collection is mutated only through the mutation protocol (Storage).
-// Each gives the strong guarantee (owner D): a failed allocation leaves the
-// collection unchanged (no key without its value).
-void map_build_set(Value& map, Value key, Value value);
-void set_build_add(Value& set, Value member);
-void stack_build_push(Value& stack, Value item);
+// Construction of a FRESH collection (map insert-or-replace, set
+// add-unless-present, stack push; each with the strong guarantee, owner D: a
+// failed allocation leaves the collection unchanged): rt/build.h, in place
+// only (Construction::map_set/set_add/stack_push with an InPlaceKey). An
+// existing collection is mutated only through the mutation protocol.
 const char* collection_kind_name(CollectionKind kind);
 // Rebuilds the key index from `items` (decoders that fill items directly).
 void rebuild_collection_index(CollectionObject& collection);

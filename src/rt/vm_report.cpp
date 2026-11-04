@@ -168,10 +168,12 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
         case OpCode::Pos: if (!positive_slow(R[in.b], out, fault)) return false; break;
         case OpCode::CallNative: return native(in, proto, R, output, fault);
         case OpCode::NewArray:
-            out = make_array(in.c);
-            // rt-lint: storage-ok fresh, the value NewArray/NewObject just made
-            for (std::uint16_t k = 0; k < in.c; ++k) array_push(out, R[in.b + k]);
+        {
+            build::Array array(in.c);
+            for (std::uint16_t k = 0; k < in.c; ++k) array.push(R[in.b + k]);
+            out = std::move(array).publish();
             break;
+        }
         case OpCode::NewObject: out = make_object(); break;
         case OpCode::MakeImmutable: mutation::make_immutable(R[in.a]); return true;
         case OpCode::LoadKFresh:  // B2 (b2-refrep.md 17, H1): a constant is a description; every
@@ -185,8 +187,12 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             break;
         case OpCode::ObjectSet: {
             Value value = RK(in.c);
+            // Tooling 2 (in place, tooling.md 2.4): the object NewObject made in this
+            // register, filled key by key across instructions (no builder can live
+            // in a register); the compiler keeps the register unaliased until done.
+            const build::InPlaceKey key;
             // rt-lint: storage-ok fresh, the value NewArray/NewObject just made
-            object_set(R[in.a], Atom{in.b}, std::move(value));
+            Construction::object_set(key, R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
         case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
