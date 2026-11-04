@@ -174,7 +174,7 @@ public:
     VmResult run_session_unit(const Program& unit, const std::vector<const Proto*>& linked, std::string& output);
     void clear_session_execution();
     void retire_session_slots(const std::vector<std::uint16_t>& slots);
-
+    friend class VmInPlace;  // tooling review F3: the in-place key's Vm owners (rt/vm_in_place.h)
     // CP23: the value of the last TopReturn, kept in this VM's heap until the
     // caller releases it (ideally after encoding it with TransferGraph on the
     // same thread). Never a raw value passed to another isolate.

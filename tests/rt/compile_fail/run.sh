@@ -43,7 +43,13 @@ check bypass_sort_key_copy.cpp 'deleted function.*SortKey'
 check build_copy.cpp 'deleted function.*build::Array::Array(const'
 check build_assign.cpp 'deleted function.*build::Array::operator='
 check build_from_value.cpp "Array(nift::rt::Value)' is private"
-check build_publish_lvalue.cpp 'publish'
+# tooling review F10: the diagnostic of an lvalue publish (g++, clang++), with a
+# compiling std::move(builder).publish() in control.cpp
+check build_publish_lvalue.cpp "build::Array' as 'this' argument discards qualifiers\\|'publish' is an lvalue"
+# tooling review F3: a Vm member that is not an owner, and a mutant-only owner
+# in a production build, cannot construct an in-place key
+check build_key_vm_member.cpp 'InPlaceKey::InPlaceKey().*private'
+check build_key_mutant_owner.cpp 'InPlaceKey::InPlaceKey().*private'
 check build_free_function.cpp "'array_push' was not declared"
 check build_primitive.cpp 'Construction::array_push.*private'
 check build_key_forge.cpp 'InPlaceKey::InPlaceKey().*private'

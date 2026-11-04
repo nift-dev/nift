@@ -1,6 +1,7 @@
 #include "rt/vm_struct.h"
 
 #include "rt/aggregate.h"
+#include "rt/vm_in_place.h"
 #include "rt/atom.h"
 #include "rt/cell.h"
 #include "rt/mutation.h"
@@ -28,7 +29,7 @@ bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, 
         // Tooling 2 (in place, tooling.md 2.4): the instance NewStruct made in this
         // register, filled field by field across instructions.
         case OpCode::StructAdd: {
-            const build::InPlaceKey key;
+            const build::InPlaceKey key = VmInPlace::key();
             // rt-lint: storage-ok fresh, the instance NewStruct just made
             Construction::struct_add_field(key, R[in.a], Atom{in.b}, rk(R, K, in.c));
             return true;

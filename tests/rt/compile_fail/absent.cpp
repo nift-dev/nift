@@ -132,7 +132,11 @@ NIFT_ABSENT_BUILD(struct_add_field, std::declval<V&>(), std::declval<Atom>(), st
 NIFT_ABSENT_BUILD(map_build_set, std::declval<V&>(), std::declval<V>(), std::declval<V>())
 NIFT_ABSENT_BUILD(set_build_add, std::declval<V&>(), std::declval<V>())
 NIFT_ABSENT_BUILD(stack_build_push, std::declval<V&>(), std::declval<V>())
+NIFT_ABSENT_BUILD(array_size, std::declval<const V&>())  // the control below
 #undef NIFT_ABSENT_BUILD
+// Tooling review F10: the free-function detector itself can say yes (an
+// existing free function, through the same macro).
+static_assert(has_array_size<Value>::value, "control: the free-function detector does not fire");
 static_assert(!has_array_push<Value>::value && !has_array_build_storage<Value>::value &&
                   !has_array_build_set<Value>::value && !has_object_set<Value>::value &&
                   !has_object_build_slot<Value>::value && !has_struct_add_field<Value>::value &&
@@ -180,8 +184,12 @@ static_assert(!can_publish_lvalue<Array>::value && !can_publish_lvalue<ArrayBulk
               "publish() is callable on an lvalue builder (it must be std::move(builder).publish())");
 static_assert(!std::is_default_constructible<InPlaceKey>::value && !std::is_aggregate<InPlaceKey>::value &&
                   !std::is_trivially_copyable<InPlaceKey>::value && !std::is_copy_constructible<InPlaceKey>::value &&
-                  !std::is_move_constructible<InPlaceKey>::value && !std::is_destructible<InPlaceKey>::value,
-              "an InPlaceKey can be made, copied, byte-copied or destroyed outside its owners");
+                  !std::is_move_constructible<InPlaceKey>::value &&
+                  !std::is_trivially_destructible<InPlaceKey>::value,
+              "an InPlaceKey can be made, copied or byte-copied outside its owners");
+// (Tooling review F3: the destructor is public so that a Vm owner's key, made
+// through VmInPlace, is destroyed in the owner's scope; it stays user-provided,
+// so the key is still not trivially copyable or implicit-lifetime.)
 
 // Controls (the detectors can say yes): the construction API and a protocol
 // entry point are found and accessible.

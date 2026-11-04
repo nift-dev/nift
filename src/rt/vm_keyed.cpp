@@ -2,6 +2,7 @@
 
 #include "rt/vm.h"
 #include "rt/aggregate.h"
+#include "rt/vm_in_place.h"
 #include "rt/collection.h"
 #include "rt/heap.h"
 #include "rt/keyed.h"
@@ -63,7 +64,7 @@ bool Vm::op_keyed_mutate(const Instr& in, Value* R, Fault& fault, const Proto* p
         case K::MapSet: {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 14
             if (natives::collection_key_ok(s[Item])) {
-                const build::InPlaceKey key;  // test mutant only (tooling.md 2.4)
+                const build::InPlaceKey key = VmInPlace::key();  // test mutant only (tooling.md 2.4)
                 // rt-lint: storage-ok mutant-only, R14: the store before the refusal
                 Construction::map_set(key, c, s[Item], s[Returned]);
             }

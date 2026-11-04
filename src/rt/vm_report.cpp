@@ -2,6 +2,7 @@
 #include "rt/parallel_task.h"
 
 #include "rt/aggregate.h"
+#include "rt/vm_in_place.h"
 #include "rt/compare.h"
 #include "rt/copy_graph.h"
 #include "rt/error.h"
@@ -190,7 +191,7 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             // Tooling 2 (in place, tooling.md 2.4): the object NewObject made in this
             // register, filled key by key across instructions (no builder can live
             // in a register); the compiler keeps the register unaliased until done.
-            const build::InPlaceKey key;
+            const build::InPlaceKey key = VmInPlace::key();
             // rt-lint: storage-ok fresh, the value NewArray/NewObject just made
             Construction::object_set(key, R[in.a], Atom{in.b}, std::move(value));
             return true;

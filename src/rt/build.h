@@ -36,7 +36,7 @@
 
 namespace nift::rt {
 
-class Vm;
+class VmInPlace;
 struct Fault;
 struct Note;
 class CycleGraph;
@@ -109,32 +109,41 @@ inline void check_live(bool live) noexcept {
 
 // The in-place construction capability. Its only constructor is private and
 // user-provided (not an aggregate), it is not copyable or movable and not
-// trivially copyable (no bit-copy), and only these owners can make one:
-//   Vm (Vm::cold: ObjectSet; Vm::struct_op: StructAdd; Vm::op_keyed_mutate:
-//     the R14 test mutant only), collection_step (the resumable collection
-//     natives' result and scratch slots), collection_sort_init (the keep-alive
-//     scratch), collection_plain_sort (the order scratch), deep_copy_tuple (the
-//     post-order fill of a graph copy), cell_read (a selector cell's private
-//     descriptor), set_index and natives::obj_merge (the M-B2 and R-B5 test
-//     mutants only).
-// Every use sits in that owner's own file; the link-time allowlist
-// (tests/abi/restricted-symbol-refs.txt) restricts which objects may reach the
-// primitives behind it, so a unit forging an owner or the key does not link.
+// trivially copyable (no bit-copy), and only these owners can construct one:
+//   the Vm members Vm::cold (ObjectSet) and Vm::struct_op (StructAdd), through
+//     VmInPlace (rt/vm_in_place.h, which befriends exactly those members; and
+//     Vm::op_keyed_mutate in the R14 test mutant build only), collection_step
+//     (the resumable collection natives' result and scratch slots),
+//     collection_sort_init (the keep-alive scratch), collection_plain_sort (the
+//     order scratch), deep_copy_tuple (the post-order fill of a graph copy),
+//     cell_read (a selector cell's private descriptor); set_index and
+//     natives::obj_merge only in their M-B2 and R-B5 test mutant builds.
+// This refuses construction, not deliberate forgery: a reference to a key can
+// be forged (a cast, an inactive union member) and explicit instantiation
+// reaches the private primitives without one, as for mutation::SortKey
+// (tooling.md 2.4, 4.2). The destructor is public (an owner's local is
+// destroyed in its own scope) and user-provided (no bit-copy).
 class InPlaceKey {
     InPlaceKey() {}
-    ~InPlaceKey() {}
     InPlaceKey(const InPlaceKey&) = delete;
     InPlaceKey& operator=(const InPlaceKey&) = delete;
-    friend class nift::rt::Vm;
+    friend class nift::rt::VmInPlace;
     friend bool nift::rt::collection_step(CollectionMethod, std::uint16_t, Value*, const natives::Context&, Fault&);
     friend bool nift::rt::collection_sort_init(Value*, const natives::Context&, Fault&, std::size_t);
     friend bool nift::rt::collection_plain_sort(Value*, const natives::Context&, Fault&);
     friend CopyStatus nift::rt::deep_copy_tuple(const Value*, std::size_t, Value*, std::size_t, bool);
     friend bool nift::rt::cell_read(const Value&, Value&, std::string&);
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 30
     friend bool nift::rt::set_index(const Note*, Value&, const Value&, const Value&, Fault&, const CycleGraph*,
                                     bool*);
+#endif
+#if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 26
     friend natives::Status nift::rt::natives::obj_merge(const natives::Context&, const Value*, std::uint32_t,
                                                          Value&, std::string&);
+#endif
+
+public:
+    ~InPlaceKey() {}
 };
 } // namespace build
 
