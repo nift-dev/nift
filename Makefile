@@ -121,6 +121,7 @@ FORCE:
 # therefore builds only the ordinary Nift CLI; the embedding library and every
 # language binding are explicit, optional targets.
 $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(filter-out $(MARKUP_C_OBJECTS),$(CLI_OBJECTS))
 	@bash scripts/build/check-config.sh $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -- $(MARKUP_C_OBJECTS)
 	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(CLI_OBJECTS)
@@ -213,16 +214,19 @@ test-markuppp-sync:
 	$(MAKE) -C "$(MARKUP_DIR)" check-nift-sync NIFT_DIR="$(CURDIR)"
 
 test-json:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/json_smoke.cpp -o "$(JSON_TEST)"
 	"$(JSON_TEST)"
 
 test-json-schema:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/json_schema_smoke.cpp src/JsonSchema.cpp -o "$(JSON_SCHEMA_TEST)"
 	"$(JSON_SCHEMA_TEST)"
 
 $(RUNTIME_VALUE_TEST): tests/runtime_value.cpp src/RuntimeValue.cpp src/RuntimeValue.h src/RuntimeJson.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/runtime_value.cpp src/RuntimeValue.cpp -o "$@"
 
@@ -291,21 +295,25 @@ $(eval $(call RT_OBJ_CONFIG,tsan-sourcemap-counter,$$(RT_HANDLE_TSAN_FLAGS) -DNI
 -include $(wildcard $(TEST_DIR)/rt/*.d $(TEST_DIR)/rt-san/*.d $(TEST_DIR)/rt-tsan/*.d)
 
 $(RT_VALUE_UNIT): tests/rt/value_unit.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_PROPERTY): tests/rt/value_property.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_property.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_REGRESS): tests/rt/value_regress.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_regress.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VALUE_BENCH): tests/rt/value_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_bench.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -313,6 +321,7 @@ $(RT_VALUE_BENCH): tests/rt/value_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 .PHONY: test-rt-value test-rt-lint test-rt-value-sanitize bench-rt-value
 # RT_VALUE_SEED / RT_VALUE_SCALE vary the randomised suite (default seed is fixed).
 $(RT_VALUE_ROUND2): tests/rt/value_round2.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_round2.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -320,6 +329,7 @@ $(RT_VALUE_ROUND2): tests/rt/value_round2.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS
 # D-040 value semantics (L7 step 2.1/2.7a): structs as COW values, nested
 # copy-on-write model, same(), identity summary bit, cycle checker.
 $(RT_VALUE_D040): tests/rt/value_d040.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_d040.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -327,12 +337,14 @@ $(RT_VALUE_D040): tests/rt/value_d040.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 # Memory investigation C1: releasing a value needs no memory (failing
 # operator new; permanent regression for the destroy_oom reproducer).
 $(RT_VALUE_DESTROY_OOM): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_UNIT_OBJECTS) -o "$@"
 # A one-slot in-frame buffer: small graphs reach the spill and the
 # pointer-reversal fallback at every injected allocation failure.
 $(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_destroy-local)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_destroy-local) -- $(RT_OBJECTS_destroy-local)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_destroy-local) -o "$@"
@@ -340,24 +352,28 @@ $(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $
 # The exact side table never allocates; a full table reports over budget
 # (one-slot build; reserves ~2 GiB of address space, never touched).
 $(RT_HEAP_ACCOUNT_OOM): tests/rt/heap_account_oom.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_saturated-slots)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_saturated-slots) -- $(RT_OBJECTS_saturated-slots)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_SATURATED_SLOTS=1 $(RT_TEST_DEPFLAGS) tests/rt/heap_account_oom.cpp $(RT_OBJECTS_saturated-slots) -o "$@"
 
 # Memory investigation C2: interned atoms count against the heap budget.
 $(RT_ATOM_BUDGET): tests/rt/atom_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/atom_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # Memory investigation C3: natives check the budget before allocating results.
 $(RT_NATIVE_BUDGET): tests/rt/native_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/native_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # C3 follow-up: a heap limit of 0 means no room, never "disabled".
 $(RT_HEAP_LIMIT_ZERO): tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -365,10 +381,12 @@ $(RT_HEAP_LIMIT_ZERO): tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_VALU
 # Cost of the D-040 cycle check isolated from the store: the same benchmark
 # with the check and with it compiled out; the guard is on the difference.
 $(RT_VALUE_CYCLE_BENCH): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_cycle_bench.cpp $(RT_UNIT_OBJECTS) -o "$@"
 $(RT_VALUE_CYCLE_BENCH_OFF): tests/rt/value_cycle_bench.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_no-cycle-check)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_no-cycle-check) -- $(RT_OBJECTS_no-cycle-check)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_NO_CYCLE_CHECK $(RT_TEST_DEPFLAGS) tests/rt/value_cycle_bench.cpp $(RT_OBJECTS_no-cycle-check) -o "$@"
@@ -404,6 +422,7 @@ test-rt-value: $(RT_VALUE_UNIT) $(RT_VALUE_REGRESS) $(RT_VALUE_PROPERTY) $(RT_VA
 # atoms by text, errors, cells, functions, refused futures/handles).
 RT_ISOLATE_TRANSFER_UNIT := $(TEST_DIR)/rt/isolate-transfer-unit$(EXEEXT)
 $(RT_ISOLATE_TRANSFER_UNIT): tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
 		tests/rt/isolate_transfer_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
@@ -427,10 +446,12 @@ RT_MUTATION_SOURCES := src/rt/mutation.cpp src/rt/mutation_collection.cpp src/rt
 RT_MUTATION_OBJECTS := $(filter-out $(RT_MUTATION_SOURCES:.cpp=.o),$(RT_VALUE_SOURCES:.cpp=.o)) src/RuntimeValue.o
 RT_MUTATION_MUTANTS := 1 2 3 4 5 6
 $(RT_MUTATION_DIR)/protocol$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/mutation_protocol.cpp $(RT_MUTATION_SOURCES) \
 		$(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
 $(RT_MUTATION_DIR)/protocol-m%$(EXEEXT): tests/rt/mutation_protocol.cpp $(RT_VALUE_DEPS) $(RT_MUTATION_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(RT_MUTATION_DIR)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_MUTATION_MUTANT=$* tests/rt/mutation_protocol.cpp \
 		$(RT_MUTATION_SOURCES) $(RT_MUTATION_OBJECTS) $(LDLIBS) -o "$@"
@@ -469,6 +490,7 @@ $(RT_REFREP_DIR)/refrep_vm.o: tests/rt/refrep_vm.cpp $(RT_VALUE_HEADERS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_REFERENCE_PROBE -c tests/rt/refrep_vm.cpp -o $@
 $(RT_REFREP_DIR)/refrep-vm$(EXEEXT): $(RT_REFREP_DIR)/refrep_vm.o $(RT_REFREP_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $(RT_REFREP_OBJECTS) $(LDLIBS) -o $@
 .PHONY: test-rt-refrep test-rt-refrep-mutants test-rt-refrep-production
 test-rt-refrep: $(RT_REFREP_DIR)/refrep-vm$(EXEEXT) test-rt-refrep-production
@@ -531,6 +553,7 @@ test-rt-vm: test-runtime2-refrep-cli
 # constants, TransferGraph arguments/globals/result; no worker threads yet).
 RT_ISOLATE_TASK_UNIT := $(TEST_DIR)/rt/isolate-task-unit$(EXEEXT)
 $(RT_ISOLATE_TASK_UNIT): tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
 		tests/runtime2/cp23/isolate_task_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
@@ -542,6 +565,7 @@ test-cp23-isolate-task-unit: $(RT_ISOLATE_TASK_UNIT)
 # error transfer, nested spawn, drain, done/status and a two-worker CPU check).
 RT_CP23_PARALLEL_UNIT := $(TEST_DIR)/rt/cp23-parallel-unit$(EXEEXT)
 $(RT_CP23_PARALLEL_UNIT): tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
 		tests/runtime2/cp23/parallel_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
@@ -553,6 +577,7 @@ test-cp23-parallel-unit: $(RT_CP23_PARALLEL_UNIT)
 # sentinel and operator support across OS workers.
 RT_CP23_SHARED_UNIT := $(TEST_DIR)/rt/cp23-shared-unit$(EXEEXT)
 $(RT_CP23_SHARED_UNIT): tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
 		tests/runtime2/cp23/shared_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
@@ -565,39 +590,51 @@ CP23_CORE := $(RT_VALUE_SOURCES) src/RuntimeValue.cpp
 CP23_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(CP23_CORE))
 CP23_TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(CP23_CORE))
 $(TEST_DIR)/rt/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-reporting-unit: tests/runtime2/cp23/reporting_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-admission-unit: tests/runtime2/cp23/admission_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-resource-unit: tests/runtime2/cp23/resource_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-contention-unit: tests/runtime2/cp23/contention_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-allocation-unit: tests/runtime2/cp23/allocation_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt/cp23-ownership-unit: tests/runtime2/cp23/ownership_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 $(TEST_DIR)/rt-san/isolate-transfer-unit: tests/rt/isolate_transfer_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 $(TEST_DIR)/rt-san/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 $(TEST_DIR)/rt-tsan/cp23-rejected-wait-unit: tests/runtime2/cp23/rejected_wait_unit.cpp $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(TSAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(TSAN_FLAGS) $< $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 $(TEST_DIR)/rt-san/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 $(TEST_DIR)/rt-tsan/cp23-%-unit: tests/runtime2/cp23/%_unit.cpp $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(TSAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(TSAN_FLAGS) $< $(CP23_TSAN_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 test-cp23-ownership-unit: $(TEST_DIR)/rt/cp23-ownership-unit
@@ -606,6 +643,7 @@ test-cp23-ownership-unit: $(TEST_DIR)/rt/cp23-ownership-unit
 # equals per-element construction. Normal, ASan/UBSan/LSan and TSan builds; not
 # part of the CP23 certification unit lists, which are unchanged.
 $(TEST_DIR)/rt/cp23-snapshot-constants-unit: tests/runtime2/cp23/snapshot_constants_unit.cpp $(CP23_CORE:.cpp=.o)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP23_CORE:.cpp=.o) $(LDLIBS) -o "$@"
 .PHONY: test-cp23-snapshot-constants
@@ -619,6 +657,7 @@ test-cp23-shared-unit-sanitize: $(TEST_DIR)/rt-san/cp23-shared-unit
 
 SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_sourcemap-counter)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_sourcemap-counter) -- $(RT_OBJECTS_sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread $(RT_TEST_DEPFLAGS) \
@@ -627,6 +666,7 @@ $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_s
 SOURCE_MAP_RETRY_UNIT := $(TEST_DIR)/rt/source-map-retry
 $(SOURCE_MAP_RETRY_UNIT): tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/source_map.h \
 		src/rt/module_link.cpp src/rt/module_link.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -ffunction-sections -fdata-sections -pthread \
 		tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/module_link.cpp \
@@ -635,6 +675,7 @@ $(SOURCE_MAP_RETRY_UNIT): tests/rt/source_map_retry_unit.cpp src/rt/source_map.c
 ERROR_OOM_UNIT := $(TEST_DIR)/rt/error-oom
 $(ERROR_OOM_UNIT): tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/error.h \
 		src/rt/heap_account.cpp src/rt/value.cpp src/rt/string.cpp
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) \
 		tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/heap_account.cpp \
@@ -655,6 +696,7 @@ $(TEST_DIR)/cp13b/vm-switch.o: src/rt/vm.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -MMD -MP -c src/rt/vm.cpp -o "$@"
 -include $(TEST_DIR)/cp13b/vm-switch.d
 $(CP13B_SWITCH_NIFT): $(filter-out src/rt/vm.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o "$@"
 .PHONY: test-runtime2-cp13b test-runtime2-cp13b-mutants
 test-runtime2-cp13b: $(TARGET) $(CP13B_SWITCH_NIFT)
@@ -691,6 +733,7 @@ test-rt-error-oom: $(ERROR_OOM_UNIT)
 	"$(ERROR_OOM_UNIT)"
 
 test-rt-error-oom-sanitize:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread \
 		tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/heap_account.cpp \
@@ -699,6 +742,7 @@ test-rt-error-oom-sanitize:
 		timeout 300 "$(TEST_DIR)/rt-san/error-oom"
 
 test-rt-source-map-sanitize: $(RT_OBJECTS_san-sourcemap-counter)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san-sourcemap-counter) -- $(RT_OBJECTS_san-sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread \
@@ -706,6 +750,7 @@ test-rt-source-map-sanitize: $(RT_OBJECTS_san-sourcemap-counter)
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/source-map"
 
 test-rt-source-map-tsan: $(RT_OBJECTS_tsan-sourcemap-counter)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-tsan"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_tsan-sourcemap-counter) -- $(RT_OBJECTS_tsan-sourcemap-counter)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) -DNIFT_SOURCEMAP_COUNTER \
@@ -727,6 +772,7 @@ test-rt-lint:
 # `ulimit -v` (it refuses to start under one); the address-space tests
 # (value-d040 large_accounting, under ulimit -v) run in test-rt-value instead.
 test-rt-value-sanitize: $(RT_OBJECTS_san) $(RT_OBJECTS_san-destroy-local)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@if [ "$$(ulimit -v)" != unlimited ]; then \
 		echo "test-rt-value-sanitize: run without ulimit -v (ASan shadow memory; found $$(ulimit -v) KiB)"; exit 1; fi
 	mkdir -p "$(TEST_DIR)/rt-san"
@@ -777,28 +823,34 @@ RT_HANDLE_BOX_UNIT := $(TEST_DIR)/rt/handle-box-unit$(EXEEXT)
 RT_HANDLE_TSAN_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread
 
 $(RT_HANDLE_UNIT): $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) -o "$@"
 
 # CP17 x CP18 (2026-10-27): HandleTable::close_context under allocation failure.
 RT_HANDLE_CLOSE_OOM := $(TEST_DIR)/rt/handle-close-oom$(EXEEXT)
 $(RT_HANDLE_CLOSE_OOM): tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_close_oom_unit.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 $(RT_HANDLE_STRESS): tests/rt/handle_table_stress.cpp $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 $(RT_HANDLE_LIFECYCLE): tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 $(RT_HANDLE_BENCH): tests/rt/handle_table_bench.cpp $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/handle_table_bench.cpp $(RT_HANDLE_SOURCES) -o "$@"
 
 $(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
 		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
@@ -818,6 +870,7 @@ test-rt-handles: $(RT_HANDLE_UNIT) $(RT_HANDLE_STRESS) $(RT_HANDLE_LIFECYCLE) $(
 	! grep -n 'transfer *(' src/rt/handles/native_access.h src/rt/handles/native_access.cpp
 
 test-rt-handles-sanitize:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_HANDLE_UNIT_SOURCES) $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-unit"
@@ -835,6 +888,7 @@ test-rt-handles-sanitize:
 		$${RT_HANDLE_RACE_ROUNDS:-300}
 
 test-rt-handles-tsan:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-tsan"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/handle_table_stress.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-tsan/handle-stress"
@@ -859,18 +913,21 @@ RT_VM_PREPARED := $(TEST_DIR)/rt/vm-prepared-parse$(EXEEXT)
 RT_VM_DEPS := $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) tests/rt/rt_vm_tool.h src/RuntimeValue.cpp
 
 $(RT_VM_UNIT): tests/rt/vm_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # The prepared-parser port against legacy's own parser (src/Ast.cpp).
 $(RT_VM_PREPARED): tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/rt/prepared_parse.h src/Ast.cpp src/Ast.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/vm_prepared_parse.cpp src/rt/prepared_parse.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$@"
 
 # CP12 phase B: globals below the compiler (opcodes, analysis, shared inference slot).
 RT_VM_GLOBALS := $(TEST_DIR)/rt/vm-globals-unit$(EXEEXT)
 $(RT_VM_GLOBALS): tests/rt/vm_globals_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_globals_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -878,11 +935,13 @@ $(RT_VM_GLOBALS): tests/rt/vm_globals_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 # CP12 phase B: the module graph and loader (D-041; rt/module_graph.h).
 RT_VM_MODULES := $(TEST_DIR)/rt/vm-modules-unit$(EXEEXT)
 $(RT_VM_MODULES): tests/rt/vm_modules_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_modules_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_run.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -929,6 +988,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
 test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(RT_OBJECTS_san)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/vm_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/vm-unit"
@@ -988,6 +1048,7 @@ $(TEST_DIR)/mutants/%.o: src/rt/%.cpp $(RT_VALUE_HEADERS)
 	mkdir -p "$(TEST_DIR)/mutants"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_VM_MUTANTS -c $< -o $@
 $(RT_VM_MUTANTS): $(filter-out $(RT_VM_MUTATED),$(CLI_OBJECTS)) $(RT_VM_MUTANT_OBJECTS) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(RT_VM_MUTATED),$(CLI_OBJECTS)) $(RT_VM_MUTANT_OBJECTS) \
 		$(LDLIBS) -o $@
 
@@ -1006,9 +1067,11 @@ RT_HOST_HEADERS := $(wildcard src/rt/host/*.h) $(wildcard src/rt/handles/*.h) sr
 RT_HOST_LAYER_UNIT := $(TEST_DIR)/rt/host-layer-unit$(EXEEXT)
 RT_HOST_PROCESS_UNIT := $(TEST_DIR)/rt/host-process-unit$(EXEEXT)
 $(RT_HOST_LAYER_UNIT): tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 $(RT_HOST_PROCESS_UNIT): tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) $(RT_HOST_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS $(CXXFLAGS) tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$@"
 
@@ -1042,6 +1105,7 @@ test: test-rt-host
 RT_HOST_LIST_EXPECTED := src/PageObserver.cpp src/rt/handle.cpp src/rt/value.cpp src/rt/string.cpp src/rt/heap_account.cpp $(RT_HOST_LINK_SOURCES)
 RT_HOST_NATIVE_UNIT := $(TEST_DIR)/rt/host-native-unit$(EXEEXT)
 $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/host_observer_native.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -1049,12 +1113,14 @@ $(RT_HOST_NATIVE_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) $(
 # CP17 N2: Host-level observer parity (real PageObserver over a test RenderHost).
 RT_N2_PARITY_UNIT := $(TEST_DIR)/rt/n2-observer-parity$(EXEEXT)
 $(RT_N2_PARITY_UNIT): tests/rt/n2_observer_parity.cpp $(RT_VALUE_SOURCES) src/PageObserver.cpp src/RuntimeValue.cpp src/PageObserver.o $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS) src/PageObserver.o
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/n2_observer_parity.cpp $(RT_UNIT_OBJECTS) src/PageObserver.o -o "$@"
 
 RT_STREAM_GUARD_UNIT := $(TEST_DIR)/rt/stream-resource-guards$(EXEEXT)
 $(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/stream_resource_guards.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -1063,22 +1129,26 @@ $(RT_STREAM_GUARD_UNIT): tests/rt/stream_resource_guards.cpp $(RT_VALUE_SOURCES)
 # the production natives and handle table (functional and ASan/UBSan builds).
 RT_UNWIND_RELEASE_UNIT := $(TEST_DIR)/rt/unwind-file-release$(EXEEXT)
 $(RT_UNWIND_RELEASE_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 RT_UNWIND_RELEASE_SAN_UNIT := $(TEST_DIR)/rt-san/unwind-file-release
 $(RT_UNWIND_RELEASE_SAN_UNIT): tests/rt/unwind_file_release_unit.cpp $(RT_VALUE_SOURCES) $(RT_OBJECTS_san-pthread)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san-pthread) -- $(RT_OBJECTS_san-pthread)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_TEST_DEPFLAGS) tests/rt/unwind_file_release_unit.cpp $(RT_OBJECTS_san-pthread) -o "$@"
 
 RT_CP17_SAN_UNIT := $(TEST_DIR)/rt-san/cp17-handles
 $(RT_CP17_SAN_UNIT): tests/rt/host_observer_native.cpp $(RT_VALUE_SOURCES) src/RuntimeValue.cpp $(RT_OBJECTS_san-pthread)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san-pthread) -- $(RT_OBJECTS_san-pthread)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread $(RT_TEST_DEPFLAGS) tests/rt/host_observer_native.cpp $(RT_OBJECTS_san-pthread) -o "$@"
 .PHONY: test-runtime2-cp17-sanitize
 test-runtime2-cp17-sanitize: $(RT_CP17_SAN_UNIT) $(RT_UNWIND_RELEASE_SAN_UNIT)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_CP17_SAN_UNIT)"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(RT_UNWIND_RELEASE_SAN_UNIT)"
 	# CP17 x CP18: the handle table under injected allocation failure (ASan/LSan/UBSan).
@@ -1103,6 +1173,7 @@ test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT) $(RT_UNWIND_RELEAS
 N2_REBUILD_UNIT := $(TEST_DIR)/rt/n2-rebuild-decision$(EXEEXT)
 N2_REBUILD_OBJECTS := $(filter-out src/nift.o src/CLI.o src/embed/%,$(OBJECTS))
 $(N2_REBUILD_UNIT): tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp $(N2_REBUILD_OBJECTS) $(LDLIBS) -o "$@"
 N2_REBUILD_MUTANT ?= 0
@@ -1113,6 +1184,7 @@ $(N2_REBUILD_MUTANT_DIR)/host_fs_write.o: src/rt/natives/host_fs_write.cpp $(RT_
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_HOST_MUTANT=$(N2_REBUILD_MUTANT) -c $< -o $@
 $(N2_REBUILD_MUTANT_BIN): tests/rt/n2_rebuild_decision.cpp $(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) \
 		$(N2_REBUILD_MUTANT_DIR)/host_fs_write.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt -Isrc $(CXXFLAGS) tests/rt/n2_rebuild_decision.cpp \
 		$(filter-out src/rt/natives/host_fs_write.o,$(N2_REBUILD_OBJECTS)) $(N2_REBUILD_MUTANT_DIR)/host_fs_write.o $(LDLIBS) -o "$@"
@@ -1177,6 +1249,7 @@ test: test-rt-host-sources-list
 
 # ThreadSanitizer on the process tests (groups are shared with the host loop thread).
 test-rt-host-tsan:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-tsan"
 	$(CXX) $(CPPFLAGS) -Itests/rt -DNIFT_HOST_TEST_HOOKS -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=thread -pthread \
 		tests/rt/host_process_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-tsan/host-process-unit"
@@ -1185,6 +1258,7 @@ test-rt-host-tsan:
 # ASan+UBSan on both Host-layer unit tests (no ulimit -v: the sanitizers
 # reserve large shadow mappings; file size, time and cleanup still apply).
 test-rt-host-sanitize:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/host_layer_unit.cpp $(RT_HOST_SOURCES) -o "$(TEST_DIR)/rt-san/host-layer-unit"
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(TEST_DIR)/rt-san/host-layer-unit"
@@ -1206,6 +1280,7 @@ bench-rt-value: $(RT_VALUE_BENCH)
 	python3 tests/rt/value_bench_guard.py "$(TEST_DIR)/rt/value-bench-table.md" tests/rt/value_bench_baseline.json
 
 $(CP17_BYTES_TEST): tests/cp17_bytes.cpp src/RuntimeValue.cpp src/RuntimeValue.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp17_bytes.cpp src/RuntimeValue.cpp -o "$@"
 
@@ -1217,6 +1292,7 @@ test-cp19-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp19_bytes_io.sh
 
 $(TEST_DIR)/nift-console-smoke$(EXEEXT): tests/console_smoke.cpp src/Console.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/console_smoke.cpp -o "$@"
 
@@ -1225,6 +1301,7 @@ test-console: $(TEST_DIR)/nift-console-smoke$(EXEEXT)
 
 PROGRESS_RENDER_TEST := $(TEST_DIR)/progress-render$(EXEEXT)
 $(PROGRESS_RENDER_TEST): tests/progress_render_unit.cpp src/BuildProgress.cpp src/BuildProgress.h src/Console.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/progress_render_unit.cpp src/BuildProgress.cpp -o $@
 
@@ -1310,34 +1387,42 @@ PACKAGE_GRAPH_RESOLVER_TEST := $(TEST_DIR)/package-graph-resolver-unit$(EXEEXT)
 PACKAGE_GRAPH_QUERY_TEST := $(TEST_DIR)/package-graph-query-unit$(EXEEXT)
 
 $(DIAGNOSTIC_OUTCOME_TEST): tests/diagnostic_outcome_unit.cpp src/Diagnostic.h src/Outcome.h src/RuntimeValue.cpp src/RuntimeValue.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/diagnostic_outcome_unit.cpp src/RuntimeValue.cpp -o $@
 
 $(CP3_EMBED_TEST): tests/v46_b4_cp3_embed.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_b4_cp3_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(CP8_EMBED_TEST): tests/v46_b4_cp8_embed.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_b4_cp8_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(PACKAGE_GRAPH_LOCK_TEST): tests/package_graph_lock_unit.cpp src/PackageGraphLock.h src/PackageMetadata.h src/FileSystem.cpp src/JsonFile.cpp
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/package_graph_lock_unit.cpp src/FileSystem.cpp src/JsonFile.cpp -o $@
 
 $(PACKAGE_GRAPH_RESOLVER_TEST): tests/package_graph_resolver_unit.cpp src/PackageGraphResolver.h src/PackageGraphLock.h src/PackageMetadata.h src/FileSystem.cpp src/JsonFile.cpp
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/package_graph_resolver_unit.cpp src/FileSystem.cpp src/JsonFile.cpp -o $@
 
 $(PACKAGE_GRAPH_QUERY_TEST): tests/package_graph_query_unit.cpp src/PackageGraphQuery.h src/PackageGraphLock.h src/PackageMetadata.h src/FileSystem.cpp src/JsonFile.cpp
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/package_graph_query_unit.cpp src/FileSystem.cpp src/JsonFile.cpp -o $@
 
 $(PARSER_STATEMENT_STATE_TEST): tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(ENGINE_TEST): tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1346,6 +1431,7 @@ test-engine: $(ENGINE_TEST)
 
 OWNERSHIP_UNIT_TEST := $(TEST_DIR)/ownership-unit$(EXEEXT)
 $(OWNERSHIP_UNIT_TEST): tests/ownership_unit.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ownership_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1354,6 +1440,7 @@ test-ownership-unit: $(OWNERSHIP_UNIT_TEST)
 
 ENGINE_BINDINGS_TEST := $(TEST_DIR)/engine-bindings$(EXEEXT)
 $(ENGINE_BINDINGS_TEST): tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1361,6 +1448,7 @@ test-engine-bindings: $(ENGINE_BINDINGS_TEST)
 	$(ENGINE_BINDINGS_TEST)
 
 $(CP18_BYTES_TEST): tests/cp18_bytes.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp18_bytes.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1370,6 +1458,7 @@ test-cp18-bytes: $(TARGET) $(CP18_BYTES_TEST)
 
 ENGINE_RENDER_API_TEST := $(TEST_DIR)/engine-render-api$(EXEEXT)
 $(ENGINE_RENDER_API_TEST): tests/engine_render_api.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_render_api.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1380,6 +1469,7 @@ test-engine-render-api: $(ENGINE_RENDER_API_TEST)
 # it proves <nift/nift.h> is self-contained (no -Isrc, no Jsonic++ visibility).
 PUBLIC_HEADER_PROBE := $(TEST_DIR)/public-header-probe$(EXEEXT)
 $(PUBLIC_HEADER_PROBE): tests/public_header_probe.cpp $(wildcard include/nift/*.h) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) -std=c++17 -Iinclude tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1388,11 +1478,13 @@ test-public-header: $(PUBLIC_HEADER_PROBE)
 
 ENGINE_LOADERS_TEST := $(TEST_DIR)/engine-loaders$(EXEEXT)
 $(ENGINE_LOADERS_TEST): tests/engine_loaders.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_loaders.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 ENGINE_SOURCE_READ_TEST := $(TEST_DIR)/engine-source-read$(EXEEXT)
 $(ENGINE_SOURCE_READ_TEST): tests/engine_source_read.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_source_read.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1404,6 +1496,7 @@ test-engine-loaders: $(ENGINE_LOADERS_TEST)
 
 ENGINE_PATHTO_TEST := $(TEST_DIR)/engine-pathto$(EXEEXT)
 $(ENGINE_PATHTO_TEST): tests/engine_pathto.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_pathto.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1414,6 +1507,7 @@ test-engine-pathto: $(ENGINE_PATHTO_TEST)
 # never write to disk, and keep shared read caches safe under concurrency.
 PROJECT_STATE_TEST := $(TEST_DIR)/project-state-parity$(EXEEXT)
 $(PROJECT_STATE_TEST): tests/project_state_parity.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/project_state_parity.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1426,6 +1520,7 @@ test-project-state: $(PROJECT_STATE_TEST)
 # with zero writes and no build decisions.
 PROJECT_HOST_TEST := $(TEST_DIR)/project-host$(EXEEXT)
 $(PROJECT_HOST_TEST): tests/project_host.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/project_host.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1437,6 +1532,7 @@ test-project-host: $(PROJECT_HOST_TEST)
 # overlay/environment precedence, dependency/requirement reporting, zero writes.
 ENGINE_PROJECT_TEST := $(TEST_DIR)/engine-project$(EXEEXT)
 $(ENGINE_PROJECT_TEST): tests/engine_project.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_project.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1450,6 +1546,7 @@ test-engine-project: $(ENGINE_PROJECT_TEST)
 # and accept/reject parity.
 CPP_RUNNER := $(TEST_DIR)/cpp-runner$(EXEEXT)
 $(CPP_RUNNER): tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1461,6 +1558,7 @@ test-conformance: $(CPP_RUNNER) $(TARGET)
 # concurrent render+reload safety, defaults/environment survival.
 ENGINE_RELOAD_TEST := $(TEST_DIR)/engine-reload$(EXEEXT)
 $(ENGINE_RELOAD_TEST): tests/engine_reload.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_reload.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1477,6 +1575,7 @@ test-engine-reload: $(ENGINE_RELOAD_TEST)
 # pagination generation.
 ENGINE_PAGINATION_SNAPSHOT_TEST := $(TEST_DIR)/engine-pagination-snapshot$(EXEEXT)
 $(ENGINE_PAGINATION_SNAPSHOT_TEST): tests/engine_pagination_snapshot.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_pagination_snapshot.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1485,6 +1584,7 @@ test-engine-pagination-snapshot: $(ENGINE_PAGINATION_SNAPSHOT_TEST)
 
 ENGINE_CONCURRENCY_TEST := $(TEST_DIR)/engine-concurrency$(EXEEXT)
 $(ENGINE_CONCURRENCY_TEST): tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1497,6 +1597,7 @@ test-engine-concurrency: $(ENGINE_CONCURRENCY_TEST)
 TSAN_CORE_OBJECTS := $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS))
 ENGINE_CONCURRENCY_TSAN := $(TEST_DIR)/engine-concurrency-tsan$(EXEEXT)
 $(ENGINE_CONCURRENCY_TSAN): tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
@@ -1505,6 +1606,7 @@ test-engine-concurrency-tsan: $(ENGINE_CONCURRENCY_TSAN)
 
 ENGINE_RELOAD_TSAN := $(TEST_DIR)/engine-reload-tsan$(EXEEXT)
 $(ENGINE_RELOAD_TSAN): tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
@@ -1533,6 +1635,7 @@ $(TEST_DIR)/pic/%.o: %.c $(TEST_DIR)/obj-config/pic.flags
 # src/rt/handles/types.o would otherwise silently overwrite libffi's types.o
 # (ffi_type_* definitions) and break static consumers.
 libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(C_ABI_CORE)
 	rm -rf $@ $@.ffi && mkdir -p $@.ffi
 	cd $@.ffi && ar x $(abspath $(LIBFFI_A)) && for m in *.o; do mv "$$m" "ffi_$$m"; done
@@ -1556,6 +1659,7 @@ LIBNIFT_C_EXPORT_FLAGS := -Wl,--version-script=$(ABI_EXPORT_MAP)
 endif
 
 libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(C_ABI_PIC)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) $(LIBNIFT_C_EXPORT_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A) $(SHARED_SYS_LIBS)
 
@@ -1584,6 +1688,7 @@ BUILD_UNIT_DEFINES_mutant-1 := -DNIFT_RT_BUILDER_MUTANT=1
 BUILD_UNIT_DEFINES_mutant-2 := -DNIFT_RT_BUILDER_MUTANT=2
 BUILD_UNIT_BINS := $(foreach v,$(BUILD_UNIT_VARIANTS),$(TEST_DIR)/rt/build-unit-$(v))
 $(BUILD_UNIT_BINS): $(TEST_DIR)/rt/build-unit-%: tests/rt/build_unit.cpp $(BUILD_UNIT_SOURCES)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(BUILD_UNIT_DEFINES_$*) $(RT_TEST_DEPFLAGS) \
 		tests/rt/build_unit.cpp $(BUILD_UNIT_SOURCES) -o "$@"
@@ -1631,10 +1736,12 @@ test-embed: test-c-abi-symbols
 # macOS dynamic library: relocatable @rpath install name so a consumer that
 # links it can load it from an installed prefix without absolute paths.
 libnift_c.dylib: $(C_ABI_PIC) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -Wl,-install_name,@rpath/libnift_c.dylib -o $@ $(C_ABI_PIC) $(LIBFFI_A)
 
 C_ABI_TEST := $(TEST_DIR)/c-abi-adversarial$(EXEEXT)
 $(C_ABI_TEST): tests/c_abi_adversarial.cpp libnift_c.a
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/c_abi_adversarial.cpp libnift_c.a $(LDLIBS) -o $@
 
@@ -1645,6 +1752,7 @@ test-c-abi: $(C_ABI_TEST)
 # library must link into a C program.
 C_ABI_C_SMOKE := $(TEST_DIR)/c-abi-smoke$(EXEEXT)
 $(C_ABI_C_SMOKE): tests/c_abi_smoke.c libnift_c.a
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CC) $(CPPFLAGS) tests/c_abi_smoke.c libnift_c.a $(LDLIBS) -lstdc++ -lm -pthread -o $@
 
@@ -1652,6 +1760,7 @@ test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
 	$(C_ABI_C_SMOKE)
 
 $(CP21_BYTES_EMBED_TEST): tests/cp21_bytes_embed.cpp libnift_c.a
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_bytes_embed.cpp libnift_c.a $(LDLIBS) -o $@
 
@@ -1727,18 +1836,22 @@ V45_EMBED_SCRIPT_C_OBJECT := $(TEST_DIR)/v45-embed-script-c.o
 V45_EMBED_PUBLIC_HEADERS := $(wildcard include/nift/*.h)
 
 $(V45_EMBED_CONTRACT_TEST): tests/v45_embed_contract.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_contract.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V45_EMBED_SCRIPT_TEST): tests/v45_embed_script.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_script.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V45_EMBED_HOST_CALLABLES_TEST): tests/v45_embed_host_callables.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_host_callables.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V45_EMBED_CONCURRENCY_TEST): tests/v45_embed_concurrency.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_concurrency.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1747,37 +1860,46 @@ $(V45_EMBED_SCRIPT_C_OBJECT): tests/v45_embed_script_c.c $(V45_EMBED_PUBLIC_HEAD
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(V45_EMBED_SCRIPT_C_TEST): $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a $(LDLIBS) -o $@
 
 $(V46_TIME_EMBED_TEST): tests/v46_time_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_time_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V46_TIMER_UNIT_TEST): tests/v46_timer_unit.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_timer_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V46_TIMER_UNIT_SAN_TEST): tests/v46_timer_unit.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_timer_unit.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 $(V46_TIMER_EMBED_SAN_TEST): tests/v46_time_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_time_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 $(V46_SECURE_RANDOM_EMBED_TEST): tests/v46_secure_random_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_secure_random_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V46_OUTPUT_EMBED_TEST): tests/v46_output_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_output_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V46_RESOURCE_PATHS_EMBED_TEST): tests/v46_resource_paths_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_resource_paths_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(V46_RESOURCE_PATHS_EMBED_SAN_TEST): tests/v46_resource_paths_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_resource_paths_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
@@ -1877,6 +1999,7 @@ test-cp15-numeric-repair: $(TARGET)
 
 FFI_ABI_TEST := $(TEST_DIR)/nift-ffi-abi$(EXEEXT)
 $(FFI_ABI_TEST): tests/ffi_abi.cpp src/FfiAbi.h $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ffi_abi.cpp $(LIBFFI_A) -o $@
 
@@ -1916,6 +2039,7 @@ test-node-package-licenses:
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
 $(HOST_SEAM_TEST): tests/host_seam.cpp $(ENGINE_CORE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/host_seam.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -1925,6 +2049,7 @@ test-host-seam: $(HOST_SEAM_TEST)
 # CP10: direct C++ Engine::render vs C ABI render overhead benchmark.
 C_ABI_BENCH := $(TEST_DIR)/c-abi-bench$(EXEEXT)
 $(C_ABI_BENCH): tests/c_abi_bench.cpp libnift_c.a
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/c_abi_bench.cpp libnift_c.a $(LDLIBS) -o $@
 
@@ -2050,6 +2175,7 @@ $(TEST_DIR)/lambda-cache/ParserExpression.o: src/ParserExpression.cpp
 -include $(TEST_DIR)/lambda-cache/ParserExpression.d
 LAMBDA_CACHE_GUARD := $(TEST_DIR)/nift-lambda-cache-guard$(EXEEXT)
 $(LAMBDA_CACHE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LDLIBS) -o $@
 
 test-v48-callback-guard: $(LAMBDA_CACHE_GUARD)
@@ -2243,15 +2369,19 @@ SHA256_UNIT_SAN := $(TEST_DIR)/sha256-unit-san$(EXEEXT)
 SHA256_UNIT_PORTABLE := $(TEST_DIR)/sha256-unit-portable$(EXEEXT)
 SHA256_BENCH := $(TEST_DIR)/sha256-bench$(EXEEXT)
 $(SHA256_UNIT): tests/sha256_unit.cpp $(SHA256_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
 $(SHA256_UNIT_SAN): tests/sha256_unit.cpp $(SHA256_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc -std=c++17 -pthread $(SANITIZER_FLAGS) -fno-sanitize-recover=undefined tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
 $(SHA256_UNIT_PORTABLE): tests/sha256_unit.cpp $(SHA256_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) -DNIFT_SHA256_DISABLE_X86_SHANI tests/sha256_unit.cpp src/Sha256.cpp -o "$@"
 $(SHA256_BENCH): tests/sha256_bench.cpp $(SHA256_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) tests/sha256_bench.cpp src/Sha256.cpp -o "$@"
 .PHONY: test-sha256 benchmark-sha256
@@ -2276,6 +2406,7 @@ test: test-sha256
 # memory cases under RLIMIT_AS.
 READ_LIMIT_UNIT := $(TEST_DIR)/read-limit-unit$(EXEEXT)
 $(READ_LIMIT_UNIT): tests/read_limit_unit.cpp src/ReadLimit.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) tests/read_limit_unit.cpp -o "$@"
 .PHONY: test-runtime2-host-deps
@@ -2612,6 +2743,7 @@ test-full-build-scaling: $(TARGET)
 
 
 $(RECOVERY_EPOCH_GUARD): tests/recovery_epoch_guard.cpp src/FileSystem.cpp src/FileSystem.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_RECOVERY_STATS tests/recovery_epoch_guard.cpp src/FileSystem.cpp -o "$@"
 
@@ -2651,6 +2783,7 @@ $(TEST_DIR)/san/%.o: %.c $(TEST_DIR)/obj-config/san.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) -c $<
 
 $(SAN_TARGET): $(SAN_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) $(SAN_LIBFFI_A) -o "$@"
 
@@ -2670,6 +2803,7 @@ $(TEST_DIR)/san-lifetime/%.o: %.c $(TEST_DIR)/obj-config/san-lifetime.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS) -c $<
 
 $(SAN_LIFETIME_TARGET): $(SAN_LIFETIME_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -std=c++17 -pthread $(SAN_LIFETIME_FLAGS) $(SAN_LIFETIME_OBJECTS) $(SAN_LIBFFI_A) -o "$@"
 
@@ -2708,11 +2842,13 @@ test-v45-concurrency-sanitize: $(SAN_TARGET)
 
 CP18_BYTES_SAN_TEST := $(TEST_DIR)/nift-cp18-bytes-sanitize$(EXEEXT)
 $(CP18_BYTES_SAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 
 CP21_BYTES_SAN_TEST := $(TEST_DIR)/nift-cp21-bytes-sanitize$(EXEEXT)
 $(CP21_BYTES_SAN_TEST): tests/cp21_bytes_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/cp21_bytes_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 
@@ -2737,6 +2873,7 @@ $(TEST_DIR)/tsan/%.o: %.c $(TEST_DIR)/obj-config/tsan.flags
 	bash scripts/build/compile-object.sh --production $@ -- $(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS) -c $<
 
 $(TSAN_TARGET): $(TSAN_OBJECTS) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -std=c++17 -pthread $(TSAN_FLAGS) $(TSAN_OBJECTS) $(TSAN_LIBFFI_A) -o "$@"
 
@@ -2754,11 +2891,13 @@ test-v45-concurrency-tsan: $(TSAN_TARGET)
 
 CP18_BYTES_TSAN_TEST := $(TEST_DIR)/nift-cp18-bytes-tsan$(EXEEXT)
 $(CP18_BYTES_TSAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(TSAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 
 CP21_BYTES_TSAN_TEST := $(TEST_DIR)/nift-cp21-bytes-tsan$(EXEEXT)
 $(CP21_BYTES_TSAN_TEST): tests/cp21_bytes_embed.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(TSAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) tests/cp21_bytes_embed.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
 
@@ -2771,6 +2910,7 @@ test-cp18-bytes-tsan: $(TSAN_TARGET) $(CP18_BYTES_TSAN_TEST) $(CP21_BYTES_TSAN_T
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 "$(CP21_BYTES_TSAN_TEST)"
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) tests/json_smoke.cpp -o "$@"
 
@@ -2893,9 +3033,11 @@ CP19_EXPR_UNIT := $(TEST_DIR)/cp19/expression-unit$(EXEEXT)
 CP19_EXPR_OBJECTS := $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
 CP19_EXPR_SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(RT_VALUE_SOURCES) src/RuntimeValue.cpp)
 $(CP19_EXPR_UNIT): tests/rt/vm_expression.cpp $(CP19_EXPR_OBJECTS) $(RT_VALUE_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/expression-sanitize$(EXEEXT): tests/rt/vm_expression.cpp $(CP19_EXPR_SAN_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 .PHONY: test-cp19-expression-sanitize
@@ -2910,6 +3052,7 @@ $(TEST_DIR)/cp19/CLI-bypass.o: src/CLI.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP19_EVAL_MUTANT_BYPASS=1 -MMD -MP -c $< -o $@
 -include $(TEST_DIR)/cp19/CLI-bypass.d
 $(CP19_EVAL_MUTANT): $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/CLI-bypass.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/CLI-bypass.o $(LDLIBS) -o $@
 .PHONY: test-cp19-shared-eval
 test: test-cp19-shared-eval
@@ -2927,20 +3070,25 @@ $(TEST_DIR)/cp19/compiler-return.o: src/rt/compiler.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP19_EVAL_MUTANT_RETURN=1 -MMD -MP -c $< -o $@
 -include $(TEST_DIR)/cp19/compiler-return.d
 $(CP19_RETURN_MUTANT): $(filter-out src/rt/compiler.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/compiler-return.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/compiler.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp19/compiler-return.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/ownership-review$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(CP19_EXPR_OBJECTS) tests/runtime2/cp19/ownership_env.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/ownership-review-sanitize$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(CP19_EXPR_SAN_OBJECTS) tests/runtime2/cp19/ownership_env.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 $(TEST_DIR)/cp19/ownership-review-switch$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o tests/runtime2/cp19/ownership_env.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/vm-switch-sanitize.o: src/rt/vm.cpp $(RT_VALUE_HEADERS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -DNIFT_RT_VM_SWITCH -c $< -o $@
 $(TEST_DIR)/cp19/ownership-review-switch-sanitize$(EXEEXT): tests/runtime2/cp19/ownership_review.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o tests/runtime2/cp19/ownership_env.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -include tests/runtime2/cp19/ownership_env.h -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 .PHONY: test-cp19-r1 test-cp19-r1-sanitize test-cp19-expression-development
@@ -2976,6 +3124,7 @@ SHELL_DISPATCH_MUTANT_DIR := $(TEST_DIR)/shell-dispatch-mutants
 SHELL_DISPATCH_LINK_OBJECTS := $(filter-out src/CLI.o,$(CLI_OBJECTS))
 
 $(SHELL_DISPATCH_UNIT): tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp src/shell/CommandDispatch.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/shell_dispatch_unit.cpp src/shell/CommandDispatch.cpp -o $@
 
 $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/CommandDispatch.cpp
@@ -2995,15 +3144,19 @@ $(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o: src/CLI.cpp src/shell/CommandDispatch
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SHELL_DISPATCH_MUTANT_SYNTAX=1 -MMD -MP -c $< -o $@
 
 $(SHELL_DISPATCH_MUTANT): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/fallback/CLI.o $(LDLIBS) -o $@
 
 $(SHELL_DISPATCH_MUTANT_QUOTING): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/quoting/CLI.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/quoting/CLI.o $(LDLIBS) -o $@
 
 $(SHELL_DISPATCH_MUTANT_EAGER): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/eager/CLI.o $(LDLIBS) -o $@
 
 $(SHELL_DISPATCH_MUTANT_SYNTAX): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH_MUTANT_DIR)/syntax/CLI.o $(LDLIBS) -o $@
 
 test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
@@ -3227,6 +3380,7 @@ test-cp20-bytes: $(TARGET)
 
 # CP-F1: source coordinate composition is independent of evaluator behavior.
 $(TEST_DIR)/source-view-unit$(EXEEXT): tests/source_view_unit.cpp src/SourceView.h src/Diagnostic.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_view_unit.cpp -o $@
 
@@ -3237,6 +3391,7 @@ test-source-view: $(TEST_DIR)/source-view-unit$(EXEEXT)
 test: test-source-view
 
 $(TEST_DIR)/source-translation-unit$(EXEEXT): tests/source_translation_unit.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_translation_unit.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
 
@@ -3256,10 +3411,12 @@ RT_PARSER_HEADERS := src/rt/lexer.h src/rt/ast.h src/rt/source_scan.h src/rt/par
 	tests/rt/rt_parser_tool.h
 
 $(TEST_DIR)/rt-parse-dump$(EXEEXT): tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) -Isrc -Itests/rt $(CXXFLAGS) tests/rt/parse_dump.cpp $(RT_PARSER_SOURCES) -o $@
 
 $(TEST_DIR)/rt-parser-unit$(EXEEXT): tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) -Isrc -Itests/rt $(CXXFLAGS) tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) -o $@
 
@@ -3270,6 +3427,7 @@ RT_LEGACY_ORACLE_OBJECTS := $(filter-out src/nift.o src/CLI.o $(RT_LINK_SOURCES:
 # needs these src/rt objects.
 RT_LEGACY_ORACLE_OBJECTS += src/rt/handle.o src/rt/value.o src/rt/string.o src/rt/heap_account.o
 $(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(RT_LEGACY_ORACLE_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_LEGACY_ORACLE_OBJECTS) $(LDLIBS) -o $@
 
@@ -3285,6 +3443,7 @@ test: test-rt-vm test-rt-vm-mutants
 # evidence; slower, not part of `make test`).
 .PHONY: test-rt-parser-asan
 test-rt-parser-asan:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)/rt-asan
 	$(CXX) -Isrc -Itests/rt -std=c++17 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
 		tests/rt/parser_unit.cpp $(RT_PARSER_SOURCES) -o $(TEST_DIR)/rt-asan/rt-parser-unit
@@ -3294,6 +3453,7 @@ test-rt-parser-asan:
 	python3 tests/runtime2/rt_parser_corpus.py --sanitized $(TEST_DIR)/rt-asan/rt-parse-dump
 
 $(TEST_DIR)/ast-source-unit$(EXEEXT): tests/ast_source_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ast_source_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
 
@@ -3304,6 +3464,7 @@ test-ast-source: $(TEST_DIR)/ast-source-unit$(EXEEXT)
 test: test-ast-source
 
 $(TEST_DIR)/source-map-probe$(EXEEXT): tests/source_map_probe.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_map_probe.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
 
@@ -3330,6 +3491,7 @@ $(TEST_DIR)/glob-keys/ParserHostHelpers.o: src/ParserHostHelpers.cpp
 -include $(TEST_DIR)/glob-keys/ParserHostHelpers.d
 GLOB_KEY_GUARD := $(TEST_DIR)/nift-glob-key-guard$(EXEEXT)
 $(GLOB_KEY_GUARD): $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHostHelpers.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHostHelpers.o $(LDLIBS) -o $@
 .PHONY: test-v49-glob-key-guard
 test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
@@ -3337,6 +3499,7 @@ test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
 
 JSON_PREFLIGHT_GUARD := $(TEST_DIR)/nift-json-preflight-guard$(EXEEXT)
 $(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp src/RuntimeValue.h src/RuntimeJson.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_JSON_PREFLIGHT_STATS tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp -o "$@"
 .PHONY: test-v49-json-preflight-guard
@@ -3348,6 +3511,7 @@ test-v49-group-scaling: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_group_scaling.py
 
 $(TEST_DIR)/v49-call-outcome-unit$(EXEEXT): tests/v49_call_outcome_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v49_call_outcome_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
 
@@ -3370,6 +3534,7 @@ test-v410-object-member-parity: $(TARGET)
 	python3 tests/v410_object_member_parity.py --nift ./$(TARGET)
 
 test-v410-object-member-unit:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p .build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
 	.build/v410-object-member-unit
@@ -3381,6 +3546,7 @@ $(TEST_DIR)/object-lookup/RuntimeValue.o: src/RuntimeValue.cpp
 -include $(TEST_DIR)/object-lookup/RuntimeValue.d
 OBJECT_LOOKUP_GUARD := $(TEST_DIR)/nift-object-lookup-guard$(EXEEXT)
 $(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_DIR)/object-lookup/RuntimeValue.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_DIR)/object-lookup/RuntimeValue.o $(LDLIBS) -o $@
 
 .PHONY: test-v410-object-member-guard
@@ -3402,6 +3568,7 @@ $(TEST_DIR)/glob-relative/ParserExpression.o: src/ParserExpression.cpp
 -include $(TEST_DIR)/glob-relative/ParserExpression.d
 GLOB_RELATIVE_GUARD := $(TEST_DIR)/nift-glob-relative-guard$(EXEEXT)
 $(GLOB_RELATIVE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-relative-guard test-v410-glob-parity
 test-v410-glob-relative-guard: $(GLOB_RELATIVE_GUARD)
@@ -3442,6 +3609,7 @@ $(TEST_DIR)/glob-prefix/ParserExpression.o: src/ParserExpression.cpp
 -include $(TEST_DIR)/glob-prefix/ParserHostHelpers.d $(TEST_DIR)/glob-prefix/ParserExpression.d
 GLOB_PREFIX_GUARD := $(TEST_DIR)/nift-glob-prefix-guard$(EXEEXT)
 $(GLOB_PREFIX_GUARD): $(filter-out src/ParserHostHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHostHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHostHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-prefix-guard test-v410-glob-prefix-parity
 test-v410-glob-prefix-guard: $(GLOB_PREFIX_GUARD)
@@ -3460,6 +3628,7 @@ $(TEST_DIR)/fs-recipe/ParserTemplate.o: src/ParserTemplate.cpp
 -include $(TEST_DIR)/fs-recipe/ParserExpression.d $(TEST_DIR)/fs-recipe/ParserTemplate.d
 FS_RECIPE_GUARD := $(TEST_DIR)/nift-fs-recipe-guard$(EXEEXT)
 $(FS_RECIPE_GUARD): $(filter-out src/ParserExpression.o src/ParserTemplate.o,$(CLI_OBJECTS)) $(TEST_DIR)/fs-recipe/ParserExpression.o $(TEST_DIR)/fs-recipe/ParserTemplate.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o src/ParserTemplate.o,$(CLI_OBJECTS)) $(TEST_DIR)/fs-recipe/ParserExpression.o $(TEST_DIR)/fs-recipe/ParserTemplate.o $(LDLIBS) -o $@
 .PHONY: test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard
 test-v410-filesystem-recipe-parity: $(TARGET)
@@ -3470,6 +3639,7 @@ test: test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard
 
 LARGE_STRING_GUARD := $(TEST_DIR)/large-string-guard$(EXEEXT)
 $(LARGE_STRING_GUARD): tests/v410_large_string_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v410_large_string_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDFLAGS) $(LDLIBS) -o $@
 .PHONY: test-v410-large-string-parity test-v410-large-string-guard
@@ -3481,6 +3651,7 @@ test: test-v410-large-string-parity test-v410-large-string-guard
 
 FILE_BUFFER_GUARD := $(TEST_DIR)/file-buffer-guard$(EXEEXT)
 $(FILE_BUFFER_GUARD): tests/v410_file_buffer_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v410_file_buffer_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDFLAGS) $(LDLIBS) -o $@
 .PHONY: test-v410-file-buffer-parity test-v410-file-buffer-guard
@@ -3493,6 +3664,7 @@ test: test-v410-file-buffer-parity test-v410-file-buffer-guard
 FILE_BUFFER_LIFETIME_GUARD := $(TEST_DIR)/file-buffer-lifetime-guard$(EXEEXT)
 FILE_BUFFER_LIFETIME_OBJECTS := $(patsubst %.o,$(TEST_DIR)/san-lifetime/%.o,$(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)))
 $(FILE_BUFFER_LIFETIME_GUARD): tests/v410_file_buffer_guard.cpp $(FILE_BUFFER_LIFETIME_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -pthread $(SAN_LIFETIME_FLAGS) tests/v410_file_buffer_guard.cpp $(FILE_BUFFER_LIFETIME_OBJECTS) $(SAN_LIBFFI_A) $(LDLIBS) -o $@
 .PHONY: test-v410-file-buffer-lifetime
 test-v410-file-buffer-lifetime: $(SAN_LIFETIME_TARGET) $(FILE_BUFFER_LIFETIME_GUARD)
@@ -3517,9 +3689,11 @@ test-sanitize-lifetime: test-v410-build-pipeline-lifetime
 PROCESS_FAILURE_TEST := $(TEST_DIR)/process-failure$(EXEEXT)
 PROCESS_CONTRACT_TEST := $(TEST_DIR)/process-contract$(EXEEXT)
 $(PROCESS_FAILURE_TEST): tests/process_failure.cpp src/Process.cpp src/JobControl.cpp src/Proc.h src/PreparedProcessPOSIX.h src/ProcessPOSIX.h src/ProcessEnvironment.h src/ProcessTestHooks.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_failure.cpp src/Process.cpp src/JobControl.cpp -o $@
 $(PROCESS_CONTRACT_TEST): tests/process_contract.cpp src/Process.cpp src/Proc.h src/PreparedProcessPOSIX.h src/ProcessPOSIX.h src/ProcessEnvironment.h src/ProcessTestHooks.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_PROCESS_TEST_HOOKS tests/process_contract.cpp src/Process.cpp -o $@
 test-process-hardening: $(PROCESS_FAILURE_TEST) $(PROCESS_CONTRACT_TEST)
@@ -3542,6 +3716,7 @@ test-consumer-snapshots: $(TARGET)
 .PHONY: test-dependency-status
 test: test-dependency-status
 test-dependency-status: $(TARGET) src/FileSystem.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/dependency_status.cpp src/FileSystem.o -o $(TEST_DIR)/dependency-status-test$(EXEEXT)
 	$(TEST_DIR)/dependency-status-test$(EXEEXT) $(TEST_DIR)/dependency-status-fixture
@@ -3561,6 +3736,7 @@ test-sort-number-compact: $(TARGET)
 
 .PHONY: test-evaluated-operand
 $(TEST_DIR)/evaluated-operand-unit$(EXEEXT): tests/evaluated_operand_unit.cpp src/EvaluatedOperand.h src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h src/SourceView.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/evaluated_operand_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
 test-evaluated-operand: $(TEST_DIR)/evaluated-operand-unit$(EXEEXT) $(TARGET)
@@ -3617,10 +3793,12 @@ RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
 RT_BUILTINS_DIFF := $(TEST_DIR)/rt/builtins-diff$(EXEEXT)
 
 $(RT_BUILTINS_UNIT): tests/rt/builtins_unit.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
 
 $(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
 
@@ -3630,10 +3808,12 @@ RT_CASE_UNIT := $(TEST_DIR)/rt/case-conversion-unit$(EXEEXT)
 RT_CASE_BENCH := $(TEST_DIR)/rt/case-conversion-bench$(EXEEXT)
 
 $(RT_CASE_UNIT): tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
 
 $(RT_CASE_BENCH): tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
 
@@ -3662,6 +3842,7 @@ RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
 $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
@@ -3671,6 +3852,7 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
 # value model fails this link. NIFT_HOST_MUTANT=13 must fail the run.
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
 $(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
 
@@ -3711,6 +3893,7 @@ test-rt-builtins-probe:
 # ASan+UBSan build of the built-in tests; every CP09 mutation entry point
 # relocates storage, so a reference held across a mutation aborts.
 test-rt-builtins-sanitize:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-unit"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-diff"
@@ -3761,6 +3944,7 @@ $(INVENTORY_MUTANT_OBJECT): src/rt/refusal_inventory.cpp $(RT_VALUE_HEADERS)
 	mkdir -p "$(TEST_DIR)/inventory-mutants"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_INVENTORY_MUTANT=1 -c $< -o $@
 $(INVENTORY_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_MUTANT_OBJECT) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_MUTANT_OBJECT) \
 		$(LDLIBS) -o $@
 .PHONY: test-runtime2-inventory-links
@@ -3778,6 +3962,7 @@ $(INVENTORY_HOST_MUTANT_OBJECT): src/rt/refusal_inventory.cpp src/rt/module_host
 	mkdir -p "$(TEST_DIR)/inventory-host-mutant"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_INVENTORY_HOST_MUTANT=1 -c $< -o $@
 $(INVENTORY_HOST_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_HOST_MUTANT_OBJECT) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_HOST_MUTANT_OBJECT) \
 		$(LDLIBS) -o $@
 .PHONY: test-runtime2-inventory-host-mutant
@@ -3793,6 +3978,7 @@ $(TEST_DIR)/cp20-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
 $(TEST_DIR)/cp20-mutants/%/nift$(EXEEXT): $(filter-out src/CLI.o src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp20-mutants/%/CLI.o $(TEST_DIR)/cp20-mutants/%/Spawn.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/CLI.o src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp20-mutants/$*/CLI.o $(TEST_DIR)/cp20-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
 .PHONY: test-cp20-shell-spawn test-cp20-shell-spawn-mutants
 test-cp20-shell-spawn: $(TARGET)
@@ -3834,67 +4020,87 @@ CP21_FAULT_LIBS := $(TEST_DIR)/cp21-delay-tcsetpgrp.so $(TEST_DIR)/cp21-fail-con
 CP21_RECOVERY_LIBS := $(TEST_DIR)/cp21-restore-fault.so
 endif
 $(CP21_PROBE): tests/cp21_foreground_probe.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-delay-tcsetpgrp.so: tests/cp21_delay_tcsetpgrp.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-cont.so: tests/cp21_fail_cont.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-restore-fault.so: tests/cp21_restore_fault.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-child-death.so: tests/cp21_unrelated_child_death.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fallback-fault.so: tests/cp21_fallback_fault.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-subreaper.so: tests/cp21_fail_subreaper.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc.so: tests/cp21_fail_proc.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-reads.so: tests/cp21_fail_proc_reads.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-enoent.so: tests/cp21_fail_proc_enoent.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-empty.so: tests/cp21_fail_proc_empty.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-children.so: tests/cp21_fail_proc_children.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-kill.so: tests/cp21_fail_kill.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-all.so: tests/cp21_fail_proc_all.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-all-enoent.so: tests/cp21_fail_proc_all_missing.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-proc-all-empty.so: tests/cp21_fail_proc_all_missing.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC -DCP21_ALL_EMPTY $< -ldl -o "$@"
 $(TEST_DIR)/cp21-fail-nonroot-stat-children.so: tests/cp21_fail_nonroot_stat_children.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/%/Spawn.o: src/shell/Spawn.cpp src/shell/Spawn.h
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_MUTANT=$* -MMD -MP -c src/shell/Spawn.cpp -o "$@"
 $(TEST_DIR)/cp21-mutants/%/nift$(EXEEXT): $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/%/Spawn.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/shell/Spawn.o,$(CLI_OBJECTS)) $(TEST_DIR)/cp21-mutants/$*/Spawn.o $(LDLIBS) -o "$@"
 CP21_TERMINAL_LEASE := $(TEST_DIR)/cp21-terminal-lease$(EXEEXT)
 $(CP21_TERMINAL_LEASE): tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_lease.cpp $(RT_HOST_SOURCES) -o "$@"
 CP21_TERMINAL_RECOVERY := $(TEST_DIR)/cp21-terminal-recovery$(EXEEXT)
 $(CP21_TERMINAL_RECOVERY): tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp $(RT_HOST_SOURCES) -o "$@"
 .PHONY: test-cp21-interactive-host test-cp21-interactive-host-mutants test-cp21-terminal-lease \
@@ -3950,12 +4156,14 @@ $(TEST_DIR)/cp21-mutants/d2/process_terminal.o: src/rt/host/process_terminal.cpp
 $(CP21_RECOVERY_D1): tests/cp21_terminal_recovery.cpp \
 	$(filter-out src/rt/host/process_posix_launch.cpp,$(RT_HOST_SOURCES)) \
 	$(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp \
 		$(filter-out src/rt/host/process_posix_launch.cpp,$(RT_HOST_SOURCES)) \
 		$(TEST_DIR)/cp21-mutants/d1/process_posix_launch.o -ldl -o "$@"
 $(CP21_RECOVERY_D2): tests/cp21_terminal_recovery.cpp \
 	$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
 	$(TEST_DIR)/cp21-mutants/d2/process_terminal.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_terminal_recovery.cpp \
 		$(filter-out src/rt/host/process_terminal.cpp,$(RT_HOST_SOURCES)) \
 		$(TEST_DIR)/cp21-mutants/d2/process_terminal.o -ldl -o "$@"
@@ -3969,37 +4177,48 @@ CP21_SCANNER_SUPERVISOR := $(TEST_DIR)/cp21-scanner-supervisor$(EXEEXT)
 CP21_FD_INHERITANCE := $(TEST_DIR)/cp21-fd-inheritance$(EXEEXT)
 CP21_FD_INHERITANCE_D3 := $(TEST_DIR)/cp21-fd-inheritance-d3$(EXEEXT)
 $(CP21_FD_CHILD): tests/cp21_fd_child.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_CHILD_UNRELATED): tests/cp21_fd_child_unrelated.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_CHILD_ESCAPE): tests/cp21_fd_child_escape.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_CHILD_ESCAPE_UNTAGGED): tests/cp21_fd_child_escape_untagged.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-fd-child-embedded$(EXEEXT): tests/cp21_fd_child_embedded.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-fd-child-zero-junk$(EXEEXT): tests/cp21_fd_child_zero_junk.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-fd-child-embedded-defect$(EXEEXT): tests/cp21_fd_child_embedded_defect.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(TEST_DIR)/cp21-fd-child-nul-target$(EXEEXT): tests/cp21_fd_child_nul_target.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_FD_CHILD_HOLD): tests/cp21_fd_child_hold.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CC) $(CFLAGS) $< -o "$@"
 $(CP21_SCANNER_SUPERVISOR): tests/cp21_scanner_supervisor.cpp
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_scanner_supervisor.cpp -o "$@"
 $(CP21_FD_INHERITANCE): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp \
 	src/rt/host/process_terminal.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.cpp -ldl -o "$@"
 $(TEST_DIR)/cp21-mutants/d3/process_terminal.o: src/rt/host/process_terminal.cpp \
@@ -4008,6 +4227,7 @@ $(TEST_DIR)/cp21-mutants/d3/process_terminal.o: src/rt/host/process_terminal.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_D3_MUTANT=1 -MMD -MP -c $< -o "$@"
 $(CP21_FD_INHERITANCE_D3): tests/cp21_fd_inheritance.cpp src/rt/host/process_terminal.h \
 	$(TEST_DIR)/cp21-mutants/d3/process_terminal.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_inheritance.cpp \
 		$(TEST_DIR)/cp21-mutants/d3/process_terminal.o -ldl -o "$@"
@@ -4017,11 +4237,13 @@ CP21_D3_EVIDENCE_TOKEN := $(shell date +%s%N)-$(shell od -An -N8 -tx1 /dev/urand
 CP21_D3_MUTANT_EVIDENCE := $(TEST_DIR)/cp21-d3-mutant.evidence
 CP21_PARSER_MUTANT_EVIDENCE := $(TEST_DIR)/cp21-parser-target-mutant.evidence
 $(CP21_FD_PROTOCOL_UNIT): tests/cp21_fd_protocol_unit.cpp tests/cp21_fd_protocol.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp21_fd_protocol_unit.cpp -o "$@"
 test-cp21-fd-protocol-unit: $(CP21_FD_PROTOCOL_UNIT)
 	"$(CP21_FD_PROTOCOL_UNIT)"
 $(CP21_FD_PROTOCOL_UNIT_MUTANT): tests/cp21_fd_protocol_unit.cpp tests/cp21_fd_protocol.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP21_PARSER_MUTANT_TARGET=1 tests/cp21_fd_protocol_unit.cpp -o "$@"
 test-cp21-fd-inheritance: test-cp21-fd-protocol-unit
@@ -4273,6 +4495,7 @@ $(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o: src/rt/host/process_posi
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CP20_MUTANT=11 -MMD -MP -c $< -o "$@"
 $(CP20_HOST_FD_MUTANT): $(filter-out src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
 	$(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/host/process_posix_launch.o,$(CLI_OBJECTS)) \
 		$(TEST_DIR)/cp20-mutants/host11/process_posix_launch.o $(LDLIBS) -o "$@"
 .PHONY: test-cp20-host-fd-mutant
@@ -4303,10 +4526,12 @@ test-runtime2-closures-s1-stress: $(TARGET)
 # CP12C Slice 1 R6: widened kind-set bits and their compiling alias mutant.
 KIND_BITS_UNIT := $(TEST_DIR)/rt/kind-bits$(EXEEXT)
 $(KIND_BITS_UNIT): tests/rt/kind_bits.cpp src/rt/infer.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/kind_bits.cpp -o "$@"
 KIND_BITS_MUTANT := $(TEST_DIR)/rt/kind-bits-mutant$(EXEEXT)
 $(KIND_BITS_MUTANT): tests/rt/kind_bits.cpp src/rt/infer.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_KIND_MUTANT=1 tests/rt/kind_bits.cpp -o "$@"
 .PHONY: test-runtime2-kind-bits
@@ -4317,6 +4542,7 @@ test-runtime2-kind-bits: $(KIND_BITS_UNIT) $(KIND_BITS_MUTANT)
 # CP12C Slice 1 C1-A: rejected cyclic cell stores, atomicity and no leak.
 CLOSURE_CYCLE_STRESS := $(TEST_DIR)/rt/closure-cycle-stress$(EXEEXT)
 $(CLOSURE_CYCLE_STRESS): tests/rt/closure_cycle_stress.cpp $(RT_VALUE_SOURCES) $(RT_VALUE_HEADERS) src/RuntimeValue.cpp $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/closure_cycle_stress.cpp $(RT_UNIT_OBJECTS) -o "$@"
@@ -4340,6 +4566,7 @@ $(CLOSURE_MUTANT_DIR)/vm_closure.o: src/rt/vm_closure.cpp $(RT_VALUE_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CLOSURE_MUTANT=$(CLOSURE_MUTANT) -c $< -o $@
 $(CLOSURE_MUTANT_BIN): $(filter-out src/rt/vm.o src/rt/value.o src/rt/vm_closure.o,$(CLI_OBJECTS)) \
 		$(CLOSURE_MUTANT_DIR)/vm.o $(CLOSURE_MUTANT_DIR)/value.o $(CLOSURE_MUTANT_DIR)/vm_closure.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/vm.o src/rt/value.o src/rt/vm_closure.o,$(CLI_OBJECTS)) \
 		$(CLOSURE_MUTANT_DIR)/vm.o $(CLOSURE_MUTANT_DIR)/value.o $(CLOSURE_MUTANT_DIR)/vm_closure.o $(LDLIBS) -o $@
 .PHONY: test-runtime2-closures-s1-mutants
@@ -4389,6 +4616,7 @@ FOR_MUTANT_OBJECTS := src/rt/compiler_loops.o src/rt/compiler_loops_step.o src/r
 $(FOR_MUTANT_BIN): $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
 		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
 		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out $(FOR_MUTANT_OBJECTS),$(CLI_OBJECTS)) \
 		$(FOR_MUTANT_DIR)/compiler_loops.o $(FOR_MUTANT_DIR)/compiler_loops_step.o \
 		$(FOR_MUTANT_DIR)/compiler_loops_bind.o $(FOR_MUTANT_DIR)/vm_iter.o $(LDLIBS) -o $@
@@ -4523,6 +4751,7 @@ certify-targets: test-runtime2-cp14b-mutants
 # wake source with the CP16 host loop. Certification tier: compiled mutants.
 RT_CORO_UNIT := $(TEST_DIR)/rt/coro-unit$(EXEEXT)
 $(RT_CORO_UNIT): tests/rt/coro_unit.cpp $(RT_VM_DEPS) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/coro_unit.cpp $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
 CP22_RUN = $(PYTHON) tests/runtime2/cp22/run.py
@@ -4539,6 +4768,7 @@ test-runtime2-cp22: $(TARGET) $(CP13B_SWITCH_NIFT) $(RT_CORO_UNIT)
 	$(PYTHON) tests/runtime2/cp22/controls.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp22/print_order.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-cp22-sanitize: $(SAN_TARGET) $(RT_OBJECTS_san)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/coro_unit.cpp $(RT_OBJECTS_san) \
@@ -4552,6 +4782,7 @@ test-runtime2-cp22-sanitize: $(SAN_TARGET) $(RT_OBJECTS_san)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/cp22/adversarial.py --nift "$(CURDIR)/$(SAN_TARGET)" --seed $${RT_VM_SEED:-2} --count $${CP22_ADV_SAN:-30}
 test-runtime2-cp22-tsan:
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-tsan"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_HANDLE_TSAN_FLAGS) tests/rt/coro_wake_unit.cpp src/rt/coro_wake.cpp $(RT_HOST_SOURCES) \
 		-o "$(TEST_DIR)/rt-tsan/coro-wake"
@@ -4568,6 +4799,7 @@ CP22_CORO_SOURCES := src/rt/vm_coro.cpp src/rt/vm_coro_ops.cpp src/rt/vm_coro_ru
 	src/rt/compiler_coro_loops.cpp src/rt/compiler_coro.cpp
 CP22_MUTANT_DIR := $(TEST_DIR)/coro-mutants
 $(CP22_MUTANT_DIR)/nift-%: $(filter-out $(CP22_CORO_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CP22_CORO_SOURCES) $(RT_VALUE_HEADERS) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(CP22_MUTANT_DIR)/$*"
 	set -e; for f in $(CP22_CORO_SOURCES); do \
 	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MUTANT=$* -c $$f -o "$(CP22_MUTANT_DIR)/$*/$$(basename $$f .cpp).o"; done
@@ -4616,6 +4848,7 @@ CORO_MODULE_SOURCES := src/rt/compiler_coro_module.cpp src/rt/compiler_coro_modu
 CORO_MODULE_MUTANT_DIR := $(TEST_DIR)/coro-module-mutants
 $(CORO_MODULE_MUTANT_DIR)/nift-%: $(filter-out $(CORO_MODULE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(CORO_MODULE_SOURCES) \
 		$(RT_VALUE_HEADERS) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(CORO_MODULE_MUTANT_DIR)/$*"
 	set -e; for f in $(CORO_MODULE_SOURCES); do \
 	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_CORO_MODULE_MUTANT=$* -DNIFT_CORO_MUTANT=$(if $(filter 16 17 18,$*),25,0) \
@@ -4629,6 +4862,7 @@ certify-targets: test-runtime2-coro-module-mutants
 # CP18 compiled-program interface: separate from legacy Engine execution.
 CP18_C_TEST := $(TEST_DIR)/cp18/program$(EXEEXT)
 $(CP18_C_TEST): tests/runtime2/cp18/program.c $(SHARED_LIB) include/nift/c_abi.h
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) -std=c11 -Wall -Wextra -pedantic $< -L. -lnift_c -pthread -Wl,-rpath,$(CURDIR) -o $@
 .PHONY: test-runtime2-cp18
@@ -4652,9 +4886,11 @@ $(CP18_SWITCH_OBJ): src/rt/vm.cpp $(RT_VALUE_HEADERS) $(CP18_SWITCH_DEP)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_RT_VM_SWITCH -fPIC -MMD -MP -c $< -o $@
 -include $(CP18_SWITCH_DEP)
 $(CP18_SWITCH_LIB): $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(SHARED_SYS_LIBS)
 $(TEST_DIR)/cp18/program-switch$(EXEEXT): tests/runtime2/cp18/program.c $(CP18_SWITCH_LIB)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CC) $(CPPFLAGS) -std=c11 -Wall -Wextra -pedantic $< $(abspath $(CP18_SWITCH_LIB)) -pthread -Wl,-rpath,$(abspath $(dir $(CP18_SWITCH_LIB))) -o $@
 .PHONY: test-runtime2-cp18-switch
 test-runtime2-cp18-switch: $(TEST_DIR)/cp18/program-switch$(EXEEXT)
@@ -4671,16 +4907,19 @@ test-embed: test-runtime2-cp18-sanitize
 CP18_COW := $(TEST_DIR)/cp18/cow-allocation$(EXEEXT)
 CP18_COW_SWITCH := $(TEST_DIR)/cp18/cow-allocation-switch$(EXEEXT)
 $(CP18_COW): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
 # CP17 x CP18: allocation failure in handle-using programs through the program API.
 CP17_HANDLE_ALLOC := $(TEST_DIR)/cp17/handle-allocation$(EXEEXT)
 $(CP17_HANDLE_ALLOC): tests/runtime2/cp17/handle_allocation.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
 # CP17 rework (F2): allocation failure that persists (consecutive failures).
 CP17_HANDLE_ALLOC_PERSIST := $(TEST_DIR)/cp17/handle-allocation-persistent$(EXEEXT)
 $(CP17_HANDLE_ALLOC_PERSIST): tests/runtime2/cp17/handle_allocation_persistent.cpp $(C_ABI_PIC) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread $< $(C_ABI_PIC) $(LIBFFI_A) $(LDLIBS) -o $@
 .PHONY: test-runtime2-cp17-handle-allocation
@@ -4688,6 +4927,7 @@ test-runtime2-cp17-handle-allocation: $(CP17_HANDLE_ALLOC) $(CP17_HANDLE_ALLOC_P
 	timeout 1800 $(CP17_HANDLE_ALLOC)
 	timeout 3600 $(CP17_HANDLE_ALLOC_PERSIST)
 $(CP18_COW_SWITCH): tests/runtime2/cp18/cow_allocation.cpp $(C_ABI_PIC) $(CP18_SWITCH_OBJ) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< $(filter-out $(TEST_DIR)/pic/src/rt/vm.o,$(C_ABI_PIC)) $(CP18_SWITCH_OBJ) $(LIBFFI_A) $(LDLIBS) -o $@
 .PHONY: test-runtime2-cp18-cow
@@ -4701,9 +4941,11 @@ test-runtime2-cp18: test-runtime2-cp18-cow
 
 # CP19 persistent VM production witness (one VM and stable cells, no Parser bridge).
 $(TEST_DIR)/cp19/session$(EXEEXT): tests/runtime2/cp19/session.cpp $(CP19_EXPR_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-switch$(EXEEXT): tests/runtime2/cp19/session.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
 .PHONY: test-cp19-session
@@ -4711,9 +4953,11 @@ test-cp19-session: $(TEST_DIR)/cp19/session$(EXEEXT) $(TEST_DIR)/cp19/session-sw
 	$(TEST_DIR)/cp19/session$(EXEEXT)
 	$(TEST_DIR)/cp19/session-switch$(EXEEXT)
 $(TEST_DIR)/cp19/session-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(CP19_EXPR_SAN_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 $(TEST_DIR)/cp19/session-switch-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 .PHONY: test-cp19-session-sanitize
@@ -4723,41 +4967,49 @@ test-cp19-session-sanitize: $(TEST_DIR)/cp19/session-sanitize$(EXEEXT) $(TEST_DI
 
 # Real session mutation controls, each swapping one production object.
 $(TEST_DIR)/cp19/session-control$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(CP19_EXPR_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m1.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=1 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m1$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m2.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=2 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m2$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m3.o: src/rt/vm_session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=3 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m3$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m4.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=4 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m4$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m5.o: src/rt/vm_closure.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=5 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m5$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m6.o: src/rt/compiler_assign_expr.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=6 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m6$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m7.o: src/rt/compiler_session_contract.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=7 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m7$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o $(LDLIBS) -o $@
 -include $(wildcard $(TEST_DIR)/cp19/session-m*.d)
 .PHONY: test-cp19-session-mutants
@@ -4783,6 +5035,7 @@ include tests/runtime2/cp19/proof.mk
 include tests/runtime2/cp19/admission_mutants.mk
 
 $(TEST_DIR)/cp19/operand-windows: tests/runtime2/cp19/operand_windows.cpp $(CP19_EXPR_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 .PHONY: test-cp19-operand-windows
 test-cp19-operand-windows: $(TEST_DIR)/cp19/operand-windows
@@ -4852,6 +5105,7 @@ certify-targets: test-cp19-certify
 # Durable mutant-1 kernel witness survives CP19 bounded session-end cleanup.
 ifeq ($(shell uname -s),Linux)
 $(TEST_DIR)/cp21-tty-audit.so: tests/cp21_tty_audit.c
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p "$(dir $@)"
 	$(CC) -shared -fPIC $< -ldl -o "$@"
 test-cp21-interactive-host test-cp21-interactive-host-mutants: $(TEST_DIR)/cp21-tty-audit.so
@@ -4966,9 +5220,11 @@ REFSEM_STALE_OBJECTS := $(filter-out src/rt/aggregate.o src/rt/aggregate_collect
 REFSEM_STALE_FLAGS := -std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address -DNIFT_RT_CHECKED_REFS -pthread
 REFSEM_STALE_SOURCES := tests/runtime2/refsem/stale_vm.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp
 $(REFSEM_STALE_DIR)/stale-vm$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
 $(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT): $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(RT_VALUE_HEADERS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(REFSEM_STALE_FLAGS) -DNIFT_REFSEM_MUTANT=19 $(REFSEM_STALE_SOURCES) $(REFSEM_STALE_OBJECTS) $(LDLIBS) -o $@
 test-runtime2-refsem-stale-vm: $(REFSEM_STALE_DIR)/stale-vm$(EXEEXT) $(REFSEM_STALE_DIR)/stale-vm-r19$(EXEEXT)

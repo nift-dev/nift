@@ -73,4 +73,8 @@ if [ "$production" = 1 ]; then
     exit 1
   fi
 fi
-printf '%s\n' "$id" > "$tmp.cfg" && mv -f "$tmp.cfg" "$base.cfg" && mv -f "$tmp.d" "$base.d" && mv -f "$tmp" "$out"
+# Tooling review F7: the sidecar also holds the sha256 of the object it was
+# written with, so a sidecar and an object from two compiles (the renames below
+# are atomic one by one, not as a pair) never pass check-config.sh as a pair.
+printf '%s %s\n' "$id" "$(sha256sum < "$tmp" | cut -d' ' -f1)" > "$tmp.cfg" &&
+  mv -f "$tmp.cfg" "$base.cfg" && mv -f "$tmp.d" "$base.d" && mv -f "$tmp" "$out"

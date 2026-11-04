@@ -14,7 +14,11 @@
 #              reproduces the first A build byte for byte (objects, sidecars,
 #              dependency files, binaries), reusing none of B's objects
 #   mixing     an object of another configuration in a directory is refused at
-#              link time (check-config.sh), never linked
+#              link time (check-config.sh), never linked; (tooling review F7)
+#              also by the libnift_c.a archive step (the re-checker's -O1
+#              reproducer), and an object whose sidecar another compile wrote
+#              (the sidecar names the default configuration, the object is
+#              another's) is refused
 #   parallel   concurrent makes of different configurations in one tree, and
 #              of one configuration sharing objects: every object, sidecar and
 #              dependency file identical to a clean build of its own
@@ -144,6 +148,24 @@ else bad "mixing: the link failed for another reason (mixing.log)"; fi
 cp "$out/keep.o" "$o"; cp "$out/keep.cfg" "${o%.o}.cfg"; touch "$o"
 build_default || bad "mixing: restore failed"
 dmanifest > "$out/A2-mixing.txt"; cmp -s "$out/A1.txt" "$out/A2-mixing.txt" || bad "mixing: restore differs"
+# tooling review F7: the archive (in-tree objects) refuses an -O1 object with its proper -O1 sidecar
+cp "$o" "$out/keep.o"; cp "${o%.o}.cfg" "$out/keep.cfg"
+bash scripts/build/compile-object.sh --production "$o" -- $(var CXX) $(var PRODUCTION_GUARD) $(var CPPFLAGS) \
+  $(var CXXFLAGS) -O1 -c src/rt/vm_closure.cpp >> "$out/make.log" 2>&1 || bad "mixing: -O1 compile failed"
+if make libnift_c.a > "$out/mixing-archive.log" 2>&1; then bad "mixing: libnift_c.a archived an -O1 object"
+elif grep -q 'check-config: 1 of' "$out/mixing-archive.log"; then
+  pass "mixing: libnift_c.a refuses an -O1 object ($(grep -o 'check-config: [^;]*' "$out/mixing-archive.log"))"
+else bad "mixing: libnift_c.a failed for another reason (mixing-archive.log)"; fi
+# a sidecar of the default configuration beside another configuration's object
+cp ".build/rt-obj/$C1/$o" "$o"; cp "$out/keep.cfg" "${o%.o}.cfg"; touch "$o"
+rm -f .build/rt/value-unit
+if make .build/rt/value-unit > "$out/mixing-pair.log" 2>&1; then bad "mixing: an object with another compile's sidecar was linked"
+elif grep -q 'check-config: 1 of' "$out/mixing-pair.log"; then
+  pass "mixing: an object beside another compile's sidecar is refused ($(grep -o 'check-config: [^;]*' "$out/mixing-pair.log"))"
+else bad "mixing: the pair case failed for another reason (mixing-pair.log)"; fi
+cp "$out/keep.o" "$o"; cp "$out/keep.cfg" "${o%.o}.cfg"; touch "$o"
+build_default || bad "mixing: restore failed"
+dmanifest > "$out/A2-mixing2.txt"; cmp -s "$out/A1.txt" "$out/A2-mixing2.txt" || bad "mixing: second restore differs"
 
 # --- parallel ---
 # references: a clean serial build of each configuration
