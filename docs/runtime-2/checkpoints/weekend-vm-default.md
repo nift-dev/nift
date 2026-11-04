@@ -249,3 +249,80 @@ Distinct evidence, all kept:
   protocol, immutability across transfer, map_set throw-safety, frame-owned sort protection,
   VM-level immutability tests, immutable-before-bounds order, perf recovery. Release diagnostic:
   budget-stop message must not say "compiler defect".
+
+## B2 reference representation integration (2026-11-04)
+
+`weekend/r2` fast-forwarded from `919b5669` to `3c962476` (tree `c12612da`), `cand/b2-refrep`
+(record `docs/runtime-2/checkpoints/b2-refrep.md`). Arrays and objects are shared references
+under the unchanged Phase A guard; one mutation protocol; immutability follows the object;
+frame-owned sort protection; fresh aggregate literals. Distinct evidence, all kept (reports on
+the NUC under `.claude-review/b2-reviews/`):
+1. `94bfce4b`: independent **REJECT** (`REVIEW.md`). H1/H2: JSON-spelled object literals were
+   one shared pool constant (loop output `2 3 4` vs legacy `2 2 2`; `same(f(1), f(2))` true);
+   M1 mutation-authority bypasses; M2 sort error classified by message text.
+2. `534f9af8` (repair): independent **ACCEPT-WITH-CONDITIONS** (`REREVIEW.md`): C1 sort
+   storage still reachable, C2 construction lint missed qualified/indirect calls, C3 session row
+   of the literal case table tested nothing.
+3. `eba6ca1f`: narrow re-check **CONDITIONS MET** (`RECHECK.md`); new LOWs R1-R3.
+4. `3c962476`: narrow re-check of R1/R2 **ACCEPT-WITH-CONDITIONS** (`RECHECK2.md`), not
+   relabelled as ACCEPT. Owner retained this tree (2026-11-04) subject to a bounded source audit:
+   all four conditions PASS (`B2-SOURCE-AUDIT.md`: no production TU includes a test helper,
+   directly or transitively, over 583 compile commands / 1,229 dependency files; no production
+   use of any demonstrated bypass; no helper symbols or strings in `nift` or `libnift_c.so`;
+   no route without changing source).
+5. Linode `b2cert-3c962476` on the exact tree (identity verified; `nift` sha256 `3062f229`
+   identical to the local build): 54 gates exit 0, including full `test-rt-vm`, every value,
+   refsem, collections, CP18 (now links: `67527994`) and CP19-R1 sanitizer lanes, all five TSan
+   lanes, all mutant lanes, session CLI x2; no OOM. Failures, every one reproduced on `919b5669`
+   on the same machine with the same failure signature (target-by-target comparison, owner
+   method 2026-11-04):
+   - `test-cp19-r1` (`eval_entry.py`, stale `NIFT_VM=require` expectation) and
+     `test-runtime2-cp18` (`combined_cp14b` reference-guard:inflow; `cow_semantics` struct-copy);
+   - `test-rt-builtins` (static assert "Host built-ins must stay last");
+   - `test-rt-vm-sanitize`: only `test-runtime2-cp14b-sanitize` fails (link: `PackageTransaction`
+     missing from its source list, the CP18 defect class); a `make -k` rerun on the exact tree
+     ran every other sub-lane and all pass;
+   - `make -k test`: 69 failing targets, all 69 also fail on `919b5669` with the same signature
+     after normalising temp paths and Makefile line numbers (66 by full-suite comparison, the
+     rest by targeted reruns on the base tree). They are historical tests that still expect the
+     legacy interpreter under VM default (refusals such as `callable:run`, `text-type-name`,
+     `aliasing`, `struct-field-init`) and two `.build/rt` unit binaries with incomplete source
+     lists (`shared_atomic_*`). Release-audit items, not B2 regressions.
+   Classification: 0 changes over 589 CP25-R units and 1,824 `tests/runtime2` units vs
+   `919b5669` (the CP25 half first failed on a harness slip, a missing `.build/rt-parse-dump`,
+   and was rerun).
+6. Same-machine performance (callgrind Ir/op, VM) vs `d209febd` / `919b5669`: `array_push`
+   382 / 384 -> **368** and `array_set` 388 / 413 -> **380** (targets <= 382 / <= 388 met);
+   push_pop 1440 -> 1431, insert_pop 2462 -> 2446, map_set 1788 -> 1498, set_add 1366 -> 1365,
+   stack_push_pop 2240 -> 2192. Owner-approved residuals: `array_index` 434 -> 436,
+   `object_member` 761 -> 762, `string_concat` 3309 -> 3312. Object literal evaluated in a loop
+   1,887 -> 4,291: the cost of correct freshness (the base figure was the defect), accepted.
+   Website build (site group, same machine): full_2k 0.291 / 0.292 -> 0.283 s, noop_2k
+   0.082 / 0.083 -> 0.082 s, one_page 0.083 -> 0.082 s, shared_partial 0.336 / 0.334 -> 0.335 s:
+   no regression. `bench-rt-value`, `bench-rt-value-cycle`, `benchmark-10k` pass.
+- Corrections to the B2 record's R1/R2 statements (owner 2026-11-04): byte-copying a `SortKey`
+  (`__builtin_bit_cast`, `malloc` + copy; `SortKey` is trivially copyable) is well-defined C++,
+  not undefined behaviour; a file declaring its own public `SortKey`/`Protocol::sort_storage`
+  links statically without diagnostic. The R2 test-helper restriction is a lint, not a
+  compile-time boundary, and RECHECK2 bypassed it (direct include of
+  `tests/rt/storage_access.h`; annotation accepted anywhere; `markuppp/`, `minifypp/`, nested
+  `tests` dirs and some suffixes unscanned). Accepted only because the audited source contains no
+  such use.
+- `libnift_c.so` exports about 2,355 internal `nift::rt::` symbols with default visibility
+  (pre-existing).
+- Carried to the tooling checkpoint (approved, before B3, required before release; separately
+  reviewable): build-object reuse; compile-time builder type (construction / publication /
+  mutation); compile-time isolation of test helpers, rejecting direct and transitive production
+  includes; close the SortKey byte-copy route and the duplicate-declaration route where
+  structurally possible; annotations only at authorised locations; scan `markuppp/`,
+  `minifypp/`, nested `tests` dirs and all relevant suffixes; the seven R3 lint tokenizer cases;
+  explicit public symbol visibility for `libnift_c.so` with an exported-symbol inventory test
+  against the embedding ABI.
+- Carried to B5/B6: L1 in-place comparator sort exposes intermediate state to aliased reads
+  (mandatory B5 test; Q7 must cover reads); L2 `cell.cpp` `replace_path` residual take,
+  default Env, partial commit (B5/B6); L3 static `c=100` path validation order (B5).
+- Invariant (owner): a compiled constant is a description, not a runtime instance; every
+  evaluation of a literal creates fresh aggregates, recursively.
+- Linode campaign: instance `110032608` deleted (API-confirmed); evidence copied to the NUC
+  `linode-jobs/b2-final/` and verified against `SHA256SUMS`; weekend campaign total US$6.05
+  (ceiling US$10).
