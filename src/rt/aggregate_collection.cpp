@@ -195,15 +195,15 @@ void Storage::map_set(Value& map, Value key, Value value) {
 void Storage::set_add(Value& set, Value member) { add_member(set, static_cast<Value&&>(member)); }
 void Storage::stack_push(Value& stack, Value item) { push_item(stack, static_cast<Value&&>(item)); }
 
-void Construction::map_set(Value& map, Value&& key, Value&& value) {
+void Construction::map_set(Value& map, Value key, Value value) {
     check_fresh(map);
     put_entry(map, static_cast<Value&&>(key), static_cast<Value&&>(value));
 }
-void Construction::set_add(Value& set, Value&& member) {
+void Construction::set_add(Value& set, Value member) {
     check_fresh(set);
     add_member(set, static_cast<Value&&>(member));
 }
-void Construction::stack_push(Value& stack, Value&& item) {
+void Construction::stack_push(Value& stack, Value item) {
     check_fresh(stack);
     push_item(stack, static_cast<Value&&>(item));
 }

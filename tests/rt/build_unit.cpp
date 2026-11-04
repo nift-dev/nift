@@ -14,8 +14,10 @@
 #include "rt/aggregate.h"
 #include "rt/copy_graph.h"
 #include "rt/heap_account.h"
+#include "rt/heap.h"
 #include "rt/compare.h"
 #include "rt/string.h"
+#include "storage_access.h"  // the construction shims: the primitives behind builders and keys
 
 #include <csignal>
 #include <cstdio>
@@ -304,7 +306,29 @@ static void graph_construction() {
     }
 }
 
+// ---- the run-time layer of both tiers (tooling.md 2.2, 2.4) -----------------
+// The in-place sites and the builders share the primitives; in checked builds
+// check_fresh refuses a published receiver (shared or immutable) by aborting
+// before any write. Release builds do not check: there the in-place sites rest
+// on their owners (compile and link time) and on the suites of 2.4.
+static void in_place_runtime_layer() {
+    if (!kChecked) return;
+    build::Array b(2);
+    b.push(Value::integer(1));
+    Value published = std::move(b).publish();
+    Value alias = published;  // a second holder: published, shared
+    expect_harmless_reuse("primitive on a shared receiver",
+                          reuse_in_child(published, [&] { array_push(published, Value::integer(2)); }));
+    build::Object o;
+    o.set(atom("k"), Value::integer(1));
+    Value frozen = std::move(o).publish();
+    mark_immutable(frozen.heap());  // the flag the protocol sets (rt/heap.h)
+    expect_harmless_reuse("primitive on an immutable receiver",
+                          reuse_in_child(frozen, [&] { object_set(frozen, atom("j"), Value::integer(2)); }));
+}
+
 int main() {
+    in_place_runtime_layer();
     publication();
     moves_and_aliases();
     allocation_failure();

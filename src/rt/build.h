@@ -155,9 +155,13 @@ class Construction {
     static void object_set(Value& object, Atom key, Value&& value);
     static Value* object_slot(Value& object, Atom key);  // null when `key` is missing
     static void struct_add_field(Value& instance, Atom field, Value&& value);
-    static void map_set(Value& map, Value&& key, Value&& value);
-    static void set_add(Value& set, Value&& member);
-    static void stack_push(Value& stack, Value&& item);
+    // The collection primitives keep their former by-value parameters: they share
+    // their bodies with Storage's map_set/set_add/stack_push (the mutation
+    // protocol's commits), and the same signature keeps that code identical
+    // (tooling.md 2.6); their key forwarders below forward the arguments as given.
+    static void map_set(Value& map, Value key, Value value);
+    static void set_add(Value& set, Value member);
+    static void stack_push(Value& stack, Value item);
 
 public:
     // In-place construction: the same primitives, for an InPlaceKey holder
@@ -175,11 +179,15 @@ public:
     static void struct_add_field(const Key&, Value& instance, Atom field, Value value) {
         struct_add_field(instance, field, static_cast<Value&&>(value));
     }
-    static void map_set(const Key&, Value& map, Value key, Value value) {
-        map_set(map, static_cast<Value&&>(key), static_cast<Value&&>(value));
+    template <class K, class V> static void map_set(const Key&, Value& map, K&& key, V&& value) {
+        map_set(map, static_cast<K&&>(key), static_cast<V&&>(value));
     }
-    static void set_add(const Key&, Value& set, Value member) { set_add(set, static_cast<Value&&>(member)); }
-    static void stack_push(const Key&, Value& stack, Value item) { stack_push(stack, static_cast<Value&&>(item)); }
+    template <class M> static void set_add(const Key&, Value& set, M&& member) {
+        set_add(set, static_cast<M&&>(member));
+    }
+    template <class I> static void stack_push(const Key&, Value& stack, I&& item) {
+        stack_push(stack, static_cast<I&&>(item));
+    }
 };
 
 namespace build {
