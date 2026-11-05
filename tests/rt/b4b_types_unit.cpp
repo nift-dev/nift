@@ -123,6 +123,31 @@ int main() {
     // A native's container inside its result (group_by's arrays): one derived site for every read of it.
     expect("native-inner", "xs := [1]\ng := xs.group_by((x) => \"k\")\ninner := g.k\ninner.push(\"s\")\nprint(g.k[1])\n",
            "g.k[1]", kKindString);
+    // Review H1: a thread entry of inexact targets (a ternary with an unknown value) widens every
+    // function used as a value; so does a call through one, before or after the use.
+    expect("thread-unknown-callee",
+           "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\n"
+           "t := thread(L(\" b \") == \"b\" ? L : mx.get(), 5)\nprint(t.join())\n", "a", kKindInt);
+    expect("thread-unknown-returned",
+           "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\n"
+           "fn(pick()) { return L(\" b \") == \"b\" ? L : mx.get() }\nt := thread(pick(), 5)\nprint(t.join())\n",
+           "a", kKindInt);
+    expect("call-unknown-ternary",
+           "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\n"
+           "fn(pick()) { return L(\" b \") == \"b\" ? L : mx.get() }\nf := pick()\nprint(f(5))\n", "a", kKindInt);
+    // Review L1 (C2): a union receiver whose object member of the mutator's name is callable.
+    expect("union-callable-member",
+           "arr := [\" a \"]\no := {\"insert\": (i, x) => { return 0 }}\nv := arr\n"
+           "if (arr.size() > 5) { v = o }\nv.insert(0, 5)\nprint(arr[0])\n", "arr[0]", kKindInt);
+    // Review H2: more than 16 sites merge into one class; every member's stores stay visible.
+    {
+        std::string src = "acc := [[1]]\n";
+        for (int i = 0; i < 20; ++i) src += "a" + std::to_string(i) + " := [" + std::to_string(i) + "]\nacc.push(a" +
+                                             std::to_string(i) + ")\n";
+        src += "a3.push(\"s\")\nprint(acc[1][1])\nprint(a7[1])\n";
+        expect("collapsed-sites", src, "a7[1]", kKindString);
+        expect("collapsed-sites-read", src, "acc[1][1]", kKindString);
+    }
     expect("escape-untracked",
            "fn[async](a()) { return (x) => { return x } }\nfa := await a()\nprint(fa(\"s\"))\n", "x", kKindString);
     // C5: in a session statement the statement's own containers are tracked per site like a script's
@@ -148,5 +173,14 @@ int main() {
     old.kinds = kKindArray;
     earlier.symbols.push_back(old);
     expect("session-exposed", "ys := [1]\nold = ys\ng(0)\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
+    // Review M1: every path that makes a container reachable by earlier code.
+    expect("session-push-exposed", "ys := [1]\nold.push(ys)\ng(0)\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
+    expect("session-index-exposed", "ys := [1]\nold[0] = ys\ng(0)\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
+    expect("session-member-exposed", "ys := [1]\nold.k = ys\ng(0)\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
+    expect("session-closure-exposed", "ys := [1]\nh := () => { return ys }\nold = h\ng(0)\nprint(ys[0])\n",
+           "ys[0]", kKindString, &earlier);
+    expect("session-late-store", "ys := [1]\nold = ys\nzs := [2]\nys[0] = zs\ng(0)\nprint(zs[0])\n", "zs[0]",
+           kKindString, &earlier);
+    expect("session-store-after-call", "ys := [1]\ng(0)\nold = ys\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
     return rt_test::finish("b4b-types-unit");
 }

@@ -1,0 +1,5 @@
+# Guard-off (NIFT_RT_REFERENCE_PROBE) internal failures that are the recorded B5
+# prerequisite U6 (b4b-element-types.md section 4): an earlier session statement's
+# value keeps its recorded structure, which only the guard keeps true. B5 must make
+# each of these pass (and delete it from this list). One per line: <file> <substring>.
+u6_session_alias.in unexpected operands (compiler defect)

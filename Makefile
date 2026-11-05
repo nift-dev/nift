@@ -963,8 +963,27 @@ test-rt-b4b-types-unit: $(RT_B4B_TYPES)
 test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES)
 	"$(RT_B4B_TYPES)"
 	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)"
-test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS)
+# B4b review (L4): the standing guard-off gate. The CLI linked with the B2
+# reference-probe compiler objects (-DNIFT_RT_REFERENCE_PROBE: no Phase A guard,
+# no `aliasing` refusal; arrays and objects shared), a TEST configuration that
+# never ships (test-rt-refrep-production). There a stale element type reaches an
+# unflagged native as `compiler defect` (exit 70): the gate fails on any exit 70,
+# internal text, tag or dispatch defect, except the recorded U6 expectations
+# (tests/runtime2/b4b/guardoff/expected_u6.txt; B5 removes them).
+B4B_GUARDOFF_NIFT := $(TEST_DIR)/b4b-guardoff/nift-guardoff$(EXEEXT)
+$(B4B_GUARDOFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(RT_REFREP_PROBE_OBJECTS) \
+		$(LDFLAGS) $(LDLIBS) $(LIBFFI_A) -o $@
+.PHONY: test-runtime2-guardoff
+test-runtime2-guardoff: $(B4B_GUARDOFF_NIFT)
+	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --guardoff
+	$(PYTHON) tests/runtime2/b4b/gen_alias.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --sample 1500 --seed 1
+	$(PYTHON) tests/runtime2/safety/fuzz.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --seed 1 --sample 3000 \
+		--session-sample 1000
+test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS) $(RT_REFREP_PROBE_OBJECTS)
 	B4B_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" B4B_UNIT_OBJECTS="$(RT_UNIT_OBJECTS) $(LDLIBS)" \
+		B4B_GUARDOFF_OBJECTS="$(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)" \
 		bash tests/runtime2/b4b/mutants.sh "$(CURDIR)/$(TARGET)"
 
 # CP12 phase B: the module graph and loader (D-041; rt/module_graph.h).

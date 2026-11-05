@@ -1,0 +1,7 @@
+old := [[" a "]]
+fn(g(v)) { old[0][0] = 5; return 0 }
+ys := [" b "]
+old.push(ys)
+g(0)
+print(ys[0])
+print("end")

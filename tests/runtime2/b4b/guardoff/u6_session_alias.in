@@ -1,0 +1,5 @@
+old := [" a "]
+ys := old
+old[0] = 5
+print(ys[0].trim())
+print("end")

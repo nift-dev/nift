@@ -39,6 +39,7 @@ HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b4b")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FAILURES = []
 CHECKS = [0]
+GUARDOFF = [False]  # --guardoff: the reference-probe build (shared references): internal failures only
 TAG = "\x1fnift:"
 
 
@@ -109,6 +110,8 @@ def judge(label, nift, files, work, main="main.f"):
     if refused(rows, ve):
         check(vo == "" and vr == 1 and "no part of it ran" in ve, "%s: refused after an effect: %r/%r" % (label, vo, ve))
         return "refused"
+    if GUARDOFF[0]:  # sharing changes meaning against legacy's copies: no equality, internal failures only
+        return "vm"
     lo, le, lr, _ = run(nift, files, "0", work, main)
     if TAG in lo + le or "\\u001fnift:" in lo + le:
         return "vm"  # legacy shows an internal tag: the approved B0/CP17/B4 presentation difference
@@ -121,12 +124,25 @@ def tree_files(tree):
 
 
 def sessions(nift, work):
-    for f in sorted(os.listdir(os.path.join(HERE, "sessions"))):
-        stdin = open(os.path.join(HERE, "sessions", f)).read()
+    dirs = ["sessions"] + (["guardoff"] if GUARDOFF[0] else [])
+    expected = {}
+    for line in open(os.path.join(HERE, "guardoff", "expected_u6.txt")):
+        if line.strip() and not line.startswith("#"):
+            name, text = line.split(" ", 1)
+            expected[name] = text.strip()
+    for sub in dirs:
+      for f in sorted(x for x in os.listdir(os.path.join(HERE, sub)) if x.endswith(".in")):
+        stdin = open(os.path.join(HERE, sub, f)).read()
         vo, ve, vr, rows = run(nift, {}, "require", work, stdin=stdin)
-        lo, le, lr, _ = run(nift, {}, "0", work, stdin=stdin)
         label = "session " + f
-        check(vr != 70 and TAG not in vo + ve and defects(rows) == 0, "%s: %r/%r/%d" % (label, vo, ve, vr))
+        internal = vr == 70 or "compiler defect" in ve or "internal failure" in ve
+        if GUARDOFF[0] and f in expected:  # the recorded U6 expectation (B5 removes it)
+            check(expected[f] in ve, "%s: the recorded U6 expectation no longer shows (%r): update the list" % (label, ve))
+            continue
+        check(not internal and TAG not in vo + ve and defects(rows) == 0, "%s: %r/%r/%d" % (label, vo, ve, vr))
+        if GUARDOFF[0]:
+            continue
+        lo, le, lr, _ = run(nift, {}, "0", work, stdin=stdin)
         if "NIFT_VM session refused" in ve:
             # Statements before the refused one ran on the VM: legacy's output starts the same.
             check(lo.startswith(vo), "%s: output before the refusal %r is not legacy's %r" % (label, vo, lo))
@@ -211,27 +227,56 @@ def containers(n):
     return "\n".join(lines) + "\n"
 
 
-def compile_scaling(nift, work):
-    """Compile time of the container-heavy shape (about 1,000 x 4 sites at 1,000): four times the
-    containers within twelve times the time (B4a: about 7x, the existing walk; quadratic: 16x)."""
-    times = {}
-    for n in (250, 1000):
-        best = None
-        for _ in range(3):
-            out, _, _, rows = run(nift, {"main.f": containers(n)}, "require", work)
-            us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" else None
-            best = us if best is None or (us is not None and us < best) else best
-        times[n] = best
-    check(times[250] is not None and times[1000] is not None and times[1000] <= 12 * times[250],
-          "compile scaling containers: %r us for 250, %r us for 1000 (must be <= 12x)" % (times[250], times[1000]))
-    print("compile scaling containers: 250 %.0f us, 1000 %.0f us" % (times[250] or 0, times[1000] or 0))
+def glob(n):
+    """Review H2: n helpers each pushing a new container (its own site) into one global array."""
+    kinds = ["%d" % 1, '"t"', "2.5", "true", "null"]
+    lines = ['acc := [[" s "]]']
+    for i in range(n):
+        lines += ["fn(k%d()) {" % i, '  acc.push([%s, " s "])' % kinds[i % len(kinds)], "  return acc.size()", "}"]
+    lines += ["print(k%d())" % i for i in range(n)] + ["print(acc[1][1].trim())"]
+    return "\n".join(lines) + "\n"
+
+
+def best_compile(nift, src, work, runs=3):
+    best = None
+    for _ in range(runs):
+        _, _, _, rows = run(nift, {"main.f": src}, "require", work)
+        us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" else None
+        best = us if best is None or (us is not None and us < best) else best
+    return best
+
+
+def compile_scaling(nift, work, baseline=None):
+    """Compile time: the container-heavy shape (four times the containers within twelve times the
+    time) and the review H2 shape (one global array, n helpers each adding a site: near-linear,
+    four times the helpers within six times the time; with --baseline, within 1.5x of B4a at
+    every size)."""
+    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, (100, 400, 1600), 6))
+    for name, make, sizes, bound in shapes:
+        times = {n: best_compile(nift, make(n), work) for n in sizes}
+        for small, large in zip(sizes, sizes[1:]):
+            check(times[small] is not None and times[large] is not None and times[large] <= bound * times[small],
+                  "compile scaling %s: %r us for %d, %r us for %d (must be <= %dx)" %
+                  (name, times[small], small, times[large], large, bound))
+        line = "compile scaling %s: %s" % (name, ", ".join("%d %.0f us" % (n, times[n] or 0) for n in sizes))
+        if baseline:
+            base = {n: best_compile(baseline, make(n), work) for n in sizes}
+            for n in sizes:
+                check(times[n] is not None and base[n] and times[n] <= 1.5 * base[n],
+                      "compile scaling %s %d: %r us against B4a %r us (must be <= 1.5x)" % (name, n, times[n], base[n]))
+            line += "; B4a " + ", ".join("%d %.0f us (%.2fx)" % (n, base[n] or 0, (times[n] or 0) / (base[n] or 1))
+                                         for n in sizes)
+        print(line)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--guardoff", action="store_true")
+    ap.add_argument("--baseline", help="B4a nift: the compile scaling shapes within 1.5x of it")
     args = ap.parse_args()
+    GUARDOFF[0] = args.guardoff
     nift = os.path.abspath(args.nift)
     work = tempfile.mkdtemp(prefix="b4b-types-")
     try:
@@ -255,7 +300,8 @@ def main():
                 outcomes[judge("module " + case, nift, tree_files(tree), work)] += 1
         sessions(nift, work)
         print("fixtures: %(vm)d run by the VM (equal to legacy), %(refused)d refused before any effect" % outcomes)
-        compile_scaling(nift, work)
+        if not args.guardoff:
+            compile_scaling(nift, work, args.baseline)
         stats = generator(nift, work, args.quick)
         print("generator: %(programs)d programs, %(vm)d run by the VM" % stats)
     finally:
