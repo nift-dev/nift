@@ -31,11 +31,22 @@ bool has(const Names& names, std::string_view name) {
 
 // B4 (review M2): a top-level statement that cannot stop the program (return,
 // exit or a run-time error): a declaration of a function, struct or enum, an
-// export, a fresh `name := <literal>` and `print(<plain string>)` (the unit
-// declares no `print`). Imports are judged by their module's statements.
+// export, a fresh `name := <literal>` (arrays and objects of literals too) and
+// `print(<plain string>)` (the unit declares no `print`). Imports are judged
+// by their module's statements.
 bool cannot_stop(const Ast& ast, const Node& st, const Names& provided, const Names& unit_names) {
-    const auto literal = [&](NodeId id) {
+    const auto literal = [&](NodeId id, const auto& self) -> bool {  // arrays and objects of literals too
         const Node& v = ast.at(id);
+        if (v.kind == NodeKind::Array || v.kind == NodeKind::Object) {
+            for (std::uint32_t k = 0; k < v.count; ++k) {
+                const Node& item = ast.at(ast.list(v)[k]);
+                const NodeId value = v.kind == NodeKind::Object ? item.b : ast.list(v)[k];
+                if ((v.kind == NodeKind::Object && item.kind != NodeKind::Property) || value == kNoNode ||
+                    !self(value, self))
+                    return false;
+            }
+            return true;
+        }
         return v.kind == NodeKind::Number || v.kind == NodeKind::True || v.kind == NodeKind::False ||
                v.kind == NodeKind::Null || (v.kind == NodeKind::String && v.count == 0);
     };
@@ -44,7 +55,7 @@ bool cannot_stop(const Ast& ast, const Node& st, const Names& provided, const Na
             return true;
         case NodeKind::Declare:
             return st.a != kNoNode && st.b != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
-                   !has(provided, ast.text(ast.at(st.a))) && literal(st.b);
+                   !has(provided, ast.text(ast.at(st.a))) && literal(st.b, literal);
         case NodeKind::ExprStmt: {
             const Node& e = ast.at(st.a);
             return e.kind == NodeKind::Call && e.count == 1 && ast.at(e.a).kind == NodeKind::Ident &&
