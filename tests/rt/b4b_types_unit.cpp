@@ -167,6 +167,15 @@ int main() {
            "  w(xs, q())\n  return g()\n}\nfn(w(a, v)) {\n  a[0] = v\n  return 0\n}\nprint(m())\n", "xs[0]", kKindString);
     expect("reader-rewalk-main",
            "xs := [1]\nfn(w(a)) { a[0] = \"s\"\nreturn 0 }\nprint(xs[0])\nw(xs)\n", "xs[0]", kKindString);
+    // Owner H1 categories: an escaping function never keeps narrow parameter or capture
+    // assumptions unless every target is known (each case calls L or a closure with an int
+    // through a path the inference cannot enumerate).
+    expect("escape-async-target", "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\nfn[async](runner(f, v)) { return f(v) }\nfn(pick()) { return L(\" b \") == \"b\" ? L : mx.get() }\nr := await runner(pick(), 5)\n", "a", kKindInt);
+    expect("escape-callback-native", "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\nm := mutex(L)\ng := m.get()\nprint(g(5))\n", "a", kKindInt);
+    expect("escape-returned", "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\nfn(mk()) { return L(\" b \") == \"b\" ? L : mx.get() }\nh := mk()\nprint(h(5))\n", "a", kKindInt);
+    expect("escape-stored", "fn(L(a)) { return a.trim() }\nprint(L(\" a \"))\nmx := mutex(1)\no := {\"f\": L}\nm := mutex(o)\nk := m.get()\nq := k.f\nprint(q(5))\n", "a", kKindInt);
+    expect("escape-closure", "xs := [\" a \"]\nc := (v) => { return v.trim() }\nprint(c(\" b \"))\nm := mutex(c)\nd := m.get()\nprint(d(5))\n", "v", kKindInt);
+    expect("escape-closure-capture", "s := \" a \"\nc := () => { return s.trim() }\nprint(c())\nfn(assign(v)) { s = v\nreturn 0 }\nassign(5)\nprint(c())\n", "s", kKindInt);
     expect("escape-untracked",
            "fn[async](a()) { return (x) => { return x } }\nfa := await a()\nprint(fa(\"s\"))\n", "x", kKindString);
     // C5: in a session statement the statement's own containers are tracked per site like a script's

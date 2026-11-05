@@ -1,0 +1,9 @@
+# Approved exceptions of the guard-off cross-check (tests/runtime2/b4b/guardoff.py).
+# <script, relative to tests/runtime2> <what is allowed> <reason>
+# output: its output may differ between runs or builds; exit70: the memory-budget stop
+# (identical on the guard-on build, by contract); timeout: a deliberate timeout fixture.
+cp22/vm-only/v_sleep_ties.f output equal sleeps: task wake order is not specified (timing)
+rt-diff-corpus/scripts/home-tmp/main.f output prints its temporary directory
+memory/c1_push.f exit70 the heap budget stop (same text and exit on the guard-on build)
+rt-diff-selftest-corpus/timeout/loop/main.f timeout the rt-diff self-test's deliberate timeout
+cp22/vm-only/v_fifo_order.f output tasks run in parallel: their print order is not specified (guard-on output varies run to run)

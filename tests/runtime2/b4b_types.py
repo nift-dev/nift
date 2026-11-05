@@ -237,7 +237,7 @@ def glob(n):
     return "\n".join(lines) + "\n"
 
 
-def best_compile(nift, src, work, runs=3):
+def best_compile(nift, src, work, runs=7):
     best = None
     for _ in range(runs):
         _, _, _, rows = run(nift, {"main.f": src}, "require", work)
@@ -251,7 +251,8 @@ def compile_scaling(nift, work, baseline=None):
     time) and the review H2 shape (one global array, n helpers each adding a site: near-linear,
     four times the helpers within six times the time; with --baseline, within 1.5x of B4a at
     every size)."""
-    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, (100, 400, 1600), 6))
+    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, (100, 400, 800, 1600), 6))
+    growth = {}
     for name, make, sizes, bound in shapes:
         times = {n: best_compile(nift, make(n), work) for n in sizes}
         for small, large in zip(sizes, sizes[1:]):
@@ -259,6 +260,14 @@ def compile_scaling(nift, work, baseline=None):
                   "compile scaling %s: %r us for %d, %r us for %d (must be <= %dx)" %
                   (name, times[small], small, times[large], large, bound))
         line = "compile scaling %s: %s" % (name, ", ".join("%d %.0f us" % (n, times[n] or 0) for n in sizes))
+        if baseline and name == "glob":
+            # Review H2: the growth is gone, not moved to larger sizes: the ratio to B4a does not
+            # rise from size to size by more than noise (10%), besides staying within 1.5x.
+            base_times = {n: best_compile(baseline, make(n), work) for n in sizes}
+            ratios = [(times[n] or 0) / (base_times[n] or 1) for n in sizes]
+            for (small, r1), (large, r2) in zip(zip(sizes, ratios), zip(sizes[1:], ratios[1:])):
+                check(r2 <= r1 * 1.10 + 0.05, "compile scaling glob: the ratio to B4a grows from %.2fx at %d to %.2fx at %d"
+                      % (r1, small, r2, large))
         if baseline:
             base = {n: best_compile(baseline, make(n), work) for n in sizes}
             for n in sizes:
