@@ -522,3 +522,14 @@ Fixes are new commits on top of `c56c4093` (no history rewritten):
 | §9 B5 wording | the coordinator's sentence | B4 20 | section 9 |
 | vm-adversarial count, `--json` tag | stated exactly | B4 20 | sections 8, 9 |
 
+Gates after the re-review fixes (result files `r3-*.result`; run on `07bc775f`, tree `85e03e1c`;
+the following commit changes this record only; every gate exit 0, git status clean before and
+after): `test-rt-lint`; `test-rt-op-admission-unit` (4027 checks); `test-runtime2-b4` (12648
+checks, 0 failures); `test-runtime2-b4-mutants` (17 caught or covered; A17 9, A18 6 failing
+checks); `test-runtime2-b3` (468 checks); `test-runtime2-safety` (33512 programs);
+`vm-modules-unit` (179 checks); `semantics-modules`; the compile scaling check (functions 6.0 /
+26.2 ms, chain-for 2.8 / 14.5 ms, chain-while 2.8 / 13.5 ms).
+
+Classification (the `569e336f` binary against `07bc775f`): CP25-R `classify-all` (589 units):
+0 changes. `tests/runtime2` (1,974 scripts): 5 changes, the five new N1 fixtures, from the
+program error `import-scope:collision` to the refusal `import-collision`; no other script changes.
