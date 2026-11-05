@@ -146,8 +146,10 @@ running (`import-scope:collision`, the invocation-export precedent: legacy print
 statements' and the module's output first), **only when legacy certainly reaches the collision
 check** (review M2): every statement legacy runs before it, in its order (the unit's earlier
 top-level statements, its importers' up to their import, earlier and the imported modules' bodies),
-cannot stop the program: a function, struct or enum declaration, an export, a fresh
-`name := <literal>` (arrays and objects of literals included), `print(<plain string>)`. Otherwise
+cannot stop the program: a function, struct or enum declaration, a module's export (checked by
+the graph itself), a fresh `name := <literal>` (arrays and objects of literals included; a number
+only when the VM's literal admission accepts it: re-review N1), `print(<plain string>)`. A
+main-file `export` may stop it (legacy: "export names no existing binding"). Otherwise
 (a top-level `return`, a statement that may fail, a module that may fail) and for a later
 declaration (legacy rebinds silently or reports a redeclaration; the CP25-R `006-main` unit) the
 refusal `import-collision` stands.
@@ -251,18 +253,21 @@ both engines.
 - `b4/refuse/*.f` (24): refused before any effect with their reason (review: five `for`-callee
   shapes, three `struct-no-method` shapes, five `struct-this-binding` shapes: method call, private
   method, rendering, field read, catch binding);
-- `b4/c1/*/` (9): the C1 legacy differential per shape; the three review M2 shapes (`return`
-  before the import, a failing statement before it, a failing module) check that legacy gives its
-  own output and never the collision;
+- `b4/c1/*/` (14): the C1 legacy differential per shape; the three review M2 shapes (`return`
+  before the import, a failing statement before it, a failing module) and the five re-review N1
+  shapes (an out-of-range integer, `1e999` in an object, a main-file `export(nosuch)`, a module's
+  `1e999`, a second module's `9223372036854775808`) check that legacy gives its own error and never
+  the collision;
 - struct receivers (review H1; the reviewer's `gen_struct.py` in the suite): a proven struct
   receiver × every method name (91) × seven contexts (top level, statement, `for`, `while`,
   function, lambda, method) × three arities = 1,911 programs; every program the VM runs (867)
   equals legacy, D-009#5 aside (the `return: ` prefix and column, 213 in function bodies); never
   exit 70, `dispatch_defects` 0. On the c56c4093 binary it reports the H1 divergences (`--quick`:
   21 failures);
-- compile scaling (review M3): 250 and 1,000 functions using the three `context:*` sites; four
-  times the functions must take at most eight times the compile time (4.1x on the tip; 14.5x on
-  c56c4093, caught);
+- compile scaling (review M3, re-review N2): 250 and 1,000 functions using the three `context:*`
+  sites, and a natural-order call chain called from a `for` and from a `while` loop; four times the
+  size must take at most eight times the compile time (functions: 4.1x on the tip, 14.5x on
+  c56c4093; chain: 4.9x / 6.5x on the tip, 11.7x on `569e336f`, caught);
 - `nift eval --json` (review L1): B3's exact output for a function and an atomic, nested too;
 - `b4/concurrent/*.f`: the atomic presented while a thread updates it (three runs, legacy's output);
 - SESSIONS and DISPLAYS: dynamic dispatch in sessions, and every new display path (struct, map,
@@ -312,7 +317,8 @@ paths.
 | A14 | `prepared.cpp` | only `while` callers are prepared code (review M4) | suite 13 |
 | A15 | `compiler_structs.cpp` | every undeclared struct method compiled as legacy's error (review H1) | suite 28 |
 | A16 | `binding_rules.cpp` | a `this` loop or catch binding in a struct admitted again (text match, review H2) | suite 10 |
-| A17 | `module_graph.cpp` | C1 whatever legacy runs before the import (review M2) | suite 4 |
+| A17 | `module_graph.cpp` | C1 whatever legacy runs before the import (review M2) | suite 9 |
+| A18 | `module_graph.cpp` | any number literal and a main-file export cannot stop the program (re-review N1) | suite 6 |
 | S6, S7 (B0, revised) | `natives/format_methods.cpp`, `vm_ops.cpp` with A9 | B0's defensive paths internal again, with the narrowing restored (B4 made them unreachable otherwise) | safety suite (54 and 46 cases exit 70) |
 | S10 (control) | `compiler_session_native.cpp`, CP19 mutant 10 | the session's guarded branch forced to the string native | covered: the precondition redirects it, output equals legacy (before B4 the mutant stopped with exit 70) |
 
@@ -352,6 +358,15 @@ the built-in rows above and the Dynamic `contains` measure the same on c56c4093 
 The tip is within noise of B3 (at most 1.02x), well inside the 1.5x bound; the suite's scaling
 check guards the shape.
 
+Call chains (re-review N2; the reviewer's `repro2/perf`, median of five): the prepared marking now
+walks each newly marked body once (a worklist) instead of sweeping to a fixpoint.
+
+| Program | B3 | `569e336f` | tip |
+| --- | --- | --- | --- |
+| 2,000-function chain called from a `for` loop | 32.6 ms | 304.8 ms | 33.8 ms (1.04x) |
+| the same chain called from a `while` loop | 320.9 ms | 322.9 ms | 36.7 ms (0.11x) |
+| `m3x4.f` (four times the M3 program) | 140.8 ms | 133.0 ms | 136.9 ms |
+
 ## 7. Size
 
 Production (`src/`, against `4c7d0b40`): 37 files, +905 −109. New: `op_admission.{h,cpp}`,
@@ -376,7 +391,7 @@ following commit changes this record only). Every gate: exit 0, git status clean
 | `test-runtime2-packages` | 830 checks, 0 failed |
 | `test-runtime2-vm-default`, `-refsem`, `-collections` | PASS (475, 278 checks) |
 | `vm-modules-unit`, `vm-inventory-links`, `semantics-modules` | 179 checks; 10 cases; PASS |
-| `vm-adversarial` | 39612 programs, 0 non-approved differences |
+| `vm-adversarial` | 39612 programs (default `--count 600`, seed 1), 0 non-approved differences. At `--count 5000` (seed 1; the re-review's run) there are 8 non-approved differences, all pre-existing (the B3 binary has 10), none in dispatch or presentation |
 
 The table below is the c56c4093 set (kept for reference).
 
@@ -419,7 +434,7 @@ Through `scratchpad/b4/gate.sh` (tree identity, command, exit code, log sha256, 
 | `test-runtime2-refsem` | PASS refsem-a: 475 checks, 0 failure(s) |
 | `test-runtime2-safety` | PASS runtime2 safety fuzz: 33512 programs (8512 exhaustive, 20000 sampled, 5000 session; seed 1; 1676 run twic |
 | `test-runtime2-vm-default` | PASS VM-default policy |
-| `vm-adversarial` | PASS vm adversarial: 39612 programs, 0 non-approved differences, 196 approved {'D-001#4 recursion': 73, 'D-009 |
+| `vm-adversarial` (`--count 600`) | PASS vm adversarial: 39612 programs, 0 non-approved differences, 196 approved {'D-001#4 recursion': 73, 'D-009 |
 | `vm-inventory-links` | PASS vm inventory links: 10 cases, 0 failure(s) |
 | `vm-modules-unit` | rt vm modules unit: 179 checks, 0 failures |
 | `vm-parity` | PASS vm parity |
@@ -458,17 +473,20 @@ section 2 change (plus the new `b4/` fixtures); no other fixture changes classif
   without B4b would either refuse arithmetic on array elements (new refusals) or reach unchecked
   opcodes. The nested-receiver invalidation (`xs[0].reverse()`, `o.a.reverse()`; both refused today,
   B6) is covered by B4b's per-site widening.
+- **`nift eval --json` of a function** emits its internal tag string (`"\u001fnift:callable:..."`),
+  as B3 did: a pre-existing JSON-mode behaviour, kept unchanged by B4 (review L1) and carried for an
+  owner decision (re-review).
 - `nift eval` display of a struct or map/set/stack stays `eval:collection-result`: its `--json`
   mode is machine-readable, and the presentation form would need the eval entry to know the mode.
 - Sessions: `presentation-struct-method` (earlier schemas' instances), and `$[c]` of an earlier
   statement's instance stays `interpolation:unknown-type` (the binding's kinds are not proven).
 - **B5 prerequisite (review; recorded for the owner).** The dispatch precondition runs at flagged
   sites only. That is acceptable only while the reference guard is on: today an unflagged site's
-  receiver kind is a compile-time fact the guard keeps true. Before the guard is removed (B5),
-  either B4b's per-site typing proves every unflagged method site sound under sharing (aliases,
-  nested collections, closures, sessions, modules, transfers), or the precondition moves to every
-  method native call (about 15 instructions per call, section 6). B4b's design must state which,
-  per site class; B5 does not start without it.
+  receiver kind is a compile-time fact the guard keeps true. B5 does not remove the guard until,
+  for every unflagged method-site class, either B4b's per-site typing is implemented and
+  independently reviewed, or the dispatch precondition is in force at that class. (Site classes:
+  aliases, nested collections, closures, sessions, modules, transfers; the precondition on every
+  method native call costs about 15 instructions per call, section 6.)
 - `for`-loop callees in `rt/prepared.cpp` (review M4): closed (section 1). `outermost_loops` (the
   loop-local declaration typing check) still visits `while` loops only: probes of the shapes it
   guards (`a := 2.5; for (...) { a := "s"; b := a }`) equal legacy in a `for` loop
@@ -494,4 +512,13 @@ Fixes are new commits on top of `c56c4093` (no history rewritten):
 | L2 stale header comment | corrected | B4 15 | `op_admission.h` |
 | L3 `context:collection-empty` broad | recorded: broad but sound | B4 16 | section 1 |
 | B5 prerequisite | recorded | B4 16 | section 9 |
+
+**Re-review of `569e336f` (ACCEPT WITH CONDITIONS)** and the fixes (commits on top of it):
+
+| Item | Fix | Commit | Evidence |
+| --- | --- | --- | --- |
+| N1 C1 admitted literals legacy rejects and a main-file export | a number literal only when the VM admits it; a main-file export may stop | B4 18 | five `b4/c1` fixtures (repro2 `M2r_*`) with legacy's error; A18 |
+| N2 marking quadratic in call-chain depth | worklist | B4 19 | chain shapes in the scaling check; section 6 |
+| §9 B5 wording | the coordinator's sentence | B4 20 | section 9 |
+| vm-adversarial count, `--json` tag | stated exactly | B4 20 | sections 8, 9 |
 
