@@ -9,6 +9,7 @@
 #include "rt/error.h"
 #include "rt/natives/builtin.h"
 #include "rt/shared_state.h"
+#include "rt/op_admission.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -66,13 +67,68 @@ bool blocking_host(natives::BuiltinId id) {
 }
 }
 
+namespace {
+// B4: a Dynamic site whose receiver family has no native of that name: the
+// admission table's failure (text and error class from rt/op_admission.cpp).
+bool dispatch_failed(const Instr& in, const Proto* proto, const natives::BuiltinSpec& spec,
+                     natives::Receiver actual, Fault& fault) {
+    DispatchFailure failure = dispatch_failure(actual, spec.name);
+    if (failure == DispatchFailure::Refuse || failure == DispatchFailure::None) {
+        // Not admitted for this family: the inference let a kind through.
+        note_dispatch_defect();
+        failure = DispatchFailure::Unsupported;
+    }
+    const Note* note = proto->note(static_cast<std::size_t>(&in - proto->code.data()));
+    std::string message = dispatch_failure_message(failure, spec.name, note ? std::string_view(note->text) : "");
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 5
+    return raise(fault, StopReason::Internal, std::move(message));  // A5: the failure is internal (exit 70)
+#endif
+    fault.catchable = dispatch_failure_catchable(failure);
+    return raise(fault, StopReason::Error, std::move(message));
+}
+
+// The dispatch precondition failed at a flagged site: select the native of
+// the receiver's family, or raise the admission table's failure (nullptr).
+// A family with neither is a defect (counted, fatal in checked builds; the
+// table's Unsupported text is raised). Out of line, off the ordinary path.
+[[gnu::noinline]] const natives::BuiltinSpec* redispatch(const Instr& in, const Proto* proto,
+                                                         const natives::BuiltinSpec& spec, const Value& receiver,
+                                                         Fault& fault) {
+    const natives::Receiver actual = natives::receiver_of(receiver);
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 4
+    (void)in; (void)proto; (void)actual; (void)fault;
+    return &spec;  // A4: no redirection (a native meets a foreign receiver)
+#else
+    if (const natives::BuiltinSpec* sibling = natives::dispatch_sibling(spec, actual)) return sibling;
+    dispatch_failed(in, proto, spec, actual, fault);
+    return nullptr;
+#endif
+}
+} // namespace
+
 // CP14: a pure built-in over R[a .. a+c) (receiver first for a method). The
 // natives store `out` last, so the result may replace R[a] directly; the
 // argument registers are temporaries of this call and are cleared.
 bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     const std::size_t id = static_cast<std::size_t>(in.b - kFirstBuiltin);
     if (id >= natives::builtin_count()) return raise(fault, StopReason::Internal, "unknown built-in");
-    const natives::BuiltinSpec& spec = natives::builtin_spec(static_cast<natives::BuiltinId>(id));
+    const natives::BuiltinSpec* chosen = &natives::builtin_spec(static_cast<natives::BuiltinId>(id));
+    std::uint16_t argc = in.c;
+    // B4 dispatch precondition (rt/op_admission.h): at a flagged site (Dynamic
+    // dispatch, the CP19 session branches) a method native only ever receives a
+    // receiver of its own family (redispatch above). Unflagged sites are
+    // compile-time proven; their natives keep their own defensive checks.
+    if (__builtin_expect(argc & kDynamicDispatch, 0)) {  // flagged sites only (b4-dispatch.md 6: measured)
+        argc = static_cast<std::uint16_t>(argc & kCallWindowMask);
+        const std::uint32_t accept = natives::receiver_accept(*chosen);
+        if (accept != 0 && argc > 0 &&
+            (!((accept >> static_cast<unsigned>(R[in.a].kind())) & 1u) ||
+             ((accept & natives::kAcceptSubkind) && natives::receiver_of(R[in.a]) != chosen->receiver))) {
+            chosen = redispatch(in, proto, *chosen, R[in.a], fault);
+            if (!chosen) return false;
+        }
+    }
+    const natives::BuiltinSpec& spec = *chosen;
     natives::Context context;
     context.heap_limit = heap_limit_;
     context.host.trace = nift::trace::enabled() ? &nift::rt::host::TraceChannel::process_default() : nullptr;
@@ -102,8 +158,8 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
             fault.code = "limit.exceeded"; fault.catchable = false;
             return raise(fault, StopReason::Error, "parallel blocking wait limit exceeded");
         }
-        status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
-    } else status = natives::call_builtin(spec, context, &R[in.a], in.c, out, message);
+        status = natives::call_builtin(spec, context, &R[in.a], argc, out, message);
+    } else status = natives::call_builtin(spec, context, &R[in.a], argc, out, message);
     switch (status) {
         case natives::Status::Ok: break;
         case natives::Status::Error:
@@ -160,8 +216,9 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
             return raise(fault, StopReason::Internal, "memory budget exceeded");
     }
     R[in.a] = std::move(out);
-    for (std::uint16_t k = 1; k < in.c; ++k) R[in.a + k] = Value();
+    for (std::uint16_t k = 1; k < argc; ++k) R[in.a + k] = Value();
     return true;
 }
+
 
 } // namespace nift::rt

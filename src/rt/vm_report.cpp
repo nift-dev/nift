@@ -131,7 +131,7 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
 }
 
 bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& output, Fault& fault) {
-    for (std::uint16_t k = 0; k < in.c; ++k)
+    for (std::uint16_t k = 0; k < (in.c & kCallWindowMask); ++k)  // B4: c's top bit is the dispatch flag
         if (is_cell(R[in.a + k])) return internal(fault, "cell reached a native");
     switch (static_cast<NativeId>(in.b)) {
         case NativeId::Print: {

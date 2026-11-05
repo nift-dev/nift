@@ -34,10 +34,13 @@ int UnitCompiler::session_native_call(const Node& node, NodeId receiver, std::st
             next = fb_->emit(OpCode::JmpNotEq, tag, expected);
         }
         const auto& spec = *candidates[k].spec;
+        // B4: flagged, so the VM's dispatch precondition checks every branch
+        // (the last one is not guarded here) and redirects within the family
+        // table, or raises the admission table's failure (rt/op_admission.h).
         const auto call = fb_->emit(OpCode::CallNative, base,
             static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),
-            static_cast<std::uint16_t>(node.count + 1));
-        fb_->note(call, std::string(spec.name));
+            static_cast<std::uint16_t>((node.count + 1) | kDynamicDispatch));
+        fb_->note(call, std::string(text(node)));
         if (k + 1 < candidates.size()) {
             done.push_back(fb_->emit(OpCode::Jmp));
             if (!fb_->patch(next, fb_->here())) return 0;

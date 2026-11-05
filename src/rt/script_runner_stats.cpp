@@ -1,6 +1,7 @@
 #include "rt/script_runner_stats.h"
 #include "rt/eval_refusal_inventory.h"
 #include "rt/refusal_inventory.h"
+#include "rt/op_admission.h"
 
 #include <algorithm>
 
@@ -37,7 +38,8 @@ void report(const Stats& s) {
          << ",\"error_in_loop_path\":" << (s.error_in_loop_path ? "true" : "false")
          << ",\"code\":\"" << json_escape(s.code) << "\",\"catchable\":" << (s.catchable ? "true" : "false")
          << ",\"error_origin\":" << (s.error_origin ? "true" : "false")
-         << ",\"heap_bytes\":" << s.heap_bytes;
+         << ",\"heap_bytes\":" << s.heap_bytes
+         << ",\"dispatch_defects\":" << dispatch_defect_count();  // B4: process-wide, see rt/op_admission.h
     const auto list = [&line](const char* name, const std::vector<std::uint64_t>& values) {
         line << ",\"" << name << "\":[";
         for (std::size_t k = 0; k < values.size(); ++k) line << (k ? "," : "") << values[k];
