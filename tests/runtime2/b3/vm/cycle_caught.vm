@@ -1,0 +1,20 @@
+assignment would create a cyclic reference: next
+N{next:N{next:""}}
+N{next:""}
+[
+  N{
+    next: N{
+      next: "",
+    },
+  },
+  N{
+    next: "",
+  },
+  N{
+    next: N{
+      next: "",
+    },
+  }
+]
+--- stderr
+--- exit 0

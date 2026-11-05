@@ -495,6 +495,52 @@ void sort_protection() {
     }
 }
 
+// B3 (b3-structs.md, owner emphasis): struct rendering under shared
+// references, in the probe configuration (the guard is off, so the alias forms
+// production refuses run here). Rendering is observational and privacy-aware
+// through every alias, container, copy, cycle refusal, transfer and session;
+// SECRET never appears.
+void structs() {
+    const std::string decl = "struct(C) {\n  a := 1\n  private b := \"SECRET\"\n  next := \"\"\n"
+                             "  fn(link(v)) { next = v }\n}\nfn(mk()) { return C() }\n";
+    const std::string c1 = "C{a:1,next:\"\"}";
+    expect("struct-alias-array", decl + "c := mk()\nxs := [c]\nys := xs\nys.push(mk())\nc.a = 9\n"
+           "print(xs.stringify())\nprint(same(xs, ys))\n", "[C{a:9,next:\"\"}," + c1 + "]\ntrue\n");
+    expect("struct-alias-object", decl + "c := mk()\no := {\"k\": [c]}\np := o\nq := p.k\nq.push(c)\n"
+           "print(o.stringify())\n", "{\"k\":[" + c1 + "," + c1 + "]}\n");
+    expect("struct-dag", decl + "c := mk()\nd := mk()\nd.link(c)\na := [c, d]\nb := [a, a]\n"
+           "print(b.stringify())\nprint(d.prettify())\n",
+           "[[" + c1 + ",C{a:1,next:" + c1 + "}],[" + c1 + ",C{a:1,next:" + c1 + "}]]\n"
+           "C{\n  a: 1,\n  next: C{\n    a: 1,\n    next: \"\",\n  },\n}\n");
+    // A cycle closed through aliases of the instances is refused before
+    // anything changes; rendering then terminates on the acyclic graph.
+    expect("struct-cycle-alias", decl + "c := mk()\nd := mk()\nx := c\ny := d\nx.link(y)\n"
+           "try { y.link(c) } catch (e) { print(e.code) }\nzs := [c, d]\nws := zs\nprint(ws.stringify())\n",
+           "runtime.reference_cycle\n[C{a:1,next:" + c1 + "}," + c1 + "]\n");
+    expect("struct-cycle-self", decl + "c := mk()\nx := c\ntry { c.link(x) } catch (e) { print(e.code) }\n"
+           "print([x].stringify())\n", "runtime.reference_cycle\n[" + c1 + "]\n");
+    // Rendering is observational: an alias sees the same graph before and after.
+    expect("struct-observe", decl + "c := mk()\na := [c]\nb := a\ns1 := b.stringify()\ns2 := a.prettify()\n"
+           "print(s1 == a.stringify())\nprint(a.length())\nprint(same(a, b))\n", "true\n1\ntrue\n");
+    expect("struct-copies", decl + "c := mk()\na := [c]\nb := copy(a)\nd := deepcopy(a)\nb.push(mk())\n"
+           "c.a = 5\nprint(a.stringify())\nprint(b.stringify())\nprint(d.stringify())\n",
+           "[C{a:5,next:\"\"}]\n[C{a:5,next:\"\"}," + c1 + "]\n[" + c1 + "]\n");
+    // A session: an array of instances aliased across statements, a schema
+    // replaced in between (old instances keep their descriptor).
+    VmSession session;
+    std::string out;
+    const auto run = [&](const std::string& source) {
+        out.clear();
+        return session.execute(source, "<session>", out).execution.reason == StopReason::None;
+    };
+    CHECK(run("struct(P) {\n  a := 1\n  private b := \"SECRET\"\n}\np := P()\nxs := [p]"));
+    CHECK(run("ys := xs"));
+    CHECK(run("struct(P) {\n  private a := \"SECRET\"\n  b := 2\n}\nq := P()"));
+    CHECK(run("ys.push(q)"));
+    CHECK(run("print(xs.stringify())") && out == "[P{a:1},P{b:2}]\n");
+    CHECK(run("print(ys.prettify())") && out.find("SECRET") == std::string::npos);
+}
+
 } // namespace
 
 int main() {
@@ -507,5 +553,6 @@ int main() {
     session_atomicity();
     identity();
     sort_protection();
+    structs();
     return rt_test::finish("refrep-vm");
 }

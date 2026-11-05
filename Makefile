@@ -5213,6 +5213,39 @@ test-runtime2-refsem-tsan: $(TSAN_TARGET)
 	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TSAN_TARGET)"
 test-rt-vm: test-runtime2-refsem test-runtime2-refsem-mutants
 test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
+# B3 struct type descriptors and privacy-aware struct rendering
+# (docs/runtime-2/checkpoints/b3-structs.md): legacy parity of the struct
+# forms, non-disclosure of private fields on every presentation path, thread
+# and session descriptors (b3_structs.py), and the value-layer unit
+# (tests/rt/struct_render_unit.cpp). The mutants D1-D7 rebuild one object
+# with -DNIFT_B3_MUTANT=n and must fail the suite or the unit.
+RT_STRUCT_RENDER_UNIT := $(TEST_DIR)/rt/struct-render-unit$(EXEEXT)
+RT_STRUCT_RENDER_UNIT_O := $(TEST_DIR)/rt/struct_render_unit.o
+$(RT_STRUCT_RENDER_UNIT_O): tests/rt/struct_render_unit.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -c tests/rt/struct_render_unit.cpp -o "$@"
+$(RT_STRUCT_RENDER_UNIT): $(RT_STRUCT_RENDER_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	$(CXX) $(CXXFLAGS) $(RT_STRUCT_RENDER_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+$(TEST_DIR)/rt-san/struct-render-unit: tests/rt/struct_render_unit.cpp $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -Itests/rt -std=c++17 -pthread $(SANITIZER_FLAGS) $< $(CP23_SAN_OBJECTS) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o "$@"
+.PHONY: test-rt-struct-render-unit test-runtime2-b3 test-runtime2-b3-mutants test-runtime2-b3-sanitize
+test-rt-struct-render-unit: $(RT_STRUCT_RENDER_UNIT)
+	"$(RT_STRUCT_RENDER_UNIT)"
+test-runtime2-b3: $(TARGET) test-rt-struct-render-unit
+	$(PYTHON) tests/runtime2/b3_structs.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-b3-mutants: $(TARGET) $(LIBFFI_A) $(RT_STRUCT_RENDER_UNIT)
+	@mkdir -p "$(TEST_DIR)/b3-mutants"
+	@printf '%s\n' $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) > "$(TEST_DIR)/b3-mutants/unit-objects"
+	B3_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/b3/mutants.sh "$(CURDIR)/$(TARGET)" \
+		"$(TEST_DIR)/b3-mutants/unit-objects"
+test-runtime2-b3-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-san/struct-render-unit
+	"$(TEST_DIR)/rt-san/struct-render-unit"
+	$(PYTHON) tests/runtime2/b3_structs.py --nift "$(CURDIR)/$(SAN_TARGET)"
+test-rt-vm: test-runtime2-b3 test-runtime2-b3-mutants
+test-rt-vm-sanitize: test-runtime2-b3-sanitize
 # B0 pre-release safety (docs/runtime-2/checkpoints/b0-safety.md): an admitted
 # program never stops with an internal VM failure (exit 70) because of a
 # run-time operand kind: handles presented, wrong-kind mutator receivers.
