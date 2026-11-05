@@ -1,5 +1,6 @@
-// B3 (applying the owner ruling of 2026-11-05, which names i05; this same
-// shape through a function value is PENDING OWNER CONFIRMATION): refused
+// B3 (the owner ruling of 2026-11-05 names i05; this same shape through a
+// function value was APPROVED BY THE OWNER, 2026-11-05, under the same
+// conservative rule): refused
 // before any effect as presentation-struct-method:stringify: an explicit
 // stringify() through a
 // function value on an instance of a struct declaring its own stringify, and

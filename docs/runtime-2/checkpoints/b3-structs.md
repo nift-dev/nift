@@ -17,13 +17,15 @@ and the 2026-11-04 addendum (batch B3–B5 certification). Branch `cand/b3-struc
 | `804858a9` | B3 5: review fixes H1, L3, L1 (section 8) and the M1 fixture wording |
 | `7b752464` | B3 6: this record's review section and compatibility.md (M1) (second freeze; re-review: ACCEPT-WITH-CONDITIONS) |
 | `058b23e0` | B3 7: re-review fixes N1 (positional kinds after array mutators), N2 (session refusal reasons); D11 |
-| `B3 8` | this record's re-review section (section 9) and compatibility.md wording (N4); the third freeze |
+| `e3e5d511` | B3 8: this record's re-review section (section 9) and compatibility.md wording (N4) |
+| `B3 9` | the owner's approvals (2.4, 2.5, compatibility.md, the fixtures); the N1 union property recorded; the third freeze |
 
 Gate runs (section 6 and 9):
 - first freeze: on `151fbd50` and `ffeecb9b`;
 - second freeze: on `7b752464` itself;
-- third freeze: on the B3 8 commit itself (a clean tree, after this record was written; the results
-  are in the `n-*.result` files).
+- third freeze: on the B3 9 commit itself (a clean tree, after this record was written; the results
+  are in the `n-*.result` files). A run started on `e3e5d511` was stopped when the owner's
+  approvals arrived; its partial results were discarded.
 
 ## 1. Contract
 
@@ -223,8 +225,8 @@ Each file gained a B3 header line and keeps its Phase A note.
 | Case | Old | New | Reason |
 | --- | --- | --- | --- |
 | `presentation_struct` | `reason` `presentation-struct:highlight` | `phaseb`: `before`, `C{v:0}`, `map([])` (VM = legacy) | B3 renders instances |
-| `presentation_struct_contents` | `reason` `presentation-struct-contents:stringify` | VM difference **pending owner approval**: `vm` `before`, `[C{v:0}]`; `legacy` exit 1, `return: undefined callable: C` | Root cause (review M1): legacy cannot construct its own module's struct from an exported function called by the importer ("undefined callable: C"), while the VM constructs it. That difference **predates B3**: the pre-B3 VM constructs it too (review probe `m5`, base binary). It is now recorded in compatibility.md ("Differences pending an owner decision"). B3 only lets the instance render. The old comment, "legacy: `[C{v:0}]`", was wrong and is corrected in the fixture. **Pending owner approval.** |
-| `presentation_struct_expression` | `reason` `presentation-struct:stringify` | VM difference **pending owner approval**: `vm` `before`, `C{v:0}`; `legacy` exit 1, `return: undefined callable: C` | as above; **pending owner approval** |
+| `presentation_struct_contents` | `reason` `presentation-struct-contents:stringify` | VM difference **approved by the owner, 2026-11-05**: `vm` `before`, `[C{v:0}]`; `legacy` exit 1, `return: undefined callable: C` | Root cause (review M1): legacy cannot construct its own module's struct from an exported function called by the importer ("undefined callable: C"), while the VM constructs it. That difference **predates B3**: the pre-B3 VM constructs it too (review probe `m5`, base binary). It is recorded in compatibility.md ("Documented compatibility differences"). B3 only lets the instance render. The old comment, "legacy: `[C{v:0}]`", was wrong and is corrected in the fixture. **Approved by the owner, 2026-11-05**: correct VM behaviour, the legacy defect is not reproduced; a documented compatibility difference, not a release blocker. |
+| `presentation_struct_expression` | `reason` `presentation-struct:stringify` | VM difference **approved by the owner, 2026-11-05**: `vm` `before`, `C{v:0}`; `legacy` exit 1, `return: undefined callable: C` | as above; **approved by the owner, 2026-11-05** |
 
 **2.5 Explicit presentation calls on structs** (owner ruling of 2026-11-05; section 1).
 
@@ -258,7 +260,7 @@ annotated, and a whole-corpus classify comes with the combined certification.
 | Fixture | Old (Phase A) | Old (earlier B3 tree, = legacy) | New | Justification |
 | --- | --- | --- | --- | --- |
 | `refsem/refuse/presentation_struct_review_i05.f` (a mixed loop over `[C(), map()]`; `C` declares `fn(stringify())` returning 7) | refused `presentation-struct:stringify` | `before`, `6`, `7` (the built-in) | refused `presentation-struct-method:stringify` | an explicit call that may hit a user method needs run-time dispatch (B4); refusing it is better than quietly giving it a different meaning |
-| `refsem/refuse/presentation_struct_review_i04.f` (a function value called with `C()` and with `map()`; `C` declares `stringify` returning `[1,2,3]`) | refused `presentation-struct:stringify` | `before`, `6`, `7` | refused `presentation-struct-method:stringify` | the same shape through a function value. The ruling's text names i05 only, so **this reclassification is pending owner confirmation** (review M1) |
+| `refsem/refuse/presentation_struct_review_i04.f` (a function value called with `C()` and with `map()`; `C` declares `stringify` returning `[1,2,3]`) | refused `presentation-struct:stringify` | `before`, `6`, `7` | refused `presentation-struct-method:stringify` | the same shape through a function value. The ruling's text named i05 only; this reclassification was **approved by the owner, 2026-11-05**, under the same conservative rule (review M1) |
 
 The new reason has a classification row (`presentation-struct-method:*`, M, pending B4 dynamic
 dispatch) and a user-facing message: "`.stringify()` on a value that may be an instance of a
@@ -489,10 +491,9 @@ Not run locally, by the batching ruling (the combined B3–B5 Linode certificati
   refsem i04 and i05.
 - **Decisions already taken:** the explicit/implicit presentation rule (owner, 2026-11-05;
   section 2.5).
-- **Decisions still open** (the coordinator has put them to the owner):
-  - the two module classification changes (2.4), whose root cause is the pre-existing
-    construction difference in compatibility.md;
-  - i04's reclassification (2.5).
+- **Decisions taken (owner, 2026-11-05):** the two module classification changes (2.4: correct VM
+  behaviour, documented compatibility differences, not release blockers) and i04's reclassification
+  (2.5, the same conservative rule as i05).
 - **Combined certification, performance review (review L2):** the per-isolate `StructTypeTable`
   grows without bound and is searched linearly.
   - Versions are process-unique per compile, and the main thread's `AtomTable` is a
@@ -556,6 +557,7 @@ The findings and their fixes (`804858a9`):
     approval". The root cause is recorded as a difference that predates B3: legacy cannot
     construct its own module's struct from an exported function called by the importer.
   - i04's reclassification is marked pending confirmation (2.5).
+  - Both have since been approved by the owner (section 9) and the wording updated.
 - **L3 (low), fixed.**
   - A private presentation method is a user method only through `this`. From outside it is not
     callable, so the built-in renders (legacy parity) and the method never runs. This holds for
@@ -662,6 +664,28 @@ were verified, with no regressions. The findings:
   - The record header's stale row and the gate-commit claims are corrected.
   - D10's count is corrected.
   - The second freeze's gate results are folded in (section 8).
+- **Owner rulings of 2026-11-05 (after the re-review):**
+  - The two module cases are approved as correct VM behaviour (the legacy defect is not
+    reproduced). They are documented compatibility differences, not release blockers.
+  - i04 is approved under the same conservative rule as i05.
+  - The fixtures, 2.4, 2.5, section 7 and compatibility.md now say so.
+- **N1, the owner's extra requirement:** type information must describe the value currently in a
+  position, never a stale concrete kind. This holds:
+  - After any mutator except a pure append, the positional facts are dropped, and the element type
+    is the union of every kind ever stored in the array (`add_element` clears `items` and
+    `tuple`). That union is a sound superset of what any position can hold now, never a single
+    kind left over from an earlier position.
+  - Probes (`scratchpad/b3/probe/n1u/`), all matching legacy or refused before any effect:
+    - `[1, 2]` reversed: `xs[0] + 1` still compiles (int stays int);
+    - `[1, "a"]` reversed or popped: the union is handled dynamically;
+    - `[[1,2,3], "ab"]` reversed: `xs[0].length()` dispatches on the union;
+    - `["s"]` cleared then pushed `5`: `xs[0] + 1` gives 6;
+    - `[1]` cleared then pushed `"s"`: `xs[0].length()` is refused (`type:length`). The union
+      int|string is conservative; this was the same before the fix.
+  - A mutation through a parameter alias or a nested alias is refused by the reference guard. One
+    in a loop body or a function body over a global invalidates too (refused).
+  - Precision and performance did not drop (above): only the nine new fixtures change
+    classification, and ops/mutation are identical.
 - **Informational (from the re-review):** `StructType::is_private(i)` returns false for
   `i >= mask size`. That is unreachable while the padding invariant holds, but it would not be
   fail-closed; noted for the combined certification.

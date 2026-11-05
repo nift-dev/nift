@@ -83,11 +83,11 @@ replacement (`[3]`). Coordinator ruling under the owner's
 correctness-over-legacy policy, owner-approved, 2026-11-01 (D-NEXT-refsem
 round 4); the owner may reverse it.
 
-## Differences pending an owner decision
+## Documented compatibility differences (approved by the owner, not release blockers)
 
 | Difference | Legacy | VM | Status |
 | --- | --- | --- | --- |
-| A module's exported function constructing that module's own struct, called from the importer (`m.f`: `struct(C){v:=7}`, `fn(make()){return C()}`, `export(make)`; `main.f`: `a := make(); print(a.v)`) | fails: `return: undefined callable: C` (exit 1); construction at the module's top level works | constructs the instance (`7`) | **predates B3** (the pre-B3 VM already constructs it); B3 lets such instances render too (`refsem/modules/presentation_struct_contents`, `presentation_struct_expression`, `b3/modules/proven_method`); classification **pending owner approval** (review M1 of B3) |
+| A module's exported function constructing that module's own struct, called from the importer (`m.f`: `struct(C){v:=7}`, `fn(make()){return C()}`, `export(make)`; `main.f`: `a := make(); print(a.v)`) | fails: `return: undefined callable: C` (exit 1); construction at the module's top level works | constructs the instance (`7`) | **predates B3** (the pre-B3 VM already constructs it); B3 lets such instances render too (`refsem/modules/presentation_struct_contents`, `presentation_struct_expression`, `b3/modules/proven_method`); **approved by the owner, 2026-11-05**: correct VM behaviour, the legacy defect is not reproduced (review M1 of B3) |
 
 ## Syntax compatibility (D-045, owner, 2026-10-20)
 
