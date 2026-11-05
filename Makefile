@@ -1736,7 +1736,7 @@ certify-targets: test-rt-isolation test-production-deps
 # certify.py (it rebuilds the shared in-tree objects under other configurations).
 .PHONY: test-build-reuse
 test-build-reuse: $(TARGET)
-	bash scripts/build/check-build-reuse.sh "$(TEST_DIR)/build-reuse"
+	bash scripts/build/check-build-reuse.sh build-reuse-out
 certify-targets: test-build-reuse
 .PHONY: test-c-abi-symbols
 test-c-abi-symbols: $(SHARED_LIB) $(ABI_EXPORT_MAP) $(C_ABI_PIC) $(LIBFFI_A)

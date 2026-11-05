@@ -32,3 +32,5 @@ dist/
 *.egg-info/
 bindings/python/build/
 bindings/python/native/
+# tooling checkpoint: test-build-reuse logs (outside .build, which its distclean check removes)
+/build-reuse-out/
