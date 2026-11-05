@@ -88,15 +88,18 @@ def run_session(nift, stdin, work, mode="require", argv=()):
 # so a copied array, a lending to session code, or a loop over a session
 # array is refused; ordinary array use runs).
 SESSIONS = [
-    # Review round 3 (coordinator): a struct declared in an earlier statement;
-    # presenting an array holding an instance is refused before that statement.
-    # The earlier statement's print ran; the refused statement printed nothing.
-    # Review round 4 (F1): a session binding holding an instance, presented
-    # through another name.
+    # Review round 3 (coordinator) / round 4 (F1): a struct declared in an
+    # earlier statement, an instance presented through another name and inside
+    # an array. Refused by Phase A (presentation-struct:stringify,
+    # presentation-struct-contents:stringify); B3 renders them: parity.
     ("session_struct_value", 'struct(C) {\n  v := 0\n}\nc := C()\nx := c\nprint("before")\n'
-     'print("x"); print(x.stringify())\n', ("refuse", "before\n", "presentation-struct:stringify")),
+     'print("x"); print(x.stringify())\n', ("parity",)),
     ("session_struct_contents", 'struct(C) {\n  v := 0\n}\nc := C()\na := [c]\nprint("before")\n'
-     'print("x"); print(a.stringify())\n', ("refuse", "before\n", "presentation-struct-contents:stringify")),
+     'print("x"); print(a.stringify())\n', ("parity",)),
+    # Formerly pending (B3): the CP19 case unrelated-callback-shadow as it was
+    # (a struct declared, an unrelated array presented).
+    ("cp19_unrelated_callback_shadow", 'struct(Point){x:=0;fn(get()){return x}};p:=Point()\n'
+     '[1,2].map(x=>x+1).stringify()\np.get()\nexit\n', ("parity",)),
     ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
     ("session_array_map", 'xs := [3, 1, 2]\nys := xs.map((v) => v * 2)\nprint(ys.length())\n', ("parity",)),
     # Sessions are fully conservative: a session read is typed "anything", so
