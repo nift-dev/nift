@@ -66,8 +66,16 @@ struct InvocationBinding {
     // binding in the unit being compiled (locate_invocation_shadows), or kNoNode.
     NodeId shadow = kNoNode;
 };
+// B3: the descriptor of a session struct's current schema version. While its
+// declaring statement compiles, `definition` is null; publication
+// (bind_session_struct_types) sets it to the published SessionDefinition.
+struct SessionStructType {
+    std::shared_ptr<const SessionDefinition> definition;
+    std::shared_ptr<const StructType> type;
+};
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
+    std::unordered_map<std::string, SessionStructType> struct_types;  // B3, by struct name
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
     std::unordered_set<std::string> imported_functions, phased_functions, inactive_imports, reserved_rebindings;
     std::unordered_map<const SessionDefinition*, std::string> named_templates;

@@ -108,7 +108,7 @@ Value array_of(std::initializer_list<Value> items) {
 Value immutable(Value v) { m::make_immutable(v); return v; }
 Value a123() { return array_of({Value::integer(1), Value::integer(2), Value::integer(3)}); }
 Value obj() { Value o = make_object(); object_set(o, atom("k"), Value::integer(1)); return o; }
-Value inst() { Value s = make_struct(atom("P")); struct_add_field(s, atom("x"), Value::integer(1)); return s; }
+Value inst() { Value s = make_struct(test_struct_type("P")); struct_add_field(s, atom("x"), Value::integer(1)); return s; }
 Value coll(CollectionKind k, bool filled) {
     Value c = make_collection(k);
     if (filled && k == CollectionKind::Map) map_set(c, make_string("a"), Value::integer(1));

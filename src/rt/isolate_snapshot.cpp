@@ -8,7 +8,7 @@ namespace nift::rt {
 namespace {
 const std::uint16_t* atom_operand(const Instr& in) {
     switch (in.op) {
-        case OpCode::ObjectSet: case OpCode::NewStruct:
+        case OpCode::ObjectSet:
         case OpCode::StructAdd: case OpCode::FieldSet: return &in.b;
         case OpCode::GetMember: case OpCode::FieldGet: return &in.c;
         default: return nullptr;
@@ -47,6 +47,9 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
         dst.code = src.code; dst.offsets = src.offsets;
         for (const auto& in : src.code) if (auto operand = atom_operand(in)) used_atoms.insert(*operand);
         dst.notes = src.notes; dst.note_table = src.note_table;
+        // B3: struct descriptors by value (never the source isolate's objects);
+        // the task interns them in its own table (isolate_task.cpp clone_proto).
+        for (const auto& type : src.struct_types) dst.struct_types.push_back(std::make_shared<StructType>(*type));
         if (src.collection_entry) dst.collection_entry = copy->protos.at(indices.at(src.collection_entry)).get();
         input.constant_counts.push_back(src.constants.size());
         for (const auto& v : src.constants) {

@@ -102,7 +102,8 @@ void abi_campaign() {
 }
 
 
-static nift::rt::Atom keys[10], type_name;
+static nift::rt::Atom keys[10];
+static std::shared_ptr<const nift::rt::StructType> type_name;
 static nift::rt::Value fixture(int kind) {
     using namespace nift::rt;
     Value value = kind == 0 ? make_array() : kind == 1 ? make_object() : make_struct(type_name);
@@ -121,7 +122,7 @@ static void check_contents(int kind, const nift::rt::Value& value, long expected
         kind == 1 ? object_get(value,keys[1]) : struct_get(value,keys[1]);
     CHECK(child && child->is(Kind::Int) && child->as_int() == expected);
     CHECK(may_contain_identity(value));
-    if (kind == 2) CHECK(struct_type(value) == type_name);
+    if (kind == 2) CHECK(struct_type_ref(value) == type_name);
 }
 // B2 (b2-refrep.md): the explicit clone sites that replaced unshare
 // (array_shallow_clone / object_shallow_clone: loop and callback snapshots,
@@ -453,7 +454,7 @@ static void literal_campaign() {
 int main() {
     using namespace nift::rt;
     for (int i = 0; i < 10; ++i) { char key[32]; std::snprintf(key,sizeof key,"cow-key-%d",i); keys[i] = atom(key); }
-    type_name = atom("CowDirectStruct");
+    type_name = test_struct_type("CowDirectStruct");
     abi_campaign();
     for (int kind = 0; kind < 3; ++kind) direct_campaign(kind);
     for (int which = 0; which < 7; ++which) growth_campaign(which);

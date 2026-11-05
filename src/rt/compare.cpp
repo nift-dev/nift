@@ -109,7 +109,8 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
             return object_size(left) == object_size(right) ? Shallow::Descend : Shallow::Unequal;
         case Kind::Struct:  // D-NEXT-refsem #2: instances compare by identity (legacy's `==`)
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 3
-            return struct_type(left) == struct_type(right) && struct_fields(left).size() == struct_fields(right).size()
+            return struct_type(left).name == struct_type(right).name &&
+                           struct_fields(left).size() == struct_fields(right).size()
                        ? Shallow::Descend : Shallow::Unequal;  // R3: structural struct equality (the old D-040 rule)
 #else
             return left.heap() == right.heap() ? Shallow::Equal : Shallow::Unequal;
@@ -311,7 +312,7 @@ bool is_aggregate(const Value& v) {
 
 std::uint64_t seed_of(const Value& v) {
     if (v.is(Kind::Array)) return 8u;
-    if (v.is(Kind::Struct)) return mix(10u, hash_text(atom_text(struct_type(v))));
+    if (v.is(Kind::Struct)) return mix(10u, hash_text(struct_type(v).name));
     return 9u;
 }
 

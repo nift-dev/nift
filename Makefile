@@ -867,7 +867,7 @@ $(RT_HANDLE_BOX_UNIT): tests/rt/handle_box_unit.cpp $(RT_HANDLE_DEPS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/struct_type.cpp src/rt/number.cpp src/rt/decimal.cpp -o "$@"
 
 .PHONY: test-rt-handles test-rt-handles-sanitize test-rt-handles-tsan test-rt-handles-guards
 # RT_HANDLE_STRESS_MS / RT_HANDLE_RACE_ROUNDS size the concurrency runs.
@@ -893,7 +893,7 @@ test-rt-handles-sanitize:
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_lifecycle_unit.cpp $(RT_HANDLE_SOURCES) \
 		-o "$(TEST_DIR)/rt-san/handle-lifecycle"
 	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) -pthread tests/rt/handle_box_unit.cpp $(RT_HANDLE_SOURCES) \
-		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/number.cpp src/rt/decimal.cpp \
+		src/rt/compare.cpp src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/atom.cpp src/rt/struct_type.cpp src/rt/number.cpp src/rt/decimal.cpp \
 		-o "$(TEST_DIR)/rt-san/handle-box-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-unit"
 	ulimit -f 100000; timeout 600 "$(TEST_DIR)/rt-san/handle-box-unit"
@@ -1695,7 +1695,7 @@ libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A) $(LIBNIFT_C_EXPORT_DEPS)
 # (B-M1: publish keeps the value; B-M2: a move copies). Each variant compiles
 # its whole, small source set with its own defines (no configuration mixing).
 BUILD_UNIT_SOURCES := src/rt/aggregate.cpp src/rt/aggregate_collection.cpp src/rt/value.cpp src/rt/heap_account.cpp \
-	src/rt/string.cpp src/rt/atom.cpp src/rt/copy_graph.cpp src/rt/compare.cpp src/rt/decimal.cpp src/rt/number.cpp
+	src/rt/string.cpp src/rt/atom.cpp src/rt/struct_type.cpp src/rt/copy_graph.cpp src/rt/compare.cpp src/rt/decimal.cpp src/rt/number.cpp
 BUILD_UNIT_VARIANTS := release checked mutant-1 mutant-2
 BUILD_UNIT_DEFINES_release :=
 BUILD_UNIT_DEFINES_checked := -DNIFT_RT_CHECKED_REFS
@@ -3784,7 +3784,7 @@ test: test-call-semantics
 # ASan+UBSan build. Linked against the CP09 value model only (not the CP12
 # compiler/VM). RT_BUILTINS_LEGACY: the legacy nift binary used as oracle.
 RT_BUILTINS_LEGACY ?= $(CURDIR)/$(TARGET)
-RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp compare.cpp \
+RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp struct_type.cpp heap_account.cpp compare.cpp \
 	number.cpp decimal.cpp render.cpp error.cpp handle.cpp legacy_bridge.cpp) src/RuntimeValue.cpp \
 	src/Sha256.cpp src/JsonSchema.cpp
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
@@ -3855,7 +3855,7 @@ bench-rt-case-conversion: $(RT_CASE_BENCH)
 # natives with the CP09 value model WITHOUT RuntimeValue.cpp, legacy_bridge.cpp
 # and render.cpp (a call into them fails the link), and the sources must not
 # include their headers.
-RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp heap_account.cpp \
+RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggregate_collection.cpp atom.cpp struct_type.cpp heap_account.cpp \
 	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp $(RT_BUILTINS_HOST)
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 

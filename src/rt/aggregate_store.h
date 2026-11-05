@@ -146,6 +146,22 @@ inline void check_fresh(const Value& value) {
 #endif
 }
 
+// B3 (b3-structs.md): an instance's field i is its descriptor's field i (the
+// order the compiler, the transfer decoder and copies build fields in), which
+// lets rendering pair fields by position. Checked builds abort when a field
+// is added at a declared position under another name. A field beyond the
+// declared ones (C++-built test values only) is allowed and never rendered;
+// release builds keep no check, and the renderer then pairs by name and never
+// renders a field its descriptor does not declare (fail closed).
+inline void check_struct_pairing(const StructObject& instance, Atom field) {
+#ifdef NIFT_RT_RELOCATE_ON_MUTATION
+    const std::size_t i = instance.fields.size();
+    if (i < instance.type->size() && instance.type->fields[i] != atom_text(field)) std::abort();
+#else
+    (void)instance; (void)field;
+#endif
+}
+
 // Hot path (every push/set): scalars and strings are decided by one compare,
 // since every kind that can carry identity sorts at or after Kind::Array.
 // B2 (plan 5.1): a nested array or object is a reference too, so storing one

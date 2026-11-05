@@ -262,18 +262,22 @@ bool Storage::object_remove(Value& object, Atom key) {
     return true;
 }
 
-Value make_struct(Atom type_name, std::size_t reserve) {
+Value make_struct(const std::shared_ptr<const StructType>& type, std::size_t reserve) {
     // Owned before reserve (as make_array): a failed reserve must release the
     // instance (B2: found by the struct copy's allocation-failure campaign,
     // tests/runtime2/cp18/cow_allocation.cpp; a leak before B2 too).
-    Value owned = Value::adopt(new StructObject(type_name));
+    if (!type) std::abort();  // B3: every instance has its descriptor
+    Value owned = Value::adopt(new StructObject(type));
     auto* instance = owned.heap_as<StructObject>();
     instance->fields.reserve(reserve);
     heap_retally(instance);
     return owned;
 }
 
-Atom struct_type(const Value& instance) { return instance.heap_as<StructObject>()->type_name; }
+const StructType& struct_type(const Value& instance) { return *instance.heap_as<StructObject>()->type; }
+const std::shared_ptr<const StructType>& struct_type_ref(const Value& instance) {
+    return instance.heap_as<StructObject>()->type;
+}
 
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance) {
     return instance.heap_as<StructObject>()->fields;
@@ -290,6 +294,7 @@ void Construction::struct_add_field(Value& instance, Atom field, Value&& value) 
     check_fresh(instance);  // construction only (B2, owner B)
     relocate_storage(instance.heap());
     check_not_self(instance.heap(), value);
+    check_struct_pairing(*instance.heap_as<StructObject>(), field);  // B3: field i is descriptor field i
     note_store(instance.heap(), value);
     instance.heap_as<StructObject>()->fields.emplace_back(field, static_cast<Value&&>(value));
     heap_retally(instance.heap());
@@ -300,7 +305,7 @@ bool Storage::struct_set(Value& instance, Atom field, Value value) {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 2
     if (instance.refcount() > 1) {  // R2: a shared instance is copied on write (the old value semantics)
         const auto* source = instance.heap_as<StructObject>();
-        build::Struct copy(source->type_name, source->fields.size());
+        build::Struct copy(source->type, source->fields.size());
         for (const auto& f : source->fields) copy.add(f.first, f.second);
         instance = std::move(copy).publish();
     }

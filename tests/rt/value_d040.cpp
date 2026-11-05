@@ -65,9 +65,9 @@ Value I(std::int64_t i) { return Value::integer(i); }
 // equality and hash of instances are identity, and a self-store is a cycle the
 // caller must refuse (the checker finds it; the value layer never clones).
 void structs() {
-    Value q = make_struct(atom("Q"));
+    Value q = make_struct(test_struct_type("Q"));
     struct_add_field(q, atom("v"), I(1));
-    Value p = make_struct(atom("P"));
+    Value p = make_struct(test_struct_type("P"));
     struct_add_field(p, atom("x"), I(1));
     struct_add_field(p, atom("s"), I(2));  // a private field takes part like any other
     struct_add_field(p, atom("q"), q);
@@ -78,20 +78,20 @@ void structs() {
     CHECK(struct_get(q, atom("v"))->as_int() == 7);  // the nested instance itself
     CHECK(equal(p, copy) && hash(p) == hash(copy));
     CHECK(!struct_set(copy, atom("nope"), I(1)) && !struct_slot_mut(copy, atom("nope")));
-    Value twin = make_struct(atom("P"));  // same type and fields: another instance
+    Value twin = make_struct(test_struct_type("P"));  // same type and fields: another instance
     struct_add_field(twin, atom("x"), I(1));
     struct_add_field(twin, atom("s"), I(2));
     struct_add_field(twin, atom("q"), q);
     CHECK(!equal(p, twin) && !equal(twin, p));
     Value o = make_object();
     object_set(o, atom("x"), I(1));
-    Value px = make_struct(atom("P"));
+    Value px = make_struct(test_struct_type("P"));
     struct_add_field(px, atom("x"), I(1));
     CHECK(!equal(px, o) && !equal(o, px));
     CHECK(copy.heap() == p.heap());  // never cloned (B2: no unshare at all)
     // A self-store is a cycle: found by the checker before anything is stored.
     CycleGraph graph;
-    Value self = make_struct(atom("N"));
+    Value self = make_struct(test_struct_type("N"));
     struct_add_field(self, atom("next"), Value());
     CHECK(would_close_cycle(CycleTarget::aggregate(self.heap()), self, graph));
     CHECK(legacy_reference_cycle(self.heap(), self));
@@ -104,7 +104,7 @@ void structs() {
     CHECK(would_close_cycle(CycleTarget::aggregate(self.heap()), arr, graph));
     CHECK(!legacy_reference_cycle(self.heap(), arr));  // legacy accepts it (arrays are copies there)
     CHECK(struct_get(self, atom("next"))->is_null());
-    Value other = make_struct(atom("N"));
+    Value other = make_struct(test_struct_type("N"));
     CHECK(!would_close_cycle(CycleTarget::aggregate(self.heap()), other, graph));
     // Collections share the same way; a shallow clone is a new outer object.
     Value m = make_collection(CollectionKind::Map);
@@ -320,7 +320,7 @@ std::string show(const Value& v) {
             return out + "}";
         }
         case Kind::Struct: {
-            std::string out = std::string(atom_text(struct_type(v))) + "{";
+            std::string out = struct_type(v).name + "{";
             for (std::size_t n = 0; n < struct_fields(v).size(); ++n)
                 out += (n ? "," : "") + std::string(atom_text(struct_fields(v)[n].first)) + ":" +
                        show(struct_fields(v)[n].second);
@@ -363,8 +363,8 @@ void self_insertion() {
     // Structs (D-NEXT-refsem #4): a store of an instance into itself, directly
     // or two levels down, is a cycle the checker finds before the caller
     // stores anything.
-    Value s = make_struct(atom("S"));
-    { Value inner = make_struct(atom("In")); struct_add_field(inner, atom("list"), make_array());
+    Value s = make_struct(test_struct_type("S"));
+    { Value inner = make_struct(test_struct_type("In")); struct_add_field(inner, atom("list"), make_array());
       struct_add_field(s, atom("inner"), inner); struct_add_field(s, atom("next"), Value()); }
     CycleGraph graph;
     const HeapObject* list_owner = struct_get(s, atom("inner"))->heap();
@@ -407,9 +407,9 @@ void sameness() {
     CHECK(shallow_copy(a, copy, kNoCopyLimit) == CopyStatus::Ok && same(a, copy) == Sameness::Different);
     CHECK(same(I(1), I(1)) == Sameness::NotIdentity && same(make_string("x"), h) == Sameness::NotIdentity);
     // D-NEXT-refsem #2: struct instances and collections are identities.
-    Value st = make_struct(atom("P"));
+    Value st = make_struct(test_struct_type("P"));
     Value st2 = st;
-    Value other = make_struct(atom("P"));
+    Value other = make_struct(test_struct_type("P"));
     Value c = make_collection(CollectionKind::Set);
     CHECK(same(st, st2) == Sameness::Same && same(st, other) == Sameness::Different);
     CHECK(same(c, c) == Sameness::Same && same(c, st) == Sameness::Different);
@@ -456,7 +456,7 @@ void summary_bit(long rounds) {
     for (int n = 0; n < 50; ++n) array_push(plain, I(n));
     Value obj = make_object();
     object_set(obj, atom("a"), plain);
-    Value st = make_struct(atom("S"));
+    Value st = make_struct(test_struct_type("S"));
     struct_add_field(st, atom("o"), obj);
     array_set(plain, 0, I(5));
     CHECK(!may_contain_identity(plain) && may_contain_identity(obj));
@@ -545,7 +545,7 @@ void aggregate_cycles(long rounds) {
         for (int k = 0; k < 3; ++k) refs.push_back(make_collection(CollectionKind::Map));
         refs.push_back(make_collection(CollectionKind::Stack));
         for (int k = 0; k < 2; ++k) {
-            Value st = make_struct(atom("N"));
+            Value st = make_struct(test_struct_type("N"));
             struct_add_field(st, atom("next"), Value());
             refs.push_back(st);
         }
@@ -605,7 +605,7 @@ Value random_stored(TestGraph& g, std::vector<Value>& closures) {
             array_push(a, below(2) ? closures[below(closures.size())] : Value::handle(HandleKind::Mutex, below(4) + 1, 1));
             Value o = make_object();
             object_set(o, atom("inner"), a);
-            Value st = make_struct(atom("Box"));
+            Value st = make_struct(test_struct_type("Box"));
             struct_add_field(st, atom("o"), o);
             return st;
         }
@@ -808,7 +808,7 @@ void tag_masking() {
         {"bytes", [] { return make_bytes({1, 2, 3}); }},
         {"array", [] { Value a = make_array(); array_push(a, I(1)); array_push(a, make_string("x")); return a; }},
         {"object", [] { Value o = make_object(); object_set(o, atom("k"), I(2)); return o; }},
-        {"struct", [] { Value s = make_struct(atom("P")); struct_add_field(s, atom("x"), I(3)); return s; }},
+        {"struct", [] { Value s = make_struct(test_struct_type("P")); struct_add_field(s, atom("x"), I(3)); return s; }},
         {"error", [] { return make_user_error("boom"); }},
     };
     for (auto& [name, make] : makers) {

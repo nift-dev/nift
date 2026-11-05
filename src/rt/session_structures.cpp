@@ -25,5 +25,14 @@ void session_structures(const Ast& ast, NodeId root, const SessionText& text,
         }
         pending.structures.insert_or_assign(definition->name, std::move(definition));
     }
+    // B3: a descriptor made by a struct's declaring statement belongs to the
+    // schema version this statement publishes (compiler_structs.cpp).
+    for (auto it = pending.struct_types.begin(); it != pending.struct_types.end();) {
+        if (it->second.definition) { ++it; continue; }
+        const auto published = pending.structures.find(it->first);
+        if (published == pending.structures.end()) { it = pending.struct_types.erase(it); continue; }
+        it->second.definition = published->second;
+        ++it;
+    }
 }
 } // namespace nift::rt

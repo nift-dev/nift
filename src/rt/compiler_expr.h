@@ -303,6 +303,7 @@ private:
     int inferred_struct(NodeId id) const;
     bool receiver_value(NodeId object, std::uint16_t dst);
     bool struct_construct(const Node& call, int s, std::uint16_t reg);
+    std::vector<std::shared_ptr<const StructType>> struct_descriptors_;  // B3, per plan_.structs (compiler_structs)
     bool struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver, int receiver_reg,
                      std::uint16_t dst);
     bool struct_member(const Node& node, int s, bool is_this, std::uint16_t dst);

@@ -178,11 +178,11 @@ void structs_and_errors() {
     std::string error;
     Value decoded;
 
-    Value point = make_struct(atom("Point"), 2);
+    Value point = make_struct(test_struct_type("Point"), 2);
     struct_add_field(point, atom("x"), I(10));
     struct_add_field(point, atom("y"), S("twenty"));
     CHECK(roundtrip(point, protos, graph, decoded, error));
-    CHECK(decoded.is(Kind::Struct) && atom_text(struct_type(decoded)) == "Point");
+    CHECK(decoded.is(Kind::Struct) && struct_type(decoded).name == "Point");
     CHECK(struct_fields(decoded).size() == 2);
     CHECK(atom_text(struct_fields(decoded)[0].first) == "x");
     CHECK(struct_fields(decoded)[0].second.as_int() == 10);

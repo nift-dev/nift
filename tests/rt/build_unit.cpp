@@ -156,7 +156,7 @@ static void publication() {
         expect_harmless_reuse("Object::set", reuse_in_child(v, [&] { b.set(atom("b"), Value::integer(2)); }));
     }
     {   // Struct
-        build::Struct b(atom("Point"), 2);
+        build::Struct b(test_struct_type("Point"), 2);
         b.add(atom("x"), Value::integer(1));
         Value v = std::move(b).publish();
         CHECK(struct_fields(v).size() == 1 && v.refcount() == 1);
@@ -203,7 +203,7 @@ static Value nested(bool& threw, int k) {
         build::Array items(3);
         items.push(make_string(std::string(40, 'a')));
         items.push(make_string(std::string(40, 'b')));
-        build::Struct point(atom("P"), 2);
+        build::Struct point(test_struct_type("P"), 2);
         point.add(atom("x"), make_string(std::string(40, 'x')));
         top.set(atom("items"), std::move(items).publish());
         top.set(atom("point"), std::move(point).publish());
@@ -247,7 +247,7 @@ static void allocation_failure() {
     bulk.append(Value::integer(1));
     build::Object o;
     o.set(atom("k"), Value::integer(1));
-    build::Struct s(atom("S"), 1);
+    build::Struct s(test_struct_type("S"), 1);
     s.add(atom("f"), Value::integer(1));
     remaining = 0;
     bool threw = false;

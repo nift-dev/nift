@@ -142,7 +142,8 @@ Value wide(std::size_t width) {
 // holding the next level plus leaves, so pointer reversal walks every kind and
 // resumes at non-zero child indexes.
 Value spine(std::size_t depth, std::size_t salt) {
-    const Atom next = atom("next"), leaf = atom("leaf"), num = atom("num"), type = atom("Node");
+    const Atom next = atom("next"), leaf = atom("leaf"), num = atom("num");
+    const auto type = test_struct_type("Node");
     Value cur = make_array(0);
     for (std::size_t i = 0; i < depth; ++i) {
         Value level;
@@ -271,7 +272,7 @@ std::vector<Value> build(const Graph& g) {
             built.push_back(v);
             continue;
         }
-        Value v = node.kind == 0 ? make_array(0) : node.kind == 1 ? make_object() : make_struct(atom("P"), 0);
+        Value v = node.kind == 0 ? make_array(0) : node.kind == 1 ? make_object() : make_struct(test_struct_type("P"), 0);
         add_slot(v, node.kind, 0, make_string(label(int(i))));
         for (std::size_t c = 0; c < node.children.size(); ++c) add_slot(v, node.kind, c + 1, built[node.children[c]]);
         built.push_back(v);

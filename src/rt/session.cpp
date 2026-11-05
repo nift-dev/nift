@@ -66,6 +66,7 @@ VmResult VmSession::finish(bool cancelled) {
     result.host_fault = faults.host_fault;
     result.host_fault_message = std::move(faults.host_fault_message);
     vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
+        namespace_.struct_types.clear();
     linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
     return result;
 }
@@ -75,6 +76,7 @@ void VmSession::close() {
         jobs_.reset();  // CP21 owner destructor still performs bounded cleanup
         // Vm destruction uses CP17's allocation-free emergency release path.
         vm_.reset(); last_value_ = Value(); globals_.clear(); namespace_.symbols.clear(); namespace_.structures.clear();
+        namespace_.struct_types.clear();
         linked_.clear(); units_.clear(); vacant_.clear(); closed_ = true;
     }
 }

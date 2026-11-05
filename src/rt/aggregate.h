@@ -58,8 +58,10 @@ const Value* object_get(const Value& object, Atom key);
 // ones included). Every Value holding an instance refers to the same object;
 // the protocol mutates it in place, visibly through every alias (never
 // cloned). Construction: rt/build.h (build::Struct).
-Value make_struct(Atom type_name, std::size_t reserve = 0);
-Atom struct_type(const Value& instance);
+Value make_struct(const std::shared_ptr<const StructType>& type, std::size_t reserve = 0);
+// B3: the descriptor the instance was constructed from (never null).
+const StructType& struct_type(const Value& instance);
+const std::shared_ptr<const StructType>& struct_type_ref(const Value& instance);
 const std::vector<std::pair<Atom, Value>>& struct_fields(const Value& instance);
 const Value* struct_get(const Value& instance, Atom field);
 

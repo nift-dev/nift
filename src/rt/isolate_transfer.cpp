@@ -17,7 +17,8 @@ const char* transfer_status_name(TransferStatus status) {
 
 TransferGraph::~TransferGraph() { clear(); }
 TransferGraph& TransferGraph::operator=(TransferGraph other) noexcept {
-    nodes_.swap(other.nodes_); tasks_.swap(other.tasks_); shared_.swap(other.shared_);
+    nodes_.swap(other.nodes_); struct_types_.swap(other.struct_types_);
+    tasks_.swap(other.tasks_); shared_.swap(other.shared_);
     std::swap(root_, other.root_); std::swap(has_root_, other.has_root_);
     return *this;
 }
@@ -36,12 +37,18 @@ std::size_t TransferGraph::storage_bytes() const noexcept {
         add(n.fields.capacity() * sizeof(n.fields[0]));
         for (const auto& field : n.fields) add(field.first.size());
     }
+    add(struct_types_.capacity() * sizeof(StructType));
+    for (const auto& type : struct_types_) {
+        add(type.name.size()); add(type.fields.capacity() * sizeof(type.fields[0]));
+        for (const auto& field : type.fields) add(field.size());
+    }
     return bytes;
 }
 
 void TransferGraph::clear() noexcept {
     const bool dropped_roots = !tasks_.empty() || !shared_.empty();
     nodes_.clear();
+    struct_types_.clear();
     tasks_.clear();
     shared_.clear();
     root_ = 0;

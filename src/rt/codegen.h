@@ -29,6 +29,9 @@ public:
 
     // Constants (deduplicated). Returns false when the pool is full.
     bool constant(const Value& value, std::uint16_t& index);
+    // B3: the index of `type` in this proto's struct descriptors (NewStruct's
+    // b operand), deduplicated by identity. False when the table is full.
+    bool struct_type(const std::shared_ptr<const StructType>& type, std::uint16_t& index);
 
     std::size_t emit(OpCode op, std::uint16_t a = 0, std::uint16_t b = 0, std::uint16_t c = 0);
     std::size_t here() const { return proto_->code.size(); }

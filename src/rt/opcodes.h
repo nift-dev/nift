@@ -79,7 +79,7 @@ namespace nift::rt {
     X(GetUpvalueCell) /* R[a] = the cell Value of closure upvalue b            */                    \
     X(SetUpvalue) /* check/store R[b] into closure cell a; text type RK[c]      */                    \
     X(Undefined)  /* raise "unknown value or malformed expression" (lambda free name) */                \
-    X(NewStruct)  /* R[a] = a new instance of struct (atom b), no fields yet      */                   \
+    X(NewStruct)  /* R[a] = a new instance of proto struct_types[b], no fields  */                   \
     X(StructAdd)  /* R[a].(atom b) = RK[c] while constructing                    */                   \
     X(FieldGet)   /* R[a] = R[b].(atom c): a field of the instance (a reference)  */                   \
     X(FieldSet)   /* R[a].(atom b) = RK[c], in place (cycle-checked first)      */                   \

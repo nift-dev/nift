@@ -410,7 +410,7 @@ void batch_b() {
     Result ecopy = call(BuiltinId::FnDeepcopy, {arr({raised, fn})});
     CHECK(ecopy.status == Status::Ok);
     // Review D2: a struct or handle anywhere in the value is a compiler defect.
-    const Value point = Value::adopt(new StructObject(atom("Point")));
+    const Value point = Value::adopt(new StructObject(test_struct_type("Point")));
     CHECK(call(BuiltinId::FnCopy, {point}).status == Status::Internal);
     CHECK(call(BuiltinId::FnCopy, {arr({i(1), obj({{"p", point}})})}).status == Status::Internal);
     CHECK(call(BuiltinId::FnDeepcopy, {obj({{"h", Value::handle(HandleKind::File, 1, 0)}})}).status ==

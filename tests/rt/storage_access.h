@@ -84,6 +84,12 @@ inline void array_build_set(Value& a, std::size_t i, Value v) {
 }
 inline void object_set(Value& o, Atom k, Value v) { StorageTestAccess::build_object_set(o, k, static_cast<Value&&>(v)); }
 inline Value* object_build_slot(Value& o, Atom k) { return StorageTestAccess::build_object_slot(o, k); }
+// B3: a struct descriptor declaring no fields, for C++-built instances (the
+// fields they add are undeclared: never rendered, b3-structs.md). A test that
+// renders builds its descriptor with StructType::make and the declared fields.
+inline std::shared_ptr<const StructType> test_struct_type(std::string name) {
+    return StructType::make(static_cast<std::string&&>(name), {}, {});
+}
 inline void struct_add_field(Value& s, Atom f, Value v) {
     StorageTestAccess::build_struct_add_field(s, f, static_cast<Value&&>(v));
 }

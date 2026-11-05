@@ -16,9 +16,9 @@ namespace nift::rt {
 
 class TransferGraph::Encoder {
 public:
-    Encoder(const TransferProtoMap& protos, std::vector<Node>& nodes,
+    Encoder(const TransferProtoMap& protos, std::vector<Node>& nodes, std::vector<StructType>& types,
             std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks, std::vector<std::shared_ptr<void>>& shared)
-        : protos_(protos), nodes_(nodes), tasks_(tasks), shared_(shared) {}
+        : protos_(protos), nodes_(nodes), types_(types), tasks_(tasks), shared_(shared) {}
     TransferStatus encode(const Value& root, std::uint32_t& root_id, std::string& error) {
         TransferStatus status = add(root, root_id, error);
         while (status == TransferStatus::Ok && !pending_.empty()) {
@@ -84,10 +84,16 @@ private:
                 node.kind = WireKind::Collection;
                 node.binding_type = static_cast<std::int64_t>(collection_kind(value));
                 break;
-            case Kind::Struct:
+            case Kind::Struct: {  // B3: the descriptor by value, once per graph
                 node.kind = WireKind::Struct;
-                node.name = std::string(atom_text(struct_type(value)));
+                const StructType* type = &struct_type(value);
+                const auto known = type_ids_.find(type);
+                if (known != type_ids_.end()) { node.struct_type = known->second; break; }
+                node.struct_type = static_cast<std::uint32_t>(types_.size());
+                types_.push_back(*type);
+                type_ids_.emplace(type, node.struct_type);
                 break;
+            }
             case Kind::Error: {
                 const auto* error_value = value.heap_as<ErrorObject>();
                 node.kind = WireKind::Error;
@@ -258,6 +264,8 @@ private:
     }
     const TransferProtoMap& protos_;
     std::vector<Node>& nodes_;
+    std::vector<StructType>& types_;
+    std::unordered_map<const StructType*, std::uint32_t> type_ids_;
     std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks_;
     std::vector<std::shared_ptr<void>>& shared_;
     std::unordered_map<const HeapObject*, std::uint32_t> seen_;
@@ -267,7 +275,7 @@ private:
 TransferStatus TransferGraph::encode(const Value& root, const TransferProtoMap& protos, std::string& error) {
     clear();
     error.clear();
-    Encoder encoder(protos, nodes_, tasks_, shared_);
+    Encoder encoder(protos, nodes_, struct_types_, tasks_, shared_);
     std::uint32_t root_id = 0;
     const TransferStatus status = encoder.encode(root, root_id, error);
     if (status != TransferStatus::Ok) { clear(); return status; }

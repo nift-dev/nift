@@ -21,6 +21,8 @@
 
 namespace nift::rt {
 
+class StructTypeTable;  // rt/struct_type.h
+
 struct Atom {
     std::uint32_t id = 0;  // 0 is the empty string ""
     bool operator==(Atom o) const noexcept { return id == o.id; }
@@ -46,9 +48,13 @@ public:
     std::string_view text(Atom atom) const { return *names_[atom.id]; }
     std::size_t size() const { return names_.size(); }
     static AtomTable& current();
+    // B3: this isolate's interned struct descriptors (rt/struct_type.h), owned
+    // with the atoms so both live exactly as long as the isolate's symbol domain.
+    StructTypeTable& struct_types();
 
 private:
     std::size_t charged_ = 0;
+    std::unique_ptr<StructTypeTable> struct_types_;
     std::vector<std::unique_ptr<std::string>> names_;
     std::unordered_map<std::string_view, std::uint32_t> ids_;
 };

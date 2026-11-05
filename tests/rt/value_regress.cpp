@@ -208,7 +208,7 @@ void deep_destruction(long depth) {
         for (long i = 0; i < depth / 4; ++i) {
             auto* outer = new FunctionObject();
             outer->upvalues.push_back(f);
-            auto* st = new StructObject(atom("Node"));
+            auto* st = new StructObject(test_struct_type("Node"));
             st->fields.emplace_back(atom("f"), Value::adopt(outer));
             f = Value::adopt(st);
         }

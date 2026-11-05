@@ -183,6 +183,53 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
     return struct_call(node, s, *m, kNoNode, -1, dst) ? 1 : 0;
 }
 
+// B3 (b3-structs.md): one descriptor per declaration per compile; in a
+// session one per schema version: the cached descriptor is reused while the
+// imported SessionDefinition is the one it was made for, and a replaced schema
+// gets a new descriptor (instances built earlier keep theirs).
+namespace {
+std::shared_ptr<const StructType> struct_descriptor(const UnitPlan& plan, SessionCompileContext* session,
+                                                    std::vector<std::shared_ptr<const StructType>>& cache, int s,
+                                                    const std::string& display_name) {
+    const auto index = static_cast<std::size_t>(s);
+    if (cache.size() < plan.structs.size()) cache.resize(plan.structs.size());
+    if (cache[index]) return cache[index];
+    const StructInfo& info = plan.structs[index];
+    std::vector<std::string> names;
+    std::vector<bool> privacy;
+    for (const StructFieldInfo& field : info.fields) {
+        names.emplace_back(field.name);
+        privacy.push_back(field.priv);
+    }
+    std::shared_ptr<const StructType> made;
+    if (session) {
+        const auto schema = session->schema_templates.find(std::string(info.name));
+        const std::shared_ptr<const SessionDefinition> definition =
+            schema != session->schema_templates.end() ? schema->second : nullptr;
+        SessionStructType& cached = session->struct_types[std::string(info.name)];
+        if (definition && cached.type && cached.definition == definition) {
+            made = cached.type;  // the same schema version as an earlier statement
+        } else {
+            made = StructType::make(display_name, std::move(names), std::move(privacy));
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 3
+            // D3: a replaced schema rewrites the cached descriptor in place, so
+            // instances built under the old schema render with the new one.
+            if (cached.type && definition != cached.definition) {
+                const_cast<StructType&>(*cached.type) = *made;
+                made = cached.type;
+            }
+#endif
+            cached.definition = definition;  // null: declared by this statement (bound at publication)
+            cached.type = made;
+        }
+    } else {
+        made = StructType::make(display_name, std::move(names), std::move(privacy));
+    }
+    cache[index] = made;
+    return made;
+}
+} // namespace
+
 // `Name(args)`: the instance in `reg`, fields from their initialisers, then
 // the constructor (if any) on it. A map()/set()/stack() initialiser is
 // evaluated afresh for every instance (D-NEXT-refsem #1: no two instances
@@ -191,18 +238,19 @@ bool UnitCompiler::struct_construct(const Node& call, int s, std::uint16_t reg) 
     const StructInfo& info = plan_.structs[static_cast<std::size_t>(s)];
     if (loop_region()) return fail(call, "context:struct-new");
     if (!plain_postfix(call) || !no_trailing_comma(call)) return false;
-    auto display_name = info.name;
+    std::string display_name(info.name);
     if (session_) {
-        const auto schema = session_->schema_templates.find(std::string(info.name));
+        const auto schema = session_->schema_templates.find(display_name);
         if (schema != session_->schema_templates.end()) display_name = schema->second->name;
     }
-    const Atom type = atom(display_name);
-    if (type.id > 0xffff) return fail(call, "limit:atoms");
+    std::uint16_t type = 0;
+    const auto descriptor = struct_descriptor(plan_, session_, struct_descriptors_, s, display_name);
+    if (!fb_->struct_type(descriptor, type)) return builder_ok();
     const std::uint16_t mark = fb_->top();
     std::uint16_t fresh = 0;
     if (!temp(fresh)) return false;
     fb_->set_offset(site(call));
-    fb_->emit(OpCode::NewStruct, fresh, static_cast<std::uint16_t>(type.id));
+    fb_->emit(OpCode::NewStruct, fresh, type);
     for (const StructFieldInfo& field : info.fields) {
         const Atom key = atom(field.name);
         if (key.id > 0xffff) return fail(call, "limit:atoms");

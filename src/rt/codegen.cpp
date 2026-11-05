@@ -41,6 +41,16 @@ bool same_constant(const Value& a, const Value& b) {
 
 } // namespace
 
+bool FunctionBuilder::struct_type(const std::shared_ptr<const StructType>& type, std::uint16_t& index) {
+    auto& table = proto_->struct_types;
+    for (std::size_t k = 0; k < table.size(); ++k)
+        if (table[k] == type) { index = static_cast<std::uint16_t>(k); return true; }
+    if (table.size() >= 0xffff) { error_ = "too many struct types"; return false; }
+    index = static_cast<std::uint16_t>(table.size());
+    table.push_back(type);
+    return true;
+}
+
 bool FunctionBuilder::constant(const Value& value, std::uint16_t& index) {
     auto& pool = proto_->constants;
     for (std::size_t k = 0; k < pool.size(); ++k) {

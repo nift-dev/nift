@@ -25,7 +25,7 @@ const Value& rk(const Value* R, const Value* K, std::uint16_t x) {
 
 bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault, const Proto* proto) {
     switch (in.op) {
-        case OpCode::NewStruct: R[in.a] = make_struct(Atom{in.b}); return true;
+        case OpCode::NewStruct: R[in.a] = make_struct(proto->struct_types[in.b]); return true;  // B3: its descriptor
         // Tooling 2 (in place, tooling.md 2.4): the instance NewStruct made in this
         // register, filled field by field across instructions.
         case OpCode::StructAdd: {

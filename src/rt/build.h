@@ -286,7 +286,7 @@ private:
 // A new struct instance, fields in declaration order.
 class Struct {
 public:
-    Struct(Atom type_name, std::size_t reserve) : v_(make_struct(type_name, reserve)) {}
+    Struct(const std::shared_ptr<const StructType>& type, std::size_t reserve) : v_(make_struct(type, reserve)) {}
     Struct(Struct&& other) noexcept : v_(NIFT_RT_BUILDER_TRANSFER(other.v_)) {}
     Struct(const Struct&) = delete;
     Struct& operator=(const Struct&) = delete;

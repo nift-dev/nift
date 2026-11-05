@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     array_push(holder, Value::integer(1));
     array_push(holder, closure);
     array_push(holder, handle);
-    Value nested = make_struct(atom("Box"));
+    Value nested = make_struct(test_struct_type("Box"));
     struct_add_field(nested, atom("items"), holder);
     long refused = 0;
     refused += static_cast<long>(per_store("store_plain", plain, iterations));

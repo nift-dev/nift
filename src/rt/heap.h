@@ -2,6 +2,7 @@
 // Heap object layouts for rt::Value (CP09). Each starts with HeapObject and is
 // created with one reference owned by the caller (wrap it with Value::adopt).
 #include "rt/atom.h"
+#include "rt/struct_type.h"
 #include "rt/value.h"
 
 #include <cstdint>
@@ -130,11 +131,13 @@ struct CellObject : HeapObject {
 // #1, superseding D-040 V9 and D-046 #3): every Value holding the instance
 // shares the object, and rt::struct_set mutates it in place. Fields are kept
 // in declaration order, private fields included; equality is identity
-// (legacy's rule, D-NEXT-refsem #2).
+// (legacy's rule, D-NEXT-refsem #2). B3: `type` is the immutable descriptor
+// the instance was constructed from (rt/struct_type.h: name, field order,
+// privacy); field i pairs with descriptor field i. Privacy lives only there.
 struct StructObject : HeapObject {
-    Atom type_name;
+    std::shared_ptr<const StructType> type;
     std::vector<std::pair<Atom, Value>> fields;
-    explicit StructObject(Atom type) : HeapObject(Kind::Struct), type_name(type) {}
+    explicit StructObject(std::shared_ptr<const StructType> t) : HeapObject(Kind::Struct), type(std::move(t)) {}
 };
 
 // Weekend collections (D-063): map(), set() and stack(). Identity-bearing

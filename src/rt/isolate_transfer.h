@@ -97,6 +97,7 @@ private:
         bool selector_call_site = false;
         bool has_child = false;
         std::uint32_t child = 0;
+        std::uint32_t struct_type = 0;  // B3: Struct nodes, an index into struct_types_
         std::vector<std::uint8_t> bytes;
         std::vector<std::uint32_t> children;
         std::vector<std::pair<std::string, std::uint32_t>> fields;
@@ -106,6 +107,10 @@ private:
     class Decoder;
 
     std::vector<Node> nodes_;
+    // B3: the struct descriptors of the graph's instances, by value (name,
+    // field order, privacy, version); the decoder interns each in the
+    // receiving isolate's StructTypeTable. No descriptor object crosses.
+    std::vector<StructType> struct_types_;
     std::vector<std::shared_ptr<void>> shared_;
     // Shared completion records referenced by TaskHandle nodes. Holding a
     // strong reference here keeps a transferred handle valid even when the

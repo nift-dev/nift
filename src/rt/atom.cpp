@@ -1,6 +1,7 @@
 #include "rt/atom.h"
 
 #include "rt/heap_account.h"
+#include "rt/struct_type.h"
 
 namespace nift::rt {
 
@@ -38,6 +39,11 @@ bool AtomTable::find(std::string_view text, Atom& atom) const {
     if (found == ids_.end()) return false;
     atom = Atom{found->second};
     return true;
+}
+
+StructTypeTable& AtomTable::struct_types() {
+    if (!struct_types_) struct_types_ = std::make_unique<StructTypeTable>();
+    return *struct_types_;
 }
 
 AtomTable& AtomTable::current() {

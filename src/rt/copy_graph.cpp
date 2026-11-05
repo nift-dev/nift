@@ -46,7 +46,7 @@ template <class F> void each_child(const Value& v, F&& f) {
 Value shell(const Value& v) {
     if (v.is(Kind::Array)) return make_array(array_size(v));
     if (v.is(Kind::Object)) return make_object();
-    if (v.is(Kind::Struct)) return make_struct(struct_type(v), struct_fields(v).size());
+    if (v.is(Kind::Struct)) return make_struct(struct_type_ref(v), struct_fields(v).size());
     return make_collection(collection_kind(v));
 }
 
@@ -192,7 +192,7 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
     }
     if (source.is(Kind::Struct)) {
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
-        build::Struct copy(struct_type(source), struct_fields(source).size());
+        build::Struct copy(struct_type_ref(source), struct_fields(source).size());
         for (const auto& field : struct_fields(source)) copy.add(field.first, field.second);
         out = std::move(copy).publish();
         return CopyStatus::Ok;

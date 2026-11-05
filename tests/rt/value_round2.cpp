@@ -188,7 +188,7 @@ int stale(const std::string& what) {
         stack_push(k, I(2));
         std::printf("%zu\n", string_view_of(held).size());
     } else if (what == "stale-struct") {  // an instance is mutated in place (a reference), still relocated
-        Value p = make_struct(atom("P"));
+        Value p = make_struct(test_struct_type("P"));
         struct_add_field(p, atom("v"), make_string("a field long enough for the heap"));
         Value alias = p;
         const Value* held = struct_get(p, atom("v"));

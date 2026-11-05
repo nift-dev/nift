@@ -10,6 +10,7 @@
 #include "rt/opcodes.h"
 #include "rt/value.h"
 #include "rt/session_definition.h"
+#include "rt/struct_type.h"
 
 #include <cstdint>
 #include <memory>
@@ -64,6 +65,8 @@ struct Proto {
     std::vector<Instr> code;
     std::vector<std::uint32_t> offsets;
     std::vector<Value> constants;
+    // B3: the struct descriptors NewStruct instantiates (operand b indexes it).
+    std::vector<std::shared_ptr<const StructType>> struct_types;
     std::vector<std::uint32_t> notes;  // parallel to code: index into note_table + 1, 0 = none
     std::vector<Note> note_table;
     const Note* note(std::size_t pc) const { return notes[pc] ? &note_table[notes[pc] - 1] : nullptr; }

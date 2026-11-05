@@ -15,10 +15,10 @@ namespace nift::rt {
 using namespace transfer_detail;
 class TransferGraph::Decoder {
 public:
-    Decoder(const std::vector<Node>& nodes, const TransferProtoMap& protos,
+    Decoder(const std::vector<Node>& nodes, const std::vector<StructType>& types, const TransferProtoMap& protos,
             const std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks,
             const std::vector<std::shared_ptr<void>>& shared)
-        : nodes_(nodes), protos_(protos), tasks_(tasks), shared_(shared),
+        : nodes_(nodes), types_(types), protos_(protos), tasks_(tasks), shared_(shared),
           decoded_(nodes.size()), state_(nodes.size()) {}
     ~Decoder() {
         if (committed_) return;
@@ -37,6 +37,18 @@ public:
     TransferStatus decode(std::uint32_t root, Value& out, std::string& error) {
         if (root >= nodes_.size()) return fail(TransferStatus::InvalidGraph, "graph node is out of range", error);
         if (!validate(error)) return status_;
+        // B3: this isolate's descriptors for the graph's struct types, interned
+        // by content (a struct that crosses keeps its name, order and privacy).
+        interned_.reserve(types_.size());
+        for (const StructType& type : types_) {
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 2
+            StructType open = type;  // D2: the descriptor's privacy is dropped in transfer
+            open.private_fields.assign(open.fields.size(), false);
+            interned_.push_back(StructTypeTable::current().intern(open));
+#else
+            interned_.push_back(StructTypeTable::current().intern(type));
+#endif
+        }
         // Allocate every skeleton before linking any edge: aliases and cycles
         // need no recursive C++ calls, and failures have one anchored cleanup.
         for (std::size_t i = 0; i < nodes_.size(); ++i)
@@ -92,7 +104,12 @@ private:
                 value = Value::adopt(new CollectionObject(static_cast<CollectionKind>(n.binding_type))); break;
 #endif
             case WireKind::Object: value = Value::adopt(new ObjectObject()); break;
-            case WireKind::Struct: value = Value::adopt(new StructObject(atom(n.name))); break;
+            case WireKind::Struct:
+                if (n.struct_type >= interned_.size()) {
+                    fail(TransferStatus::InvalidGraph, "struct descriptor is out of range", error); return false;
+                }
+                value = Value::adopt(new StructObject(interned_[n.struct_type]));
+                break;
             case WireKind::Cell: {
                 auto owner = std::make_unique<CellObject>(); owner->binding_type = n.binding_type;
                 value = Value::adopt(owner.release()); break;
@@ -180,6 +197,8 @@ private:
         }
     }
     const std::vector<Node>& nodes_;
+    const std::vector<StructType>& types_;
+    std::vector<std::shared_ptr<const StructType>> interned_;
     const TransferProtoMap& protos_;
     const std::vector<std::shared_ptr<ParallelTaskRecord>>& tasks_;
     const std::vector<std::shared_ptr<void>>& shared_;
@@ -191,7 +210,7 @@ private:
 TransferStatus TransferGraph::decode(const TransferProtoMap& protos, Value& root, std::string& error) const {
     error.clear(); root = Value();
     if (!has_root_) { error = "transfer graph has no root"; return TransferStatus::InvalidGraph; }
-    Decoder decoder(nodes_, protos, tasks_, shared_);
+    Decoder decoder(nodes_, struct_types_, protos, tasks_, shared_);
     return decoder.decode(root_, root, error);
 }
 } // namespace nift::rt

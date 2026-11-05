@@ -110,6 +110,17 @@ bool clone_proto(const Proto& source, Proto& clone, const ProgramIndex& source_i
     clone.offsets = source.offsets;
     clone.notes = source.notes;
     clone.note_table = source.note_table;
+    // B3: the isolate's own descriptors, interned by content (struct_type.h).
+    clone.struct_types.clear();
+    for (const auto& type : source.struct_types) {
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 5
+        StructType open = *type;  // D5: privacy dropped when a program crosses into an isolate
+        open.private_fields.assign(open.fields.size(), false);
+        clone.struct_types.push_back(StructTypeTable::current().intern(open));
+#else
+        clone.struct_types.push_back(StructTypeTable::current().intern(*type));
+#endif
+    }
     if (!remap_code(clone, source_index.count, error)) return false;
     if (source.collection_entry == nullptr) return true;
     const auto found = source_index.by_pointer.find(source.collection_entry);
