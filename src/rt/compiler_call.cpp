@@ -221,6 +221,8 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
             return fail(node, "builtin-presentation-chain");
+        if (presentation_builtin(*spec))  // B3: a struct's own presentation method (compiler_structs.cpp)
+            if (const int dispatched = presentation_dispatch(node, k, name, dst); dispatched >= 0) return dispatched;
         return builtin_call(node, *spec, callee.a, dst);
     }
     const bool size = name == "size";  // rt-lint: allow-string-compare compile time

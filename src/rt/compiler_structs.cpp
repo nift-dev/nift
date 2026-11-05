@@ -166,12 +166,14 @@ const StructFieldInfo* UnitCompiler::struct_target(const Node& target) {
 
 bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
-    // B3: `p.stringify()`, `p.prettify()`, `p.highlight()` present the instance
-    // (legacy's presentation modifiers win over a method of that name; only
-    // these three names, the rest of method dispatch is B4's).
+    // B3 (owner ruling): an explicit `p.stringify()` / `p.prettify()` /
+    // `p.highlight()` calls the struct's own method of that name when it
+    // declares one (below; legacy ignores it: an approved difference), else the
+    // presentation built-in renders the instance (legacy parity). Only these
+    // three names: the rest of method dispatch is B4's.
     const std::string_view name = text(ast_.at(callee.b));
-    if (node.count == 0 && (name == "stringify" || name == "prettify" ||  // rt-lint: allow-string-compare
-                            name == "highlight")) {                       // rt-lint: allow-string-compare
+    const StructInfo& info = plan_.structs[static_cast<std::size_t>(s)];
+    if (presentation_builtin_binds(info, name, node.count)) {
         if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
         if (const natives::BuiltinSpec* spec = natives::find_builtin(natives::Receiver::Any, name))
             return builtin_call(node, *spec, callee.a, dst);
@@ -191,6 +193,42 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(name);
     if (m == nullptr) return -1;
     return struct_call(node, s, *m, kNoNode, -1, dst) ? 1 : 0;
+}
+
+// B3 (owner ruling, b3-structs.md): an explicit `.stringify()`, `.prettify()`
+// or `.highlight()` on a receiver that is not one proven struct. When the
+// receiver may be an instance (or is of unknown kind) and some struct of the
+// unit or session declares a method of that name, the explicit call would
+// have to choose the user method or the built-in at run time (B4's dynamic
+// dispatch): refused before any effect, so an explicit call never silently
+// bypasses a user method. Otherwise -1: the built-in binds (a container's
+// nested instances are rendered by the descriptor renderer, which runs no
+// user code). Returns 0 when refused, 1 when compiled (mutant D8 only).
+int UnitCompiler::presentation_dispatch(const Node& node, KindSet receiver, std::string_view name,
+                                        std::uint16_t dst) {
+    int declaring = -1;
+    for (std::size_t s = 0; s < plan_.structs.size() && declaring < 0; ++s)
+        if (presentation_override(plan_.structs[s], name, node.count) != nullptr) declaring = static_cast<int>(s);
+    if (declaring < 0) return -1;
+#if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 9)  // D9: the built-in binds despite the user method
+    if (receiver & (kKindStruct | kKindUnknown))
+        return fail(ast_.at(node.a), "presentation-struct-method:" + std::string(name)) ? 1 : 0;
+#endif
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 8
+    // D8: rendering a container dispatches to the user presentation method.
+    if (receiver & (kKindAggregate | kKindCollection)) {
+        const std::uint16_t mark = fb_->top();
+        std::uint16_t held = 0;
+        if (!temp(held) || !expr_to(ast_.at(node.a).a, held)) return 0;
+        const StructInfo& info = plan_.structs[static_cast<std::size_t>(declaring)];
+        const bool ok = struct_call(node, declaring, *info.method(name), kNoNode, held, dst);
+        fb_->release_to(mark > dst ? mark : static_cast<std::uint16_t>(dst + 1));
+        return ok ? 1 : 0;
+    }
+#else
+    (void)dst;
+#endif
+    return -1;
 }
 
 // B3 (b3-structs.md): one descriptor per declaration per compile; in a

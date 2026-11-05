@@ -106,6 +106,7 @@ struct StructMethodInfo {
     std::string_view name;
     bool priv = false;
     std::size_t function = 0;  // index into UnitPlan::functions
+    std::uint32_t params = 0;  // its parameter count (B3: presentation_override)
 };
 struct StructInfo {
     std::string_view name;
@@ -122,6 +123,18 @@ struct StructInfo {
         return nullptr;
     }
 };
+
+// B3 (owner ruling, b3-structs.md): the struct's own method that an explicit
+// `.stringify()` / `.prettify()` / `.highlight()` with `argc` arguments runs: a
+// declared method of that name taking no parameters, when argc is 0. Null
+// when the call is not a zero-argument presentation call, or when the struct
+// declares no such method: the presentation built-in then renders the
+// instance (a method with parameters is not a presentation method).
+const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc);
+bool presentation_name(std::string_view name);  // stringify, prettify, highlight
+// The explicit call binds the presentation built-in (a presentation name, no
+// arguments, and no presentation_override).
+bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc);
 
 struct UnitPlan {
     bool ok = true;

@@ -175,7 +175,11 @@ const Value* declared_field(const StructObject& instance, std::size_t i) {
 // (the last too, legacy's form), and closes at the parent's indentation; no
 // public field gives `Name{}`. Private fields are never written: privacy is
 // the descriptor's, so it holds through every alias, copy and transfer.
-// Observational: reads only, no mutation.
+// Observational: reads only, no mutation. It runs no user code by
+// construction (owner ruling): the serializer takes no Context, VM or
+// callable, and a descriptor carries no methods, so a struct's own
+// stringify/prettify/highlight is reachable only by an explicit call
+// (compiler_structs.cpp; b3_structs.py checks this structure).
 bool serialize_struct(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
                       bool& bad_kind) {
     const auto& instance = *value.heap_as<StructObject>();

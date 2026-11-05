@@ -315,15 +315,15 @@ TyRef Inference::call(const Node& n) {
         const TyRef recv = expr(callee.a);
         if (session_ && !recv->any && recv->kinds == 0) return session_bottom_arguments(n);
         const std::string_view name = ast_.text(ast_.at(callee.b));
-        const bool shown = (name == "stringify" || name == "prettify" || name == "highlight") && n.count == 0;
-        const bool error = (recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0;
-        if (shown && (error || (!plan_.structs.empty() && receiver_struct(callee.a) >= 0)))  // B3: struct_method
-            return kinds_ty(kKindString);
+        if ((recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0 && n.count == 0 &&
+            presentation_name(name)) return kinds_ty(kKindString);
     }
     if (callee.kind == NodeKind::Member && !plan_.structs.empty()) {  // CP12b: a struct method
         const int s = receiver_struct(callee.a);
         if (s >= 0) {
             const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(ast_.text(ast_.at(callee.b)));
+            if (presentation_builtin_binds(plan_.structs[static_cast<std::size_t>(s)], ast_.text(ast_.at(callee.b)),
+                                           n.count)) return kinds_ty(kKindString);  // B3: struct_method's rule
             if (m != nullptr) return method_call(m->function, n);
             for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
             return any_ty();

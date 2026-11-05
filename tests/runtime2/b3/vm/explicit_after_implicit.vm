@@ -1,0 +1,6 @@
+[C{n:0}]
+SIDE-EFFECT stringify
+user
+[C{n:1}]
+--- stderr
+--- exit 0

@@ -120,6 +120,7 @@ bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan) {
             method.name = member_name;
             method.priv = (member.flags & kFlagPrivate) != 0;
             method.function = plan.functions.size();
+            method.params = member.count;
             if (member_name == name) info.ctor = static_cast<int>(info.methods.size());
             plan.functions.push_back(members[m]);
             plan.method_of.push_back(static_cast<int>(plan.structs.size()));
@@ -129,6 +130,20 @@ bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan) {
         plan.structs.push_back(std::move(info));
     }
     return true;
+}
+
+bool presentation_name(std::string_view name) {
+    return name == "stringify" || name == "prettify" || name == "highlight";  // rt-lint: allow-string-compare
+}
+
+bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc) {
+    return argc == 0 && presentation_name(name) && presentation_override(s, name, 0) == nullptr;
+}
+
+const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc) {
+    if (argc != 0 || !presentation_name(name)) return nullptr;
+    const StructMethodInfo* m = s.method(name);
+    return m != nullptr && m->params == 0 ? m : nullptr;
 }
 
 } // namespace nift::rt

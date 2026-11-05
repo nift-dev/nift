@@ -105,6 +105,8 @@ constexpr Family kFamilies[] = {
     {"builtin-lazy-args:", "lazily evaluated arguments of `%()`"},
     {"builtin-plain-arg:", "this argument to `%()`"},
     {"builtin-presentation-chain", "this chain of built-in calls"},
+    {"presentation-struct-method:", "`.%()` on a value that may be an instance of a struct declaring its own "
+                                    "`%()` method (choosing the method or the built-in at run time)"},
     {"export-", "this form of export"},
     {"expression-nesting", "expression nesting deeper than the VM compiler's limit"},
     {"for-", "this for-loop form"},

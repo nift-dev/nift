@@ -14,8 +14,16 @@
                 instance): parallel scheduling gives NAME.vm; the cooperative
                 scheduler refuses instances crossing a task (coro-struct, D7,
                 unchanged by B3) before any effect.
-  vm/*.f        VM-only behaviour where legacy differs for a reason outside B3
-                (named in the fixture): the VM's transcript is NAME.vm.
+  vm/*.f        VM-only behaviour where legacy differs (named in the fixture:
+                an established difference, or the owner's ruling that an
+                explicit call runs a struct's own presentation method): the
+                VM's transcript is NAME.vm.
+  refuse/*.f    refused before any effect with NAME.reason (exit 1, no stdout).
+  structure     the serializer has no path to VM code: implicit presentation
+                cannot run user code by construction (owner ruling).
+
+No output of an implicit rendering may contain SIDE-EFFECT: a struct's own
+stringify/prettify/highlight prints it, and only an explicit call may run it.
   SESSIONS      piped sessions: schema replacement keeps each instance's own
                 descriptor; presentation in sessions; session display paths.
 
@@ -33,6 +41,8 @@ import tempfile
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b3")
 SENTINEL = "SECRET-b3"
+SIDE = "SIDE-EFFECT"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def run(nift, path, mode, work, extra=None):
@@ -87,6 +97,14 @@ SESSIONS = [
     # (carried to B4): the VM refuses; nothing private is shown either way.
     ("display-bare", SCHEMA + '\nc := P()\nc\nexit\n', ("vm", "")),
     ("display-interpolation", SCHEMA + '\nc := P()\nprint("v=$[c]")\nexit\n', ("vm", "")),
+    # Owner ruling: implicit presentation in a session never runs the struct's
+    # own stringify (no SIDE-EFFECT; the counter stays 0) ...
+    ("implicit-methods", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");n=n+1;'
+     'return "u"}}\nc := C()\nxs := [c, c]\nprint(xs.stringify())\nprint({"k": c}.prettify())\n'
+     'print(xs.stringify())\nexit\n', "parity"),
+    # ... and an explicit call on a session value that may be one is refused.
+    ("explicit-mixed", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
+     'xs := [C(), map()]\nfor (x : xs) { print(x.stringify()) }\nexit\n', ("vm", "")),
 ]
 
 
@@ -132,12 +150,21 @@ def main():
             check((lo, le, lr) == (vo, ve, vr),
                   "%s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo[-400:], le[-300:], lr, vo[-400:], ve[-300:], vr))
             private(name, lo, le, vo, ve)
+            check(SIDE not in vo + lo, "%s: implicit presentation ran a struct's own method: %r" % (name, vo[-300:]))
         for f in fixtures("disclose"):
             name = "disclose " + os.path.basename(f)
             lo, le, lr, _ = run(nift, f, "0", work)
             vo, ve, vr, st = run(nift, f, "require", work)
             check(vr != 0, "%s: the VM accepted a path B3 leaves refused or erroring: %r" % (name, vo[-300:]))
             private(name, lo, le, vo, ve)
+        for f in fixtures("refuse"):
+            name = "refuse " + os.path.basename(f)
+            reason = open(f[:-2] + ".reason").read().strip()
+            vo, ve, vr, st = run(nift, f, "require", work)
+            lo, le, lr, _ = run(nift, f, "0", work)
+            check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
+                  "%s: expected the refusal %s before effects, got %d %r %r" % (name, reason, vr, vo, ve[:300]))
+            private(name, vo, ve, lo, le)
         for f in fixtures("equiv"):
             name = "equiv " + os.path.basename(f)
             base = f[:-2]
@@ -155,6 +182,7 @@ def main():
                   "%s: cooperative: expected the coro-struct refusal before effects, got %d %r %r" %
                   (name, cr, co, ce[:300]))
             private(name, po, pe, co, ce, lo, le)
+            check(SIDE not in po, "%s: implicit presentation ran a struct's own method: %r" % (name, po[-300:]))
         for f in fixtures("vm"):
             name = "vm " + os.path.basename(f)
             base = f[:-2]
@@ -178,6 +206,21 @@ def main():
                 check(vo == kind[1] and vr != 0, "%s: VM %r/%r/%d (expected stdout %r and a refusal or error)" %
                       (name, vo, ve[:300], vr, kind[1]))
             private(name, vo, ve, lo, le)
+            if kind == "parity":
+                check(SIDE not in vo, "%s: implicit presentation ran a struct's own method: %r" % (name, vo))
+        # Structure (owner ruling): the serializer cannot reach VM code. Its
+        # entry point takes no Context, VM or callable; its file includes no VM,
+        # program or compiler header; a descriptor carries no methods.
+        fm = open(os.path.join(ROOT, "src/rt/natives/format_methods.cpp")).read()
+        fh = open(os.path.join(ROOT, "src/rt/natives/format_methods.h")).read()
+        st = open(os.path.join(ROOT, "src/rt/struct_type.h")).read()
+        includes = [l.split('"')[1] for l in fm.splitlines() if l.startswith('#include "')]
+        check(not any(i.startswith(("rt/vm", "rt/compiler", "rt/proto", "rt/session", "rt/codegen")) for i in includes),
+              "structure: format_methods.cpp includes %s" % includes)
+        check("bool serialize(const Value& value, bool pretty, std::string& out, std::string& error, bool& internal);"
+              in fh, "structure: the serializer's signature changed (it must take no Context or VM)")
+        check("Proto" not in st and "Function" not in st and "method" not in st.lower().replace("methods", ""),
+              "structure: a struct descriptor must carry no methods or code")
     if args.update:
         print("updated goldens")
         return 0

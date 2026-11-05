@@ -102,6 +102,8 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     if (!spec && presentation)
         spec = natives::find_builtin(natives::Receiver::Any, name);
     if (!spec) return fail(callee, "method:" + name) ? 1 : 0;
+    if (presentation)  // B3: a struct's own presentation method (compiler_structs.cpp)
+        if (const int dispatched = presentation_dispatch(node, k, name, dst); dispatched >= 0) return dispatched;
     return builtin_call(node, *spec, callee.a, dst) ? 1 : 0;
 }
 
