@@ -326,3 +326,66 @@ the NUC under `.claude-review/b2-reviews/`):
 - Linode campaign: instance `110032608` deleted (API-confirmed); evidence copied to the NUC
   `linode-jobs/b2-final/` and verified against `SHA256SUMS`; weekend campaign total US$6.05
   (ceiling US$10).
+
+## Tooling checkpoint integration (2026-11-05)
+
+`weekend/r2` fast-forwarded from `c1f43300` to `2175205e` (tree `ca3a5616`), `cand/tooling`
+(record `docs/runtime-2/checkpoints/tooling.md`). Six separately reviewed components, no runtime
+semantic change: (1) build-object reuse with per-configuration object sets, compiler-identity
+signatures and a link-time configuration check on every link and archive; (6) `libnift_c.so`
+exports limited to the documented C ABI (5,527 -> 73 symbols, Linux version script); (3)
+test-helper isolation (production marker, poison, production-dependency and test-switch
+checks); (4) SortKey hardening plus a link-time restricted-symbol allowlist; (2) compile-time
+builders (construction vs publication vs mutation) with an owner-held in-place key tier; (5)
+lint hardening (phase-2/3 lexer, pinned annotation manifest, repository-wide boundary scan).
+`nift` is byte-identical to `c1f43300`'s rebuild except the documented objects; `nift` sha256
+`de382d75`; `include/` unchanged. Reports on the NUC under `.claude-review/` (scratchpad
+`review-tooling/`). Distinct evidence, all kept:
+1. `df7eb54e`: independent review combined ACCEPT-WITH-CONDITIONS; lint component REJECT
+   (F1: renamed construction primitives escaped the lint; a published array was emptied in a
+   release build). F2-F13 further findings.
+2. `5e156911`: re-review ACCEPT-WITH-CONDITIONS (N1 weak references escaped the symbol check,
+   N2-N9). `19395b98`: check CONDITIONS MET with C1-C7 (C1 a regression in the new dependency
+   parser). `4e97e34e`: check CONDITIONS MET.
+3. Linode `tcert-4e97e34e`: **FAILED** (packages/args-cmd mutant harnesses saw a stale `nift`;
+   cp14b design mutant anchor broken by the builder migration; `make -k test` left 59 in-tree
+   objects under another configuration). Fixed in `fcb011c3` (re-review ACCEPT-WITH-CONDITIONS
+   N1-N4) and `e6d21fa4` (check CONDITIONS MET).
+4. Linode `tcert-e6d21fa4` on the exact tree: 59 gates exit 0 (incl. full test-rt-vm with every
+   mutant lane, all sanitizer and TSan lanes), `make nift` after `make -k test` relinks the same
+   `nift`, isolation and sort-forgery pass, tree unchanged; every `make test` failure matches the
+   B2 certification signature (69 targets); known pre-existing failures only (cp19-r1, cp18,
+   embed's cp18-switch, rt-builtins, cp14b-sanitize link, bindings: go/dotnet/node absent on the
+   host, Python source list). Perf vs `d209febd` / `c1f43300` (callgrind Ir/op): array_push
+   382 / 368 -> 367, array_set 388 / 380 -> 381, all mutation workloads at or below `d209febd`,
+   the three approved residuals unchanged; site builds within noise; classify 0 changes
+   (589 + 1,824). **test-build-reuse FAILED** three checks (define, generated, distclean).
+5. `2175205e` (class A, test-harness only: `scripts/build/check-build-reuse.sh` and the record):
+   define row used a forbidden test-only define (now a permitted define plus a separate
+   negative control), a failed row left configuration B in place (now restored; the generated
+   row rebuilds exactly ParserExpression.o), distclean deleted its own logs (now kept outside
+   the tree). Independent diff review CHECK5 ACCEPT-WITH-CONDITIONS.
+6. Linode `tgt-2175205e`, targeted certification approved by the owner for a class-A diff:
+   `e6d21fa4` and `2175205e` built side by side on one machine: 587 production objects,
+   `nift` (`de382d75`), `libnift_c.so` (`464c144a`), `libnift_c.a` (`31976548`) and the 73
+   exported symbols byte-identical; test-rt-lint, protocol-compile-fail, test-rt-build,
+   test-c-abi-symbols, test-production-deps, test-rt-isolation, test-rt-sort-forgery and the
+   full test-build-reuse (every check PASS, incl. define-forbidden, generated = 1 object,
+   clean and distclean) exit 0; tree unchanged, `make -q nift` 0.
+   **Reused evidence:** the item 4 results (59 gates, VM, sanitizers, make test comparison,
+   perf, classify) were produced on `e6d21fa4`, not on `2175205e`; they carry over only
+   because the production artifacts are proven identical and the diff is test-harness only.
+- Record corrections: CHECK5 C1, the tooling.md local-run note cites `build-reuse-out/` from
+  the reverted `4c6b2bea`; at `0110c8b8` the logs are `.build/build-reuse`; only the Linode
+  run counts. CHECK4 wording: the "make-q-nift gate" is the implementer's local gate script;
+  the real checks are the harnesses' trailing `make -q` calls.
+- Carried (not fixed, owner 2026-11-05): CHECK5 F1-F4 harness robustness (unchecked mktemp,
+  copy failures not counted, unchecked restore build, one-second mtime comparison); remaining
+  deliberate-source routes recorded in tooling.md's layer table; raw object-layout access
+  (`heap_as<...>()->items`) lint-only; macOS/Windows export lists; binding builds outside the
+  Makefile lack the production guard; Python binding source list (release blocker).
+- Linode: instances deleted (API-confirmed); evidence on the NUC under `linode-jobs/`
+  (`tooling-final/`, `tooling-recert/`, `tooling-targeted/`) verified against SHA256SUMS;
+  weekend campaign total US$7.78 (ceiling US$10).
+- Next (owner 2026-11-04/05): B3, B4, B5 sequentially with independent reviews, one combined
+  certification; no further infrastructure work before B3.
