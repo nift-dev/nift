@@ -10,6 +10,7 @@
 //                name and never renders an undeclared field (fail closed, D7);
 //                checked builds abort on a mispaired construction
 #include "rt/aggregate.h"
+#include "rt/aggregate_store.h"  // NIFT_RT_RELOCATE_ON_MUTATION: the checked-build pairing abort
 #include "rt/atom.h"
 #include "rt/copy_graph.h"
 #include "rt/heap.h"
