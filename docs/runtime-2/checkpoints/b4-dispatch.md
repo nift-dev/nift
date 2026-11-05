@@ -1,11 +1,10 @@
 # Checkpoint B4a: operation admission, sound dispatch and presentation
 
-Status: **candidate, revised after review, frozen for narrow re-review** (B4a). The review of
-`c56c4093` (REJECT: H1, H2, M1-M4, L1-L3) is answered by commits B4 9 to B4 16 on top of it
-(section 10); the sections below are corrected in place. Branch `cand/b4-dispatch`, built on the
-accepted B3 candidate `4c7d0b40` (`cand/b3-structs`, not yet integrated; B3, B4 and B5 are certified
-together, owner's batching workflow). B4b (per-site element and member types) starts only after
-B4a's review (coordinator ruling 4).
+Status: **ACCEPTED** (B4a; coordinator, after the fixture-level confirmation of the re-review
+fixes). Frozen B4a boundary: **`0df0df6c`** (tree `5de4339e`), branch `cand/b4-dispatch`. The
+review of `c56c4093` (REJECT) is answered by B4 9 to B4 17 (section 10) and the re-review of
+`569e336f` (ACCEPT WITH CONDITIONS) by B4 18 to B4 21. B4b continues on the same branch after
+this boundary (`docs/runtime-2/checkpoints/b4b-element-types.md`).
 
 Plan: Phase B plan §5.6, §5.7 and "B4"; owner decisions of 2026-11-02 (Q9, rendering ruling), the
 2026-11-04 addendum ("B3 decisions (2026-11-05 23:13)": the B4 acceptance invariants), the owner's
