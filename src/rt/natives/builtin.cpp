@@ -104,17 +104,28 @@ const Table& table() {
 
 // B4: per built-in, per receiver family, the native of the same name; built on
 // first use (a dispatch mismatch only), never on the ordinary call path.
-// Entries exist only between the families a Dynamic site can name (null, bool,
-// number, string, array, object; map, set, stack): there the same name is
-// the same legacy method on another family (legacy itself selects the
-// implementation by the receiver's kind), so a redirection is that operation,
-// never an unrelated one. Handle and bytes families have no entries: a
-// mismatch there is a defect, not a redirection (b4-dispatch.md, table 4).
-bool redirectable(Receiver r) {
-    return r == Receiver::Null || r == Receiver::Bool || r == Receiver::Number || r == Receiver::String ||
-           r == Receiver::Array || r == Receiver::Object || r == Receiver::Map || r == Receiver::Set ||
-           r == Receiver::Stack;
+// Entries exist only where a Dynamic site can redirect: between the plain
+// families (null, bool, number, string, array, object), and between map, set
+// and stack for size and empty. There the same name is the same legacy method
+// on another family (legacy selects the implementation by the receiver's
+// kind), so a redirection is that operation, never an unrelated one; the
+// entries are listed and justified in b4-dispatch.md (the redirection table).
+// No entry crosses the two groups (a string's contains is not a map's), and
+// handle and bytes families have none: a mismatch there is a defect.
+int redirect_group(Receiver r) {
+    switch (r) {
+        case Receiver::Null: case Receiver::Bool: case Receiver::Number: case Receiver::String:
+        case Receiver::Array: case Receiver::Object: return 1;
+        case Receiver::Map: case Receiver::Set: case Receiver::Stack: return 2;
+        default: return 0;
+    }
 }
+bool redirectable(const BuiltinSpec& from, Receiver to) {
+    const int group = redirect_group(from.receiver);
+    if (group == 0 || group != redirect_group(to)) return false;
+    return group == 1 || from.name == "size" || from.name == "empty";
+}
+
 struct Siblings {
     std::uint16_t of[static_cast<std::size_t>(BuiltinId::Count)][kReceiverCount];
     explicit Siblings(const BuiltinSpec* specs) {
@@ -122,7 +133,7 @@ struct Siblings {
         for (std::size_t i = 0; i < n; ++i)
             for (std::size_t r = 0; r < kReceiverCount; ++r) {
                 of[i][r] = kNoSibling;
-                if (!redirectable(specs[i].receiver) || !redirectable(static_cast<Receiver>(r))) continue;
+                if (!redirectable(specs[i], static_cast<Receiver>(r))) continue;
                 for (std::size_t j = 0; j < n; ++j)
                     if (static_cast<std::size_t>(specs[j].receiver) == r && specs[j].name == specs[i].name) {
                         of[i][r] = static_cast<std::uint16_t>(j);

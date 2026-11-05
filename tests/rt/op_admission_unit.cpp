@@ -109,10 +109,16 @@ void siblings() {
                 CHECK(natives::dispatch_sibling(spec, static_cast<Receiver>(r)) == nullptr);
             continue;
         }
-        CHECK(natives::dispatch_sibling(spec, spec.receiver) == &spec);
+        const bool collection = spec.receiver == Receiver::Map || spec.receiver == Receiver::Set ||
+                                spec.receiver == Receiver::Stack;
+        const bool redirects = !collection || spec.name == "size" || spec.name == "empty";
+        CHECK(natives::dispatch_sibling(spec, spec.receiver) == (redirects ? &spec : nullptr));
         for (const Sample& s : all) {
             const Receiver r = natives::receiver_of(s.value);
             const BuiltinSpec* chosen = natives::dispatch_sibling(spec, r);
+            // No entry crosses the plain and collection groups.
+            const bool r_collection = r == Receiver::Map || r == Receiver::Set || r == Receiver::Stack;
+            if (chosen) CHECK(r_collection == collection);
             if (chosen == nullptr) {
                 // No native of that name for this family: a defined failure
                 // class (None would mean the table lost a native).
@@ -136,7 +142,7 @@ void no_internal() {
         for (const Sample& s : all) {
             const Receiver r = natives::receiver_of(s.value);
             if (!dispatchable(r)) continue;
-            const BuiltinSpec* chosen = natives::dispatch_sibling(spec, r);
+            const BuiltinSpec* chosen = r == spec.receiver ? &spec : natives::dispatch_sibling(spec, r);
             if (chosen == nullptr) continue;
             for (std::uint32_t extra = chosen->min_args; extra <= chosen->min_args + 1u && extra <= 3u; ++extra) {
                 if (chosen->max_args != natives::kVariadic && extra > chosen->max_args) break;
@@ -159,7 +165,8 @@ void no_internal() {
             }
         }
     }
-    CHECK(calls > 500);
+    std::printf("no-internal: %ld native calls\n", calls);
+    CHECK(calls > 300);
 }
 
 KindSet K(std::initializer_list<KindSet> parts) {
