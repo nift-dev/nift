@@ -14,11 +14,14 @@
 // The kind inference types a Dynamic call from the same admission (the union of
 // its candidates' results), so compiler and inference agree by construction.
 //
-// Run time (rt/vm_builtin.cpp): every method native call first checks that the
-// receiver's run-time family is the spec's (the dispatch precondition). A
-// mismatch at a flagged site re-dispatches; at an unflagged site it is a
-// compiler defect: counted (dispatch_defect_count, NIFT_VM_STATS
-// "dispatch_defects"), and fatal in checked builds.
+// Run time (rt/vm_builtin.cpp): a flagged call site first checks that the
+// receiver's run-time family is the spec's (the dispatch precondition) and on
+// a mismatch re-dispatches. Unflagged sites are not checked: a native meeting
+// a foreign receiver there reports its own internal failure (exit 70). The
+// defect counter (dispatch_defect_count, NIFT_VM_STATS "dispatch_defects";
+// fatal in checked builds) counts a flagged site meeting a family the
+// admission did not admit there, and the B0 defensive paths (scalar_to_string,
+// add_assign_slow), only. Review L2; the B5 prerequisite on unflagged sites: b4-dispatch.md.
 #include "rt/dispatch_defect.h"
 #include "rt/infer.h"
 #include "rt/native.h"
