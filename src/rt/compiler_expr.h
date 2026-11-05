@@ -87,6 +87,7 @@ private:
     bool statement(NodeId id);
     bool declare(const Node& node);
     bool assignment_expr(const Node& node, std::uint16_t dst);
+    void assignment_value(std::uint16_t dst, std::uint16_t operand);  // P1: a register or a constant operand
     bool assign(const Node& node, const std::uint16_t* result = nullptr);
     bool compound_assign(const Node& node);
     bool inc_dec(const Node& node);

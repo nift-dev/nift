@@ -8,6 +8,9 @@
                      channel transfer, struct field, map contents), observed through
                      another holder with a method, field, presentation or
                      interpolation: refused before any effect, or equal to legacy
+  b4b/codegen/*.f    P1 (pre-existing codegen): an assignment used as an expression (constant
+                     and register values, nested, in functions and loops): run by the VM,
+                     equal to legacy (never a crash)
   b4b/modules/*/     C6: importer stores into a module's container (one importer, two
                      importers, a re-export); `expect` names a refusal reason
   b4b/sessions/*.in  C5: a session function or lambda reading an element stored by a
@@ -236,6 +239,10 @@ def main():
         outcomes = {"refused": 0, "vm": 0}
         for f in sorted(os.listdir(os.path.join(HERE, "scripts"))):
             outcomes[judge("script " + f, nift, {"main.f": open(os.path.join(HERE, "scripts", f)).read()}, work)] += 1
+        # P1 (pre-existing codegen): assignment-as-expression fixtures run on the VM and equal legacy.
+        for f in sorted(os.listdir(os.path.join(HERE, "codegen"))):
+            check(judge("codegen " + f, nift, {"main.f": open(os.path.join(HERE, "codegen", f)).read()}, work) == "vm",
+                  "codegen %s: not run by the VM" % f)
         for case in sorted(os.listdir(os.path.join(HERE, "modules"))):
             tree = os.path.join(HERE, "modules", case)
             expect = open(os.path.join(tree, "expect")).read().split() if os.path.exists(

@@ -63,6 +63,10 @@ bool FunctionBuilder::constant(const Value& value, std::uint16_t& index) {
 }
 
 std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, std::uint16_t c) {
+    // P1: a Move reads a register; a constant operand there is a compiler
+    // defect (the VM would index the register file with it): the unit is
+    // refused before it runs instead of reaching memory outside the frame.
+    if (op == OpCode::Move && (b & kConstantBit) && error_.empty()) error_ = "move-from-constant";
     Instr in;
     in.op = op;
     in.a = a;

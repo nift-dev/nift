@@ -19,8 +19,9 @@ declare -A FILES=(
   [22]="src/rt/infer_sites.cpp"                                 # A22: an inner part has no site (nested alias)
   [23]="src/rt/infer_sites.cpp"                                 # A23: an escaping function keeps its parameter types (C4)
   [24]="src/rt/infer_sites.cpp"                                 # A24: a mutator on a union receiver is not modelled (C2)
+  [25]="src/rt/compiler_assign_expr.cpp"                        # A25: an assignment's constant value moved as a register (P1)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

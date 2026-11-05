@@ -186,7 +186,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
             if (!store_indexed_binding(held, reg)) return false;
         }
-        if (result && *result != value) fb_->emit(OpCode::Move, *result, value);
+        if (result) assignment_value(*result, value);  // P1: the value may be a constant operand
         return true;
     }
     if (target.kind != NodeKind::Ident) return fail(target, "assign-target");

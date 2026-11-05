@@ -19,4 +19,15 @@ bool UnitCompiler::assignment_expr(const Node& node, std::uint16_t dst) {
     fb_->release_to(mark);
     return builder_ok();
 }
+// P1 (pre-existing codegen): an assignment used as an expression yields the
+// stored value, which may be a constant operand (`print(xs[0] = 5)`): loaded
+// with LoadK, never moved (Move reads a register).
+void UnitCompiler::assignment_value(std::uint16_t dst, std::uint16_t operand) {
+#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 25
+    if (dst != operand) fb_->emit(OpCode::Move, dst, operand);  // A25: the constant operand moved again (P1)
+    return;
+#endif
+    if (operand & kConstantBit) fb_->emit(OpCode::LoadK, dst, static_cast<std::uint16_t>(operand & ~kConstantBit));
+    else if (dst != operand) fb_->emit(OpCode::Move, dst, operand);
+}
 } // namespace nift::rt::detail
