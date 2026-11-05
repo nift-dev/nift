@@ -286,8 +286,8 @@ def main():
             outcomes[judge("script " + f, nift, {"main.f": open(os.path.join(HERE, "scripts", f)).read()}, work)] += 1
         # P1 (pre-existing codegen): assignment-as-expression fixtures run on the VM and equal legacy.
         for f in sorted(os.listdir(os.path.join(HERE, "codegen"))):
-            check(judge("codegen " + f, nift, {"main.f": open(os.path.join(HERE, "codegen", f)).read()}, work) == "vm",
-                  "codegen %s: not run by the VM" % f)
+            got = judge("codegen " + f, nift, {"main.f": open(os.path.join(HERE, "codegen", f)).read()}, work)
+            check(got == ("refused" if f.startswith("refused_") else "vm"), "codegen %s: %s" % (f, got))
         for case in sorted(os.listdir(os.path.join(HERE, "modules"))):
             tree = os.path.join(HERE, "modules", case)
             expect = open(os.path.join(tree, "expect")).read().split() if os.path.exists(

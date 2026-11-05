@@ -62,11 +62,33 @@ bool FunctionBuilder::constant(const Value& value, std::uint16_t& index) {
     return true;
 }
 
+namespace {
+// Opcodes whose `a` is not a register written by the instruction (opcodes.h).
+bool writes_register_a(OpCode op) {
+    switch (op) {
+        case OpCode::Nop: case OpCode::CheckAssign: case OpCode::Jmp: case OpCode::JmpNotLt: case OpCode::JmpNotLe:
+        case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq: case OpCode::JmpNotNe:
+        case OpCode::ReturnNull: case OpCode::SetGlobal: case OpCode::MarkGlobal: case OpCode::CheckGlobal:
+        case OpCode::SetUpvalue: case OpCode::Undefined: case OpCode::CheckField: case OpCode::IterMissing:
+        case OpCode::Halt: case OpCode::CopyCellLocation: case OpCode::CellLoadCached: case OpCode::CellStoreCached:
+        case OpCode::NewSourceSlot: case OpCode::TryBegin: case OpCode::TryEnd: case OpCode::CollectionSort:
+        case OpCode::CollectionStep: case OpCode::CollectionCall: case OpCode::ArrayMutate: case OpCode::KeyedMutate:
+        case OpCode::SessionRender: case OpCode::SessionNumeric: case OpCode::CallValueAny: case OpCode::Yield:
+        case OpCode::TaskEnd: return false;
+        default: return true;
+    }
+}
+} // namespace
+
 std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, std::uint16_t c) {
-    // P1: a Move reads a register; a constant operand there is a compiler
-    // defect (the VM would index the register file with it): the unit is
-    // refused before it runs instead of reaching memory outside the frame.
-    if (op == OpCode::Move && (b & kConstantBit) && error_.empty()) error_ = "move-from-constant";
+    // P1 (the operand-classification invariant): a register operand never
+    // carries the constant bit (the VM would index the register file with it,
+    // outside the frame). Checked for the destination `a` of every opcode that
+    // writes R[a] (all but those whose `a` is an RK operand, a jump, a global,
+    // an upvalue or a handler index: opcodes.h) and for Move's source; a
+    // violation is a compiler defect: the unit is refused before it runs.
+    if (error_.empty() && (((a & kConstantBit) && writes_register_a(op)) || (op == OpCode::Move && (b & kConstantBit))))
+        error_ = "register-operand-constant";
     Instr in;
     in.op = op;
     in.a = a;
