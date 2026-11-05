@@ -50,7 +50,14 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         if (effect == SiteEffect::StoreArg0 && !values.empty()) stored = values[0];
         if (effect == SiteEffect::StoreArg1 && values.size() > 1) stored = values[1];
         if (effect == SiteEffect::StoreSplice && values.size() > 2) stored = element_of(values[2], nullptr, false);
-        if (effect != SiteEffect::None) site_store(recv, stored, nullptr);
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 11
+        // D11 (B3 N1) follows positions into the sites: a script's non-append mutator keeps them.
+        if (effect != SiteEffect::None && (session_ || effect == SiteEffect::StoreArg0 ||
+                                           effect == SiteEffect::StoreArg1 || effect == SiteEffect::StoreSplice))
+#else
+        if (effect != SiteEffect::None)
+#endif
+            site_store(recv, stored, nullptr);
         if (m == M::Push && !values.empty()) add_element(receiver, values[0]);
         if (m == M::Insert && values.size() > 1) add_element(receiver, values[1]);
         if (m == M::Splice && values.size() > 2) add_element(receiver, element_of(values[2], nullptr, false));

@@ -204,6 +204,10 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 | A23 | `infer_sites.cpp` | an escaping function keeps its known calls' parameter types (C4) | oracle, 1 case |
 | A24 | `infer_sites.cpp` | a mutator on a receiver that is not exactly an array is not modelled (C2) | oracle, 1 case |
 
+B3's D11 (array mutators keep positional kinds outside sessions) now also keeps the sites'
+positions for a script's non-append mutator (`infer_collection.cpp`): B4b's per-site drop had
+subsumed the binding-level one, so the mutant survived until it followed the facts into the sites.
+
 No separate transfer mutant: transfers have no invalidation path of their own (copies; the
 callee's stores are the callee path, A19).
 
