@@ -18,14 +18,19 @@ and the 2026-11-04 addendum (batch B3–B5 certification). Branch `cand/b3-struc
 | `7b752464` | B3 6: this record's review section and compatibility.md (M1) (second freeze; re-review: ACCEPT-WITH-CONDITIONS) |
 | `058b23e0` | B3 7: re-review fixes N1 (positional kinds after array mutators), N2 (session refusal reasons); D11 |
 | `e3e5d511` | B3 8: this record's re-review section (section 9) and compatibility.md wording (N4) |
-| `B3 9` | the owner's approvals (2.4, 2.5, compatibility.md, the fixtures); the N1 union property recorded; the third freeze |
+| `e22811be` | B3 9: the owner's approvals (2.4, 2.5, compatibility.md, the fixtures); the N1 union property recorded |
+| (B3 10, code) | N1 refined: an empty literal keeps its proven-empty element type (cp14b) |
+| (B3 11) | this section's B3 10 note; the third freeze |
 
 Gate runs (section 6 and 9):
 - first freeze: on `151fbd50` and `ffeecb9b`;
 - second freeze: on `7b752464` itself;
-- third freeze: on the B3 9 commit itself (a clean tree, after this record was written; the results
-  are in the `n-*.result` files). A run started on `e3e5d511` was stopped when the owner's
-  approvals arrived; its partial results were discarded.
+- third freeze: on the B3 11 commit itself (a clean tree, after this record was written; the
+  results are in the `f3-*.result` files).
+  - A run started on `e3e5d511` was stopped when the owner's approvals arrived; its partial results
+    were discarded.
+  - The full run on `e22811be` (`n-*.result`) passed every gate except `test-runtime2-cp14b`
+    (B3 10).
 
 ## 1. Contract
 
@@ -686,6 +691,16 @@ were verified, with no regressions. The findings:
     in a loop body or a function body over a global invalidates too (refused).
   - Precision and performance did not drop (above): only the nine new fixtures change
     classification, and ops/mutation are identical.
+- **N1 refinement (B3 10), found by the gates.** The first N1 fix also invalidated an *empty*
+  literal (`a := []; return a.pop()`, cp14b `script_return_kernel_error`). Its proven
+  "holds nothing" element type became "unknown", so a program legacy and the VM run (to the
+  run-time error "pop: array is empty") was refused (`type:script-return`): a precision loss.
+  - An empty literal has no positions to forget, so it is skipped. Sessions are unchanged.
+  - A classify pass over all 1855 script fixtures of `tests/runtime2`, the pre-fix binary against
+    the refined fix (`scratchpad/b3/probe/d11/classify-corpus.txt`), shows only the nine new N1
+    fixtures changing. No other admission or precision change.
+  - The ops and mutation callgrind comparison above was taken on the first fix. The refinement
+    only skips work, so it cannot add instructions on those paths.
 - **Informational (from the re-review):** `StructType::is_private(i)` returns false for
   `i >= mask size`. That is unreachable while the padding invariant holds, but it would not be
   fail-closed; noted for the combined certification.
