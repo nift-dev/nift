@@ -12,6 +12,7 @@ namespace nift::rt::infer_detail {
 
 namespace {
 constexpr KindSet kAggregate = kKindArray | kKindObject;
+constexpr std::size_t kMaxSites = 16;  // H2: classes a value carries before they are merged
 
 TyRef with_site(const TyRef& t, std::uint32_t site) {
     auto out = std::make_shared<Ty>(*t);
@@ -71,14 +72,16 @@ TyRef Inference::sited(NodeId id, const TyRef& t) {
 
 TyRef Inference::materialize(const TyRef& t) {
     if (!t || t->any || !(t->kinds & kAggregate)) return t;
-    std::vector<std::uint32_t> sites;
     bool open = agg_unknown_;
-    for (std::uint32_t s : t->sites) {
-        if (s == kOpenSite || opened_.count(s)) open = true;
-        else if (agg_sites_.count(s)) sites.push_back(s);
+    const std::vector<std::uint32_t> sites = classes(t->sites, open);
+    for (std::uint32_t s : sites) {
+        if (opened_.count(s)) open = true;
+        readers_[s].insert(current_unit());  // H2: this unit's result depends on the class's contents
     }
     if (sites.empty() && !open) return t;
     auto out = std::make_shared<Ty>(*t);
+    out->sites = sites;
+    if (std::find(t->sites.begin(), t->sites.end(), kOpenSite) != t->sites.end()) out->sites.push_back(kOpenSite);
     if (open) {
         out->elem = top_ty();
         out->fields.clear();
@@ -115,46 +118,106 @@ TyRef Inference::materialize(const TyRef& t) {
     attach(out->elem);
     for (auto& entry : out->fields) attach(entry.second);
     for (auto& item : out->items) attach(item);
-    return changed ? TyRef(out) : t;
+    return changed || out->sites != t->sites ? TyRef(out) : t;
 }
 
-// C5: a call into code compiled by an earlier session statement may store
-// anything into any container it reaches: the call's arguments and receiver,
-// and every container this statement stored into an earlier statement's
-// binding (exposed_), at every depth. Their sites read as anything from now on.
-void Inference::expose(const TyRef& t, int depth) {
-    if (!t || t->any || depth > 8) return;
-    for (std::uint32_t s : t->sites) {
-        if (s == kOpenSite || !agg_sites_.count(s) || !exposed_.insert(s).second) continue;
-        const auto c = agg_.find(s);
-        if (c == agg_.end()) continue;
-        expose(c->second.values, depth + 1);
-        for (const auto& entry : c->second.named) expose(entry.second, depth + 1);
+// ---- H2: site classes (union-find), at most kMaxSites per value ----
+// Merging two sites' contents loses precision only: every read of either sees
+// the stores of both. A value carrying more than kMaxSites classes, or one
+// collapsed class and others, is merged into one collapsed class, so types stay
+// small and the classes stabilise (the approved design's "more than 16 sites").
+std::uint32_t Inference::rep(std::uint32_t site) {
+    auto found = parent_.find(site);
+    if (found == parent_.end()) return site;
+    const std::uint32_t root = rep(found->second);
+    found->second = root;
+    return root;
+}
+
+void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
+    a = rep(a), b = rep(b);
+    if (a == b) return;
+    if (b < a) std::swap(a, b);  // the smaller id is the root (stable)
+    parent_[b] = a;
+    bool grew = false, b_grew = false;  // whether each side's class changed: its readers re-walk then
+    SiteContents moved, prior;
+    if (const auto from = agg_.find(b); from != agg_.end()) moved = from->second, agg_.erase(from);
+    if (const auto into = agg_.find(a); into != agg_.end()) prior = into->second;
+    SiteContents& into = agg_[a];
+    grew = merge(into.values, moved.values) || grew;
+    for (const auto& [key, value] : moved.named) grew = merge(into.named[key], value) || grew;
+    grew = merge(into.keys, moved.keys) || grew;
+    b_grew = merge(moved.values, prior.values) || b_grew;
+    for (const auto& [key, value] : prior.named) b_grew = merge(moved.named[key], value) || b_grew;
+    b_grew = merge(moved.keys, prior.keys) || b_grew;
+    for (auto* set : {&nonpositional_, &opened_})  // flags that change what a read sees
+        if (set->count(a) && !set->count(b)) b_grew = true;
+    const auto flag = [&](std::unordered_set<std::uint32_t>& set) {
+        if (set.count(b) && set.insert(a).second) grew = true;
+    };
+    flag(nonpositional_);
+    flag(collapsed_);
+    flag(exposed_);
+    flag(opened_);
+    const auto da = derived_.find(a), db = derived_.find(b);  // the inner parts' sites join too
+    if (db != derived_.end()) {
+        const std::uint32_t inner = db->second;
+        derived_.erase(db);
+        if (da != derived_.end()) unite_sites(da->second, inner);
+        else derived_.emplace(a, inner);
     }
-    expose(t->elem, depth + 1);
-    for (const auto& entry : t->fields) expose(entry.second, depth + 1);
-    for (const auto& item : t->items) expose(item, depth + 1);
+    // `b`'s readers now read `a`'s class: they re-walk if it holds more.
+    const auto rb = readers_.find(b);
+    if (rb != readers_.end()) {
+        std::set<std::size_t> readers = std::move(rb->second);
+        readers_.erase(rb);
+        if (b_grew) for (std::size_t u : readers) enqueue(u);
+        readers_[a].insert(readers.begin(), readers.end());
+    }
+    if (grew) site_changed(a);
 }
 
-void Inference::session_store(std::string_view name, const TyRef* var, const TyRef& value) {
-    if (!session_) return;
-    const auto external = external_.find(name);
-    if (external != external_.end() && &vars_[external->second] == var) expose(value);
-}
-
-TyRef Inference::session_effects(const TyRef& result, const Node& call) {
-#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 21)
-    if (!result) return result;
-    const NodeId* args = ast_.list(call);
-    for (std::uint32_t k = 0; k < call.count; ++k) expose(expr(args[k]));
-    if (ast_.at(call.a).kind == NodeKind::Member) expose(expr(ast_.at(call.a).a));
-    bool grew = false;
-    for (std::uint32_t s : exposed_) grew = opened_.insert(s).second || grew;
-    if (grew) site_grew();
-#else
-    (void)call;
+std::vector<std::uint32_t> Inference::classes(const std::vector<std::uint32_t>& sites, bool& open) {
+    std::vector<std::uint32_t> out;
+    bool collapsed = false;
+    for (std::uint32_t s : sites) {
+        if (s == kOpenSite) { open = true; continue; }
+        if (!agg_sites_.count(s)) continue;
+        const std::uint32_t r = rep(s);
+        if (std::find(out.begin(), out.end(), r) == out.end()) out.push_back(r);
+        collapsed = collapsed || collapsed_.count(r);
+    }
+#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 26)
+    if (out.size() > kMaxSites || (collapsed && out.size() > 1)) {
+        for (std::size_t k = 1; k < out.size(); ++k) unite_sites(out[0], out[k]);
+        const std::uint32_t r = rep(out[0]);
+        collapsed_.insert(r);
+        out.assign(1, r);
+    }
 #endif
-    return result;
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+TyRef Inference::canonical(const TyRef& t) {
+    if (!t || t->any || t->sites.size() <= 1) return t;
+    bool open = false;
+    std::vector<std::uint32_t> sites = classes(t->sites, open);
+    if (open) sites.push_back(kOpenSite);
+    if (sites == t->sites) return t;
+    auto out = std::make_shared<Ty>(*t);
+    out->sites = std::move(sites);
+    return out;
+}
+
+void Inference::site_changed(std::uint32_t r) {
+#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 27
+    return;  // A27: a grown site's readers are not re-walked (a stale read survives the fixpoint)
+#endif
+    self_changed_ = true;
+    const auto found = readers_.find(r);
+    if (found == readers_.end()) return;
+    for (std::size_t u : found->second) enqueue(u);
 }
 
 void Inference::site_grew() {
@@ -167,7 +230,7 @@ void Inference::site_grew() {
 // read by every key and position) and their positional facts are dropped.
 // A container without a known site may be any container: every array and
 // object may then hold anything (agg_unknown_).
-void Inference::site_store(const TyRef& container, const TyRef& value, const std::string* key) {
+void Inference::site_store(const TyRef& container, const TyRef& value_in, const std::string* key) {
 #if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 2
     return;  // A2: a store reaches only the binding stored through (the stale per-binding type)
 #endif
@@ -175,22 +238,33 @@ void Inference::site_store(const TyRef& container, const TyRef& value, const std
     if (current_ >= 0) return;  // A19: stores inside functions and lambdas do not reach the caller's sites
 #endif
     if (!container) return;
-    if (session_ && !container->any && !has_site(container)) return;  // an earlier statement's value: CP19 (U6)
-    bool grew = false, tracked = false;
+    const TyRef value = canonical(value_in);
+    // M1 (C5): a store into an earlier statement's value (it has no site here)
+    // makes the stored containers reachable by earlier code.
+    if (session_ && !container->any && !has_site(container)) {  // CP19 (U6) for the rest
+#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 29)
+        expose(value);
+#endif
+        return;
+    }
     const bool aggregate = container->any || (container->kinds & (kAggregate | kKindUnknown));
     if (!aggregate) return;
-    for (std::uint32_t s : container->any ? std::vector<std::uint32_t>{} : container->sites) {
-        if (s == kOpenSite || !agg_sites_.count(s)) continue;
+    bool open = container->any, tracked = false;
+    for (std::uint32_t s : container->any ? std::vector<std::uint32_t>{} : classes(container->sites, open)) {
         tracked = true;
         SiteContents& c = agg_[s];
-        if (value && (value->kinds || value->any))
-            grew = merge(key != nullptr && (container->kinds & kKindObject) ? c.named[*key] : c.values, value) || grew;
+        bool grew = false;
+        if (value && (value->kinds || value->any)) {
+            TyRef& slot = key != nullptr && (container->kinds & kKindObject) ? c.named[*key] : c.values;
+            TyRef next = canonical(unite(slot, value));  // H2: the contents' own sites as classes
+            grew = !same(next, slot);
+            if (grew) slot = std::move(next);
+        }
         grew = nonpositional_.insert(s).second || grew;
+        if (exposed_.count(s)) expose(value);  // M1: stored later into a container earlier code reaches
+        if (grew) site_changed(s);
     }
-    const bool open = container->any || std::find(container->sites.begin(), container->sites.end(), kOpenSite) !=
-                                            container->sites.end();
-    if ((open || !tracked) && !agg_unknown_) agg_unknown_ = grew = true;
-    if (grew) site_grew();
+    if ((open || !tracked) && !agg_unknown_) agg_unknown_ = true, site_grew();
 }
 
 const std::string* Inference::store_key(NodeId index, std::string& storage) const {
@@ -255,33 +329,6 @@ void Inference::dynamic_mutation(const TyRef& recv, std::string_view name, const
         }
     }
     if (mutator) site_store(recv, stored, nullptr);
-}
-
-// C4: a function value passed to code the inference does not walk (a native
-// that is not a collection method) may be called with anything: its
-// parameters are anything.
-void Inference::escape_callables(const std::vector<TyRef>& values) {
-#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 23
-    return;  // A23: an escaping function keeps the parameter types of its known calls
-#endif
-    const std::size_t n = plan_.functions.size();
-    for (const TyRef& v : values)
-        for (std::uint32_t unit : v->callables) {
-            if (!escaped_units_.insert(unit).second) continue;
-            bool grew = false;
-            if (unit < n) for (TyRef& p : params_[unit]) grew = merge(p, top_ty()) || grew;
-            else if (unit > n && unit - n - 1 < lambdas_.size())
-                for (TyRef& p : lambdas_[unit - n - 1].params) grew = merge(p, top_ty()) || grew;
-            if (grew) enqueue(unit);
-        }
-}
-
-// C4: a call whose targets the inference does not know: any function used as
-// a value may be the callee, with any arguments.
-void Inference::untracked_call() {
-    auto as_value = std::make_shared<Ty>();
-    for (std::size_t unit : value_units_) as_value->callables.push_back(static_cast<std::uint32_t>(unit));
-    escape_callables({as_value});
 }
 
 } // namespace nift::rt::infer_detail

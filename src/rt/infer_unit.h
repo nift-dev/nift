@@ -199,11 +199,23 @@ private:
     void dynamic_mutation(const TyRef& recv, std::string_view name, const std::vector<TyRef>& values);
     void escape_callables(const std::vector<TyRef>& values);  // C4: called where the inference does not see
     void untracked_call();                                    // C4: a call whose targets are unknown
-    void site_grew();
+    void site_grew();                                   // every unit re-walks (unknown contents, C4, C5)
+    void site_changed(std::uint32_t rep);               // H2: the readers of one site class re-walk
+    std::uint32_t rep(std::uint32_t site);              // H2: a site's class (union-find)
+    void unite_sites(std::uint32_t a, std::uint32_t b);
+    std::vector<std::uint32_t> classes(const std::vector<std::uint32_t>& sites, bool& open);
+    TyRef canonical(const TyRef& t);                    // H2: a value's sites as at most 16 classes
     TyRef session_effects(const TyRef& result, const Node& call);  // C5: a call of an earlier statement's code
     void expose(const TyRef& t, int depth = 0);                     // C5: reachable by earlier code
+    void expose_sites(const std::vector<std::uint32_t>& sites);
+    void session_open();
     void session_store(std::string_view name, const TyRef* var, const TyRef& value);
-    std::unordered_set<std::uint32_t> exposed_, opened_;
+    void thread_target(const TyRef& f);                 // H1: thread/async entry of possibly unknown targets
+    bool exact_callee(const TyRef& f) const;            // H1: every target known
+    std::unordered_set<std::uint32_t> exposed_, opened_, collapsed_;
+    std::unordered_map<std::uint32_t, std::uint32_t> parent_;
+    std::unordered_map<std::uint32_t, std::set<std::size_t>> readers_;
+    bool earlier_called_ = false, closure_exposed_ = false, untracked_seen_ = false;
     const std::string* store_key(NodeId index, std::string& storage) const;  // a literal string index
     void element_update(NodeId target, const TyRef& value, Op op);          // `xs[i] += v`, `o.k++`
     std::map<std::uint32_t, SiteContents> agg_;

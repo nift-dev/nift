@@ -36,6 +36,7 @@ std::size_t Inference::lambda_unit(NodeId node) {
 }
 
 TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew) {
+    if (!exact_callee(callee)) untracked_call();  // B4b H1: some targets are not in `callables`
     TyRef out = empty_ty();
     for (std::uint32_t unit : callee->callables) {
         if (static_cast<std::size_t>(unit) < plan_.functions.size()) {

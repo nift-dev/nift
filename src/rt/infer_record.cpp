@@ -5,8 +5,11 @@ namespace nift::rt::infer_detail {
 TyRef Inference::record(NodeId id, TyRef t) {
     const TyRef raw = t;  // the guard's own per-binding facts (B5 deletes them with the guard)
     t = sited(id, t);  // B4b: an array's or object's contents are its sites'
-    if (!t->callables.empty() && !callee_nodes_.count(id))  // B4b C4: a function used as a value
-        for (std::uint32_t unit : t->callables) value_units_.insert(unit);
+    if (!t->callables.empty() && !callee_nodes_.count(id)) {  // B4b C4: a function used as a value
+        bool fresh_unit = false;
+        for (std::uint32_t unit : t->callables) fresh_unit = value_units_.insert(unit).second || fresh_unit;
+        if (fresh_unit && untracked_seen_) escape_callables({t});  // H1: after an inexact call too
+    }
     if (session_) t = session_current_shape(t);
     result_.kinds[id] = t->kinds;
     if (session_) result_.session_shapes[id] = t;
@@ -58,6 +61,7 @@ TyRef Inference::thread_call(const Node& n) {
     std::vector<TyRef> values;
     for(std::uint32_t k=1;k<n.count;++k)values.push_back(expr(args[k]));
     bool grew=false;
+    thread_target(f);  // B4b H1: an inexact entry widens every function that may be it
     const TyRef returns=f->callables.empty()?any_ty():call_callables(f,values,grew);
     auto handle=std::make_shared<Ty>();
     handle->kinds=kKindThread;

@@ -353,9 +353,9 @@ TyRef Inference::call(const Node& n) {
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
         if (const auto historical = session_historical_call(n, field)) return session_effects(historical, n);
         bool grew = false;
+        if (recv->kinds != kKindArray) dynamic_mutation(recv, key, values);  // B4b C2 (L1: before a member call)
         if (!field->callables.empty()) return call_callables(field, values, grew);
         if (!field->any && (field->kinds & kKindFunction)) untracked_call();  // B4b C4: unknown targets
-        if (recv->kinds != kKindArray) dynamic_mutation(recv, key, values);  // B4b C2
         const NodeId call_id = static_cast<NodeId>(&n - &ast_.at(0));
         const bool mixed = recv->any || (recv->kinds & ~kKindCollection);  // D-063: possibly a collection
         const bool shown = !n.count && (key == "stringify" || key == "prettify" || key == "highlight");

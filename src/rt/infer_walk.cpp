@@ -126,7 +126,7 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
     if (!var || (*var)->any) return;
     auto updated = std::make_shared<Ty>(**var);
     if (key) updated->key = unite(updated->key, value);
-    else updated->elem = unite(updated->elem, value);
+    else updated->elem = canonical(unite(updated->elem, value));  // B4b H2: its sites as classes
     updated->tuple = false;
     updated->items.clear();
     TyRef next = unite(TyRef(updated), TyRef(updated));
