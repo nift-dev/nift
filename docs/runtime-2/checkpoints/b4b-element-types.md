@@ -162,18 +162,18 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 | Property | Evidence |
 | --- | --- |
-| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b supplies sound kinds for U2 (section 4): the oracle, mutants A2, A19-A24 |
-| Every mutation path is in the type model | C1 check in `b4b_types.py` (protocol entry points, `CollectionMethod` enumerators, natives, protocol users, against the sources); `static_assert` on the effect table; oracle cases per path; mutant A20 (one mutator dropped) caught |
-| Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`: unknown origin reads as anything (the compiler then refuses or dispatches dynamically); C2 (`dynamic_mutation`, A24), C4 (`escape_callables`/`untracked_call`, A23); generator (section 5): `dispatch_defects` 0, never exit 70 |
-| Session-persistent code cannot keep stale assumptions | C5 above: coherent recompilation and shape contracts (CP19, its mutants 7/8), the guard for aliases (`b4b/sessions/*`), `session_effects` (A21, oracle `session-earlier-call`) |
-| The wrong-kind generators find no internal failures | `b4b_types.py` generator (1,568 programs); the reviewer's `gen1.py` (both passes) and `gen_struct.py` on the B4b tip (section 5) |
-| Performance stays within the limits | Section 7: run time identical (B4a set, ops, mutation); compile time within 1.25x of B4a; the scaling checks in `test-runtime2-b4` and `test-runtime2-b4b` |
+| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration and the struct oracle in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `-returned`, `call-unknown-ternary`; fixtures `b4b/scripts/*unknown_callee*`; mutant A28) and U2 (the oracle; mutants A2, A19-A27, A29). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references: a stale Static fact shows as `compiler defect`): 0 internal failures in the b4b suite, 1,500 alias programs and 12,512 fuzz programs |
+| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key); mutant A20 (one mutator dropped) |
+| Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`; C2 (A24), C4 (A23, A28: an inexact callee or thread/async entry widens every function used as a value); the guard-off gate and generators: `dispatch_defects` 0, never exit 70 |
+| Session-persistent code cannot keep stale assumptions | Today: coherent recompilation and shape contracts (CP19, mutants 7/8), the guard for aliases; `session_effects` with the full reachability rule (review M1: oracle `session-push/index/member/closure-exposed`, `session-late-store`, `session-store-after-call`; mutants A21, A29). After B5: **not yet** (U6, section 4); the guard-off gate shows it (`b4b/guardoff/u6_session_alias.in`, listed in `expected_u6.txt`, which B5 must empty) |
+| The wrong-kind generators find no internal failures | `b4b_types.py` generator (1,568), `gen_alias.py` (guard-on and guard-off), `gen1.py` passes a and b and `gen_struct.py` on the tip (section 10); P1 (a pre-existing codegen crash the review found) fixed in B4b 7 |
+| Performance stays within the limits | Run time identical (section 7); compile time within 1.5x of B4a at every measured size including the review H2 shape (section 10); the scaling checks in `test-runtime2-b4` and `test-runtime2-b4b` (glob shape near-linear; with `--baseline`, against B4a) |
 
 ## 4. Unflagged method-site classes (the B4a section 9 prerequisite)
 
 | Class | Receiver | Answer | Holds after B5 (guard removed)? |
 | --- | --- | --- | --- |
-| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding (parameters: every call, C4 for unknown callers) | **Yes**: sharing changes contents, not which value a binding holds |
+| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8) | **Yes**: sharing changes contents, not which value a binding holds |
 | U2 | an element or member read (`xs[i]`, `o.k`, `for` binding, element-returning methods) | (a) per-site contents (B4b) | **Yes**: stores through every alias reach the sites by construction |
 | U3 | a struct field | (a) one slot per field (B3) | **Yes** |
 | U4 | map/set/stack contents | (a) per site (D-NEXT-refsem) | **Yes** |
@@ -298,12 +298,16 @@ Not run locally (combined certification): full `make test`, `test-rt-vm-sanitize
 
 ## 9. Findings and carried items
 
-- **Pre-existing, found by the B4b fixtures (not B4b's):** a lambda returned by an async function
-  and called after `await` (`fn[async](a()) { return (x) => ... }`, `fa := await a()`, `fa(" a ")`)
-  runs on the VM, where legacy reports `invalid lambda` at the call (the same on the B4a tip).
-  `atomic.store([..])`'s message differs from legacy's (`store requires a signed 64-bit integer`
-  against `store: atomic<int> requires ...`). Neither is a fixture; both are for the release
-  audit.
+- **Async lambda after `await`** (review L2): not a finding. A lambda returned by an async function
+  and called after `await` runs on the VM where legacy reports `invalid lambda`: the approved CP22
+  correction `correction:lambda-registry` (owner, round 7; cp22-coroutines.md 874 and 1238;
+  `tests/runtime2/cp22/sem_lambda_*`). compatibility.md now has its row.
+- **`atomic.store` text** (review L3), carried to the release audit: `a.store([1])` reports
+  `store requires a signed 64-bit integer`, legacy `store: atomic<int> requires a signed 64-bit
+  integer` (same position and exit status).
+- **L1 (latent C2 hole)**, fixed in B4b 8: a union receiver whose object member of a mutator's name
+  is callable took the member call before the mutator model; the compiler refuses such calls
+  (`type:push`, `method:insert`), so it was unreachable. Oracle `union-callable-member`.
 - **`nift eval --json` internal tag** (owner ruling): a function's tag in `--json` output is a
   release blocker assigned to the release-blocker audit (b4-dispatch.md section 9); B4b does not
   touch the JSON conversion path.
