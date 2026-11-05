@@ -269,8 +269,15 @@ both engines.
   atomic, function in sessions and `nift eval`) with non-disclosure checks;
 - interpolation: 40 programs (five scalar families × four kinds without a text form × two contexts);
 - the spec × kind enumeration: 50 names × 15 receiver kinds × 4 contexts = 3,000 programs: never
-  exit 70, never an internal tag, `dispatch_defects` 0, parity for the plain kinds. 702 run on the
-  VM (the B3 binary: 215).
+  exit 70, never an internal tag, `dispatch_defects` 0, parity for the plain kinds. 681 run on the
+  VM (702 on c56c4093, which compiled struct receivers' string-method names: H1; the B3 binary: 215).
+
+The reviewer's wrong-kind generator (`review-b4/repro/gen1.py`, independent of the suite; run on
+the tip after the fixes, not part of a gate): pass a (`for`, `for` callee) 20,274 programs, pass b
+(eight other contexts, 6,000 sampled) : never exit 70, no tag leak, no internal text, 0 defects.
+Of the programs the VM runs, 131 (a) and 57 (b) differ from legacy; every one gives the same VM
+output on the B3 binary (pre-existing: presentation of handles as tags, CP17/B0; a single-kind
+object's non-method text; `remove` argument column), except 4 of the M1 class (approved, §2).
 
 `tests/rt/op_admission_unit.cpp`: admission decisions and failure texts; every built-in × every
 run-time kind through the tables; 357 native calls through the table, none returns
@@ -352,6 +359,26 @@ Production (`src/`, against `4c7d0b40`): 37 files, +905 −109. New: `op_admissi
 `dispatch_defect.h`; opcode `StructIs`. Tests and Makefile: 151 files, +1,467 −312.
 
 ## 8. Gates (local; result files in `scratchpad/b4/gates/`)
+
+**After the review fixes** (result files `r-*.result`): run on `dbe57017` (tree `22a990f8`; the
+following commit changes this record only). Every gate: exit 0, git status clean before and after.
+
+| Gate | Result |
+| --- | --- |
+| `test-rt-lint` | PASS rt-lint, boundary: 0 problems |
+| `test-rt-build` | PASS (builder mutant B-M2 caught) |
+| `test-rt-op-admission-unit` | 4027 checks, 0 failures |
+| `test-runtime2-b4` | PASS b4-dispatch: 12636 checks, 0 failures (struct receivers 1,911 programs, 867 on the VM; enumeration 3,000, 681 on the VM: struct receivers' string-method names are refused again, H1; compile scaling 6.0 / 25.2 ms) |
+| `test-runtime2-b4-mutants` | PASS: 16 caught or covered (A1 9, A3 40, A4 61, A5 61, A6 61, A7 2, A9 43, A10 4, A11 4, A12 5, A13 5, A14 13, A15 28, A16 10, A17 4 failing checks; S10 covered) |
+| `test-runtime2-b3`, `-b3-mutants` | 468 checks, 0 failures; 11 caught |
+| `test-runtime2-safety` | PASS fuzz: 33512 programs |
+| `test-cp19-session-cli`, `test-cp19-functional` | PASS |
+| `test-runtime2-packages` | 830 checks, 0 failed |
+| `test-runtime2-vm-default`, `-refsem`, `-collections` | PASS (475, 278 checks) |
+| `vm-modules-unit`, `vm-inventory-links`, `semantics-modules` | 179 checks; 10 cases; PASS |
+| `vm-adversarial` | 39612 programs, 0 non-approved differences |
+
+The table below is the c56c4093 set (kept for reference).
 
 Through `scratchpad/b4/gate.sh` (tree identity, command, exit code, log sha256, git status before and after). The set ran on `ad4ef25d` (tree `6af73259`); the two mutant gates that failed there on harness file maps (B4 8a) ran again on `ce92a319` (tree `0ded3593`, harness-only change). Every gate below: exit 0, git status clean before and after.
 
