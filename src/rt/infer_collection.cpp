@@ -46,8 +46,15 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         if (m == M::Push && !values.empty()) add_element(receiver, values[0]);
         if (m == M::Insert && values.size() > 1) add_element(receiver, values[1]);
         if (m == M::Splice && values.size() > 2) add_element(receiver, element_of(values[2], nullptr, false));
-        if (session_ && m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))
-            add_element(receiver, empty_ty());  // any mutation invalidates positional facts
+        // Any mutation invalidates positional facts (B3 review N1: in scripts and
+        // modules too, not only sessions: after `xs.reverse()` the instance that
+        // was at xs[0] may be anywhere, so `xs[0]` is no longer a proven receiver).
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 11
+        if (session_ && m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))  // D11
+#else
+        if (m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))
+#endif
+            add_element(receiver, empty_ty());
         if (m == M::Sort && !values.empty()) {
             bool grew = false;
             const auto argument=collection_value(element);

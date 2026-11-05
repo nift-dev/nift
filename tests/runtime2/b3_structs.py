@@ -81,9 +81,11 @@ def run_session(nift, stdin, work, mode="require"):
 
 
 SCHEMA = 'struct(P){a:=1;private b:="SECRET-b3";c:=3}'
+PSM = "presentation-struct-method:stringify"
 UMETHOD = 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
-# (name, stdin, kind): "parity" = legacy-equal and no refusal; ("vm", out) = the VM's
-# stdout (an approved B3 behaviour or refusal) plus non-disclosure on both engines.
+# (name, stdin, kind): "parity" = legacy-equal and no refusal; ("vm", out, reason) = the
+# VM's stdout before the statement refused with `reason` (review N2: the reason is
+# asserted), plus non-disclosure on both engines.
 SESSIONS = [
     # Schema replacement (D3): the old instance keeps its own descriptor, the
     # new one gets the new schema's (privacy swapped).
@@ -102,8 +104,9 @@ SESSIONS = [
     ("session-expression", SCHEMA + '\nc := P()\nc.stringify()\nc.prettify()\nc.highlight()\nexit\n', "parity"),
     # Session display of a bare instance and interpolation stay as they were
     # (carried to B4): the VM refuses; nothing private is shown either way.
-    ("display-bare", SCHEMA + '\nc := P()\nc\nexit\n', ("vm", "")),
-    ("display-interpolation", SCHEMA + '\nc := P()\nprint("v=$[c]")\nexit\n', ("vm", "")),
+    ("display-bare", SCHEMA + '\nc := P()\nc\nexit\n', ("vm", "", "session:collection-result")),
+    ("display-interpolation", SCHEMA + '\nc := P()\nprint("v=$[c]")\nexit\n',
+     ("vm", "", "interpolation:unknown-type")),
     # Owner ruling: implicit presentation in a session never runs the struct's
     # own stringify (no SIDE-EFFECT; the counter stays 0) ...
     ("implicit-methods", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");n=n+1;'
@@ -111,29 +114,30 @@ SESSIONS = [
      'print(xs.stringify())\nexit\n', "parity"),
     # ... and an explicit call on a session value that may be one is refused.
     ("explicit-mixed", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
-     'xs := [C(), map()]\nfor (x : xs) { print(x.stringify()) }\nexit\n', ("vm", "")),
+     'xs := [C(), map()]\nfor (x : xs) { print(x.stringify()) }\nexit\n', ("vm", "", PSM)),
     # Review H1: a later statement that does not name the struct still sees an
     # earlier statement's user presentation method (D10 ignores those).
     ("h1-alias", UMETHOD + 'c := C()\nd := c\nprint(d.prettify())\nprint(d.stringify())\nexit\n',
-     ("vm", 'C{\n  n: 0,\n}\n')),
-    ("h1-index", UMETHOD + 'c := C()\nxs := [c]\nprint(xs[0].stringify())\nexit\n', ("vm", "")),
-    ("h1-lookup", UMETHOD + 'c := C()\nm := map()\nm.set("k", c)\nprint(m.get("k").stringify())\nexit\n',
-     ("vm", "")),
+     ("vm", 'C{\n  n: 0,\n}\n', PSM)),
+    ("h1-index", UMETHOD + 'c := C()\nxs := [c]\nprint(xs[0].stringify())\nexit\n', ("vm", "", PSM)),
+    # Review N2: an object lookup (the former map lookup was refused for an
+    # unrelated reason, session:collection-result).
+    ("h1-lookup", UMETHOD + 'c := C()\no := {"k": c}\nprint(o["k"].stringify())\nexit\n', ("vm", "", PSM)),
     # A session function: defined after the struct, or before it (the
     # function is recompiled with the session's later struct and refused).
     ("h1-function-after", UMETHOD + 'fn(show(x)) { return x.stringify() }\nc := C()\nprint(show(c))\nexit\n',
-     ("vm", "")),
+     ("vm", "", PSM)),
     ("h1-function-before", 'fn(show(x)) { return x.stringify() }\nprint(show([1]))\n' + UMETHOD +
-     'c := C()\nprint(show(c))\nexit\n', ("vm", "[1]\n")),
+     'c := C()\nprint(show(c))\nexit\n', ("vm", "[1]\n", PSM)),
     # Schema replacement removing the method: the old instance, proven, runs
     # its own method; an alias that may be it is refused.
     ("h1-replace-remove", UMETHOD + 'p := C()\nstruct(C){n:=1}\nq := C()\nprint(p.stringify())\n'
-     'print(q.stringify())\nd := p\nprint(d.stringify())\nexit\n', ("vm", "SIDE-EFFECT\nu\nC{n:1}\n")),
+     'print(q.stringify())\nd := p\nprint(d.stringify())\nexit\n', ("vm", "SIDE-EFFECT\nu\nC{n:1}\n", PSM)),
     # Schema replacement adding the method: the proven old instance renders,
     # the new one runs its method, an alias is refused (it may be either).
     ("h1-replace-add", 'struct(C){n:=0}\np := C()\nd := p\nprint(d.stringify())\n' + UMETHOD +
      'q := C()\nprint(q.stringify())\nprint(p.stringify())\ne := p\nprint(e.stringify())\nexit\n',
-     ("vm", "C{n:0}\nSIDE-EFFECT\nu\nC{n:0}\n")),
+     ("vm", "C{n:0}\nSIDE-EFFECT\nu\nC{n:0}\n", PSM)),
     # Review L3: a private presentation method is no user method from outside:
     # nothing refused, the built-in renders (legacy parity).
     ("l3-private", 'struct(C){n:=0;private s:="SECRET-b3";private fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
@@ -255,8 +259,9 @@ def main():
                 check((vo, ve, vr) == (lo, le, lr) and "refused" not in ve,
                       "%s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo, le, lr, vo, ve, vr))
             else:
-                check(vo == kind[1] and vr != 0, "%s: VM %r/%r/%d (expected stdout %r and a refusal or error)" %
-                      (name, vo, ve[:300], vr, kind[1]))
+                check(vo == kind[1] and vr == 1 and "session refused: %s" % kind[2] in ve,
+                      "%s: VM %r/%r/%d (expected stdout %r, then the refusal %s)" % (name, vo, ve[:300], vr, kind[1],
+                                                                                   kind[2]))
             private(name, vo, ve, lo, le)
             if kind == "parity":
                 check(SIDE not in vo, "%s: implicit presentation ran a struct's own method: %r" % (name, vo))
