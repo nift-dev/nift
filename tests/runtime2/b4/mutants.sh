@@ -33,9 +33,10 @@ declare -A FILE=(
   [15]=src/rt/compiler_structs.cpp   # A15: every undeclared struct method compiled as legacy's error (review H1)
   [16]=src/rt/binding_rules.cpp      # A16: a `this` loop/catch binding in a struct admitted (text match, review H2)
   [17]=src/rt/module_graph.cpp       # A17: C1 whatever legacy runs before the import (review M2)
+  [18]=src/rt/module_graph.cpp       # A18: any number literal and a main-file export cannot stop the program (N1)
   [14]=src/rt/prepared.cpp           # A14: only `while` callers are prepared code (the `for`-callee gap, review M4)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 7 9 10 11 12 13 14 15 16 17 S10)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 7 9 10 11 12 13 14 15 16 17 18 S10)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

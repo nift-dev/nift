@@ -2,6 +2,7 @@
 
 #include "FileSystem.h"
 #include "rt/module_loader.h"
+#include "rt/literal.h"
 #include "rt/module_scan.h"
 #include "rt/package_resolve.h"
 #include "rt/parser.h"
@@ -25,15 +26,22 @@ struct Origin {
     std::size_t module = 0;  // the module whose top level declares it
 };
 
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 18
+#define NIFT_B4_ANY_NUMBER 1  // A18: any number literal and any export cannot stop the program (re-review N1)
+#else
+#define NIFT_B4_ANY_NUMBER 0
+#endif
+
 bool has(const Names& names, std::string_view name) {
     return std::find(names.begin(), names.end(), name) != names.end();
 }
 
 // B4 (review M2): a top-level statement that cannot stop the program (return,
-// exit or a run-time error): a declaration of a function, struct or enum, an
-// export, a fresh `name := <literal>` (arrays and objects of literals too) and
-// `print(<plain string>)` (the unit declares no `print`). Imports are judged
-// by their module's statements.
+// exit or a run-time error): a declaration of a function, struct or enum, a
+// fresh `name := <literal>` (arrays and objects of literals too; a number only
+// when the VM admits its literal: re-review N1) and `print(<plain string>)` (the
+// unit declares no `print`). Imports are judged by their module's statements;
+// exports in `visit`.
 bool cannot_stop(const Ast& ast, const Node& st, const Names& provided, const Names& unit_names) {
     const auto literal = [&](NodeId id, const auto& self) -> bool {  // arrays and objects of literals too
         const Node& v = ast.at(id);
@@ -47,12 +55,13 @@ bool cannot_stop(const Ast& ast, const Node& st, const Names& provided, const Na
             }
             return true;
         }
-        return v.kind == NodeKind::Number || v.kind == NodeKind::True || v.kind == NodeKind::False ||
+        Value number;  // re-review N1: a number literal only when the VM admits it (legacy rejects others)
+        if (v.kind == NodeKind::Number) return NIFT_B4_ANY_NUMBER || decode_number_literal(ast.text(v), number);
+        return v.kind == NodeKind::True || v.kind == NodeKind::False ||
                v.kind == NodeKind::Null || (v.kind == NodeKind::String && v.count == 0);
     };
     switch (st.kind) {
-        case NodeKind::FnDecl: case NodeKind::StructDecl: case NodeKind::EnumDecl: case NodeKind::Export:
-            return true;
+        case NodeKind::FnDecl: case NodeKind::StructDecl: case NodeKind::EnumDecl: return true;
         case NodeKind::Declare:
             return st.a != kNoNode && st.b != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
                    !has(provided, ast.text(ast.at(st.a))) && literal(st.b, literal);
@@ -140,6 +149,10 @@ public:
                                      (!frames_.empty() && frames_.back().at_import ? "@import" : "import"));
             }
             if (st.kind == NodeKind::Export) {
+                // Re-review N1: an export may stop the program (legacy: "export names no
+                // existing binding"). A module's is checked here (check_export reports
+                // legacy's error itself); the main file's is not checked: it may stop.
+                if (index == 0 && !NIFT_B4_ANY_NUMBER) reached_ = false;
                 if (index > 0 && !check_export(index, ast, st, provided, bound)) return false;
                 continue;
             }
