@@ -52,7 +52,11 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
 #if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 11
         if (session_ && m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))  // D11
 #else
-        if (m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2))
+        // An empty literal has no positions to forget: invalidating it would turn
+        // its proven "holds nothing" element into "unknown" (cp14b
+        // script_return_kernel_error: `a := []; return a.pop()`).
+        if (m != M::Push && m != M::Insert && !(m == M::Splice && values.size() > 2) &&
+            (session_ || !(recv->tuple && recv->items.empty())))
 #endif
             add_element(receiver, empty_ty());
         if (m == M::Sort && !values.empty()) {
