@@ -1,0 +1,4 @@
+ys := [" a "]
+fn(g()) { ys[0] = 5; return 0 }
+g(); print(ys[0].trim())
+print("end")

@@ -1,0 +1,2 @@
+xs := [" a "]
+export(xs)

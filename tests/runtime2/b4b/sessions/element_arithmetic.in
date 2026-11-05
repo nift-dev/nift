@@ -1,0 +1,6 @@
+xs := [1]
+fn(f()) { return xs[0] + 1 }
+print(f())
+xs[0] = "s"
+print(f())
+print("end")

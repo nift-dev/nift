@@ -1,0 +1,7 @@
+xs := [" a "]
+fn(f()) { return xs[0].trim() }
+print(f())
+ys := [xs]
+ys[0][0] = 5
+print(f())
+print("end")

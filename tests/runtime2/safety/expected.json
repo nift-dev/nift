@@ -5486,12 +5486,12 @@
  },
  "m_sortc_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+  "stderr": "error: p.f:3:33: not compiled for the VM (type:<): an operation whose operand types the VM cannot prove (<) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
   "stdout": ""
  },
  "m_sortc_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+  "stderr": "error: p.f:5:18: not compiled for the VM (type:<): an operation whose operand types the VM cannot prove (<) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
   "stdout": ""
  },
  "m_sortc_object_param": {

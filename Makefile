@@ -946,6 +946,27 @@ $(RT_VM_GLOBALS): tests/rt/vm_globals_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_globals_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
+# B4b: the kind inference's element and member types under sharing (the
+# primary oracle; docs/runtime-2/checkpoints/b4b-element-types.md).
+RT_B4B_TYPES := $(TEST_DIR)/rt/b4b-types-unit$(EXEEXT)
+$(RT_B4B_TYPES): tests/rt/b4b_types_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/b4b_types_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
+.PHONY: test-rt-b4b-types-unit
+test-rt-b4b-types-unit: $(RT_B4B_TYPES)
+	"$(RT_B4B_TYPES)"
+# B4b: the end-to-end suite (fixtures with a legacy differential, the mutator
+# classification check, the wrong-kind generator) and its mutation controls.
+.PHONY: test-runtime2-b4b test-runtime2-b4b-mutants
+test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES)
+	"$(RT_B4B_TYPES)"
+	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS)
+	B4B_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" B4B_UNIT_OBJECTS="$(RT_UNIT_OBJECTS) $(LDLIBS)" \
+		bash tests/runtime2/b4b/mutants.sh "$(CURDIR)/$(TARGET)"
+
 # CP12 phase B: the module graph and loader (D-041; rt/module_graph.h).
 RT_VM_MODULES := $(TEST_DIR)/rt/vm-modules-unit$(EXEEXT)
 $(RT_VM_MODULES): tests/rt/vm_modules_unit.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
