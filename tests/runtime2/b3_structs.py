@@ -85,7 +85,8 @@ PSM = "presentation-struct-method:stringify"
 UMETHOD = 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
 # (name, stdin, kind): "parity" = legacy-equal and no refusal; ("vm", out, reason) = the
 # VM's stdout before the statement refused with `reason` (review N2: the reason is
-# asserted), plus non-disclosure on both engines.
+# asserted); ("error", out, text) = an ordinary statement error (B4); plus
+# non-disclosure on both engines.
 SESSIONS = [
     # Schema replacement (D3): the old instance keeps its own descriptor, the
     # new one gets the new schema's (privacy swapped).
@@ -102,11 +103,17 @@ SESSIONS = [
     ("struct-contents", SCHEMA + '\nc := P()\na := [c]\nprint("before")\nprint("x"); print(a.stringify())\nexit\n',
      "parity"),
     ("session-expression", SCHEMA + '\nc := P()\nc.stringify()\nc.prettify()\nc.highlight()\nexit\n', "parity"),
-    # Session display of a bare instance and interpolation stay as they were
-    # (carried to B4): the VM refuses; nothing private is shown either way.
-    ("display-bare", SCHEMA + '\nc := P()\nc\nexit\n', ("vm", "", "session:collection-result")),
+    # B4 (b4-dispatch.md 6): the session display of a bare instance is its
+    # descriptor form (legacy parity: public fields only, no user method runs).
+    # Interpolating an instance from an earlier statement stays refused in a
+    # session (the binding's kinds are not proven there); in a script it is an
+    # ordinary error (b4/dispatch). Nothing private is shown either way.
+    ("display-bare", SCHEMA + '\nc := P()\nc\nexit\n', "parity"),
+    ("display-bare-user-method", UMETHOD + 'c := C()\nc\nexit\n', "parity"),
     ("display-interpolation", SCHEMA + '\nc := P()\nprint("v=$[c]")\nexit\n',
      ("vm", "", "interpolation:unknown-type")),
+    ("display-interpolation-same-line", SCHEMA + '\nc := P(); print("v=$[c]")\nexit\n',
+     ("error", "", "struct instances cannot be rendered as text")),
     # Owner ruling: implicit presentation in a session never runs the struct's
     # own stringify (no SIDE-EFFECT; the counter stays 0) ...
     ("implicit-methods", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");n=n+1;'
@@ -258,6 +265,10 @@ def main():
             if kind == "parity":
                 check((vo, ve, vr) == (lo, le, lr) and "refused" not in ve,
                       "%s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo, le, lr, vo, ve, vr))
+            elif kind[0] == "error":  # B4: an ordinary statement error (the session goes on)
+                check(vo == kind[1] and kind[2] in ve and "refused" not in ve,
+                      "%s: VM %r/%r/%d (expected stdout %r, then the error %s)" % (name, vo, ve[:300], vr, kind[1],
+                                                                                 kind[2]))
             else:
                 check(vo == kind[1] and vr == 1 and "session refused: %s" % kind[2] in ve,
                       "%s: VM %r/%r/%d (expected stdout %r, then the refusal %s)" % (name, vo, ve[:300], vr, kind[1],

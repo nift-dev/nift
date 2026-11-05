@@ -216,8 +216,12 @@ bool UnitCompiler::return_statement(const Node& node) {
     // (its tag or stringify form); the VM has no form for it: refused before
     // anything runs (M14 drops it).
 #if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 14
+    // B4 (b4-dispatch.md 6): a session shows a struct or map/set/stack value
+    // itself (its compact form); one inside an array or object, and every
+    // such `nift eval` result, stay refused.
+    const bool nested = kinds_.collection_holders.count(node.a) && (kinds(node.a) & kKindAggregate);
     if (expression_result_ && !in_function_ && unit_makes_collections() &&
-        ((kinds(node.a) & kKindTagged) || kinds_.collection_holders.count(node.a)))
+        (session_ ? nested : ((kinds(node.a) & kKindTagged) || kinds_.collection_holders.count(node.a))))
         return fail(ast_.at(node.a), session_ ? "session:collection-result" : "eval:collection-result");
 #endif
     if ((!expression_result_ || in_function_) && !no_alias(node.a, node)) return false;

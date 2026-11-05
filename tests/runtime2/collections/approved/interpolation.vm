@@ -1,0 +1,4 @@
+ran
+--- stderr
+error: interpolation.f:6:12: map, set and stack values cannot be rendered as text
+--- exit 1

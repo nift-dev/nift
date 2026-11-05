@@ -341,8 +341,8 @@
  },
  "h_atomic_bool_map_highlight_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_map_highlight_top": {
   "exit": 1,
@@ -366,8 +366,8 @@
  },
  "h_atomic_bool_map_prettify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_map_prettify_top": {
   "exit": 1,
@@ -391,8 +391,8 @@
  },
  "h_atomic_bool_map_stringify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_map_stringify_top": {
   "exit": 1,
@@ -661,8 +661,8 @@
  },
  "h_atomic_bool_stack_highlight_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_stack_highlight_top": {
   "exit": 1,
@@ -686,8 +686,8 @@
  },
  "h_atomic_bool_stack_prettify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_stack_prettify_top": {
   "exit": 1,
@@ -711,8 +711,8 @@
  },
  "h_atomic_bool_stack_stringify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\ntrue\nafter\n"
  },
  "h_atomic_bool_stack_stringify_top": {
   "exit": 1,
@@ -1061,8 +1061,8 @@
  },
  "h_atomic_int_map_highlight_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_map_highlight_top": {
   "exit": 1,
@@ -1086,8 +1086,8 @@
  },
  "h_atomic_int_map_prettify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_map_prettify_top": {
   "exit": 1,
@@ -1111,8 +1111,8 @@
  },
  "h_atomic_int_map_stringify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_map_stringify_top": {
   "exit": 1,
@@ -1381,8 +1381,8 @@
  },
  "h_atomic_int_stack_highlight_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_stack_highlight_top": {
   "exit": 1,
@@ -1406,8 +1406,8 @@
  },
  "h_atomic_int_stack_prettify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_stack_prettify_top": {
   "exit": 1,
@@ -1431,8 +1431,8 @@
  },
  "h_atomic_int_stack_stringify_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
-  "stdout": "b\nafter\n"
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n1\nafter\n"
  },
  "h_atomic_int_stack_stringify_top": {
   "exit": 1,
@@ -1446,8 +1446,8 @@
  },
  "h_atomic_session_tail": {
   "exit": 0,
-  "stderr": "error: opaque runtime values cannot be rendered as text in $[a]\n",
-  "stdout": "b\nafter\n"
+  "stderr": "",
+  "stdout": "b\n1\nafter\n"
  },
  "h_channel_alone_highlight_closure": {
   "exit": 1,
@@ -2336,8 +2336,8 @@
  },
  "h_map_session_bare_earlier": {
   "exit": 0,
-  "stderr": "error: a map, set or stack value cannot be shown by the Runtime 2.0 VM yet (no source position is available for this report)\n",
-  "stdout": "b\nafter\n"
+  "stderr": "",
+  "stdout": "b\nmap([])\nafter\n"
  },
  "h_mutex_alone_highlight_closure": {
   "exit": 1,
@@ -3206,8 +3206,8 @@
  },
  "h_set_session_tail_earlier": {
   "exit": 0,
-  "stderr": "error: map, set and stack values cannot be rendered as text in $[s]\n",
-  "stdout": "b\nafter\n"
+  "stderr": "",
+  "stdout": "b\nset([])\nafter\n"
  },
  "h_thread": {
   "exit": 1,
@@ -3230,114 +3230,114 @@
   "stdout": "b\n"
  },
  "i_atomic_bool_closure_int": {
-  "exit": 1,
-  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\nitrue\n"
  },
  "i_atomic_bool_closure_str": {
-  "exit": 1,
-  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\nitrue\n"
  },
  "i_atomic_bool_loop_int": {
-  "exit": 1,
-  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\nitrue\n"
  },
  "i_atomic_bool_loop_str": {
-  "exit": 1,
-  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\nitrue\n"
  },
  "i_atomic_bool_mapget_int": {
-  "exit": 1,
-  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\nitrue\n"
  },
  "i_atomic_bool_mapget_str": {
-  "exit": 1,
-  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\nitrue\n"
  },
  "i_atomic_bool_param_int": {
-  "exit": 1,
-  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\nitrue\n"
  },
  "i_atomic_bool_param_str": {
-  "exit": 1,
-  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\nitrue\n"
  },
  "i_atomic_bool_pop_int": {
-  "exit": 1,
-  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nitrue\n"
  },
  "i_atomic_bool_pop_str": {
-  "exit": 1,
-  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nitrue\n"
  },
  "i_atomic_bool_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\nafter\n"
+  "stderr": "",
+  "stdout": "b\ni1\nitrue\nafter\n"
  },
  "i_atomic_int_closure_int": {
-  "exit": 1,
-  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\ni1\n"
  },
  "i_atomic_int_closure_str": {
-  "exit": 1,
-  "stderr": "error: p.f:1:17: lambda body error: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\ni1\n"
  },
  "i_atomic_int_loop_int": {
-  "exit": 1,
-  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\ni1\n"
  },
  "i_atomic_int_loop_str": {
-  "exit": 1,
-  "stderr": "error: p.f:3:26: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\ni1\n"
  },
  "i_atomic_int_mapget_int": {
-  "exit": 1,
-  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\ni1\n"
  },
  "i_atomic_int_mapget_str": {
-  "exit": 1,
-  "stderr": "error: p.f:5:54: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\ni1\n"
  },
  "i_atomic_int_param_int": {
-  "exit": 1,
-  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\ni1\n"
  },
  "i_atomic_int_param_str": {
-  "exit": 1,
-  "stderr": "error: p.f:1:26: opaque runtime value is not serializable\n",
-  "stdout": "b\nis\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\nis\ni1\n"
  },
  "i_atomic_int_pop_int": {
-  "exit": 1,
-  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\n"
  },
  "i_atomic_int_pop_str": {
-  "exit": 1,
-  "stderr": "error: p.f:4:11: opaque runtime value is not serializable\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\ni1\n"
  },
  "i_atomic_int_session": {
   "exit": 0,
-  "stderr": "error: opaque runtime value is not serializable\n",
-  "stdout": "b\ni1\nafter\n"
+  "stderr": "",
+  "stdout": "b\ni1\ni1\nafter\n"
  },
  "i_channel_closure_int": {
   "exit": 1,

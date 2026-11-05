@@ -9,6 +9,7 @@
 #include "rt/error.h"
 #include "rt/natives/builtin.h"
 #include "rt/shared_state.h"
+#include "rt/shared_atomic.h"
 #include "rt/op_admission.h"
 
 #include <cstdlib>
@@ -93,9 +94,24 @@ bool dispatch_failed(const Instr& in, const Proto* proto, const natives::Builtin
 // A family with neither is a defect (counted, fatal in checked builds; the
 // table's Unsupported text is raised). Out of line, off the ordinary path.
 [[gnu::noinline]] const natives::BuiltinSpec* redispatch(const Instr& in, const Proto* proto,
-                                                         const natives::BuiltinSpec& spec, const Value& receiver,
+                                                         const natives::BuiltinSpec& spec, Value& receiver,
                                                          Fault& fault) {
-    const natives::Receiver actual = natives::receiver_of(receiver);
+    natives::Receiver actual = natives::receiver_of(receiver);
+    // B4 (b4-dispatch.md 6, owner): interpolation shows an atomic by its
+    // current value: one sequentially consistent load through the runtime's
+    // atomic access (as print does), then that value's own to_string.
+#if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 13)  // A13: an atomic is not loaded (B0's error again)
+    if (actual == natives::Receiver::Atomic && spec.name == "to_string") {  // rt-lint: allow-string-compare cold
+        SharedOpError failure;
+        Value loaded;
+        if (!shared_atomic_load(receiver, loaded, failure)) {
+            raise(fault, StopReason::Error, failure.message);
+            return nullptr;
+        }
+        receiver = std::move(loaded);
+        actual = natives::receiver_of(receiver);
+    }
+#endif
 #if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 4
     (void)in; (void)proto; (void)actual; (void)fault;
     return &spec;  // A4: no redirection (a native meets a foreign receiver)

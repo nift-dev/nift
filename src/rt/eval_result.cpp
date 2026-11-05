@@ -3,6 +3,8 @@
 #include "rt/atom.h"
 #include "rt/heap.h"
 #include "rt/render.h"
+#include "rt/natives/format_methods.h"
+#include "rt/shared_atomic.h"
 
 // rt-lint: cold-file CLI result serialization after execution
 namespace nift::rt {
@@ -12,10 +14,26 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
         error = "value nesting exceeds " + std::to_string(kMaxBridgeDepth) + " levels";
         return false;
     }
+    // B4 (b4-dispatch.md 6, owner): a function has no shown form; its
+    // internal tag is not disclosed (stringify's ordinary error).
     if (value.is(Kind::Function)) {
-        const auto* function = value.heap_as<FunctionObject>();
-        out = nift::RuntimeValue(callable_marker(*function));
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 11
+        out = nift::RuntimeValue(callable_marker(*value.heap_as<FunctionObject>()));  // A11: the tag again
         return true;
+#endif
+        error = "opaque runtime value is not serializable";
+        return false;
+    }
+    // B4: an atomic is shown by its current value: one sequentially
+    // consistent load through the runtime's atomic access (as print does).
+    if (value.is(Kind::Handle) && value.handle_kind() == HandleKind::Atomic) {
+        SharedOpError failure;
+        Value loaded;
+        if (!shared_atomic_load(value, loaded, failure)) {
+            error = failure.message;
+            return false;
+        }
+        return to_legacy(loaded, out, error);
     }
     if (value.is(Kind::Array)) {
         out = nift::RuntimeValue::make_array();
@@ -48,5 +66,12 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
 } // namespace
 bool eval_result_to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) {
     return convert(value, out, error, 0);
+}
+bool session_presented(const Value& value, std::string& text) {
+    if (!value.is(Kind::Struct) && !value.is(Kind::Collection)) return false;
+    std::string error;
+    bool internal = false;
+    text.clear();
+    return natives::serialize(value, false, text, error, internal);
 }
 } // namespace nift::rt

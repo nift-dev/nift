@@ -1,6 +1,8 @@
 #include "rt/vm_session_render.h"
 #include "rt/heap.h"
 #include "rt/render.h"
+#include "rt/eval_result.h"
+#include "rt/shared_atomic.h"
 // rt-lint: cold-file REPL presentation; no Error mutation or legacy execution
 namespace nift::rt {
 bool Vm::op_session_render(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto) {
@@ -13,8 +15,15 @@ bool Vm::op_session_render(const Instr& in, Value* R, VmResult& result, Fault& f
             std::string(value.is(Kind::Array) ? "array $[" : "object $[") + source +
             (value.is(Kind::Array) ? "]; select an element first" : "]; select a member first"));
     }
-    if (value.is(Kind::Function)) {
-        result.statement_text += callable_marker(*value.heap_as<FunctionObject>()); return true;
+    // B4 (b4-dispatch.md 6): no internal tag for a function; a struct or a
+    // map/set/stack shows its compact form; an atomic its current value.
+    if (value.is(Kind::Function)) return raise(fault, StopReason::Error, "opaque runtime value is not serializable");
+    if (std::string shown; session_presented(value, shown)) { result.statement_text += shown; return true; }
+    if (value.is(Kind::Handle) && value.handle_kind() == HandleKind::Atomic) {
+        SharedOpError failure;
+        Value loaded;
+        if (!shared_atomic_load(value, loaded, failure)) return raise(fault, StopReason::Error, failure.message);
+        return append_rendered(loaded, result.statement_text) || internal(fault, "session statement rendering");
     }
     if (value.is(Kind::Error))
         return raise(fault, StopReason::Error, "Error values cannot be rendered as text in $[" + source + "]");

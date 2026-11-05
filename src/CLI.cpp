@@ -1776,6 +1776,8 @@ static int run_vm_session_statement(nift::rt::VmSession& session, const std::str
     if (!expression && result.execution.returned && !result.execution.return_inspection && result.value.is_null())
         std::cout << "null\n";
     if ((expression || result.execution.returned) && !result.value.is_null()) {
+        std::string presented;  // B4: a struct or map/set/stack: its compact form
+        if (nift::rt::session_presented(result.value, presented)) { std::cout << presented << '\n'; return 0; }
         nift::RuntimeValue value;
         std::string error;
         // B0 (b0-safety.md): a statement value the session cannot show (a

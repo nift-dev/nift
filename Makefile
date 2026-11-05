@@ -5270,6 +5270,11 @@ test-runtime2-b4-mutants: $(TARGET) $(LIBFFI_A) $(RT_OP_ADMISSION_UNIT)
 	B4_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/b4/mutants.sh "$(CURDIR)/$(TARGET)" \
 		"$(TEST_DIR)/b4-mutants/unit-objects"
 test-rt-vm: test-runtime2-b4 test-runtime2-b4-mutants
+# The TSan lane (combined certification; not run locally): b4/concurrent among them.
+.PHONY: test-runtime2-b4-tsan
+test-runtime2-b4-tsan: $(TSAN_TARGET)
+	$(PYTHON) tests/runtime2/b4_dispatch.py --nift "$(CURDIR)/$(TSAN_TARGET)" --quick
+test-rt-vm-sanitize: test-runtime2-b4-tsan
 # B0 pre-release safety (docs/runtime-2/checkpoints/b0-safety.md): an admitted
 # program never stops with an internal VM failure (exit 70) because of a
 # run-time operand kind: handles presented, wrong-kind mutator receivers.

@@ -1,0 +1,3 @@
+before
+error: present_interp_map.f:6:12: map, set and stack values cannot be rendered as text
+[exit 1]

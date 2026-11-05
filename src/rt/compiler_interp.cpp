@@ -278,7 +278,11 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
         // Kinds without a text form beside one scalar family: a Dynamic part.
         const KindSet scalar = static_cast<KindSet>(whole & kKindScalar);
         const bool dynamic = (whole & ~kKindScalar) != 0;
-        if (scalar == 0) return fail(part, "interpolation:unknown-type");
+        // B4 (b4-dispatch.md 6, owner): a struct instance or a map/set/stack
+        // alone is an ordinary run-time error (B0's text), an atomic shows its
+        // value; mutexes, channels, functions and futures alone stay refused.
+        const bool presented = scalar == 0 && (whole & ~(kKindCollection | kKindStruct | kKindAtomic)) == 0;
+        if (scalar == 0 && !presented) return fail(part, "interpolation:unknown-type");
         const bool number = (scalar & ~kKindNumber) == 0;
         const bool string = scalar == kKindString;
         const bool boolean = scalar == kKindBool;
@@ -286,7 +290,7 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
         if (!number && !string && !boolean && !null) return fail(part, "interpolation:unknown-type");
 
         const natives::BuiltinSpec* spec = nullptr;
-        const MethodBinding binding = bind_method(scalar, "to_string", spec);
+        const MethodBinding binding = bind_method(presented ? kKindNull : scalar, "to_string", spec);
         if (binding != MethodBinding::Bound && binding != MethodBinding::Dead)
             return fail(part, "interpolation:unknown-type");
 

@@ -7,6 +7,8 @@
                     (NIFT_VM=0): stdout, stderr and exit status; a `.vm` golden
                     marks an approved difference (D-009#5), which must still
                     differ from legacy
+  b4/concurrent/*.f run on the VM with legacy's final output, three times (an
+                    atomic presented while a thread updates it; TSan lane too)
   b4/refuse/*.f     refused before any effect, with the `.reason` given
   sessions          piped sessions (SESSIONS): equal to legacy
   enumeration       every built-in method name of the plain families x every
@@ -85,6 +87,18 @@ def run_session(nift, stdin, mode, work):
     return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode, rows
 
 
+def run_display(nift, spec, work):
+    d = tempfile.mkdtemp(dir=work)
+    if isinstance(spec, list):
+        p = subprocess.run(["timeout", "60", nift] + spec, cwd=d, env=env_for(d, "require", None),
+                           stdin=subprocess.DEVNULL, capture_output=True)
+    else:
+        p = subprocess.run(["timeout", "60", nift, "-i"], cwd=d, env=env_for(d, "require", None), input=spec.encode(),
+                           capture_output=True)
+    shutil.rmtree(d, ignore_errors=True)
+    return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
+
+
 def defects(rows):
     return sum(int(r.get("dispatch_defects", 0)) for r in rows)
 
@@ -93,6 +107,22 @@ def fixtures(kind):
     d = os.path.join(HERE, kind)
     return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith(".f"))
 
+
+# Non-disclosure (owner): no VM output on any B4 path shows an internal tag.
+TAG = "\x1fnift:"
+
+# B4 presentation (b4-dispatch.md 6): sessions and `nift eval` where the VM's
+# display is the approved one: (name, stdin or eval argv, stdout, stderr part).
+DISPLAYS = [
+    ("session_struct", 'struct(C){a:=1;private s:="SECRET-b4";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
+                       'c := C()\nc\n', "C{a:1}\n", ""),
+    ("session_map", 'm := map()\nm.set("k", 1)\nm\n', "1\nmap([[\"k\",1]])\n", ""),
+    ("session_atomic", 'a := atomic<int>(5)\na\na.store(7)\na\n', "5\n7\n", ""),
+    ("session_function", 'f := (x) => x\nf\nprint("after")\n', "after\n", "opaque runtime value is not serializable"),
+    ("eval_function", ["eval", "(x) => x"], "", "opaque runtime value is not serializable"),
+    ("eval_function_nested", ["eval", "[(x) => x]"], "", "opaque runtime value is not serializable"),
+    ("eval_atomic", ["eval", "atomic<int>(5)"], "5\n", ""),
+]
 
 SESSIONS = [
     ("union_loop", 'for (v : [" a ", 7]) { print(v.trim()) }\nprint("after")\n'),
@@ -163,6 +193,7 @@ def enumeration(nift, work, quick):
                 vo, ve, vr, rows = run_text(nift, src, "1", work)
                 stats["programs"] += 1
                 label = "enumeration %s.%s on %s (%s)" % (name, call, kind, ctx)
+                check(TAG not in vo + ve, "%s: an internal tag in the VM's output" % label)
                 check(vr != 70 and "internal failure" not in ve and "compiler defect" not in ve,
                       "%s: internal failure (exit %d): %r" % (label, vr, ve[-200:]))
                 check(defects(rows) == 0, "%s: dispatch_defects %d" % (label, defects(rows)))
@@ -230,6 +261,9 @@ def main():
                   "dispatch %s: not run by the VM: %r" % (name, ve[-300:]))
             check(defects(rows) == 0, "dispatch %s: dispatch_defects %d" % (name, defects(rows)))
             check(vr != 70, "dispatch %s: exit 70" % name)
+            check(TAG not in vo + ve and "SECRET-b4" not in vo + ve and "SIDE-EFFECT" not in vo + ve
+                  or name.startswith("struct_presentation"),  # explicit calls may run the user method
+                  "dispatch %s: an internal tag, a private value or an implicit user method" % name)
             lo, le, lr, _ = run_text(nift, src, "0", work, name)
             golden = f[:-2] + ".vm"
             got = "%s%s[exit %d]\n" % (vo, ve, vr)
@@ -242,6 +276,14 @@ def main():
             else:
                 check((vo, ve, vr) == (lo, le, lr), "dispatch %s: VM %r/%r/%d vs legacy %r/%r/%d" %
                       (name, vo, ve, vr, lo, le, lr))
+        for f in fixtures("concurrent"):  # deterministic final state; the TSan lane runs them too
+            name = os.path.basename(f)
+            src = open(f).read()
+            for _ in range(3):
+                vo, ve, vr, rows = run_text(nift, src, "require", work, name)
+                lo, le, lr, _ = run_text(nift, src, "0", work, name)
+                check(rows and rows[-1].get("outcome") == "vm" and (vo, ve, vr) == (lo, le, lr),
+                      "concurrent %s: VM %r/%r/%d vs legacy %r/%r/%d" % (name, vo, ve[-200:], vr, lo, le, lr))
         for f in fixtures("refuse"):
             name = os.path.basename(f)
             reason = open(f[:-2] + ".reason").read().strip()
@@ -258,6 +300,11 @@ def main():
             check((vo, ve, vr) == (lo, le, lr), "session %s: VM %r/%r/%d vs legacy %r/%r/%d" %
                   (name, vo, ve, vr, lo, le, lr))
         print("interpolation: %d programs" % interpolation(nift, work))
+        for name, spec, out, err in DISPLAYS:
+            vo, ve, vr = run_display(nift, spec, work)
+            check(vo == out and err in ve and TAG not in vo + ve and "SECRET-b4" not in vo + ve
+                  and "SIDE-EFFECT" not in vo and "refused" not in ve and vr != 70,
+                  "display %s: VM %r/%r/%d (expected stdout %r, stderr containing %r)" % (name, vo, ve, vr, out, err))
         stats = enumeration(nift, work, args.quick)
         # The enumeration must exercise dynamic dispatch, not only refusals
         # (mutant A3 refuses every Dynamic case).

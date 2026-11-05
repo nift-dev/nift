@@ -1,0 +1,3 @@
+before
+error: present_interp_struct.f:11:12: struct instances cannot be rendered as text
+[exit 1]

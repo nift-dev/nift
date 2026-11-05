@@ -85,15 +85,14 @@ void check_cli_result_codec() {
         Vm vm(*compiled.program, options);
         std::string output, error;
         CHECK(vm.run(output).reason == StopReason::None);
-        CHECK(eval_result_to_legacy(captured, presented, error));
-        CHECK(error.empty());
+        // B4 (b4-dispatch.md 6, owner ruling): a function has no shown form;
+        // its internal tag is never disclosed (it was before B4).
+        CHECK(!eval_result_to_legacy(captured, presented, error));
+        CHECK(error == "opaque runtime value is not serializable");
         // Presentation must not expand the generic executable-state bridge.
         nift::RuntimeValue rejected;
         CHECK(!to_legacy(captured, rejected, error));
     }
-    CHECK(presented.array.size() == 2);
-    CHECK(presented.array[0].string == std::string("\x1fnift:callable:lambda:1"));
-    CHECK(presented.array[1].object[0].second.string == std::string("\x1fnift:callable:lambda:2"));
     auto formatted = evaluate("[error(\"outer\",\"user.outer\",error(\"inner\"))].prettify()");
     CHECK(formatted.is(Kind::String));
     const auto text = string_view_of(formatted);

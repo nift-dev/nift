@@ -81,16 +81,15 @@ def run_session(nift, stdin, work, argv=None, mode="require"):
 
 
 # (name, stdin, argv, expectation): ("refuse", stdout before the refusal,
-# reason, "line:column") or ("parity",). argv None: a piped session.
+# reason, "line:column"), ("parity",) or ("vm", stdout) (B4). argv None: a piped session.
 SESSIONS = [
-    ("collection_statement", 'print("a")\nmap()\nprint("b")\n', None,
-     ("refuse", "a\n", "session:collection-result", "<stdin>:2:1")),
-    ("collection_in_line", 'print("a")\nprint(1); set()\nprint("b")\n', None,
-     ("refuse", "a\n", "session:collection-result", "<stdin>:2:11")),
+    # B4 (b4-dispatch.md 6): a session shows a map/set/stack value itself in its
+    # compact form (legacy parity); legacy's tag inside a line is not reproduced.
+    ("collection_statement", 'print("a")\nmap()\nprint("b")\n', None, ("parity",)),
+    ("collection_in_line", 'print("a")\nprint(1); set()\nprint("b")\n', None, ("vm", "a\n1\nnullset([])\nb\n")),
     ("collection_nested", 'print("a")\n[map()]\nprint("b")\n', None,
      ("refuse", "a\n", "session:collection-result", "<stdin>:2:1")),
-    ("collection_call_result", 'print("a")\nf := () => stack()\nf()\nprint("b")\n', None,
-     ("refuse", "a\n", "session:collection-result", "<stdin>:3:1")),
+    ("collection_call_result", 'print("a")\nf := () => stack()\nf()\nprint("b")\n', None, ("parity",)),
     ("mutator_echo", 'print("a")\nm := map(); m.set(1, 2); print(m.size())\nprint("b")\n', None,
      ("refuse", "a\n", "session:collection-mutator", "<stdin>:2:13")),
     ("same_string_literal", 'print("a")\nf := () => 1; print(same("f", "f"))\nprint("b")\n', None,
@@ -178,6 +177,9 @@ def main():
         # ---- sessions and eval ----
         for name, stdin, argv, want in SESSIONS:
             vo, ve, vr = run_session(nift, stdin, work, argv)
+            if want[0] == "vm":  # B4: the VM's transcript where legacy shows an internal tag
+                check(vo == want[1] and "refused" not in ve, "session %s: VM %r/%r/%d" % (name, vo, ve, vr))
+                continue
             if want[0] == "parity":
                 lo, le, lr = run_session(nift, stdin, work, argv, mode="0")
                 check((vo, ve, vr) == (lo, le, lr) and "not compiled" not in ve and "refused" not in ve,
