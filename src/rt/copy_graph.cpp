@@ -46,7 +46,7 @@ template <class F> void each_child(const Value& v, F&& f) {
 std::shared_ptr<const StructType> copy_descriptor(const Value& instance) {
 #if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 4
     const StructType& type = struct_type(instance);  // D4: the copy's descriptor is all public
-    return StructType::make(type.name, type.fields, {});
+    return StructType::make(type.name, type.fields, std::vector<bool>(type.fields.size(), false));
 #else
     return struct_type_ref(instance);
 #endif

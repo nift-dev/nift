@@ -1,0 +1,6 @@
+before
+[C{v:7}]
+SIDE-EFFECT explicit
+user
+--- stderr
+--- exit 0

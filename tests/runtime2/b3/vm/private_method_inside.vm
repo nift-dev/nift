@@ -1,0 +1,5 @@
+SIDE-EFFECT inside
+user
+C{v:0}
+--- stderr
+--- exit 0

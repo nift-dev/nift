@@ -76,6 +76,11 @@ struct SessionStructType {
 struct SessionCompileContext {
     std::vector<SessionSymbol> symbols;
     std::unordered_map<std::string, SessionStructType> struct_types;  // B3, by struct name
+    // B3 (review H1): every presentation method name (stringify, prettify,
+    // highlight; public, no parameters) any struct schema of this session has
+    // declared, in any statement. Never shrinks: an instance of a replaced
+    // schema may still be reachable (UnitCompiler::presentation_dispatch).
+    std::unordered_set<std::string> presentation_methods;
     std::unordered_map<std::string, std::shared_ptr<const SessionDefinition>> structures;
     std::unordered_set<std::string> imported_functions, phased_functions, inactive_imports, reserved_rebindings;
     std::unordered_map<const SessionDefinition*, std::string> named_templates;

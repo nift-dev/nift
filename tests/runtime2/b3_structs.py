@@ -19,6 +19,8 @@
                 explicit call runs a struct's own presentation method): the
                 VM's transcript is NAME.vm.
   refuse/*.f    refused before any effect with NAME.reason (exit 1, no stdout).
+  modules/*/    main.f importing m.f: `reason` (refused before any effect) or
+                `vm` (the VM's transcript; written by --update).
   structure     the serializer has no path to VM code: implicit presentation
                 cannot run user code by construction (owner ruling).
 
@@ -45,10 +47,14 @@ SIDE = "SIDE-EFFECT"
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def run(nift, path, mode, work, extra=None):
+def run(nift, path, mode, work, extra=None, tree=None):
     d = tempfile.mkdtemp(dir=work)
     name = os.path.basename(path)
-    shutil.copy(path, os.path.join(d, name))
+    if tree:  # a module case: the whole directory
+        for f in os.listdir(tree):
+            shutil.copy(os.path.join(tree, f), os.path.join(d, f))
+    else:
+        shutil.copy(path, os.path.join(d, name))
     stats = os.path.join(d, "stats.jsonl")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode, "NIFT_VM_STATS": stats}
@@ -75,6 +81,7 @@ def run_session(nift, stdin, work, mode="require"):
 
 
 SCHEMA = 'struct(P){a:=1;private b:="SECRET-b3";c:=3}'
+UMETHOD = 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
 # (name, stdin, kind): "parity" = legacy-equal and no refusal; ("vm", out) = the VM's
 # stdout (an approved B3 behaviour or refusal) plus non-disclosure on both engines.
 SESSIONS = [
@@ -105,6 +112,32 @@ SESSIONS = [
     # ... and an explicit call on a session value that may be one is refused.
     ("explicit-mixed", 'struct(C){n:=0;private s:="SECRET-b3";fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
      'xs := [C(), map()]\nfor (x : xs) { print(x.stringify()) }\nexit\n', ("vm", "")),
+    # Review H1: a later statement that does not name the struct still sees an
+    # earlier statement's user presentation method (D10 ignores those).
+    ("h1-alias", UMETHOD + 'c := C()\nd := c\nprint(d.prettify())\nprint(d.stringify())\nexit\n',
+     ("vm", 'C{\n  n: 0,\n}\n')),
+    ("h1-index", UMETHOD + 'c := C()\nxs := [c]\nprint(xs[0].stringify())\nexit\n', ("vm", "")),
+    ("h1-lookup", UMETHOD + 'c := C()\nm := map()\nm.set("k", c)\nprint(m.get("k").stringify())\nexit\n',
+     ("vm", "")),
+    # A session function: defined after the struct, or before it (the
+    # function is recompiled with the session's later struct and refused).
+    ("h1-function-after", UMETHOD + 'fn(show(x)) { return x.stringify() }\nc := C()\nprint(show(c))\nexit\n',
+     ("vm", "")),
+    ("h1-function-before", 'fn(show(x)) { return x.stringify() }\nprint(show([1]))\n' + UMETHOD +
+     'c := C()\nprint(show(c))\nexit\n', ("vm", "[1]\n")),
+    # Schema replacement removing the method: the old instance, proven, runs
+    # its own method; an alias that may be it is refused.
+    ("h1-replace-remove", UMETHOD + 'p := C()\nstruct(C){n:=1}\nq := C()\nprint(p.stringify())\n'
+     'print(q.stringify())\nd := p\nprint(d.stringify())\nexit\n', ("vm", "SIDE-EFFECT\nu\nC{n:1}\n")),
+    # Schema replacement adding the method: the proven old instance renders,
+    # the new one runs its method, an alias is refused (it may be either).
+    ("h1-replace-add", 'struct(C){n:=0}\np := C()\nd := p\nprint(d.stringify())\n' + UMETHOD +
+     'q := C()\nprint(q.stringify())\nprint(p.stringify())\ne := p\nprint(e.stringify())\nexit\n',
+     ("vm", "C{n:0}\nSIDE-EFFECT\nu\nC{n:0}\n")),
+    # Review L3: a private presentation method is no user method from outside:
+    # nothing refused, the built-in renders (legacy parity).
+    ("l3-private", 'struct(C){n:=0;private s:="SECRET-b3";private fn(stringify()){print("SIDE-EFFECT");return "u"}}\n'
+     'c := C()\nd := c\nprint(c.stringify())\nprint(d.stringify())\nexit\n', "parity"),
 ]
 
 
@@ -164,6 +197,25 @@ def main():
             lo, le, lr, _ = run(nift, f, "0", work)
             check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
                   "%s: expected the refusal %s before effects, got %d %r %r" % (name, reason, vr, vo, ve[:300]))
+            private(name, vo, ve, lo, le)
+        mods = os.path.join(HERE, "modules")
+        for case in sorted(os.listdir(mods)):
+            tree = os.path.join(mods, case)
+            name = "module " + case
+            main = os.path.join(tree, "main.f")
+            vo, ve, vr, st = run(nift, main, "require", work, tree=tree)
+            lo, le, lr, _ = run(nift, main, "0", work, tree=tree)
+            if os.path.exists(os.path.join(tree, "reason")):
+                reason = open(os.path.join(tree, "reason")).read().strip()
+                check(vr == 1 and vo == "" and "(%s)" % reason in ve and "no part of it ran" in ve,
+                      "%s: expected %s before effects, got %d %r %r" % (name, reason, vr, vo, ve[:300]))
+            else:
+                got = transcript(vo, ve, vr)
+                if args.update:
+                    open(os.path.join(tree, "vm"), "w").write(got)
+                    continue
+                want = open(os.path.join(tree, "vm")).read() if os.path.exists(os.path.join(tree, "vm")) else None
+                check(ran_on_vm(st) and got == want, "%s: output\n%s\nexpected\n%s" % (name, got, want))
             private(name, vo, ve, lo, le)
         for f in fixtures("equiv"):
             name = "equiv " + os.path.basename(f)

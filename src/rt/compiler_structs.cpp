@@ -173,7 +173,7 @@ bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
     // three names: the rest of method dispatch is B4's.
     const std::string_view name = text(ast_.at(callee.b));
     const StructInfo& info = plan_.structs[static_cast<std::size_t>(s)];
-    if (presentation_builtin_binds(info, name, node.count)) {
+    if (presentation_builtin_binds(info, name, node.count, text(ast_.at(callee.a)))) {
         if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
         if (const natives::BuiltinSpec* spec = natives::find_builtin(natives::Receiver::Any, name))
             return builtin_call(node, *spec, callee.a, dst);
@@ -209,14 +209,22 @@ int UnitCompiler::presentation_dispatch(const Node& node, KindSet receiver, std:
     int declaring = -1;
     for (std::size_t s = 0; s < plan_.structs.size() && declaring < 0; ++s)
         if (presentation_override(plan_.structs[s], name, node.count) != nullptr) declaring = static_cast<int>(s);
-    if (declaring < 0) return -1;
+    // Review H1: in a session, every schema any earlier statement declared
+    // counts too (its instances may be reachable here without the statement
+    // naming the struct). D10 ignores them.
+#if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 10)
+    const bool in_session = session_ && node.count == 0 && session_->presentation_methods.count(std::string(name));
+#else
+    const bool in_session = false;
+#endif
+    if (declaring < 0 && !in_session) return -1;
 #if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 9)  // D9: the built-in binds despite the user method
     if (receiver & (kKindStruct | kKindUnknown))
         return fail(ast_.at(node.a), "presentation-struct-method:" + std::string(name)) ? 1 : 0;
 #endif
 #if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 8
     // D8: rendering a container dispatches to the user presentation method.
-    if (receiver & (kKindAggregate | kKindCollection)) {
+    if (declaring >= 0 && (receiver & (kKindAggregate | kKindCollection))) {
         const std::uint16_t mark = fb_->top();
         std::uint16_t held = 0;
         if (!temp(held) || !expr_to(ast_.at(node.a).a, held)) return 0;

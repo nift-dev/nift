@@ -40,7 +40,8 @@ struct StructType {
     bool same_content(const StructType& other) const noexcept;
 
     // A new descriptor with a fresh version. `private_fields` is padded with
-    // false (or truncated) to the field count.
+    // true (a field without a mask entry is private: fail closed; review L1)
+    // or truncated to the field count.
     static std::shared_ptr<const StructType> make(std::string name, std::vector<std::string> fields,
                                                   std::vector<bool> private_fields);
 };

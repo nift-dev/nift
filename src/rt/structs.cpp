@@ -136,14 +136,17 @@ bool presentation_name(std::string_view name) {
     return name == "stringify" || name == "prettify" || name == "highlight";  // rt-lint: allow-string-compare
 }
 
-bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc) {
-    return argc == 0 && presentation_name(name) && presentation_override(s, name, 0) == nullptr;
+bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc,
+                                std::string_view receiver) {
+    const bool inside = receiver == "this";  // rt-lint: allow-string-compare compile time
+    return argc == 0 && presentation_name(name) && presentation_override(s, name, 0, inside) == nullptr;
 }
 
-const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc) {
+const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc,
+                                              bool inside) {
     if (argc != 0 || !presentation_name(name)) return nullptr;
     const StructMethodInfo* m = s.method(name);
-    return m != nullptr && m->params == 0 ? m : nullptr;
+    return m != nullptr && m->params == 0 && (!m->priv || inside) ? m : nullptr;
 }
 
 } // namespace nift::rt

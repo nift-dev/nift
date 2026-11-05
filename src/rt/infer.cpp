@@ -323,7 +323,7 @@ TyRef Inference::call(const Node& n) {
         if (s >= 0) {
             const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(ast_.text(ast_.at(callee.b)));
             if (presentation_builtin_binds(plan_.structs[static_cast<std::size_t>(s)], ast_.text(ast_.at(callee.b)),
-                                           n.count)) return kinds_ty(kKindString);  // B3: struct_method's rule
+                                           n.count, ast_.text(ast_.at(callee.a)))) return kinds_ty(kKindString);
             if (m != nullptr) return method_call(m->function, n);
             for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
             return any_ty();

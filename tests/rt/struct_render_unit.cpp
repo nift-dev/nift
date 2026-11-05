@@ -1,6 +1,7 @@
 // B3 (docs/runtime-2/checkpoints/b3-structs.md): struct type descriptors and
 // privacy-aware struct rendering, at the value layer.
-//   descriptor   creation, versions, content interning, one table per isolate
+//   descriptor   creation, versions, content interning, one table per isolate,
+//                a short privacy mask padded private (review L1)
 //   forms        legacy's byte-exact compact and pretty forms (D1, D6)
 //   transfer     the descriptor crosses by value and is interned (D2)
 //   copies       copy/deepcopy keep the instance's descriptor
@@ -71,8 +72,8 @@ Value make_c(const std::shared_ptr<const StructType>& type) {
 }
 
 void descriptor() {
-    const auto a = StructType::make("P", {"x", "y"}, {true});
-    const auto b = StructType::make("P", {"x", "y"}, {true});
+    const auto a = StructType::make("P", {"x", "y"}, {true, false});
+    const auto b = StructType::make("P", {"x", "y"}, {true, false});
     CHECK(a->version != b->version && a->private_fields.size() == 2 && a->is_private(0) && !a->is_private(1));
     CHECK(!a->is_private(7) && a->position("y") == 1 && a->position("z") == -1);
     CHECK(!a->same_content(*b));  // another schema version
@@ -89,6 +90,22 @@ void descriptor() {
         CHECK(StructTypeTable::current().intern(*a) != ia);
     }
     CHECK(&StructTypeTable::current() == &table && table.size() == before + 3);
+    // Review L1: a short privacy mask is padded with private (fail closed),
+    // when made and when interned.
+    const auto short_mask = StructType::make("M", {"a", "b", "c"}, {false});
+    CHECK(!short_mask->is_private(0) && short_mask->is_private(1) && short_mask->is_private(2));
+    StructType truncated = *short_mask;
+    truncated.private_fields.clear();
+    const auto interned = table.intern(truncated);
+    CHECK(interned->is_private(0) && interned->is_private(1) && interned->is_private(2));
+    Value m = make_struct(short_mask, 3);
+    struct_add_field(m, atom("a"), I(1));
+    struct_add_field(m, atom("b"), S(kSecret));
+    struct_add_field(m, atom("c"), S(kSecret));
+    CHECK(render(m) == "M{a:1}" && render(m, true) == "M{\n  a: 1,\n}");
+    Value none = make_struct(StructType::make("Q", {"a"}, {}), 1);
+    struct_add_field(none, atom("a"), S(kSecret));
+    CHECK(render(none) == "Q{}");
 }
 
 void forms() {

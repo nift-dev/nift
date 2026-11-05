@@ -1,5 +1,7 @@
-// B3, owner ruling (2026-11-05): refused before any effect as
-// presentation-struct-method:stringify: an explicit stringify() through a
+// B3 (applying the owner ruling of 2026-11-05, which names i05; this same
+// shape through a function value is PENDING OWNER CONFIRMATION): refused
+// before any effect as presentation-struct-method:stringify: an explicit
+// stringify() through a
 // function value on an instance of a struct declaring its own stringify, and
 // on a map, needs run-time dispatch (B4). Legacy and the earlier B3 tree print
 // the built-in form (`before`, 6, 7). Before B3: presentation-struct:stringify.

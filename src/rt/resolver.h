@@ -129,12 +129,18 @@ struct StructInfo {
 // declared method of that name taking no parameters, when argc is 0. Null
 // when the call is not a zero-argument presentation call, or when the struct
 // declares no such method: the presentation built-in then renders the
-// instance (a method with parameters is not a presentation method).
-const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc);
+// instance (a method with parameters is not a presentation method). A
+// private method is a user method only through `this` (`inside`, review L3):
+// from outside it is not callable, so the built-in renders (legacy parity).
+const StructMethodInfo* presentation_override(const StructInfo& s, std::string_view name, std::uint32_t argc,
+                                              bool inside = false);
 bool presentation_name(std::string_view name);  // stringify, prettify, highlight
-// The explicit call binds the presentation built-in (a presentation name, no
-// arguments, and no presentation_override).
-bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc);
+// The explicit call `receiver.name(argc arguments)` on an instance of `s`
+// binds the presentation built-in (a presentation name, no arguments, and no
+// presentation_override; `receiver` is the receiver's source text: `this`
+// reaches a private method).
+bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc,
+                                std::string_view receiver);
 
 struct UnitPlan {
     bool ok = true;

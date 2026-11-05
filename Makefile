@@ -5218,7 +5218,7 @@ test-rt-vm-sanitize: test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
 # forms, non-disclosure of private fields on every presentation path, thread
 # and session descriptors (b3_structs.py), and the value-layer unit
 # (tests/rt/struct_render_unit.cpp). The mutants rebuild one object
-# with -DNIFT_B3_MUTANT=n and must fail the suite or the unit (D1-D9).
+# with -DNIFT_B3_MUTANT=n and must fail the suite or the unit (D1-D10).
 RT_STRUCT_RENDER_UNIT := $(TEST_DIR)/rt/struct-render-unit$(EXEEXT)
 RT_STRUCT_RENDER_UNIT_O := $(TEST_DIR)/rt/struct_render_unit.o
 $(RT_STRUCT_RENDER_UNIT_O): tests/rt/struct_render_unit.cpp $(RT_VALUE_HEADERS)

@@ -15,8 +15,15 @@ void session_structures(const Ast& ast, NodeId root, const SessionText& text,
         definition->source = text.pieces.back().source; definition->path = path;
         definition->begin = node.begin - text.unit_begin; definition->end = node.end - text.unit_begin;
         bool methods = false;
-        for (std::uint32_t m = 0; m < node.count; ++m)
-            methods = methods || ast.at(ast.list(node)[m]).kind == NodeKind::FnDecl;
+        for (std::uint32_t m = 0; m < node.count; ++m) {
+            const auto& member = ast.at(ast.list(node)[m]);
+            methods = methods || member.kind == NodeKind::FnDecl;
+            // B3 (review H1): a presentation method, for every later statement.
+            const std::string_view named = ast.text(ast.at(member.a));
+            if (member.kind == NodeKind::FnDecl && member.count == 0 && !(member.flags & kFlagPrivate) &&
+                (named == "stringify" || named == "prettify" || named == "highlight"))  // rt-lint: allow-string-compare
+                pending.presentation_methods.emplace(named);
+        }
         if (methods) for (std::uint32_t m = 0; m < node.count; ++m) {
             const auto& field = ast.at(ast.list(node)[m]);
             if (field.kind == NodeKind::StructField &&

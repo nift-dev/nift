@@ -26,7 +26,7 @@ std::shared_ptr<const StructType> StructType::make(std::string name, std::vector
                                                    std::vector<bool> private_fields) {
     auto type = std::make_shared<StructType>();
     type->name = std::move(name);
-    private_fields.resize(fields.size(), false);
+    private_fields.resize(fields.size(), true);  // review L1: a missing mask entry is private (fail closed)
     type->fields = std::move(fields);
     type->private_fields = std::move(private_fields);
     type->version = next_version.fetch_add(1, std::memory_order_relaxed);
@@ -35,7 +35,7 @@ std::shared_ptr<const StructType> StructType::make(std::string name, std::vector
 
 std::shared_ptr<const StructType> StructTypeTable::intern(const StructType& content) {
     auto type = std::make_shared<StructType>(content);
-    type->private_fields.resize(type->fields.size(), false);
+    type->private_fields.resize(type->fields.size(), true);  // review L1: fail closed
     for (const auto& entry : entries_)
         if (entry->same_content(*type)) return entry;
     entries_.push_back(type);
