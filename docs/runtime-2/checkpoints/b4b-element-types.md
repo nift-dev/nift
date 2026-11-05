@@ -4,7 +4,7 @@ Status: **candidate, frozen for independent review** (B4b). Branch `cand/b4-disp
 accepted B4a boundary `0df0df6c`. Plan: Phase B plan §5.7 and "B4" (per-site types, mutant A2);
 the owner's B4b ruling (2026-11-06); the coordinator's approval of the design note with
 conditions C1-C8 (2026-11-06) and the owner's evidence requirement (section 3). Commits B4b 0
-(this note) to B4b 3; tip, tree and gates: section 8.
+(this note) to B4b 6; tip, tree and gates: section 8.
 
 B4b changes no observable behaviour while the guard is on: it only moves programs between
 admitted and refused (section 6). Run time is unchanged (section 7).
@@ -91,7 +91,7 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 `src/rt/infer_sites.{h,cpp}` (new), `infer_mutators.h` (new), and hooks in `infer.cpp`,
 `infer_record.cpp`, `infer_walk.cpp`, `infer_collection.cpp`, `infer_for.cpp`, `infer_session.cpp`,
-`infer_types.{h,cpp}`, `infer_unit.h`. Production: 12 files, +449 -33.
+`infer_types.{h,cpp}`, `infer_unit.h`. Production: 12 files, +490 -33 (against `0df0df6c`).
 
 - **Sites.** `Inference::fresh` gives a construction its site: an array or object literal, a
   native's new array or object (the call node: `split`, `keys`, `map`, `filter`, `slice`, ...),
