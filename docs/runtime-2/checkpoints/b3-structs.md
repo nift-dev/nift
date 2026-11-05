@@ -13,6 +13,9 @@ and the 2026-11-04 addendum (batch B3–B5 certification). Branch `cand/b3-struc
 | `a89c8d63` | B3 2b: the refsem sessions part of B3 2 (left out of that commit by mistake) |
 | `151fbd50` | B3 2c: owner ruling: explicit calls run a struct's own presentation method; mixed receivers refused; D8, D9 |
 | `ffeecb9b` | B3 3b: the unit's checked-build branch sees its switch (the ASan lane) |
+| `f24c292e` | B3 4: this record (frozen; independent review: ACCEPT-WITH-CONDITIONS) |
+| `804858a9` | B3 5: review fixes H1, L3, L1 (section 8) and the M1 fixture wording |
+| (later) | B3 6: this record's review section and compatibility.md (M1) |
 | (this record) | B3 4: this record |
 
 The final gates ran on `151fbd50` and `ffeecb9b`, the tip before this record (section 6). This
@@ -216,8 +219,8 @@ Each file gained a B3 header line and keeps its Phase A note.
 | Case | Old | New | Reason |
 | --- | --- | --- | --- |
 | `presentation_struct` | `reason` `presentation-struct:highlight` | `phaseb`: `before`, `C{v:0}`, `map([])` (VM = legacy) | B3 renders instances |
-| `presentation_struct_contents` | `reason` `presentation-struct-contents:stringify` | approved VM difference: `vm` `before`, `[C{v:0}]`; `legacy` exit 1, `return: undefined callable: C` | Legacy cannot construct a module's struct through the exported function. The old comment, "legacy: `[C{v:0}]`", was wrong (probed on `0b5079fc` and on the tip) and is corrected in the fixture. **Classification change needs approval.** |
-| `presentation_struct_expression` | `reason` `presentation-struct:stringify` | approved VM difference: `vm` `before`, `C{v:0}`; `legacy` exit 1, `return: undefined callable: C` | as above; **needs approval** |
+| `presentation_struct_contents` | `reason` `presentation-struct-contents:stringify` | VM difference **pending owner approval**: `vm` `before`, `[C{v:0}]`; `legacy` exit 1, `return: undefined callable: C` | Root cause (review M1): legacy cannot construct its own module's struct from an exported function called by the importer ("undefined callable: C"), while the VM constructs it. That difference **predates B3**: the pre-B3 VM constructs it too (review probe `m5`, base binary). It is now recorded in compatibility.md ("Differences pending an owner decision"). B3 only lets the instance render. The old comment, "legacy: `[C{v:0}]`", was wrong and is corrected in the fixture. **Pending owner approval.** |
+| `presentation_struct_expression` | `reason` `presentation-struct:stringify` | VM difference **pending owner approval**: `vm` `before`, `C{v:0}`; `legacy` exit 1, `return: undefined callable: C` | as above; **pending owner approval** |
 
 **2.5 Explicit presentation calls on structs** (owner ruling of 2026-11-05; section 1).
 
@@ -251,7 +254,7 @@ annotated, and a whole-corpus classify comes with the combined certification.
 | Fixture | Old (Phase A) | Old (earlier B3 tree, = legacy) | New | Justification |
 | --- | --- | --- | --- | --- |
 | `refsem/refuse/presentation_struct_review_i05.f` (a mixed loop over `[C(), map()]`; `C` declares `fn(stringify())` returning 7) | refused `presentation-struct:stringify` | `before`, `6`, `7` (the built-in) | refused `presentation-struct-method:stringify` | an explicit call that may hit a user method needs run-time dispatch (B4); refusing it is better than quietly giving it a different meaning |
-| `refsem/refuse/presentation_struct_review_i04.f` (a function value called with `C()` and with `map()`; `C` declares `stringify` returning `[1,2,3]`) | refused `presentation-struct:stringify` | `before`, `6`, `7` | refused `presentation-struct-method:stringify` | the same |
+| `refsem/refuse/presentation_struct_review_i04.f` (a function value called with `C()` and with `map()`; `C` declares `stringify` returning `[1,2,3]`) | refused `presentation-struct:stringify` | `before`, `6`, `7` | refused `presentation-struct-method:stringify` | the same shape through a function value. The ruling's text names i05 only, so **this reclassification is pending owner confirmation** (review M1) |
 
 The new reason has a classification row (`presentation-struct-method:*`, M, pending B4 dynamic
 dispatch) and a user-facing message: "`.stringify()` on a value that may be an instance of a
@@ -479,11 +482,24 @@ Not run locally, by the batching ruling (the combined B3–B5 Linode certificati
   refsem i04 and i05.
 - **Decisions already taken:** the explicit/implicit presentation rule (owner, 2026-11-05;
   section 2.5).
-- **Decisions still open:** the two module classification changes (2.4), where legacy fails to
-  construct a module's struct through an exported function and the VM renders it.
+- **Decisions still open** (the coordinator has put them to the owner):
+  - the two module classification changes (2.4), whose root cause is the pre-existing
+    construction difference in compatibility.md;
+  - i04's reclassification (2.5).
+- **Combined certification, performance review (review L2):** the per-isolate `StructTypeTable`
+  grows without bound and is searched linearly.
+  - Versions are process-unique per compile, and the main thread's `AtomTable` is a
+    `thread_local` that is never released. A long-lived session or host that repeatedly compiles
+    and round-trips instances through threads therefore keeps every descriptor it ever decoded.
+  - Each descriptor of each decoded graph is interned by an O(entries) scan.
+  - Not fixed in B3. A version-keyed `unordered_map` of weak references would bound both.
+- **Release audit (review L4, predates B3):** an integer struct field accepts `1e3` and `3.0` on
+  the VM (prints 1000 / 3), where legacy refuses with "cannot change struct field type: z"
+  (review probe `ft.f`). The base binary behaves the same.
 - **Descriptor memory:** compile-time and decoded descriptors are not charged to the VM heap
   budget. Instances hold one shared reference each. An isolate's `StructTypeTable` grows with the
-  distinct descriptors it receives, which is bounded by the programs it runs.
+  distinct descriptors it receives: bounded per program, unbounded across a long session (L2
+  above).
 - **Not run locally** (combined B3–B5 Linode certification):
   - full `make test`;
   - `test-rt-vm-sanitize`;
@@ -491,3 +507,52 @@ Not run locally, by the batching ruling (the combined B3–B5 Linode certificati
   - perf campaigns;
   - classify over the whole corpus;
   - the TSan lanes.
+
+## 8. Independent review of `f24c292e` and its fixes
+
+The verdict was ACCEPT-WITH-CONDITIONS
+(`scratchpad/review-b3/REVIEW.md`):
+- no private-field disclosure on any path;
+- 500 generated programs byte-equal to legacy;
+- the 127–130 depth boundary equal to legacy;
+- all 9 mutants caught.
+
+The findings and their fixes (`804858a9`):
+
+- **H1 (high), fixed.**
+  - *Defect.* In a session, an explicit presentation call on an unproven receiver checked only
+    the structs of the current statement's plan. So `d := c; d.stringify()` silently bound the
+    built-in although an earlier statement had declared `C` with a user `stringify()`.
+  - *Fix.* `SessionCompileContext::presentation_methods` collects, when each statement
+    publishes, every public zero-parameter presentation method name that any session struct
+    schema has declared (`session_structures.cpp`). The set never shrinks, because instances of
+    a replaced schema stay reachable. `presentation_dispatch` refuses when the name is in it.
+  - *Inference.* No change is needed: it types the built-in's string result only where the
+    compiler binds the built-in (proven receivers through the shared predicate). An unproven
+    receiver is now refused before inference matters.
+  - *Modules.* Already covered, because a linked unit's plan includes the imported modules'
+    structs. `b3/modules/visible_method` (refused) and `proven_method` (the user method runs)
+    pin it.
+  - *Session tests* (`b3_structs.py` SESSIONS `h1-*`): an alias, an index, a map lookup, a
+    session function defined after the struct, and one defined before it (recompiled with the
+    session's later struct and refused when called). Schema replacement removing the method: the
+    proven old instance runs its own method, and an alias is refused. Schema replacement adding
+    it: the proven old instance renders, the new one runs the method, and an alias is refused.
+  - *Mutant D10* (the session's schemas ignored) is caught by five checks. The mutant suite
+    covers D1–D10, all caught.
+- **M1 (medium), fixed in wording.**
+  - The two module fixtures, the record (2.4) and compatibility.md now say "pending owner
+    approval". The root cause is recorded as a difference that predates B3: legacy cannot
+    construct its own module's struct from an exported function called by the importer.
+  - i04's reclassification is marked pending confirmation (2.5).
+- **L3 (low), fixed.**
+  - A private presentation method is a user method only through `this`. From outside it is not
+    callable, so the built-in renders (legacy parity) and the method never runs. This holds for
+    proven, container and mixed receivers (`b3/parity/private_method.f`, session `l3-private`).
+  - Inside the struct, `this.stringify()` runs it (`b3/vm/private_method_inside.f`; the owner's
+    explicit-call rule).
+  - The H1 predicate counts only public methods.
+- **L1 (low), fixed.** A short privacy mask pads with private, both when made and when interned
+  (unit `descriptor()`). The D4 mutant now passes its all-public mask explicitly.
+- **L2 (low), carried** to the combined certification's performance review (section 7).
+- **L4 (low, predates B3), carried** to the release audit (section 7).
