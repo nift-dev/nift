@@ -187,6 +187,7 @@ private:
     // CP14 built-in over a fresh window (receiver kNoNode: free function); B4 Dynamic: compiler_dispatch.cpp
     int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
     int dynamic_method_call(const Node&, NodeId, std::string_view, std::uint16_t);
+    bool object_length_context() const;  // B4: legacy's prepared length() may run here (compiler_dispatch.cpp)
     bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);
     bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst,
                       bool dynamic = false);
@@ -387,8 +388,7 @@ private:
     void block_end(BlockRegs& regs);              // after the block's code: records its range
     void block_clear(const BlockRegs& regs);      // emits the clears (at each normal exit)
     bool block_holds_handles(NodeId block) const;
-    std::uint32_t error_call_offset_ = kNoNode;  // `throw error(...)`: report the throw
-    std::uint32_t error_call_offset_saved_ = kNoNode;
+    std::uint32_t error_call_offset_ = kNoNode, error_call_offset_saved_ = kNoNode;  // `throw error(...)`: the throw
     bool in_function_ = false;
     bool in_lambda_ = false;
     int depth_ = 0;

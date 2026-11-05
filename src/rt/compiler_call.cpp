@@ -232,7 +232,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         return false;
     // Legacy's prepared `length()` counts an object's members; the canonical
     // one rejects an object (D-018).
-    if (!size && loop_reachable() && (kinds(callee.a) & (kKindObject | kKindUnknown)))
+    if (!size && (kinds(callee.a) & (kKindObject | kKindUnknown)) && object_length_context())
         return fail(node, "context:object-length");
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;

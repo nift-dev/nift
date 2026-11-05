@@ -115,7 +115,6 @@ CONTEXTS = ("loop", "fn", "fnloop", "top")
 APPROVED = {
     ("to_int", "frac", "loop"): "native error column: the static path reports the call, legacy the print argument",
     ("to_int", "frac", "fnloop"): "the same, in a function called from loop code",
-    ("length", "object", "fnloop"): "Length opcode: legacy's prepared evaluator counts members (pre-existing)",
 }
 
 
