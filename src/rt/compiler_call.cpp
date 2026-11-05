@@ -6,12 +6,12 @@
 #include "rt/atom.h"
 #include "rt/builtin_bind.h"
 #include "rt/native.h"
+#include "rt/op_admission.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
 // Calls, methods, member and index reads (CP11/CP12); errors at the expression (D-018c).
 namespace nift::rt::detail {
-
 bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     if (callee.kind == NodeKind::Member) return method_call(node, dst);
@@ -148,7 +148,7 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
 }
 // CP14: a call of a built-in over a fresh window (receiver, arguments), D-018.
 bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
-                                std::uint16_t dst) {
+                                std::uint16_t dst, bool dynamic) {
     if (!builtin_arguments_ok(node, spec, receiver)) return false;
     const NodeId* args = ast_.list(node);
     const std::uint32_t window = node.count + (receiver != kNoNode ? 1u : 0u);
@@ -167,8 +167,8 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::CallNative, base,
                                      static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),
-                                     static_cast<std::uint16_t>(window));
-    fb_->note(at, std::string(spec.name));
+                                     static_cast<std::uint16_t>(window | (dynamic ? kDynamicDispatch : 0u)));
+    fb_->note(at, dynamic ? std::string(text(node)) : std::string(spec.name));  // B4: legacy's call text
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(mark);
     return builder_ok();
@@ -208,6 +208,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
                 // treats as a special method (as before the integration).
                 if (session_ && legacy_special_method(name) && (k & (kKindObject | kKindUnknown)))
                     return fail(node, "session:legacy-method-precedence");
+                if (const int r = dynamic_method_call(node, callee.a, name, dst); r >= 0) return r == 1;  // B4
                 // Probe mode only: Unknown defers to the underlying refusal.
                 if (!unknown_defers(k) || bind_method(0, name, spec) != MethodBinding::Dead)
                     return fail(node, "builtin-receiver:" + std::string(name));

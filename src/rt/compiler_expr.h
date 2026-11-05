@@ -184,11 +184,12 @@ private:
     bool call(const Node& node, std::uint16_t dst);
     bool call_value(const Node& node, NodeId callee, bool member, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);
-    // CP14: a pure built-in over a fresh window (receiver: kNoNode for a free
-    // function); W1, W2/W4 refusals.
+    // CP14 built-in over a fresh window (receiver kNoNode: free function); B4 Dynamic: compiler_dispatch.cpp
     int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
+    int dynamic_method_call(const Node&, NodeId, std::string_view, std::uint16_t);
     bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);
-    bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst);
+    bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst,
+                      bool dynamic = false);
     bool unobservable_argument(NodeId id);
     bool array_literal(const Node& node, std::uint16_t dst);
     bool object_literal(const Node& node, std::uint16_t dst);
@@ -388,7 +389,6 @@ private:
     bool block_holds_handles(NodeId block) const;
     std::uint32_t error_call_offset_ = kNoNode;  // `throw error(...)`: report the throw
     std::uint32_t error_call_offset_saved_ = kNoNode;
-
     bool in_function_ = false;
     bool in_lambda_ = false;
     int depth_ = 0;

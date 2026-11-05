@@ -76,8 +76,14 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     // keeps the existing method refusals (builtin-receiver, method:...).
     if (!(k & kKindCollection) || (k & ~kKindCollection)) return -1;
     const std::string name(text(ast_.at(callee.b)));
-    if (k != kKindMap && k != kKindSet && k != kKindStack)
+    if (k != kKindMap && k != kKindSet && k != kKindStack) {
+        // B4: a bare binding of several collection kinds dispatches the
+        // read-only natives every family has (size, empty) at run time.
+        const Node& r = ast_.at(callee.a);
+        if (r.kind == NodeKind::Ident && find_binding(text(r)))
+            if (const int d = dynamic_method_call(node, callee.a, name, dst); d >= 0) return d;
         return fail(callee, "collection-receiver:" + name) ? 1 : 0;  // a value that may be of several kinds
+    }
     if (collection_method(name) >= static_cast<int>(CollectionMethod::Map))
         return fail(node, "collection-callback:" + name) ? 1 : 0;  // m.map(...), s.filter(...), ...
     const bool presentation = name == "stringify" || name == "prettify" || name == "highlight";

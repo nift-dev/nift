@@ -1,0 +1,4 @@
+before
+a
+error: return_position.f:3:19: trim: unsupported for this value
+[exit 1]

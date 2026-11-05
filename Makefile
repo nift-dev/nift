@@ -5259,10 +5259,17 @@ $(RT_OP_ADMISSION_UNIT_O): tests/rt/op_admission_unit.cpp $(RT_VALUE_HEADERS)
 $(RT_OP_ADMISSION_UNIT): $(RT_OP_ADMISSION_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CXXFLAGS) $(RT_OP_ADMISSION_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
-.PHONY: test-rt-op-admission-unit
+.PHONY: test-rt-op-admission-unit test-runtime2-b4 test-runtime2-b4-mutants
 test-rt-op-admission-unit: $(RT_OP_ADMISSION_UNIT)
 	"$(RT_OP_ADMISSION_UNIT)"
-test-rt-vm: test-rt-op-admission-unit
+test-runtime2-b4: $(TARGET) test-rt-op-admission-unit
+	$(PYTHON) tests/runtime2/b4_dispatch.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-b4-mutants: $(TARGET) $(LIBFFI_A) $(RT_OP_ADMISSION_UNIT)
+	@mkdir -p "$(TEST_DIR)/b4-mutants"
+	@printf '%s\n' $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) > "$(TEST_DIR)/b4-mutants/unit-objects"
+	B4_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/b4/mutants.sh "$(CURDIR)/$(TARGET)" \
+		"$(TEST_DIR)/b4-mutants/unit-objects"
+test-rt-vm: test-runtime2-b4 test-runtime2-b4-mutants
 # B0 pre-release safety (docs/runtime-2/checkpoints/b0-safety.md): an admitted
 # program never stops with an internal VM failure (exit 70) because of a
 # run-time operand kind: handles presented, wrong-kind mutator receivers.

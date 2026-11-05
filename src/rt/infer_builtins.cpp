@@ -1,6 +1,7 @@
 #include "rt/infer_builtins.h"
 
 #include "rt/builtin_bind.h"
+#include "rt/op_admission.h"
 #include "rt/native.h"
 
 // Result types of CP14 built-ins for the kind inference (rt/infer.cpp).
@@ -138,8 +139,21 @@ TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv, const std:
     switch (bind_method(recv->kinds, name, spec)) {
         case MethodBinding::Bound: return builtin_result(ast, *spec, recv, values, n);
         case MethodBinding::Dead: return empty_ty();  // never executed
-        default: return any_ty();  // refused by the compiler
+        default: break;
     }
+    // B4: a Dynamic call (rt/op_admission.h) is typed by the union of its
+    // candidates' results, each over its branch of the receiver; a failing
+    // family produces no value.
+    const MethodAdmission admitted = admit_dynamic_method(recv->kinds, name, n.count);
+    if (admitted.admission != Admission::Dynamic) return any_ty();  // refused by the compiler
+    TyRef result = empty_ty();
+    for (const DispatchCandidate& branch : admitted.branches) {
+        if (!branch.spec) continue;
+        auto part = std::make_shared<Ty>(*recv);
+        part->kinds = branch.kinds;
+        result = unite(result, builtin_result(ast, *branch.spec, part, values, n));
+    }
+    return result;
 }
 
 TyRef function_result(const Ast& ast, const Node& n, const std::vector<TyRef>& values) {
