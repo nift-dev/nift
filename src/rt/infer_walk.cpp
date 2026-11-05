@@ -148,6 +148,7 @@ void Inference::statement(NodeId id) {
             if (target.kind == NodeKind::Ident) {
                 if (TyRef* var = find(ast_.text(target))) {
                     if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }  // CP23: atomic store
+                    session_store(ast_.text(target), var, v);  // B4b C5: reachable by earlier code
                     merge_local(*var, v); record(n.a, *var); }
             } else if (target.kind == NodeKind::Index) {
                 expr(target.b);

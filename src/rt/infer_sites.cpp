@@ -74,7 +74,7 @@ TyRef Inference::materialize(const TyRef& t) {
     std::vector<std::uint32_t> sites;
     bool open = agg_unknown_;
     for (std::uint32_t s : t->sites) {
-        if (s == kOpenSite) open = true;
+        if (s == kOpenSite || opened_.count(s)) open = true;
         else if (agg_sites_.count(s)) sites.push_back(s);
     }
     if (sites.empty() && !open) return t;
@@ -119,10 +119,40 @@ TyRef Inference::materialize(const TyRef& t) {
 }
 
 // C5: a call into code compiled by an earlier session statement may store
-// anything into any container this statement reaches.
-TyRef Inference::session_effects(const TyRef& result) {
+// anything into any container it reaches: the call's arguments and receiver,
+// and every container this statement stored into an earlier statement's
+// binding (exposed_), at every depth. Their sites read as anything from now on.
+void Inference::expose(const TyRef& t, int depth) {
+    if (!t || t->any || depth > 8) return;
+    for (std::uint32_t s : t->sites) {
+        if (s == kOpenSite || !agg_sites_.count(s) || !exposed_.insert(s).second) continue;
+        const auto c = agg_.find(s);
+        if (c == agg_.end()) continue;
+        expose(c->second.values, depth + 1);
+        for (const auto& entry : c->second.named) expose(entry.second, depth + 1);
+    }
+    expose(t->elem, depth + 1);
+    for (const auto& entry : t->fields) expose(entry.second, depth + 1);
+    for (const auto& item : t->items) expose(item, depth + 1);
+}
+
+void Inference::session_store(std::string_view name, const TyRef* var, const TyRef& value) {
+    if (!session_) return;
+    const auto external = external_.find(name);
+    if (external != external_.end() && &vars_[external->second] == var) expose(value);
+}
+
+TyRef Inference::session_effects(const TyRef& result, const Node& call) {
 #if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 21)
-    if (result && !agg_unknown_) agg_unknown_ = true, site_grew();
+    if (!result) return result;
+    const NodeId* args = ast_.list(call);
+    for (std::uint32_t k = 0; k < call.count; ++k) expose(expr(args[k]));
+    if (ast_.at(call.a).kind == NodeKind::Member) expose(expr(ast_.at(call.a).a));
+    bool grew = false;
+    for (std::uint32_t s : exposed_) grew = opened_.insert(s).second || grew;
+    if (grew) site_grew();
+#else
+    (void)call;
 #endif
     return result;
 }

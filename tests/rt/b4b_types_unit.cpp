@@ -142,5 +142,11 @@ int main() {
     g.arity = 1;
     earlier.symbols.push_back(g);
     expect("session-earlier-call", "xs := [1]\ng(xs)\nprint(xs[0])\n", "xs[0]", kKindString, &earlier);
+    // ... and one this statement stored into an earlier statement's binding (`old`), which that code can reach.
+    SessionSymbol old;
+    old.name = "old";
+    old.kinds = kKindArray;
+    earlier.symbols.push_back(old);
+    expect("session-exposed", "ys := [1]\nold = ys\ng(0)\nprint(ys[0])\n", "ys[0]", kKindString, &earlier);
     return rt_test::finish("b4b-types-unit");
 }

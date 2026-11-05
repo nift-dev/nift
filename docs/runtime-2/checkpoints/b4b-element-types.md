@@ -138,8 +138,10 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
   a later statement (`ys := xs`, `ys[0] = ...`) is refused by the guard
   (`b4b/sessions/alias_store_reentry.in`: `reference-guard:inflow`). B4b adds: a statement's own
   containers are tracked per site like a script's (`session-alias`, `session-function` in the
-  oracle), and a call into an earlier statement's code makes every container of the statement
-  anything (`session_effects`; oracle `session-earlier-call`; mutant A21). Values of earlier
+  oracle), and a call into an earlier statement's code makes every container it can reach anything: the
+  call's arguments and receiver and every container the statement stored into an earlier
+  statement's binding, at every depth (`session_effects`, `expose`; oracle `session-earlier-call`,
+  `session-exposed`; mutant A21). Values of earlier
   statements keep their recorded structure: this is **guard-dependent** (U6, section 4).
 - **C6, modules.** Modules are linked into one unit (D-037), so an importer's store reaches the
   module's sites: `b4b/modules/importer_store` (the module's function sees the importer's string
@@ -181,7 +183,7 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 ## 5. Tests and evidence
 
-- `make test-rt-b4b-types-unit` (`tests/rt/b4b_types_unit.cpp`, the primary oracle): 27 cases, 135
+- `make test-rt-b4b-types-unit` (`tests/rt/b4b_types_unit.cpp`, the primary oracle): 28 cases, 140
   checks (section 2 lists the paths).
 - `make test-runtime2-b4b` (`tests/runtime2/b4b_types.py`): 22 scripts, 3 module trees, 5
   sessions; the C1 check; the wrong-kind generator (8 holder paths x 4 original kinds x 7 stored

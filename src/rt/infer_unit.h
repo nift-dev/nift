@@ -200,7 +200,10 @@ private:
     void escape_callables(const std::vector<TyRef>& values);  // C4: called where the inference does not see
     void untracked_call();                                    // C4: a call whose targets are unknown
     void site_grew();
-    TyRef session_effects(const TyRef& result);  // C5: a call of an earlier statement's code
+    TyRef session_effects(const TyRef& result, const Node& call);  // C5: a call of an earlier statement's code
+    void expose(const TyRef& t, int depth = 0);                     // C5: reachable by earlier code
+    void session_store(std::string_view name, const TyRef* var, const TyRef& value);
+    std::unordered_set<std::uint32_t> exposed_, opened_;
     const std::string* store_key(NodeId index, std::string& storage) const;  // a literal string index
     void element_update(NodeId target, const TyRef& value, Op op);          // `xs[i] += v`, `o.k++`
     std::map<std::uint32_t, SiteContents> agg_;

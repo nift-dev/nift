@@ -302,7 +302,7 @@ TyRef Inference::expr(NodeId id) {
 
 TyRef Inference::call(const Node& n) {
     const Node& callee = ast_.at(n.a);
-    if (const auto external = session_call(n)) return session_effects(external);
+    if (const auto external = session_call(n)) return session_effects(external, n);
     const NodeId* args = ast_.list(n);
     // CP13B: the reserved Error constructor.
     if (callee.kind == NodeKind::Ident && ast_.text(callee) == "error" && find(ast_.text(callee)) == nullptr &&
@@ -351,7 +351,7 @@ TyRef Inference::call(const Node& n) {
         const TyRef field = record(n.a, element_of(recv, &key, true));
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
-        if (const auto historical = session_historical_call(n, field)) return session_effects(historical);
+        if (const auto historical = session_historical_call(n, field)) return session_effects(historical, n);
         bool grew = false;
         if (!field->callables.empty()) return call_callables(field, values, grew);
         if (!field->any && (field->kinds & kKindFunction)) untracked_call();  // B4b C4: unknown targets
@@ -365,7 +365,7 @@ TyRef Inference::call(const Node& n) {
         if (collection >= 0 && recv->kinds == kKindArray) {
             const auto result = fresh(call_id, collection_result(n, recv, values, collection));
             if (const auto h = session_ ? session_collection_call(n, values, collection) : nullptr)
-                return session_effects(h);
+                return session_effects(h, n);
             return result;
         }
         escape_callables(values);  // B4b C4: a native does not call back
@@ -380,8 +380,8 @@ TyRef Inference::call(const Node& n) {
     if (session_ && !callee_ty->any && callee_ty->kinds == 0) return empty_ty();
     if (session_ && !callee_ty->any && !(callee_ty->kinds & (kKindFunction | kKindUnknown)) &&
         callee.kind == NodeKind::Ident && find(ast_.text(callee))) return empty_ty();
-    if (const auto unknown = session_unknown_call(n, callee_ty)) return session_effects(unknown);
-    if (const auto historical = session_historical_call(n, callee_ty)) return session_effects(historical);
+    if (const auto unknown = session_unknown_call(n, callee_ty)) return session_effects(unknown, n);
+    if (const auto historical = session_historical_call(n, callee_ty)) return session_effects(historical, n);
     bool grew = false;
     if (!callee_ty->callables.empty()) return call_callables(callee_ty, values, grew);
     if ((callee.kind != NodeKind::Ident || find(ast_.text(callee))) &&  // B4b C4: targets unknown
