@@ -139,6 +139,14 @@ DISPLAYS = [
     ("eval_function_nested", ["eval", "[(x) => x]"], "", "opaque runtime value is not serializable"),
     ("eval_atomic", ["eval", "atomic<int>(5)"], "5\n", ""),
 ]
+# Review L1: `nift eval --json` (machine-readable) is unchanged by B4: B3's exact
+# output and exit status (a function is its tag string, an atomic not serializable).
+JSON_DISPLAYS = [
+    ("json_atomic", "atomic<int>(5)", "", "eval: opaque runtime value is not serializable\n", 2),
+    ("json_atomic_nested", "[atomic<int>(5)]", "", "eval: opaque runtime value is not serializable\n", 2),
+    ("json_function", "(x) => x", '"\\u001fnift:callable:lambda:1"\n', "", 0),
+    ("json_function_nested", "[(x) => x]", '[\n"\\u001fnift:callable:lambda:1"\n]\n', "", 0),
+]
 
 SESSIONS = [
     ("union_loop", 'for (v : [" a ", 7]) { print(v.trim()) }\nprint("after")\n'),
@@ -398,6 +406,9 @@ def main():
         st = struct_receivers(nift, work, args.quick)
         check(st["vm"] >= (60 if args.quick else 300), "struct receivers: only %d programs ran on the VM" % st["vm"])
         print("struct receivers: %(programs)d programs, %(vm)d run by the VM" % st)
+        for name, expression, out, err, code in JSON_DISPLAYS:
+            got = run_display(nift, ["eval", "--json", expression], work)
+            check(got == (out, err, code), "display %s: VM %r (expected %r)" % (name, got, (out, err, code)))
         stats = enumeration(nift, work, args.quick)
         # The enumeration must exercise dynamic dispatch, not only refusals
         # (mutant A3 refuses every Dynamic case).

@@ -68,7 +68,9 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
 // evaluate the untouched expression on legacy. A VM failure never retries.
 // Execution success fills value. Classification never executes or fills value.
 // A handled failure sets exit_code; runtime expression errors also fill error.
+// `json`: `nift eval --json` (review L1: its output is unchanged by B4: a
+// function is its tag string, an atomic not serializable).
 bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
-                           std::string& error, int& exit_code);
+                           std::string& error, int& exit_code, bool json = false);
 
 } // namespace nift::rt

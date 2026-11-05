@@ -1990,7 +1990,7 @@ static int run_eval(int argc, char** argv) {
 #if defined(NIFT_CP19_EVAL_MUTANT_BYPASS) // test-only deliberate legacy misrouting
     const bool vm_handled=false;
 #else
-    const bool vm_handled=nift::rt::eval_expression_on_vm(expression,value,error,vm_exit);
+    const bool vm_handled=nift::rt::eval_expression_on_vm(expression,value,error,vm_exit,json_output);
 #endif
     if(vm_handled) {
         if(vm_exit!=0){if(!error.empty())std::cerr<<"eval: "<<error<<'\n';return vm_exit;}

@@ -102,7 +102,7 @@ void internal_failure(Stats& stats, const std::filesystem::path& path, const std
     exit_code = 70;
 }
 
-struct EvalResult { nift::RuntimeValue& value; std::string& error; };
+struct EvalResult { nift::RuntimeValue& value; std::string& error; bool json = false; };
 
 bool run_unit(const std::string& source, const std::filesystem::path& source_path, VmMode mode, Stats& stats,
               int& exit_code, EvalResult* eval = nullptr,
@@ -170,13 +170,13 @@ bool run_script_on_vm(const std::string& source, const std::filesystem::path& so
 }
 
 bool eval_expression_on_vm(const std::string& source, nift::RuntimeValue& value,
-                           std::string& error, int& exit_code) {
+                           std::string& error, int& exit_code, bool json) {
     const VmMode mode = vm_mode_from_environment();
     if (mode == VmMode::Off) return false;
     Stats stats;
     stats.source_bytes = source.size();
     stats.path = "<eval>";
-    EvalResult result{value, error};
+    EvalResult result{value, error, json};
     try {
         return run_unit(source, "<eval>", mode, stats, exit_code, &result);
     } catch (const std::bad_alloc&) {
@@ -213,7 +213,7 @@ bool finish_run(const std::string& source, const std::filesystem::path& source_p
     stats.heap_live = result.heap_live;
     stats.heap_bytes = live_heap_bytes();
     if (result.reason == StopReason::None) {
-        if (eval && !eval_result_to_legacy(returned, eval->value, eval->error)) {
+        if (eval && !eval_result_to_legacy(returned, eval->value, eval->error, eval->json)) {
             stats.outcome = "vm-error";
             stats.reason = eval->error;
             report(stats);

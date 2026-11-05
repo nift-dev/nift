@@ -9,7 +9,7 @@
 // rt-lint: cold-file CLI result serialization after execution
 namespace nift::rt {
 namespace {
-bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, std::size_t depth) {
+bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, std::size_t depth, bool json) {
     if (depth > kMaxBridgeDepth) {
         error = "value nesting exceeds " + std::to_string(kMaxBridgeDepth) + " levels";
         return false;
@@ -17,6 +17,10 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
     // B4 (b4-dispatch.md 6, owner): a function has no shown form; its
     // internal tag is not disclosed (stringify's ordinary error).
     if (value.is(Kind::Function)) {
+        if (json) {  // review L1: --json output unchanged
+            out = nift::RuntimeValue(callable_marker(*value.heap_as<FunctionObject>()));
+            return true;
+        }
 #if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 11
         out = nift::RuntimeValue(callable_marker(*value.heap_as<FunctionObject>()));  // A11: the tag again
         return true;
@@ -26,7 +30,7 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
     }
     // B4: an atomic is shown by its current value: one sequentially
     // consistent load through the runtime's atomic access (as print does).
-    if (value.is(Kind::Handle) && value.handle_kind() == HandleKind::Atomic) {
+    if (!json && value.is(Kind::Handle) && value.handle_kind() == HandleKind::Atomic) {
         SharedOpError failure;
         Value loaded;
         if (!shared_atomic_load(value, loaded, failure)) {
@@ -40,7 +44,7 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
         out.array.reserve(array_size(value));
         for (const auto& item : array_items(value)) {
             nift::RuntimeValue child;
-            if (!convert(item, child, error, depth + 1)) return false;
+            if (!convert(item, child, error, depth + 1, json)) return false;
             out.array.push_back(std::move(child));
         }
         return true;
@@ -50,7 +54,7 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
         out.object.reserve(object_size(value));
         for (const auto& entry : object_entries(value)) {
             nift::RuntimeValue child;
-            if (!convert(entry.second, child, error, depth + 1)) return false;
+            if (!convert(entry.second, child, error, depth + 1, json)) return false;
             out.object.emplace_back(std::string(atom_text(entry.first)), std::move(child));
         }
         return true;
@@ -64,8 +68,8 @@ bool convert(const Value& value, nift::RuntimeValue& out, std::string& error, st
     return to_legacy(value, out, error);
 }
 } // namespace
-bool eval_result_to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error) {
-    return convert(value, out, error, 0);
+bool eval_result_to_legacy(const Value& value, nift::RuntimeValue& out, std::string& error, bool json) {
+    return convert(value, out, error, 0, json);
 }
 bool session_presented(const Value& value, std::string& text) {
     if (!value.is(Kind::Struct) && !value.is(Kind::Collection)) return false;
