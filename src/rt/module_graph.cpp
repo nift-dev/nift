@@ -29,6 +29,32 @@ bool has(const Names& names, std::string_view name) {
     return std::find(names.begin(), names.end(), name) != names.end();
 }
 
+// B4 (review M2): a top-level statement that cannot stop the program (return,
+// exit or a run-time error): a declaration of a function, struct or enum, an
+// export, a fresh `name := <literal>` and `print(<plain string>)` (the unit
+// declares no `print`). Imports are judged by their module's statements.
+bool cannot_stop(const Ast& ast, const Node& st, const Names& provided, const Names& unit_names) {
+    const auto literal = [&](NodeId id) {
+        const Node& v = ast.at(id);
+        return v.kind == NodeKind::Number || v.kind == NodeKind::True || v.kind == NodeKind::False ||
+               v.kind == NodeKind::Null || (v.kind == NodeKind::String && v.count == 0);
+    };
+    switch (st.kind) {
+        case NodeKind::FnDecl: case NodeKind::StructDecl: case NodeKind::EnumDecl: case NodeKind::Export:
+            return true;
+        case NodeKind::Declare:
+            return st.a != kNoNode && st.b != kNoNode && ast.at(st.a).kind == NodeKind::Ident &&
+                   !has(provided, ast.text(ast.at(st.a))) && literal(st.b);
+        case NodeKind::ExprStmt: {
+            const Node& e = ast.at(st.a);
+            return e.kind == NodeKind::Call && e.count == 1 && ast.at(e.a).kind == NodeKind::Ident &&
+                   ast.text(ast.at(e.a)) == "print" && !has(unit_names, "print") &&  // rt-lint: allow-string-compare
+                   ast.at(ast.list(e)[0]).kind == NodeKind::String && ast.at(ast.list(e)[0]).count == 0;
+        }
+        default: return false;
+    }
+}
+
 struct Frame {
     std::size_t unit = 0;      // the importing unit
     std::uint32_t offset = 0;  // its import statement
@@ -85,7 +111,11 @@ public:
         // them: an import may rebind a name to the same declaration (the
         // shared instance, D-041), never to a different one.
         std::vector<Origin> bound;
-        for (std::string_view name : importer_names(ast, root)) bound.push_back({name, index});
+        Names unit_names;
+        for (std::string_view name : importer_names(ast, root)) {
+            bound.push_back({name, index});
+            unit_names.push_back(name);
+        }
         Names provided;  // names earlier statements of a module bind (for `export`)
         const Node& program = ast.at(root);
         const NodeId* items = ast.list(program);
@@ -102,6 +132,7 @@ public:
                 if (index > 0 && !check_export(index, ast, st, provided, bound)) return false;
                 continue;
             }
+            if (st.kind != NodeKind::Import) reached_ = reached_ && cannot_stop(ast, st, provided, unit_names);
             if (const std::string_view name = declared_name(ast, st); !name.empty()) provided.push_back(name);
             if (st.kind != NodeKind::Import) continue;
             std::size_t target = 0;
@@ -129,10 +160,16 @@ public:
                     // import (a declaration of an earlier top-level statement, or
                     // an earlier import's export) is legacy's program error at the
                     // import, as the invocation-export precedent (rejected before
-                    // running); a later declaration (legacy rebinds or reports a
-                    // redeclaration) keeps the capability refusal.
+                    // running), when legacy certainly reaches the import and the
+                    // check (review M2: no statement legacy runs first, the
+                    // modules' included, can stop it); otherwise, and for a later
+                    // declaration (legacy rebinds or reports a redeclaration), the
+                    // capability refusal.
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 17
+                    reached_ = true;  // A17: C1 whatever runs first (review M2)
+#endif
 #if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 12)
-                    if (same->module != incoming.module && has(provided, incoming.name))
+                    if (same->module != incoming.module && has(provided, incoming.name) && reached_)
                         return error(index, st.begin, "import-scope:collision",
                                      "export collides with existing binding: " + std::string(incoming.name), &frame);
 #endif
@@ -302,6 +339,7 @@ private:
     std::unique_ptr<PackageReader> packages_;
     std::vector<Frame> frames_;   // the active imports, outermost first
     bool stopped_ = false;
+    bool reached_ = true;  // every statement legacy has run so far, in its order, cannot stop it (M2)
 };
 
 } // namespace

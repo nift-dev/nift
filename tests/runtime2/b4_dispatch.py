@@ -11,7 +11,8 @@
                     atomic presented while a thread updates it; TSan lane too)
   b4/c1/*/          C1: per import-collision shape, legacy's error line as a program
                     error before running (`expect` program-error), or the capability
-                    refusal (`expect` refuse)
+                    refusal (`expect` refuse); a `legacy` file lists output legacy gives
+                    instead of the collision (it stops first: review M2)
   b4/refuse/*.f     refused before any effect, with the `.reason` given
   sessions          piped sessions (SESSIONS): equal to legacy
   enumeration       every built-in method name of the plain families x every
@@ -366,6 +367,12 @@ def main():
             else:
                 check(vr == 1 and vo == "" and "(import-collision)" in ve,
                       "c1 %s: expected the import-collision refusal, got %r/%r/%d" % (case, vo, ve, vr))
+            # Review M2: where legacy stops before the collision (a `legacy` file: lines of its
+            # output), it never reports the collision, so the VM must not either.
+            if os.path.exists(os.path.join(tree, "legacy")):
+                want = open(os.path.join(tree, "legacy")).read().splitlines()
+                check(all(line in lo + le for line in want) and "collides with existing binding" not in le,
+                      "c1 %s: legacy %r/%r/%d (expected %r, no collision)" % (case, lo, le, lr, want))
         for f in fixtures("refuse"):
             name = os.path.basename(f)
             reason = open(f[:-2] + ".reason").read().strip()
