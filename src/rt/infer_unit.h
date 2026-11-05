@@ -205,6 +205,8 @@ private:
     void unite_sites(std::uint32_t a, std::uint32_t b);
     std::vector<std::uint32_t> classes(const std::vector<std::uint32_t>& sites, bool& open);
     TyRef canonical(const TyRef& t);                    // H2: a value's sites as at most 16 classes
+    std::vector<std::uint32_t> with_classes(const std::vector<std::uint32_t>& raw,
+                                            const std::vector<std::uint32_t>& classes) const;
     TyRef session_effects(const TyRef& result, const Node& call);  // C5: a call of an earlier statement's code
     void expose(const TyRef& t, int depth = 0);                     // C5: reachable by earlier code
     void expose_sites(const std::vector<std::uint32_t>& sites);

@@ -80,8 +80,7 @@ TyRef Inference::materialize(const TyRef& t) {
     }
     if (sites.empty() && !open) return t;
     auto out = std::make_shared<Ty>(*t);
-    out->sites = sites;
-    if (std::find(t->sites.begin(), t->sites.end(), kOpenSite) != t->sites.end()) out->sites.push_back(kOpenSite);
+    out->sites = with_classes(t->sites, sites);
     if (open) {
         out->elem = top_ty();
         out->fields.clear();
@@ -202,11 +201,23 @@ std::vector<std::uint32_t> Inference::classes(const std::vector<std::uint32_t>& 
 TyRef Inference::canonical(const TyRef& t) {
     if (!t || t->any || t->sites.size() <= 1) return t;
     bool open = false;
-    std::vector<std::uint32_t> sites = classes(t->sites, open);
-    if (open) sites.push_back(kOpenSite);
+    std::vector<std::uint32_t> sites = with_classes(t->sites, classes(t->sites, open));
     if (sites == t->sites) return t;
     auto out = std::make_shared<Ty>(*t);
     out->sites = std::move(sites);
+    return out;
+}
+
+// A value's site list with its array/object sites replaced by their classes;
+// map/set/stack sites (D-NEXT-refsem) and kOpenSite are kept as they are.
+std::vector<std::uint32_t> Inference::with_classes(const std::vector<std::uint32_t>& raw,
+                                                   const std::vector<std::uint32_t>& classes) const {
+    std::vector<std::uint32_t> out = classes;
+    for (std::uint32_t s : raw)
+        if (s != kOpenSite && !agg_sites_.count(s)) out.push_back(s);
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    if (std::find(raw.begin(), raw.end(), kOpenSite) != raw.end()) out.push_back(kOpenSite);
     return out;
 }
 

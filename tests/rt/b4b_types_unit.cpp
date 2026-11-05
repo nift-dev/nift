@@ -148,6 +148,25 @@ int main() {
         expect("collapsed-sites", src, "a7[1]", kKindString);
         expect("collapsed-sites-read", src, "acc[1][1]", kKindString);
     }
+    // Review H2: a unit that read a site before another unit's store grew it is walked again
+    // (r is walked before w: functions are walked last-declared first).
+    expect("reader-rewalk",
+           "xs := [1]\nfn(w(a)) { a[0] = \"s\"\nreturn 0 }\nfn(r()) { return xs[0] }\nprint(r())\nw(xs)\n", "xs[0]",
+           kKindString);
+    expect("reader-rewalk-2",
+           "xs := [1]\nfn(r()) { return xs[0] }\nfn(w(a)) { a[0] = \"s\"\nreturn 0 }\nprint(r())\nw(xs)\n", "xs[0]",
+           kKindString);
+    // ... where nothing else re-walks the reader (a lambda reading a captured local; w's return
+    // does not grow, so m is not walked again): only the site's readers list.
+    expect("reader-rewalk-lambda",
+           "fn(m()) {\n  xs := [1]\n  g := () => { return xs[0] }\n  w(xs)\n  return g()\n}\n"
+           "fn(w(a)) {\n  a[0] = \"s\"\n  return 0\n}\nprint(m())\n", "xs[0]", kKindString);
+    // ... and the stored value grows late (a return chain): only the readers list re-walks the lambda.
+    expect("reader-rewalk-late",
+           "fn(t()) { return \"s\" }\nfn(q()) { return t() }\nfn(m()) {\n  xs := [1]\n  g := () => { return xs[0] }\n"
+           "  w(xs, q())\n  return g()\n}\nfn(w(a, v)) {\n  a[0] = v\n  return 0\n}\nprint(m())\n", "xs[0]", kKindString);
+    expect("reader-rewalk-main",
+           "xs := [1]\nfn(w(a)) { a[0] = \"s\"\nreturn 0 }\nprint(xs[0])\nw(xs)\n", "xs[0]", kKindString);
     expect("escape-untracked",
            "fn[async](a()) { return (x) => { return x } }\nfa := await a()\nprint(fa(\"s\"))\n", "x", kKindString);
     // C5: in a session statement the statement's own containers are tracked per site like a script's
