@@ -273,7 +273,7 @@ TyRef Inference::expr(NodeId id) {
                 elem = unite(elem, item);
             }
             a->elem = elem;
-            t = a;
+            t = fresh(id, a);  // B4b: an allocation site
             break;
         }
         case NodeKind::Object: {
@@ -287,7 +287,7 @@ TyRef Inference::expr(NodeId id) {
                 const std::string key(quoted.size() >= 2 ? quoted.substr(1, quoted.size() - 2) : quoted);
                 o->fields[key] = unite(o->fields.count(key) ? o->fields[key] : empty_ty(), expr(prop.b));
             }
-            if (!t) t = o;
+            if (!t) t = fresh(id, o);  // B4b: an allocation site
             break;
         }
         case NodeKind::Assign: case NodeKind::CompoundAssign:
@@ -302,7 +302,7 @@ TyRef Inference::expr(NodeId id) {
 
 TyRef Inference::call(const Node& n) {
     const Node& callee = ast_.at(n.a);
-    if (const auto external = session_call(n)) return external;
+    if (const auto external = session_call(n)) return session_effects(external);
     const NodeId* args = ast_.list(n);
     // CP13B: the reserved Error constructor.
     if (callee.kind == NodeKind::Ident && ast_.text(callee) == "error" && find(ast_.text(callee)) == nullptr &&
@@ -351,26 +351,26 @@ TyRef Inference::call(const Node& n) {
         const TyRef field = record(n.a, element_of(recv, &key, true));
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
-        if (const auto historical = session_historical_call(n, field)) return historical;
-        if (!field->callables.empty()) {
-            bool grew = false;
-            const TyRef result = call_callables(field, values, grew);
-            return result;
-        }
+        if (const auto historical = session_historical_call(n, field)) return session_effects(historical);
+        bool grew = false;
+        if (!field->callables.empty()) return call_callables(field, values, grew);
+        if (!field->any && (field->kinds & kKindFunction)) untracked_call();  // B4b C4: unknown targets
+        if (recv->kinds != kKindArray) dynamic_mutation(recv, key, values);  // B4b C2
+        const NodeId call_id = static_cast<NodeId>(&n - &ast_.at(0));
         const bool mixed = recv->any || (recv->kinds & ~kKindCollection);  // D-063: possibly a collection
         const bool shown = !n.count && (key == "stringify" || key == "prettify" || key == "highlight");
         if ((recv->kinds & kKindCollection) && !(mixed && shown))  // presentation: a string for any value
             return mixed ? any_ty() : keyed_result(n, recv, values, key);  // mixed: refused by the compiler
         const int collection = collection_method(key);
         if (collection >= 0 && recv->kinds == kKindArray) {
-            const auto result = collection_result(n, recv, values, collection);
-            if (session_) if (const auto historical = session_collection_call(n, values, collection)) return historical;
+            const auto result = fresh(call_id, collection_result(n, recv, values, collection));
+            if (const auto h = session_ ? session_collection_call(n, values, collection) : nullptr)
+                return session_effects(h);
             return result;
         }
-        TyRef result=method_result(ast_, n, recv, values, session_ != nullptr);
-        if((result->kinds&kKindNumber)&&key!="size"&&key!="length") {
-            result=with_text_number(result,true);
-        }
+        escape_callables(values);  // B4b C4: a native does not call back
+        TyRef result=fresh(call_id, method_result(ast_, n, recv, values, session_ != nullptr));
+        if((result->kinds&kKindNumber)&&key!="size"&&key!="length") result=with_text_number(result,true);
         return result;
     }
     if (plan_.coroutines && callee.kind == NodeKind::Ident && n.count > 0) if (TyRef t = thread_call(n)) return t;
@@ -380,18 +380,18 @@ TyRef Inference::call(const Node& n) {
     if (session_ && !callee_ty->any && callee_ty->kinds == 0) return empty_ty();
     if (session_ && !callee_ty->any && !(callee_ty->kinds & (kKindFunction | kKindUnknown)) &&
         callee.kind == NodeKind::Ident && find(ast_.text(callee))) return empty_ty();
-    if (const auto unknown = session_unknown_call(n, callee_ty)) return unknown;
-    if (const auto historical = session_historical_call(n, callee_ty)) return historical;
-    if (!callee_ty->callables.empty()) {
-        bool grew = false;
-        return call_callables(callee_ty, values, grew);
-    }
+    if (const auto unknown = session_unknown_call(n, callee_ty)) return session_effects(unknown);
+    if (const auto historical = session_historical_call(n, callee_ty)) return session_effects(historical);
+    bool grew = false;
+    if (!callee_ty->callables.empty()) return call_callables(callee_ty, values, grew);
+    if ((callee.kind != NodeKind::Ident || find(ast_.text(callee))) &&  // B4b C4: targets unknown
+        (callee_ty->any || (callee_ty->kinds & (kKindFunction | kKindUnknown)))) untracked_call();
+    escape_callables(values);  // B4b C4: a native does not call back
     // print, a CP14 free built-in, or something the compiler refuses
     TyRef result=callee.kind == NodeKind::Ident ? function_result(ast_, n, values) : any_ty();
     if (callee.kind == NodeKind::Ident) result = constructed(n, result);  // D-NEXT-refsem: an allocation site
-    if(result->kinds&kKindNumber) {
-        result=with_text_number(result,true);
-    }
+    result = fresh(static_cast<NodeId>(&n - &ast_.at(0)), result);  // B4b: a native's new array or object
+    if(result->kinds&kKindNumber) result=with_text_number(result,true);
     return result;
 }
 

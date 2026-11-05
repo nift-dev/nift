@@ -22,7 +22,9 @@ void Inference::seed_session() {
         if (entry.shadow != kNoNode) continue;  // the entry's own top-level binding replaces it
         external_.emplace(entry.symbol.name, vars_.size());
         if (entry.symbol.const_array) const_arrays_.insert(vars_.size());
-        vars_.push_back(entry.symbol.structure ? entry.symbol.structure : kinds_ty(entry.symbol.kinds));
+        // B4b: an invocation binding (`args`) is one allocation site of this unit.
+        vars_.push_back(fresh(new_site(), entry.symbol.structure ? entry.symbol.structure :
+                                                                   kinds_ty(entry.symbol.kinds)));
     }
     if (session_) for (const auto& symbol : session_->symbols) {
         external_.emplace(symbol.name, vars_.size());

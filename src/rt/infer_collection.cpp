@@ -1,4 +1,5 @@
 #include "rt/infer_collection.h"
+#include "rt/infer_mutators.h"
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/string.h"
@@ -43,6 +44,13 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
     else result_.collection_text_numbers.erase(receiver_id);
     if(m<M::Map) {
         const auto receiver = ast_.at(n.a).a;
+        // B4b (C1): the method's effect on the receiver's sites, through every alias.
+        const SiteEffect effect = collection_effect(m);
+        TyRef stored = empty_ty();
+        if (effect == SiteEffect::StoreArg0 && !values.empty()) stored = values[0];
+        if (effect == SiteEffect::StoreArg1 && values.size() > 1) stored = values[1];
+        if (effect == SiteEffect::StoreSplice && values.size() > 2) stored = element_of(values[2], nullptr, false);
+        if (effect != SiteEffect::None) site_store(recv, stored, nullptr);
         if (m == M::Push && !values.empty()) add_element(receiver, values[0]);
         if (m == M::Insert && values.size() > 1) add_element(receiver, values[1]);
         if (m == M::Splice && values.size() > 2) add_element(receiver, element_of(values[2], nullptr, false));
@@ -122,7 +130,8 @@ TyRef Inference::contents(const TyRef& collection, bool keys, const std::string*
     if (collection->any) return (collection->kinds & kKindUnknown) ? any_ty() : top_ty();
     // Persistent sessions: an earlier statement's stores are not in this
     // walk, so a session read may be anything (sound; refused where it matters).
-    if (session_ || contents_unknown_ || collection->sites.empty()) return top_ty();
+    if (session_ || contents_unknown_ || collection->sites.empty() ||
+        collection->sites.back() == kOpenSite) return top_ty();  // B4b: of unknown origin too
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 7
     return empty_ty();  // R7: nothing is known to be stored (inference unsound under aliasing)
 #endif
@@ -145,7 +154,7 @@ TyRef Inference::contents(const TyRef& collection, bool keys, const std::string*
 void Inference::add_contents(const TyRef& collection, const TyRef& value, bool keys, const std::string* name) {
     if (collection->any) return;  // the compiler refuses such a receiver
     bool grew = false;
-    if (collection->sites.empty()) {
+    if (collection->sites.empty() || collection->sites.back() == kOpenSite) {  // B4b: unknown origin too
         grew = !contents_unknown_;
         contents_unknown_ = true;
     }

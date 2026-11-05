@@ -79,6 +79,12 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     for (std::uint32_t site : b->sites)
         if (!std::binary_search(t->sites.begin(), t->sites.end(), site))
             t->sites.insert(std::upper_bound(t->sites.begin(), t->sites.end(), site), site);
+    // B4b: a container without any site joined with one that has sites stays
+    // of unknown origin (never "only the other's sites").
+    constexpr KindSet tracked = kKindArray | kKindObject | kKindCollection;
+    if (((a->kinds & tracked) && a->sites.empty() && !b->sites.empty()) ||
+        ((b->kinds & tracked) && b->sites.empty() && !a->sites.empty()))
+        if (t->sites.empty() || t->sites.back() != kOpenSite) t->sites.push_back(kOpenSite);
     if (a->elem || b->elem) t->elem = unite(a->elem, b->elem, depth + 1);
     if (a->key || b->key) t->key = unite(a->key, b->key, depth + 1);
     if (a->tuple && b->tuple && a->items.size() == b->items.size()) {

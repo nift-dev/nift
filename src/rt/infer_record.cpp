@@ -3,6 +3,10 @@
 // rt-lint: cold-file compile-time expression kind recording
 namespace nift::rt::infer_detail {
 TyRef Inference::record(NodeId id, TyRef t) {
+    const TyRef raw = t;  // the guard's own per-binding facts (B5 deletes them with the guard)
+    t = sited(id, t);  // B4b: an array's or object's contents are its sites'
+    if (!t->callables.empty() && !callee_nodes_.count(id))  // B4b C4: a function used as a value
+        for (std::uint32_t unit : t->callables) value_units_.insert(unit);
     if (session_) t = session_current_shape(t);
     result_.kinds[id] = t->kinds;
     if (session_) result_.session_shapes[id] = t;
@@ -13,9 +17,9 @@ TyRef Inference::record(NodeId id, TyRef t) {
             if(decl!=binding_decls_.end())result_.bindings[id]=decl->second;
         }
     }
-    if(t->collection_array)result_.collection_arrays.insert(id);
+    if(raw->collection_array)result_.collection_arrays.insert(id);
     else result_.collection_arrays.erase(id);
-    if(t->collection_object)result_.collection_objects.insert(id);
+    if(raw->collection_object)result_.collection_objects.insert(id);
     else result_.collection_objects.erase(id);
     if(plan_.coroutines&&holds_future(t))result_.future_holders.insert(id);  // CP22
     else result_.future_holders.erase(id);
@@ -28,7 +32,7 @@ TyRef Inference::record(NodeId id, TyRef t) {
     else result_.collection_elements_of.erase(id);
     if (t->kinds & kKindStruct) result_.struct_ids[id] = t->any ? -2 : t->struct_id;  // D-NEXT-refsem
     else result_.struct_ids.erase(id);
-    if ((t->kinds & (kKindArray | kKindObject)) && holds_aggregate_below(t)) result_.nested_aggregates.insert(id);
+    if ((raw->kinds & (kKindArray | kKindObject)) && holds_aggregate_below(raw)) result_.nested_aggregates.insert(id);
     else result_.nested_aggregates.erase(id);
     auto& targets = result_.callable_targets[id];
     targets.clear();

@@ -152,11 +152,15 @@ void Inference::statement(NodeId id) {
             } else if (target.kind == NodeKind::Index) {
                 expr(target.b);
                 add_element(target.a, v);
-                expr(target.a);
+                std::string key;  // B4b: the store reaches every alias's sites
+                site_store(expr(target.a), v, store_key(target.b, key));
             } else if (target.kind == NodeKind::Member) {  // CP12b: a struct field
                 if (TyRef* field = struct_field(receiver_struct(target.a), ast_.text(ast_.at(target.b)))) {
                     merge_local(*field, v);
                     record(n.a, *field);
+                } else {
+                    const std::string key(ast_.text(ast_.at(target.b)));
+                    site_store(expr(target.a), v, &key);  // B4b: an object member
                 }
             }
             break;
@@ -169,7 +173,7 @@ void Inference::statement(NodeId id) {
                 var = struct_field(receiver_struct(target.a), ast_.text(ast_.at(target.b)));
             else if (target.kind == NodeKind::Ident)
                 var = find(ast_.text(target));
-            if (!var) break;
+            if (!var) { element_update(n.a, v, n.op); break; }  // B4b: `xs[i] += v`, `o.k -= v`
             if ((*var)->kinds & kKindAtomic) { record(n.a, *var); break; }
             Op op = Op::Add;
             switch (n.op) {
@@ -196,6 +200,8 @@ void Inference::statement(NodeId id) {
                 if (!((*var)->kinds & kKindAtomic))
                     merge_local(*var, kinds_ty(((*var)->kinds & kKindNumber) ? kKindInt : 0));
                 record(n.a, *var);
+            } else {
+                element_update(n.a, nullptr, Op::Add);  // B4b: `xs[i]++`
             }
             break;
         }
@@ -239,6 +245,8 @@ void Inference::statement(NodeId id) {
                 // D-NEXT-refsem: a stack's elements are its allocation sites' contents.
                 if (e.count == 1 && (receiver->kinds & kKindCollection)) add_contents(receiver, v, false);
                 else if (e.count == 1) add_element(ast_.at(e.a).a, v);
+                if (e.count == 1 && (receiver->any || (receiver->kinds & ~kKindCollection)))
+                    site_store(receiver, v, nullptr);  // B4b: an array's push reaches every alias
                 expr(ast_.at(e.a).a);
                 break;
             }

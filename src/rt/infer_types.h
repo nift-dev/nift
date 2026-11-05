@@ -40,7 +40,12 @@ struct Ty {
     // collection may come from, sorted. Empty for a collection of unknown
     // origin. Contents are tracked per site (Inference::contents).
     std::vector<std::uint32_t> sites;
+    // B4b (b4b-element-types.md): arrays and objects carry allocation sites in
+    // `sites` too (Inference::materialize); kOpenSite marks a value of unknown
+    // origin (its contents are anything, a store through it reaches anything).
 };
+
+inline constexpr std::uint32_t kOpenSite = 0xFFFFFFFFu;
 
 const TyRef& empty_ty();
 // Every kind at every depth ("top"), e.g. beyond the depth cap.

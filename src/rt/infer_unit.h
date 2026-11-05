@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -184,6 +185,32 @@ private:
     };
     std::map<std::uint32_t, SiteContents> contents_;
     bool contents_unknown_ = false;
+
+    // ---- B4b (b4b-element-types.md): arrays and objects per allocation site ----
+    // A value's type carries its sites; the stores of every alias go to the
+    // sites (agg_), and every read is materialized from them (record()).
+    TyRef materialize(const TyRef& t);
+    TyRef sited(NodeId id, const TyRef& t);             // record(): materialized, or of unknown origin
+    TyRef fresh(NodeId site, const TyRef& t);           // a construction: allocation site `site`
+    std::uint32_t new_site();                           // a site without a node (an invocation seed)
+    bool has_site(const TyRef& t) const;
+    std::uint32_t derived(std::uint32_t site);          // the site of the untracked parts inside `site`
+    void site_store(const TyRef& container, const TyRef& value, const std::string* key);
+    void dynamic_mutation(const TyRef& recv, std::string_view name, const std::vector<TyRef>& values);
+    void escape_callables(const std::vector<TyRef>& values);  // C4: called where the inference does not see
+    void untracked_call();                                    // C4: a call whose targets are unknown
+    void site_grew();
+    TyRef session_effects(const TyRef& result);  // C5: a call of an earlier statement's code
+    const std::string* store_key(NodeId index, std::string& storage) const;  // a literal string index
+    void element_update(NodeId target, const TyRef& value, Op op);          // `xs[i] += v`, `o.k++`
+    std::map<std::uint32_t, SiteContents> agg_;
+    std::unordered_set<std::uint32_t> agg_sites_, nonpositional_;
+    std::unordered_map<std::uint32_t, std::uint32_t> derived_;
+    std::unordered_set<NodeId> callee_nodes_;
+    std::set<std::size_t> value_units_;
+    std::set<std::uint32_t> escaped_units_;
+    std::uint32_t next_site_ = 0x80000000u;
+    bool agg_unknown_ = false, sites_ready_ = false;
 };
 
 } // namespace nift::rt::infer_detail
