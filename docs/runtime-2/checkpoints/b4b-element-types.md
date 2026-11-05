@@ -223,12 +223,12 @@ callee's stores are the callee path, A19).
 
 No program changed its VM output or admission against B4a in pass a.
 
-## 6. Classification (the B4a tip `0df0df6c` against the B4b tip)
+## 6. Classification (the B4a tip `0df0df6c` against the B4b tip `301095af`)
 
 - CP25-R `classify-all` (589 units): **0 changes** of outcome, reason, line or column. One unit's
   reasons list (`vm-corpus/cp04/toplevel_alias.f`, refused `aliasing` in both) lists `aliasing` and
   `unresolved-name` once more each.
-- `tests/runtime2` classify (2,002 scripts, the new `b4b/` fixtures included): 2 changes, both
+- `tests/runtime2` classify (2,003 scripts, the new `b4b/` fixtures included): 2 changes, both
   refused in both binaries, with another reason:
 
   | Script | B4a | B4b | Why |
@@ -265,4 +265,53 @@ fresh array pushed to and stored into, 4,000 sites at 1,000):
 
 At most 1.23x B4a (containers), inside the 1.5x bound. The container shape grows about 7x for 4x
 on both binaries (the existing walk, not B4b's); `test-runtime2-b4b` checks it stays within 12x.
+
+The reviewer's generators (5b) and the performance figures ran on B4b 3; B4b 4 and 5 change a
+B3 mutant's code and the session-only `session_effects` rule, which neither exercises. The
+classification above was taken on `301095af`.
+
+## 8. Gates (local; result files `scratchpad/b4/gates/b4b-*.result`)
+
+Run on `301095af` (tree `b2f11934`), every gate exit 0, git status clean before and after; the
+following commit changes this record only.
+
+| Gate | Result |
+| --- | --- |
+| `test-rt-lint`, `test-rt-build`, `test-rt-isolation`, `test-production-deps` | PASS (701 files; 1,493 production compile commands) |
+| `test-rt-op-admission-unit` | 4,027 checks, 0 failures |
+| `test-rt-b4b-types-unit` | 140 checks, 0 failures |
+| `test-runtime2-b4b` | 6,397 checks, 0 failures |
+| `test-runtime2-b4b-mutants` | 7 caught |
+| `test-runtime2-b4`, `-b4-mutants` | 12,648 checks; 17 caught or covered |
+| `test-runtime2-b3`, `-b3-mutants` | 468 checks; 11 caught |
+| `test-runtime2-safety`, `-safety-mutants` | 33,512 programs; 7 caught |
+| `test-runtime2-collections`, `-collections-mutants` | 278 checks; 11 caught |
+| `test-runtime2-refsem`, `-refsem-mutants` | 475 checks; 23 caught |
+| `test-cp19-session-cli`, `test-cp19-functional` | PASS |
+| `test-runtime2-packages`, `-args-cmd`, `-cp22`, `-cp23`, `-coro-module`, `-vm-default` | PASS (830 package checks) |
+| `test-rt-refrep`, `test-rt-mutation-protocol`, `test-rt-value` | 129; 191 checks; PASS |
+| `vm-unit`, `vm-globals-unit`, `vm-modules-unit` | 40,341; 23; 179 checks |
+| `semantics-modules`, `vm-adversarial` (`--count 600`, seed 1) | PASS; 39,612 programs, 0 non-approved differences |
+
+Not run locally (combined certification): full `make test`, `test-rt-vm-sanitize`,
+`test-build-reuse`, perf campaigns.
+
+## 9. Findings and carried items
+
+- **Pre-existing, found by the B4b fixtures (not B4b's):** a lambda returned by an async function
+  and called after `await` (`fn[async](a()) { return (x) => ... }`, `fa := await a()`, `fa(" a ")`)
+  runs on the VM, where legacy reports `invalid lambda` at the call (the same on the B4a tip).
+  `atomic.store([..])`'s message differs from legacy's (`store requires a signed 64-bit integer`
+  against `store: atomic<int> requires ...`). Neither is a fixture; both are for the release
+  audit.
+- **`nift eval --json` internal tag** (owner ruling): a function's tag in `--json` output is a
+  release blocker assigned to the release-blocker audit (b4-dispatch.md section 9); B4b does not
+  touch the JSON conversion path.
+- **B5 prerequisite (U6, section 4):** earlier session statements' values keep their recorded
+  structure, which only the CP19 per-binding contracts and the guard keep true. Before the guard
+  goes: per-site session contracts, or contents of earlier values read as anything (measured here:
+  admitted session cases in cp19, refsem, b4, safety and args-cmd become refused), or the
+  precondition at that class.
+- The guard's own facts (`nested_aggregates`, `collection_arrays`/`_objects`) still come from the
+  per-binding types; B5 deletes them with the guard.
 
