@@ -21,9 +21,9 @@ declare -A FILE=(
   [5]=src/rt/isolate_task.cpp             # D5: a program crossing into an isolate loses its descriptors' privacy
   [6]=src/rt/natives/format_methods.cpp   # D6: the pretty form drops the comma after each field line
   [7]=src/rt/natives/format_methods.cpp   # D7: rendering walks the instance's fields, unpaired with the descriptor
-  [8]=src/rt/compiler_structs.cpp         # D8: rendering a container dispatches to a struct's own presentation method
-  [9]=src/rt/compiler_structs.cpp         # D9: an explicit call on a mixed receiver binds the built-in despite a user method
-  [10]=src/rt/compiler_structs.cpp        # D10: the session's earlier struct schemas are ignored by that check (review H1)
+  [8]=src/rt/compiler_presentation.cpp    # D8: rendering a container dispatches to a struct's own presentation method
+  [9]=src/rt/compiler_presentation.cpp    # D9: an explicit call on a mixed receiver binds the built-in despite a user method
+  [10]=src/rt/compiler_presentation.cpp   # D10: the session's earlier struct schemas are ignored by that check (review H1)
   [11]=src/rt/infer_collection.cpp        # D11: array mutators keep positional element kinds outside sessions (review N1)
 )
 list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11)

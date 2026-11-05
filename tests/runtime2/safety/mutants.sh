@@ -20,6 +20,12 @@ declare -A FILE=(
   [6]=src/rt/natives/format_methods.cpp  # S6: to_string of a kind the interpolation lowering set aside is Status::Internal (review F1)
   [7]=src/rt/vm_ops.cpp                  # S7: appending such a value to an interpolation's string is an internal failure
 )
+# B4 (b4-dispatch.md 5): the lowering no longer sets kinds aside (scalar_only is
+# gone; mixed parts dispatch at run time), so S6/S7's paths are reachable only
+# through a narrowing defect. They are built together with B4 mutant A9 (the
+# narrowing restored): the B0 paths must still be what keeps that defect from
+# exit 70, and S6/S7 must still be caught.
+declare -A WITH_A9=([6]=1 [7]=1)
 list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
@@ -36,9 +42,15 @@ fail=0
 for n in "${list[@]}"; do
   src=${FILE[$n]}; obj=${src%.cpp}.o; mobj=$OUT/s$n-$(basename "$obj")
   $CXX $CPPFLAGS $CXXFLAGS -DNIFT_SAFETY_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant S$n: build failed"; exit 2; }
-  link=$(printf '%s\n' $objects | grep -vx "$obj" | grep -v '\.a$' | tr '\n' ' ')
+  extra=""; skip="$obj"
+  if [ -n "${WITH_A9[$n]:-}" ]; then
+    extra=$OUT/a9-compiler_interp.o; skip="$obj|src/rt/compiler_interp.o"
+    $CXX -include src/build/production_tu.h $CPPFLAGS $CXXFLAGS -DNIFT_B4_MUTANT=9 -c src/rt/compiler_interp.cpp -o "$extra" \
+      || { echo "mutant S$n: A9 build failed"; exit 2; }
+  fi
+  link=$(printf '%s\n' $objects | grep -vxE "$skip" | grep -v '\.a$' | tr '\n' ' ')
   libs=$(printf '%s\n' $objects | grep '\.a$' | tr '\n' ' ')
-  $CXX $CXXFLAGS $link "$mobj" -ldl $libs -o "$OUT/nift-s$n" || { echo "mutant S$n: link failed"; exit 2; }
+  $CXX $CXXFLAGS $link "$mobj" $extra -ldl $libs -o "$OUT/nift-s$n" || { echo "mutant S$n: link failed"; exit 2; }
   if python3 tests/runtime2/safety/safety.py --nift "$OUT/nift-s$n" > "$OUT/s$n.log" 2>&1; then
     echo "mutant S$n ($src): SURVIVED"; fail=1
   else
