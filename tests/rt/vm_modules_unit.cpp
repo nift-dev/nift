@@ -118,7 +118,7 @@ const Expect kExpect[] = {
     {"cycle", "import-error:cycle", "import-error:cycle"},
     {"diamond", "ok", "import-reinitialised"},
     {"dynamic_path", "import-dynamic", "import-dynamic"},
-    {"export_collision", "import-collision", "import-collision"},
+    {"export_collision", "import-scope:collision", "import-scope:collision"},  // B4 C1
     {"export_copy", "ok", "ok"},
     {"export_missing", "module-error:export-missing", "module-error:export-missing"},
     {"in_block", "import-nested", "import-nested"},
@@ -167,7 +167,7 @@ void check_d041_fixtures() {
         const char* fixture;
         const char* verdict;  // under OncePerContext
     } expect[] = {
-        {"repeated", "ok"}, {"repeated_two_spellings", "ok"}, {"export_clash", "import-collision"},
+        {"repeated", "ok"}, {"repeated_two_spellings", "ok"}, {"export_clash", "import-scope:collision"},  // B4 C1
         {"diamond", "ok"}, {"diamond_stateful", "ok"}, {"nested_chain", "ok"}, {"nested_shared", "ok"},
         {"circular", "import-error:cycle"}, {"self_cycle", "import-error:cycle"}, {"stateful_export_binding", "ok"},
         {"stateful_array_binding", "ok"}, {"failed_init", "import-nested"},  // imports inside `try`
@@ -199,7 +199,9 @@ void check_rebinding() {
     CHECK(verdict(ok.graph) == "ok");
     CHECK(ok.graph.modules.size() == 3 && ok.graph.modules[2]->export_origins.size() == 1 &&
           ok.graph.modules[2]->export_origins[0] == 1);  // b re-exports c's cf
-    CHECK(verdict(plan(dir / "clash.f", InitPolicy::OncePerContext).graph) == "import-collision");
+    // B4 C1: an earlier import's export is legacy's program error at the import;
+    // a later declaration keeps the capability refusal.
+    CHECK(verdict(plan(dir / "clash.f", InitPolicy::OncePerContext).graph) == "import-scope:collision");
     CHECK(verdict(plan(dir / "late.f", InitPolicy::OncePerContext).graph) == "import-collision");
 }
 

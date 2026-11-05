@@ -66,15 +66,17 @@ CASES = [
     },
     {
         "name": "import-collision",
+        # B4 C1: a binding declared before the import is the program error
+        # import-scope:collision; one declared after it keeps this refusal.
         "files": {
-            "main.f": 'mf := 1\nimport("m.nft")\n',
+            "main.f": 'import("m.nft")\nfn(mf(x)) { return 2 }\n',
             "m.nft": 'print("m runs")\nmv := [1]\nfn(mf(x)) { return x + 1 }\nexport(mv)\nexport(mf)\n',
         },
         "first": "import-collision",
         "certain": {"import-collision"},
         "complete": False,
         "stop": "import-collision",
-        "item0_line": 2,
+        "item0_line": 1,
         "item0_column": 1,
     },
     {

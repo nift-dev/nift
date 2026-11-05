@@ -960,9 +960,11 @@ def section_s():
     genuine("S c11b cmd exported before args names cmd",
             {"pz.f": 'cmd := "c"\nargs := [1]\nexport(cmd)\nexport(args)\n', "m.f": 'import("pz.f")\n'},
             "import-scope:invocation-export", "R/m.f:1:1", "export collides with existing binding: cmd", args=("a",))
-    vm = genuine("S b08 an ordinary collision first is the import-collision refusal (x)",
+    # B4 C1 (b4-dispatch.md 7): x is bound before the import, so the ordinary
+    # collision is legacy's program error (it was the import-collision refusal).
+    vm = genuine("S b08 an ordinary collision first is the program error (x)",
                  {"px.f": 'x := 5\nargs := [1]\nexport(x)\nexport(args)\n', "m.f": 'x := 1\nimport("px.f")\n'},
-                 "import-collision", "R/m.f:2:1", program_error=False, args=("a",))
+                 "import-scope:collision", "R/m.f:2:1", "export collides with existing binding: x", args=("a",))
     check("args" not in error_line(vm.stderr), "S b08 does not name args", vm.stderr)
     genuine("S b08b args first names args",
             {"px.f": 'x := 5\nargs := [1]\nexport(args)\nexport(x)\n', "m.f": 'x := 1\nimport("px.f")\n'},

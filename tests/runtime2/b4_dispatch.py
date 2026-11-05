@@ -9,6 +9,9 @@
                     differ from legacy
   b4/concurrent/*.f run on the VM with legacy's final output, three times (an
                     atomic presented while a thread updates it; TSan lane too)
+  b4/c1/*/          C1: per import-collision shape, legacy's error line as a program
+                    error before running (`expect` program-error), or the capability
+                    refusal (`expect` refuse)
   b4/refuse/*.f     refused before any effect, with the `.reason` given
   sessions          piped sessions (SESSIONS): equal to legacy
   enumeration       every built-in method name of the plain families x every
@@ -97,6 +100,18 @@ def run_display(nift, spec, work):
                            capture_output=True)
     shutil.rmtree(d, ignore_errors=True)
     return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
+
+
+def run_tree(nift, tree, mode, work):
+    d = tempfile.mkdtemp(dir=work)
+    for f in os.listdir(tree):
+        if f != "expect":
+            shutil.copy(os.path.join(tree, f), os.path.join(d, f))
+    p = subprocess.run(["timeout", "60", nift, "main.f"], cwd=d, env=env_for(d, mode, None), stdin=subprocess.DEVNULL,
+                       capture_output=True)
+    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    shutil.rmtree(d, ignore_errors=True)
+    return norm(p.stdout), norm(p.stderr), p.returncode
 
 
 def defects(rows):
@@ -284,6 +299,21 @@ def main():
                 lo, le, lr, _ = run_text(nift, src, "0", work, name)
                 check(rows and rows[-1].get("outcome") == "vm" and (vo, ve, vr) == (lo, le, lr),
                       "concurrent %s: VM %r/%r/%d vs legacy %r/%r/%d" % (name, vo, ve[-200:], vr, lo, le, lr))
+        # C1 (b4-dispatch.md 7): legacy differential per import-collision shape.
+        c1 = os.path.join(HERE, "c1")
+        for case in sorted(os.listdir(c1)):
+            tree = os.path.join(c1, case)
+            expect = open(os.path.join(tree, "expect")).read().strip()
+            vo, ve, vr = run_tree(nift, tree, "require", work)
+            lo, le, lr = run_tree(nift, tree, "0", work)
+            first = ve.splitlines()[0] if ve else ""
+            if expect == "program-error":
+                check(vr == 1 and vo == "" and first in le.splitlines() and "collides with existing binding" in first
+                      and "no part of it ran" in ve and "not compiled" not in ve,
+                      "c1 %s: VM %r/%r/%d vs legacy %r/%r/%d" % (case, vo, ve, vr, lo, le, lr))
+            else:
+                check(vr == 1 and vo == "" and "(import-collision)" in ve,
+                      "c1 %s: expected the import-collision refusal, got %r/%r/%d" % (case, vo, ve, vr))
         for f in fixtures("refuse"):
             name = os.path.basename(f)
             reason = open(f[:-2] + ".reason").read().strip()

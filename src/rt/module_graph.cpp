@@ -125,6 +125,17 @@ public:
                 const auto same = std::find_if(bound.begin(), bound.end(),
                                                [&](const Origin& o) { return o.name == incoming.name; });
                 if (same != bound.end()) {
+                    // B4 C1 (b4-dispatch.md 7): a binding that exists before this
+                    // import (a declaration of an earlier top-level statement, or
+                    // an earlier import's export) is legacy's program error at the
+                    // import, as the invocation-export precedent (rejected before
+                    // running); a later declaration (legacy rebinds or reports a
+                    // redeclaration) keeps the capability refusal.
+#if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 12)
+                    if (same->module != incoming.module && has(provided, incoming.name))
+                        return error(index, st.begin, "import-scope:collision",
+                                     "export collides with existing binding: " + std::string(incoming.name), &frame);
+#endif
                     if (same->module != incoming.module) return refuse(index, st.begin, "import-collision");
                     continue;  // the same declaration again: rebound
                 }
