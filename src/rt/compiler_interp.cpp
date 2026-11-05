@@ -11,8 +11,12 @@
 // kind inference does not visit String children (infer*.cpp belongs to CP12B),
 // so interpolation_kind() proves the common scalar forms from bindings,
 // literals, operators, native result rules and simple user-function returns.
-// Aggregates use interpolation:non-scalar; unproven or mixed families use
-// interpolation:unknown-type (a tracked coverage gap, not unsupported syntax).
+// Aggregates use interpolation:non-scalar; unproven or mixed scalar families
+// use interpolation:unknown-type (a tracked coverage gap, not unsupported
+// syntax). B4: one scalar family mixed with kinds that have no text form
+// converts through a flagged to_string (rt/op_admission.h): those kinds give
+// B0's ordinary error at run time, from the dispatch, never a native's
+// defensive path.
 #include "rt/compiler_interp.h"
 
 #include "rt/compiler_expr.h"
@@ -36,11 +40,17 @@ KindSet native_result_kinds(const natives::BuiltinSpec& spec) {
     return result;
 }
 
-KindSet scalar_only(KindSet kinds) {
+// B4 (b4-dispatch.md 4): B0's root cause was here. scalar_only kept the
+// scalar bits of a mixed set and bound to_string from them; the kinds are
+// now kept whole, and the lowering converts a mixed part through a flagged
+// (Dynamic) to_string. Unknown and aggregates keep their own refusals.
+KindSet part_kinds(KindSet kinds) {
     if (kinds & kKindUnknown) return kKindUnknown;
     if (kinds & kKindAggregate) return kKindAggregate;
-    if (!(kinds & kKindScalar)) return kKindUnknown;
-    return static_cast<KindSet>(kinds & kKindScalar);
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 9
+    if (kinds & kKindScalar) return static_cast<KindSet>(kinds & kKindScalar);  // A9: B0's narrowing restored
+#endif
+    return kinds;
 }
 
 bool literal_scalar(const Ast& ast, NodeId id) {
@@ -149,7 +159,7 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
                 if (global != nullptr && global->global) binding = global;
             }
             if (!binding) return kKindUnknown;
-            return scalar_only(binding->decl_kinds);
+            return part_kinds(binding->decl_kinds);
         }
         case NodeKind::Unary: {
             if (node.op == Op::Not) return kKindBool;
@@ -185,11 +195,11 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
             if (node.kind == NodeKind::Coalesce) {
                 const KindSet left = interpolation_kind_impl(node.a, active, literal_only);
                 const KindSet right = interpolation_kind_impl(node.b, active, literal_only);
-                return scalar_only(static_cast<KindSet>(left | right));
+                return part_kinds(static_cast<KindSet>(left | right));
             }
             const KindSet left = interpolation_kind_impl(node.b, active, literal_only);
             const KindSet right = interpolation_kind_impl(node.c, active, literal_only);
-            return scalar_only(static_cast<KindSet>(left | right));
+            return part_kinds(static_cast<KindSet>(left | right));
         }
         case NodeKind::Index: {
             if (literal_only) return kKindUnknown;
@@ -263,8 +273,12 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
         if (kinds_here & kKindHandle) return fail(part, "host-handle-flow");
         if (kinds_here & kKindUnknown) return fail(part, "interpolation:unknown-type");
         if (kinds_here & kKindAggregate) return fail(part, "interpolation:non-scalar");
-        const KindSet scalar = scalar_only(kinds_here);
-        if (scalar == kKindUnknown) return fail(part, "interpolation:unknown-type");
+        const KindSet whole = part_kinds(kinds_here);
+        if (whole == kKindUnknown) return fail(part, "interpolation:unknown-type");
+        // Kinds without a text form beside one scalar family: a Dynamic part.
+        const KindSet scalar = static_cast<KindSet>(whole & kKindScalar);
+        const bool dynamic = (whole & ~kKindScalar) != 0;
+        if (scalar == 0) return fail(part, "interpolation:unknown-type");
         const bool number = (scalar & ~kKindNumber) == 0;
         const bool string = scalar == kKindString;
         const bool boolean = scalar == kKindBool;
@@ -296,11 +310,12 @@ bool UnitCompiler::interpolation(const Node& node, std::uint16_t dst) {
         }
 #endif
 
-        if (!string) {
+        if (!string || dynamic) {
             fb_->set_offset(ast_.at(part_id).begin);
             const std::size_t at = fb_->emit(
                 OpCode::CallNative, piece,
-                static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec->id)), 1);
+                static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec->id)),
+                static_cast<std::uint16_t>(dynamic ? 1u | kDynamicDispatch : 1u));
             fb_->note(at, "to_string");
         }
         fb_->set_offset(ast_.at(part_id).begin);

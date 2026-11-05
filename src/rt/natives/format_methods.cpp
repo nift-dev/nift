@@ -1,4 +1,5 @@
 #include "rt/natives/format_methods.h"
+#include "rt/dispatch_defect.h"  // B4
 
 #include "rt/shared_state.h"
 
@@ -330,6 +331,7 @@ Status scalar_to_string(const Context&, const Value* args, std::uint32_t argc, V
     if (!(args[0].is_number() || args[0].is(Kind::Bool) || args[0].is_null())) {
         const char* text = unrenderable_text(args[0]);
         if (!text) return internal(error, "to_string receiver");  // a string: the lowering appends it directly
+        note_dispatch_defect();  // B4: flagged sites never get here (b4-dispatch.md 4)
         return fail(error, text);
     }
 #endif

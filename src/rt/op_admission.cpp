@@ -2,6 +2,7 @@
 
 #include "rt/aggregate_store.h"  // NIFT_RT_RELOCATE_ON_MUTATION: checked builds abort on a defect
 #include "rt/builtin_bind.h"
+#include "rt/natives/format_methods.h"
 
 #include <atomic>
 #include <cstdlib>
@@ -76,6 +77,10 @@ DispatchFailure dispatch_failure(Receiver family, std::string_view name) {
     // a number's to_double, an object's length.
     if (family == Receiver::Number && name == "to_double") return DispatchFailure::Refuse;
     if (family == Receiver::Object && name == "length") return DispatchFailure::Refuse;
+    // B0's root cause, structurally (b4-dispatch.md 4): an interpolated part
+    // mixing a scalar family with kinds that have no text form converts
+    // through a flagged to_string; those kinds fail with B0's text.
+    if (name == "to_string" && !plain_family(family)) return DispatchFailure::Unrenderable;
     switch (family) {
         case Receiver::String: case Receiver::Number: case Receiver::Array: return DispatchFailure::Unsupported;
         case Receiver::Null: case Receiver::Bool: case Receiver::Object: return DispatchFailure::Malformed;
@@ -83,8 +88,13 @@ DispatchFailure dispatch_failure(Receiver family, std::string_view name) {
     }
 }
 
-std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text) {
+std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text,
+                                     const Value* receiver) {
     switch (failure) {
+        case DispatchFailure::Unrenderable:
+            if (receiver)
+                if (const char* text = natives::unrenderable_text(*receiver)) return text;
+            return "opaque runtime value is not serializable";
         case DispatchFailure::Malformed:
             return "unknown value or malformed expression: " + std::string(call_text);
         case DispatchFailure::Composite: return "to_string: use stringify() for composite values";

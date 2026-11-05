@@ -19,6 +19,7 @@
 // mismatch at a flagged site re-dispatches; at an unflagged site it is a
 // compiler defect: counted (dispatch_defect_count, NIFT_VM_STATS
 // "dispatch_defects"), and fatal in checked builds.
+#include "rt/dispatch_defect.h"
 #include "rt/infer.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
@@ -40,6 +41,7 @@ enum class DispatchFailure : std::uint8_t {
     Unsupported,  // "<name>: unsupported for this value" (string, number, array)
     Malformed,    // "unknown value or malformed expression: <call text>" (null, bool, object)
     Composite,    // "to_string: use stringify() for composite values" (array, object)
+    Unrenderable, // interpolation's to_string on a value with no text form (B0's text by kind)
     Refuse,       // legacy's behaviour is context-dependent or not reproduced: not admitted
 };
 
@@ -72,16 +74,15 @@ KindSet family_kinds(natives::Receiver family);
 
 // Legacy's failure class for a receiver family with no native of `name`.
 DispatchFailure dispatch_failure(natives::Receiver family, std::string_view name);
-// Its message (call_text: the call's source text, for Malformed).
-std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text);
+// Its message (call_text: the call's source text, for Malformed; receiver: the
+// value, for Unrenderable).
+std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text,
+                                     const Value* receiver = nullptr);
 // Whether the error is catchable (the owner's ruling on invariant 4 is set
 // here, and only here): provisionally legacy's class, an ordinary uncatchable
 // error like every other native error.
 bool dispatch_failure_catchable(DispatchFailure failure);
 
-// Process-wide count of dispatch-precondition violations at unflagged sites
-// (compiler defects); reported in NIFT_VM_STATS as "dispatch_defects".
-std::uint64_t dispatch_defect_count();
-void note_dispatch_defect();
+// dispatch_defect_count / note_dispatch_defect: rt/dispatch_defect.h.
 
 } // namespace nift::rt

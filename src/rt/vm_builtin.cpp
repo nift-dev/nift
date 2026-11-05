@@ -71,7 +71,7 @@ namespace {
 // B4: a Dynamic site whose receiver family has no native of that name: the
 // admission table's failure (text and error class from rt/op_admission.cpp).
 bool dispatch_failed(const Instr& in, const Proto* proto, const natives::BuiltinSpec& spec,
-                     natives::Receiver actual, Fault& fault) {
+                     natives::Receiver actual, const Value& receiver, Fault& fault) {
     DispatchFailure failure = dispatch_failure(actual, spec.name);
     if (failure == DispatchFailure::Refuse || failure == DispatchFailure::None) {
         // Not admitted for this family: the inference let a kind through.
@@ -79,7 +79,8 @@ bool dispatch_failed(const Instr& in, const Proto* proto, const natives::Builtin
         failure = DispatchFailure::Unsupported;
     }
     const Note* note = proto->note(static_cast<std::size_t>(&in - proto->code.data()));
-    std::string message = dispatch_failure_message(failure, spec.name, note ? std::string_view(note->text) : "");
+    std::string message =
+        dispatch_failure_message(failure, spec.name, note ? std::string_view(note->text) : "", &receiver);
 #if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 5
     return raise(fault, StopReason::Internal, std::move(message));  // A5: the failure is internal (exit 70)
 #endif
@@ -100,7 +101,7 @@ bool dispatch_failed(const Instr& in, const Proto* proto, const natives::Builtin
     return &spec;  // A4: no redirection (a native meets a foreign receiver)
 #else
     if (const natives::BuiltinSpec* sibling = natives::dispatch_sibling(spec, actual)) return sibling;
-    dispatch_failed(in, proto, spec, actual, fault);
+    dispatch_failed(in, proto, spec, actual, receiver, fault);
     return nullptr;
 #endif
 }

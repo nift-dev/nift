@@ -180,6 +180,40 @@ def enumeration(nift, work, quick):
     return stats
 
 
+# B0's root cause, structurally (b4-dispatch.md 4): an interpolated part mixing
+# one scalar family with kinds that have no text form converts through a
+# flagged to_string; those kinds fail with B0's text, from the dispatch.
+INTERP_SCALARS = {"int": ("1", "1"), "frac": ("2.5", "2.5"), "string": ('"s"', "s"), "bool": ("true", "true"),
+                  "null": ("null", "null")}
+INTERP_OTHERS = {
+    "map": ("map()", "map, set and stack values cannot be rendered as text"),
+    "stack": ("stack()", "map, set and stack values cannot be rendered as text"),
+    "mutex": ("mutex()", "opaque runtime value is not serializable"),
+    "lambda": ("(x) => x", "opaque runtime value is not serializable"),
+}
+
+
+def interpolation(nift, work):
+    n = 0
+    for sk, (sv, shown) in INTERP_SCALARS.items():
+        for ok, (ov, text) in INTERP_OTHERS.items():
+            for ctx in ("loop", "fn"):
+                if ctx == "loop":
+                    src = 'print("b")\nfor (v : [%s, %s]) { print("x$[v]") }\nprint("never")\n' % (sv, ov)
+                else:
+                    src = 'print("b")\nfn(f(v)) { print("x$[v]") }\nf(%s)\nf(%s)\nprint("never")\n' % (sv, ov)
+                vo, ve, vr, rows = run_text(nift, src, "require", work)
+                n += 1
+                label = "interpolation %s|%s (%s)" % (sk, ok, ctx)
+                outcome = rows[-1].get("outcome") if rows else None
+                if outcome not in ("vm", "vm-error"):
+                    continue  # refused before any effect (e.g. interpolation:unknown-type): unchanged
+                check(vr == 1 and vo == "b\nx%s\n" % shown and text in ve and "never" not in vo,
+                      "%s: %r/%r/%d" % (label, vo, ve[-200:], vr))
+                check(defects(rows) == 0, "%s: dispatch_defects %d" % (label, defects(rows)))
+    return n
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -224,6 +258,7 @@ def main():
             check(defects(rows) == 0, "session %s: dispatch_defects %d" % (name, defects(rows)))
             check((vo, ve, vr) == (lo, le, lr), "session %s: VM %r/%r/%d vs legacy %r/%r/%d" %
                   (name, vo, ve, vr, lo, le, lr))
+        print("interpolation: %d programs" % interpolation(nift, work))
         stats = enumeration(nift, work, args.quick)
         # The enumeration must exercise dynamic dispatch, not only refusals
         # (mutant A3 refuses every Dynamic case).

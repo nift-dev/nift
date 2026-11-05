@@ -24,8 +24,9 @@ declare -A FILE=(
   [4]=src/rt/vm_builtin.cpp          # A4: the VM ignores the Dynamic flag (a native meets a foreign receiver)
   [5]=src/rt/vm_builtin.cpp          # A5: a dispatch failure is an internal failure (exit 70)
   [6]=src/rt/op_admission.cpp        # A6: the unsupported and malformed failure texts are swapped
+  [9]=src/rt/compiler_interp.cpp     # A9: B0's narrowing restored (scalar_only binds to_string unflagged)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 S10)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 9 S10)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

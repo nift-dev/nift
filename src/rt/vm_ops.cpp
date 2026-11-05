@@ -1,4 +1,5 @@
 #include "rt/vm_ops.h"
+#include "rt/dispatch_defect.h"  // B4
 #include "rt/vm.h"
 
 #include "rt/aggregate.h"
@@ -162,7 +163,10 @@ bool add_assign_slow(const Instr& in, Value& target, const Value& right, Fault& 
     // B0: an interpolation appends a part whose kinds the lowering narrowed to
     // string (`for (v : ["s", mutex()]) { "$[v]" }`); the other kinds arrive here.
     if (target.is(Kind::String))
-        if (const char* text = natives::unrenderable_text(right)) return raise(fault, StopReason::Error, text);
+        if (const char* text = natives::unrenderable_text(right)) {
+            note_dispatch_defect();  // B4: interpolation converts mixed parts through a flagged to_string
+            return raise(fault, StopReason::Error, text);
+        }
 #endif
     if (!target.is_number() || !right.is_number()) return internal(fault, "compound assignment");
     return arith_slow(in, OpCode::Add, target, right, target, fault);
