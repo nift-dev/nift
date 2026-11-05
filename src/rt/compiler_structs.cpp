@@ -182,11 +182,20 @@ bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
             return builtin_call(node, *spec, callee.a, dst);
     }
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(text(ast_.at(callee.b)));
-    // B4: legacy reports a method the struct does not declare as an ordinary
-    // error at the call, before evaluating any argument ("struct has no
-    // method: <name>"); the admission table proves it fails there, so it is
-    // compiled as that run-time error instead of refused (b4-dispatch.md 2).
+    // B4 (review H1): legacy reports a method the struct does not declare as an
+    // ordinary error at the call, before evaluating any argument ("struct has
+    // no method: <name>"), except for a string method's name: its `substr`
+    // anywhere, and string methods in prepared code, run on the instance's tag
+    // text. Compiled as that error only for other names outside prepared code
+    // (b4-dispatch.md 2); otherwise refused as in B3.
 #if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 10)
+    const bool string_name = natives::find_builtin(natives::Receiver::String, name) != nullptr;
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 15
+    const bool legacy_fails = true || string_name;  // A15: every undeclared name compiled as the error (H1)
+#else
+    const bool legacy_fails = !string_name && !loop_reachable();
+#endif
+    if (m == nullptr && !legacy_fails) return fail(callee, "struct-no-method");
     if (m == nullptr)
         return plain_postfix(node) && legacy_fatal(node, "struct has no method: " + std::string(name), dst);
 #else

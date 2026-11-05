@@ -238,6 +238,58 @@ INTERP_OTHERS = {
 }
 
 
+# Review H1: a proven struct receiver x every method name x seven contexts x three
+# arities (the reviewer's generator): wherever the VM runs it, equal to legacy,
+# except D-009#5 (legacy prefixes "return: " to an error raised in a returned
+# expression and reports the return's column).
+STRUCT_EXTRA = ("nosuch", "push", "pop", "sort", "map", "filter", "get", "set", "insert", "remove", "reverse", "keys")
+STRUCT_CONTEXTS = {
+    "top": 'c := S()\nprint("before")\nprint(c.CALL)\nprint("after")\n',
+    "for": 'c := S()\nprint("before")\nfor (i : [1]) { print(c.CALL) }\nprint("after")\n',
+    "while": 'c := S()\nprint("before")\ni := 0\nwhile (i < 1) { print(c.CALL); i += 1 }\nprint("after")\n',
+    "fn": 'fn(g(v)) { return v.CALL }\nprint("before")\nprint(g(S()))\nprint("after")\n',
+    "lambda": 'f := (v) => v.CALL\nprint("before")\nprint(f(S()))\nprint("after")\n',
+    "stmt": 'c := S()\nprint("before")\nc.CALL\nprint("after")\n',
+    "method": 'c := S()\nprint("before")\nprint(c.probe())\nprint("after")\n',
+}
+
+
+def d009_5(vm, legacy):
+    (vo, ve, vr), (lo, le, lr) = vm, legacy
+    a = re.match(r"error: t\.f:(\d+):\d+: (.*)\n$", ve)
+    b = re.match(r"error: t\.f:(\d+):\d+: return: (.*)\n$", le)
+    return vo == lo and vr == lr and a and b and a.groups() == b.groups()
+
+
+def struct_receivers(nift, work, quick):
+    names = set()
+    for line in open(os.path.join(ROOT, "src", "rt", "natives", "builtin_list.inc")):
+        m = re.match(r'NIFT_RT_BUILTIN\((\w+), "(\w+)", (\w+),', line)
+        if m and m.group(3) != "None":
+            names.add(m.group(2))
+    names |= set(STRUCT_EXTRA)
+    stats = {"programs": 0, "vm": 0}
+    for ctx, body in STRUCT_CONTEXTS.items():
+        for name in sorted(names):
+            for args in (("",) if quick else ("", '"a"', "1, 1")):
+                call = "%s(%s)" % (name, args)
+                head = ("struct(S) {\n  a := 1\n  fn(probe()) { return this.%s }\n}\n" % call if ctx == "method"
+                        else "struct(S) { a := 1 }\n")
+                src = head + body.replace("CALL", call)
+                vm = run_text(nift, src, "require", work)
+                stats["programs"] += 1
+                label = "struct %s (%s)" % (call, ctx)
+                check(vm[2] != 70 and defects(vm[3]) == 0, "%s: exit %d, dispatch_defects %d" %
+                      (label, vm[2], defects(vm[3])))
+                if not vm[3] or vm[3][-1].get("outcome") not in ("vm", "vm-error"):
+                    continue
+                stats["vm"] += 1
+                legacy = run_text(nift, src, "0", work)
+                check(vm[:3] == legacy[:3] or d009_5(vm[:3], legacy[:3]), "%s: VM %r vs legacy %r" %
+                      (label, vm[:3], legacy[:3]))
+    return stats
+
+
 def interpolation(nift, work):
     n = 0
     for sk, (sv, shown) in INTERP_SCALARS.items():
@@ -336,6 +388,9 @@ def main():
                   and "SIDE-EFFECT" not in vo and "refused" not in ve and vr != 70,
                   "display %s: VM %r/%r/%d (expected stdout %r, stderr containing %r)" % (name, vo, ve, vr, out, err))
         compile_scaling(nift, work)
+        st = struct_receivers(nift, work, args.quick)
+        check(st["vm"] >= (60 if args.quick else 300), "struct receivers: only %d programs ran on the VM" % st["vm"])
+        print("struct receivers: %(programs)d programs, %(vm)d run by the VM" % st)
         stats = enumeration(nift, work, args.quick)
         # The enumeration must exercise dynamic dispatch, not only refusals
         # (mutant A3 refuses every Dynamic case).
