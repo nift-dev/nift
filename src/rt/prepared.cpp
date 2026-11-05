@@ -1,18 +1,18 @@
 #include "rt/prepared.h"
-
 // rt-lint: cold-file compile-time analysis, once per unit
-
 #include "rt/prepared_outer.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/text_type.h"
-
 #include <functional>
 #include <unordered_set>
 #include <vector>
-
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 14
+#define NIFT_B4_FOR_CALLERS 0  // A14: `while` callers only (the pre-B4 gap, review M4)
+#else
+#define NIFT_B4_FOR_CALLERS 1  // B4 (review M4): legacy prepares a `for` loop's callees too
+#endif
 namespace nift::rt {
-
 namespace {
 
 // Pushes the children of `n` so that they pop in pre-order (a, b, c, list).
@@ -154,7 +154,7 @@ private:
     void mark_prepared_functions() {
         marked_.assign(plan_.functions.size(), false);
         walk(ast_, root_, [this](NodeId id, const Node& n) {
-            if (n.kind == NodeKind::While) mark_calls(id);
+            if (n.kind == NodeKind::While || (NIFT_B4_FOR_CALLERS && n.kind == NodeKind::For)) mark_calls(id);  // B4 M4
             return true;
         });
         do {
@@ -337,7 +337,7 @@ private:
             if (marked_[f]) check_call_sites(ast_.at(plan_.functions[f]).b);
         if (result_.refused) return;
         walk(ast_, root_, [this](NodeId, const Node& n) {
-            if (n.kind != NodeKind::While) return true;
+            if (n.kind != NodeKind::While && !(NIFT_B4_FOR_CALLERS && n.kind == NodeKind::For)) return true;
             return check_call_sites(n.a) && check_call_sites(n.b);
         });
     }

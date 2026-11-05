@@ -187,7 +187,6 @@ private:
     // CP14 built-in over a fresh window (receiver kNoNode: free function); B4 Dynamic: compiler_dispatch.cpp
     int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
     int dynamic_method_call(const Node&, NodeId, std::string_view, std::uint16_t);
-    bool object_length_context() const;  // B4: legacy's prepared length() may run here (compiler_dispatch.cpp)
     bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);
     bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst,
                       bool dynamic = false);

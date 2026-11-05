@@ -335,6 +335,7 @@ def main():
             check(vo == out and err in ve and TAG not in vo + ve and "SECRET-b4" not in vo + ve
                   and "SIDE-EFFECT" not in vo and "refused" not in ve and vr != 70,
                   "display %s: VM %r/%r/%d (expected stdout %r, stderr containing %r)" % (name, vo, ve, vr, out, err))
+        compile_scaling(nift, work)
         stats = enumeration(nift, work, args.quick)
         # The enumeration must exercise dynamic dispatch, not only refusals
         # (mutant A3 refuses every Dynamic case).
@@ -347,6 +348,35 @@ def main():
         return 1
     print("PASS b4-dispatch: %d checks, 0 failure(s)" % CHECKS[0])
     return 0
+
+
+def scaling_program(n):
+    """n functions each using to_int on a double, a map's empty() and an unknown length() (the
+    context:* refusal sites; legal outside prepared code), and loops calling another function."""
+    lines = ["m := map()"]
+    for i in range(n):
+        lines += ["fn(h%d(x, v)) {" % i, "    y := x * 1.5", "    t := y.to_int() + (m.empty() ? 1 : 0) + v.length()",
+                  "    return t", "}"]
+    lines += ["fn(g(v)) { return v + 1 }", "for (i : [1]) { print(g(i)) }", "k := 0",
+              "while (k < 1) { k = g(k) }", "print(h0(2, \"ab\") + h%d(2, \"abc\"))" % (n - 1)]
+    return "\n".join(lines) + "\n"
+
+
+def compile_scaling(nift, work):
+    """Review M3: compile time stays linear in the number of functions (B4's context:* checks once
+    walked the whole program per call site: 36x on a 3,451-line program). Four times the functions
+    must cost well under the sixteen times a quadratic pass gives; the best of three runs."""
+    times = {}
+    for n in (250, 1000):
+        best = None
+        for _ in range(3):
+            out, _, _, rows = run_text(nift, scaling_program(n), "require", work)
+            us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" and out == "2\n13\n" else None
+            best = us if best is None or (us is not None and us < best) else best
+        times[n] = best
+    ok = times[250] is not None and times[1000] is not None and times[1000] <= 8 * times[250]
+    check(ok, "compile scaling: %r us for 250 functions, %r us for 1000 (must be <= 8x)" % (times[250], times[1000]))
+    print("compile scaling: 250 functions %.0f us, 1000 functions %.0f us" % (times[250] or 0, times[1000] or 0))
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@
 //                        parameter from that text (M3).
 //
 // Prepared-reachable code (over-approximated, which only refuses more): the
-// conditions and bodies of every `while` loop, anywhere, and the whole body
+// conditions and bodies of every `while` and `for` loop (B4, review M4), anywhere, and the whole body
 // of every function called from prepared-reachable code (fixpoint).
 #include "rt/infer.h"
 #include "rt/resolver.h"

@@ -192,7 +192,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             if (result >= 0) return result == 1;
         }
         const KindSet k = kinds(callee.a);
-        if (name == "to_int" && (k & kKindFrac) && object_length_context())  // rt-lint: allow-string-compare B4
+        if (name == "to_int" && (k & kKindFrac) && loop_reachable())  // rt-lint: allow-string-compare B4
             return fail(node, "context:number-to-int");
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
@@ -233,7 +233,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         return false;
     // Legacy's prepared `length()` counts an object's members; the canonical
     // one rejects an object (D-018).
-    if (!size && (kinds(callee.a) & (kKindObject | kKindUnknown)) && object_length_context())
+    if (!size && (kinds(callee.a) & (kKindObject | kKindUnknown)) && loop_reachable())
         return fail(node, "context:object-length");
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;

@@ -30,8 +30,9 @@ declare -A FILE=(
   [11]=src/rt/eval_result.cpp        # A11: a function's display shows its internal tag again
   [13]=src/rt/vm_builtin.cpp         # A13: interpolation does not load an atomic (B0's error again)
   [12]=src/rt/module_graph.cpp       # A12: C1 off (a real collision is the capability refusal again)
+  [14]=src/rt/prepared.cpp           # A14: only `while` callers are prepared code (the `for`-callee gap, review M4)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 7 9 10 11 12 13 S10)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 3 4 5 6 7 9 10 11 12 13 14 S10)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

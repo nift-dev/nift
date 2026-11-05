@@ -79,7 +79,7 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     // B4 (b4-dispatch.md 2): legacy's prepared evaluator (loop code and the
     // functions called from it) answers false for an empty collection's
     // empty(); the canonical one, true. Refused there before any effect.
-    if (name == "empty" && (loop_region() || object_length_context()))  // rt-lint: allow-string-compare compile time
+    if (name == "empty" && loop_reachable())  // rt-lint: allow-string-compare compile time
         return fail(node, "context:collection-empty") ? 1 : 0;
     if (k != kKindMap && k != kKindSet && k != kKindStack) {
         // B4: a bare binding of several collection kinds dispatches the

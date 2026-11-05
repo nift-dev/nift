@@ -13,65 +13,6 @@
 
 namespace nift::rt::detail {
 
-namespace {
-void walk_calls(const Ast& ast, const UnitPlan& plan, NodeId id, std::vector<bool>& marked, bool& changed) {
-    if (id == kNoNode) return;
-    const Node& n = ast.at(id);
-    if (n.kind == NodeKind::FnDecl || n.kind == NodeKind::Lambda) return;  // a nested callable's own body
-    if (n.kind == NodeKind::Call && ast.at(n.a).kind == NodeKind::Ident) {
-        const auto found = plan.index.find(ast.text(ast.at(n.a)));
-        if (found != plan.index.end()) {
-            const std::size_t f = found->second - 1u;
-            if (f < marked.size() && !marked[f] && !(ast.at(plan.functions[f]).flags & kFlagAsync)) {
-                marked[f] = true;
-                changed = true;
-            }
-        }
-    }
-    walk_calls(ast, plan, n.a, marked, changed);
-    walk_calls(ast, plan, n.b, marked, changed);
-    walk_calls(ast, plan, n.c, marked, changed);
-    const NodeId* list = ast.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k) walk_calls(ast, plan, list[k], marked, changed);
-}
-void seed_loops(const Ast& ast, const UnitPlan& plan, NodeId id, std::vector<bool>& marked, bool& changed) {
-    if (id == kNoNode) return;
-    const Node& n = ast.at(id);
-    if (n.kind == NodeKind::While || n.kind == NodeKind::For) {
-        walk_calls(ast, plan, id, marked, changed);
-        return;
-    }
-    seed_loops(ast, plan, n.a, marked, changed);
-    seed_loops(ast, plan, n.b, marked, changed);
-    seed_loops(ast, plan, n.c, marked, changed);
-    const NodeId* list = ast.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k) seed_loops(ast, plan, list[k], marked, changed);
-}
-} // namespace
-
-// Legacy runs the body of a function called from a `while` or a `for` loop
-// (transitively) on its prepared evaluator, where an object's length() counts
-// its members (the canonical one rejects it) and a fraction's to_int() error is
-// reported at the statement (the canonical one at the call). rt/prepared.h marks only `while`
-// callers (its own refusals), so a `for` loop's callee compiled the canonical
-// behaviour where legacy printed the count (b4-dispatch.md 2, old vs new).
-// Over-approximated: it only refuses more (context:object-length).
-bool UnitCompiler::object_length_context() const {
-    if (loop_reachable()) return true;
-    if (!in_function_ || in_lambda_) return false;
-    std::vector<bool> marked(plan_.functions.size(), false);
-    bool changed = false;
-    seed_loops(ast_, plan_, root_, marked, changed);
-    for (std::size_t f = 0; f < plan_.functions.size(); ++f)
-        seed_loops(ast_, plan_, ast_.at(plan_.functions[f]).b, marked, changed);
-    do {
-        changed = false;
-        for (std::size_t f = 0; f < marked.size(); ++f)
-            if (marked[f]) walk_calls(ast_, plan_, ast_.at(plan_.functions[f]).b, marked, changed);
-    } while (changed);
-    return function_ < marked.size() && marked[function_];
-}
-
 // -1: not a Dynamic case (the caller keeps its refusal); 0: refused here (an
 // argument rule); 1: compiled.
 int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::string_view name, std::uint16_t dst) {
