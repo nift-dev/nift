@@ -13,13 +13,17 @@ and the 2026-11-04 addendum (batch B3–B5 certification). Branch `cand/b3-struc
 | `a89c8d63` | B3 2b: the refsem sessions part of B3 2 (left out of that commit by mistake) |
 | `151fbd50` | B3 2c: owner ruling: explicit calls run a struct's own presentation method; mixed receivers refused; D8, D9 |
 | `ffeecb9b` | B3 3b: the unit's checked-build branch sees its switch (the ASan lane) |
-| `f24c292e` | B3 4: this record (frozen; independent review: ACCEPT-WITH-CONDITIONS) |
+| `f24c292e` | B3 4: this record (first freeze; independent review: ACCEPT-WITH-CONDITIONS) |
 | `804858a9` | B3 5: review fixes H1, L3, L1 (section 8) and the M1 fixture wording |
-| (later) | B3 6: this record's review section and compatibility.md (M1) |
-| (this record) | B3 4: this record |
+| `7b752464` | B3 6: this record's review section and compatibility.md (M1) (second freeze; re-review: ACCEPT-WITH-CONDITIONS) |
+| `058b23e0` | B3 7: re-review fixes N1 (positional kinds after array mutators), N2 (session refusal reasons); D11 |
+| `B3 8` | this record's re-review section (section 9) and compatibility.md wording (N4); the third freeze |
 
-The final gates ran on `151fbd50` and `ffeecb9b`, the tip before this record (section 6). This
-record changes only `docs/`.
+Gate runs (section 6 and 9):
+- first freeze: on `151fbd50` and `ffeecb9b`;
+- second freeze: on `7b752464` itself;
+- third freeze: on the B3 8 commit itself (a clean tree, after this record was written; the results
+  are in the `n-*.result` files).
 
 ## 1. Contract
 
@@ -474,6 +478,9 @@ Not run locally, by the batching ruling (the combined B3–B5 Linode certificati
     errors);
   - `$[instance]` interpolation (legacy's internal tag is not reproduced; the VM refuses or errors).
   - Both are under non-disclosure tests today.
+- **To B4 (N3):** detecting `this` by its text over-refuses (`for (this : xs) { this.stringify() }`).
+- **To B4 (inference):** alias-sound inference in general; B3 fixed only the positional-kind
+  invalidation hole (N1).
 - **To B4 (dispatch):** only the three presentation names moved. A proven struct receiver calling
   any other built-in name keeps `struct-no-method`.
 - **To B4 (dynamic dispatch):** `presentation-struct-method:<name>`. An explicit
@@ -533,12 +540,16 @@ The findings and their fixes (`804858a9`):
   - *Modules.* Already covered, because a linked unit's plan includes the imported modules'
     structs. `b3/modules/visible_method` (refused) and `proven_method` (the user method runs)
     pin it.
-  - *Session tests* (`b3_structs.py` SESSIONS `h1-*`): an alias, an index, a map lookup, a
+  - *Session tests* (`b3_structs.py` SESSIONS `h1-*`): an alias, an index, an object lookup (the
+    first form, a map lookup, was refused for an unrelated reason, `session:collection-result`, and
+    was replaced in the re-review round, N2), a
     session function defined after the struct, and one defined before it (recompiled with the
     session's later struct and refused when called). Schema replacement removing the method: the
     proven old instance runs its own method, and an alias is refused. Schema replacement adding
     it: the proven old instance renders, the new one runs the method, and an alias is refused.
-  - *Mutant D10* (the session's schemas ignored) is caught by five checks. The mutant suite
+  - *Mutant D10* (the session's schemas ignored) was caught by four checks (`h1-alias`,
+    `h1-index`, `h1-replace-remove`, `h1-replace-add`; `h1-function-*` refuse without the set,
+    because the function is recompiled with C in the plan). After N2, seven checks catch it. The mutant suite
     covers D1–D10, all caught.
 - **M1 (medium), fixed in wording.**
   - The two module fixtures, the record (2.4) and compatibility.md now say "pending owner
@@ -556,3 +567,101 @@ The findings and their fixes (`804858a9`):
   (unit `descriptor()`). The D4 mutant now passes its all-public mask explicitly.
 - **L2 (low), carried** to the combined certification's performance review (section 7).
 - **L4 (low, predates B3), carried** to the release audit (section 7).
+
+**Gates of the second freeze** (`7b752464`, tree `41c80903`; prefix `r-`; 26 gates, all exit 0, git
+status clean before and after):
+
+| Gate | Exit | Log sha256 (prefix) | Last line |
+| --- | --- | --- | --- |
+| `test-c-abi-symbols` | 0 | `9585de506dd0956f` | PASS abi-consumer: built outside the tree, linked dynamically, 34 nift_* symbols resolved from the l |
+| `test-cp19-functional` | 0 | `c88b2a2ba63c8504` | PASS retained-reader numeric guard and legacy channels |
+| `test-cp19-session-cli` | 0 | `f06e22c578f7f6ed` | PASS retained-reader numeric guard and legacy channels |
+| `test-production-deps` | 0 | `82e4c024f181e59a` | PASS production-deps: 1473 production compile commands, no dependency in tests/ (-M, system headers  |
+| `test-rt-build` | 0 | `401bfdcd972d970b` | PASS builder mutant B-M2 caught: 4 observed changes to a published value (rt build unit (release): 2 |
+| `test-rt-isolation` | 0 | `b5236fbd372719f5` | PASS isolation: production cannot reach the storage-level test helpers |
+| `test-rt-lint` | 0 | `05667f070a4ebbe8` | PASS rt-lint boundary: 0 problem(s) in 691 files (src, include, bindings, markuppp, minifypp and the |
+| `test-rt-mutation-protocol` | 0 | `59c0b9b30c28b428` | mutation-protocol: 191 checks, 0 failures |
+| `test-rt-protocol-compile-fail` | 0 | `8c137822ce5863b5` | PASS compile-fail control compiles |
+| `test-rt-refrep` | 0 | `8516f09ea3370a7f` | refrep-vm: 129 checks, 0 failures |
+| `test-rt-value` | 0 | `c1827ae7390a36e7` | heap-limit-zero: PASS |
+| `test-runtime2-args-cmd` | 0 | `33b9a4e0c103afa5` | PASS heap: cmd ends with the live heap of the string literal |
+| `test-runtime2-b3-mutants` | 0 | `894817edaffb5ca1` | PASS b3 mutants: 10 caught |
+| `test-runtime2-b3-sanitize` | 0 | `0d592dc505581087` | PASS b3-structs: 302 checks, 0 failure(s) |
+| `test-runtime2-b3` | 0 | `47cb0602220d018f` | PASS b3-structs: 302 checks, 0 failure(s) |
+| `test-runtime2-collections` | 0 | `d4dc480404d01726` | PASS collections: 279 checks, 0 failure(s) |
+| `test-runtime2-coro-module` | 0 | `3a9eda6117e9840a` | PASS coro-module: 0 failure(s) |
+| `test-runtime2-cp14b` | 0 | `858aadd7ad3275d7` | UNVERIFIED original_uncaught |
+| `test-runtime2-cp22` | 0 | `9c6dfd720f4766db` | PASS cp22 print-order evidence |
+| `test-runtime2-cp23` | 0 | `1009b564354216da` | PASS cp22 default: 87 case(s), 0 failure(s) |
+| `test-runtime2-packages` | 0 | `185ae868c5fcd1a3` | packages: 828 checks, 0 failed |
+| `test-runtime2-refrep-cli` | 0 | `72294fa932c1dbca` | PASS refrep-cli: 7 checks, 0 failure(s) |
+| `test-runtime2-refsem-mutants` | 0 | `a14e07a223118d34` | PASS refsem mutants: 23 caught |
+| `test-runtime2-refsem` | 0 | `3af0a7deb88d68fb` | PASS refsem-a: 473 checks, 0 failure(s) |
+| `test-runtime2-safety` | 0 | `434be8b605386f01` | PASS runtime2 safety fuzz: 33512 programs (8512 exhaustive, 20000 sampled, 5000 session; seed 1; 167 |
+| `test-runtime2-vm-default` | 0 | `309385cb80a90fde` | PASS VM-default policy |
+
+## 9. Re-review of `7b752464` and its fixes
+
+The verdict was ACCEPT-WITH-CONDITIONS (`scratchpad/review-b3/REREVIEW.md`). H1, L3, L1 and M1
+were verified, with no regressions. The findings:
+
+- **N1 (medium; predates B3, but breaks B3's rule), fixed in `058b23e0`.**
+  - *Defect.* `infer_collection.cpp` invalidated an array's per-position element kinds after a
+    mutator only in sessions. So in a script, `xs := [C(), map()]; xs.reverse(); d := xs[0]`
+    proved `d` a `C`, and `d.stringify()` ran C's own method on the map (legacy: `map([])`). The
+    same happened after `remove`, `pop` and two-argument `splice`, for ordinary methods (`d.get()`
+    ran C's method) and for field reads (the VM's dynamic field check failed instead). The base
+    binary does the same.
+  - *Fix.* The invalidation applies in scripts and modules too.
+  - *Audit of every array mutator* (`CollectionMethod` below `Map`):
+    - push, insert and splice with a replacement already widened the element type and dropped
+      positions (`add_element`);
+    - pop, remove, clear, splice with one or two arguments, reverse, sort and comparator sort now
+      do too;
+    - there is no shift or unshift;
+    - index stores (`xs[0] = v`) and object stores already invalidate (probed: refused);
+    - an alias (`ys := xs; ys.reverse()`) is refused by the reference guard;
+    - a function mutating a global array invalidates it (probed: refused).
+  - *Tests.*
+    - `b3/refuse/n1_<mutator>_<use>.f`: reverse, remove, pop, clear, splice with one and with two
+      arguments, and insert, each with a presentation method, an ordinary method and a field read.
+      That is 21 scripts, each refused with its own reason: `presentation-struct-method:stringify`,
+      `builtin-receiver:get`, `type:member`.
+    - `b3/modules/n1_*`: seven module cases (every mutator with a presentation method; reverse
+      also with a method and a field).
+    - `sort` and comparator `sort` over an array holding instances are refused earlier for their
+      own reasons (`collection-element:sort`, `method:sort`), so they are not fixtures.
+  - *Mutant D11* (the session-only guard restored) is caught by 15 checks. The mutant suite now
+    covers D1–D11, all caught.
+  - *Classify* over the B3, refsem and collections fixtures (387 files, pre-fix binary = D11
+    against the fix): only the nine new N1 fixtures change, from compiled to refused (reverse,
+    remove and splice2, each with present, method and field). No existing fixture changes
+    admission (`scratchpad/b3/probe/d11/classify-compare.txt`).
+  - Related: the reviewer's `z2` (`xs := [[1,2,3], "ab"]; xs.reverse(); xs[0].length()`), which
+    was a pre-existing VM internal failure (exit 70, unexpected operands), is now refused before
+    any effect (`type:index`).
+  - *Performance* (local callgrind, pre-fix binary against the fix): `run.py --groups ops` and
+    `vm_compare.py --groups mutation` are identical:
+    - loop 117, add_local 188, call 566, array_index 436, array_push 367, object_member 762,
+      string_concat 3313, if_branch 249, fib_call 393;
+    - array_set 381, array_push_pop 1430, array_insert_pop 2446, map_set 1496, set_add 1363,
+      stack_push_pop 2190.
+
+    Positional kinds exist only for array literals, so ordinary hot loops are unaffected.
+  - *Carried to B4:* alias-sound inference in general (plan 5.7) stays B4's. This fixes only the
+    invalidation hole.
+- **N2 (low), fixed.** Every refused session case in `b3_structs.py` asserts its refusal reason.
+  `h1-lookup` now uses an object lookup and is refused for H1's reason.
+- **N3 (low), carried to B4.** Detecting `this` by its source text over-refuses:
+  `for (this : xs) { this.stringify() }` outside any struct passes the text test and is then
+  refused (`struct-private`), where legacy renders. Safe, since nothing runs and nothing is
+  disclosed.
+- **N4 (wording), fixed.**
+  - compatibility.md now attributes "a private one only through `this`" to the review L3 fix (a
+    coordinator ruling applying legacy parity), not to the owner's ruling.
+  - The record header's stale row and the gate-commit claims are corrected.
+  - D10's count is corrected.
+  - The second freeze's gate results are folded in (section 8).
+- **Informational (from the re-review):** `StructType::is_private(i)` returns false for
+  `i >= mask size`. That is unreachable while the padding invariant holds, but it would not be
+  fail-closed; noted for the combined certification.
