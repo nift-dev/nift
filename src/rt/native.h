@@ -18,6 +18,11 @@ enum class NativeId : std::uint16_t { Print };
 // CallNative operand b: a NativeId below kFirstBuiltin, a CP14 built-in
 // (natives::BuiltinId = b - kFirstBuiltin, rt/builtin_bind.h) from there on.
 inline constexpr std::uint16_t kFirstBuiltin = 1;
+// CallNative operand c: the window size (at most 0x7fff, compiler_call.cpp
+// `limit:arguments`); its top bit marks a B4 Dynamic dispatch site
+// (rt/op_admission.h): the VM selects the native of the receiver's family.
+inline constexpr std::uint16_t kDynamicDispatch = 0x8000;
+inline constexpr std::uint16_t kCallWindowMask = 0x7fff;
 
 struct NativeInfo {
     NativeId id;

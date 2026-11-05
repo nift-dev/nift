@@ -5246,6 +5246,23 @@ test-runtime2-b3-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-san/struct-render-unit
 	$(PYTHON) tests/runtime2/b3_structs.py --nift "$(CURDIR)/$(SAN_TARGET)"
 test-rt-vm: test-runtime2-b3 test-runtime2-b3-mutants
 test-rt-vm-sanitize: test-runtime2-b3-sanitize
+# B4 operation admission and dispatch (docs/runtime-2/checkpoints/b4-dispatch.md):
+# the admission table and the run-time dispatch precondition at the value layer
+# (tests/rt/op_admission_unit.cpp), the script and session suite against legacy
+# (tests/runtime2/b4_dispatch.py, dispatch_defects == 0 everywhere), and the
+# mutants (-DNIFT_B4_MUTANT=n rebuilds one object; each must fail a B4 check).
+RT_OP_ADMISSION_UNIT := $(TEST_DIR)/rt/op-admission-unit$(EXEEXT)
+RT_OP_ADMISSION_UNIT_O := $(TEST_DIR)/rt/op_admission_unit.o
+$(RT_OP_ADMISSION_UNIT_O): tests/rt/op_admission_unit.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -c tests/rt/op_admission_unit.cpp -o "$@"
+$(RT_OP_ADMISSION_UNIT): $(RT_OP_ADMISSION_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	$(CXX) $(CXXFLAGS) $(RT_OP_ADMISSION_UNIT_O) $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o $(LDLIBS) -o "$@"
+.PHONY: test-rt-op-admission-unit
+test-rt-op-admission-unit: $(RT_OP_ADMISSION_UNIT)
+	"$(RT_OP_ADMISSION_UNIT)"
+test-rt-vm: test-rt-op-admission-unit
 # B0 pre-release safety (docs/runtime-2/checkpoints/b0-safety.md): an admitted
 # program never stops with an internal VM failure (exit 70) because of a
 # run-time operand kind: handles presented, wrong-kind mutator receivers.

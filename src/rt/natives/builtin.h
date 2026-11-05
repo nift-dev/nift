@@ -174,6 +174,20 @@ std::string_view recoverable_code(BuiltinId id);
 // recoverable_code and handle_error_class; no second classification table.
 bool is_recoverable_code(std::string_view code);
 
+// B4 (rt/op_admission.h): the natives family a run-time receiver belongs to
+// (Receiver::None for a kind no method family takes), and the native of the
+// same name as `spec` for receiver family `family` (spec itself when it is of
+// that family), or nullptr. Both are table lookups (no name comparison).
+Receiver receiver_of(const Value& value) noexcept;
+const BuiltinSpec* dispatch_sibling(const BuiltinSpec& spec, Receiver family) noexcept;
+inline constexpr std::size_t kReceiverCount = static_cast<std::size_t>(Receiver::Stack) + 1;
+// The dispatch precondition's fast test: bit k set when a value of rt::Kind k
+// may be a receiver of `id`'s family; kAcceptSubkind: the family is one sub-kind
+// of a Collection or Handle value (receiver_of decides). 0: no receiver (a free
+// function or a method of any value).
+inline constexpr std::uint32_t kAcceptSubkind = 1u << 31;
+std::uint32_t receiver_accept(const BuiltinSpec& spec) noexcept;
+
 // Calls the native. Each native checks its own arity and reports legacy's
 // per-function message ("split: expected one delimiter", "<m>: expected no
 // arguments", ...); min_args/max_args are for the compiler.

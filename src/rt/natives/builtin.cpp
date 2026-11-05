@@ -1,5 +1,6 @@
 #include "rt/natives/builtin.h"
 
+#include "rt/aggregate_collection.h"
 #include "rt/handle.h"
 
 #include "rt/natives/array_methods.h"
@@ -67,10 +68,29 @@ static_assert(sizeof kFunctions / sizeof kFunctions[0] == static_cast<std::size_
               "one native function per built-in, in builtin_list.inc order");
 static_assert(sizeof kSpecs / sizeof kSpecs[0] == static_cast<std::size_t>(BuiltinId::Count), "spec table size");
 
+constexpr std::uint16_t kNoSibling = 0xffff;
+
+constexpr std::uint32_t bit(Kind k) { return 1u << static_cast<unsigned>(k); }
+std::uint32_t accept_of(Receiver r) {
+    switch (r) {
+        case Receiver::None: case Receiver::Any: return 0;
+        case Receiver::Null: return bit(Kind::Null);
+        case Receiver::Bool: return bit(Kind::Bool);
+        case Receiver::Number: return bit(Kind::Int) | bit(Kind::Double) | bit(Kind::Decimal);
+        case Receiver::String: return bit(Kind::String);
+        case Receiver::Array: return bit(Kind::Array);
+        case Receiver::Object: return bit(Kind::Object);
+        case Receiver::Bytes: return bit(Kind::Bytes);
+        case Receiver::Map: case Receiver::Set: case Receiver::Stack: return bit(Kind::Collection) | kAcceptSubkind;
+        default: return bit(Kind::Handle) | kAcceptSubkind;  // File, Stream, Mutex, Atomic, Channel
+    }
+}
+
 struct Table {
     BuiltinSpec specs[static_cast<std::size_t>(BuiltinId::Count)];
     Table() {
-        for (std::size_t i = 0; i < static_cast<std::size_t>(BuiltinId::Count); ++i) {
+        constexpr std::size_t n = static_cast<std::size_t>(BuiltinId::Count);
+        for (std::size_t i = 0; i < n; ++i) {
             specs[i] = kSpecs[i];
             specs[i].fn = kFunctions[i];
         }
@@ -82,11 +102,84 @@ const Table& table() {
     return instance;
 }
 
+// B4: per built-in, per receiver family, the native of the same name; built on
+// first use (a dispatch mismatch only), never on the ordinary call path.
+// Entries exist only between the families a Dynamic site can name (null, bool,
+// number, string, array, object; map, set, stack): there the same name is
+// the same legacy method on another family (legacy itself selects the
+// implementation by the receiver's kind), so a redirection is that operation,
+// never an unrelated one. Handle and bytes families have no entries: a
+// mismatch there is a defect, not a redirection (b4-dispatch.md, table 4).
+bool redirectable(Receiver r) {
+    return r == Receiver::Null || r == Receiver::Bool || r == Receiver::Number || r == Receiver::String ||
+           r == Receiver::Array || r == Receiver::Object || r == Receiver::Map || r == Receiver::Set ||
+           r == Receiver::Stack;
+}
+struct Siblings {
+    std::uint16_t of[static_cast<std::size_t>(BuiltinId::Count)][kReceiverCount];
+    explicit Siblings(const BuiltinSpec* specs) {
+        constexpr std::size_t n = static_cast<std::size_t>(BuiltinId::Count);
+        for (std::size_t i = 0; i < n; ++i)
+            for (std::size_t r = 0; r < kReceiverCount; ++r) {
+                of[i][r] = kNoSibling;
+                if (!redirectable(specs[i].receiver) || !redirectable(static_cast<Receiver>(r))) continue;
+                for (std::size_t j = 0; j < n; ++j)
+                    if (static_cast<std::size_t>(specs[j].receiver) == r && specs[j].name == specs[i].name) {
+                        of[i][r] = static_cast<std::uint16_t>(j);
+                        break;
+                    }
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 1
+                if (r == static_cast<std::size_t>(Receiver::Array)) of[i][r] = kNoSibling;  // A1: omits arrays
+#endif
+            }
+    }
+};
+
+const Siblings& siblings() {
+    static const Siblings instance(table().specs);
+    return instance;
+}
+
 } // namespace
 
 const BuiltinSpec& builtin_spec(BuiltinId id) { return table().specs[static_cast<std::size_t>(id)]; }
 
 std::size_t builtin_count() { return static_cast<std::size_t>(BuiltinId::Count); }
+
+Receiver receiver_of(const Value& value) noexcept {
+    switch (value.kind()) {
+        case Kind::Null: return Receiver::Null;
+        case Kind::Bool: return Receiver::Bool;
+        case Kind::Int: case Kind::Double: case Kind::Decimal: return Receiver::Number;
+        case Kind::String: return Receiver::String;
+        case Kind::Bytes: return Receiver::Bytes;
+        case Kind::Array: return Receiver::Array;
+        case Kind::Object: return Receiver::Object;
+        case Kind::Collection:
+            switch (collection_kind(value)) {
+                case CollectionKind::Map: return Receiver::Map;
+                case CollectionKind::Set: return Receiver::Set;
+                default: return Receiver::Stack;
+            }
+        case Kind::Handle:
+            switch (value.handle_kind()) {
+                case HandleKind::File: return Receiver::File;
+                case HandleKind::Stream: return Receiver::Stream;
+                case HandleKind::Mutex: return Receiver::Mutex;
+                case HandleKind::Atomic: return Receiver::Atomic;
+                case HandleKind::Channel: return Receiver::Channel;
+                default: return Receiver::None;
+            }
+        default: return Receiver::None;
+    }
+}
+
+std::uint32_t receiver_accept(const BuiltinSpec& spec) noexcept { return accept_of(spec.receiver); }
+
+const BuiltinSpec* dispatch_sibling(const BuiltinSpec& spec, Receiver family) noexcept {
+    const std::uint16_t j = siblings().of[static_cast<std::size_t>(spec.id)][static_cast<std::size_t>(family)];
+    return j == kNoSibling ? nullptr : &table().specs[j];
+}
 
 const BuiltinSpec* find_builtin(Receiver receiver, std::string_view name) {
     for (const BuiltinSpec& spec : table().specs)
