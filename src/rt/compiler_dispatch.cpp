@@ -51,7 +51,8 @@ void seed_loops(const Ast& ast, const UnitPlan& plan, NodeId id, std::vector<boo
 
 // Legacy runs the body of a function called from a `while` or a `for` loop
 // (transitively) on its prepared evaluator, where an object's length() counts
-// its members; the canonical one rejects it. rt/prepared.h marks only `while`
+// its members (the canonical one rejects it) and a fraction's to_int() error is
+// reported at the statement (the canonical one at the call). rt/prepared.h marks only `while`
 // callers (its own refusals), so a `for` loop's callee compiled the canonical
 // behaviour where legacy printed the count (b4-dispatch.md 2, old vs new).
 // Over-approximated: it only refuses more (context:object-length).

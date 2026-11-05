@@ -203,6 +203,9 @@ def check(nift, item, work, timeout):
         key = outcome_key(st) if vm[2] != "timeout" else "timeout"
         if st and st["outcome"] in ("internal-error", "replayed"):
             verdict = "diff"
+        # B4 (b4-dispatch.md): no method native met a foreign receiver.
+        if st and st.get("dispatch_defects", 0):
+            verdict = "diff"
         # Single execution: the unit ran on exactly one engine, once.
         if st and (st.get("vm_executions", 0) + st.get("legacy_executions", 0)) != 1:
             verdict = "diff"

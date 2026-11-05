@@ -6,7 +6,6 @@
 #include "rt/atom.h"
 #include "rt/builtin_bind.h"
 #include "rt/native.h"
-#include "rt/op_admission.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
@@ -193,6 +192,8 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             if (result >= 0) return result == 1;
         }
         const KindSet k = kinds(callee.a);
+        if (name == "to_int" && (k & kKindFrac) && object_length_context())  // rt-lint: allow-string-compare B4
+            return fail(node, "context:number-to-int");
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
             case MethodBinding::Bound: case MethodBinding::Dead: break;

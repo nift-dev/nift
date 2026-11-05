@@ -484,7 +484,32 @@ def malformed(seed, count):
         yield "malformed", f"malformed-{kind}-{seed}-{i}", text, {}
 
 
+# B4 (b4-dispatch.md): built-in methods on receivers of imprecise kinds (two
+# different kinds flowing into one receiver through a loop element, a
+# parameter, an element read): dynamic dispatch, legacy's ordinary errors,
+# never an internal failure or a dispatch defect.
+MIXED_KINDS = ['" a "', "5", "2.5", "true", "null", "[3, 1]", '{"k": 1}', '"xa"', "map()", "stack()"]
+MIXED_OPS = ["trim()", 'contains("a")', "to_string()", "keys()", 'join(",")', "first()", "size()", "length()",
+             "empty()", "to_int()", "to_upper()", "stringify()", 'index_of("a")', "sum()"]
+
+
+def mixedrecv(_seed, _count):
+    for x, first in enumerate(MIXED_KINDS):
+        for y, second in enumerate(MIXED_KINDS):
+            if x == y:
+                continue
+            for o, op in enumerate(MIXED_OPS):
+                pair = "[%s, %s]" % (first, second)
+                yield "mixedrecv", f"mixed-{x}-{y}-{o}-loop", 'print("b")\nfor (v : %s) { print(v.%s) }\n' % (pair, op), {}
+                if (x + y + o) % 3 == 0:
+                    yield "mixedrecv", f"mixed-{x}-{y}-{o}-fn", (
+                        'print("b")\nfn(f(v)) { print(v.%s) }\nf(%s)\nf(%s)\n' % (op, first, second)), {}
+                    yield "mixedrecv", f"mixed-{x}-{y}-{o}-elem", (
+                        'print("b")\nxs := %s\nv := xs[1]\nprint(v.%s)\n' % (pair, op)), {}
+
+
 FAMILIES = {
+    "mixedrecv": mixedrecv,
     "typed": typed, "context": context, "numeric": numeric, "receiver": receiver, "names": names, "alias": alias,
     "control": control, "recursion": recursion, "output": output, "malformed": malformed, "typing": typing,
 }
