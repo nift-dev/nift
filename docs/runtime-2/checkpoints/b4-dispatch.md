@@ -1,6 +1,8 @@
 # Checkpoint B4a: operation admission, sound dispatch and presentation
 
-Status: **candidate, frozen for independent review** (B4a). Branch `cand/b4-dispatch`, built on the
+Status: **candidate, revised after review, frozen for narrow re-review** (B4a). The review of
+`c56c4093` (REJECT: H1, H2, M1-M4, L1-L3) is answered by commits B4 9 to B4 16 on top of it
+(section 10); the sections below are corrected in place. Branch `cand/b4-dispatch`, built on the
 accepted B3 candidate `4c7d0b40` (`cand/b3-structs`, not yet integrated; B3, B4 and B5 are certified
 together, owner's batching workflow). B4b (per-site element and member types) starts only after
 B4a's review (coordinator ruling 4).
@@ -101,12 +103,24 @@ path. Output is unchanged (safety suite and fuzz, b3 disclose, `b4_dispatch.py` 
   anything else (another struct's instance included) renders through the built-in descriptor
   renderer. The inference types the call as the built-in's string united with each such method's
   result. Sessions and receivers of unknown kind keep `presentation-struct-method`.
-- A proven struct receiver calling a method its struct does not declare: legacy's ordinary error
-  `struct has no method: <name>` at the call, before any argument (was refused `struct-no-method`).
-- N3: whether a receiver is the enclosing struct's `this` is the resolver's answer, not the
-  receiver's text (`presentation_builtin_binds(..., bool inside)`, `Inference::own_this`).
+- A proven struct receiver calling a method its struct does not declare, by a name that is not a
+  string method's, outside prepared code: legacy's ordinary error `struct has no method: <name>` at
+  the call, before any argument (was refused `struct-no-method`). Elsewhere the B3 refusal
+  `struct-no-method` stands (review H1): legacy runs `substr` on the instance's tag text in every
+  context, and every string method there in prepared code (loop bodies, their callees, struct
+  methods conservatively). Acceptance: the reviewer's struct generator (section 4).
+- `this` (N3, review H2): outside a struct, a binding named `this` is an ordinary binding (the
+  resolver's answer). Inside a struct declaration, a declaration or parameter named `this` was
+  already refused (`binding-name-reserved`, `param-name-reserved`); a `for`-loop or `catch`
+  binding named `this` is now refused too (`struct-this-binding`, `rt/binding_rules.h`). So every
+  `this` the receiver analysis (`compiler_structs.cpp`, `infer_walk.cpp`) meets inside a struct is
+  the instance. The c56c4093 record claimed N3 resolved; only the outside-a-struct half was: inside
+  a method, `for (this : xs)` reached the enclosing instance's methods, private ones included.
 
-**Presentation** (owner rulings; human-readable only, machine-readable serialization unchanged;
+**Presentation** (owner rulings; human-readable only: `nift eval --json` keeps B3's output, a
+function's tag string and an atomic's "not serializable" error (review L1: the mode is passed to
+the conversion, `eval_result_to_legacy(..., json)`); the table's `nift eval` column is without
+`--json`;
 all observational: no user code, no mutation, no message consumed, nothing awaited, no lock beyond
 the registry lookup):
 
@@ -129,8 +143,14 @@ build is not cheap on this machine: not run locally).
 earlier top-level declaration, a function included, or an earlier import's export) is legacy's
 program error `import: export collides with existing binding: <name>` at the import, rejected before
 running (`import-scope:collision`, the invocation-export precedent: legacy prints the earlier
-statements' and the module's output first). A later declaration keeps `import-collision` (legacy
-rebinds silently or reports a redeclaration; the CP25-R `006-main` unit).
+statements' and the module's output first), **only when legacy certainly reaches the collision
+check** (review M2): every statement legacy runs before it, in its order (the unit's earlier
+top-level statements, its importers' up to their import, earlier and the imported modules' bodies),
+cannot stop the program: a function, struct or enum declaration, an export, a fresh
+`name := <literal>` (arrays and objects of literals included), `print(<plain string>)`. Otherwise
+(a top-level `return`, a statement that may fail, a module that may fail) and for a later
+declaration (legacy rebinds silently or reports a redeclaration; the CP25-R `006-main` unit) the
+refusal `import-collision` stands.
 
 **C3** (no code change, coordinator ruling 6). The `opaque:legacy-runtime-error` regions are parser
 level, not admission decisions. Per family, as seen in the corpora:
@@ -147,18 +167,27 @@ level, not admission decisions. Per family, as seen in the corpora:
 Compiling them as run-time errors would need the admission table to know legacy's exact text and
 position for an unstructured region; it does not. Recorded, unchanged.
 
-**Two context gaps closed** (coordinator addition; the generator of section 4):
-- `context:object-length` now also covers a function called (transitively) from a `for` loop:
-  `rt/prepared.h` marks only `while` callers, so an object's `length()` there compiled the canonical
-  behaviour where legacy's prepared evaluator prints the member count
-  (`UnitCompiler::object_length_context`). Number `to_double` has no such gap: every such call is
-  refused already (`builtin-receiver`).
-- In the same prepared contexts: a fraction's `to_int()` error (legacy reports the statement) is
-  refused (`context:number-to-int`), and an empty collection's `empty()` (legacy answers false) is
-  refused (`context:collection-empty`). Both were admitted divergences on the B3 tree.
+**Prepared code includes `for` loops' callees** (review M4, M3). Legacy runs loop code and the
+functions called (transitively) from any loop, `while` or `for`, on its prepared evaluator.
+`rt/prepared.cpp` marked only `while` callers; it now seeds `for` loops too, both when marking
+prepared functions and when checking calls of functions legacy cannot prepare
+(`prepared-fn-unprepared`). Every prepared-evaluator refusal (`prepared-*`, `string-arg-type`,
+`context:*`) therefore covers `for` callees (the reviewer's t2, t3, t6, t7, t8 are refused
+fixtures). The three context refusals B4 added use that marking (`loop_reachable()`):
+- `context:object-length`: an object's (or unknown receiver's) `length()` (legacy's prepared
+  evaluator counts the members; canonical code fails). Number `to_double` has no such gap: every
+  such call is refused already (`builtin-receiver`).
+- `context:number-to-int`: a fraction's `to_int()` error (legacy reports the statement).
+- `context:collection-empty`: any collection `empty()` in prepared code (legacy answers false for
+  an empty one). Broad (it also refuses a non-empty collection's `empty()`, which would agree) but
+  sound (review L3).
+
+The c56c4093 tip computed the `for`-callee set by a whole-program walk per call site
+(`object_length_context()`): quadratic compile time (the reviewer's 3,451-line program: 1.4 s
+against B3's 30 ms). The walk is deleted; section 6 has the compile-time measurements.
 
 **Carried** (section 9): `nift eval` display of a struct or collection; sessions' presentation
-dispatch; `rt/prepared.h`'s `while`-only marking for its other refusals (review item).
+dispatch; the B5 prerequisite on unflagged sites.
 
 ## 2. Approved changes (old against new, with the reason)
 
@@ -170,8 +199,10 @@ dispatch; `rt/prepared.h`'s `while`-only marking for its other refusals (review 
 | `refsem/refuse/presentation_struct_review_i04.f` → `refsem/approved/` | refused | as above; legacy `before`, 6, 7 | the same |
 | `refsem/refuse/presentation_struct_review_i05.f` | refused `presentation-struct-method:stringify` | refused `type:length` | the call's result may be the method's 7: `.length()` is not proven (sound) |
 | `b3/modules/{n1_clear,n1_pop,n1_remove,n1_reverse,n1_splice2}_present`, `visible_method` | `reason` (refused) | `vm` transcripts | run-time choice, module instances included |
-| `struct-no-method` units (e.g. `c.trim()` on a proven struct) | refused | `struct has no method: trim` at the call (=L) | the admission table proves legacy fails there |
-| `for (this : xs) { this.stringify() }` (private presentation method) | refused `struct-private` | built-in render (=L) | N3 |
+| `struct-no-method` units with a name that is not a string method's, outside prepared code (e.g. `c.size(arg())` at top level) | refused | `struct has no method: size` at the call (=L) | legacy fails there (review H1: the struct generator, every admitted program equal to legacy) |
+| `struct-no-method` with a string method's name (`c.trim()`, `c.substr(1, 3)`), or in prepared code (loops, their callees, struct methods) | refused | refused (unchanged; the c56c4093 tip compiled them: H1) | legacy runs the string native on the tag text there |
+| `for (this : xs) { this.stringify() }` outside any struct | refused `struct-private` | built-in render (=L) | N3 (the resolver's binding) |
+| `for (this : xs)` / `catch (this)` inside a struct (the c56c4093 tip ran the enclosing instance's methods: H2) | compiled (wrong receiver) | refused `struct-this-binding` | review H2 |
 | `collections/refuse/interpolation.f` → `approved/` | refused `interpolation:unknown-type` | ordinary error `map, set and stack values cannot be rendered as text` (legacy: its tag) | owner presentation ruling |
 | `b3/disclose/interp_direct.f` | refused | ordinary error `struct instances cannot be rendered as text` (legacy: its tag) | owner ruling 2 |
 | `safety/expected.json`: `i_atomic_*` (22 cases) | B0 error `opaque runtime value is not serializable` after the scalar part | the atomic's value (=L) | atomics by value |
@@ -181,11 +212,21 @@ dispatch; `rt/prepared.h`'s `while`-only marking for its other refusals (review 
 | collections SESSIONS `collection_in_line` | refused | `nullset([])` (legacy: `null` + its tag) | the same; no tag |
 | b3 SESSIONS `display-bare` | refused | parity `P{a:1,c:3}`; new `display-bare-user-method` (no user code runs) | owner ruling 2 |
 | `tests/rt/vm_expression.cpp` (eval of `[x=>x, ...]`) | `\x1fnift:callable:lambda:1` | `opaque runtime value is not serializable` | owner: no internal tag |
-| `modules-d041/export_clash`, `semantics-modules/export_collision`, `vm_modules_unit` clash.f, packages b08 | refused `import-collision` | program error `import-scope:collision`, legacy's error line | C1 |
+| `modules-d041/export_clash`, `semantics-modules/export_collision`, `vm_modules_unit` clash.f, packages b08 | refused `import-collision` | program error `import-scope:collision`, legacy's error line | C1 (every earlier statement cannot stop the program) |
+| an import collision after a top-level `return`, a statement that may fail, or in a module that may fail | refused `import-collision` | refused (unchanged; the c56c4093 tip reported the collision: M2) | legacy stops first or reports the other error |
+| `nift eval --json` of a function / an atomic | tag string / not serializable | unchanged (the c56c4093 tip changed both: L1) | machine-readable output unchanged |
+| `nift eval` (without `--json`) of a function / an atomic | the tag / not serializable | ordinary error / the value | owner presentation ruling |
 | `vm_inventory_links` import-collision case | the declared-before shape | the declared-after shape (still the refusal) | C1 moved the old shape |
 | object `length()` in a `for` loop's callee | compiled: malformed-expression error (legacy: the member count) | refused `context:object-length` | correctness (coordinator addition) |
+| every `prepared-*`, `string-arg-type`, `context:*` shape in a function called from a `for` loop (t2, t3, t6, t7, t8) | compiled (legacy differs: double argument evaluation, `1.5` against a modulo error, `a0.5b` against a type error, other error positions) | refused, the reason of the `while`-callee shape | review M4 |
 | fraction `to_int()` in loop code or its callees | compiled: error at another column | refused `context:number-to-int` | correctness (generator) |
 | empty collection `empty()` in loop code or its callees | compiled: `true` (legacy `false`) | refused `context:collection-empty` | correctness (generator) |
+
+Approved diagnostic difference (review M1, compatibility.md): a malformed method call on a call
+receiver with arguments in prepared code (`mk(i).starts_with("a")`) reports the source text;
+legacy reports its prepared evaluator's hoisted argument names (`starts_with(__nift_native_arg_5)`).
+Same output, line, column and exit status. Legacy's numbering cannot be reproduced; golden
+`b4/dispatch/malformed_call_receiver_loop.vm`.
 
 `classification.tsv`: rows for `struct-no-method` (resolved), `presentation-struct-method:*`
 (sessions and unknown receivers only), `collection-receiver:*`, `session:collection-result`,
@@ -202,12 +243,27 @@ both engines.
 ## 4. Tests and evidence
 
 `make test-runtime2-b4` (`tests/runtime2/b4_dispatch.py`, prerequisite `test-rt-op-admission-unit`):
-- `b4/dispatch/*.f` (26): VM-compiled, equal to legacy, or a `.vm` golden for an approved difference
+- `b4/dispatch/*.f` (26; `struct_no_method_this` moved to `refuse/`, `malformed_call_receiver_loop`
+  added): VM-compiled, equal to legacy, or a `.vm` golden for an approved difference
   that must still differ; no internal tag, private value or implicit user method in any output;
   receiver evaluated once and argument effects as legacy in success and failure (`receiver_once.f`,
   `all_natives_effect_args.f`, `no_effect_args.f`);
-- `b4/refuse/*.f` (11): refused before any effect with their reason;
-- `b4/c1/*/` (6): the C1 legacy differential per shape;
+- `b4/refuse/*.f` (24): refused before any effect with their reason (review: five `for`-callee
+  shapes, three `struct-no-method` shapes, five `struct-this-binding` shapes: method call, private
+  method, rendering, field read, catch binding);
+- `b4/c1/*/` (9): the C1 legacy differential per shape; the three review M2 shapes (`return`
+  before the import, a failing statement before it, a failing module) check that legacy gives its
+  own output and never the collision;
+- struct receivers (review H1; the reviewer's `gen_struct.py` in the suite): a proven struct
+  receiver × every method name (91) × seven contexts (top level, statement, `for`, `while`,
+  function, lambda, method) × three arities = 1,911 programs; every program the VM runs (867)
+  equals legacy, D-009#5 aside (the `return: ` prefix and column, 213 in function bodies); never
+  exit 70, `dispatch_defects` 0. On the c56c4093 binary it reports the H1 divergences (`--quick`:
+  21 failures);
+- compile scaling (review M3): 250 and 1,000 functions using the three `context:*` sites; four
+  times the functions must take at most eight times the compile time (4.1x on the tip; 14.5x on
+  c56c4093, caught);
+- `nift eval --json` (review L1): B3's exact output for a function and an atomic, nested too;
 - `b4/concurrent/*.f`: the atomic presented while a thread updates it (three runs, legacy's output);
 - SESSIONS and DISPLAYS: dynamic dispatch in sessions, and every new display path (struct, map,
   atomic, function in sessions and `nift eval`) with non-disclosure checks;
@@ -246,6 +302,10 @@ paths.
 | A11 | `eval_result.cpp` | a function's display shows its tag again | suite 4 |
 | A12 | `module_graph.cpp` | C1 off | suite 5 |
 | A13 | `vm_builtin.cpp` | interpolation does not load an atomic | suite 2 |
+| A14 | `prepared.cpp` | only `while` callers are prepared code (review M4) | suite 13 |
+| A15 | `compiler_structs.cpp` | every undeclared struct method compiled as legacy's error (review H1) | suite 28 |
+| A16 | `binding_rules.cpp` | a `this` loop or catch binding in a struct admitted again (text match, review H2) | suite 10 |
+| A17 | `module_graph.cpp` | C1 whatever legacy runs before the import (review M2) | suite 4 |
 | S6, S7 (B0, revised) | `natives/format_methods.cpp`, `vm_ops.cpp` with A9 | B0's defensive paths internal again, with the narrowing restored (B4 made them unreachable otherwise) | safety suite (54 and 46 cases exit 70) |
 | S10 (control) | `compiler_session_native.cpp`, CP19 mutant 10 | the session's guarded branch forced to the string native | covered: the precondition redirects it, output equals legacy (before B4 the mutant stopped with exit 70) |
 
@@ -271,6 +331,19 @@ against 393), which B4 does not touch: binary layout, not VM work. The built-in 
 on every built-in call cost about 15 more instructions per call (1.4%), so it runs only at flagged
 sites; the redirection table is built on first use (built eagerly it cost 2.3M instructions at
 startup). Website builds do not execute the scripting compiler or the VM.
+
+**After the review fixes** (B4 9-16): the VM and the natives are unchanged, and so is run time:
+the built-in rows above and the Dynamic `contains` measure the same on c56c4093 and the tip (1074,
+903, 1187, 870; 2844). **Compile time** (review M3; `compile_us`, NIFT_VM_STATS, best of three):
+
+| Program | B3 | c56c4093 | tip |
+| --- | --- | --- | --- |
+| reviewer's `M3_compile_quadratic.f` (3,451 lines, 150 functions) | 36.7 ms | 1,450.7 ms | 27.2 ms |
+| suite scaling program, 250 functions | 5.9 ms | 33.9 ms | 6.0 ms |
+| suite scaling program, 1,000 functions | 26.1 ms | 480.0 ms | 26.2 ms |
+
+The tip is within noise of B3 (at most 1.02x), well inside the 1.5x bound; the suite's scaling
+check guards the shape.
 
 ## 7. Size
 
@@ -337,6 +410,17 @@ reasons and code compared, the B3 binary against the B4a tip): **0 changes**. Th
 section 2 change (plus the new `b4/` fixtures); no other fixture changes classification.
 
 
+**After the review fixes** (the c56c4093 binary against the tip, same tree of fixtures):
+- CP25-R `classify-all` (589 units): **0 changes** (outcome, reason, line, column, reasons, code).
+  The `for`-callee marking adds no refusal in the release corpus.
+- `tests/runtime2` classify (1,963 scripts): 16 changes, all new review fixtures, all from
+  compiled (or another refusal) to a refusal before execution: `struct-this-binding` 5,
+  `struct-no-method` 3, `import-collision` 3 (the M2 shapes; c56c4093 reported the collision),
+  `context:assignment-error` 2, `context:modulo-assignment`, `context:string-append-type`,
+  `prepared-fn-unprepared` 1 each. No pre-existing fixture changes classification
+  (`modules-d041/export_clash` and `semantics-modules/export_collision` keep C1's program error:
+  their modules declare an array literal, B4 13a).
+
 ## 9. Carried items
 
 - **B4b** (after B4a's review; owner ruling 6): sound per-site element and member typing for arrays
@@ -351,11 +435,36 @@ section 2 change (plus the new `b4/` fixtures); no other fixture changes classif
   mode is machine-readable, and the presentation form would need the eval entry to know the mode.
 - Sessions: `presentation-struct-method` (earlier schemas' instances), and `$[c]` of an earlier
   statement's instance stays `interpolation:unknown-type` (the binding's kinds are not proven).
-- Release audit: `rt/prepared.h` marks only `while` callers as prepared-reachable; legacy also runs
-  a `for` loop's callees on its prepared evaluator. B4 closed the three context gaps the generator
-  showed (object length, fraction to_int, collection empty); its other refusals (prepared-decl-type,
-  string-arg-type, the `context:*` family) were not audited against `for` callees.
+- **B5 prerequisite (review; recorded for the owner).** The dispatch precondition runs at flagged
+  sites only. That is acceptable only while the reference guard is on: today an unflagged site's
+  receiver kind is a compile-time fact the guard keeps true. Before the guard is removed (B5),
+  either B4b's per-site typing proves every unflagged method site sound under sharing (aliases,
+  nested collections, closures, sessions, modules, transfers), or the precondition moves to every
+  method native call (about 15 instructions per call, section 6). B4b's design must state which,
+  per site class; B5 does not start without it.
+- `for`-loop callees in `rt/prepared.cpp` (review M4): closed (section 1). `outermost_loops` (the
+  loop-local declaration typing check) still visits `while` loops only: probes of the shapes it
+  guards (`a := 2.5; for (...) { a := "s"; b := a }`) equal legacy in a `for` loop
+  (`scratchpad/b4/fix/p/d1.f`, `d3.f`); not audited beyond that.
 - `test-cp19-shared-eval` fails on the B3 binary too (`eval_entry.py` expects `NIFT_VM=require` in an
   unresolved-name refusal): pre-existing; not in the local gate list.
 - Not run locally (combined B3–B5 certification): full `make test`, `test-rt-vm-sanitize` (with the
   new `test-runtime2-b4-tsan`), `test-build-reuse`, perf campaigns, whole-corpus classify.
+
+## 10. Review of c56c4093 (REJECT) and the fixes
+
+Fixes are new commits on top of `c56c4093` (no history rewritten):
+
+| Finding | Fix | Commit | Evidence |
+| --- | --- | --- | --- |
+| H1 `struct has no method` compiled where legacy runs a string native on the tag | compiled only for non-string-method names outside prepared code; else `struct-no-method` (B3) | B4 10 | struct generator in the suite (1,911 programs, 0 non-approved differences); fixtures; A15 |
+| H2 `this` resolved by text inside a struct (`for (this : xs)`) | `for`/`catch` binding named `this` inside a struct refused (`struct-this-binding`) | B4 11 | 5 fixtures; A16; record N3 corrected (section 1) |
+| M1 malformed call-receiver text in loop code | kept; approved diagnostic difference | B4 12 | golden; compatibility.md |
+| M2 C1 where legacy stops first | C1 only when nothing legacy runs first can stop it | B4 13, 13a | 3 fixtures with legacy differential; A17 |
+| M3 quadratic compile (whole-program walk) | walk deleted; the prepared marking reused | B4 9 | section 6; suite scaling check |
+| M4 `for` callees outside every prepared refusal | `rt/prepared.cpp` seeds `for` loops | B4 9 | t2, t3, t6, t7, t8 fixtures; A14 |
+| L1 `nift eval --json` changed | JSON mode keeps B3's behaviour | B4 14 | exact B3 output checked |
+| L2 stale header comment | corrected | B4 15 | `op_admission.h` |
+| L3 `context:collection-empty` broad | recorded: broad but sound | B4 16 | section 1 |
+| B5 prerequisite | recorded | B4 16 | section 9 |
+
