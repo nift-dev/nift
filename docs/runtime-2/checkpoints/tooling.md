@@ -947,3 +947,36 @@ variants (`test-runtime2-packages-mutants`, `test-runtime2-args-cmd-mutants`,
 | N3: `write-signature.sh` returned the last group's status only | the exit status covers every group | |
 | N4 (record) | section 1 corrected: a TEST_DIR-only make is supported while the in-tree objects are current; an out-of-repo TEST_DIR with a stale in-tree object is refused (its libffi headers are outside the repository); `make TEST_DIR=<tmp> nift` (relinking the in-tree `nift` against the temporary libffi) is unsupported | |
 | gate tree state (reviewer's note) | `test-rt-isolation` and `test-rt-sort-forgery` rebuilt their planted objects (byte-identical, newer mtimes), leaving `make -q nift` 1; both now restore the sources with their own mtimes and put back the objects, sidecars, dependency files (and, for sort-forgery, `nift`) they saved, then require the restored objects (`make -q`) to be up to date | the `make-q-nift` gate runs after them |
+
+## Recertification of `e6d21fa4`: `test-build-reuse` failed (recorded)
+
+Linode recertification of `e6d21fa4` (coordinator): every other gate passed, including `test-rt-vm`
+with every mutant lane, `make nift` after `make -k test`, and `make -q nift` 0 after the gates;
+`test-build-reuse` exited 2 after 4,031 s with three failures (quoted from the Linode log; the
+per-check logs under `.build/build-reuse/` were deleted by the distclean check, so that log is the
+only evidence from `e6d21fa4`, labelled as such here):
+
+```
+FAIL build-reuse define: B build failed
+FAIL build-reuse generated: B rebuilt 248 objects, expected 1
+scripts/build/check-build-reuse.sh: line 223: .build/build-reuse/distclean-nift.log: No such file or directory
+FAIL build-reuse make distclean nift (distclean-nift.log)
+```
+
+Root causes and fixes (test harness only: `scripts/build/check-build-reuse.sh`; no production
+source, Makefile, production build script, compiler configuration, generated input, dependency
+rule or object-cache change since `e6d21fa4`; owner ruling: keep the production restriction):
+
+| Failure | Root cause | Fix |
+| --- | --- | --- |
+| define: B build failed | the row's B configuration added `-DNIFT_TOOLING_PROBE`, a test-only switch (`*PROBE*`) that every production compile refuses on its command line since check C2 (`check-production-tu.py --args`); the harness used a forbidden input, the restriction is intended | the row's B adds `-DNIFT_BUILD_REUSE_SIGNATURE_INPUT=1`, a define production compiles may carry; a separate negative control first runs `make src/rt/aggregate.o` with `-DNIFT_TOOLING_PROBE` and requires the refusal and no object written |
+| generated: B rebuilt 248, expected 1 | a consequence of the define row, not over-invalidation: when a row's B build failed the row returned without rebuilding A, so `.build/obj-config/default.flags` was left with B's content (written when B's make read the Makefile); the generated row's own make, with the default flags, rewrote it back, and every object of the set (247 runtime objects plus `ParserExpression.o`: 248) was correctly rebuilt against a changed signature. The dependency graph: of the in-tree objects only `src/ParserExpression.o` includes libffi's installed headers (its `.d` names `ffi.h`); `LIBFFI_CFLAGS` is in no object identity (only in libffi's toolchain signature); the libffi include path is in every identity but does not change with `LIBFFI_CFLAGS`. Locally the generated row run alone rebuilt exactly `src/ParserExpression.o` | a row whose B build fails now rebuilds A before returning, so a failed row cannot leave another configuration's signature for the next; the expectation (1) is unchanged |
+| distclean: its log could not be written | the logs were in OUTDIR, `.build/build-reuse`, which `make clean` (it removes `.build/*` but libffi) had already deleted, together with every earlier log | before the clean checks the script copies OUTDIR to a directory outside the tree (`mktemp -d` under `TMPDIR`), writes the clean and distclean logs there, then copies everything back into OUTDIR; the Makefile target is unchanged (a first attempt moved OUTDIR in the Makefile, `4c6b2bea`; reverted in `0110c8b8`) |
+
+Evidence on the final harness (`0110c8b8`, local, 2 cores, 4,567 s, result file
+`tooling/gates/recert/test-build-reuse.result`, logs copied to `tooling/logs/recert/build-reuse-out/`):
+`test-build-reuse` exit 0, every check PASS: deps, equiv, compiler, flags, define (forbidden)
+(refused, no object written), define (248 rebuilt, A again byte-identical), generated (exactly
+`src/ParserExpression.o` rebuilt, A again byte-identical), header, mixing (three cases), parallel
+(two rounds), relocated, dry run, `make clean nift` and `make distclean nift` (`nift` `de382d75`,
+every object with its sidecar, `make -q nift` 0); all logs present in OUTDIR afterwards.
