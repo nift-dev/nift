@@ -61,6 +61,7 @@ constexpr Family kFamilies[] = {
     {"eval:collection-result", "a map, set or stack as the result of `nift eval`"},
     {"same:argument-shape", "`same()` with an argument that is not a plain name"},
     {"context:", "a context-dependent legacy behaviour (%)"},
+    {"struct-this-binding", "a loop or catch binding named `this` inside a struct"},
     {"struct-", "this struct feature"},
     {"session:", "this statement in an interactive session (%)"},
     {"aliasing", "shared references to arrays or objects (aliasing)"},

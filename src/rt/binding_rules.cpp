@@ -68,4 +68,32 @@ BindingCallViolation reserved_binding_call(const Ast& ast) {
     return result;
 }
 
+NodeId this_binding_in_struct(const Ast& ast) {
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> structs;
+    for (NodeId id = 0; id < ast.size(); ++id)
+        if (ast.at(id).kind == NodeKind::StructDecl) structs.emplace_back(ast.at(id).begin, ast.at(id).end);
+    const auto shadows = [&](NodeId name) {
+        const Node& n = ast.at(name);
+#if defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 16
+        return false;  // A16: a `this` binding is admitted again (the receiver is matched by its text)
+#endif
+        if (n.kind != NodeKind::Ident || ast.text(n) != "this") return false;  // rt-lint: allow-string-compare
+        for (const auto& [begin, end] : structs)
+            if (n.begin >= begin && n.begin < end) return true;
+        return false;
+    };
+    for (NodeId id = 0; !structs.empty() && id < ast.size(); ++id) {
+        const Node& n = ast.at(id);
+        if (n.kind == NodeKind::For && n.a != kNoNode && ast.at(n.a).kind == NodeKind::ForBinding) {
+            const Node& header = ast.at(n.a);
+            const NodeId* names = ast.list(header);
+            for (std::uint32_t k = 0; k < header.count; ++k)
+                if (shadows(names[k])) return names[k];
+        } else if (n.kind == NodeKind::Try && n.b != kNoNode && shadows(n.b)) {
+            return n.b;
+        }
+    }
+    return kNoNode;
+}
+
 }  // namespace nift::rt

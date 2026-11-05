@@ -145,6 +145,12 @@ UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::st
         plan.offset = binding.offset;
         return plan;
     }
+    if (const NodeId shadow = this_binding_in_struct(ast); shadow != kNoNode) {
+        plan.ok = false;
+        plan.reason = "struct-this-binding";
+        plan.offset = ast.at(shadow).begin;
+        return plan;
+    }
     const Node& program = ast.at(root);
     const NodeId* statements = ast.list(program);
     bool executable_seen = false, late = false;
