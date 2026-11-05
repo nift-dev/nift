@@ -306,6 +306,7 @@ private:
     bool struct_construct(const Node& call, int s, std::uint16_t reg);
     std::vector<std::shared_ptr<const StructType>> struct_descriptors_;  // B3, per plan_.structs (compiler_structs)
     int presentation_dispatch(const Node& node, KindSet receiver, std::string_view name, std::uint16_t dst);  // B3
+    bool presentation_select(const Node& node, std::string_view name, std::uint16_t dst);  // B4: run-time choice
     bool struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver, int receiver_reg,
                      std::uint16_t dst);
     bool struct_member(const Node& node, int s, bool is_this, std::uint16_t dst);
@@ -389,8 +390,7 @@ private:
     void block_clear(const BlockRegs& regs);      // emits the clears (at each normal exit)
     bool block_holds_handles(NodeId block) const;
     std::uint32_t error_call_offset_ = kNoNode, error_call_offset_saved_ = kNoNode;  // `throw error(...)`: the throw
-    bool in_function_ = false;
-    bool in_lambda_ = false;
+    bool in_function_ = false, in_lambda_ = false;
     int depth_ = 0;
     static constexpr int kMaxExpressionNesting = 48;
     std::string reason_;

@@ -1,0 +1,8 @@
+before
+[
+  1
+]
+SIDE-EFFECT prettify
+user
+--- stderr
+--- exit 0

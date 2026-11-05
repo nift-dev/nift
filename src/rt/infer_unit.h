@@ -80,6 +80,9 @@ private:
     // ---- CP12b structs (rt/structs.h) ----
     // The struct whose method is being walked, or -1.
     int current_struct() const;
+    bool own_this(NodeId receiver) const;
+    TyRef mixed_presentation(const Node& call);  // B4
+    bool mixed_presentation_call(const Node& call);  // B4 N3: the enclosing struct's `this` (not a binding named so)
     // A field's one slot, shared by every unit (like a global's).
     std::size_t field_slot(const StructFieldInfo& field);
     static KindSet value_kinds(const Value& v);

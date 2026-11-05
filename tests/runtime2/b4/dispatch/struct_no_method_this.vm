@@ -1,0 +1,3 @@
+before
+error: struct_no_method_this.f:4:24: struct has no method: nosuch
+[exit 1]

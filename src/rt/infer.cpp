@@ -323,11 +323,11 @@ TyRef Inference::call(const Node& n) {
         if (s >= 0) {
             const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(ast_.text(ast_.at(callee.b)));
             if (presentation_builtin_binds(plan_.structs[static_cast<std::size_t>(s)], ast_.text(ast_.at(callee.b)),
-                                           n.count, ast_.text(ast_.at(callee.a)))) return kinds_ty(kKindString);
+                                           n.count, own_this(callee.a))) return kinds_ty(kKindString);
             if (m != nullptr) return method_call(m->function, n);
-            for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
-            return any_ty();
+            return empty_ty();  // B4: "struct has no method", a run-time error before the arguments
         }
+        if (mixed_presentation_call(n)) return mixed_presentation(n);  // B4: the user method or the built-in
     }
     if (callee.kind == NodeKind::Ident && !plan_.structs.empty()) {
         const auto s = plan_.struct_index.find(ast_.text(callee));

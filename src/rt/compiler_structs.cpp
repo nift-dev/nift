@@ -1,4 +1,5 @@
 #include "rt/compiler_structs.h"
+#include "rt/compiler_presentation.h"
 
 #include "rt/aggregate.h"
 #include "rt/alias.h"
@@ -173,13 +174,24 @@ bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
     // three names: the rest of method dispatch is B4's.
     const std::string_view name = text(ast_.at(callee.b));
     const StructInfo& info = plan_.structs[static_cast<std::size_t>(s)];
-    if (presentation_builtin_binds(info, name, node.count, text(ast_.at(callee.a)))) {
+    bool is_this = false;  // B4 N3: the resolver's `this`, not the receiver's text
+    struct_of_receiver(callee.a, is_this);
+    if (presentation_builtin_binds(info, name, node.count, is_this)) {
         if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
         if (const natives::BuiltinSpec* spec = natives::find_builtin(natives::Receiver::Any, name))
             return builtin_call(node, *spec, callee.a, dst);
     }
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(text(ast_.at(callee.b)));
-    if (m == nullptr) return fail(callee, "struct-no-method");
+    // B4: legacy reports a method the struct does not declare as an ordinary
+    // error at the call, before evaluating any argument ("struct has no
+    // method: <name>"); the admission table proves it fails there, so it is
+    // compiled as that run-time error instead of refused (b4-dispatch.md 2).
+#if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 10)
+    if (m == nullptr)
+        return plain_postfix(node) && legacy_fatal(node, "struct has no method: " + std::string(name), dst);
+#else
+    if (m == nullptr) return fail(callee, "struct-no-method");  // A10: the old refusal (precision lost)
+#endif
     return struct_call(node, s, *m, callee.a, -1, dst);
 }
 
@@ -195,55 +207,10 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
     return struct_call(node, s, *m, kNoNode, -1, dst) ? 1 : 0;
 }
 
-// B3 (owner ruling, b3-structs.md): an explicit `.stringify()`, `.prettify()`
-// or `.highlight()` on a receiver that is not one proven struct. When the
-// receiver may be an instance (or is of unknown kind) and some struct of the
-// unit or session declares a method of that name, the explicit call would
-// have to choose the user method or the built-in at run time (B4's dynamic
-// dispatch): refused before any effect, so an explicit call never silently
-// bypasses a user method. Otherwise -1: the built-in binds (a container's
-// nested instances are rendered by the descriptor renderer, which runs no
-// user code). Returns 0 when refused, 1 when compiled (mutant D8 only).
-int UnitCompiler::presentation_dispatch(const Node& node, KindSet receiver, std::string_view name,
-                                        std::uint16_t dst) {
-    int declaring = -1;
-    for (std::size_t s = 0; s < plan_.structs.size() && declaring < 0; ++s)
-        if (presentation_override(plan_.structs[s], name, node.count) != nullptr) declaring = static_cast<int>(s);
-    // Review H1: in a session, every schema any earlier statement declared
-    // counts too (its instances may be reachable here without the statement
-    // naming the struct). D10 ignores them.
-#if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 10)
-    const bool in_session = session_ && node.count == 0 && session_->presentation_methods.count(std::string(name));
-#else
-    const bool in_session = false;
-#endif
-    if (declaring < 0 && !in_session) return -1;
-#if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 9)  // D9: the built-in binds despite the user method
-    if (receiver & (kKindStruct | kKindUnknown))
-        return fail(ast_.at(node.a), "presentation-struct-method:" + std::string(name)) ? 1 : 0;
-#endif
-#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 8
-    // D8: rendering a container dispatches to the user presentation method.
-    if (declaring >= 0 && (receiver & (kKindAggregate | kKindCollection))) {
-        const std::uint16_t mark = fb_->top();
-        std::uint16_t held = 0;
-        if (!temp(held) || !expr_to(ast_.at(node.a).a, held)) return 0;
-        const StructInfo& info = plan_.structs[static_cast<std::size_t>(declaring)];
-        const bool ok = struct_call(node, declaring, *info.method(name), kNoNode, held, dst);
-        fb_->release_to(mark > dst ? mark : static_cast<std::uint16_t>(dst + 1));
-        return ok ? 1 : 0;
-    }
-#else
-    (void)dst;
-#endif
-    return -1;
-}
-
 // B3 (b3-structs.md): one descriptor per declaration per compile; in a
 // session one per schema version: the cached descriptor is reused while the
 // imported SessionDefinition is the one it was made for, and a replaced schema
 // gets a new descriptor (instances built earlier keep theirs).
-namespace {
 std::shared_ptr<const StructType> struct_descriptor(const UnitPlan& plan, SessionCompileContext* session,
                                                     std::vector<std::shared_ptr<const StructType>>& cache, int s,
                                                     const std::string& display_name) {
@@ -284,7 +251,6 @@ std::shared_ptr<const StructType> struct_descriptor(const UnitPlan& plan, Sessio
     cache[index] = made;
     return made;
 }
-} // namespace
 
 // `Name(args)`: the instance in `reg`, fields from their initialisers, then
 // the constructor (if any) on it. A map()/set()/stack() initialiser is

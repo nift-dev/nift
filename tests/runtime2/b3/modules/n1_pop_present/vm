@@ -1,0 +1,4 @@
+before
+map([])
+--- stderr
+--- exit 0

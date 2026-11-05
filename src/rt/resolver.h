@@ -137,10 +137,10 @@ const StructMethodInfo* presentation_override(const StructInfo& s, std::string_v
 bool presentation_name(std::string_view name);  // stringify, prettify, highlight
 // The explicit call `receiver.name(argc arguments)` on an instance of `s`
 // binds the presentation built-in (a presentation name, no arguments, and no
-// presentation_override; `receiver` is the receiver's source text: `this`
-// reaches a private method).
-bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc,
-                                std::string_view receiver);
+// presentation_override; `inside`: the receiver is the enclosing struct's
+// `this`, which reaches a private method; B4 N3: decided by the resolver, not
+// by the receiver's text, so a binding named `this` outside a struct is not).
+bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc, bool inside);
 
 struct UnitPlan {
     bool ok = true;

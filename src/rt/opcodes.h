@@ -84,6 +84,7 @@ namespace nift::rt {
     X(FieldGet)   /* R[a] = R[b].(atom c): a field of the instance (a reference)  */                   \
     X(FieldSet)   /* R[a].(atom b) = RK[c], in place (cycle-checked first)      */                   \
     X(CheckField) /* RK[a] assignable to field type RK[b]; c: legacy's wording    */                  \
+    X(StructIs)   /* B4: R[a] = R[b] is an instance of proto struct_types[c]      */                  \
     X(IterCheck)  /* R[a] is the iterable; b: 0 single-array, 1 pair-object,       */                    \
                   /* 2 force non-iterable, 3 force array-pair, 4 force object-single*/                 \
                   /* c: 1 the loop holds the value (B2: snapshot it if shared)    */                 \

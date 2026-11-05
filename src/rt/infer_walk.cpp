@@ -44,9 +44,33 @@ void Inference::seed_struct_fields() {
         }
 }
 
+// B4 (b4-dispatch.md 5): an explicit presentation call on a receiver that may
+// be an instance: the string of the built-in, or the result of any struct's
+// own zero-parameter presentation method (presentation_select).
+TyRef Inference::mixed_presentation(const Node& n) {
+    const std::string_view name = ast_.text(ast_.at(ast_.at(n.a).b));
+    TyRef result = kinds_ty(kKindString);
+    for (const StructInfo& info : plan_.structs)
+        if (const StructMethodInfo* m = presentation_override(info, name, 0))
+            result = unite(result, method_call(m->function, n));
+    return result;
+}
+
+bool Inference::mixed_presentation_call(const Node& n) {
+    const Node& callee = ast_.at(n.a);
+    return n.count == 0 && presentation_name(ast_.text(ast_.at(callee.b))) && (expr(callee.a)->kinds & kKindStruct);
+}
+
+bool Inference::own_this(NodeId receiver) const {
+    const Node& o = ast_.at(receiver);
+    return o.kind == NodeKind::Ident && current_struct() >= 0 &&
+           ast_.text(o) == "this";  // rt-lint: allow-string-compare compile time
+}
+
 int Inference::receiver_struct(NodeId object) {
     const Node& o = ast_.at(object);
-    if (o.kind == NodeKind::Ident && ast_.text(o) == "this")  // rt-lint: allow-string-compare compile time
+    if (o.kind == NodeKind::Ident && ast_.text(o) == "this" &&  // rt-lint: allow-string-compare compile time
+        current_struct() >= 0)  // B4 N3: outside a struct, `this` is an ordinary binding
         return record(object, any_ty()), current_struct();
     const TyRef t = expr(object);
     return t->struct_id >= 0 ? t->struct_id : -1;

@@ -1,0 +1,6 @@
+before
+SIDE-EFFECT stringify
+user
+map([])
+--- stderr
+--- exit 0

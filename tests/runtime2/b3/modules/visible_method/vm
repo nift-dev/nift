@@ -1,0 +1,6 @@
+before
+SIDE-EFFECT
+user
+map([])
+--- stderr
+--- exit 0

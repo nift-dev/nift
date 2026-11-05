@@ -26,6 +26,17 @@ const Value& rk(const Value* R, const Value* K, std::uint16_t x) {
 bool Vm::struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault, const Proto* proto) {
     switch (in.op) {
         case OpCode::NewStruct: R[in.a] = make_struct(proto->struct_types[in.b]); return true;  // B3: its descriptor
+        case OpCode::StructIs: {  // B4: an instance of that declaration (descriptor versions are unique per compile)
+            const Value& v = R[in.b];
+            const bool is = v.is(Kind::Struct) &&
+#if !(defined(NIFT_B4_MUTANT) && NIFT_B4_MUTANT == 7)
+                            v.heap_as<StructObject>()->type->version == proto->struct_types[in.c]->version;
+#else
+                            true;  // A7: any instance counts (the runtime descriptor is ignored)
+#endif
+            R[in.a] = Value::boolean(is);
+            return true;
+        }
         // Tooling 2 (in place, tooling.md 2.4): the instance NewStruct made in this
         // register, filled field by field across instructions.
         case OpCode::StructAdd: {
