@@ -23,8 +23,6 @@ constexpr Family kFamilies[] = {
     {"method:", "the method call `.%()`"},
     {"builtin-bytes:", "bytes values with `%()`"},
     {"builtin-receiver:", "`%()` on this kind of receiver"},
-    {"presentation-struct-contents:", "`%()` on a container that may hold a struct instance"},
-    {"presentation-struct:", "`%()` on a value that may be a struct instance (struct rendering)"},
     {"builtin-arity:", "`%()` with this number of arguments"},
     {"type:", "an operation whose operand types the VM cannot prove (%)"},
     {"static-error:", "a statically certain program error the VM does not reproduce yet (%)"},

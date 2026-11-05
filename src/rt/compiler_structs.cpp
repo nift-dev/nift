@@ -166,6 +166,16 @@ const StructFieldInfo* UnitCompiler::struct_target(const Node& target) {
 
 bool UnitCompiler::struct_method(const Node& node, int s, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
+    // B3: `p.stringify()`, `p.prettify()`, `p.highlight()` present the instance
+    // (legacy's presentation modifiers win over a method of that name; only
+    // these three names, the rest of method dispatch is B4's).
+    const std::string_view name = text(ast_.at(callee.b));
+    if (node.count == 0 && (name == "stringify" || name == "prettify" ||  // rt-lint: allow-string-compare
+                            name == "highlight")) {                       // rt-lint: allow-string-compare
+        if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
+        if (const natives::BuiltinSpec* spec = natives::find_builtin(natives::Receiver::Any, name))
+            return builtin_call(node, *spec, callee.a, dst);
+    }
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(text(ast_.at(callee.b)));
     if (m == nullptr) return fail(callee, "struct-no-method");
     return struct_call(node, s, *m, callee.a, -1, dst);

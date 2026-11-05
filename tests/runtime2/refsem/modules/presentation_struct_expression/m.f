@@ -1,6 +1,8 @@
-// Review round 4 (F1, D-NEXT-refsem): an expression inside an imported module
-// presents an instance it builds; the program is refused at compile time,
-// before the importer's first print.
+// B3 (b3-structs.md): an expression inside an imported module presents an
+// instance it builds: the VM prints `C{v:0}`. Formerly refused
+// (presentation-struct:stringify; review round 4, F1). Legacy fails with
+// "return: undefined callable: C" (it cannot construct a module's struct
+// through the exported function). An approved B3 classification change.
 struct(C) {
   v := 0
 }

@@ -221,10 +221,6 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
             return fail(node, "builtin-presentation-chain");
-        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & kKindStruct))  // no struct rendering (R3-4)
-            return fail(callee, "presentation-struct:" + std::string(name));
-        if (presentation_builtin(*spec) && unit_may_hold_structs() && (k & (kKindAggregate | kKindCollection)))
-            return fail(callee, "presentation-struct-contents:" + std::string(name));
         return builtin_call(node, *spec, callee.a, dst);
     }
     const bool size = name == "size";  // rt-lint: allow-string-compare compile time

@@ -13,7 +13,7 @@ std::atomic<std::uint64_t> next_version{1};
 
 std::ptrdiff_t StructType::position(std::string_view field) const noexcept {
     for (std::size_t i = 0; i < fields.size(); ++i)
-        if (fields[i] == field) return static_cast<std::ptrdiff_t>(i);  // rt-lint: allow-string-compare cold
+        if (fields[i] == field) return static_cast<std::ptrdiff_t>(i);
     return -1;
 }
 

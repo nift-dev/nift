@@ -315,8 +315,9 @@ TyRef Inference::call(const Node& n) {
         const TyRef recv = expr(callee.a);
         if (session_ && !recv->any && recv->kinds == 0) return session_bottom_arguments(n);
         const std::string_view name = ast_.text(ast_.at(callee.b));
-        if ((recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0 &&
-            (name == "stringify" || name == "prettify" || name == "highlight") && n.count == 0)
+        const bool shown = (name == "stringify" || name == "prettify" || name == "highlight") && n.count == 0;
+        const bool error = (recv->kinds & kKindError) && (recv->kinds & ~(kKindError | kKindNull)) == 0;
+        if (shown && (error || (!plan_.structs.empty() && receiver_struct(callee.a) >= 0)))  // B3: struct_method
             return kinds_ty(kKindString);
     }
     if (callee.kind == NodeKind::Member && !plan_.structs.empty()) {  // CP12b: a struct method

@@ -42,11 +42,21 @@ template <class F> void each_child(const Value& v, F&& f) {
     }
 }
 
+// B3: a copy keeps the source instance's descriptor (its privacy included).
+std::shared_ptr<const StructType> copy_descriptor(const Value& instance) {
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 4
+    const StructType& type = struct_type(instance);  // D4: the copy's descriptor is all public
+    return StructType::make(type.name, type.fields, {});
+#else
+    return struct_type_ref(instance);
+#endif
+}
+
 // A new empty object of the source's kind (the shell, linked in phase 2).
 Value shell(const Value& v) {
     if (v.is(Kind::Array)) return make_array(array_size(v));
     if (v.is(Kind::Object)) return make_object();
-    if (v.is(Kind::Struct)) return make_struct(struct_type_ref(v), struct_fields(v).size());
+    if (v.is(Kind::Struct)) return make_struct(copy_descriptor(v), struct_fields(v).size());
     return make_collection(collection_kind(v));
 }
 
@@ -192,7 +202,7 @@ CopyStatus shallow_copy(const Value& source, Value& out, std::size_t heap_limit)
     }
     if (source.is(Kind::Struct)) {
         if (!fits(estimate(source.heap()), heap_limit)) return CopyStatus::Budget;
-        build::Struct copy(struct_type_ref(source), struct_fields(source).size());
+        build::Struct copy(copy_descriptor(source), struct_fields(source).size());
         for (const auto& field : struct_fields(source)) copy.add(field.first, field.second);
         out = std::move(copy).publish();
         return CopyStatus::Ok;

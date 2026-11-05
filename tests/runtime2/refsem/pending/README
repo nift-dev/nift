@@ -5,13 +5,10 @@ NAME.session (a piped session's input); NAME.expected: the valid output
 refusal, raised before the refused statement has any effect. Phase B turns
 each into a parity case.
 
-  ret_multiline_http_shape.f        tests/runtime2/diagnostics/changes/ (the
-                                    nift-packages/http capabilities() shape);
-                                    review round 4, F3
-  cp19_unrelated_callback_shadow    tests/runtime2/cp19/session_struct_cli.py,
-    .session                        case unrelated-callback-shadow as it was;
-                                    CP19 test correction (owner decision,
-                                    2026-11-01)
+  (B3, b3-structs.md: ret_multiline_http_shape.f is now refsem/parity/, and
+  cp19_unrelated_callback_shadow.session the parity session
+  cp19_unrelated_callback_shadow in refsem_a.py SESSIONS, with its original
+  case restored in tests/runtime2/cp19/session_struct_cli.py.)
   cp14b_loop_binding_pop.f          tests/runtime2/cp14b/design_mutations.py
   cp14b_map_callback_store.f        witnesses (mutants copied-mutation-receiver,
   cp14b_map_callback_pop_push.f     live-source-not-snapshot) refused by the

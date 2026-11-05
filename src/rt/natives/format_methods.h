@@ -34,9 +34,10 @@ Status fn_is_collection(const Context&, const Value* args, std::uint32_t argc, V
 Status fn_is_enum(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 
 // Legacy serialize_value for plain values (null, bool, numbers, strings,
-// arrays, objects and Errors; bytes and functions are serialization errors).
-// False with `error` set on failure; unsupported runtime kinds (structs and
-// handles) are reported through `internal`.
+// arrays, objects, Errors, map/set/stack and, B3, struct instances with their
+// descriptor's privacy; bytes, functions and handles are serialization
+// errors). False with `error` set on failure; a kind that cannot reach the
+// serializer (a cell) is reported through `internal`.
 bool serialize(const Value& value, bool pretty, std::string& out, std::string& error, bool& internal);
 
 // B0 (docs/runtime-2/checkpoints/b0-safety.md): the ordinary error text for a

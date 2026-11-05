@@ -22,13 +22,11 @@ cases=[
  ('inline-schema','c.add(3)\nc.get()\nexit\n',3,0,['-i','-c',schema]),
  ('stdin-schema',schema+';c.add(3);print(c.get())',1,0,['-i','-']),
  ('constructor-field-param','struct(Point){x:=0;fn(Point(x)){this.x=x} fn(get()){return x}}\np:=Point(7)\np.get()\nexit\n',3,0),
- # CP19 test correction (owner decision, 2026-11-01): the original program
- # ([1,2].map(x=>x+1).stringify(), then p.get(); legacy [2,3] and 0) meets
- # Phase A's temporary presentation-struct-contents refusal; it is preserved
- # unchanged as tests/runtime2/refsem/pending/cp19_unrelated_callback_shadow.*.
- # The callback parameter x still shadows the field x; both mapped values are
- # checked by index (2 and 3) and p.get() is 0.
- ('unrelated-callback-shadow','struct(Point){x:=0;fn(get()){return x}};p:=Point()\nys:=[1,2].map(x=>x+1)\n(ys[0] == 2)\n(ys[1] == 3)\np.get()\nexit\n',5,0),
+ # B3 (b3-structs.md): the original program, restored ([1,2].map(x=>x+1).stringify(),
+ # then p.get(); legacy [2,3] and 0). Phase A refused it (presentation-struct-contents,
+ # the CP19 test correction of 2026-11-01, kept below as the index form).
+ ('unrelated-callback-shadow','struct(Point){x:=0;fn(get()){return x}};p:=Point()\n[1,2].map(x=>x+1).stringify()\np.get()\nexit\n',3,0),
+ ('unrelated-callback-shadow-index','struct(Point){x:=0;fn(get()){return x}};p:=Point()\nys:=[1,2].map(x=>x+1)\n(ys[0] == 2)\n(ys[1] == 3)\np.get()\nexit\n',5,0),
  ('separate-schema','struct(Counter){v:=0;fn(add(n)){v+=n} fn(get()){return v}}\nc:=Counter()\nc.add(3)\nc.get()\nc.add(4)\nc.get()\nexit\n',6,0),
  ('field-read-write','struct(Point){x:=1;y:=2};p:=Point()\n(p.x)\np.x = 3\n(p.x)\n(p.y)\nexit\n',5,0),
  ('constructor','struct(Point){v:=0;fn(Point(n)){v=n} fn(get()){return v}}\np:=Point(7)\np.get()\nexit\n',3,0),

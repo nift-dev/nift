@@ -73,6 +73,8 @@ bool serialize_error(const Value& value, bool pretty, int depth, std::string& ou
 // Recursion is bounded by kMaxDepth + 1 levels.
 bool serialize_collection(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
                           bool& bad_kind);
+bool serialize_struct(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
+                      bool& bad_kind);
 bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, std::string& error, bool& bad_kind) {
     if (depth > kMaxDepth) { error = "value serialization depth exceeded"; return false; }
     switch (value.kind()) {
@@ -93,8 +95,8 @@ bool serialize_at(const Value& value, bool pretty, int depth, std::string& out, 
 #endif
         case Kind::Array: case Kind::Object: break;
         case Kind::Collection: return serialize_collection(value, pretty, depth, out, error, bad_kind);
-        // Struct (refused before any effect: presentation-struct*, whole unit)
-        // and Cell (never a first-class value) cannot reach the serializer.
+        case Kind::Struct: return serialize_struct(value, pretty, depth, out, error, bad_kind);
+        // Cell: never a first-class value; it cannot reach the serializer.
         default: bad_kind = true; error = "stringify argument kind"; return false;
     }
     const bool array = value.is(Kind::Array);
@@ -149,6 +151,72 @@ bool serialize_collection(const Value& value, bool pretty, int depth, std::strin
     }
     if (pretty && count != 0) out.append(static_cast<std::size_t>(depth * 2), ' ');
     out += "])";
+    return true;
+}
+
+// B3 (b3-structs.md): the instance field declared at position `i` of its
+// descriptor: field i itself (the construction order; asserted in checked
+// builds, aggregate_store.h), else the field of that name. Null when the
+// instance has no such field. Fields the descriptor does not declare are
+// never reached (fail closed).
+const Value* declared_field(const StructObject& instance, std::size_t i) {
+    const std::string& name = instance.type->fields[i];
+    if (i < instance.fields.size() && atom_text(instance.fields[i].first) == name)
+        return &instance.fields[i].second;
+    for (const auto& field : instance.fields)
+        if (atom_text(field.first) == name) return &field.second;  // the by-name fallback
+    return nullptr;
+}
+
+// B3: legacy serialize_value's struct form (ParserExpression.cpp): the type
+// name, then each PUBLIC field of the instance's own descriptor in
+// declaration order, `name:value` (the name raw, not quoted). Pretty puts one
+// field per line at the next depth, `name: value`, each line ending with ","
+// (the last too, legacy's form), and closes at the parent's indentation; no
+// public field gives `Name{}`. Private fields are never written: privacy is
+// the descriptor's, so it holds through every alias, copy and transfer.
+// Observational: reads only, no mutation.
+bool serialize_struct(const Value& value, bool pretty, int depth, std::string& out, std::string& error,
+                      bool& bad_kind) {
+    const auto& instance = *value.heap_as<StructObject>();
+    const StructType& type = *instance.type;
+    out += type.name;
+    out += '{';
+    bool first = true;
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 7
+    // D7: the instance's own fields, unpaired with the descriptor (an undeclared
+    // or unpaired field is written; privacy only by position).
+    for (std::size_t i = 0; i < instance.fields.size(); ++i) {
+        if (i < type.size() && type.is_private(i) && atom_text(instance.fields[i].first) == type.fields[i]) continue;
+        const Value* field = &instance.fields[i].second;
+        const std::string name(atom_text(instance.fields[i].first));
+#else
+    for (std::size_t i = 0; i < type.size(); ++i) {
+#if !(defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 1)
+        if (type.is_private(i)) continue;  // D1 renders private fields
+#endif
+        const Value* field = declared_field(instance, i);
+        if (field == nullptr) continue;
+        const std::string& name = type.fields[i];
+#endif
+        if (pretty) {
+            if (first) out += '\n';
+            out.append(static_cast<std::size_t>((depth + 1) * 2), ' ');
+        } else if (!first) {
+            out += ',';
+        }
+        out += name;
+        out += pretty ? ": " : ":";
+        if (!serialize_at(*field, pretty, depth + 1, out, error, bad_kind)) return false;
+#if defined(NIFT_B3_MUTANT) && NIFT_B3_MUTANT == 6
+        if (pretty) out += '\n';  // D6: no comma after a pretty field line
+#else
+        if (pretty) out += ",\n";
+#endif
+        first = false;
+    }
+    if (pretty && !first) out.append(static_cast<std::size_t>(depth * 2), ' ');
+    out += '}';
     return true;
 }
 
