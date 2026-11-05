@@ -435,22 +435,37 @@ def scaling_program(n):
     return "\n".join(lines) + "\n"
 
 
+def chain_program(n, loop):
+    """Re-review N2: a call chain in natural order (h_i calls h_{i-1}), its last function called from a
+    `for` or a `while` loop: the prepared marking walks each body once (it advanced one per sweep)."""
+    lines = ["fn(h0(x)) { return x }"] + ["fn(h%d(x)) { return h%d(x) + 1 }" % (i, i - 1) for i in range(1, n)]
+    if loop == "for":
+        lines.append("for (i : [1]) { print(h%d(0)) }" % (n - 1))
+    else:
+        lines += ["i := 0", "while (i < 1) { print(h%d(0))" % (n - 1), " i += 1 }"]
+    return "\n".join(lines) + "\n", "%d\n" % (n - 1)
+
+
 def compile_scaling(nift, work):
     """Review M3: compile time stays linear in the number of functions (B4's context:* checks once
-    walked the whole program per call site: 36x on a 3,451-line program). Four times the functions
-    must cost well under the sixteen times a quadratic pass gives; the best of three runs."""
-    times = {}
-    for n in (250, 1000):
-        best = None
-        for _ in range(3):
-            out, _, _, rows = run_text(nift, scaling_program(n), "require", work)
-            us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" and out == "2\n13\n" else None
-            best = us if best is None or (us is not None and us < best) else best
-        times[n] = best
-    ok = times[250] is not None and times[1000] is not None and times[1000] <= 8 * times[250]
-    check(ok, "compile scaling: %r us for 250 functions, %r us for 1000 (must be <= 8x)" % (times[250], times[1000]))
-    print("compile scaling: 250 functions %.0f us, 1000 functions %.0f us" % (times[250] or 0, times[1000] or 0))
-
+    walked the whole program per call site: 36x on a 3,451-line program), and in a call chain's
+    depth (re-review N2). Four times the functions must cost well under the sixteen times a
+    quadratic pass gives; the best of three runs."""
+    shapes = {"functions": lambda n: (scaling_program(n), "2\n13\n"),
+              "chain-for": lambda n: chain_program(n, "for"), "chain-while": lambda n: chain_program(n, "while")}
+    for shape, make in shapes.items():
+        times = {}
+        for n in (250, 1000):
+            src, want = make(n)
+            best = None
+            for _ in range(3):
+                out, _, _, rows = run_text(nift, src, "require", work)
+                us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" and out == want else None
+                best = us if best is None or (us is not None and us < best) else best
+            times[n] = best
+        ok = times[250] is not None and times[1000] is not None and times[1000] <= 8 * times[250]
+        check(ok, "compile scaling %s: %r us for 250, %r us for 1000 (must be <= 8x)" % (shape, times[250], times[1000]))
+        print("compile scaling %s: 250 %.0f us, 1000 %.0f us" % (shape, times[250] or 0, times[1000] or 0))
 
 if __name__ == "__main__":
     sys.exit(main())

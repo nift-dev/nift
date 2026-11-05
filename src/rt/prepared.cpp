@@ -143,25 +143,25 @@ private:
             if (f >= 0 && !marked_[static_cast<std::size_t>(f)] &&  // CP22: a task runs canonically
                 !(ast_.at(plan_.functions[static_cast<std::size_t>(f)]).flags & kFlagAsync)) {
                 marked_[static_cast<std::size_t>(f)] = true;
-                changed_ = true;
+                pending_.push_back(static_cast<std::size_t>(f));
             }
             return true;
         });
     }
 
     // Seeds: calls in any loop condition or body; then every call in the body
-    // of a marked function, to a fixpoint.
+    // of a marked function, each body walked once (a worklist: re-review N2).
     void mark_prepared_functions() {
         marked_.assign(plan_.functions.size(), false);
         walk(ast_, root_, [this](NodeId id, const Node& n) {
             if (n.kind == NodeKind::While || (NIFT_B4_FOR_CALLERS && n.kind == NodeKind::For)) mark_calls(id);  // B4 M4
             return true;
         });
-        do {
-            changed_ = false;
-            for (std::size_t f = 0; f < plan_.functions.size(); ++f)
-                if (marked_[f]) mark_calls(ast_.at(plan_.functions[f]).b);
-        } while (changed_);
+        while (!pending_.empty()) {
+            const std::size_t f = pending_.back();
+            pending_.pop_back();
+            mark_calls(ast_.at(plan_.functions[f]).b);
+        }
     }
 
     // Prepared function bodies: every declaration referring to a binding (the
@@ -387,7 +387,7 @@ private:
     std::vector<std::vector<std::size_t>> callers_;
     std::vector<bool> marked_;
     std::vector<bool> unpreparable_;  // per function: legacy cannot prepare its body
-    bool changed_ = false;
+    std::vector<std::size_t> pending_;  // marked functions whose bodies are not walked yet
     PreparedRefusal result_;
 };
 
