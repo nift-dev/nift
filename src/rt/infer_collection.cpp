@@ -33,6 +33,27 @@ TyRef Inference::collection_callables(const TyRef& callee,const std::vector<TyRe
     }
     return out;
 }
+// An array method call's result (`recv` is an array; `call` the call's node, its allocation site).
+// B4b 32 (review of ce0a9a44, N-1): reverse() and both sorts return their receiver
+// (kCollectionResults, rt/infer_mutators.h), so their result is an alias: the method's result type
+// (the receiver's elements, positions dropped by the reorder) with the receiver's own sites, so
+// both name one site class and the one dependency mechanism covers it (a read of the result records
+// its reader on the receiver's classes, a store through it notifies the receiver's readers). A
+// receiver without a site (an earlier session statement's value, U6) gives a result without one,
+// read and stored exactly like the receiver. Every other result is a new array or object (an
+// allocation site at the call) or a value that carries its own sites already.
+TyRef Inference::collection_call(const Node& n,NodeId call,const TyRef& recv,const std::vector<TyRef>& values,
+                                 int id) {
+    const TyRef result=collection_result(n,recv,values,id);
+#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 38)  // A38: a new site (ce0a9a44, review N-1)
+    if(collection_result_identity(static_cast<CollectionMethod>(id))==ResultIdentity::Receiver) {
+        auto alias=std::make_shared<Ty>(*result);
+        alias->sites=recv->sites;
+        return alias;
+    }
+#endif
+    return fresh(call,result);
+}
 TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::vector<TyRef>& values,int id) {
     using M=CollectionMethod;
     const auto m=static_cast<M>(id);
