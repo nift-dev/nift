@@ -15,9 +15,12 @@
 set -u
 nift=$1; lib=$2; probe=$3
 fail=0
-rules=$(grep -n -- '-DNIFT_RT_REFERENCE_PROBE' Makefile | grep -v '^[0-9]*:#')
+# Each recipe defining the probe must belong to a test-only target: the refrep
+# probe objects and harness ($(RT_REFREP_DIR)/), or the B4b guard-off gate's
+# sanitizer objects ($(TEST_DIR)/san-guardoff/); never a production object.
+rules=$(awk '/^[^\t#][^=]*:/ { target = $0 } /^\t.*-DNIFT_RT_REFERENCE_PROBE/ { print NR ": " target " :: " $0 }' Makefile)
 count=$(printf '%s\n' "$rules" | grep -c .)
-if [ "$count" -ne 2 ] || printf '%s\n' "$rules" | grep -qv 'RT_REFREP_DIR\|\$(CXX) \$(CPPFLAGS)'; then
+if [ "$count" -ne 3 ] || printf '%s\n' "$rules" | grep -qv '^[0-9]*: \$(RT_REFREP_DIR)/\|^[0-9]*: \$(TEST_DIR)/san-guardoff/'; then
   echo "FAIL: unexpected NIFT_RT_REFERENCE_PROBE build rules:"; printf '%s\n' "$rules"; fail=1; fi
 if grep -nE '^(CPPFLAGS|CXXFLAGS|CFLAGS)\b.*NIFT_RT_REFERENCE_PROBE' Makefile; then
   echo "FAIL: production flags define the probe"; fail=1; fi
