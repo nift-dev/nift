@@ -253,3 +253,18 @@ portability gap the owner should rule on (list it for the release-blocker audit)
 3. Item A: owner's choice (`scratchpad/b5/cp19/OPTIONS.md`, recommendation option 1).
 4. Comparator-sort portability (section 8): owner ruling.
 5. Freeze record.
+
+### 9.1 Final gate batch on B5 8 (52 results, `scratchpad/b5/gates/fin-*.result`)
+
+PASS 40. FAIL 12:
+- pre-existing (identical at the B4b tip): cp14b functional `script_return_kernel_error`; cp19
+  `-proof-cli`, `-s1-dispatch`, `-shared-eval`, `-admission-mutants`, `-session-mutants` (an exact
+  17f7964c build is still to do).
+- B5 conversions still open (not yet analysed in detail): cp22 refuse `r_share_alias.f`,
+  `r_share_alias_task.f` (expected `fallback:aliasing`, now admitted) and cp23 classification (2
+  failures, same family: the "CP22/CP23 tsv references" item); cp14b witnesses
+  `adversarial-copy-function`; `vm_adversarial` (67 non-approved differences, presumably Q3
+  shared-reference results without a pinned approval); `cp25r-inventory` (check failed).
+- harness defect: gen1/gen_struct (`review-b4b-r5/gtools`) import a reviewer worktree path that no
+  longer exists (`rv-b4b-r5/src/rt/natives/builtin_list.inc`); production gen_alias PASS.
+Each open item must be classified (newly admitted / approved rule / preserved) before freeze.
