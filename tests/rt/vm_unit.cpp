@@ -232,12 +232,6 @@ void check_errors() {
         {"n := 7\nh := 5.5\ni := 0\nwhile (i < 1) { i += 1\nn += h }\n", "context:assignment-error"},
         {"fn(f(a)) {\nx := 1\nx = a\nreturn x }\ni := 0\nwhile (i < 1) { i += 1\nprint(f(\"s\")) }\n",
          "context:assignment-error"},
-        {"a := [1]\nb := a\n", "aliasing"},
-        // D-NEXT-refsem #1: the D-040 copy at a call to a mutating callee (Phase B
-        // would let g's push reach b) is refused by the Phase A guard.
-        {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n",
-         "reference-guard:argument"},
-        {"fn(f()) { a := [1]\n return a }\nx := f()\n", "aliasing"},
         // CP25-R: print([1]) compiles; the VM raises legacy's print Error.
         {"s := \"abc\"\nprint(s.size())\n", "type:length"},
         {"x := 5\nprint(x.length())\n", "type:length"},
@@ -253,6 +247,17 @@ void check_errors() {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
         CHECK(r.reason == c.output);
         if (r.reason != c.output) std::fprintf(stderr, "  program: %s  reason [%s]\n", c.source, r.reason.c_str());
+    }
+    // B5 (D-NEXT-refsem-b): the `aliasing` and Phase A guard refusals are deleted; these run with
+    // shared references (g's push reaches b: plan section 8 Q3 row 1; legacy copies: 2 1).
+    const Case shared[] = {
+        {"a := [1]\nb := a\n", ""},
+        {"fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\nprint(b.length())\n", "2\n2\n"},
+        {"fn(f()) { a := [1]\n return a }\nx := f()\n", ""},
+    };
+    for (const Case& c : shared) {
+        const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
+        CHECK(r.reason.empty() && r.result.reason == StopReason::None && r.output == c.output);
     }
 }
 
@@ -578,13 +583,13 @@ void check_kind_inference() {
     }
     // CP14B's approved D-040 copy is independent. Keep long-chain coverage
     // as a positive execution assertion, rather than the obsolete refusal.
-    // D-NEXT-refsem #1: the implicit copy (`b := a` then b.push) is refused by
-    // the Phase A guard (Phase B would alias), so the long chain must still
-    // reach that refusal, and an explicit deepcopy is the positive execution.
+    // B5 (D-NEXT-refsem-b): `b := a` aliases (the guard is deleted), so the long
+    // chain's push reaches `a` (2); an explicit deepcopy stays independent (1).
     for(int n:{199,201,500}) {
         const auto aliased=rt_vm_tool::run(chain_program(n,
             "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n"));
-        CHECK(aliased.reason=="reference-guard:inflow");
+        CHECK(aliased.reason.empty());CHECK(aliased.result.reason==StopReason::None);
+        CHECK(aliased.output=="2\n");
         const auto copied=rt_vm_tool::run(chain_program(n,
             "a := [1]\nb := deepcopy(a)\nb.push(2)\nprint(a.length())\n"));
         CHECK(copied.reason.empty());CHECK(copied.result.reason==StopReason::None);

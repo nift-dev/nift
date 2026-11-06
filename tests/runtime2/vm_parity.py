@@ -157,12 +157,31 @@ def copy_fixture_matches(text, legacy, vm, st):
     return d040_witnesses.match(text, legacy, vm, st) == "vm-corpus/cp11/replay_alias.f"
 
 
+def r2_golden(name):
+    """B5 (D-NEXT-refsem-b): the Runtime 2.0 golden of an approved difference."""
+    stem = os.path.join(CORPUS, name[:-2]) + ".r2"
+    return (open(stem + ".stdout", "rb").read(), open(stem + ".stderr", "rb").read(),
+            int(open(stem + ".exit").read().strip()))
+
+
+def legacy_golden(name):
+    stem = os.path.join(CORPUS, name[:-2])
+    return (open(stem + ".stdout", "rb").read(), open(stem + ".stderr", "rb").read(),
+            int(open(stem + ".exit").read().strip()))
+
+
 def corpus(args, work):
-    expect = {}
+    expect, approved = {}, {}
     for line in open(os.path.join(CORPUS, "EXPECT")):
         line = line.split("#")[0].strip()
         if line:
             parts = line.split()
+            # B5: `approved=<rule>` (an approved shared-reference difference; the VM gives the
+            # .r2 golden exactly, which differs from legacy's): plan section 8 Q3.
+            for p in parts[2:]:
+                if p.startswith("approved="):
+                    approved[parts[0]] = p.split("=", 1)[1]
+            parts = [p for p in parts if not p.startswith("approved=")]
             expect[parts[0]] = (parts[1], parts[2] if len(parts) > 2 else "")
     names = sorted(f for f in os.listdir(CORPUS) if f.endswith(".f"))
     failures = 0
@@ -174,8 +193,16 @@ def corpus(args, work):
                                     require=bool(want and want[0] in ("vm", "vm-error")))
         got = outcome_key(st)
         tally[got] += 1
-        v = ("approved D-040 independent copy" if single_execution(st) and copy_fixture_matches(text, a, b, st)
-             else verdict(same, a, b, st))
+        if name in approved:
+            r2 = r2_golden(name)
+            ok = (single_execution(st) and b == r2 and (c is None or c == r2) and a == legacy_golden(name)
+                  and r2 != a and approved[name] in ("Q3",))
+            v = f"approved B5 {approved[name]}" if ok else "diff"
+            if not ok:
+                print(f"FAIL corpus {name}: approved {approved[name]}: VM {b!r:.200} != r2 {r2!r:.200}")
+        else:
+            v = ("approved D-040 independent copy" if single_execution(st) and copy_fixture_matches(text, a, b, st)
+                 else verdict(same, a, b, st))
         if v.startswith("approved"):
             tally[v] += 1
         elif v != "same":
@@ -193,7 +220,7 @@ def corpus(args, work):
         elif st is None or st["outcome"] != want[0] or not st["reason"].startswith(want[1]):
             print(f"FAIL corpus {name}: expected {want[0]} {want[1]}, got {got}")
             failures += 1
-        elif c is not None and c != a and not copy_fixture_matches(text, a, c, st) and not classify_difference(a, c, st).startswith("approved"):
+        elif c is not None and c != a and name not in approved and not copy_fixture_matches(text, a, c, st) and not classify_difference(a, c, st).startswith("approved"):
             show(f"corpus {name} (NIFT_VM=require)", a, c)
             failures += 1
     print(f"vm corpus: {len(names)} scripts, {failures} failures; outcomes {dict(sorted(tally.items()))}")

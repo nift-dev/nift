@@ -10,6 +10,11 @@ ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$ROOT" || exit 2
 OUT=.build/refsem-mutants
 mkdir -p "$OUT"
+# B5 (b5-refsem.md section 7): R13, R17, R18 and R20 are retired, obsolete under shared-reference
+# semantics: they mutated the Phase A guard (reference_guard{,_walk}.cpp), which is deleted with
+# every rule they weakened. Their defect classes are now the semantics' own: aliasing is the
+# production behaviour (b5/q3), loops snapshot (R-B3, test-rt-refrep-mutants), escapes are U6's
+# heap (b5 mutants U1/U3/U4).
 # mutant -> source file : what it breaks
 declare -A FILE=(
   [1]=src/rt/value_cycle.cpp          # the cycle check misses the receiver itself (summary shortcut first)
@@ -24,19 +29,15 @@ declare -A FILE=(
   [10]=src/rt/copy_graph.cpp          # copy() is deep (the v4.4 rule)
   [11]=src/rt/compiler_keyed.cpp      # mutable collections are admitted as keys and members
   [12]=src/rt/vm_coro_ops.cpp         # cooperative tasks share the caller's references (no copy at spawn)
-  [13]=src/rt/reference_guard.cpp     # the Phase A forward-compatibility guard is off
   [14]=src/rt/vm_keyed.cpp            # a refused map store happens before the refusal (graph changed)
   [15]=src/rt/isolate_transfer_encode.cpp  # a thread transfer loses aliasing between collections/instances
   [16]=src/rt/vm_closure.cpp          # a cycle closed through a captured cell is fatal, not catchable
-  [17]=src/rt/reference_guard.cpp     # the lent rule is off (a lent binding mutated during the call or loop)
-  [18]=src/rt/reference_guard.cpp     # a parameter a closure captures does not escape
-  [20]=src/rt/reference_guard_walk.cpp  # a loop over a map/set/stack binds exclusive values (the review-2 short-circuit)
   [21]=src/rt/mutation.cpp            # B2: array/object receivers skip the cycle check (the B1 transition rule; was: the take's pre-check)
   [22]=src/rt/compiler_array_mutation.cpp  # a splice stores its removal before the replacement's cycle check
   [23]=src/rt/compiler_array_mutation.cpp  # only a captured splice evaluates its arguments first (review round 4)
   [31]=src/rt/vm_report.cpp           # B2 review H1: an object literal loads the one shared pool constant (no fresh copy)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 31)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(1 2 3 4 5 6 7 8 9 10 11 12 14 15 16 21 22 23 31)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

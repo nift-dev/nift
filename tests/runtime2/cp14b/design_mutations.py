@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The twelve approved design mutants, exact controls, and negative harness controls."""
+"""The approved design mutants (twelve; B5 retired removed-const-guard), exact controls, and negative harness controls."""
 import argparse,copy,hashlib,json,os,subprocess,tempfile
 from pathlib import Path
 from functional import CASES,run
@@ -22,14 +22,13 @@ COPIES=[
 # The loop-binding form the guard admits (review of 542f0a65): the binding is
 # mutated and read, the iterated array is not read back.
 'for(v:[[1,2]]) { v.pop(); print(v.stringify()) }']
-# Witnesses the Phase A forward-compatibility guard refuses before any effect
-# (reference-guard:lent: an array mutated while a loop or a callback holds it;
-# D-NEXT-refsem #9). They cannot witness a VM mutant while the guard stands;
-# each is preserved unchanged, with legacy's output, in
-# tests/runtime2/refsem/pending/cp14b_*.f (CP19/CP14B test correction, owner
-# decision 2026-11-01). The other witnesses of their mutants still run.
-GUARDED_WITNESSES={COPIES[3],CASES['snapshot_mutation'],
-    'a:=[1,2,3]; fn(cb(x)) { a.pop(); a.push(9); return x }; print(a.map(cb).stringify()); print(a.stringify())'}
+# B5 (D-NEXT-refsem-b): the Phase A guard is deleted, so the witnesses it refused (COPIES[3],
+# snapshot_mutation, the pop/push callback) run again, legacy-equal, and are reinstated as
+# witnesses of copied-mutation-receiver and live-source-not-snapshot (plan, B5 tests).
+# removed-const-guard is retired, obsolete under owner Q2 option B: `const` is binding-only and
+# the static const-array path it disabled (NIFT_COLLECTION_MUTANT 11) is deleted (B5 2).
+GUARDED_WITNESSES=set()
+RETIRED={'removed-const-guard'}  # kept in MUTANTS: the numbering selects each injection
 # name, translation unit, existing test macro (0 means source-copy injection), witnesses
 MUTANTS=[
 ('ignored-callback-result','collection_helpers',0,[CASES['map'],'print([1,2,3].reduce((a,x)=>a+x,10))']),
@@ -120,19 +119,14 @@ def main():
         subprocess.run(['g++','-pthread',str(driver),*linked,'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)],check=True,capture_output=True)
         return binary,dict(intended_commit=intended_commit,driver_sha256=driver_hash,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),source_sha256=source_hash,flags=flags,macro=macro,marker=name)
     normal,normal_identity=build('control');results=[];negatives=[]
-    # Each excluded witness must still be refused by the guard before any
-    # effect; if the guard changes, the coverage loss is flagged here.
-    with tempfile.TemporaryDirectory(prefix='cp14b-guarded-') as folder:
-        for source in sorted(GUARDED_WITNESSES):
-            row=run(str(normal),'require',source,Path(folder));st=row['stats'][-1] if row['stats'] else {}
-            if not (row['exit']==1 and row['out']=='' and st.get('outcome')=='require-error'
-                    and str(st.get('reason','')).startswith('reference-guard:') and st.get('vm_executions')==0):
-                raise RuntimeError('Guarded witness no longer refused by the guard (restore it): '+source+' '+str(row))
     import comparator_profile as cprof
     prof=cprof.profile(str(normal));unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-design-mutants-') as folder:
         root=Path(folder)
         for number,(name,stem,macro,witnesses) in enumerate(MUTANTS,1):
+            if name in RETIRED:
+                results.append(dict(number=number,name=name,detected=True,coverage='retired (B5, owner Q2 option B)'))
+                print('RETIRED',number,name,flush=True);continue
             tagged=[cprof.is_comparator(source) for source in witnesses]
             if prof.refused and any(tagged):
                 if not all(tagged):raise RuntimeError('Mixed comparator and non-comparator witnesses: '+name)
