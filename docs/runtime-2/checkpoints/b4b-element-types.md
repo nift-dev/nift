@@ -1,15 +1,16 @@
 # Checkpoint B4b: sound per-site element and member typing
 
-Status: **fix-round candidate, frozen for focused re-review** (B4b). Branch `cand/b4-dispatch`,
-after the accepted B4a boundary `0df0df6c`. Plan: Phase B plan §5.7 and "B4" (per-site types,
-mutant A2); the owner's B4b ruling (2026-11-06); the coordinator's approval of the design note with
-conditions C1-C8 (2026-11-06) and the owner's evidence requirement (section 3). Commits B4b 0
-(this note) to B4b 6 (rejected tip `e293105e`), fix round B4b 7 to 14 (section 10); tip, tree and
-gates: section 8. **Open finding F1** (section 9, found in the hand-over verification): the H2
-site-class merge makes a parameter-push shape exhaust the walk budget from 16 helpers on.
+Status: **final repair round candidate, frozen for focused re-review** (B4b). Branch
+`cand/b4-dispatch`, after the accepted B4a boundary `0df0df6c`. Plan: Phase B plan §5.7 and "B4"
+(per-site types, mutant A2); the owner's B4b ruling (2026-11-06); the coordinator's approval of the
+design note with conditions C1-C8 (2026-11-06) and the owner's evidence requirement (section 3).
+Commits B4b 0 (this note) to B4b 6 (rejected tip `e293105e`), fix round B4b 7 to 14 (section 10),
+final repair round B4b 15 to 19 (sections 11 to 13: F1 convergence, F2 test isolation, P1 mutant
+and audit, and a pre-existing U1 hole found on the way); tip, tree and gates: section 8.
 
-B4b changes no observable behaviour while the guard is on: it only moves programs between
-admitted and refused (section 6). Run time is unchanged (section 7).
+B4b changes no observable behaviour while the guard is on, except that programs which exited 70
+on B4a are now refused or run their checked dispatch (sections 6, 13); otherwise it only moves
+programs between admitted and refused (section 6). Run time is unchanged (section 7).
 
 ## 1. Design note (approved, with conditions C1-C8)
 
@@ -227,9 +228,8 @@ positions for a script's non-append mutator (`infer_collection.cpp`): B4b's per-
 subsumed the binding-level one, so the mutant survived until it followed the facts into the sites.
 
 No separate transfer mutant: transfers have no invalidation path of their own (copies; the
-callee's stores are the callee path, A19). No mutant removes the builder invariant itself
-(`register-operand-constant`, section 10.1): with A25 applied the invariant turns the crash into a
-refusal, which is what the suite sees.
+callee's stores are the callee path, A19). A34 (final repair round) removes the builder invariant
+itself (section 10.1).
 
 ### 5b. The reviewer's generators on the tip
 
@@ -459,6 +459,34 @@ the VM equal to legacy, 2 refused before any effect). **Mutant:** A25 (the `Move
 assignment site): caught by 8 failing suite checks (the fixtures are refused by the builder
 invariant instead of running); guard-off build failed.
 
+**The invariant's own mutant (final repair round, B4b 18).** The oracle builds invalid
+instructions directly (`builder_case` in `b4b_types_unit.cpp`): `Move` with a constant-flagged
+source, and `LoadK`, `Add` and `GetIndex` with a constant-flagged destination; `emit` must set
+`register-operand-constant` when the instruction is built, before any proto exists (the compiler
+then refuses the unit, `limit:register-operand-constant`, `UnitCompiler::builder_ok`). Controls:
+register operands, `LoadK`'s constant `b`, `Add`'s RK `c`, and `JmpNotLt`'s RK `a` are accepted.
+Mutant **A34** removes the check from `FunctionBuilder::emit`: the 4 rejection cases fail.
+
+**Bounded audit of the other register-only operands (final repair round, read-only).** A constant
+operand exists only as the result of `FunctionBuilder::constant` (37 call sites) or `expr_any`
+(9 call sites, which returns `constant`'s operand for a literal); every other operand is a
+register from `alloc` (`top_ < kMaxRegisters = 0x7fff`, so the constant bit `0x8000` cannot be
+set), a binding's register from `Scopes` (allocated the same way), or a count, an atom, a proto,
+global, upvalue or struct-type index (not a register operand). So a register-only operand can
+carry the bit only if one of those 46 results reaches it:
+
+| Register-only operands (`opcodes.h`) | What guarantees no constant reaches them |
+| --- | --- |
+| `a` of every opcode writing `R[a]` (all but `writes_register_a`'s exclusions), `Move` b | the builder invariant (B4b 11), now with its mutant A34 |
+| `b` of `AddI`, `Not`, `Truth`, `Neg`, `Pos`, `BindType`, `GetIndex`, `GetMember`, `Length`, `FieldGet`, `StructIs`, `ArrayElem`(+c), `ArrayElemValue`(+c), `ObjectKeys`, `ObjectLookup`(+c), `ObjectLookupValue`(+c), `CellLoad`, `CellAnchor`, `CallValue`, `Await`, `FutureOp`, `ErrorJson`; `b` and `c` of `NewCell`; `b` of `NewArray`, `ErrorNew` (a register range) | the producer is `expr_to`/`reg_any`/`temp`/`alloc` (a register) at the emit sites read; no `expr_any` or `constant` result is passed: of the 9 `expr_any` results, 8 go to RK slots (`SetIndex` b/c, `AddAssign` b and `Sub`..`Mod` c, `AtomicUpdate` c, `GetIndex` c, binary `b`/`c`, `JmpNot*` a/b, `Push` b, struct-field arithmetic) and 1 to `ObjectSet` c, which the VM reads as `RK(c)` (`vm_report.cpp`; the opcode comment's `R[c]` is stale); the assignment value goes through `assignment_value` (`LoadK`, B4b 7) |
+| `a` read as a register by `JmpFalse`, `JmpTrue`, `JmpNotNull`, `Return`, `Throw`, `TopReturn`, `Push`, `SetIndex`, `FieldSet`, `IterCheck`, `JmpIncLt` (and its `b`), `Call`/`CallNative`/`Spawn`/`Sleep`/`Closure` frame bases | not excluded by `writes_register_a`, so the builder invariant covers them too (a constant `a` is refused) |
+| `b` of `SetGlobal`, `CellStore`, `SetUpvalue`, `CheckType` (a and b) | register producers at the emit sites read (`SetGlobal` takes a binding or `temp` register, also for the `LoadNull` of a global take; cell and upvalue stores take the value's register; text types are RK `c`) |
+| the 37 `constant` results | each goes to `LoadK` b (some masked with `& 0x7fff`), an RK text-type or field-type operand (`BindType`/`CellStore`/`SetUpvalue`/`CheckAssign` c, `CheckField` a/b, `StructAdd` c; most of them the `-1` "untyped" text type), a compare-jump RK operand (`JmpNotEq` b in `compiler_session_native.cpp`), or an `expr_any` result above |
+
+Result: no reachable defect found; the operands not covered by the invariant (`b`/`c` rows above)
+are guaranteed by their producers only, as section 10.1 already recorded; widening the invariant
+to them would need a per-opcode operand table (a redesign of the builder's checks), not done.
+
 ### 10.2 The standing guard-off gate `test-runtime2-guardoff`
 
 **Probe binary.** `.build/b4b-guardoff/nift-guardoff`: the production CLI objects with
@@ -562,3 +590,144 @@ refused `reference-guard:inflow`.
 and under `NIFT_VM=require`. `L1_union_callable_member.f`: refused `aliasing` before any effect
 (legacy 5). `L2_async_lambda_after_await.f`: VM `a`, `end`, exit 0; legacy `invalid lambda`, exit 1
 (the approved CP22 correction, section 9).
+
+## 11. F1: type-analysis convergence (final repair round, B4b 15)
+
+**Behaviour before.** `review-b4b/perf/many<N>.f` (N helpers `fn(kN(r)) { r.push([<a literal of
+kind N mod 5>, " s "]) ... }`, each called once with one shared `acc`): refused
+`analysis-limit:kinds` from exactly 16 helpers on, at about 19x B4a's compile time; `nestb<N>` (the
+pushed array passed in as a parameter too) compiled, at 3.4x B4a at 100 rising to 5.9x at 800.
+
+**Root cause** (found with a walk trace before any change). Not the widening itself and not a
+reset of the per-site union or flags: `add_element`, the binding update of a `push` statement
+(`infer_walk.cpp`), *replaced* the receiver binding by its new type instead of joining it. The
+new type's element spells the pushed container's sites by class (`canonical`, since B4b 8); the
+binding is merged again at the start of every walk from the parameter (`params_`, a union of the
+arguments, which spell the sites as they were made). With at most 16 sites every class is a
+single site and both spellings agree. From the 17th site on one element union (16 helpers plus
+`acc`'s own inner literal: hence exactly 16 helpers) the classes merge, the spellings differ, and
+each walk of each helper does: the parameter merge grows the binding (`[5]` to `[5, 282]` in the
+trace of `many16`), the push shrinks it back to the class spelling (`[5]`), `same()` reports a
+change, the unit is enqueued again. No site store or merge happens after the first pass: the
+walks oscillate on the spelling alone until the budget (64 walks per unit) refuses the program.
+Readers being re-queued on every merge, and the collapsed classes, were secondary costs (below),
+not the cause of the non-termination.
+
+**Fix (monotone).**
+
+- `add_element` joins the new type with the binding (`unite(*var, updated)`): a binding only grows.
+  Mutant **A30** restores the replacement: the oracle's convergence cases fail (6), and the b4b
+  suite sees `analysis-limit:kinds` for the 16, 17 and 100-helper fixtures.
+- Past 16 classes the collapsed class is **opened** (`classes()`, the approved design note's
+  "more than 16 sites ... contents are anything"): its contents read as anything from then on, so
+  a method on an element is Dynamic under the B4a precondition or refused where Dynamic is not
+  valid; never Static. `opened_` only grows, and every site merged into an opened class later
+  reads anything too (`unite_sites` propagates the flag): discarded precision never comes back.
+  Growth of an opened class changes no read, so it re-walks nobody (`site_store`, `unite_sites`).
+  Mutant **A31** keeps the collapsed class's precision (no opening, no pruning): 15 oracle cases
+  fail (the "reads anything" checks).
+- The parts of an opened class are pruned to anything (`infer_prune.cpp`: `prune_part` in
+  `materialize` and for stored contents), which is exactly what their own read gives; types stay
+  small. Only opened classes are pruned (a program without one is analysed as before).
+
+Analysis imprecision and unsupported operations stay separate: the widening only changes kinds to
+"anything"; whether a method on "anything" is Dynamic or refused is B4a's unchanged admission
+(`op-admission-unit`), and no refusal reason of the language level is touched.
+
+**Cost (no change to results).** Readers lists join smaller-into-larger and are vectors with a
+membership bitmap (`UnitSet`; the root is the smaller site id, and helpers are walked in
+decreasing order, so the collapsed class's list was copied at every merge); `unite` returns its
+first operand when it already covers the second (`covers`, no allocation); `materialize` keeps its
+result per type object while no site fact changes (`site_version_`; the readers of the classes
+read are still recorded per unit); a binding that grows at its declaration, before the walk read
+it, does not walk the unit again (the second walk was for values read before they grew;
+`slot_read_`; other units that read the binding are enqueued as before: functions for a global,
+lambdas for a capture, section 13).
+
+**Measurements** (`compile_us`, best of 7, the tip and B4a `0df0df6c` interleaved; local,
+guidance only; `test-runtime2-b4b` with `--baseline`, gate `z-compile-scaling`; the guard refuses
+`many` and `nestb` after the analysis on both binaries, so the times include the analysis):
+
+TABLE-F1
+
+Walks are linear (`many` and `nestb`: 2 walks per helper and 2 or 3 of main at every size, from
+3 per helper and 3 of main before the declaration rule; `glob`: 2 per helper). Instruction counts
+(callgrind, compile only) give the same picture with less noise: `many` 1.20x to 1.37x, `nestb`
+1.28x to 1.46x, `glob` 1.12x to 1.36x B4a at 100 to 800.
+
+**Tests.** Oracle (`b4b_types_unit.cpp`): `converge-many`, `converge-nestb`, `converge-glob` at
+8, 14, 15, 16, 17, 18, 24, 40 and 100 helpers: converged within `4 x units + 16` walks, the
+observed element's kinds monotone in the size, and anything from 17 on. Suite
+(`b4b_types.py convergence`): `many`, `nestb`, `glob` and `globp` (`glob` observed by `print`) at
+15, 16, 17 and 100 helpers: refused before any effect or equal to legacy, never an analysis limit;
+the same step runs under `--guardoff` (`test-runtime2-guardoff`), where `nestb` and `globp` run on
+the guard-off VM. The compile-scaling check now covers `glob`, `many` and `nestb` at 100, 400, 800
+and 1,600 (and `containers`): four times the helpers within six times the time, within 1.5x of
+B4a at every size, the ratio not rising by more than 10% from size to size; it now measures the
+compile time whatever the outcome (a run stopped by an analysis limit fails it).
+
+**Classification changes (old against new).** The F1 shapes are generated, not corpus programs.
+
+| Program | B4a | `a42035c1` | Tip | Why |
+| --- | --- | --- | --- | --- |
+| `glob` (16 helpers and more), `acc[1][1].trim()` | admitted (Static `trim` on the stale per-binding tuple) | admitted (Static `trim`, the collapsed class's union) | refused `builtin-receiver:trim` | the element union has more than 16 origins: anything; `trim` on anything is not admitted (B4a admission, unchanged) |
+| `many` (16 helpers and more) | refused `reference-guard:argument` | refused `analysis-limit:kinds` | refused `builtin-receiver:trim` | the analysis converges; the same widening |
+| `many` (up to 15), `nestb` (all sizes) | refused (guard) | refused (guard) | refused (guard) | unchanged |
+| `globp` (any size) | admitted | admitted | admitted | `print` of anything is admitted; output equal to legacy |
+
+On `tests/runtime2` (2,029 scripts) and CP25-R (589 units) no program changes outcome against
+`a42035c1` (section 6). The `glob` change is the cost of the coordinator's rule for this round
+("analysis imprecision widens to anything"): a program whose one array receives more than 16
+distinct allocation sites and then calls a built-in that is not admitted on Dynamic receivers on
+an element is refused instead of run. The previous round's collapsed class kept the union of the
+contents, also sound, and admitted it; the choice is recorded here for the reviewer.
+
+## 12. F2: test isolation (B4b 16, 17)
+
+- `tests/runtime2/b4b/guardoff.py` runs every fixture in a fresh copy of its directory (of its
+  parent when the script names `../`) made at one temporary path for every run of it, so the
+  guard-on and guard-off runs see the same absolute paths and nothing is written into the source
+  tree. The other steps of `test-runtime2-guardoff` (`b4b_types.py --guardoff`, `gen_alias.py`,
+  `safety/fuzz.py`) already wrote their programs into temporary directories.
+- The three files B4b 12 committed are removed (B4b 16, a normal deletion commit).
+- **Permanent check:** `test-runtime2-guardoff` (and its sanitizer variant) saves the
+  repository's state before its steps and fails if it changed after
+  (`tests/runtime2/repo_state.py`: every path of `git status --porcelain --ignored=matching
+  --untracked-files=all`, so untracked and ignored outputs are named too, and the hash of `git
+  diff HEAD`; build products left out; a self-test with a scratch repository: a tracked change, a
+  further change to a changed file, an untracked and an ignored file are caught, a build product
+  and the restored tree are not). Python bytecode is not written by the gate.
+- **The CP16 `fs_symlink` interference** (evidence): with the committed regular file
+  `link.txt` in the probe directory, `capture.py --nift nift --check --only fs_symlink` (which
+  copies the probe directory, then runs `setup.sh`) printed `ln: failed to create symbolic link
+  'link.txt': File exists` on each of its two runs, so the probe ran with a regular file where its
+  symlink belongs. After the removal `setup.sh` runs without an error. The probe's pre-existing
+  expected-output difference remains, the same with and without the file: `expected/fs_symlink/stdout`
+  has `true` first, the run prints it after the `cat` lines (`DIFF fs_symlink: stdout`); not
+  touched here (no Makefile gate runs this capture).
+- One timing fixture joined the cross-check's approved output differences:
+  `cp22/vm-only/v_thread_order.f` (two threads print in parallel and the first thread's final
+  `status()` is timing; it differed once between the builds under load, and varies run to run on
+  both). It is still checked for exit 70, internal text and dispatch defects.
+
+## 13. U1: a lambda's captured binding growing after its walk (pre-existing; found in this round)
+
+While checking the walk-count rule of section 11, a probe showed a hole in the U1 claim
+(section 4) present on B4a `0df0df6c`, `e293105e` and `a42035c1`: a lambda unit is walked before
+a later write grows the binding it captures (or a global it reads); nothing walked the lambda
+again (`merge_local` enqueued the functions for a global, never the lambdas), so its kinds stayed
+those of the earlier write. Example: `xs := [" s "]`, `g := () => { return xs[0].trim() }`,
+`xs = q()` where `q()` returns `[1]` through a call chain: B4a admits a Static `trim` and exits 70
+(`unexpected operands (compiler defect): built-in trim`) in default and strict mode; legacy exits
+1 (`trim: unsupported for this value`).
+
+Fix (`infer_bindings.cpp`): the inference records which lambda units read each binding slot
+(`find` in a lambda's walk) and enqueues them when the slot grows (`merge_local`, and the push
+statement's binding update). Fixtures `b4b/scripts/lambda_capture_*.f` (8: top-level assignment,
+a function assigning the global, a function's local and parameter, a nested lambda, another
+lambda assigning, an object member, a collection callback): exit 70 on B4a each; on the tip the
+VM runs them with the checked dispatch, equal to legacy (D-009#5 allowed). Oracle cases
+`lambda-capture-*` (8). Mutant **A32** (lambda readers dropped): 8 oracle cases and the 8 fixtures
+fail. Classification of `tests/runtime2` and CP25-R does not change (these programs were and are
+compiled; what changes is the dispatch the compiler emits). Struct fields read in a lambda are not
+affected (a field initialised with an array has no site: its contents are anything).
