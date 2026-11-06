@@ -3,3 +3,10 @@
 # value keeps its recorded structure, which only the guard keeps true. B5 must make
 # each of these pass (and delete it from this list). One per line: <file> <substring>.
 u6_session_alias.in unexpected operands (compiler defect)
+# Review of 4c9632b8 (L-3): the call path of the same class (B5 prerequisite, not fixed by B4b:
+# with the guard on all three are refused before any effect, reference-guard:shared/inflow).
+# A function defined in an earlier statement stores into its parameter, or through a global's
+# inner element, or a merged local; a later statement reads the earlier statement's array.
+u6_call_param_store.in unexpected operands (compiler defect)
+u6_call_global_inner.in unexpected operands (compiler defect)
+u6_call_mix_param.in unexpected operands (compiler defect)
