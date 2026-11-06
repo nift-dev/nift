@@ -1,6 +1,8 @@
 # Checkpoint B5: guard removal, the reference-semantics switch (D-NEXT-refsem-b)
 
-Status: **IN PROGRESS, NOT FROZEN.** B5 8: item B trim part done, sort part STOP; item A sized (OPTIONS.md); final gates to re-run. Earlier stop at the owner's B decision point
+Status: **FREEZE-READY (B5 13), with open owner decisions (section 10.11).** Owner decisions of
+2026-11-07 06:55: D1 approved and fixtured, D2 recorded as a release blocker, D3 accepted and gated,
+D4 (bounded Option 2) STOPPED with its cause traced (10.5). Final gates: section 10.8. History: earlier stop at the owner's B decision point
 (section 8): A (E-U6-1) is a STOP with alternatives; B (`trim`/dispatch, approved 2026-11-07
 04:47) is not implemented. The full gate set was deliberately not run (the coordinator requires
 it on the final code, after B); a pre-B smoke set was (section 5). Branch `cand/b5-refsem` from
@@ -112,6 +114,8 @@ semantics 158 rows; **iii** previously admitted, behaviour changed by an approve
 **p** outcome preserved, only the expectation's form changed 7 rows (a heap budget, a refusal
 reason, a stale pre-existing expectation, a harness baseline, mutant retirements); **ii**
 previously admitted, behaviour changed without an approved rule: 1 row, E-U6-1 (section 8 A).
+Counts after B5 12: **i 166, ii 1 (E-U6-1, owner decision pending), iii 7 (incl. the D1 row), p 9**;
+no PENDING-OWNER row remains.
 Approved differences are pinned exactly: `.r2.stdout/.stderr/.exit` goldens with
 `approved=<rule>` (for-s2, closures-s1, vm-corpus/cp11), `B5_APPROVED` (capture_origins),
 `APPROVED` (cp14b functional); each check also requires the pinned result to differ from legacy.
@@ -238,33 +242,204 @@ sort, and with the VM as the default engine (no automatic fallback) those progra
 It is a safe refusal, not a wrong result, so not a correctness defect; it is a release
 portability gap the owner should rule on (list it for the release-blocker audit).
 
-## 9. Not done (exact stop point, after B5 8)
+## 9. Stop point
 
-1. The final gate batch (`scratchpad/b5/final_gates.sh`; results `scratchpad/b5/gates/fin*-*.result`)
-   was started on B5 7, stopped after 7 gates to fix a regression it found (struct `to_string`
-   interpolation and named struct receivers, fixed in B5 8), and must be re-run from the start on
-   B5 8: fixpoint, b4/b4b mutants, guard-off generator gate, generators gen1/gen_struct/gen_alias
-   on production, CP25-R (`test-cp25r`, `cp25r-inventory`), rt-diff and vm_parity (semantic and
-   classification differentials), CP22/CP23, vm_adversarial, all earlier gates. Already on B5 8:
-   b3, b4, b5, b5-mutants PASS (`fin3-*`, `fin2-*`). On B5 7 before the fix: rt-lint, b4b,
-   b4b-fixpoint, b4-mutants PASS.
-2. The five cp19 targets on an exact 17f7964c build (`git archive` into the scratchpad, one build
-   tree at a time: delete it after).
-3. Item A: owner's choice (`scratchpad/b5/cp19/OPTIONS.md`, recommendation option 1).
-4. Comparator-sort portability (section 8): owner ruling.
-5. Freeze record.
+Superseded by section 10 (B5 11 to B5 13, replacement implementer). The historical batch of
+B5 8 to B5 10 (`scratchpad/b5/gates/fin-*.result`) is kept as evidence for tip 3ffedcac/f572d8cd.
 
-### 9.1 Final gate batch on B5 8 (52 results, `scratchpad/b5/gates/fin-*.result`)
+**Gate count correction (9.1 said 40 PASS / 12 FAIL).** The 52 `fin-*.result` files hold 13
+failing make targets and 39 passing:
 
-PASS 40. FAIL 12:
-- pre-existing (identical at the B4b tip): cp14b functional `script_return_kernel_error`; cp19
-  `-proof-cli`, `-s1-dispatch`, `-shared-eval`, `-admission-mutants`, `-session-mutants` (an exact
-  17f7964c build is still to do).
-- B5 conversions still open (not yet analysed in detail): cp22 refuse `r_share_alias.f`,
-  `r_share_alias_task.f` (expected `fallback:aliasing`, now admitted) and cp23 classification (2
-  failures, same family: the "CP22/CP23 tsv references" item); cp14b witnesses
-  `adversarial-copy-function`; `vm_adversarial` (67 non-approved differences, presumably Q3
-  shared-reference results without a pinned approval); `cp25r-inventory` (check failed).
-- harness defect: gen1/gen_struct (`review-b4b-r5/gtools`) import a reviewer worktree path that no
-  longer exists (`rv-b4b-r5/src/rt/natives/builtin_list.inc`); production gen_alias PASS.
-Each open item must be classified (newly admitted / approved rule / preserved) before freeze.
+| Failing target (fin batch) | Fixture-level failures inside it | Disposition (section 10) |
+| --- | --- | --- |
+| cp25r-inventory | 6 unclassified reasons (coro-blocking-host:file/:rm, method:open/write/save/close) | pre-existing, identical on an exact 17f7964c build |
+| gen1 | harness crash: input path in a deleted reviewer worktree | harness fixed (candidate tree, loud failure on a missing input) |
+| gen_struct | same | same |
+| test-cp19-admission-mutants | B5: case `loop` control (3 CHECKs); 17f7964c: case `wrapper` control (2 CHECKs) | pre-existing target failure; its content changed: see 10.6 |
+| test-cp19-proof-cli | needs `CP19_LEGACY_ORACLE` | pre-existing, identical |
+| test-cp19-s1-dispatch | `run()` refused `callable:run` (8 checks) | pre-existing, identical |
+| test-cp19-session-mutants | session-m7 contract witness | pre-existing target failure; content changed: see 10.6 |
+| test-cp19-shared-eval | expects `NIFT_VM=require` in a refusal note | pre-existing, identical |
+| test-runtime2-cp14b-witnesses | 8 copy witnesses (the log's last line named only `adversarial-copy-function`); const_admission never ran (make stopped) | converted (10.4) |
+| test-runtime2-cp14b | `script_return_kernel_error` | pre-existing, identical |
+| test-runtime2-cp22 | 2 of 90 refuse cases (`r_share_alias{,_task}.f`) | converted (10.4) |
+| test-runtime2-cp23 | 2 of 90 classifications (same two) | converted (10.4) |
+| vm-adversarial | 67 non-approved differences | analysed in 7 groups, pinned per program (10.4) |
+
+## 10. Owner decisions of 2026-11-07 06:55 and the freeze (B5 11 to B5 13)
+
+### 10.1 D1 loop-variable closures: APPROVED, fixtures pass (B5 11)
+
+The VM already had the required semantics (no code change): `tests/runtime2/b5/loopclosure/`
+(8 fixtures, NIFT_VM=require, in `test-runtime2-b5` on production and the probe build): distinct
+binding per iteration (l01), same-iteration closures share later assignments and iterations are
+independent (l02 setter/getter pairs, l03, l07), while-body bindings (l04), closures escaping the
+loop and the function in objects inside arrays (l05), nested loops (l06), rebinding after capture
+with no source mutation (l08: legacy 1, B4b tip 1, B5 7). VM-supported syntax: closures stored with
+`push` and called through a local after the loop (`f0 := fs[0]; f0()`). capture_origins'
+PENDING-OWNER row is now class iii "D1 loop-variable closures" (an intentional capture change,
+distinct from snapshot iteration); compatibility.md updated.
+
+### 10.2 D2 comparator-sort portability: RELEASE BLOCKER (recorded, nothing changed)
+
+The GCC 15.2 (`__GLIBCXX__ == 20260321`) profile gate in `compiler_collection_sort.cpp` is kept
+unchanged. Release blocker for the post-certification investigation (owner 06:55: deterministic
+portable sort preserving comparator invocation order, error behaviour, allocation failure,
+copy-sort-commit and identity; bounded stable merge sort vs the existing one). **The combined
+Linode campaign must build with GCC 15.2** (it is the only place production comparator sort is
+exercised); cross-platform release validation must cover the other supported toolchains (which
+refuse comparator sort, `method:sort`, before any effect). Comparator-sort atomicity on this host
+is verified on the probe build only (`b5/sort`, copy-sort-commit, failure injection at every call,
+identity, catchable receiver mutation; mutant 8): NOT production evidence.
+
+### 10.3 D3 the plain `.sort()` refusals: ACCEPTED as a documented precision limitation (B5 11)
+
+`tests/runtime2/b5/sort_refusals.py` over `docs/runtime-2/evidence/b5/sort-refusals.jsonl` (564
+gen_alias programs: the 452 sort-kind ones and 112 trim-kind ones with an argument-less sort on the
+stored-into array), in `test-runtime2-b5`: every program exits 1 with no stdout, its directory
+unchanged, an ordinary `error:` diagnostic naming the reason and saying nothing ran, no internal
+failure. Production: 549 `collection-element:sort`, 15 `method:sort` (the program also has a
+comparator sort: the D2 gate refuses it first); probe build: 564 `collection-element:sort`. None
+of the 564 was admitted by the B4b tip (390 collection-element:sort, 112 builtin-receiver:trim, 47
+reference-guard/aliasing, 15 method:sort), so no previously admitted production program regresses
+through this limitation (owner: that would have needed a release-blocker decision). No element
+dispatch mechanism was added.
+
+### 10.4 Conversions found by the final batch (B5 11), each with its rule
+
+Every converted program was refused before any effect by the B4b tip (class i); each new result
+was checked by hand derivation or against legacy before its expectation changed:
+- cp22/cp23 `r_share_alias.f` (1, 2: legacy-equal) and `r_share_alias_task.f` (2, 1: the task's
+  push reaches only its graph copy, D7/Q4): `CP22-CLASSIFICATION.tsv` rows now `vm - legacy-golden`.
+- cp14b copy witnesses: 6 legacy-equal; generated-102/162 differ in one line each (`mut8(a9)` then
+  `a9` is `[1,2,99]`, legacy `[1,2]`): Q3 "Call arguments", pinned in `B5_DIFF`.
+- cp14b const admission: 4 element stores through a `const` binding run (Q2 B; legacy "cannot
+  assign to const binding"); `for(v:a){v.push(9)}` legacy-equal (section 3 Iteration).
+- vm_adversarial: 67 differences in 7 root-cause groups (`scratchpad/b5/adversarial/GROUPS.md`,
+  minimal reproducers with legacy, B4b-tip and B5 results): G1 `to_string` on a map, B0 text (32);
+  G2 `trim`, item B text (8); G3 `to_upper` on a map, an ordinary error where legacy prints its
+  internal collection tag and exits 0 (8; owner 04:47 "never a leaked tag"); G4 Call arguments
+  (5); G5 Extraction through `?:`/`??` (12); G6 `q := (p)` (1); G7 `return:` prefix (1, already
+  B4b behaviour). No exit 70; evaluation order unchanged (same output prefix / same line count);
+  no file effects. Overlap with D1/D4: none. Each pinned by source sha256 with its exact result
+  (`tests/runtime2/b5/adversarial-approved.json`); any other difference still fails.
+- cp25r-inventory: NOT converted: pre-existing (section 9 table, 10.6).
+
+### 10.5 D4 cp19 shared-callable (bounded Option 2): STOPPED, nothing implemented (B5 12)
+
+Traced on an instrumented build (reverted; production binary rebuilt byte-identical): the
+refusal is not caused by `plain()` clearing heap callable targets. In statement 2 the parameter
+`v` of `ap` is seeded historical (no targets), so `v()` takes the fact-proved historical-call
+path; `session_effects` sets `earlier_called_` and `session_open()` opens every exposed class,
+and under U6 the two session-heap classes are always exposed. Every later read of an earlier
+array or object is then `any` (monotone), `q` becomes untracked and the call unproved. A
+diagnostic build that only skips opening the heap classes admits the witness and prints 1 (the
+B4b result) with no Option 2 change. Option 2 is therefore neither sufficient nor, for the
+witness, necessary; sound admission needs a persisted, transitive per-callable heap-EFFECT
+summary checked against a complete scan of the session's targets: new session effect tracking,
+outside Option 2 (owner STOP clause). Estimate 250-400 production lines, high risk
+(`scratchpad/b5/cp19/OPTIONS.md`, "B5 D4"). E-U6-1 stays class ii, refused before any effect:
+**owner decision needed.** The same family also explains cp19 admission-mutant case `loop`
+(10.6). Not affected: D1 (no session), the vm_adversarial groups.
+
+### 10.6 Pre-existing failures, on an exact 17f7964c build (temporary worktree, deleted)
+
+`git worktree add --detach` 17f7964c (tree ef8c508d), `make nift` (339 s), each target run there
+(`scratchpad/b5/gates17f/`). A pre-existing failure is not a waiver: each goes to the
+release-blocker audit.
+
+| Target | 17f7964c | B5 | Cause | Resolve before release? |
+| --- | --- | --- | --- | --- |
+| test-runtime2-cp14b `script_return_kernel_error` | FAIL | FAIL, identical | `a := []; return a.pop()` refused `type:script-return` (a B3 N1 refinement regressed after B3) | yes: a precision regression of an admitted form; release-blocker audit |
+| test-cp19-proof-cli | FAIL | FAIL, identical | needs `CP19_LEGACY_ORACLE` (the frozen legacy binary) | harness input: must run (with the oracle) on the certification instance |
+| test-cp19-s1-dispatch | FAIL | FAIL, identical | `run()` refused `callable:run` | no for VM support (owner release scope defers run()/cmd()); the target's expectations must be reclassified to the release scope before certification |
+| test-cp19-shared-eval | FAIL | FAIL, identical | expects `NIFT_VM=require` in a refusal note the CLI no longer prints | yes (stale harness expectation; fix the harness or the note) |
+| test-cp19-admission-mutants | FAIL (case `wrapper` control: probe refused by the Phase A guard) | FAIL (case `loop` control: `session:current-callable-proof`; `wrapper`, `field` pass now) | B5: the E-U6-1 family (a historical closure calling a callable read from a captured array, `scratchpad/b5/cp19/loop-witness.in`); previously admitted by the B4b control, refused before any effect now | yes: tied to the E-U6-1 owner decision (10.5) |
+| test-cp19-session-mutants | FAIL (m7 contract: statement 2 refused by the guard) | FAIL (m7: statement 2 admitted now, statement 3 `nested[0][1]` refused `type:index`) | B5: U6's single heap pool for every depth (nested[0] may be a number or callable); not admitted at the B4b tip either | yes: harness witness must be rebuilt for B5 semantics, the `type:index` precision noted |
+| cp25r-inventory | FAIL (after `make .build/rt-parse-dump`) | FAIL, identical 6 reasons | classify-all compiles `rt-diff-corpus/async/{fileops,thread}` without the cooperative switches (the tooling artefact of the existing `coro-blocking-host:exists` row); both run on the VM in real runs at 17f7964c and B5 | yes: classify the six reasons (tooling) or fix classify-all's switches |
+| test-runtime2-vm-corpus | 155 FAIL lines | 124 (subset) | default-environment goldens (section 5) | release-blocker audit |
+
+### 10.7 trim audit evidence (scratchpad/b5/trim/)
+
+`expected.v1.json` (original) and `expected.json` (v2) unchanged; `expected.v3.json` adds the
+corrected expectation of the 97 with both originals alongside. `CORRECTIONS.tsv`: 284 rows, one
+per changed expectation (187 v1->v2, 97 v2->v3): program, stage, category, original expected,
+corrected expected, actual on the B5 probe build and on production, the B4b tip and legacy, and
+the rule. v1->v2: 114 sort-refusal rows (D3), 73 async/thread rows (D7/Q4 graph copy; expectation =
+legacy's output). v2->v3: 52 async/thread (category a: section 3 "Threads, parallel async" /
+"Cooperative async (D7)": instances cross with their descriptor, "dL for instances (legacy
+refuses)"; v2 kept legacy's `future: undefined callable: C`); 20 reverse()/sort() identity
+(category b: Q3 "Call arguments"/"Returns"/"Element/field store" + B4b 32 receiver identity,
+`kCollectionResults`; + Q7 for the comparator context: the v1/v2 oracle ce0a9a44 gave the result a
+new site and copied); **25 FLAGGED, tied to no approved rule**: 13 still refused `method:splice`
+(category c, a classifier omission; the refusal itself pre-exists) and 12 still refused
+`builtin-receiver:trim` (category d, the receiver flows through a function-returned `reverse()`; a
+remaining precision gap of item B). All 284 B5 results are refusals before any effect, success or
+ordinary errors; no exit 70. The 54 rows whose B5 result does not match their v2 correction are
+exactly those whose v2 expectation the v3 stage corrected. 36 rows differ between the probe and
+production builds, all by the D2 gate (`method:sort`). This is evidence for the reviewer, not a
+classification by the implementer.
+
+### 10.8 Gates on the freeze code (B5 12, `scratchpad/b5/gates/final-*.result`)
+
+Batch `scratchpad/b5/final_gates2.sh` on B5 12 (`c775c425`, tree `ba9dd0be`; B5 13 is this
+record only), production binary sha256 ac283072..., each result with its command, exit code and
+summary in `scratchpad/b5/gates/final-<target>.result` (logs `final-<target>.log`); every make
+target's repository status before/after unchanged.
+
+**PASS (46):** test-rt-lint, test-runtime2-b3, -b4, -b4b, -b5 (73 fixture programs incl.
+loopclosure; sort-refusals 564), -b4b-fixpoint, -b4-mutants, -b4b-mutants, -b5-mutants, -guardoff,
+-refsem, -refsem-mutants, -collections, -packages, -args-cmd, -args-cmd-mutants, -safety,
+-coro-module, test-rt-refrep, test-rt-refrep-mutants, test-runtime2-vm-default, test-cp19-session,
+-session-cli, -proof, -proof-mutants, test-runtime2-for-s2, -for-s2-mutants, -closures-s1,
+-closures-s1-mutants, -capture-origins, -cp14b-design-mutants, -cp14b-witnesses, -cp14b-sort,
+-cp18-cow, -cp22, -cp23, test-cp25r, test-runtime2-rt-diff, -d040-witnesses, vm-unit, vm_parity
+(--gen 300 --seed 1), vm_adversarial (--seed 1 --count 600: 0 non-approved), gen1 (production,
+20,274 programs, 0 bad), gen_struct (production, 1,911, 0 bad), gen_alias (production, 12,600, 0
+bad), sort-refusals on the probe build.
+
+**FAIL (7 make targets), all pre-existing (10.6), failure signatures identical to the fin batch:**
+cp25r-inventory (6 unclassified reasons), test-cp19-admission-mutants (case `loop` control only:
+the other 13 cases' controls pass when run one by one), test-cp19-proof-cli, test-cp19-s1-dispatch,
+test-cp19-session-mutants, test-cp19-shared-eval, test-runtime2-cp14b (`script_return_kernel_error`).
+
+**Negative controls (expected to fail, and do):** gen1 and gen_struct pointed at a missing tree
+(`NIFT_TREE=/nonexistent/tree`) exit 2 with "required input missing: ..." and write no programs
+(`final-gen1-negative-control.result`, `final-gen_struct-negative-control.result`). The
+generators (`scratchpad/b5/gtools/`) read the builtin table from the tree the nift binary was
+built in (or NIFT_TREE) and fail loudly when it is missing or truncated.
+
+**Repository state:** `git status --porcelain --ignored` after the batch lists only ignored build
+products (objects, dependency files, `.cfg` compile-configuration sidecars of
+`scripts/build/compile-object.sh`, `.build/`, `nift`) plus three `__pycache__` directories
+(interpreter caches of harness runs made without PYTHONDONTWRITEBYTECODE, some older than this
+session): deleted; the re-check lists build products only
+(`final-git-status-ignored-after-cleanup.txt`). No tracked or untracked change.
+
+Verified by these gates: snapshot iteration (b5/q3 r05/r06, refsem loop rows, for-s2,
+capture_origins live-read rows; the 1M-element snapshot memory gate `test-runtime2-b5-snapshot-memory` (B5 9) runs `for_s2.py`, the same command as test-runtime2-for-s2, cases g9_million/g9_million_write under a 40 MB heap budget),
+closure bindings (b5/loopclosure, closures-s1, capture_origins D1 rows), comparator-sort atomicity
+(b5/sort and cp14b-sort on the PROBE build only, see 10.2).
+
+### 10.9 Measures (deterministic; wall clock is Linode only)
+
+B5 11 to B5 13 change no production source: the production binary is byte-identical to the one
+the fin batch measured (sha256 ac283072...). Measures already recorded stand: trim item B +26
+instructions per newly checked call (callgrind, +2.0% of a trim loop iteration; static sites
+unchanged); 1M-element loop snapshot peak 32.8 MB (array + snapshot, +0.95x, plan section 7 allows
++1x; permanent gate). No new instruction or memory cost from D1 to D4.
+
+### 10.10 What Linode must cover
+
+GCC 15.2 build (D2: production comparator sort, `b5/sort` on production, cp14b-sort on
+production); the full `make test`, sanitizers (incl. `test-runtime2-guardoff-sanitize`), the
+regression suite, the cp19 targets with `CP19_LEGACY_ORACLE`; wall-clock: trim checked-path
+overhead and the website-build benchmarks against v4.12; the 1M snapshot memory gate.
+
+### 10.11 Owner decisions still needed
+
+1. E-U6-1 / D4: accept the refusal as a documented precision limitation, or approve the
+   heap-effect-summary design (10.5); the cp19 admission-mutant `loop` case follows it.
+2. The 25 flagged trim-audit rows (10.7) are refusals before any effect with no approved rule
+   (precision gaps, not semantic changes): reviewer/owner classification.
+3. The release-blocker audit list of 10.6.
