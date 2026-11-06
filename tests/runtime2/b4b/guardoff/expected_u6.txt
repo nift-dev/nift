@@ -10,3 +10,7 @@ u6_session_alias.in unexpected operands (compiler defect)
 u6_call_param_store.in unexpected operands (compiler defect)
 u6_call_global_inner.in unexpected operands (compiler defect)
 u6_call_mix_param.in unexpected operands (compiler defect)
+# Review of 17f7964c (R5-L3): a receiver-returning method's result in an earlier statement
+# (`ys := xs.reverse()`) is siteless like the earlier value, so a later store through it is the
+# same class (guard on: refused before any effect, reference-guard:inflow).
+u6_receiver_result.in unexpected operands (compiler defect)

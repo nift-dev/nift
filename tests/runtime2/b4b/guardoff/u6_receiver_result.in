@@ -1,0 +1,5 @@
+xs := [" a "]
+ys := xs.reverse()
+ys[0] = 5
+print(xs[0].trim())
+print("end")

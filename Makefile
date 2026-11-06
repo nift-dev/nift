@@ -1009,6 +1009,7 @@ test-runtime2-guardoff: $(B4B_GUARDOFF_NIFT)
 	$(PYTHON) tests/runtime2/safety/fuzz.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --seed 1 --sample 3000 \
 		--session-sample 1000
 	$(PYTHON) tests/runtime2/b4b/guardoff.py --guardoff "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/b4b/result_identity.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)"
 	$(PYTHON) tests/runtime2/repo_state.py check "$(B4B_GUARDOFF_STATE)"
 # The ASan/UBSan variant of the guard-off build (owner ruling): the sanitizer CLI's
 # objects with the reference-probe compiler objects, on a sample. Expensive to build

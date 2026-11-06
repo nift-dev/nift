@@ -6,6 +6,12 @@ review of `c56c4093` (REJECT) is answered by B4 9 to B4 17 (section 10) and the 
 `569e336f` (ACCEPT WITH CONDITIONS) by B4 18 to B4 21. B4b continues on the same branch after
 this boundary (`docs/runtime-2/checkpoints/b4b-element-types.md`).
 
+**B4b: ACCEPTED WITH CONDITIONS** (independent narrow re-review of `17f7964c`, tree `ef8c508d`,
+`scratchpad/review-b4b-r5/REVIEW.md`; conditions R5-L1 to R5-L3, all Low, closed on the B5 branch:
+b4b-element-types.md section 20). The B4 checkpoint (B4a `0df0df6c` + B4b) ends at **`17f7964c`**;
+B5 starts from it (`cand/b5-refsem`). The section 9 B5 prerequisite is answered in the B5 record
+(`docs/runtime-2/checkpoints/b5-refsem.md`).
+
 Plan: Phase B plan §5.6, §5.7 and "B4"; owner decisions of 2026-11-02 (Q9, rendering ruling), the
 2026-11-04 addendum ("B3 decisions (2026-11-05 23:13)": the B4 acceptance invariants), the owner's
 B4 rulings (relayed 2026-11-06) and the coordinator's plan rulings 1-7 (2026-11-06).
