@@ -18,6 +18,9 @@
                      orders, in functions, lambdas and globals: refused before any effect,
                      `aliasing` by the guard, `builtin-receiver:trim` with --guardoff (the
                      reader's `trim` is on anything); never exit 70
+  b4b/admission/     B4b 23: the recorded admission differences against B4a and a42035c1
+                     (expect.txt; `glob` from 16 helpers refused `builtin-receiver:trim`
+                     before any effect, exit 1), each with its expected-future marker
   b4b/sessions/*.in  C5: a session function or lambda reading an element stored by a
                      later statement: each statement's output equals legacy's until
                      the VM refuses one (then nothing more runs)
@@ -284,6 +287,28 @@ def widen(nift, work):
               (label, expected, got, reasons or ve[-200:]))
 
 
+def admission(nift, work):
+    """B4b 23: each recorded admission difference holds as recorded (the same with --guardoff): a
+    refusal is before any effect with exit 1 (judge), and its reason is the recorded one. The
+    expected-future marker is printed: a change of outcome must update expect.txt and the record."""
+    d = os.path.join(HERE, "admission")
+    rows = [line.split(None, 3) for line in open(os.path.join(d, "expect.txt"))
+            if line.strip() and not line.startswith("#")]
+    for name, now, before, future in rows:
+        src = open(os.path.join(d, name)).read()
+        label = "admission " + name
+        got = judge(label, nift, {"main.f": src}, work)
+        _, ve, vr, rows_ = run(nift, {"main.f": src}, "require", work)
+        if now.startswith("refuse:"):
+            reason = now.split(":", 1)[1]
+            check(got == "refused" and vr == 1 and any(r.get("reason") == reason for r in rows_),
+                  "%s: expected the %s refusal (exit 1, before any effect), got %s %r" % (label, reason, got, ve[-200:]))
+        else:
+            check(got == now, "%s: expected %s, got %s %r" % (label, now, got, ve[-200:]))
+        if future.startswith("recover:"):
+            print("admission %s: %s (B4a and a42035c1: %s); expected future: %s" % (name, now, before, future))
+
+
 def compile_row(nift, src, work):
     _, _, _, rows = run(nift, {"main.f": src}, "require", work)
     return rows[-1] if rows else {}
@@ -374,6 +399,7 @@ def main():
                 outcomes[judge("module " + case, nift, tree_files(tree), work)] += 1
         sessions(nift, work)
         widen(nift, work)
+        admission(nift, work)
         convergence(nift, work)
         print("fixtures: %(vm)d run by the VM (equal to legacy), %(refused)d refused before any effect" % outcomes)
         if not args.guardoff:

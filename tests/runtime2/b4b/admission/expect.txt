@@ -1,0 +1,13 @@
+# B4b admission differences against B4a 0df0df6c and a42035c1 (docs/runtime-2/compatibility.md;
+# docs/runtime-2/checkpoints/b4b-element-types.md section 14). `glob`: one global array receiving
+# a container from each of N helpers, then `acc[1][1].trim()`. From 16 helpers the element
+# union has more than 16 allocation sites: its contents read as anything (F1, B4b 15), and
+# `trim` on anything is not admitted (B4a's admission, unchanged): refused before any effect,
+# exit 1. B4a and a42035c1 admitted these with a Static `trim` (the result was right: the
+# elements are strings). Provisionally accepted (owner, 2026-11-06 15:16).
+#
+# file      now                          B4a and a42035c1   expected future (marker)
+glob15.f    vm                           vm                 -
+glob16.f    refuse:builtin-receiver:trim vm                 recover:vm B5 decision: a runtime-kind check (Dynamic) for trim and the related string built-ins
+glob17.f    refuse:builtin-receiver:trim vm                 recover:vm B5 decision: a runtime-kind check (Dynamic) for trim and the related string built-ins
+glob100.f   refuse:builtin-receiver:trim vm                 recover:vm B5 decision: a runtime-kind check (Dynamic) for trim and the related string built-ins
