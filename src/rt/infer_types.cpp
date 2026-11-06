@@ -100,6 +100,8 @@ bool covers(const TyRef& a, const TyRef& b, int depth) {
 }
 } // namespace
 
+thread_local std::size_t* unite_work = nullptr;
+
 TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     if (!a || a.get() == empty_ty().get()) return b ? b : empty_ty();
     if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return a;
@@ -107,6 +109,9 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
         if ((a->kinds | b->kinds) & kKindUnknown) return any_ty();
         return top_ty();
     }
+    if (unite_work)  // B4b 23: one type plus the entries of both operands
+        *unite_work += 1 + a->sites.size() + b->sites.size() + a->fields.size() + b->fields.size() +
+                       a->items.size() + b->items.size() + a->callables.size() + b->callables.size();
     if (covers(a, b, depth)) return a;
     auto t = std::make_shared<Ty>();
     t->kinds = a->kinds | b->kinds;

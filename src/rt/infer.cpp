@@ -39,6 +39,11 @@ Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const Gl
     }
 }
 UnitKinds Inference::run(std::size_t max_walks) {
+    struct Counting {  // B4b 23: the type unions of this run count into its work
+        std::size_t* saved;
+        explicit Counting(std::size_t* to) : saved(unite_work) { unite_work = to; }
+        ~Counting() { unite_work = saved; }
+    } counting(&result_.work.unite_items);
     const std::size_t n = plan_.functions.size();
     callers_.assign(n, {});
     queued_.assign(n + 1, false);

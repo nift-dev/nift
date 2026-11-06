@@ -289,17 +289,13 @@ def compile_row(nift, src, work):
     return rows[-1] if rows else {}
 
 
-def best_compile(nift, src, work, runs=7):
-    """The best compile time of `runs` runs, whatever the outcome (the guard refuses `many` and
-    `nestb` after the analysis); None if any run stopped at an analysis limit (F1)."""
-    best = None
-    for _ in range(runs):
-        row = compile_row(nift, src, work)
-        if not row or str(row.get("reason", "")).startswith("analysis-limit"):
-            return None
-        us = row.get("compile_us")
-        best = us if best is None or (us is not None and us < best) else best
-    return best
+def compile_us(nift, src, work):
+    """One compile time, whatever the outcome (the guard refuses `many` and `nestb` after the
+    analysis); None if the run stopped at an analysis limit (F1)."""
+    row = compile_row(nift, src, work)
+    if not row or str(row.get("reason", "")).startswith("analysis-limit"):
+        return None
+    return row.get("compile_us")
 
 
 def convergence(nift, work):
@@ -313,46 +309,37 @@ def convergence(nift, work):
             check(not reason.startswith("analysis-limit"), "convergence %s %d: refused %s" % (name, n, reason))
 
 
-def compile_scaling(nift, work, baseline=None):
-    """Compile time: the container-heavy shape (four times the containers within twelve times the
-    time), the review H2 shape (one global array, n helpers each adding a site) and the F1 shapes
-    (`many`, `nestb`: the array a parameter): near-linear, four times the helpers within six times
-    the time; with --baseline, within 1.5x of B4a at every size, the ratio not rising with the size."""
+def median(values):
+    values = sorted(values)
+    k = len(values) // 2
+    return values[k] if len(values) % 2 else (values[k - 1] + values[k]) / 2.0
+
+
+def compile_scaling(nift, work, baseline=None, runs=7):
+    """Compile time (`compile_us`) of the scaling shapes at 100, 400, 800 and 1,600 helpers: the
+    container-heavy shape, the review H2 shape (one global array, n helpers each adding a site) and
+    the F1 shapes (`many`, `nestb`: the array a parameter). Guidance only (B4b 23): the gate is the
+    deterministic analysis-work count (tests/runtime2/b4b/work.py); a wall-clock bound is flaky on a
+    shared machine. Printed: the median of `runs` runs, with --baseline (B4a) interleaved run by
+    run, and the ratio of the medians (the Linode objective: within 1.5x of B4a). Checked: no run
+    stops at an analysis limit (deterministic)."""
     sizes = (100, 400, 800, 1600)
-    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, sizes, 6), ("many", many, sizes, 6),
-              ("nestb", nestb, sizes, 6))
-    for name, make, sizes, bound in shapes:
-        times, base = {}, {}
-        for n in sizes:  # the two binaries interleaved, so a load change affects both alike
+    for name, make in (("containers", containers), ("glob", glob), ("many", many), ("nestb", nestb)):
+        cells = []
+        for n in sizes:
             src = make(n)
-            times[n], base[n] = None, None
-            for _ in range(7):
-                t = best_compile(nift, src, work, 1)
-                times[n] = t if times[n] is None or (t is not None and t < times[n]) else times[n]
-                if t is None:
-                    times[n] = None
-                    break
+            tip, base = [], []
+            for _ in range(runs):  # interleaved, so a load change affects both alike
+                t = compile_us(nift, src, work)
+                check(t is not None, "compile scaling %s %d: stopped at an analysis limit" % (name, n))
+                tip.append(t or 0)
                 if baseline:
-                    b = best_compile(baseline, src, work, 1)
-                    base[n] = b if base[n] is None or (b is not None and b < base[n]) else base[n]
-        for small, large in zip(sizes, sizes[1:]):
-            check(times[small] is not None and times[large] is not None and times[large] <= bound * times[small],
-                  "compile scaling %s: %r us for %d, %r us for %d (must be <= %dx)" %
-                  (name, times[small], small, times[large], large, bound))
-        line = "compile scaling %s: %s" % (name, ", ".join("%d %.0f us" % (n, times[n] or 0) for n in sizes))
-        if baseline:
-            ratios = [(times[n] or 0) / (base[n] or 1) for n in sizes]
-            if name != "containers":
-                # Review H2: the growth is gone, not moved to larger sizes: the ratio to B4a does not
-                # rise from size to size by more than noise (10%), besides staying within 1.5x.
-                for (small, r1), (large, r2) in zip(zip(sizes, ratios), zip(sizes[1:], ratios[1:])):
-                    check(r2 <= r1 * 1.10 + 0.05, "compile scaling %s: the ratio to B4a grows from %.2fx at %d to "
-                          "%.2fx at %d" % (name, r1, small, r2, large))
-            for n in sizes:
-                check(times[n] is not None and base[n] and times[n] <= 1.5 * base[n],
-                      "compile scaling %s %d: %r us against B4a %r us (must be <= 1.5x)" % (name, n, times[n], base[n]))
-            line += "; B4a " + ", ".join("%d %.0f us (%.2fx)" % (n, base[n] or 0, r) for n, r in zip(sizes, ratios))
-        print(line)
+                    base.append(compile_us(baseline, src, work) or 0)
+            cell = "%d %.0f us" % (n, median(tip))
+            if baseline:
+                cell += " (B4a %.0f us, %.2fx)" % (median(base), median(tip) / (median(base) or 1))
+            cells.append(cell)
+        print("compile scaling %s (median of %d, guidance): %s" % (name, runs, ", ".join(cells)))
 
 
 def main():
@@ -360,7 +347,8 @@ def main():
     ap.add_argument("--nift", required=True)
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--guardoff", action="store_true")
-    ap.add_argument("--baseline", help="B4a nift: the compile scaling shapes within 1.5x of it")
+    ap.add_argument("--baseline", help="B4a nift: the compile times printed against it (guidance)")
+    ap.add_argument("--runs", type=int, default=7, help="compile scaling: runs per size (the median)")
     args = ap.parse_args()
     GUARDOFF[0] = args.guardoff
     nift = os.path.abspath(args.nift)
@@ -389,7 +377,7 @@ def main():
         convergence(nift, work)
         print("fixtures: %(vm)d run by the VM (equal to legacy), %(refused)d refused before any effect" % outcomes)
         if not args.guardoff:
-            compile_scaling(nift, work, args.baseline)
+            compile_scaling(nift, work, args.baseline, args.runs)
         stats = generator(nift, work, args.quick)
         print("generator: %(programs)d programs, %(vm)d run by the VM" % stats)
     finally:

@@ -191,6 +191,8 @@ struct UnitKinds {
         std::size_t materializations = 0;  // site reads computed (not taken from the memo)
         std::size_t site_unions = 0;       // site classes merged
         std::size_t reader_moves = 0;      // reader entries moved by those merges
+        std::size_t site_items = 0;        // site entries of values mapped to their classes (a type's size)
+        std::size_t unite_items = 0;       // types built by unions of types, with their operands' entries
     } work;
     KindSet of(NodeId id) const {
         return id < kinds.size() ? kinds[id] : static_cast<KindSet>(kKindAll | kKindUnknown);

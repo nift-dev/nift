@@ -198,6 +198,7 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
 }
 
 std::vector<std::uint32_t> Inference::classes(const std::vector<std::uint32_t>& sites, bool& open) {
+    result_.work.site_items += sites.size();
     std::vector<std::uint32_t> out;
     bool collapsed = false;
     for (std::uint32_t s : sites) {

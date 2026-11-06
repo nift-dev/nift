@@ -1,0 +1,222 @@
+{
+ "commit": "0df0df6c (B4a)",
+ "counts": {
+  "containers": {
+   "100": {
+    "converged": 1,
+    "enqueues": 202,
+    "materializations": 0,
+    "nodes": 10000,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 3900,
+    "units": 101,
+    "walks": 202
+   },
+   "1600": {
+    "converged": 1,
+    "enqueues": 3202,
+    "materializations": 0,
+    "nodes": 160000,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 62400,
+    "units": 1601,
+    "walks": 3202
+   },
+   "400": {
+    "converged": 1,
+    "enqueues": 802,
+    "materializations": 0,
+    "nodes": 40000,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 15600,
+    "units": 401,
+    "walks": 802
+   },
+   "800": {
+    "converged": 1,
+    "enqueues": 1602,
+    "materializations": 0,
+    "nodes": 80000,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 31200,
+    "units": 801,
+    "walks": 1602
+   }
+  },
+  "glob": {
+   "100": {
+    "converged": 1,
+    "enqueues": 106,
+    "materializations": 0,
+    "nodes": 2076,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 530,
+    "units": 101,
+    "walks": 106
+   },
+   "1600": {
+    "converged": 1,
+    "enqueues": 1606,
+    "materializations": 0,
+    "nodes": 32076,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 8030,
+    "units": 1601,
+    "walks": 1606
+   },
+   "400": {
+    "converged": 1,
+    "enqueues": 406,
+    "materializations": 0,
+    "nodes": 8076,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 2030,
+    "units": 401,
+    "walks": 406
+   },
+   "800": {
+    "converged": 1,
+    "enqueues": 806,
+    "materializations": 0,
+    "nodes": 16076,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 4030,
+    "units": 801,
+    "walks": 806
+   }
+  },
+  "many": {
+   "100": {
+    "converged": 1,
+    "enqueues": 202,
+    "materializations": 0,
+    "nodes": 3236,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 1713,
+    "units": 101,
+    "walks": 202
+   },
+   "1600": {
+    "converged": 1,
+    "enqueues": 3202,
+    "materializations": 0,
+    "nodes": 51236,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 27213,
+    "units": 1601,
+    "walks": 3202
+   },
+   "400": {
+    "converged": 1,
+    "enqueues": 802,
+    "materializations": 0,
+    "nodes": 12836,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 6813,
+    "units": 401,
+    "walks": 802
+   },
+   "800": {
+    "converged": 1,
+    "enqueues": 1602,
+    "materializations": 0,
+    "nodes": 25636,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 13613,
+    "units": 801,
+    "walks": 1602
+   }
+  },
+  "nestb": {
+   "100": {
+    "converged": 1,
+    "enqueues": 202,
+    "materializations": 0,
+    "nodes": 3676,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 2677,
+    "units": 101,
+    "walks": 202
+   },
+   "1600": {
+    "converged": 1,
+    "enqueues": 3202,
+    "materializations": 0,
+    "nodes": 58536,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 42767,
+    "units": 1601,
+    "walks": 3202
+   },
+   "400": {
+    "converged": 1,
+    "enqueues": 802,
+    "materializations": 0,
+    "nodes": 14648,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 10695,
+    "units": 401,
+    "walks": 802
+   },
+   "800": {
+    "converged": 1,
+    "enqueues": 1602,
+    "materializations": 0,
+    "nodes": 29276,
+    "planned": 1,
+    "reader_moves": 0,
+    "site_items": 0,
+    "site_unions": 0,
+    "unite_items": 21377,
+    "units": 801,
+    "walks": 1602
+   }
+  }
+ },
+ "how": "bash tests/runtime2/b4b/work_build.sh 0df0df6c H && python3 tests/runtime2/b4b/work.py --harness H --measure (B4b 23, on the tree of B4b 23: B4a's inference objects with the counters at the points named in work_build.sh, the B4b 23 harness and unit objects)"
+}

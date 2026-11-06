@@ -57,6 +57,8 @@ TyRef kinds_ty(KindSet kinds);
 TyRef collection_ty(KindSet kinds, std::uint32_t site);
 TyRef with_text_number(const TyRef&,bool maybe);
 TyRef unite(const TyRef& a, const TyRef& b, int depth = 0);
+// B4b 23: while the inference runs, the sizes of the types `unite` combines (UnitKinds::work).
+extern thread_local std::size_t* unite_work;
 bool same(const TyRef& a, const TyRef& b);
 // The type of `value[key]` (key: a literal string, or null when unknown;
 // position: an integer literal index, or -1).

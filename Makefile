@@ -959,9 +959,22 @@ test-rt-b4b-types-unit: $(RT_B4B_TYPES)
 	"$(RT_B4B_TYPES)"
 # B4b: the end-to-end suite (fixtures with a legacy differential, the mutator
 # classification check, the wrong-kind generator) and its mutation controls.
+# B4b 23: the compile-scaling gate on deterministic analysis-work counts (tests/runtime2/b4b/work.py,
+# against B4a's counts in work_b4a.json); the wall-clock compile times are guidance only.
+RT_B4B_WORK := $(TEST_DIR)/rt/b4b-work$(EXEEXT)
+$(RT_B4B_WORK): tests/rt/b4b_work.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	mkdir -p "$(TEST_DIR)/rt"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/b4b_work.cpp $(RT_UNIT_OBJECTS) -o "$@"
+.PHONY: test-runtime2-b4b-work
+test-runtime2-b4b-work: $(RT_B4B_WORK)
+	$(PYTHON) tests/runtime2/b4b/work.py --self-test
+	$(PYTHON) tests/runtime2/b4b/work.py --harness "$(CURDIR)/$(RT_B4B_WORK)"
 .PHONY: test-runtime2-b4b test-runtime2-b4b-mutants
-test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES)
+test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES) $(RT_B4B_WORK)
 	"$(RT_B4B_TYPES)"
+	$(PYTHON) tests/runtime2/b4b/work.py --harness "$(CURDIR)/$(RT_B4B_WORK)"
 	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)"
 # B4b review (L4): the standing guard-off gate. The CLI linked with the B2
 # reference-probe compiler objects (-DNIFT_RT_REFERENCE_PROBE: no Phase A guard,

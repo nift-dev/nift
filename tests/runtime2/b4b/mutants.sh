@@ -2,7 +2,8 @@
 # B4b mutation controls (docs/runtime-2/checkpoints/b4b-element-types.md): each
 # mutant rebuilds the translation units holding its deliberate defect
 # (-DNIFT_B4B_MUTANT=n), links them into the inference oracle
-# (b4b-types-unit) and into nift; the oracle or the b4b suite must FAIL.
+# (b4b-types-unit), the analysis-work harness (b4b-work) and nift; the oracle, the work
+# gate or the b4b suite must FAIL.
 #   mutants.sh <nift> [n ...]   (default: every mutant)
 set -u
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
@@ -53,8 +54,12 @@ for n in "${list[@]}"; do
   ulibs=$(printf '%s\n' $unit_objects | grep '\.a$' | tr '\n' ' ')
   $CXX $CPPFLAGS -Itests/rt $CXXFLAGS tests/rt/b4b_types_unit.cpp $ulink "${built[@]}" -ldl $ulibs -o "$OUT/unit-$n" \
     || { echo "mutant A$n: unit link failed"; exit 2; }
-  unit=0; suite=0; guard="-"
+  # B4b 23: the analysis-work gate (tests/runtime2/b4b/work.py) on the mutant's inference
+  $CXX $CPPFLAGS -Itests/rt $CXXFLAGS tests/rt/b4b_work.cpp $ulink "${built[@]}" -ldl $ulibs -o "$OUT/work-$n" \
+    || { echo "mutant A$n: work harness link failed"; exit 2; }
+  unit=0; suite=0; guard="-"; workgate=0
   "$OUT/unit-$n" > "$OUT/u$n.log" 2>&1 || unit=1
+  python3 tests/runtime2/b4b/work.py --harness "$OUT/work-$n" > "$OUT/w$n.log" 2>&1 || workgate=1
   python3 tests/runtime2/b4b_types.py --nift "$OUT/nift-$n" --quick > "$OUT/m$n.log" 2>&1 || suite=1
   if [ -n "$guardoff_objects" ]; then
     glink=$(filter "$(printf '%s\n' $guardoff_objects | grep -v '\.a$')")
@@ -63,12 +68,12 @@ for n in "${list[@]}"; do
       python3 tests/runtime2/b4b/gen_alias.py --nift "$OUT/guardoff-$n" --sample 600 --seed 1; } > "$OUT/g$n.log" 2>&1 \
       && guard=passed || guard=failed
   fi
-  if [ $unit -eq 0 ] && [ $suite -eq 0 ] && [ "$guard" != failed ]; then
+  if [ $unit -eq 0 ] && [ $suite -eq 0 ] && [ $workgate -eq 0 ] && [ "$guard" != failed ]; then
     echo "mutant A$n (${FILES[$n]}): SURVIVED"; fail=1
   else
-    echo "mutant A$n (${FILES[$n]}): caught (oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases; suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks; guard-off $guard)"
+    echo "mutant A$n (${FILES[$n]}): caught (oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases; suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks; work gate $(grep -c '^FAIL ' "$OUT/w$n.log") failures; guard-off $guard)"
   fi
-  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n"
+  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n" "$OUT/work-$n"
 done
 [ $fail -eq 0 ] && echo "PASS b4b mutants: ${#list[@]} caught" || echo "FAIL b4b mutants"
 exit $fail
