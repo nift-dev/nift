@@ -53,22 +53,11 @@ struct Binding {
     bool invocation = false;  // a script invocation binding (`cmd`, `args`), session or script
     std::uint16_t cell_reg = 0;
     std::uint16_t upvalue_index = 0;
-    // CP12C slice 2 lazy `for` read binding (array single form).
-    bool lazy_for = false;
     bool loop_binding = false;
     // A named iterable's slot is boxed only if an escaping selector needs it.
     // This internal owner does not imply mutation through a user closure.
     bool selector_root_only = false;
     bool location_source = false;
-    bool selector = false;
-    std::uint16_t selector_reg = 0;
-    bool lazy_pair = false;
-    std::uint16_t lazy_keys = 0;
-    std::string_view lazy_source_name;
-    std::string_view lazy_name;
-    std::uint16_t lazy_index = 0;
-    std::uint16_t lazy_active = 0;
-    std::shared_ptr<const Binding> lazy_source_binding;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

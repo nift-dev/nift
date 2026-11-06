@@ -143,21 +143,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
         const Capture& capture = task.captures[k];
         const std::uint16_t reg = capture_regs[k];
         const Binding& binding = capture.binding;
-        if (binding.selector) {
-            // A copied legacy descriptor keeps its source location until this
-            // particular binding is reassigned. Its cached iteration value is
-            // deliberately not the captured location.
-#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 3
-            fb_->emit(OpCode::Move, reg, binding.reg);
-#else
-            const std::size_t assigned = fb_->emit(OpCode::JmpFalse, binding.lazy_active);
-            fb_->emit(OpCode::CopyCellLocation, reg, binding.selector_reg);
-            const std::size_t done = fb_->emit(OpCode::Jmp);
-            fb_->patch(assigned, fb_->here());
-            fb_->emit(OpCode::CopyCellLocation, reg, binding.reg);
-            fb_->patch(done, fb_->here());
-#endif
-        } else if (capture.source == Capture::Source::LocalCell) {
+        if (capture.source == Capture::Source::LocalCell) {
             fb_->emit(binding.loop_binding ? OpCode::CopyCellLocation : OpCode::Move, reg, capture.index);
         } else {
             fb_->emit(OpCode::GetUpvalueCell, reg, capture.index);

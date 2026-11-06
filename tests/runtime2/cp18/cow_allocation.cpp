@@ -333,9 +333,8 @@ static void reference_model_campaigns() {
 // A persistent session under repeated allocation failure: a failed statement
 // never corrupts or nulls a binding, later statements recover, and nothing
 // leaks across statements or after the session.
-static void session_campaign() {
+static void session_pass(bool report) {
     using namespace nift::rt;
-    const auto base_allocations = outstanding_allocations;
     {
         VmSession session;
         std::string out;
@@ -372,9 +371,22 @@ static void session_campaign() {
         out.clear();
         if (completed)
             CHECK(session.execute("print(a.length())","final",out).execution.reason == StopReason::None);
-        std::printf("reference model session: %d allocation sites; %d recoveries; complete %d; closed by an "
-                    "internal stop %d\n",sites,recovered,completed,closed);
+        if (report)
+            std::printf("reference model session: %d allocation sites; %d recoveries; complete %d; closed by an "
+                        "internal stop %d\n",sites,recovered,completed,closed);
     }
+}
+
+// B5: the baseline is taken after one complete warm-up pass over the same
+// failure schedule. A recovery path can be the first caller of a
+// function-local static singleton (B5: `infer_detail::any_ty()`, first
+// reached from session alias inference on a statement after an injected
+// failure, once per process). That allocation is not a leak; anything else
+// allocated and not freed during the measured pass still counts.
+static void session_campaign() {
+    session_pass(false);
+    const auto base_allocations = outstanding_allocations;
+    session_pass(true);
     CHECK(outstanding_allocations == base_allocations);
 }
 

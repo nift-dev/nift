@@ -143,7 +143,6 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
         }
         return fail(node, in_function_ ? "free-name" : "unresolved-name");
     }
-    if (binding->lazy_for) return for_lazy_read(*binding, reg);
     if (binding->global && !binding->cell)
         return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);
     return read_binding(*binding, reg);

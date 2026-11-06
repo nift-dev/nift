@@ -84,35 +84,26 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
         state.place = &state.source_holder;
     }
     if (iterable.kind == NodeKind::Ident && !snapshot) state.source_name = text(iterable);
-    // B5 (D5; plan §3 Iteration, §8 Q3 rows 5-6; B2 coordinator ruling 1): a loop over a binding
-    // iterates the shallow snapshot taken at entry, as a loop over an expression result does (the
-    // held value, IterCheck c = 1): the length is invariant, the elements are the original
-    // references, and the body's mutations change the container, not the active iteration. The
-    // live re-read path (legacy's model: live element reads, lazy element locations) is unused.
-#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1
-    state.live = !state.error_only && state.place != nullptr;  // M1 (B5): live re-reads again
-#else
-    state.live = false;
-#endif
+    // B5 (D5; plan §3 Iteration, §8 Q3 rows 5-6; B2 coordinator ruling 1): every loop, over a
+    // binding or an expression result, iterates the shallow snapshot taken at entry (the held
+    // value, IterCheck c = 1): the length is invariant, the elements are the original references,
+    // and the body's mutations change the container, not the active iteration. Legacy's model
+    // (live element reads, lazy element locations) and its compiler path are deleted (B5 4).
+    // `place`/`source_name` remain only for the vanished-element analysis below.
 
     if (!state.error_only) {
-        if (state.live && !state.snapshot_mutant) {
-            if (!for_read_source(*state.place, state.entry, state.entry_temp)) return false;
-        } else {
-            if (!temp(state.held) || !expr_to(header.a, state.held)) return false;
-            // B2: a result copied out of a freed temporary (a call's window)
-            // drops that copy, so a fresh result is held once and needs no
-            // entry snapshot.
-            const Instr& last = fb_->at(fb_->here() - 1);
-            if (last.op == OpCode::Move && last.a == state.held && last.b != state.held && last.b >= fb_->top())
-                fb_->emit(OpCode::LoadNull, last.b);
-            state.entry = state.held;
-            state.entry_temp = false;
-        }
+        if (!temp(state.held) || !expr_to(header.a, state.held)) return false;
+        // B2: a result copied out of a freed temporary (a call's window)
+        // drops that copy, so a fresh result is held once and needs no
+        // entry snapshot.
+        const Instr& last = fb_->at(fb_->here() - 1);
+        if (last.op == OpCode::Move && last.a == state.held && last.b != state.held && last.b >= fb_->top())
+            fb_->emit(OpCode::LoadNull, last.b);
+        state.entry = state.held;
+        state.entry_temp = false;
         fb_->set_offset(node.begin);
         // c = 1 (B2): the loop holds the value itself; snapshot it if shared.
-        fb_->emit(OpCode::IterCheck, state.entry, static_cast<std::uint16_t>(state.mode),
-                  static_cast<std::uint16_t>(state.live && !state.snapshot_mutant ? 0 : 1));
+        fb_->emit(OpCode::IterCheck, state.entry, static_cast<std::uint16_t>(state.mode), 1);
     } else {
         if (iterable.kind == NodeKind::Ident) {
             const Binding* binding = find_binding(text(iterable));
@@ -158,15 +149,6 @@ bool UnitCompiler::for_finish(ForState& state) {
     for (std::size_t at : loops_.back().continues) fb_->patch(at, increment);
 #endif
     fb_->set_offset(node.begin);
-#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 2
-    if (state.live && !state.pair) {  // M1b: dynamic length also after each body
-        std::uint16_t fresh = 0;
-        bool fresh_temp = false;
-        if (!for_read_source(*state.place, fresh, fresh_temp)) return false;
-        fb_->emit(OpCode::Length, state.count, fresh, 0);
-        if (fresh_temp) for_clear_register(fresh);
-    }
-#endif
     if (state.body_start != 0)
         fb_->patch(fb_->emit(OpCode::JmpIncLt, state.index, state.count), state.body_start);
 
@@ -178,9 +160,7 @@ bool UnitCompiler::for_finish(ForState& state) {
     for (std::size_t at : loops_.back().breaks) fb_->patch(at, cleanup);
 #endif
     if (state.pair) for_clear_register(state.keys);
-    if (!state.live || state.snapshot_mutant) for_clear_register(state.held);
-    if (state.first_binding.selector) for_clear_register(state.first_binding.selector_reg);
-    if (state.second_binding.selector) for_clear_register(state.second_binding.selector_reg);
+    for_clear_register(state.held);
     if (state.has_loop) for_clear_register(state.loop_binding.reg);
     for_clear_register(state.first_binding.reg);
     if (state.pair) for_clear_register(state.second_binding.reg);

@@ -6,11 +6,11 @@
 #include "rt/string.h"
 
 // Default `for` iterator opcodes (CP12C slice 2). The iterator itself lives in
-// registers: the entry length/key list and the index. The source place is
-// re-read by compiler-generated code for every step (so mutations of existing
-// elements and reassignment of the binding are observed, and no second owning
-// reference to the collection is held across the body). These opcodes only do
-// the heap-free element/key lookups and the legacy form/type errors.
+// registers: the entry length/key list and the index. B5 (D5): the loop holds
+// its source value and iterates the shallow snapshot IterCheck takes when the
+// value is shared, so the body's mutations and rebinding of the source never
+// reach the active iteration. These opcodes do the snapshot, the element/key
+// lookups and the legacy form/type errors.
 
 namespace nift::rt {
 
@@ -20,13 +20,17 @@ const Note* note_at(const Proto* proto, const Instr* pc) {
 }
 } // namespace
 
-// D5 snapshots (D-NEXT-refsem): the budget for `n` copied Values (and a
-// map's index) before the copy is made, so a budget stop leaves nothing half
-// built (the VM's ordinary budget stop text).
-bool Vm::reserve_snapshot(std::size_t n, Fault& fault) {
+// D5 snapshots (D-NEXT-refsem): the budget for the copy before it is made, so
+// a budget stop leaves nothing half built (the VM's ordinary budget stop
+// text). `keyed`: an object's or map's entries (key and value) and index;
+// otherwise `n` Values (an array, or a set or stack's members). B5: every
+// loop over a binding now snapshots, so an array is charged what its copy
+// holds, not the keyed bound (2.25 times as much).
+bool Vm::reserve_snapshot(std::size_t n, bool keyed, Fault& fault) {
     natives::Context context;
     context.heap_limit = heap_limit_;
-    if (natives::reserve_result(context, n * (2 * sizeof(Value) + sizeof(std::uint32_t)) + 128)) return true;
+    const std::size_t item = keyed ? 2 * sizeof(Value) + sizeof(std::uint32_t) : sizeof(Value);
+    if (natives::reserve_result(context, n * item + 128)) return true;
     return raise(fault, StopReason::Internal, "memory budget exceeded");
 }
 
@@ -36,15 +40,15 @@ bool Vm::reserve_snapshot(std::size_t n, Fault& fault) {
 // or object: under copy-on-write the register was a value, and the body's
 // in-place mutation of the original must not reach the active loop. A
 // uniquely held value is the loop's alone (nothing else can reach it).
-// Loops over a binding (c = 0) re-read it live, as before (the full D5
-// snapshot is B5's).
+// B5: loops over a binding emit c = 1 too (every loop iterates its entry
+// snapshot); c = 0 (live re-reads) is emitted only by for-mutant M1.
 bool Vm::entry_snapshot(const Instr& in, Value& source, Fault& fault) {
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 27
     return true;  // R-B3: the loop iterates the live array or object
 #endif
     if (in.c == 0 || source.refcount() <= 1) return true;
-    const std::size_t n = source.is(Kind::Array) ? array_size(source) : object_size(source);
-    if (!reserve_snapshot(n, fault)) return false;
+    const bool array = source.is(Kind::Array);
+    if (!reserve_snapshot(array ? array_size(source) : object_size(source), !array, fault)) return false;
     source = source.is(Kind::Array) ? array_shallow_clone(source) : object_shallow_clone(source);
     return memory_ok(fault);
 }
@@ -63,7 +67,7 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
                 // mutate in place, so the snapshot is an explicit shallow copy
                 // (O(n), budget-checked), never the live object.
 #if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 8)
-                if (!reserve_snapshot(collection_item_count(source), fault)) return false;
+                if (!reserve_snapshot(collection_item_count(source), true, fault)) return false;
                 source = collection_shallow_clone(source);  // R[a] is the loop's own snapshot register
 #endif
                 return memory_ok(fault);
@@ -75,7 +79,7 @@ bool Vm::op_iter_check(const Instr& in, Value* R, Fault& fault) {
         if (in.b != 0)  // the pair form (or its forced error): legacy's array message, nothing converted
             return raise(fault, StopReason::Error, "array @for syntax is @for(item : array){...}");
         const auto& items = collection_view(source);
-        if (!reserve_snapshot(items.size(), fault)) return false;
+        if (!reserve_snapshot(items.size(), false, fault)) return false;
         build::Array array(items.size());
 #if defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 7
         const bool reverse = false;  // M7: a stack iterated bottom first

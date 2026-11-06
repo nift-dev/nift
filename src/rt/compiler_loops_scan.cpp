@@ -3,9 +3,11 @@
 #include "rt/native.h"
 
 // Read/write/capture scans over a default-`for` body (CP12C slice 2). The
-// loop variable is a value binding, but a vanished element/key is reported at
-// the first statement that reads it (legacy's lazy location reference), so
-// the body is scanned for reads, writes and closure captures.
+// loop variable is a value binding. The body is scanned for reads, writes and
+// closure captures, and for statements that may shrink a named source; B5:
+// the loop iterates its entry snapshot, so an element cannot vanish any more,
+// and the shrink scan only keeps the CP12C `for-capture-vanishing` and
+// `for-missing-write` refusals (b5-refsem.md section 2, item 6).
 
 namespace nift::rt::detail {
 
@@ -154,7 +156,6 @@ struct CaptureScan {
 struct ShrinkScan {
     const Ast& ast;
     std::string_view name;
-    bool element_writes = false;
     bool found = false;
 
     void call(NodeId id) {
@@ -186,8 +187,6 @@ struct ShrinkScan {
         if (n.kind == NodeKind::Ident && ast.text(n) == name) { found = true; return; }
         if (n.kind == NodeKind::Member) { node(n.a); return; }
         if (n.kind == NodeKind::Index) {
-            const Node& holder = ast.at(n.a);
-            if (element_writes && holder.kind == NodeKind::Ident && ast.text(holder) == name) found = true;
             node(n.a);
             node(n.b);
             return;
@@ -233,14 +232,6 @@ bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place,
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
     ShrinkScan scan{ast_, name};
-    scan.node(node_id(body));
-    return scan.found;
-}
-
-bool UnitCompiler::for_source_may_change(const Node& body, const Binding* place, std::string_view name) const {
-    if (place == nullptr) return false;
-    if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;
-    ShrinkScan scan{ast_, name, true};
     scan.node(node_id(body));
     return scan.found;
 }

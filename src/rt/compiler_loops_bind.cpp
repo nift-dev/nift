@@ -8,58 +8,8 @@
 namespace nift::rt::detail {
 
 bool UnitCompiler::for_read_source(const Binding& b, std::uint16_t& reg, bool& temp_owned) {
-    temp_owned = false;
-    if (b.lazy_for) {
-        if (!for_lazy_read(b, reg)) return false;
-        temp_owned = true;
-        return true;
-    }
     temp_owned = b.cell || b.upvalue || b.global;
     return read_binding(b, reg);
-}
-
-bool UnitCompiler::for_lazy_read(const Binding& b, std::uint16_t& reg) {
-    if (b.selector) {
-        if (!temp(reg)) return false;
-        const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
-        emit_binding_read(OpCode::CellLoad, reg, b.selector_reg);
-        const std::size_t done = fb_->emit(OpCode::Jmp);
-        fb_->patch(assigned, fb_->here());
-        emit_binding_read(OpCode::CellLoad, reg, b.reg);
-        fb_->patch(done, fb_->here());
-        return true;
-    }
-    if (b.lazy_source_binding) {
-        Binding source = *b.lazy_source_binding;
-        std::uint16_t src = 0, value = 0, found = 0;
-        bool src_temp = false;
-        if (!for_read_source(source, src, src_temp)) return false;
-        if (b.lazy_pair) {
-            std::uint16_t key = 0;
-            if (!temp(key) || !temp(value) || !temp(found) || found != value + 1) return false;
-            fb_->emit(OpCode::GetIndex, key, b.lazy_keys, b.lazy_index);
-            fb_->emit(OpCode::ObjectLookup, value, src, key);
-            for_clear_register(key);
-        } else {
-            if (!temp(value) || !temp(found) || found != value + 1) return false;
-            fb_->emit(OpCode::ArrayElem, value, src, b.lazy_index);
-        }
-        if (src_temp) for_clear_register(src);
-        const std::size_t have = fb_->emit(OpCode::JmpTrue, found);
-        const std::size_t at = fb_->emit(OpCode::IterMissing);
-        fb_->note(at, std::string(b.lazy_name.empty() ? b.lazy_source_name : b.lazy_name));
-        fb_->patch(have, fb_->here());
-        const std::size_t assigned = fb_->emit(OpCode::JmpFalse, b.lazy_active);
-        const std::size_t done = fb_->emit(OpCode::Jmp);
-        fb_->patch(assigned, fb_->here());
-        if (b.cell) fb_->emit(OpCode::CellLoad, value, b.reg);
-        else if (b.upvalue) fb_->emit(OpCode::GetUpvalue, value, b.upvalue_index);
-        else fb_->emit(OpCode::Move, value, b.reg);
-        fb_->patch(done, fb_->here());
-        reg = value;
-        return true;
-    }
-    return fail(ast_.at(root_), "for-lazy-source");
 }
 
 bool UnitCompiler::for_source_binding(const Node& iterable, const Binding*& binding) const {
@@ -78,8 +28,7 @@ bool UnitCompiler::for_declare_binding(std::string_view name, const Node& at, bo
     binding.decl_text_double = false;
     // The type register first so the value register is the newest one.
     if (!fb_->alloc(binding.type_reg) || !fb_->alloc(binding.reg)) return builder_ok();
-    // Persistent aggregate iteration can retain or mutate its source location.
-    // Use the existing selector-cell path rather than an unmaterialised lazy register.
+    // A captured loop variable (or a session's aggregate one) lives in a cell.
     if (captured || (session_ && (decl_kinds & kKindAggregate))) {
         if (!fb_->alloc(binding.cell_reg)) return builder_ok();
         binding.cell = true;

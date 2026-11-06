@@ -4791,11 +4791,13 @@ test-runtime2-cp12c-probes: $(TARGET)
 	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src .build/cp12c-probes-src
 	python3 tests/runtime2/cp12c_probes.py "$(CURDIR)/$(TARGET)" tests/runtime2/cp12c-probes/src2 .build/cp12c-probes-src2
 test: test-runtime2-cp12c-probes
+# B5 4: M1 (live re-reads) and M2 (dynamic length) are retired with the live
+# re-read path they mutated (tests/runtime2/for_s2.py; refsem R-B3 covers it).
 test-runtime2-for-s2-mutants: $(TARGET)
 	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
 	normal_sha=$$(sha256sum "$(CURDIR)/$(TARGET)" | cut -d' ' -f1); \
 	tree=$$(git rev-parse HEAD^{tree}); \
-	for n in 1 2 3 4 5 6 7; do \
+	for n in 3 4 5 6 7; do \
 		$(MAKE) FOR_MUTANT=$$n "$(TEST_DIR)/for-mutants/nift-$$n" >/dev/null || exit 1; \
 		sha=$$(sha256sum "$(TEST_DIR)/for-mutants/nift-$$n" | cut -d' ' -f1); \
 		printf '{"mutant": %s, "sha256": "%s", "build": "for-mutant", "normal_sha256": "%s", "source_tree": "%s"}\n' "$$n" "$$sha" "$$normal_sha" "$$tree" > "$(TEST_DIR)/for-mutants/nift-$$n.json"; \

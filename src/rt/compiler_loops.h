@@ -14,8 +14,6 @@ struct UnitCompiler::ForState {
     const Binding* place = nullptr;
     Binding source_holder;
     std::string_view source_name;
-    bool live = false;
-    bool snapshot_mutant = false;
     bool saved_textual = false;
     bool error_only = false;
     int mode = 0;

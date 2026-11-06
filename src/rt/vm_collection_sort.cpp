@@ -23,9 +23,7 @@ Value* source(Value* stack,Value* R,const Instr& in) {
     if(!(in.c&0x20))return (in.c&0x10?stack:R)+in.b;
     Value anchor=cell_anchor(R[in.a+Selector]);
     auto* cell=cell_of(anchor);
-    // Selector writeback can allocate. Those locations remain a compile-time
-    // refusal until a no-allocation path is established; never guess in drain.
-    return cell&&cell->binding_type!=kSelectorCell?&cell->value:nullptr;
+    return cell?&cell->value:nullptr;
 }
 }
 // B2 (owner requirement E): the sort-protection registry (rt/vm.h).

@@ -268,7 +268,7 @@ private:
     bool origin_at(const Proto* proto, std::uint32_t offset, SourceOrigin& out, Fault& fault) const;
     bool op_array_mutate(const Instr&, Value*, Fault&, const Proto*);
     bool op_keyed_mutate(const Instr&, Value*, Fault&, const Proto*);  // D-063 (vm_keyed.cpp)
-    bool reserve_snapshot(std::size_t n, Fault& fault);  // D5 loop snapshots (vm_iter.cpp)
+    bool reserve_snapshot(std::size_t n, bool keyed, Fault& fault);  // D5 loop snapshots (vm_iter.cpp)
     // D-NEXT-refsem #4 (vm_keyed.cpp): true (and nothing stored) when storing
     // `stored` into the struct instance or collection `receiver` would close a
     // reference cycle; raises the catchable runtime.reference_cycle Error with

@@ -16,20 +16,6 @@ std::uintptr_t location(const Value& value, SessionCaptureLocation& out,
         const auto parent = location(cell->value, out, active, depth + 1);
         if (!parent) key = 0;
         else out.edges.push_back({key, parent, false, {}});
-    } else if (cell->binding_type == kSelectorCell) {
-        if (!cell->value.is(Kind::Array) || array_size(cell->value) != 8) key = 0;
-        else {
-            const auto& descriptor = array_items(cell->value);
-            const auto* local = cell_of(descriptor[7]);
-            const auto parent = location(descriptor[0], out, active, depth + 1);
-            if (!local || !parent || !(descriptor[1].is(Kind::Int) || descriptor[1].is(Kind::String))) key = 0;
-            else {
-                key = reinterpret_cast<std::uintptr_t>(local);
-                out.edges.push_back({key, parent, descriptor[1].is(Kind::Int),
-                    descriptor[1].is(Kind::String) ? std::string(string_view_of(descriptor[1])) : std::string{},
-                    descriptor[1].is(Kind::String)});
-            }
-        }
     } else if (cell->binding_type < 0) key = 0;
     active.erase(cell);
     return key;

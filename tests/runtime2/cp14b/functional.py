@@ -149,15 +149,11 @@ CASES.update({
 'ordinary_lambda_collection_error':'g:=()=>[1].filter(x=>x); g()',
 })
 
-# D-NEXT-refsem #1 (Phase A forward-compatibility guard, review round 1): the
-# VM refuses these before any effect; their output changes once arrays are
-# references (a callback or loop mutating the array it walks, a function used
-# as a value mutating its parameter, a mutator whose result aliases its
-# receiver). Legacy (NIFT_VM=0) is unchanged.
-GUARDED={'snapshot_mutation':'reference-guard:lent','snapshot_growth':'reference-guard:lent',
-'arity_guard_reverse':'reference-guard:shared','arity_guard_sort':'reference-guard:shared',
-'iterator_mutation':'reference-guard:lent','captured_snapshot':'reference-guard:lent',
-'aggregate_callback_mutation':'reference-guard:argument','aggregate_reduce_result':'reference-guard:argument'}
+# B5 (D-NEXT-refsem-b): the Phase A guard that refused snapshot_mutation,
+# snapshot_growth, arity_guard_reverse, arity_guard_sort, iterator_mutation,
+# captured_snapshot, aggregate_callback_mutation and aggregate_reduce_result is
+# deleted; they run, legacy-equal except aggregate_callback_mutation (APPROVED).
+GUARDED={}
 
 # Approved differences (the VM's result differs from legacy's on purpose).
 # splice_throw: D-NEXT-refsem review round 4, F2 (owner-approved difference,
@@ -165,7 +161,19 @@ GUARDED={'snapshot_mutation':'reference-guard:lent','snapshot_growth':'reference
 # replacement leaves the array unchanged. Legacy removes before it evaluates
 # the replacement; its output is kept here as the documented difference.
 APPROVED={'splice_throw':dict(vm='boom\n[1,2,3]\n',legacy='boom\n[1,3]\n',
-          citation='D-NEXT-refsem round 4 F2, owner-approved difference 2026-11-01')}
+          citation='D-NEXT-refsem round 4 F2, owner-approved difference 2026-11-01'),
+# B5: the callback's parameter is the array's element (shared), so its push
+# reaches `a` (plan section 3 Call arguments; Q3 row 1). Legacy copies it.
+'aggregate_callback_mutation':dict(vm='[[1,9],[2,9]]\n[[1,9],[2,9]]\n',legacy='[[1,9],[2,9]]\n[[1],[2]]\n',
+          citation='D-NEXT-refsem-b plan section 3 Call arguments, Q3 row 1 (B5)'),
+# B5 (owner Q2 option B): `const` is binding-only; the array it names is mutable.
+# Legacy refuses a mutation through the const name (a fatal error).
+'const_precedence':dict(vm='ARG\n9\n',legacy='',vm_err='',vm_exit=0,
+          legacy_err='error: $CASE/case.f:1:59: cannot mutate const array: a\n',legacy_exit=1,
+          citation='owner Q2 option B (const is binding-only), B5'),
+'const_capture':dict(vm='',legacy='',vm_err='',vm_exit=0,
+          legacy_err='error: $CASE/case.f:1:32: lambda body error: cannot mutate const array: a\n',legacy_exit=1,
+          citation='owner Q2 option B (const is binding-only), B5')}
 
 def run(binary,mode,source,root):
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
@@ -185,8 +193,12 @@ def main():
             legacy=run(a.legacy,'0',source,Path(tmp));vm=run(a.nift,'require',source,Path(tmp))
             if name in APPROVED:
                 want=APPROVED[name];st=vm['stats'][-1] if vm['stats'] else {}
-                ok=(vm['out']==want['vm'] and legacy['out']==want['legacy'] and vm['err']==legacy['err'] and
-                    vm['exit']==legacy['exit'] and st.get('outcome') in ['vm','vm-error'] and st.get('legacy_executions')==0)
+                same_tail='vm_err' not in want
+                tail_ok=(vm['err']==legacy['err'] and vm['exit']==legacy['exit']) if same_tail else (
+                    vm['err']==want['vm_err'] and vm['exit']==want['vm_exit'] and
+                    legacy['err']==want['legacy_err'] and legacy['exit']==want['legacy_exit'])
+                ok=(vm['out']==want['vm'] and legacy['out']==want['legacy'] and tail_ok and
+                    st.get('outcome') in ['vm','vm-error'] and st.get('legacy_executions')==0)
             elif name in GUARDED:
                 st=vm['stats'][-1] if vm['stats'] else {}
                 ok=vm['out']=='' and vm['exit']==1 and st.get('outcome')=='require-error' and st.get('reason')==GUARDED[name] and st.get('vm_executions')==0

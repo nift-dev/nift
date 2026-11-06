@@ -5,7 +5,6 @@
 #include "rt/heap_account.h"
 #include "rt/string.h"
 
-#include <vector>
 
 namespace nift::rt {
 
@@ -35,13 +34,17 @@ const CellObject* cell_plain_capture(const Value& cell) {
 std::int64_t cell_binding_type(const CellObject& cell) {
     const CellObject* current = &cell;
     while (current->binding_type == kSourceSlot) current = cell_of(current->value);
-    return current->binding_type == kSelectorCell ? array_items(current->value)[2].as_int() : current->binding_type;
+    return current->binding_type;
 }
 
-Value cell_slot(const Value& cell) {
-    const CellObject* object = cell_of(cell);
-    return object && object->binding_type == kSelectorCell ? array_items(object->value)[7] : cell;
-}
+// B5 4 (B2 review L2 resolved by deletion): the selector cells (a loop
+// variable's lazy location descriptor, kind -2) and their cached path store
+// `replace_path` (a residual take, a default mutation::Env, a deeper level
+// committed before its parent was validated) are gone with the live loop path:
+// every loop iterates its entry snapshot (D5), so no compiled code creates a
+// location descriptor. The cell opcodes keep their names; a "cached" access
+// is the plain cell access and a captured loop cell is shared, not copied.
+Value cell_slot(const Value& cell) { return cell; }
 
 Value cell_anchor(const Value& cell) {
     Value anchor = cell;
@@ -54,126 +57,27 @@ Value cell_anchor(const Value& cell) {
 }
 
 bool cell_read(const Value& cell, Value& value, std::string& missing) {
-    const CellObject* current = cell_of(cell);
-    Value anchor = cell;
-    std::vector<const CellObject*> path;
-    while (current && (current->binding_type == kSelectorCell || current->binding_type == kSourceSlot)) {
-        if (current->binding_type == kSelectorCell) {
-            path.push_back(current);
-            anchor = array_items(current->value)[0];
-        } else anchor = current->value;
-        current = cell_of(anchor);
-    }
+    (void)missing;
+    const CellObject* current = cell_of(cell_anchor(cell));
     if (!current) return false;
-    Value selected = current->value;
-    for (auto it = path.rbegin(); it != path.rend(); ++it) {
-        const auto& descriptor = array_items((*it)->value);
-        const Value& key = descriptor[1];
-        const Value* found = nullptr;
-        if (selected.is(Kind::Array) && key.is(Kind::Int) && key.as_int() >= 0 &&
-            static_cast<std::uint64_t>(key.as_int()) < array_size(selected))
-            found = &array_items(selected)[static_cast<std::size_t>(key.as_int())];
-        else if (selected.is(Kind::Object) && key.is(Kind::String)) {
-            Atom atom;
-            if (AtomTable::current().find(string_view_of(key), atom)) found = object_get(selected, atom);
-        }
-        if (!found) { missing = std::string(string_view_of(descriptor[3])); return false; }
-        Value next = *found;  // copy before releasing the parent that owns it
-        selected = std::move(next);
-    }
-    value = std::move(selected);
-    if (CellObject* owner = cell_of(cell); owner && owner->binding_type == kSelectorCell) {
-        // Tooling 2 (in place, tooling.md 2.4): the cell's own selector descriptor,
-        // never user-visible, updated after its creation (not a builder's value).
-        const build::InPlaceKey key;
-        // rt-lint: storage-ok private-descriptor, the cell's own
-        Construction::array_set(key, owner->value, 5, Value::boolean(true));
-        // rt-lint: storage-ok private-descriptor, the cell's own
-        Construction::array_set(key, owner->value, 6, anchor);
-    }
+    value = current->value;
     return true;
 }
 
-Value copy_cell_location(const Value& cell) {
-    const CellObject* object = cell_of(cell);
-    // B2: the copy owns its descriptor (an explicit clone; under copy-on-write
-    // the first cache update of either cell made them independent).
-    if (!object || object->binding_type != kSelectorCell) return cell;
-    return make_cell(array_shallow_clone(object->value), kSelectorCell);
-}
+Value copy_cell_location(const Value& cell) { return cell; }
 
 bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
-    const CellObject* object = cell_of(cell);
-    if (!object || object->binding_type != kSelectorCell) return cell_read(cell, value, missing);
-    const auto& parts = array_items(object->value);
-    if (!parts[5].as_bool()) return cell_read(parts[4], value, missing);
-    // The cached pointer belongs to the value owner at the last sync, not to
-    // a later replacement of its source slot. Preserve that owner explicitly.
-    // B2: a private copy of the descriptor (an explicit clone: arrays are
-    // references, so writing the shared one would change this cell's).
-    build::Array descriptor = build::Array::shallow_clone(object->value);
-    descriptor.set(0, parts[6]);
-    Value cached = make_cell(std::move(descriptor).publish(), kSelectorCell);
-    return cell_read(cached, value, missing);
+    return cell_read(cell, value, missing);
 }
-
-namespace {
-bool replace_path(Value& parent, const std::vector<Value>& keys, std::size_t at, const Value& value) {
-    const Value& key = keys[at];
-    const Value* previous = nullptr;
-    Atom atom;
-    if (parent.is(Kind::Array) && key.is(Kind::Int) && key.as_int() >= 0 &&
-        static_cast<std::uint64_t>(key.as_int()) < array_size(parent))
-        previous = &array_items(parent)[static_cast<std::size_t>(key.as_int())];
-    else if (parent.is(Kind::Object) && key.is(Kind::String) &&
-             AtomTable::current().find(string_view_of(key), atom)) previous = object_get(parent, atom);
-    if (!previous) return false;
-    Value replacement = value;
-    if (at + 1 < keys.size()) {
-        replacement = *previous;
-        if (!replace_path(replacement, keys, at + 1, value)) return false;
-    }
-    // B1: the location store goes through the mutation protocol.
-    const mutation::Env env;
-    return parent.is(Kind::Array) ? mutation::set(parent, static_cast<std::size_t>(key.as_int()), replacement, env).ok()
-                                  : mutation::object_put(parent, atom, replacement, env).ok();
-}
-} // namespace
 
 bool cell_cached_put(Value& cell, Value value, std::string& missing) {
-    CellObject* object = cell_of(cell);
-    if (!object) return false;
-    if (object->binding_type != kSelectorCell) { cell_put(cell, std::move(value)); return true; }
-    const auto& parts = array_items(object->value);
-    if (!parts[5].as_bool()) {
-        Value cache = parts[4];
-        cell_put(cache, std::move(value));
-        return true;
-    }
-    std::vector<Value> keys;
-    CellObject* current = object;
-    while (current->binding_type == kSelectorCell) {
-        const auto& descriptor = array_items(current->value);
-        keys.insert(keys.begin(), descriptor[1]);
-        missing = std::string(string_view_of(descriptor[3]));
-        current = cell_of(descriptor[0]);
-        if (!current) return false;
-    }
-    CellObject* owner = cell_of(parts[6]);
-    if (!owner) return false;
-    Value source = std::move(owner->value);
-    const bool ok = replace_path(source, keys, 0, value);
-    owner->value = std::move(source);
-    if (may_contain_identity(owner->value)) mark_may_hold_identity(owner);
-    return ok;
+    (void)missing;
+    if (!cell_of(cell)) return false;
+    cell_put(cell, std::move(value));
+    return true;
 }
 
-Value cell_cached_owner(const Value& cell) {
-    const CellObject* object = cell_of(cell);
-    if (!object || object->binding_type != kSelectorCell) return cell_anchor(cell);
-    const auto& parts = array_items(object->value);
-    return parts[parts[5].as_bool() ? 6 : 4];
-}
+Value cell_cached_owner(const Value& cell) { return cell_anchor(cell); }
 
 Value cell_load(const Value& cell) {
     Value result;
@@ -193,13 +97,6 @@ void cell_put(Value& cell, Value value) {
 void cell_rebind(Value& cell, Value value) {
     CellObject* object = cell_of(cell);
     if (!object) return;
-    if (object->binding_type == kSelectorCell) {
-        Value slot = array_items(object->value)[7];
-        cell_rebind(slot, std::move(value));
-        object->value = std::move(slot);
-        object->binding_type = kSourceSlot;
-        return;
-    }
     if (object->binding_type == kSourceSlot) {
         CellObject* child = cell_of(object->value);
         if (child->binding_type == kSourceSlot) cell_rebind(object->value, std::move(value));

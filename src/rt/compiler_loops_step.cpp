@@ -69,15 +69,6 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
 
     state.loop_start = fb_->here();
     fb_->set_offset(node.begin);
-#if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 2
-    if (state.live && !state.pair) {  // M1b: dynamic length, appended elements are visited
-        std::uint16_t fresh = 0;
-        bool fresh_temp = false;
-        if (!for_read_source(*state.place, fresh, fresh_temp)) return false;
-        fb_->emit(OpCode::Length, state.count, fresh, 0);
-        if (fresh_temp) for_clear_register(fresh);
-    }
-#endif
     state.exits.push_back(fb_->emit(OpCode::JmpNotLt, state.index, state.count));
     state.body_start = fb_->here();
     if (plan_.coroutines) fb_->emit(OpCode::Yield);  // CP22: a safepoint every iteration
@@ -91,22 +82,6 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     const bool second_captured = state.pair ? for_body_captures(body, text(ast_.at(state.names[1]))) : false;
     state.first_used = state.reads_first || first_writes || first_captured;
     state.second_used = state.pair && (state.reads_second || second_writes || second_captured);
-    const bool source_changes = for_source_may_change(body, state.place, state.source_name);
-    const bool lazy_first = !state.pair && state.first_used && state.live && !state.source_name.empty() &&
-                            !state.snapshot_mutant && (source_changes || state.first_binding.cell);
-    if (lazy_first) {
-        Binding lazy = state.first_binding;
-        lazy.lazy_for = true;
-        lazy.lazy_source_name = state.source_name;
-        lazy.lazy_name = text(ast_.at(state.names[0]));
-        lazy.lazy_index = state.index;
-        if (!temp(lazy.lazy_active)) return false;
-        const Binding& src = *state.place;
-        lazy.lazy_source_binding = std::make_shared<const Binding>(src);
-        fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
-        state.first_binding = lazy;
-        scopes_.update(text(ast_.at(state.names[0])), lazy);
-    }
     // A vanished element/key is only possible when the body can change the
     // source; otherwise the value-only opcodes avoid the found flag, the
     // missing check and (for a plain binding) the element copy.
@@ -115,31 +90,7 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
         return fail(node, "for-capture-vanishing");
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))
         return fail(node, "for-missing-write");
-    if (state.pair && (shrink || state.second_binding.cell) && state.live && !state.source_name.empty() &&
-        !state.snapshot_mutant) {
-        Binding lazy = state.second_binding;
-        lazy.lazy_for = true;
-        lazy.lazy_pair = true;
-        lazy.lazy_source_name = state.source_name;
-        lazy.lazy_name = text(ast_.at(state.names[1]));
-        lazy.lazy_keys = state.keys;
-        lazy.lazy_index = state.index;
-        if (!temp(lazy.lazy_active)) return false;
-        const Binding& src = *state.place;
-        lazy.lazy_source_binding = std::make_shared<const Binding>(src);
-        fb_->emit(OpCode::LoadI, lazy.lazy_active, 1);
-        state.second_binding = lazy;
-        scopes_.update(text(ast_.at(state.names[1])), lazy);
-    }
-    Binding& selected = state.pair ? state.second_binding : state.first_binding;
-    if (selected.cell && selected.lazy_for && state.live) {
-        selected.selector = true;
-        selected.location_source = true;
-        if (!temp(selected.selector_reg)) return false;
-        scopes_.update(text(ast_.at(state.names[state.pair ? 1 : 0])), selected);
-    }
-    state.track_missing = shrink && ((!state.pair && state.first_used && !state.first_binding.lazy_for) ||
-                                    (state.pair && state.second_used && !state.second_binding.lazy_for));
+    state.track_missing = shrink && ((!state.pair && state.first_used) || (state.pair && state.second_used));
     return true;
 }
 
@@ -148,35 +99,13 @@ bool UnitCompiler::for_step(ForState& state) {
     // A loop variable nobody reads, writes or captures is not materialised:
     // the body runs for the fixed count, exactly as legacy (its binding has no
     // observable use). This keeps the modifying benchmark at while-loop cost.
-    const bool eager_lazy_cell = !state.pair && state.first_used && state.first_binding.lazy_for &&
-                                 state.first_binding.cell;
-    const bool need_source = state.pair ? state.second_used :
-                             (eager_lazy_cell || (state.first_used && !state.first_binding.lazy_for));
-    std::uint16_t source = 0;
-    bool source_temp = false;
-    if (need_source) {
-        if (state.live && !state.snapshot_mutant) {
-            if (!for_read_source(*state.place, source, source_temp)) return false;
-        } else {
-            source = state.held;
-        }
-    }
+    // The loop reads its own held snapshot (B5: there is no live source re-read).
+    const std::uint16_t source = state.held;
 
     if (!state.pair) {
-        if (eager_lazy_cell) {
-            std::uint16_t value = 0;
-            if (!temp(value)) return false;
-            fb_->emit(OpCode::ArrayElemValue, value, source, state.index);
-            if (source_temp) for_clear_register(source);
-            fb_->emit(OpCode::BindType, state.first_binding.type_reg, value, state.untyped);
-            if (!for_bind_value(state.first_binding, value, state.first_binding.type_reg, true,
-                                state.first_flag))
-                return false;
-            for_clear_register(value);
-        } else if (state.first_used && !state.first_binding.lazy_for) {
+        if (state.first_used) {
             if (!state.track_missing && !state.first_binding.cell) {
                 fb_->emit(OpCode::ArrayElemValue, state.first_binding.reg, source, state.index);
-                if (source_temp) for_clear_register(source);
                 fb_->emit(OpCode::BindType, state.first_binding.type_reg, state.first_binding.reg,
                           state.untyped);
             } else {
@@ -184,7 +113,6 @@ bool UnitCompiler::for_step(ForState& state) {
                 if (!temp(value) || (state.track_missing && !temp(found))) return false;
                 if (state.track_missing) fb_->emit(OpCode::ArrayElem, value, source, state.index);
                 else fb_->emit(OpCode::ArrayElemValue, value, source, state.index);
-                if (source_temp) for_clear_register(source);
                 state.first_missing = found;
                 fb_->emit(OpCode::BindType, state.first_binding.type_reg, value, state.untyped);
                 if (!for_bind_value(state.first_binding, value, state.first_binding.type_reg, true,
@@ -208,16 +136,14 @@ bool UnitCompiler::for_step(ForState& state) {
                 return false;
 #endif
         }
-        if (state.second_used && (!state.second_binding.lazy_for || state.second_binding.cell)) {
+        if (state.second_used) {
             if (!state.track_missing && !state.second_binding.cell) {
                 fb_->emit(OpCode::ObjectLookupValue, state.second_binding.reg, source, key);
-                if (source_temp) for_clear_register(source);
             } else {
                 if (!temp(value) || (state.track_missing && !temp(found))) return false;
                 value_allocated = true;
                 if (state.track_missing) fb_->emit(OpCode::ObjectLookup, value, source, key);
                 else fb_->emit(OpCode::ObjectLookupValue, value, source, key);
-                if (source_temp) for_clear_register(source);
                 state.second_missing = found;
             }
         }
@@ -253,33 +179,6 @@ bool UnitCompiler::for_step(ForState& state) {
         if (state.second_used && value_allocated) for_clear_register(value);
     }
 
-    const Binding& selected = state.pair ? state.second_binding : state.first_binding;
-    if (selected.selector) {
-        // The descriptor owns the source SLOT, not a copied iterable Value.
-        // Its path is stable while direct writes use the iteration's cache.
-        const std::uint16_t mark = fb_->top();
-        std::uint16_t payload = 0, parts[8], root = 0, descriptor_type = 0, name = 0;
-        if (!temp(payload)) return false;
-        for (auto& part : parts) if (!temp(part)) return false;
-        if (!binding_cell(*state.place, root)) return false;
-        fb_->emit(OpCode::CellSlot, parts[0], root);
-        if (state.pair) fb_->emit(OpCode::GetIndex, parts[1], state.keys, state.index);
-        else fb_->emit(OpCode::Move, parts[1], state.index);
-        fb_->emit(OpCode::Move, parts[2], selected.type_reg);
-        if (!fb_->constant(make_string(text(ast_.at(state.names[state.pair ? 1 : 0]))), name) ||
-            !temp(descriptor_type)) return false;
-        fb_->emit(OpCode::LoadI, descriptor_type, jump_operand(-2));
-        fb_->emit(OpCode::LoadK, parts[3], static_cast<std::uint16_t>(name & ~kConstantBit));
-        fb_->emit(OpCode::CellAnchor, parts[4], selected.reg);
-        fb_->emit(OpCode::LoadBool, parts[5], 0);
-        fb_->emit(OpCode::LoadNull, parts[6]);
-        fb_->emit(OpCode::Move, parts[7], selected.reg);
-        fb_->emit(OpCode::NewArray, payload, parts[0], 8);
-        fb_->emit(OpCode::NewCell, selected.selector_reg, payload, descriptor_type);
-        for_clear_register(payload);
-        for (auto part : parts) for_clear_register(part);
-        fb_->release_to(mark);
-    }
     if (state.has_loop && !for_emit_loop_metadata(state.loop_binding, state.index, state.count)) return false;
     return true;
 }
@@ -321,8 +220,8 @@ bool UnitCompiler::for_emit_body(ForState& state) {
             k + 1 < body.count)
             return fail(statement_node, "jump-not-last");
         if (!statement(body_list[k])) return false;
-        // Assigning to the loop variable replaces the lazy location: a later
-        // read is the new value, not the vanished element.
+        // Assigning to the loop variable replaces the vanished element: a later
+        // read is the new value.
         if (statement_node.kind == NodeKind::Assign || statement_node.kind == NodeKind::CompoundAssign ||
             statement_node.kind == NodeKind::IncDec) {
             const Node& target = ast_.at(statement_node.a);

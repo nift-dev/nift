@@ -16,11 +16,9 @@ CellObject* cell_of(const Value& cell);
 const CellObject* cell_plain_capture(const Value& cell);
 // A plain Value copy (D-040 COW semantics for the value).
 Value cell_load(const Value& cell);
-// A selector is encoded in a Cell's existing, GC-visible Value payload:
-// [source slot, key/index, binding type, diagnostic name, cache cell, synced,
-//  cached root owner, local lexical slot].
-// Descriptors are copied on closure creation/invocation; slots remain shared.
-constexpr std::int64_t kSelectorCell = -2;
+// A source slot (-3) forwards to the cell it names. B5 4: the selector cell
+// (-2, a loop variable's lazy location descriptor) is deleted with the live
+// loop path; the cached-access functions below are the plain cell accesses.
 constexpr std::int64_t kSourceSlot = -3;
 bool cell_read(const Value& cell, Value& value, std::string& missing);
 Value copy_cell_location(const Value& cell);

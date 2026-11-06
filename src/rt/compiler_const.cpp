@@ -26,10 +26,7 @@ bool UnitCompiler::const_write(const Node& node, const Node* value, const std::u
     if (update) {
         std::uint16_t cur = 0;
         if (!temp(cur)) return false;
-        bool lazy_temp = false;
-        if (b.lazy_for) {
-            if (!for_read_source(b, cur, lazy_temp)) return false;
-        } else if (b.global && !b.cell) {
+        if (b.global && !b.cell) {
             if (!global_read_value(b.reg, cur, text(target))) return false;
         } else if (!read_binding(b, cur)) {
             return false;

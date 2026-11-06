@@ -57,36 +57,61 @@ GOLDENS["selector_missing_side_effect"] = "1\nafter-write\n"
 cases.update({'nested_source_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>()=>x[0]}\ng:=h()\na=[]\nprint(g())\n', 'nested_decl_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{f:=()=>x[0];return f}}\ng:=h()\na=[]\nprint(g())\n', 'nested_active_caller': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>x[0]}}\ng:=h()\na=[]\nfn(invoke(cb)){cb()}\ninvoke(g)\n', 'nested_third_escape': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>()=>x[0]}}\ng:=h()\ng=g()\na=[]\nprint(g())\n'})
 
 
-# D-NEXT-refsem #1 (the Phase A forward-compatibility guard, review of
-# ad9d842f): these cases mutate the iterated source while the loop holds it
-# (`lent`: Phase B iterates the live array), or mutate an element through the
-# loop binding, which a closure keeps (`shared-part`: Phase B aliases the
-# element). The VM refuses them before any effect; NIFT_VM=1 runs legacy.
-GUARDED = {
-    "callback_read_write": "reference-guard:shared-part",
-    "callback_write": "reference-guard:shared-part",
-    "capture_named_aggregate": "reference-guard:shared-part",
-    "capture_named_repeated": "reference-guard:shared-part",
-    "capture_source_after": "reference-guard:lent",
-    "capture_source_repeated": "reference-guard:lent",
-    "frame_escape": "reference-guard:lent",
-    "named_aggregate_block_element_after": "reference-guard:shared-part",
-    "named_aggregate_block_element_before": "reference-guard:shared-part",
-    "named_aggregate_block_source_after": "reference-guard:lent",
-    "named_aggregate_block_source_before": "reference-guard:lent",
-    "named_aggregate_expr_element_after": "reference-guard:shared-part",
-    "named_aggregate_expr_element_before": "reference-guard:shared-part",
-    "named_aggregate_expr_source_after": "reference-guard:lent",
-    "named_aggregate_expr_source_before": "reference-guard:lent",
-    "named_scalar_block_source_after": "reference-guard:lent",
-    "named_scalar_block_source_before": "reference-guard:lent",
-    "named_scalar_expr_source_after": "reference-guard:lent",
-    "named_scalar_expr_source_before": "reference-guard:lent",
-    "parameter_escape": "reference-guard:lent",
-    "read_before": "reference-guard:shared-part",
-    "rebound_cached_owner": "reference-guard:shared-part",
-    "selector_missing_cached_write": "reference-guard:shared-part",
-    "selector_missing_side_effect": "reference-guard:shared-part",
+# B5 (D-NEXT-refsem-b, b5-refsem.md): the Phase A guard is deleted and every
+# loop iterates its entry snapshot with an ordinary loop binding (plan section 3
+# Iteration, D5; Q3 rows 5-6; owner 2026-11-01 "loops iterate a snapshot taken
+# at entry"). Legacy's loop variable is a live location of the source element,
+# which these cases distinguish; the VM's exact result is pinned here and must
+# differ from legacy's. Sub-rules:
+#   D5 live reads: legacy reads the source element when the closure runs (after
+#     the source was written, rebound or emptied: 9, or "reference target no
+#     longer exists"); the binding holds the element bound at that iteration.
+#   D5 ordinary binding: the loop binding is an ordinary binding, so a closure
+#     sees a later assignment to it (`x=7`, `x+=1`), as for any captured local.
+#   D5 element mutation: a mutation through the binding mutates the element
+#     itself (the source's element and every closure's view of it).
+# Cases not listed (read_before, callback_read_write, ...) are legacy-equal.
+B5_APPROVED = {
+    'named_scalar_expr_assign_before': ('7\n', 0, 'D5 ordinary binding'),
+    'named_scalar_block_assign_before': ('7\n', 0, 'D5 ordinary binding'),
+    'named_aggregate_expr_assign_before': ('7\n', 0, 'D5 ordinary binding'),
+    'named_aggregate_block_assign_before': ('7\n', 0, 'D5 ordinary binding'),
+    'named_scalar_expr_element_before': ('2\n', 0, 'D5 ordinary binding'),
+    'named_scalar_block_element_before': ('2\n', 0, 'D5 ordinary binding'),
+    'descriptor_write_calls': ('2\n3\n', 0, 'D5 ordinary binding'),
+    'named_scalar_expr_source_before': ('1\n', 0, 'D5 live reads'),
+    'named_scalar_expr_source_after': ('1\n', 0, 'D5 live reads'),
+    'named_scalar_block_source_before': ('1\n', 0, 'D5 live reads'),
+    'named_scalar_block_source_after': ('1\n', 0, 'D5 live reads'),
+    'named_aggregate_expr_source_before': ('1\n', 0, 'D5 live reads'),
+    'named_aggregate_expr_source_after': ('1\n', 0, 'D5 live reads'),
+    'named_aggregate_block_source_before': ('1\n', 0, 'D5 live reads'),
+    'named_aggregate_block_source_after': ('1\n', 0, 'D5 live reads'),
+    'capture_source_after': ('1\n', 0, 'D5 live reads'),
+    'capture_source_repeated': ('1\n1\n', 0, 'D5 live reads'),
+    'frame_escape': ('1\n', 0, 'D5 live reads'),
+    'parameter_escape': ('1\n', 0, 'D5 live reads'),
+    'source_after_loop': ('2\n', 0, 'D5 live reads'),
+    'source_rebound_after_loop': ('2\n', 0, 'D5 live reads'),
+    'missing_after_loop': ('1\n', 0, 'D5 live reads'),
+    'selector_missing_index': ('1\n', 0, 'D5 live reads'),
+    'selector_missing_member': ('1\n', 0, 'D5 live reads'),
+    'nested_selector_missing_print': ('1\n', 0, 'D5 live reads'),
+    'nested_selector_missing_call': ('', 0, 'D5 live reads'),
+    'nested_source_view': ('1\n', 0, 'D5 live reads'),
+    'nested_decl_view': ('1\n', 0, 'D5 live reads'),
+    'nested_active_caller': ('', 0, 'D5 live reads'),
+    'nested_third_escape': ('1\n', 0, 'D5 live reads'),
+    'named_aggregate_expr_element_before': ('9\n', 0, 'D5 element mutation'),
+    'named_aggregate_expr_element_after': ('9\n', 0, 'D5 element mutation'),
+    'named_aggregate_block_element_before': ('9\n', 0, 'D5 element mutation'),
+    'named_aggregate_block_element_after': ('9\n', 0, 'D5 element mutation'),
+    'capture_named_aggregate': ('9\n', 0, 'D5 element mutation'),
+    'capture_named_repeated': ('9\n9\n', 0, 'D5 element mutation'),
+    'callback_write': ('9\n9\n', 0, 'D5 element mutation'),
+    'rebound_cached_owner': ('1\n9\n', 0, 'D5 element mutation'),
+    'selector_missing_cached_write': ('1\n9\n', 0, 'D5 element mutation'),
+    'selector_missing_side_effect': ('1\nafter-write\n9\n', 0, 'D5 element mutation'),
 }
 
 
@@ -114,20 +139,19 @@ def main():
                 results[mode] = result
                 rows.append({"case": name, "mode": mode, "stdout": result[0].decode(),
                              "stderr": result[1].decode(), "exit": result[2], "stats": telemetry})
-                if mode != "0" and name in GUARDED:
-                    want = "fallback" if mode == "1" else "require-error"
-                    if (not telemetry or telemetry.get("outcome") != want or telemetry.get("vm_executions") != 0 or
-                            telemetry.get("reason") != GUARDED[name]):
-                        failures += 1
-                        print(f"FAIL {name}/{mode}: expected {want}/{GUARDED[name]} before effects: {telemetry}")
-                elif mode != "0" and (not telemetry or telemetry.get("vm_executions") != 1 or
-                        telemetry.get("outcome") != ("vm-error" if name in ERROR_CASES else "vm")):
+                expected_vm_exit = B5_APPROVED[name][1] if name in B5_APPROVED else (1 if name in ERROR_CASES else 0)
+                if mode != "0" and (not telemetry or telemetry.get("vm_executions") != 1 or
+                        telemetry.get("outcome") != ("vm-error" if expected_vm_exit else "vm")):
                     failures += 1
                     print(f"FAIL {name}/{mode}: required VM execution: {telemetry}")
             expected_exit = 1 if name in ERROR_CASES else 0
-            refused = name in GUARDED and results["require"][0] == b"" and results["require"][2] == 1
-            if (results["0"][2] != expected_exit or results["0"] != results["1"] or
-                    (results["0"] != results["require"] and not refused)):
+            if name in B5_APPROVED:
+                want = (B5_APPROVED[name][0].encode(), b"", B5_APPROVED[name][1])
+                bad = (results["0"][2] != expected_exit or results["1"] != want or results["require"] != want or
+                       results["0"] == want)
+            else:
+                bad = results["0"][2] != expected_exit or results["0"] != results["1"] or results["0"] != results["require"]
+            if bad:
                 failures += 1
                 print(f"FAIL {name}: {results}")
             elif name in GOLDENS and results["0"][0].decode() != GOLDENS[name]:

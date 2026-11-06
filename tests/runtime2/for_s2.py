@@ -9,6 +9,17 @@ named pre-existing `fallback:`), and `.stdout/.stderr/.exit` are the legacy
 oracle. Executable fixtures must run on the VM (`NIFT_VM=require`,
 `vm_executions = 1`). Mutants are compiling `-DNIFT_FOR_MUTANT=N` builds; a
 missing binary or missing stats is a harness failure, never a detection.
+
+B5 (D-NEXT-refsem-b, b5-refsem.md): an EXPECT entry with `approved=<rule>`
+is an approved difference from legacy. The VM must give the Runtime 2.0
+golden `.r2.stdout/.r2.stderr/.r2.exit` exactly, and that golden must differ
+from the legacy one (otherwise the entry is plain parity and must not carry an
+approval). Rules: `D5` (plan section 3 Iteration: every loop iterates the
+shallow snapshot taken at entry; legacy reads elements live and errors when
+they vanish; Q3 rows 5-6). Mutants M1 (live re-reads) and M2 (dynamic length
+after each body) are retired with the live re-read path they mutated (deleted
+in B5 4): the defect class is covered by refsem mutant R-B3 (the loop iterates
+the live array) and by the b5/q3 fixtures.
 """
 import argparse
 import json
@@ -25,10 +36,6 @@ FIXTURES = os.path.join(HERE, "for-s2")
 
 # The intended observable defect of each mutant, not just "something failed".
 MUTANT_SIGNATURES = {
-    1: {"t26_read_after_shrink_first_iter.f": {"stdout": b"1\n2\n3\n", "exit": 0, "outcome": "vm"}},
-    # D-NEXT-refsem #1: g6_push_once.f is refused by the guard now (the array
-    # is mutated while the loop holds it); rebinding the source shows M2 too.
-    2: {"g6_rebind_longer.f": {"stdout": b"1\n2\n3\n4\n5\n5\n", "exit": 0, "outcome": "vm"}},
     3: {"g7_closure_loop_var.f": {"stdout": b"1\n1\n1\n", "exit": 0, "outcome": "vm"}},
     4: {"g3_continue_finite.f": {"stdout": b"1\n2\n", "exit": 0, "outcome": "vm"}},
     5: {"g6_break_object.f": {"stdout": b"a\n", "exit": 0, "outcome": "vm", "heap_leak_gt": 32}},
@@ -38,8 +45,6 @@ MUTANT_SIGNATURES = {
 }
 
 MUTANT_CASES = {
-    1: ["t26_read_after_shrink_first_iter.f"],
-    2: ["g6_rebind_longer.f"],
     3: ["g7_closure_loop_var.f"],
     4: ["g3_continue_finite.f"],
     5: ["g6_break_object.f"],
@@ -57,10 +62,13 @@ def cases():
         parts = line.split()
         name, want = parts[0], parts[1]
         budget = None
+        approved = None
         for p in parts[2:]:
             if p.startswith("budget="):
                 budget = p.split("=", 1)[1]
-        out.append((name + ".f", want, budget))
+            elif p.startswith("approved="):
+                approved = p.split("=", 1)[1]
+        out.append((name + ".f", want, budget, approved))
     return out
 
 
@@ -93,13 +101,16 @@ def run(nift, work, name, want, budget=None, timeout_s=60):
     return result, st
 
 
-def golden(name):
-    stem = os.path.join(FIXTURES, name[:-2])
+APPROVAL_RULES = {"D5"}
+
+
+def golden(name, suffix=""):
+    stem = os.path.join(FIXTURES, name[:-2]) + suffix
     return (open(stem + ".stdout", "rb").read(), open(stem + ".stderr", "rb").read(),
             int(open(stem + ".exit").read().strip()))
 
 
-def check(nift, work, name, want, budget=None, timeout_s=60):
+def check(nift, work, name, want, budget=None, timeout_s=60, approved=None):
     vm, st = run(nift, work, name, want, budget, timeout_s)
     g = golden(name)
     problems = []
@@ -107,7 +118,15 @@ def check(nift, work, name, want, budget=None, timeout_s=60):
         return [f"timeout after {timeout_s}s"], st
     if st is None:
         return ["no NIFT_VM=1 statistics"], st
-    if (vm[0], vm[1], vm[2]) != g:
+    if approved is not None:
+        r2 = golden(name, ".r2")
+        if approved not in APPROVAL_RULES:
+            problems.append(f"unknown approval rule {approved!r}")
+        if r2 == g:
+            problems.append("approved golden equals legacy's (parity needs no approval)")
+        if (vm[0], vm[1], vm[2]) != r2:
+            problems.append(f"approved {approved}: golden {r2!r} != VM {(vm[0], vm[1], vm[2])!r}")
+    elif (vm[0], vm[1], vm[2]) != g:
         problems.append(f"legacy {g!r} != VM {(vm[0], vm[1], vm[2])!r}")
     outcome = st.get("outcome")
     if want == "vm":
@@ -126,7 +145,7 @@ def check(nift, work, name, want, budget=None, timeout_s=60):
     return problems, st
 
 
-def check_mutant(nift, normal, work, name, want, budget, timeout_s, mutant):
+def check_mutant(nift, normal, work, name, want, budget, timeout_s, mutant, approved=None):
     """Run one designated mutant case. Returns (detected, harness_failure, note)."""
     if normal is None:
         return False, True, "--normal is required for mutant detection"
@@ -142,7 +161,7 @@ def check_mutant(nift, normal, work, name, want, budget, timeout_s, mutant):
     normal_vm, normal_st = run(normal, work, name, want, budget, timeout_s)
     if normal_vm[3] or normal_st is None or normal_st.get("outcome") not in ("vm", "vm-error"):
         return False, True, "unmutated baseline did not execute"
-    baseline_problems, _ = check(normal, work, name, want, budget, timeout_s)
+    baseline_problems, _ = check(normal, work, name, want, budget, timeout_s, approved)
     if baseline_problems:
         return False, True, "unmutated baseline fails: " + "; ".join(baseline_problems)
     sig = MUTANT_SIGNATURES[mutant][name]
@@ -183,10 +202,10 @@ def main():
         failures, detected, notes = 0, [], []
         with tempfile.TemporaryDirectory(prefix="for-s2-mutant-") as work:
             for name in MUTANT_CASES[args.mutant]:
-                want, budget = None, None
-                for n, w, b in cases():
+                want, budget, approved = None, None, None
+                for n, w, b, a in cases():
                     if n == name:
-                        want, budget = w, b
+                        want, budget, approved = w, b, a
                         break
                 if want is None:
                     failures += 1
@@ -194,7 +213,7 @@ def main():
                     continue
                 timeout_s = 30
                 ok, harness_failure, note = check_mutant(nift, normal, work, name, want, budget, timeout_s,
-                                                          args.mutant)
+                                                          args.mutant, approved)
                 if ok:
                     detected.append(name)
                 if harness_failure:
@@ -212,8 +231,8 @@ def main():
     failures, tally = 0, {}
     with tempfile.TemporaryDirectory(prefix="for-s2-") as work:
         selected = [c for c in cases() if not (args.skip_million and c[0].startswith("g9_million"))]
-        for name, want, budget in selected:
-            problems, st = check(nift, work, name, want, budget)
+        for name, want, budget, approved in selected:
+            problems, st = check(nift, work, name, want, budget, approved=approved)
             outcome = (st or {}).get("outcome") or "?"
             tally[outcome] = tally.get(outcome, 0) + 1
             if problems:

@@ -9,10 +9,7 @@ bool UnitCompiler::atomic_update(const Node& node, const Binding& b, std::uint16
     const Node& target = ast_.at(node.a);
     const std::uint16_t mark = fb_->top();
     std::uint16_t handle = 0;
-    bool lazy_temp = false;
-    if (b.lazy_for) {
-        if (!for_read_source(b, handle, lazy_temp)) return false;
-    } else if (b.global) {
+    if (b.global) {
         if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target))))
             return false;
         if (!global_read_value(b.reg, handle, text(target))) return false;
@@ -64,10 +61,7 @@ bool UnitCompiler::atomic_store(const Node& node, const Binding& b) {
     const Node& target = ast_.at(node.a);
     const std::uint16_t mark = fb_->top();
     std::uint16_t handle = 0;
-    bool lazy_temp = false;
-    if (b.lazy_for) {
-        if (!for_read_source(b, handle, lazy_temp)) return false;
-    } else if (b.global) {
+    if (b.global) {
         if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target))))
             return false;
         if (!global_read_value(b.reg, handle, text(target))) return false;

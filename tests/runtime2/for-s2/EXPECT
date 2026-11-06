@@ -31,19 +31,19 @@ g5_loop_reserved fallback:binding-name-reserved
 g5_loop_scope vm
 g5_loop_var_assign vm
 g6_break_object vm
-g6_call_copy fallback:reference-guard:argument  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
-g6_element_modify fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
-g6_element_modify_late fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
-g6_nested_reassign vm
+g6_call_copy vm  # B5: admitted (guard deleted), legacy-equal
+g6_element_modify vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
+g6_element_modify_late vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
+g6_nested_reassign vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
 g6_object_add_key vm
-g6_object_missing_value vm-error
-g6_object_values vm
-g6_push_each fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
-g6_rebind_longer vm  # D-NEXT-refsem #1: the for-mutant 2 witness (rebinding is no mutation; the snapshot holds)
-g6_push_once fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
+g6_object_missing_value vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live) (was vm-error)
+g6_object_values vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
+g6_push_each vm  # B5: admitted (guard deleted), legacy-equal
+g6_rebind_longer vm  # rebinding the source is no mutation; the snapshot holds (legacy-equal)
+g6_push_once vm  # B5: admitted (guard deleted), legacy-equal
 g6_reassign_empty_unused vm
-g6_reassign_longer vm
-g6_reassign_shorter vm-error
+g6_reassign_longer vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
+g6_reassign_shorter vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live) (was vm-error)
 g7_closure_body_decl vm
 g7_closure_break vm
 g7_closure_capture_after vm
@@ -51,9 +51,9 @@ g7_closure_loop_var vm
 g8_break_outside fallback:jump-outside-loop
 g8_index_error vm-error
 g8_undefined fallback:unresolved-name
-g9_million vm budget=24000000
-g9_million_write fallback:reference-guard:lent budget=24000000  # D-NEXT-refsem #1: the iterated array is written in the body
-t16_same_iter_modify fallback:reference-guard:lent  # D-NEXT-refsem #1: the iterated (or passed) array is mutated while lent (Phase B: live)
-t26_read_after_shrink_first_iter vm-error
+g9_million vm budget=40000000  # B5: the entry snapshot holds a second 16 MB of elements while the loop runs (+1x the array; was 24000000)
+g9_million_write vm budget=40000000  # B5: admitted (guard deleted), legacy-equal; the entry snapshot as g9_million
+t16_same_iter_modify vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live)
+t26_read_after_shrink_first_iter vm approved=D5  # B5 D5: the entry snapshot (legacy reads elements live) (was vm-error)
 t21_lambda_not_called fallback:for-capture-vanishing
 t27_assign_toplevel_after_shrink fallback:for-missing-write

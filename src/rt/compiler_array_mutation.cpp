@@ -36,23 +36,22 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     auto read=[&]()->bool {
         std::uint16_t value=0;
         if(binding.global&&!binding.cell){if(!global_read_value(binding.reg,value,text(receiver)))return false;}
-        else if(binding.cell||binding.upvalue||binding.selector){if(!indexed_binding(binding,value))return false;}
+        else if(binding.cell||binding.upvalue){if(!indexed_binding(binding,value))return false;}
         else value=binding.reg;
         fb_->emit(OpCode::Move,state+Source,value);
         return true;
     };
-    // A location binding (a loop element or selector) writes the element back
-    // (the location's own store; the array itself was changed in place).
+    // A captured loop binding writes the element back (its cell's own store;
+    // the array itself was changed in place).
     auto put=[&]()->bool {
-        if(binding.selector||(binding.loop_binding&&(binding.cell||binding.upvalue))){
+        if(binding.loop_binding&&(binding.cell||binding.upvalue)){
             if(!store_indexed_binding(binding,state+Source))return false;}
         fb_->emit(OpCode::LoadNull,state+Source);return true;
     };
     fb_->set_offset(collection_offset(node));
-    if(binding.selector||(binding.loop_binding&&(binding.cell||binding.upvalue))) {
+    if(binding.loop_binding&&(binding.cell||binding.upvalue)) {
         std::uint16_t refreshed=0;
-        if(binding.selector) {if(!for_lazy_read(binding,refreshed))return false;}
-        else if(!read_binding(binding,refreshed))return false;
+        if(!read_binding(binding,refreshed))return false;
         fb_->emit(OpCode::LoadNull,refreshed);
     }
 #if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 7  // R-B7 (b5 mutants): args a binding-only check again

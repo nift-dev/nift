@@ -103,17 +103,6 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
     if (!text_type_of(type, ast_.at(node.b), text_type)) return false;
-    if (b.lazy_for) {
-        if (b.cell) {
-            std::uint16_t untyped = 0;
-            if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
-            fb_->emit(OpCode::CellStore, b.reg, value, untyped);
-        } else if (b.reg != value) {
-            fb_->emit(OpCode::Move, b.reg, value);
-        }
-        fb_->emit(OpCode::LoadI, b.lazy_active, 0);
-        return builder_ok();
-    }
     if (b.cell || b.upvalue) {
         fb_->set_offset(node.begin);
         const std::uint16_t mark = fb_->top();
@@ -181,7 +170,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
-        if (indirect && !global && (held.selector || held.loop_binding || held.location_source)) {
+        if (indirect && !global && (held.loop_binding || held.location_source)) {
             std::uint16_t untyped = 0;
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
             if (!store_indexed_binding(held, reg)) return false;
@@ -212,16 +201,12 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     // the right-hand side, which may read it) and stored back.
     std::uint16_t reg = b.reg, binding_type = b.type_reg, value = 0;
     const bool indirect = b.cell || b.upvalue;
-    const bool lazy = b.lazy_for;
-    bool lazy_temp = false;
     Value small;
     const Node* rhs = node.kind == NodeKind::IncDec ? nullptr : &ast_.at(node.b);
     const bool immediate = rhs != nullptr && node.op == Op::AddAssign && rhs->kind == NodeKind::Number &&
                            decode_number_literal(text(*rhs), small) && small.is(Kind::Int) && small.as_int() <= 32767;
     if (rhs != nullptr && !immediate && !expr_any(node.b, value)) return false;
-    if (lazy) {
-        if (!for_read_source(b, reg, lazy_temp)) return false;
-    } else if (indirect) {
+    if (indirect) {
         if (!read_binding(b, reg)) return false;
     } else if (b.global && ((loop_reachable() &&
                              (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) ||
@@ -245,19 +230,6 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
         }
     }
     if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
-    if (lazy) {
-        if (b.cell) {
-            std::uint16_t untyped = 0;
-            if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
-            fb_->emit(OpCode::CellStore, b.reg, reg, untyped);
-        } else if (b.reg != reg) {
-            fb_->emit(OpCode::Move, b.reg, reg);
-        }
-        fb_->emit(OpCode::LoadI, b.lazy_active, 0);
-        if (lazy_temp) fb_->release_to(mark);
-        else fb_->release_to(mark);
-        return builder_ok();
-    }
     if (indirect) {
         std::uint16_t untyped = 0;
         if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
@@ -345,10 +317,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     std::uint16_t work = 0;
     if (!temp(work)) return false;
-    bool lazy_temp = false;
-    if (b.lazy_for) {
-        if (!for_read_source(b, work, lazy_temp)) return false;
-    } else if (b.global && !b.cell) {
+    if (b.global && !b.cell) {
         if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) return false;
         if (!global_read_value(b.reg, work, text(target))) return false;
     } else if (!read_binding(b, work)) {
@@ -373,14 +342,7 @@ bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
     fb_->emit(OpCode::AddI, work, work, jump_operand(up ? 1 : -1));
     std::uint16_t untyped = 0;
     if (!fb_->constant(Value::integer(-1), untyped)) return false;
-    if (b.lazy_for) {
-        if (b.cell) {
-            fb_->emit(OpCode::CellStore, b.reg, work, untyped);
-        } else if (b.reg != work) {
-            fb_->emit(OpCode::Move, b.reg, work);
-        }
-        fb_->emit(OpCode::LoadI, b.lazy_active, 0);
-    } else if (b.cell || b.upvalue) {
+    if (b.cell || b.upvalue) {
         if (!store_binding(b, work, untyped)) return false;
         fb_->note(fb_->here() - 1u, std::string(text(target)));
     } else {

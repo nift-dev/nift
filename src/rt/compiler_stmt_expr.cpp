@@ -28,7 +28,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
                 std::uint16_t result=0;
                 return temp(result)&&collection_failure(expr,result,"push: expected one argument");
             }
-            if(holder&&(holder->const_array||holder->selector||holder->loop_binding)) {
+            if(holder&&(holder->const_array||holder->loop_binding)) {
                 std::uint16_t result=0;
                 return temp(result)&&array_mutation(expr,result,0);
             }
@@ -49,7 +49,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));
-            if (indirect && !global && (held.selector || held.loop_binding || held.location_source)) {
+            if (indirect && !global && (held.loop_binding || held.location_source)) {
                 std::uint16_t untyped = 0;
                 if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
                 if (!store_indexed_binding(held, reg)) return false;

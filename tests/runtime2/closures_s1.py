@@ -9,6 +9,12 @@ Fixtures live in closures-s1/: EXPECT pins the NIFT_VM=1 outcome; .stdout,
 .stderr and .exit are the legacy oracle. D-038 caller-local lookup is the one
 approved fallback (legacy output, VM refusal before execution); every other
 difference goes through vm_policies (D-001#4 recursion, D-018c diagnostics).
+
+B5 (D-NEXT-refsem-b, b5-refsem.md): an EXPECT entry with `approved=<rule>` is
+an approved shared-reference difference. The VM must give the Runtime 2.0
+golden `.r2.stdout/.r2.stderr/.r2.exit` exactly, and that golden must differ
+from legacy's. Rule `Q3` (plan section 8 Q3, rows 1-2: arguments and returns
+share the caller's array; legacy copies them).
 """
 import argparse
 import json
@@ -51,12 +57,25 @@ MUTANT_CASES = {
 }
 
 
+APPROVAL_RULES = {"Q3"}
+
+
+def approvals():
+    out = {}
+    for line in open(os.path.join(FIXTURES, "EXPECT")):
+        parts = line.split("#")[0].split()
+        for p in parts[2:]:
+            if p.startswith("approved="):
+                out[parts[0]] = p.split("=", 1)[1]
+    return out
+
+
 def cases():
     out = []
     for line in open(os.path.join(FIXTURES, "EXPECT")):
         line = line.split("#")[0].strip()
         if line:
-            out.append(tuple(line.split()))
+            out.append(tuple(line.split()[:2]))
     return out
 
 
@@ -87,8 +106,8 @@ def run(nift, work, name, mode, env_extra=None):
     return (p.stdout.replace(d.encode(), b"$ROOT"), p.stderr.replace(d.encode(), b"$ROOT"), p.returncode), st
 
 
-def golden(name):
-    stem = os.path.join(FIXTURES, name[:-2])
+def golden(name, suffix=""):
+    stem = os.path.join(FIXTURES, name[:-2]) + suffix
     return (open(stem + ".stdout", "rb").read(), open(stem + ".stderr", "rb").read(),
             int(open(stem + ".exit").read().strip()))
 
@@ -129,9 +148,20 @@ def check(nift, work, name, want, prepare):
                 st.get("vm_executions") != 1):
             problems.append(f"expected runtime.reference_cycle, got {outcome}/{st.get('reason')} code={st.get('code')}")
         return problems, outcome, st
-    verdict, policy = vm_policies.classify(legacy, vm, st, open(os.path.join(FIXTURES, name), "rb").read())
-    if verdict not in ("same", "approved"):
-        problems.append(f"legacy {legacy!r} != VM {vm!r} (verdict {verdict})")
+    approved = approvals().get(name)
+    if approved is not None:
+        r2 = golden(name, ".r2")
+        policy = None
+        if approved not in APPROVAL_RULES:
+            problems.append(f"unknown approval rule {approved!r}")
+        if r2 == g:
+            problems.append("approved golden equals legacy's (parity needs no approval)")
+        if vm != r2:
+            problems.append(f"approved {approved}: golden {r2!r} != VM {vm!r}")
+    else:
+        verdict, policy = vm_policies.classify(legacy, vm, st, open(os.path.join(FIXTURES, name), "rb").read())
+        if verdict not in ("same", "approved"):
+            problems.append(f"legacy {legacy!r} != VM {vm!r} (verdict {verdict})")
     if want == "vm" and outcome != "vm":
         problems.append(f"expected vm, got {outcome}/{st.get('reason')}")
     elif want == "vm-error" and outcome != "vm-error":
