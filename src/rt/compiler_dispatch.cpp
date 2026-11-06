@@ -20,9 +20,16 @@ int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::st
     if (admitted.admission != Admission::Dynamic) return -1;
     // B5: a struct instance among the receiver kinds fails only if no struct
     // of the unit declares a method of that name (legacy would call it).
-    if (kinds(receiver) & kKindStruct)
+    // Legacy's text for a struct instance depends on the receiver's syntax: a
+    // name gives "struct has no method: <name>", an element or member read the
+    // tagged value's "unknown value or malformed expression" (probed, b5-refsem.md
+    // section 8 B); the table has the second only, so a named struct receiver
+    // keeps its refusal.
+    if (kinds(receiver) & kKindStruct) {
+        if (ast_.at(receiver).kind == NodeKind::Ident) return -1;
         for (const StructInfo& s : plan_.structs)
             if (s.method(name)) return -1;
+    }
     for (const DispatchCandidate& branch : admitted.branches)
         if (branch.spec && !builtin_arguments_ok(node, *branch.spec, receiver)) return 0;
     if (admitted.fails()) {

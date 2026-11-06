@@ -100,12 +100,16 @@ DispatchFailure tagged_dispatch_failure(const Value& receiver, Receiver family, 
     // A struct instance has no built-in family (Receiver::None); legacy reports
     // a plain method name on it as on a map: "unknown value or malformed
     // expression" (probed: b5-refsem.md section 8 B).
-    if (family == Receiver::None && receiver.is(Kind::Struct) && plain_method_name(name))
+    // Interpolation's to_string keeps B0's unrenderable text (dispatch_failure).
+    const DispatchFailure base = dispatch_failure(family, name);
+    if (base == DispatchFailure::Refuse && family == Receiver::None && receiver.is(Kind::Struct) &&
+        plain_method_name(name))
         return DispatchFailure::Malformed;
+    return base;
 #else
     (void)receiver;
-#endif
     return dispatch_failure(family, name);
+#endif
 }
 
 std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text,
@@ -185,7 +189,9 @@ MethodAdmission admit_dynamic_method(KindSet kinds, std::string_view name, std::
         }
         if (ok && (tagged & kKindStruct)) {
             ++families;
-            out.branches.push_back({kKindStruct, nullptr, DispatchFailure::Malformed});
+            const DispatchFailure base = dispatch_failure(Receiver::None, name);  // to_string: Unrenderable
+            out.branches.push_back({kKindStruct, nullptr,
+                                    base == DispatchFailure::Refuse ? DispatchFailure::Malformed : base});
         }
     } else
         for (const Family& f : kCollectionFamilies) ok = ok && consider(f);

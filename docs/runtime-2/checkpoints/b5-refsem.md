@@ -1,6 +1,6 @@
 # Checkpoint B5: guard removal, the reference-semantics switch (D-NEXT-refsem-b)
 
-Status: **IN PROGRESS, NOT FROZEN.** Stopped at a clean commit at the owner's B decision point
+Status: **IN PROGRESS, NOT FROZEN.** B5 8: item B trim part done, sort part STOP; item A sized (OPTIONS.md); final gates to re-run. Earlier stop at the owner's B decision point
 (section 8): A (E-U6-1) is a STOP with alternatives; B (`trim`/dispatch, approved 2026-11-07
 04:47) is not implemented. The full gate set was deliberately not run (the coordinator requires
 it on the final code, after B); a pre-B smoke set was (section 5). Branch `cand/b5-refsem` from
@@ -160,25 +160,71 @@ B5 U2 equivalent (retired in B5 1).
   Tests required for (1)/(2): the original program, sibling closures, an escaping closure storing
   into a captured array, a nested container, repeated kind-changing stores (owner list).
 
-**B. `trim` and dynamic dispatch: APPROVED (PROPOSAL.md), NOT IMPLEMENTED (stop point).** Scope
-facts gathered: the 1,276 programs are in `scratchpad/review-b4b-r5/galias/off.jsonl` (`src`
-field; refused with `builtin-receiver:trim` 824, `collection-element:sort` 452). The `trim`
-part is `op_admission.cpp` (`admit_dynamic_method`, `dispatch_failure`); the `sort` part is a
-different refusal (`compiler_native_args.cpp` / `compiler_collection.cpp`
-`collection-element:<name>`, plain sort over an array that may hold a map/set/stack), which the
-proposal's section (c) does not cover: its legacy behaviour must be established first.
+**B. `trim` and dynamic dispatch (approved 04:47): trim part IMPLEMENTED (B5 7, B5 8); sort part
+STOP.**
+- Mechanism (B4a's one admission table and its run-time kind check, no new opcode or path):
+  `admit_dynamic_method` accepts a plain union that also holds legacy's tagged values (map,
+  set, stack, struct instance); each is a failing family of a plain method name with legacy's
+  probed text "unknown value or malformed expression: <call>" (B0's unrenderable text stays for
+  interpolation's `to_string`). Still refused: unknown kinds, handles/functions, a tagged family
+  with its own native of the name (`contains` on a stack), a struct type declaring the method, a
+  NAMED struct receiver (legacy says "struct has no method: <name>" there, by syntax: the table
+  has one text per family), observable arguments with a failing family (B4a rule). At run time
+  `tagged_dispatch_failure` gives a struct instance (no built-in family) its failure.
+- Static sites unchanged by construction: for every kind set without tagged bits the admission
+  computation is the old one (the only sites whose admission changes were refused before); b4
+  (12,684) and b4b work gates unchanged. Cost on a newly checked site: +26 instructions per call
+  (callgrind, +2.0% of a trim loop iteration; `scratchpad/b5/trim/overhead.txt`). Wall clock: on
+  the Linode certification list (owner rule).
+- Order and evaluation: the receiver is evaluated once into CallNative's register (fixture
+  `b5/dispatch/trim_receiver_once`); arguments must be unobservable when a family fails (fixture
+  `trim_observable_argument_refused`); the failure precedes arguments. Copy-sort-commit and
+  receiver identity are untouched.
+- The 1,276 programs (`scratchpad/b5/trim/`): classified before running (`classify.py`,
+  `expected.json`; v1 kept as `expected.v1.json`, v2 adds the sort STOP and the async/thread
+  copy rule after the v1 run, both recorded), checked by `check.py` on the probe build
+  (comparator `sort` in the programs; see section 4): 1,179 as expected; 97 not, all explained
+  (`discrepancies.tsv`): 52 async/thread where the task's argument graph is a copy (Q4, owner
+  2026-11-01; legacy refuses the struct inside the thread), 20 receiver-returning
+  `reverse()`/`sort()` aliasing (B4b receiver identity, Q7, Q3 row 1: the store reaches the
+  receiver; the ce0a9a44 oracle copied), 13 still refused by a pre-existing `method:splice`, 12
+  still refused `builtin-receiver:trim` (receiver through a function-returned `reverse`). No
+  internal failure, tag or dispatch defect in any run.
+- Mutants: T1 (B5 11: the tagged families get no failure) and T2 (B5 12: the tagged sites
+  compiled static, no run-time check) are caught by `b5/dispatch` (`test-runtime2-b5-mutants`).
+- **Sort part (452 `collection-element:sort`): STOP.** These programs are refused at an
+  argument-less `xs.sort()` over an array that may hold a map/struct (`compiler_native_args.cpp`,
+  the D-063 tag-observing rule: legacy sorts its collections as tagged strings,
+  `[m, " a "].sort()` runs in legacy and keeps the tag order). Admitting them needs a run-time
+  check on the ELEMENTS of the receiver (no tagged element at sort time, else a defined error),
+  not on the receiver's family: B4a's table and precondition check the receiver only. That is a
+  second mechanism; the owner's rule says stop. In the generated programs the sort runs before
+  the tagged store, so each would print legacy-differing results only through Q3 sharing.
 
-## 9. Not done (exact stop point)
+**Comparator sort on this host (owner question 5).** Not a `_GLIBCXX` assertion and not a
+strict-weak-ordering check: a Nift-side compile-time gate (owner decision 2026-10-25, CP14B D4):
+`compiler_collection_sort.cpp` admits `sort(comparator)` only when the binary is built against
+the libstdc++ whose comparator call schedule was frozen (`__GLIBCXX__ == 20260321`, GCC 15.2),
+because the comparator's side effects observe std::sort's call order; elsewhere it refuses
+`method:sort` before any effect (this host: GCC 13.3). Production therefore differs by
+toolchain: the certification instance with GCC 15.2/20260321 runs comparator sort; any other
+toolchain (other GCC versions, clang/libc++, macOS, FreeBSD, Windows) refuses every comparator
+sort, and with the VM as the default engine (no automatic fallback) those programs do not run.
+It is a safe refusal, not a wrong result, so not a correctness defect; it is a release
+portability gap the owner should rule on (list it for the release-blocker audit).
 
-Tip after B5 6. Remaining, in order:
-1. B (section 8): implement the `trim` admission in `op_admission.cpp`; establish legacy's
-   behaviour for the 452 `collection-element:sort` programs and decide whether they are in B's
-   scope; classify all 1,276 by expected outcome before running (table under
-   `scratchpad/b5/trim/`); mutants T1, T2; overhead (instructions and wall clock) on new and
-   unaffected paths; identical bytecode for static sites.
-2. A: the owner chooses an alternative (section 8 A).
-3. The full gate set on the final code: fixpoint, b4/b4b mutants, generators (gen1, gen_alias,
-   gen_struct, ...), CP25-R re-inventory, classification and semantic differentials,
-   CP22/CP23/VM-unit/adversarial lanes, all earlier gates; the five cp19 targets on 17f7964c;
-   local benchmarks against 17f7964c (compile and run time; the 1.5x compile target).
-4. Freeze record.
+## 9. Not done (exact stop point, after B5 8)
+
+1. The final gate batch (`scratchpad/b5/final_gates.sh`; results `scratchpad/b5/gates/fin*-*.result`)
+   was started on B5 7, stopped after 7 gates to fix a regression it found (struct `to_string`
+   interpolation and named struct receivers, fixed in B5 8), and must be re-run from the start on
+   B5 8: fixpoint, b4/b4b mutants, guard-off generator gate, generators gen1/gen_struct/gen_alias
+   on production, CP25-R (`test-cp25r`, `cp25r-inventory`), rt-diff and vm_parity (semantic and
+   classification differentials), CP22/CP23, vm_adversarial, all earlier gates. Already on B5 8:
+   b3, b4, b5, b5-mutants PASS (`fin3-*`, `fin2-*`). On B5 7 before the fix: rt-lint, b4b,
+   b4b-fixpoint, b4-mutants PASS.
+2. The five cp19 targets on an exact 17f7964c build (`git archive` into the scratchpad, one build
+   tree at a time: delete it after).
+3. Item A: owner's choice (`scratchpad/b5/cp19/OPTIONS.md`, recommendation option 1).
+4. Comparator-sort portability (section 8): owner ruling.
+5. Freeze record.
