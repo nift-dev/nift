@@ -182,6 +182,16 @@ struct UnitKinds {
     std::unordered_set<NodeId> future_holders;
     bool converged = false;
     std::size_t walks = 0;  // unit walks the worklist needed (statistics, tests)
+    // B4b 23: the analysis work as deterministic counts (the compile-scaling gate,
+    // docs/runtime-2/checkpoints/b4b-element-types.md section 15). `nodes` and `enqueues`
+    // exist in B4a's analysis too (its baseline is measured with the same counters).
+    struct Work {
+        std::size_t nodes = 0;             // expressions and statements visited by the walks
+        std::size_t enqueues = 0;          // units queued for a walk
+        std::size_t materializations = 0;  // site reads computed (not taken from the memo)
+        std::size_t site_unions = 0;       // site classes merged
+        std::size_t reader_moves = 0;      // reader entries moved by those merges
+    } work;
     KindSet of(NodeId id) const {
         return id < kinds.size() ? kinds[id] : static_cast<KindSet>(kKindAll | kKindUnknown);
     }

@@ -140,6 +140,12 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     ++site_version_;
     if (b < a) std::swap(a, b);  // the smaller id is the root (stable)
     parent_[b] = a;
+    ++result_.work.site_unions;
+    // B4b 22 (review of 16f24f36): whether each side was opened *before* this union. Only a
+    // class opened before it may skip its readers: they were walked again when it opened and
+    // read anything since. A class this union opens (the root inheriting `b`'s flag) changes
+    // every read of it, so the readers that read it while it was precise walk again.
+    const bool a_was_open = opened_.count(a) != 0, b_was_open = opened_.count(b) != 0;
     bool grew = false, b_grew = false;  // whether each side's class changed: its readers re-walk then
     SiteContents moved, prior;
     if (const auto from = agg_.find(b); from != agg_.end()) moved = from->second, agg_.erase(from);
@@ -153,7 +159,7 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     b_grew = merge(moved.keys, prior.keys) || b_grew;
     for (auto* set : {&nonpositional_, &opened_})  // flags that change what a read sees
         if (set->count(a) && !set->count(b)) b_grew = true;
-    if (opened_.count(b)) b_grew = false;  // F1: `b`'s readers read anything already
+    if (b_was_open) b_grew = false;  // F1: `b` was opened before: its readers read anything already
     const auto flag = [&](std::unordered_set<std::uint32_t>& set) {
         if (set.count(b) && set.insert(a).second) grew = true;
     };
@@ -161,7 +167,12 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     flag(collapsed_);
     flag(exposed_);
     flag(opened_);
-    if (opened_.count(a)) grew = false;  // F1: an opened class reads anything; growing it changes no read
+#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 35
+    (void)a_was_open;
+    if (opened_.count(a)) grew = false;  // A35: also a class opened just now (16f24f36: its precise readers stay stale)
+#else
+    if (a_was_open) grew = false;  // F1: opened before this union: growing it changes no read
+#endif
     const auto da = derived_.find(a), db = derived_.find(b);  // the inner parts' sites join too
     if (db != derived_.end()) {
         const std::uint32_t inner = db->second;
@@ -180,6 +191,7 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
         // copy its whole list at every merge: quadratic in the sites).
         UnitSet& into_readers = readers_[a];
         if (into_readers.size() < readers.size()) std::swap(into_readers, readers);
+        result_.work.reader_moves += readers.size();
         for (std::size_t u : readers.list) into_readers.insert(u);
     }
     if (grew) site_changed(a);

@@ -147,7 +147,7 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
 }
 
 void Inference::statement(NodeId id) {
-    const Node& n = ast_.at(id);
+    const Node& n = visit(id);
     switch (n.kind) {
         case NodeKind::Declare: {
             const TyRef v = expr(n.b);

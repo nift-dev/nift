@@ -13,6 +13,11 @@
                      equal to legacy (never a crash)
   b4b/modules/*/     C6: importer stores into a module's container (one importer, two
                      importers, a re-export); `expect` names a refusal reason
+  b4b/widen/*.f      B4b 22 (review of 16f24f36): a precise class merged into a class opened
+                     (widened) earlier, directly and transitively (A -> B -> C), in both merge
+                     orders, in functions, lambdas and globals: refused before any effect,
+                     `aliasing` by the guard, `builtin-receiver:trim` with --guardoff (the
+                     reader's `trim` is on anything); never exit 70
   b4b/sessions/*.in  C5: a session function or lambda reading an element stored by a
                      later statement: each statement's output equals legacy's until
                      the VM refuses one (then nothing more runs)
@@ -264,6 +269,21 @@ def globp(n):
     return glob(n).replace("print(acc[1][1].trim())", "print(acc[1][1])")
 
 
+def widen(nift, work):
+    """B4b 22: the readers of a class that a union opens read anything (none keeps a Static `trim`):
+    each fixture is refused before any effect, by the guard (`aliasing`) or, guard off, by the
+    admission of `trim` on anything; the guard-off run never reaches the VM (exit 70 before)."""
+    expected = "builtin-receiver:trim" if GUARDOFF[0] else "aliasing"
+    d = os.path.join(HERE, "widen")
+    for f in sorted(x for x in os.listdir(d) if x.endswith(".f")):
+        label = "widen " + f
+        got = judge(label, nift, {"main.f": open(os.path.join(d, f)).read()}, work)
+        _, ve, _, rows = run(nift, {"main.f": open(os.path.join(d, f)).read()}, "require", work)
+        reasons = [str(r.get("reason", "")) for r in rows]
+        check(got == "refused" and expected in reasons, "%s: expected the %s refusal, got %s %r" %
+              (label, expected, got, reasons or ve[-200:]))
+
+
 def compile_row(nift, src, work):
     _, _, _, rows = run(nift, {"main.f": src}, "require", work)
     return rows[-1] if rows else {}
@@ -365,6 +385,7 @@ def main():
             else:
                 outcomes[judge("module " + case, nift, tree_files(tree), work)] += 1
         sessions(nift, work)
+        widen(nift, work)
         convergence(nift, work)
         print("fixtures: %(vm)d run by the VM (equal to legacy), %(refused)d refused before any effect" % outcomes)
         if not args.guardoff:

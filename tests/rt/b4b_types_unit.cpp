@@ -15,13 +15,20 @@
 #include "rt/compiler.h"
 #include "rt/globals.h"
 #include "rt/infer.h"
+#include "rt/infer_unit.h"
 #include "rt/parser.h"
 #include "rt/resolver.h"
 #include "rt_test.h"
 
+#include <dirent.h>
+
+#include <algorithm>
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace nift::rt;
 
@@ -34,6 +41,7 @@ struct Unit {
     UnitPlan plan;
     GlobalPlan globals;
     UnitKinds kinds;
+    std::vector<NodeId> stale;
 };
 
 std::unique_ptr<Unit> infer(const std::string& source, const SessionCompileContext* session = nullptr) {
@@ -46,9 +54,43 @@ std::unique_ptr<Unit> infer(const std::string& source, const SessionCompileConte
     u->plan = plan_unit(*u->ast, u->root);
     CHECK(u->plan.ok);
     u->globals = plan_globals(*u->ast, u->root, u->plan);
-    u->kinds = infer_unit_kinds(*u->ast, u->root, u->plan, 0, &u->globals, session);
+    // B4b 22: every case is also checked for the invalidation invariant directly: the converged
+    // result is a fixed point (one more walk of every unit changes no node's kinds), so no unit
+    // kept facts an input change (a class grown, opened or merged) should have re-walked it for.
+    infer_detail::Inference inference(*u->ast, u->root, u->plan, &u->globals, session);
+    inference.verify_fixed_point();
+    u->kinds = inference.run(0);
     CHECK(u->kinds.converged);
+    u->stale = inference.stale();
     return u;
+}
+
+// B4b 22: the fixed-point check on its own (the stale nodes, with their text, on failure).
+void fixed_point(const char* name, const Unit& u) {
+    CHECK(u.stale.empty());
+    if (!u.stale.empty())
+        std::fprintf(stderr, "  case %s: not a fixed point: %zu node(s) change on one more walk, first `%s`\n", name,
+                     u.stale.size(), std::string(u.ast->text(u.ast->at(u.stale[0]))).c_str());
+}
+
+std::string read_file(const std::string& path) {
+    std::ifstream in(path);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+std::vector<std::string> fixtures(const std::string& dir) {
+    std::vector<std::string> out;
+    if (DIR* d = opendir(dir.c_str())) {
+        while (const dirent* e = readdir(d)) {
+            const std::string name = e->d_name;
+            if (name.size() > 2 && name.compare(name.size() - 2, 2, ".f") == 0) out.push_back(name);
+        }
+        closedir(d);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 // The kinds of the last expression whose source text is `text` (an index,
@@ -74,6 +116,25 @@ void expect(const char* name, const std::string& source, std::string_view observ
     CHECK(ok);
     if (!ok) std::fprintf(stderr, "  case %s: %s has kinds %#llx, missing %#llx\n", name, std::string(observed).c_str(),
                           static_cast<unsigned long long>(got), static_cast<unsigned long long>(stored));
+    fixed_point(name, *u);
+}
+
+// B4b 22 (review of 16f24f36): a fixture of tests/runtime2/b4b/widen, where a precise class is
+// merged into a class opened before (directly, or A -> B -> C transitively): every reader that
+// read the precise class before the merge reads anything after it (each observed expression has
+// every kind), and the result is a fixed point.
+void widened(const std::string& file, const std::vector<std::string>& observed) {
+    const std::string name = "widen-" + file;
+    const auto u = infer(read_file("tests/runtime2/b4b/widen/" + file));
+    for (const std::string& text : observed) {
+        const KindSet got = last(*u, text);
+        const bool anything = (got & kKindAll) == kKindAll;
+        CHECK(anything);
+        if (!anything)
+            std::fprintf(stderr, "  case %s: %s has kinds %#llx after the merge into a widened class, not anything\n",
+                         name.c_str(), text.c_str(), static_cast<unsigned long long>(got));
+    }
+    fixed_point(name.c_str(), *u);
 }
 
 // F1: the parameter-push shape (`many`: n helpers each pushing a new array into the one array
@@ -124,7 +185,11 @@ void convergence(const char* name, std::string (*shape)(int), std::string_view o
         u->root = parsed.root;
         u->plan = plan_unit(*u->ast, u->root);
         u->globals = plan_globals(*u->ast, u->root, u->plan);
-        u->kinds = infer_unit_kinds(*u->ast, u->root, u->plan, 0, &u->globals);
+        infer_detail::Inference inference(*u->ast, u->root, u->plan, &u->globals);
+        inference.verify_fixed_point();
+        u->kinds = inference.run(0);
+        u->stale = inference.stale();
+        fixed_point((std::string(name) + "-" + std::to_string(n)).c_str(), *u);
         const std::size_t units = static_cast<std::size_t>(n) + 1;
         const bool converged = u->kinds.converged && u->kinds.walks <= 4 * units + 16;
         CHECK(converged);
@@ -169,6 +234,31 @@ void builder_case(const char* name, OpCode op, bool constant_a, bool constant_b,
 }  // namespace
 
 int main() {
+    // B4b 22 (review of 16f24f36): merging a precise class into an already widened one
+    // invalidates the precise class's readers (the reviewer's reproducer, single merges through
+    // other paths, and A -> B -> C with C widened, both merge orders, functions, lambdas, globals).
+    for (const std::string& f : fixtures("tests/runtime2/b4b/widen")) {
+        if (f.rfind("transitive_", 0) == 0) widened(f, {"a[0]", "bb[0]"});
+        else if (f == "single_object_member.f") widened(f, {"a.k"});
+        else if (f == "single_param_reader.f") widened(f, {"v[0]"});
+        else widened(f, {"a[0]"});
+    }
+    CHECK(fixtures("tests/runtime2/b4b/widen").size() >= 27);
+    // B4b 22: the fixed point holds for every b4b fixture script too.
+    // (a script the planner refuses, before any inference, is left out: `struct_field_container.f`.)
+    std::size_t scripts = 0;
+    for (const std::string& f : fixtures("tests/runtime2/b4b/scripts")) {
+        const std::string src = read_file("tests/runtime2/b4b/scripts/" + f);
+        Ast ast(src);
+        const ParseResult parsed = parse_script(ast);
+        if (!parsed.ok || !plan_unit(ast, parsed.root).ok) {
+            std::fprintf(stderr, "  note: fixpoint-%s: not planned (left out)\n", f.c_str());
+            continue;
+        }
+        ++scripts;
+        fixed_point(("fixpoint-" + f).c_str(), *infer(src));
+    }
+    CHECK(scripts >= 30);
     // P1 (review): the operand-classification invariant in the builder.
     builder_case("p1-move-constant-source", OpCode::Move, false, true, true);
     builder_case("p1-loadk-constant-destination", OpCode::LoadK, true, true, true);

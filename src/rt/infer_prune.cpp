@@ -26,6 +26,7 @@ TyRef Inference::materialize(const TyRef& t) {
     }
     std::vector<std::uint32_t> read;
     TyRef out = materialize_now(t, read);
+    ++result_.work.materializations;
     for (std::uint32_t s : read) readers_[s].insert(unit);  // H2: this unit depends on them
     if (memo_version_ == site_version_) materialized_[t.get()] = Materialized{t, out, std::move(read), unit};
     return out;

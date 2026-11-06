@@ -58,6 +58,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         ++result_.walks;
         if (self_changed_) enqueue(unit);
     }
+    if (verify_) check_fixed_point();
     export_session();
     result_.converged = true;
     return std::move(result_);
@@ -70,7 +71,7 @@ void Inference::enqueue(std::size_t unit) {
             session_->template_definitions.count(lambdas_[index].node)) return;
     }
     if (unit >= queued_.size()) queued_.resize(unit + 1, false);
-    if (!queued_[unit]) queue_.push_back(unit);
+    if (!queued_[unit]) queue_.push_back(unit), ++result_.work.enqueues;
     queued_[unit] = true;
 }
 
@@ -143,7 +144,7 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
 
 
 TyRef Inference::expr(NodeId id) {
-    const Node& n = ast_.at(id);
+    const Node& n = visit(id);
     if (const auto seed = session_expression_seed(id)) return record(id, seed);
     TyRef t;
     switch (n.kind) {

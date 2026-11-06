@@ -33,6 +33,12 @@ public:
     // is re-walked only when its bindings, a parameter or a callee's return grew; its last walk sees its final
     // inputs. Out of budget: "not converged" (never "know nothing"), and the compiler refuses.
     UnitKinds run(std::size_t max_walks);
+    // B4b 22 (tests): after convergence, walk every unit once more and record each node whose
+    // kinds that walk changes (`stale()`). A converged result is a fixed point, so the list is
+    // empty unless a unit kept facts an input change should have re-walked it for (the
+    // invalidation invariant, checked directly: b4b_types_unit.cpp `fixpoint-*`).
+    void verify_fixed_point() { verify_ = true; }
+    const std::vector<NodeId>& stale() const { return stale_; }
 
 private:
     void enqueue(std::size_t unit);
@@ -53,6 +59,11 @@ private:
     void session_call_edge(std::size_t target, std::size_t arity, std::size_t arguments);
 
     std::size_t current_unit() const;
+    // B4b 23: an expression or statement walked (the analysis-work count `nodes`).
+    const Node& visit(NodeId id) {
+        ++result_.work.nodes;
+        return ast_.at(id);
+    }
 
     using Scope = std::vector<std::pair<std::string_view, std::size_t>>;
 
@@ -162,6 +173,9 @@ private:
     std::shared_ptr<SessionLocationInference> session_locations_;
     std::unordered_map<std::string_view, std::size_t> external_;
     UnitKinds result_;
+    bool verify_ = false;
+    std::vector<NodeId> stale_;
+    void check_fixed_point();
     std::vector<std::vector<TyRef>> params_;
     std::vector<TyRef> returns_;
     std::vector<TyRef> vars_;
