@@ -25,6 +25,7 @@ refusal with that reason before execution (review round 3). A different
 outcome fails the gate. Exit 1 on failure.
 """
 import argparse
+import hashlib
 import collections
 import concurrent.futures as cf
 import json
@@ -155,6 +156,25 @@ def classify_difference(legacy, vm, st):
     return f"approved:{policy}" if verdict == "approved" else verdict
 
 
+# B5 (b5-refsem.md section 6): the programs B5 newly admits whose result differs from legacy,
+# each analysed by hand and pinned by its source hash with the approved rule and the EXACT
+# VM result (stdout, exit, first error message without its position). Not a family pattern:
+# any other differing program, or a pinned one whose result changes, is still a difference.
+B5_PINNED = {row["source_sha256"]: row for row in json.load(open(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "b5", "adversarial-approved.json")))}
+
+
+def b5_pinned(source, vm):
+    row = B5_PINNED.get(hashlib.sha256(source.encode()).hexdigest())
+    if row is None or vm[2] == "timeout":
+        return None
+    first = vm[1].decode("utf-8", "replace").strip().split("\n")[0]
+    message = re.sub(r"^error: .*?p\.f:[0-9]+:[0-9]+: ", "", first)
+    if (vm[0].decode("utf-8", "replace"), vm[2], message) != (row["stdout"], row["exit"], row["error"]):
+        return None
+    return "approved:B5 pinned (" + row["rule"].split(":")[0] + ")"
+
+
 def outcome_key(st):
     if not st:
         return "no-stats"
@@ -198,6 +218,8 @@ def check(nift, item, work, timeout):
         with heavy_lock(name in HEAVY):
             legacy, vm, st, retry = run_pair(nift, path, d, extra, item_timeout(family, name, timeout))
         verdict = classify_difference(legacy, vm, st)
+        if verdict == "diff":
+            verdict = b5_pinned(source, vm) or verdict
         if retry and "asymmetric" in retry:
             verdict = "diff"
         key = outcome_key(st) if vm[2] != "timeout" else "timeout"

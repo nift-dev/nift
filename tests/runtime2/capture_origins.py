@@ -66,19 +66,22 @@ cases.update({'nested_source_view': 'h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>()=>x[
 #   D5 live reads: legacy reads the source element when the closure runs (after
 #     the source was written, rebound or emptied: 9, or "reference target no
 #     longer exists"); the binding holds the element bound at that iteration.
-#   D5 ordinary binding: the loop binding is an ordinary binding, so a closure
-#     sees a later assignment to it (`x=7`, `x+=1`), as for any captured local.
+#   D1 loop-variable closures (owner 2026-11-07 06:55, decision 1; an intentional
+#     capture change, NOT a snapshot effect): each iteration has a distinct ordinary
+#     binding; a closure of that iteration sees a later assignment to it (`x=7`,
+#     `x+=1`), closures of different iterations are independent (fixtures
+#     tests/runtime2/b5/loopclosure, invoked after the loop on the VM).
 #   D5 element mutation: a mutation through the binding mutates the element
 #     itself (the source's element and every closure's view of it).
 # Cases not listed (read_before, callback_read_write, ...) are legacy-equal.
 B5_APPROVED = {
-    'named_scalar_expr_assign_before': ('7\n', 0, 'D5 ordinary binding'),
-    'named_scalar_block_assign_before': ('7\n', 0, 'D5 ordinary binding'),
-    'named_aggregate_expr_assign_before': ('7\n', 0, 'D5 ordinary binding'),
-    'named_aggregate_block_assign_before': ('7\n', 0, 'D5 ordinary binding'),
-    'named_scalar_expr_element_before': ('2\n', 0, 'D5 ordinary binding'),
-    'named_scalar_block_element_before': ('2\n', 0, 'D5 ordinary binding'),
-    'descriptor_write_calls': ('2\n3\n', 0, 'D5 ordinary binding'),
+    'named_scalar_expr_assign_before': ('7\n', 0, 'D1 loop-variable closures'),
+    'named_scalar_block_assign_before': ('7\n', 0, 'D1 loop-variable closures'),
+    'named_aggregate_expr_assign_before': ('7\n', 0, 'D1 loop-variable closures'),
+    'named_aggregate_block_assign_before': ('7\n', 0, 'D1 loop-variable closures'),
+    'named_scalar_expr_element_before': ('2\n', 0, 'D1 loop-variable closures'),
+    'named_scalar_block_element_before': ('2\n', 0, 'D1 loop-variable closures'),
+    'descriptor_write_calls': ('2\n3\n', 0, 'D1 loop-variable closures'),
     'named_scalar_expr_source_before': ('1\n', 0, 'D5 live reads'),
     'named_scalar_expr_source_after': ('1\n', 0, 'D5 live reads'),
     'named_scalar_block_source_before': ('1\n', 0, 'D5 live reads'),

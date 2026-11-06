@@ -1,4 +1,7 @@
 # Historical CP22 REFUSE.tsv is preserved. CP23 default classifications.
+# B5 (b5-refsem.md section 6, class i): r_share_alias.f and r_share_alias_task.f ran into the deleted `aliasing`
+# refusal; they now run with legacy's output: the task receives a graph copy (plan section 3 D7/Q4), so the
+# task variant's push does not reach the caller (2, then 1).
 # fixture	CP22 reason	CP23 outcome	CP23 reason	policy
 r_capture.f	coro-capture	vm	-	legacy-golden
 r_async_value.f	coro-async-value	require-error	coro-async-value	preserved-refusal
@@ -61,8 +64,8 @@ r_ca_higher_order.f	coro-task-loop	vm	-	legacy-golden
 r_ca_global_lambda.f	coro-task-loop	vm	-	legacy-golden
 r_ca_nested_call_chain.f	coro-task-native:sha256	vm	-	legacy-golden
 r_ca_mutual_recursion.f	coro-task-recursion	vm	-	legacy-golden
-r_share_alias.f	aliasing	require-error	aliasing	preserved-refusal
-r_share_alias_task.f	aliasing	require-error	aliasing	preserved-refusal
+r_share_alias.f	aliasing	vm	-	legacy-golden
+r_share_alias_task.f	aliasing	vm	-	legacy-golden
 r_f3_member_print_default.f	coro-observe:print	vm	-	qualified:parallel-print-order
 r_f3_member_loop.f	coro-task-loop	vm	-	legacy-golden
 r_f3_member_join_default.f	builtin-receiver:join	require-error	builtin-receiver:join	preserved-refusal

@@ -85,7 +85,7 @@ maps, sets, stacks and struct instances; the Phase A guard that refused these pr
 | `p := o; p["k"] = 2; print(o)` | `{"k":1}` | `{"k":2}` |
 | `for (v : a) { a[0] = 9; print(v) }` | `9` (live element) | `1` (entry snapshot, D5) |
 | `for (v : b) { b.pop(); print(v) }` | error "reference target no longer exists" | every entry element |
-| a closure capturing a loop variable (`for (x : a) { f = () => x; x = 7 }`) | reads the source element when called (`1`, or the vanished-element error) | the loop binding is an ordinary binding (`7`) |
+| a closure capturing a loop variable (`for (x : a) { f = () => x; x = 7 }`) | reads the source element when called (`1`, or the vanished-element error) | the loop binding is an ordinary, per-iteration binding (`7`): closures of one iteration share it and see later assignments to it, closures of different iterations are independent. An intentional capture change approved by the owner 2026-11-07 06:55 (B5 D1), distinct from snapshot iteration (fixtures `tests/runtime2/b5/loopclosure`) |
 | `d := copy([[1]]); d[0].push(2)` | original unchanged (deep) | original shows `[[1,2]]` (shallow `copy`; `deepcopy` is recursive) |
 | `a.push(a)` | pushes a copy | catchable `runtime.reference_cycle` |
 | `b := args; b.push("q")` | `args` grows | "cannot mutate const array: b" (Q1: `args` immutable through every alias) |
