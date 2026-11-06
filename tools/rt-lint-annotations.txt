@@ -14,8 +14,6 @@ src/rt/aggregate.h | test-access-decl | struct StorageTestAccess;
 src/rt/build.h | test-access-decl | #pragma GCC poison StorageTestAccess
 src/rt/build.h | test-access-decl | friend struct StorageTestAccess;
 src/rt/build.h | test-access-decl | static_assert(!test_access_detail::complete<StorageTestAccess>::value,
-src/rt/cell.cpp | storage-ok private-descriptor | Construction::array_set(key, owner->value, 5, Value::boolean(true));
-src/rt/cell.cpp | storage-ok private-descriptor | Construction::array_set(key, owner->value, 6, anchor);
 src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,*group,item);
 src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,s[Keys],r);
 src/rt/collection_helpers.cpp | storage-ok fresh | Construction::array_push(bk,s[Keys],r);break;
