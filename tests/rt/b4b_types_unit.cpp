@@ -75,9 +75,106 @@ void expect(const char* name, const std::string& source, std::string_view observ
                           static_cast<unsigned long long>(got), static_cast<unsigned long long>(stored));
 }
 
+// F1: the parameter-push shape (`many`: n helpers each pushing a new array into the one array
+// they are passed), `nestb` (the pushed array passed in too) and `glob` (a global array).
+std::string many_shape(int n) {
+    const char* kinds[] = {"1", "\"t\"", "2.5", "true", "null"};
+    std::string src;
+    for (int i = 0; i < n; ++i)
+        src += "fn(k" + std::to_string(i) + "(r)) {\n  r.push([" + kinds[i % 5] + ", \" s \"])\n  return r.size()\n}\n";
+    src += "acc := [[\" s \"]]\n";
+    for (int i = 0; i < n; ++i) src += "print(k" + std::to_string(i) + "(acc))\n";
+    return src + "print(acc[0][1])\n";
+}
+
+std::string nestb_shape(int n) {
+    const char* values[] = {"[1]", "[\"t\"]", "[[1]]", "[{\"q\": 1}]", "[null]", "[true]", "[2.5]"};
+    std::string src;
+    for (int i = 0; i < n; ++i)
+        src += "fn(k" + std::to_string(i) + "(r, v)) {\n  r.push(v)\n  return r.size()\n}\n";
+    src += "acc := [[\" s \"]]\n";
+    for (int i = 0; i < n; ++i)
+        src += "t" + std::to_string(i) + " := " + values[i % 7] + "\nprint(k" + std::to_string(i) + "(acc, t" +
+               std::to_string(i) + "))\n";
+    return src + "print(acc[1][0])\n";
+}
+
+std::string glob_shape(int n) {
+    const char* kinds[] = {"1", "\"t\"", "2.5", "true", "null"};
+    std::string src = "acc := [[\" s \"]]\n";
+    for (int i = 0; i < n; ++i)
+        src += "fn(k" + std::to_string(i) + "()) {\n  acc.push([" + kinds[i % 5] + ", \" s \"])\n  return acc.size()\n}\n";
+    for (int i = 0; i < n; ++i) src += "print(k" + std::to_string(i) + "())\n";
+    return src + "print(acc[1][1])\n";
+}
+
+// F1: the analysis reaches its fixed point for every size (no walk-budget refusal), within a
+// linear number of walks; the observed kinds only grow with the size (monotone: precision
+// discarded at the 16-class bound never comes back), and past the bound they are anything.
+void convergence(const char* name, std::string (*shape)(int), std::string_view observed) {
+    KindSet previous = 0;
+    for (int n : {8, 14, 15, 16, 17, 18, 24, 40, 100}) {
+        const std::string src = shape(n);
+        auto u = std::make_unique<Unit>();
+        u->source = src;
+        u->ast = std::make_unique<Ast>(u->source);
+        const ParseResult parsed = parse_script(*u->ast);
+        CHECK(parsed.ok);
+        u->root = parsed.root;
+        u->plan = plan_unit(*u->ast, u->root);
+        u->globals = plan_globals(*u->ast, u->root, u->plan);
+        u->kinds = infer_unit_kinds(*u->ast, u->root, u->plan, 0, &u->globals);
+        const std::size_t units = static_cast<std::size_t>(n) + 1;
+        const bool converged = u->kinds.converged && u->kinds.walks <= 4 * units + 16;
+        CHECK(converged);
+        if (!converged)
+            std::fprintf(stderr, "  case %s-%d: converged %d after %zu walks (bound %zu)\n", name, n,
+                         static_cast<int>(u->kinds.converged), u->kinds.walks, 4 * units + 16);
+        if (!u->kinds.converged) continue;
+        const KindSet got = last(*u, observed);
+        const bool monotone = (got & previous) == previous;
+        CHECK(monotone);
+        if (!monotone)
+            std::fprintf(stderr, "  case %s-%d: %s has kinds %#llx, lost %#llx of the smaller size\n", name, n,
+                         std::string(observed).c_str(), static_cast<unsigned long long>(got),
+                         static_cast<unsigned long long>(previous & ~got));
+        previous = got;
+        if (n >= 17) {  // more than 16 origins on the one element union: anything
+            const bool anything = (got & kKindAll) == kKindAll;
+            CHECK(anything);
+            if (!anything)
+                std::fprintf(stderr, "  case %s-%d: %s has kinds %#llx, not anything\n", name, n,
+                             std::string(observed).c_str(), static_cast<unsigned long long>(got));
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
+    // F1: convergence past the 16-class bound (monotone widening to anything).
+    convergence("converge-many", many_shape, "acc[0][1]");
+    convergence("converge-nestb", nestb_shape, "acc[1][0]");
+    convergence("converge-glob", glob_shape, "acc[1][1]");
+    // U1 (found with F1, on B4a too): a lambda walked before a later write grows the binding it
+    // captures (or a global it reads) is walked again; it must see the int stored there.
+    const std::string pre = "fn(t()) { return [1] }\nfn(q()) { return t() }\n";
+    expect("lambda-capture-assign", pre + "xs := [\" s \"]\ng := () => { return xs[0] }\nxs = q()\nprint(g())\n",
+           "xs[0]", kKindInt);
+    expect("lambda-capture-global", pre + "xs := [\" s \"]\ng := () => { return xs[0] }\nfn(w()) { xs = q()\n"
+           "return 0 }\nw()\nprint(g())\n", "xs[0]", kKindInt);
+    expect("lambda-capture-local", pre + "fn(m()) {\n  xs := [\" s \"]\n  g := () => { return xs[0] }\n"
+           "  xs = q()\n  return g()\n}\nprint(m())\n", "xs[0]", kKindInt);
+    expect("lambda-capture-param", pre + "fn(m(xs)) {\n  g := () => { return xs[0] }\n  xs = q()\n"
+           "  return g()\n}\nprint(m([\" s \"]))\n", "xs[0]", kKindInt);
+    expect("lambda-capture-nested", pre + "xs := [\" s \"]\ng := () => { h := () => { return xs[0] }\n"
+           "return h() }\nxs = q()\nprint(g())\n", "xs[0]", kKindInt);
+    expect("lambda-capture-lambda-write", pre + "xs := [\" s \"]\ng := () => { return xs[0] }\n"
+           "w := () => { xs = q()\nreturn 0 }\nw()\nprint(g())\n", "xs[0]", kKindInt);
+    expect("lambda-capture-member", "fn(t()) { return {\"a\": 1} }\nfn(q()) { return t() }\n"
+           "o := {\"a\": \" s \"}\ng := () => { return o.a }\no = q()\nprint(g())\n", "o.a", kKindInt);
+    expect("lambda-capture-callback", pre + "xs := [\" s \"]\nys := [1]\nr := ys.map((v) => xs[0])\nxs = q()\n"
+           "print(ys.map((v) => xs[0]))\n", "xs[0]", kKindInt);
     // An element replaced through an alias, observed through the original binding, and the reverse.
     expect("alias", "xs := [1]\nys := xs\nys[0] = \"s\"\nprint(xs[0])\n", "xs[0]", kKindString);
     expect("alias-reverse", "xs := [1]\nys := xs\nxs[0] = \"s\"\nprint(ys[0])\n", "ys[0]", kKindString);

@@ -237,44 +237,101 @@ def glob(n):
     return "\n".join(lines) + "\n"
 
 
+def many(n):
+    """F1: n helpers each pushing a new array (its own site) into the one array passed to all of them."""
+    kinds = ["%d" % 1, '"t"', "2.5", "true", "null"]
+    lines = []
+    for i in range(n):
+        lines += ["fn(k%d(r)) {" % i, '  r.push([%s, " s "])' % kinds[i % len(kinds)], "  return r.size()", "}"]
+    lines += ['acc := [[" s "]]'] + ["print(k%d(acc))" % i for i in range(n)] + ["print(acc[0][1].trim())"]
+    return "\n".join(lines) + "\n"
+
+
+def nestb(n):
+    """F1: the same with the pushed array passed in too (a parameter's sites stored into a parameter's)."""
+    values = ["[1]", '["t"]', "[[1]]", '[{"q": 1}]', "[null]", "[true]", "[2.5]"]
+    lines = []
+    for i in range(n):
+        lines += ["fn(k%d(r, v)) {" % i, "  r.push(v)", "  return r.size()", "}"]
+    lines += ['acc := [[" s "]]']
+    for i in range(n):
+        lines += ["t%d := %s" % (i, values[i % len(values)]), "print(k%d(acc, t%d))" % (i, i)]
+    return "\n".join(lines + ["print(acc.size())"]) + "\n"
+
+
+def globp(n):
+    """F1: `glob` observed by print (admitted while the guard is on): the VM's output equals legacy's."""
+    return glob(n).replace("print(acc[1][1].trim())", "print(acc[1][1])")
+
+
+def compile_row(nift, src, work):
+    _, _, _, rows = run(nift, {"main.f": src}, "require", work)
+    return rows[-1] if rows else {}
+
+
 def best_compile(nift, src, work, runs=7):
+    """The best compile time of `runs` runs, whatever the outcome (the guard refuses `many` and
+    `nestb` after the analysis); None if any run stopped at an analysis limit (F1)."""
     best = None
     for _ in range(runs):
-        _, _, _, rows = run(nift, {"main.f": src}, "require", work)
-        us = rows[-1].get("compile_us") if rows and rows[-1].get("outcome") == "vm" else None
+        row = compile_row(nift, src, work)
+        if not row or str(row.get("reason", "")).startswith("analysis-limit"):
+            return None
+        us = row.get("compile_us")
         best = us if best is None or (us is not None and us < best) else best
     return best
 
 
+def convergence(nift, work):
+    """F1: from 15 to 17 helpers (the 16-class bound) and at 100, every shape is refused before any
+    effect or equal to legacy, and never by the analysis limit (the widening converges)."""
+    for name, make in (("many", many), ("nestb", nestb), ("glob", glob), ("globp", globp)):
+        for n in (15, 16, 17, 100):
+            src = make(n)
+            judge("convergence %s %d" % (name, n), nift, {"main.f": src}, work)
+            reason = str(compile_row(nift, src, work).get("reason", ""))
+            check(not reason.startswith("analysis-limit"), "convergence %s %d: refused %s" % (name, n, reason))
+
+
 def compile_scaling(nift, work, baseline=None):
     """Compile time: the container-heavy shape (four times the containers within twelve times the
-    time) and the review H2 shape (one global array, n helpers each adding a site: near-linear,
-    four times the helpers within six times the time; with --baseline, within 1.5x of B4a at
-    every size)."""
-    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, (100, 400, 800, 1600), 6))
-    growth = {}
+    time), the review H2 shape (one global array, n helpers each adding a site) and the F1 shapes
+    (`many`, `nestb`: the array a parameter): near-linear, four times the helpers within six times
+    the time; with --baseline, within 1.5x of B4a at every size, the ratio not rising with the size."""
+    sizes = (100, 400, 800, 1600)
+    shapes = (("containers", containers, (250, 1000), 12), ("glob", glob, sizes, 6), ("many", many, sizes, 6),
+              ("nestb", nestb, sizes, 6))
     for name, make, sizes, bound in shapes:
-        times = {n: best_compile(nift, make(n), work) for n in sizes}
+        times, base = {}, {}
+        for n in sizes:  # the two binaries interleaved, so a load change affects both alike
+            src = make(n)
+            times[n], base[n] = None, None
+            for _ in range(7):
+                t = best_compile(nift, src, work, 1)
+                times[n] = t if times[n] is None or (t is not None and t < times[n]) else times[n]
+                if t is None:
+                    times[n] = None
+                    break
+                if baseline:
+                    b = best_compile(baseline, src, work, 1)
+                    base[n] = b if base[n] is None or (b is not None and b < base[n]) else base[n]
         for small, large in zip(sizes, sizes[1:]):
             check(times[small] is not None and times[large] is not None and times[large] <= bound * times[small],
                   "compile scaling %s: %r us for %d, %r us for %d (must be <= %dx)" %
                   (name, times[small], small, times[large], large, bound))
         line = "compile scaling %s: %s" % (name, ", ".join("%d %.0f us" % (n, times[n] or 0) for n in sizes))
-        if baseline and name == "glob":
-            # Review H2: the growth is gone, not moved to larger sizes: the ratio to B4a does not
-            # rise from size to size by more than noise (10%), besides staying within 1.5x.
-            base_times = {n: best_compile(baseline, make(n), work) for n in sizes}
-            ratios = [(times[n] or 0) / (base_times[n] or 1) for n in sizes]
-            for (small, r1), (large, r2) in zip(zip(sizes, ratios), zip(sizes[1:], ratios[1:])):
-                check(r2 <= r1 * 1.10 + 0.05, "compile scaling glob: the ratio to B4a grows from %.2fx at %d to %.2fx at %d"
-                      % (r1, small, r2, large))
         if baseline:
-            base = {n: best_compile(baseline, make(n), work) for n in sizes}
+            ratios = [(times[n] or 0) / (base[n] or 1) for n in sizes]
+            if name != "containers":
+                # Review H2: the growth is gone, not moved to larger sizes: the ratio to B4a does not
+                # rise from size to size by more than noise (10%), besides staying within 1.5x.
+                for (small, r1), (large, r2) in zip(zip(sizes, ratios), zip(sizes[1:], ratios[1:])):
+                    check(r2 <= r1 * 1.10 + 0.05, "compile scaling %s: the ratio to B4a grows from %.2fx at %d to "
+                          "%.2fx at %d" % (name, r1, small, r2, large))
             for n in sizes:
                 check(times[n] is not None and base[n] and times[n] <= 1.5 * base[n],
                       "compile scaling %s %d: %r us against B4a %r us (must be <= 1.5x)" % (name, n, times[n], base[n]))
-            line += "; B4a " + ", ".join("%d %.0f us (%.2fx)" % (n, base[n] or 0, (times[n] or 0) / (base[n] or 1))
-                                         for n in sizes)
+            line += "; B4a " + ", ".join("%d %.0f us (%.2fx)" % (n, base[n] or 0, r) for n, r in zip(sizes, ratios))
         print(line)
 
 
@@ -308,6 +365,7 @@ def main():
             else:
                 outcomes[judge("module " + case, nift, tree_files(tree), work)] += 1
         sessions(nift, work)
+        convergence(nift, work)
         print("fixtures: %(vm)d run by the VM (equal to legacy), %(refused)d refused before any effect" % outcomes)
         if not args.guardoff:
             compile_scaling(nift, work, args.baseline)

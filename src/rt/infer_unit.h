@@ -77,6 +77,11 @@ private:
     void declare(std::string_view name, NodeId at, const TyRef& value);
 
     TyRef* find(std::string_view name);
+    TyRef* find_binding(std::string_view name);
+    bool into_lambda_readers(const TyRef* var);  // U1: enqueue the lambdas that read `var`
+    std::unordered_map<std::size_t, std::set<std::size_t>> lambda_readers_;  // binding slot -> lambda units
+    std::vector<std::size_t> slot_read_;  // F1: per binding slot, the last walk that read it
+    std::size_t walk_serial_ = 0;
 
     // ---- CP12b structs (rt/structs.h) ----
     // The struct whose method is being walked, or -1.
@@ -190,6 +195,17 @@ private:
     // A value's type carries its sites; the stores of every alias go to the
     // sites (agg_), and every read is materialized from them (record()).
     TyRef materialize(const TyRef& t);
+    TyRef materialize_now(const TyRef& t, std::vector<std::uint32_t>& read);
+    TyRef pruned(const TyRef& value);  // F1: a stored value as it reads
+    void prune_parts(std::shared_ptr<Ty>& t, bool& changed, std::vector<std::uint32_t>& read);
+    TyRef prune_part(const TyRef& part, std::vector<std::uint32_t>& read, int depth);  // F1: opened: anything
+    struct Materialized {
+        TyRef in, out;
+        std::vector<std::uint32_t> read;  // the classes the result depends on
+        std::size_t unit;                 // the last unit entered in their readers lists
+    };
+    std::unordered_map<const Ty*, Materialized> materialized_;  // F1: valid while site_version_ holds
+    std::uint64_t site_version_ = 0, memo_version_ = 0;
     TyRef sited(NodeId id, const TyRef& t);             // record(): materialized, or of unknown origin
     TyRef fresh(NodeId site, const TyRef& t);           // a construction: allocation site `site`
     std::uint32_t new_site();                           // a site without a node (an invocation seed)
@@ -216,7 +232,31 @@ private:
     bool exact_callee(const TyRef& f) const;            // H1: every target known
     std::unordered_set<std::uint32_t> exposed_, opened_, collapsed_;
     std::unordered_map<std::uint32_t, std::uint32_t> parent_;
-    std::unordered_map<std::uint32_t, std::set<std::size_t>> readers_;
+    // F1: a class's readers in the order they first read it; membership in
+    // constant time (a collapsed class is read by every unit of the shape).
+    struct UnitSet {
+        std::vector<std::size_t> list;
+        std::vector<bool> has;  // built once the list is long
+        void insert(std::size_t u) {
+            if (list.size() < 16) {
+                for (std::size_t v : list)
+                    if (v == u) return;
+                list.push_back(u);
+                if (list.size() == 16)
+                    for (std::size_t v : list) mark(v);
+                return;
+            }
+            if (u < has.size() && has[u]) return;
+            mark(u);
+            list.push_back(u);
+        }
+        void mark(std::size_t u) {
+            if (u >= has.size()) has.resize(u + 1, false);
+            has[u] = true;
+        }
+        std::size_t size() const { return list.size(); }
+    };
+    std::unordered_map<std::uint32_t, UnitSet> readers_;
     bool earlier_called_ = false, closure_exposed_ = false, untracked_seen_ = false;
     const std::string* store_key(NodeId index, std::string& storage) const;  // a literal string index
     void element_update(NodeId target, const TyRef& value, Op op);          // `xs[i] += v`, `o.k++`

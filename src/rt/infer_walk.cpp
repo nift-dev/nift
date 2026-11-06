@@ -129,8 +129,21 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
     else updated->elem = canonical(unite(updated->elem, value));  // B4b H2: its sites as classes
     updated->tuple = false;
     updated->items.clear();
-    TyRef next = unite(TyRef(updated), TyRef(updated));
-    if (!same(next, *var)) { *var = next; self_changed_ = true; }
+    // B4b F1: joined with the binding, never put in its place. `canonical`
+    // spells merged sites by their class; the binding (merged again from the
+    // parameters and every write each walk) spells them as they were made.
+    // Assigning the shorter spelling would shrink the binding, the next walk
+    // would grow it back, and the unit would never stabilise.
+#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 30
+    TyRef next = updated;  // A30: the shorter spelling replaces the binding (F1: the walks never stabilise)
+#else
+    TyRef next = unite(*var, TyRef(updated));
+#endif
+    if (!same(next, *var)) {
+        *var = next;
+        self_changed_ = true;
+        into_lambda_readers(var);  // U1
+    }
 }
 
 void Inference::statement(NodeId id) {

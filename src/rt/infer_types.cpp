@@ -58,6 +58,48 @@ TyRef with_text_number(const TyRef& value,bool maybe) {
     auto next=std::make_shared<Ty>(*value);next->legacy_text_number=true;return next;
 }
 
+namespace {
+// F1: whether unite(a, b, depth) would build a type equal to `a` (same()):
+// then unite returns `a` itself and allocates nothing. Every read of a
+// container joins its sites' contents again (Inference::materialize), and
+// after the first walks they are mostly included already.
+bool covers(const TyRef& a, const TyRef& b, int depth) {
+    if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return true;
+    if (!a || a.get() == empty_ty().get()) return false;
+    if (a->any || b->any || depth > kMaxDepth)
+        return a.get() == (((a->kinds | b->kinds) & kKindUnknown) ? any_ty() : top_ty()).get();
+    if ((a->kinds | b->kinds) != a->kinds) return false;
+    if ((b->historical_callable && !a->historical_callable) || (b->untracked_callable && !a->untracked_callable) ||
+        (b->legacy_text_number && !a->legacy_text_number))
+        return false;
+    if (a->collection_array && (b->kinds & kKindArray) && !b->collection_array) return false;
+    if (a->collection_object && (b->kinds & kKindObject) && !b->collection_object) return false;
+    if (a->struct_id != b->struct_id && a->struct_id != -2) return false;
+    for (std::uint32_t site : b->sites)
+        if (!std::binary_search(a->sites.begin(), a->sites.end(), site)) return false;
+    constexpr KindSet tracked = kKindArray | kKindObject | kKindCollection;
+    if ((((a->kinds & tracked) && a->sites.empty() && !b->sites.empty()) ||
+         ((b->kinds & tracked) && b->sites.empty() && !a->sites.empty())) &&
+        (a->sites.empty() || a->sites.back() != kOpenSite))
+        return false;
+    for (std::uint32_t u : b->callables)
+        if (std::find(a->callables.begin(), a->callables.end(), u) == a->callables.end()) return false;
+    if (!covers(a->elem, b->elem, depth + 1) || !covers(a->key, b->key, depth + 1)) return false;
+    if (a->tuple) {
+        if (!b->tuple || a->items.size() != b->items.size()) return false;
+        for (std::size_t k = 0; k < a->items.size(); ++k)
+            if (!covers(a->items[k], b->items[k], depth + 1)) return false;
+    } else if (!a->items.empty()) {
+        return false;
+    }
+    for (const auto& [key, ty] : b->fields) {
+        const auto it = a->fields.find(key);
+        if (it == a->fields.end() || !covers(it->second, ty, depth + 1)) return false;
+    }
+    return true;
+}
+} // namespace
+
 TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     if (!a || a.get() == empty_ty().get()) return b ? b : empty_ty();
     if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return a;
@@ -65,6 +107,7 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
         if ((a->kinds | b->kinds) & kKindUnknown) return any_ty();
         return top_ty();
     }
+    if (covers(a, b, depth)) return a;
     auto t = std::make_shared<Ty>();
     t->kinds = a->kinds | b->kinds;
     t->historical_callable = a->historical_callable || b->historical_callable;

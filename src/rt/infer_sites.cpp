@@ -31,6 +31,7 @@ bool Inference::has_site(const TyRef& t) const {
 std::uint32_t Inference::new_site() {
     const std::uint32_t site = next_site_++;
     agg_sites_.insert(site);
+    ++site_version_;
     return site;
 }
 
@@ -44,7 +45,7 @@ std::uint32_t Inference::derived(std::uint32_t site) {
 
 TyRef Inference::fresh(NodeId site, const TyRef& t) {
     if (!t || t->any || !(t->kinds & kAggregate) || has_site(t)) return t;
-    agg_sites_.insert(site);
+    if (agg_sites_.insert(site).second) ++site_version_;
     return with_site(t, site);
 }
 
@@ -70,13 +71,12 @@ TyRef Inference::sited(NodeId id, const TyRef& t) {
 #endif
 }
 
-TyRef Inference::materialize(const TyRef& t) {
-    if (!t || t->any || !(t->kinds & kAggregate)) return t;
+TyRef Inference::materialize_now(const TyRef& t, std::vector<std::uint32_t>& read) {
     bool open = agg_unknown_;
     const std::vector<std::uint32_t> sites = classes(t->sites, open);
     for (std::uint32_t s : sites) {
         if (opened_.count(s)) open = true;
-        readers_[s].insert(current_unit());  // H2: this unit's result depends on the class's contents
+        read.push_back(s);
     }
     if (sites.empty() && !open) return t;
     auto out = std::make_shared<Ty>(*t);
@@ -117,6 +117,7 @@ TyRef Inference::materialize(const TyRef& t) {
     attach(out->elem);
     for (auto& entry : out->fields) attach(entry.second);
     for (auto& item : out->items) attach(item);
+    prune_parts(out, changed, read);
     return changed || out->sites != t->sites ? TyRef(out) : t;
 }
 
@@ -136,6 +137,7 @@ std::uint32_t Inference::rep(std::uint32_t site) {
 void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     a = rep(a), b = rep(b);
     if (a == b) return;
+    ++site_version_;
     if (b < a) std::swap(a, b);  // the smaller id is the root (stable)
     parent_[b] = a;
     bool grew = false, b_grew = false;  // whether each side's class changed: its readers re-walk then
@@ -151,6 +153,7 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     b_grew = merge(moved.keys, prior.keys) || b_grew;
     for (auto* set : {&nonpositional_, &opened_})  // flags that change what a read sees
         if (set->count(a) && !set->count(b)) b_grew = true;
+    if (opened_.count(b)) b_grew = false;  // F1: `b`'s readers read anything already
     const auto flag = [&](std::unordered_set<std::uint32_t>& set) {
         if (set.count(b) && set.insert(a).second) grew = true;
     };
@@ -158,6 +161,7 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     flag(collapsed_);
     flag(exposed_);
     flag(opened_);
+    if (opened_.count(a)) grew = false;  // F1: an opened class reads anything; growing it changes no read
     const auto da = derived_.find(a), db = derived_.find(b);  // the inner parts' sites join too
     if (db != derived_.end()) {
         const std::uint32_t inner = db->second;
@@ -168,10 +172,15 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     // `b`'s readers now read `a`'s class: they re-walk if it holds more.
     const auto rb = readers_.find(b);
     if (rb != readers_.end()) {
-        std::set<std::size_t> readers = std::move(rb->second);
+        UnitSet readers = std::move(rb->second);
         readers_.erase(rb);
-        if (b_grew) for (std::size_t u : readers) enqueue(u);
-        readers_[a].insert(readers.begin(), readers.end());
+        if (b_grew) for (std::size_t u : readers.list) enqueue(u);
+        // F1: the smaller list joins the larger (the root is the smaller id,
+        // so a class grown site by site in decreasing order would otherwise
+        // copy its whole list at every merge: quadratic in the sites).
+        UnitSet& into_readers = readers_[a];
+        if (into_readers.size() < readers.size()) std::swap(into_readers, readers);
+        for (std::size_t u : readers.list) into_readers.insert(u);
     }
     if (grew) site_changed(a);
 }
@@ -192,6 +201,13 @@ std::vector<std::uint32_t> Inference::classes(const std::vector<std::uint32_t>& 
         const std::uint32_t r = rep(out[0]);
         collapsed_.insert(r);
         out.assign(1, r);
+#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 31)
+        // F1: too many known origins is analysis imprecision: the class's
+        // contents read as anything from now on (a method on them is Dynamic,
+        // under the B4a precondition, or refused). Monotone: a class never
+        // leaves opened_, and every site merged into it later reads anything.
+        if (opened_.insert(r).second) site_changed(r);
+#endif
     }
 #endif
     std::sort(out.begin(), out.end());
@@ -222,16 +238,18 @@ std::vector<std::uint32_t> Inference::with_classes(const std::vector<std::uint32
 }
 
 void Inference::site_changed(std::uint32_t r) {
+    ++site_version_;
 #if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 27
     return;  // A27: a grown site's readers are not re-walked (a stale read survives the fixpoint)
 #endif
     self_changed_ = true;
     const auto found = readers_.find(r);
     if (found == readers_.end()) return;
-    for (std::size_t u : found->second) enqueue(u);
+    for (std::size_t u : found->second.list) enqueue(u);
 }
 
 void Inference::site_grew() {
+    ++site_version_;
     self_changed_ = true;
     for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
 }
@@ -267,13 +285,15 @@ void Inference::site_store(const TyRef& container, const TyRef& value_in, const 
         bool grew = false;
         if (value && (value->kinds || value->any)) {
             TyRef& slot = key != nullptr && (container->kinds & kKindObject) ? c.named[*key] : c.values;
-            TyRef next = canonical(unite(slot, value));  // H2: the contents' own sites as classes
+            TyRef next = pruned(canonical(unite(slot, value)));  // H2: the contents' own sites as classes
             grew = !same(next, slot);
             if (grew) slot = std::move(next);
         }
         grew = nonpositional_.insert(s).second || grew;
         if (exposed_.count(s)) expose(value);  // M1: stored later into a container earlier code reaches
-        if (grew) site_changed(s);
+        // F1: the contents of an opened class are kept (exposure reaches them,
+        // C5) but read by nobody: they read as anything, so nothing re-walks.
+        if (grew && !opened_.count(s)) site_changed(s);
     }
     if ((open || !tracked) && !agg_unknown_) agg_unknown_ = true, site_grew();
 }

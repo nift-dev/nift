@@ -52,6 +52,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         const std::size_t unit = queue_.front();
         queue_.pop_front();
         queued_[unit] = self_changed_ = false;
+        ++walk_serial_;
         walk_unit(unit);
         if (session_locations_ && !session_locations_converged()) return std::move(result_);
         ++result_.walks;
@@ -87,6 +88,7 @@ bool Inference::merge(TyRef& into, const TyRef& value) {
 void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (!merge(into, value)) return;
     if (session_locations_) session_sync_locations();
+    into_lambda_readers(&into);  // U1: the lambdas that read this binding walk again
     self_changed_ = true;  // a global's slot is shared by every unit using it (CP12b):
     if (session_) {
         for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
@@ -118,7 +120,16 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
             infer_text_type(ast_.text(ast_.at(ast_.at(at).b))) : TextType{};
         merge_local(vars_[slot], session_global_shape(value,
             type.kind == TextType::Kind::Known && type.known == 3));
-    } else merge_local(vars_[slot], value);
+    } else {
+        // F1: a binding that grows where it is declared, before this walk read
+        // it, needs no second walk of this unit: every read of it in this
+        // walk comes after (other units that read it are enqueued by
+        // merge_local: functions for a global, lambdas for a capture).
+        const bool changed = self_changed_;
+        const bool read = slot < slot_read_.size() && slot_read_[slot] == walk_serial_;
+        merge_local(vars_[slot], value);
+        if (!read) self_changed_ = changed;
+    }
     if (session_locations_) {
         const auto locations = session_->capture_locations.find(binding_decls_[slot]);
         if (locations != session_->capture_locations.end())
@@ -128,24 +139,6 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }
 
-TyRef* Inference::find(std::string_view name) {
-    for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope)
-        for (auto entry = scope->rbegin(); entry != scope->rend(); ++entry)
-            if (entry->first == name) return &vars_[entry->second];
-    // A function's free name resolved to a top-level binding (rt/globals.h).
-    // A lambda uses its enclosing named function's free-name map.
-    const int owner = current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()
-                          ? current_
-                          : owner_function_;
-    const std::size_t slot = globals_.find(owner, name, persist_index_, vars_, ast_.size());
-    if (slot != GlobalSlots::kNone) return &vars_[slot];
-    const auto external = external_.find(name);
-    if (external != external_.end() && (!plan_.index.count(name) ||
-        (session_ && session_->phased_functions.count(std::string(name))))) return &vars_[external->second];
-    if (current_ < 0 || static_cast<std::size_t>(current_) <= plan_.functions.size()) return nullptr;
-    const auto top = top_level_slots_.find(name);
-    return top == top_level_slots_.end() ? nullptr : &vars_[top->second];
-}
 
 
 
