@@ -87,8 +87,10 @@ std::size_t FunctionBuilder::emit(OpCode op, std::uint16_t a, std::uint16_t b, s
     // writes R[a] (all but those whose `a` is an RK operand, a jump, a global,
     // an upvalue or a handler index: opcodes.h) and for Move's source; a
     // violation is a compiler defect: the unit is refused before it runs.
+#if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 34)  // A34: the invariant removed (P1)
     if (error_.empty() && (((a & kConstantBit) && writes_register_a(op)) || (op == OpCode::Move && (b & kConstantBit))))
         error_ = "register-operand-constant";
+#endif
     Instr in;
     in.op = op;
     in.a = a;

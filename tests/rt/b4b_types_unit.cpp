@@ -11,6 +11,7 @@
 // reordering mutator, a dynamic receiver (C2), a dynamic key (C3), escaping
 // functions (C4) and session-compiled code (C5); wrong-kind swaps (a map where
 // a struct was, a struct where a map was).
+#include "rt/codegen.h"
 #include "rt/compiler.h"
 #include "rt/globals.h"
 #include "rt/infer.h"
@@ -149,9 +150,34 @@ void convergence(const char* name, std::string (*shape)(int), std::string_view o
     }
 }
 
+// P1: FunctionBuilder::emit refuses a register-only operand that carries the constant bit when
+// the instruction is built, before any proto exists to run (the compiler then refuses the unit,
+// limit:register-operand-constant); register operands and RK operands pass.
+void builder_case(const char* name, OpCode op, bool constant_a, bool constant_b, bool rejected) {
+    FunctionBuilder fb("p1");
+    std::uint16_t r = 0, k = 0;
+    CHECK(fb.alloc(r));
+    CHECK(fb.constant(Value::integer(5), k));
+    fb.emit(op, constant_a ? k : r, constant_b ? k : r, r);
+    const bool got = fb.error() == "register-operand-constant";
+    CHECK(got == rejected);
+    if (got != rejected)
+        std::fprintf(stderr, "  case %s: builder error %s, expected %s\n", name,
+                     fb.error().empty() ? "none" : fb.error().c_str(), rejected ? "the rejection" : "none");
+}
+
 }  // namespace
 
 int main() {
+    // P1 (review): the operand-classification invariant in the builder.
+    builder_case("p1-move-constant-source", OpCode::Move, false, true, true);
+    builder_case("p1-loadk-constant-destination", OpCode::LoadK, true, true, true);
+    builder_case("p1-add-constant-destination", OpCode::Add, true, false, true);
+    builder_case("p1-getindex-constant-destination", OpCode::GetIndex, true, false, true);
+    builder_case("p1-move-registers", OpCode::Move, false, false, false);
+    builder_case("p1-loadk", OpCode::LoadK, false, true, false);
+    builder_case("p1-add-rk-operands", OpCode::Add, false, true, false);
+    builder_case("p1-jump-rk-a", OpCode::JmpNotLt, true, true, false);
     // F1: convergence past the 16-class bound (monotone widening to anything).
     convergence("converge-many", many_shape, "acc[0][1]");
     convergence("converge-nestb", nestb_shape, "acc[1][0]");

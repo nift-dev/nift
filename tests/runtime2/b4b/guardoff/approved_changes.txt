@@ -7,3 +7,4 @@ rt-diff-corpus/scripts/home-tmp/main.f output prints its temporary directory
 memory/c1_push.f exit70 the heap budget stop (same text and exit on the guard-on build)
 rt-diff-selftest-corpus/timeout/loop/main.f timeout the rt-diff self-test's deliberate timeout
 cp22/vm-only/v_fifo_order.f output tasks run in parallel: their print order is not specified (guard-on output varies run to run)
+cp22/vm-only/v_thread_order.f output two threads run in parallel: their print order and the first thread's final status() are timing (varies run to run on both builds under load)

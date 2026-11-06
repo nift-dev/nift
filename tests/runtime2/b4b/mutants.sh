@@ -27,8 +27,9 @@ declare -A FILES=(
   [30]="src/rt/infer_walk.cpp"                                  # A30: a push puts the class spelling in place of the binding (F1: no fixed point)
   [31]="src/rt/infer_sites.cpp src/rt/infer_prune.cpp"          # A31: past 16 sites the collapsed class keeps its precision (F1)
   [32]="src/rt/infer_bindings.cpp"                              # A32: a lambda keeps a captured binding's kinds read before it grew (U1)
+  [34]="src/rt/codegen.cpp"                                     # A34: FunctionBuilder::emit's operand invariant removed (P1)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32 34)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"
