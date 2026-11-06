@@ -175,19 +175,19 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 | Property | Evidence |
 | --- | --- |
-| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28; and the pre-existing lambda-capture hole of section 13: oracle `lambda-capture-*`, 8 fixtures that exit 70 on B4a, mutant A32) and U2 (oracle cases of sections 2, 10, 11; mutants A2, A19-A22, A24, A26, A27, A29-A31); past 16 origins the kinds are anything, so such sites are Dynamic or refused (section 11). P1: the builder invariant and its mutant A34 (section 10.1). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on the final tree: 0 failures over the b4b suite (36 fixtures, the F1 shapes, 1,568 generated; 6,297 checks), 1,500 alias programs, 12,512 fuzz programs and the 2,029-script cross-check, each fixture in a temporary copy, the repository unchanged |
-| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores; a write that grows a binding a lambda captured, section 13); mutant A20 (one mutator dropped), A29 (session store paths), A32 (lambda readers) |
-| (widened-group repair round, section 17) Invalidation | The 16f24f36 defect (a class opened by a union kept its precise readers; guard-off exit 70) fixed in B4b 22; the invalidation invariant checked directly as a fixed point on every oracle case and fixture (`verify_fixed_point`); 27 `widen` fixtures incl. A -> B -> C transitive merges, both orders, functions, lambdas, globals; mutant A35; audit of every opened-class shortcut (section 14). Re-verified on `0cd6d6ae`: 36 gates, generators, classification (0 changes against `16f24f36`; nothing newly admitted against B4a), run time identical (section 17) |
+| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28; and the pre-existing lambda-capture hole of section 13: oracle `lambda-capture-*`, 8 fixtures that exit 70 on B4a, mutant A32; **corrected in B4b 26 (section 18):** the reverse edge, a lambda's write read by the unit that declares the binding, was not covered, a production exit 70 on B4a and `4c9632b8` (review H-1): every slot now records every reader unit; oracle `owner-*`, `field-lambda-reader`, 11 fixtures `b4b/scripts/owner_*.f` and `b4b/modules/owner_module`, mutant A36; and the fixed-point gate over the corpus and the generators, section 18) and U2 (oracle cases of sections 2, 10, 11; mutants A2, A19-A22, A24, A26, A27, A29-A31); past 16 origins the kinds are anything, so such sites are Dynamic or refused (section 11). P1: the builder invariant and its mutant A34 (section 10.1). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on the final tree: 0 failures over the b4b suite (36 fixtures, the F1 shapes, 1,568 generated; 6,297 checks), 1,500 alias programs, 12,512 fuzz programs and the 2,029-script cross-check, each fixture in a temporary copy, the repository unchanged |
+| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores; a write that grows a binding a lambda captured, section 13; a lambda's write to its owner's binding, section 18); mutant A20 (one mutator dropped), A29 (session store paths), A32 (lambda readers), A36 (only lambdas recorded as readers) |
+| (widened-group repair round, section 17; **general invariant, section 18**) Invalidation | B4b 26 to 29 (section 18): one mechanism for every dependency edge (every fact recorded with the units that read it, every growth re-walks them all, whatever the lexical or call direction), and the fixed-point gate `test-runtime2-b4b-fixpoint` (the production analysis plus the after-convergence check, guard on and off, over `tests/runtime2`, CP25-R, the session fixtures and every generator; any non-fixed point fails, never repaired). Before: the 16f24f36 defect (a class opened by a union kept its precise readers; guard-off exit 70) fixed in B4b 22; the invalidation invariant checked directly as a fixed point on every oracle case and fixture (`verify_fixed_point`); 27 `widen` fixtures incl. A -> B -> C transitive merges, both orders, functions, lambdas, globals; mutant A35; audit of every opened-class shortcut (section 14). Re-verified on `0cd6d6ae`: 36 gates, generators, classification (0 changes against `16f24f36`; nothing newly admitted against B4a), run time identical (section 17) |
 | Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`; C2 (A24), C4 (A23; A28: an inexact callee or any thread/async entry widens every function used as a value); too many known origins read as anything (opened classes, A31). Measured on the final tree: H1 reproducers refused (no exit 70); the four exit-70 fixtures of B4a are refused and the eight lambda-capture ones run checked (sections 6, 13); generators 38,185 programs, 0 exit 70, 0 defects (section 5b); guard-off gate `dispatch_defects` 0 |
 | Session-persistent code cannot keep stale assumptions | Today: coherent recompilation and shape contracts (CP19, mutants 7/8), the guard for aliases; `session_effects` with the full reachability rule (review M1: oracle `session-push-exposed`, `-index-`, `-member-`, `-closure-exposed`, `session-late-store`, `session-store-after-call`; mutants A21 (8 cases), A29 (3 cases)); the reviewer's `rv_b4b_unit.cpp` 40 checks, 0 failures on the tip objects. After B5: **not yet** (U6, section 4): the guard-off gate shows it (`b4b/guardoff/u6_session_alias.in`, listed in `expected_u6.txt`, which B5 must empty; re-checked on the tip: guard-off exit 70 `unexpected operands (compiler defect): built-in trim`, production refused `reference-guard:inflow`) |
 | The wrong-kind generators find no internal failures | On the final tree: `b4b_types.py` generator (1,568), `gen_alias.py` (1,500, guard-off), `gen1.py` pass a (20,274) and pass b (16,000), `gen_struct.py` (1,911): 0 exit 70, signals, tag leaks, internal text or defects; the same admissions and VM output as B4a and `a42035c1` (section 5b). P1 (a pre-existing codegen crash the review found) fixed in B4b 7 and 11 (section 10.1); a 390-program assignment-as-value probe set crashes 117 times on B4a and 0 times on the tip |
-| Performance stays within the limits | **Widened-group round:** compile scaling gated by deterministic analysis-work counts against B4a (section 15: linear on every shape; the 19x and `nestb` pathologies of `a42035c1`/`e293105e` fail it); wall clock guidance 1.06x to 1.54x (section 17; 1.5x is the Linode objective); run time identical (section 17). Final repair round: Run time identical (section 7, re-measured on the final tree). Compile time (section 11, gate `z-compile-scaling`, best of 7 against B4a at 100, 400, 800, 1,600 helpers): `glob` 1.35x/1.31x/1.22x/1.01x, `many` 1.31x/1.34x/1.31x/1.38x, `nestb` 1.48x/1.49x/1.43x/1.38x (close to the bound, section 11), containers 1.22x; no analysis-limit refusal at any size (F1 fixed); before: `many` 19x and refused from 16 helpers, `nestb` 3.4x to 5.9x |
+| Performance stays within the limits | **B4b 28 (section 18):** the work metric counts every reader check; `many` was quadratic in them on `4c9632b8` (61x B4a's W at 3,200 helpers), linear now (2.97x, 2.00x per doubling; the gate fails `4c9632b8`, `16f24f36` and mutant A37); callgrind and wall clock: section 18. **Widened-group round:** compile scaling gated by deterministic analysis-work counts against B4a (section 15: linear on every shape; the 19x and `nestb` pathologies of `a42035c1`/`e293105e` fail it); wall clock guidance 1.06x to 1.54x (section 17; 1.5x is the Linode objective); run time identical (section 17). Final repair round: Run time identical (section 7, re-measured on the final tree). Compile time (section 11, gate `z-compile-scaling`, best of 7 against B4a at 100, 400, 800, 1,600 helpers): `glob` 1.35x/1.31x/1.22x/1.01x, `many` 1.31x/1.34x/1.31x/1.38x, `nestb` 1.48x/1.49x/1.43x/1.38x (close to the bound, section 11), containers 1.22x; no analysis-limit refusal at any size (F1 fixed); before: `many` 19x and refused from 16 helpers, `nestb` 3.4x to 5.9x |
 
 ## 4. Unflagged method-site classes (the B4a section 9 prerequisite)
 
 | Class | Receiver | Answer | Holds after B5 (guard removed)? |
 | --- | --- | --- | --- |
-| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8). Captured cells: the claim "one slot" held, but a lambda walked before the slot's last growth was not walked again (exit 70 on B4a and `a42035c1`; fixed in B4b 15, section 13) | **Yes**: sharing changes contents, not which value a binding holds |
+| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8). Captured cells: the claim "one slot" held, but a lambda walked before the slot's last growth was not walked again (exit 70 on B4a and `a42035c1`; fixed in B4b 15, section 13). **Correction (review of `4c9632b8`, H-1):** B4b 15 fixed only the lambda-reader direction; a named function (or a method, or a module function) reading its own local or parameter after a lambda's write that grew in a later walk kept the earlier kinds (exit 70 in production on B4a and `4c9632b8`). Fixed in B4b 26 (section 18): every unit that reads a slot is recorded and re-walked when it grows, and the fixed-point gate checks the claim over the whole corpus and the generators | **Yes**: sharing changes contents, not which value a binding holds |
 | U2 | an element or member read (`xs[i]`, `o.k`, `for` binding, element-returning methods) | (a) per-site contents (B4b) | **Yes**: stores through every alias reach the sites by construction |
 | U3 | a struct field | (a) one slot per field (B3) | **Yes** |
 | U4 | map/set/stack contents | (a) per site (D-NEXT-refsem) | **Yes** |
@@ -810,6 +810,15 @@ fail. Classification of `tests/runtime2` and CP25-R does not change (these progr
 compiled; what changes is the dispatch the compiler emits). Struct fields read in a lambda are not
 affected (a field initialised with an array has no site: its contents are anything).
 
+**Correction (review of `4c9632b8`, REJECT, H-1).** The fix above recorded lambda readers only. The
+reverse edge, a lambda writing a binding of the unit that declares it (a named function's local or
+parameter, a method's, a module function's) whose write grows only in a later walk of the lambda,
+read by the declaring unit after the call, re-walked nothing: production exit 70 on B4a, `e293105e`,
+`16f24f36` and `4c9632b8` (nine reviewer variants and one corpus instance). The claim of this
+section and of section 4 (U1: "the union of every write") was therefore false for that edge. B4b 26
+replaces the lambda-only reader sets by one mechanism for every slot and every reading unit
+(section 18).
+
 ## 14. Widened-group invalidation (B4b 22; independent review of `16f24f36`: REJECT)
 
 The independent re-review of `16f24f36` (report and reproducers kept in
@@ -958,7 +967,10 @@ and the mutant A30 (`MUTANT=30`, commit `.`): `work_history.json`.
 | `nestb` | 16,872 / 6,555 (2.57x); 202 / 202 | 59,890 / 26,145 (2.29x); 802 / 802 | 117,172 / 52,255 (2.24x); 1,602 / 1,602 | 232,104 / 104,505 (2.22x); 3,202 / 3,202 |
 | `containers` | 16,197 / 14,102 (1.15x); 102 / 202 | 64,797 / 56,402 (1.15x); 402 / 802 | 129,597 / 112,802 (1.15x); 802 / 1,602 | 259,197 / 225,602 (1.15x); 1,602 / 3,202 |
 
-Linear on every shape (the ratio to B4a is flat or falling). `W` weighs every elementary operation
+Linear on every shape (the ratio to B4a is flat or falling) **in the counted terms**; correction
+(review of `4c9632b8`, M-1): the reader checks of `site_changed` were not counted (only the pushes
+onto the worklist), and `many` was quadratic in them; B4b 28 counts every reader check and removes
+the quadratic term (section 18). `W` weighs every elementary operation
 alike, so its ratio is not a time ratio: a walked node costs far more than a site entry. For
 reference, callgrind instructions of the analysis harness (parse, plan and inference; one run each,
 local): `glob` 1.79x B4a at 400 and 1.76x at 1,600, `many` 1.83x at 400, `nestb` 1.44x at 400 and
@@ -1083,3 +1095,285 @@ Two points are above 1.5x locally (`nestb` 100, `many` 1,600; the deterministic 
 of repeated runs); recorded for the owner, not hidden by a looser bound.
 
 **Freeze:** tip and tree in the commit B4b 25 (this record); worktree clean.
+
+## 18. Dependency invariant, fixed-point gate and reader-check scaling (B4b 26 to 31; independent review of `4c9632b8`: REJECT)
+
+Owner ruling 2026-11-06 18:04 (bounded repair). The review's findings: H-1 (High, pre-existing
+since B4a, production exit 70), M-1 (Medium-High, `many` quadratic in uncounted work), L-1 to L-5.
+Both earlier REJECTs and their evidence stand; nothing accepted earlier was undone.
+
+### 18.1 H-1: root cause
+
+`Inference::merge_local` re-walked, when a binding slot grew: the lambdas that had read it (B4b 15,
+`lambda_readers_`, recorded only when the reading unit was a lambda), the unit being walked
+(`self_changed_`) and, for a global's shared slot, every named function. A named function (or a
+method, or a module function) that declares a local or has a parameter, creates a lambda that
+assigns it, calls the lambda and then reads the binding was never walked again when the lambda's
+assignment grew in a *later* walk of the lambda (the assigned value is a call whose return is known
+only later). Its reads kept the earlier kinds, so a Static `trim`/`to_upper` was compiled on a
+stale kind: `unexpected operands (compiler defect)`, exit 70, in production (`NIFT_VM=require` and
+the default; the guard admits it). Same on B4a `0df0df6c`, `e293105e`, `16f24f36`, `4c9632b8`.
+Programs where the lambda's return changed in the same walk as its write were rescued by accident
+(the caller is re-walked for the return), the pattern of the two previous rejections.
+
+### 18.2 The general mechanism and why it covers every edge
+
+**Invariant.** For every analysis fact F that a unit's walk reads, if F grows after that read, the
+unit is walked again (queued) before the worklist empties. Then the converged result is a fixed
+point: no unit's last walk saw a smaller F than the final one.
+
+**Mechanism (one rule for every fact store).** Each mutable fact keeps the set of units that read it,
+recorded at the read with the unit being walked, whatever that unit is; each growth queues every
+recorded reader. The fact stores of the analysis and where each records and notifies:
+
+| Fact | Read (reader recorded) | Grows (readers queued) |
+| --- | --- | --- |
+| binding slot: local, parameter binding, capture, global, struct field, session external | `find()` and `struct_field()`, both through `note_read` (B4b 26; was: lambdas only) | `merge_local()` and the push update in `add_element()`, both through `slot_changed` |
+| site class contents and flags (opened, nonpositional, collapsed, exposed) | `materialize()` (memo hits too) | `site_changed()` (store, union, opening); a union's moved readers (`unite_sites`) |
+| a function's parameters | the function itself (its walk binds them) | `call_callables`, `method_call`, `escape_callables`: the function is queued |
+| a function's return | `callers_` (every calling unit) | `merge_return` |
+| a lambda's parameters, return, collection return | the lambda; `LambdaInfo::callers` | `call_callables`; `merge_lambda_return`; `walk_lambda` |
+| a lambda's lexical scope | the lambda | `lambda_unit()` (the scope changed) |
+| unknown contents (`agg_unknown_`), session exposure | every unit | `site_grew()`, `session_open()` (all units) |
+
+Why this covers every edge regardless of scope or direction: a reader is identified by the unit
+being walked at the read, not by its lexical relation to the fact. The declaring function, a lambda
+(nested at any depth), main, a struct method, a module function compiled as its own unit, a
+callback or thread entry: each reads a slot only through `find()` (names, captures, globals and
+external session names all resolve there) or `struct_field()` (member access to a field), and both
+record the current unit; no analysis code reads a binding slot otherwise during a walk (audited:
+the remaining direct `vars_[...]` uses are the declaration's own merge, the struct field seeding
+before the first walk, and session export/sync after or outside the walks). Every growth of a slot
+goes through `merge_local` or `add_element`, and both notify the slot's readers. The other stores
+already followed the same rule (table). A global's growth formerly re-walked every *function* (not
+the lambdas, not main); it now re-walks exactly the units that read it, which includes those.
+Parameters, members, callbacks and modules need no special case: a parameter is a slot declared
+by its function, a member access on an object binding reads the binding's slot and the object's
+site class (both recorded), a callback is a lambda unit, a module function is a unit of its module.
+
+**Sessions.** A session compile re-walks every unit at any slot growth, as before (and every
+notification there scans its whole list, section 18.5); session-persistent code of *earlier*
+statements is not walked by this analysis at all: that is U6, a B5 prerequisite (section 4,
+`expected_u6.txt`, 18.7).
+
+**Mutants.** A36 records only lambdas as slot readers (B4b 15's rule): the oracle (`owner-*`,
+10 cases), the b4b suite (the 10 `owner_*` fixtures and the module exit 70) and the fixed-point
+gate on the b4b fixtures fail. A32 (no slot reader re-walked) is caught as before.
+
+**Fixtures.** `tests/runtime2/b4b/scripts/owner_*.f` (the reviewer's H1, H1b to H1g and U13a, the
+corpus instance's pattern of `refsem/heap/cell_cycle_control.f` with the lambda called, a nested
+lambda two levels below the owner) and `b4b/modules/owner_module` (H1h): legacy's ordinary error
+on the VM (D-009#5 allowed), exit 1, guard on and off; exit 70 on `4c9632b8` and B4a. Oracle cases
+`owner-local`, `-param`, `-object`, `-loop`, `-callback`, `-nested`, `-method`, `-delayed-global`,
+`-main-lambda-write`, and `field-lambda-reader` (a lambda reading a struct field through a member
+access, grown later by a method: the field's readers include lambdas now; before, a global's or
+field's growth re-walked only the named functions).
+
+### 18.3 Fixed-point verification as a permanent gate (L-1)
+
+`Inference::check_fixed_point` (B4b 22) now checks the fixed point of the whole analysis state: one
+more walk of every unit (each with its own walk serial and dequeue record, exactly as `run()` walks)
+must queue no unit, grow no walk's own inputs (`self_changed_`), create no lambda unit, and change
+no per-node fact the compiler reads (kinds, `elements`, `callable_targets`, `callable_unknown`,
+`struct_ids`, `bindings`, `collection_*`, `nested_aggregates`, `future_holders`). It reports; the
+converged result is kept.
+
+**Gate builds.** `B4B_FIXPOINT_NIFT` and `B4B_FIXPOINT_OFF_NIFT` (Makefile): the production CLI
+and the guard-off CLI with one object replaced, `infer_session.cpp` compiled with
+`-DNIFT_B4B_FIXPOINT_GATE`: the same analysis (every other object is production's), then the
+check; any non-fixed point fails the compile with `B4B-FIXPOINT:` and exit 86, never repaired.
+`make test-runtime2-b4b-fixpoint` (`tests/runtime2/b4b/fixpoint.py`) runs both builds over: the
+`tests/runtime2` corpus (2,07x scripts, run with `NIFT_VM=require` and classified with
+`classify-all`, in temporary copies), CP25-R (589 units), every session fixture (`*.in`), and the
+generators: `b4b_types.py`'s (1,568), `gen_alias.py` (all 5,460 programs), the reviewers' `gen1`
+pass a (20,274) and pass b (16,000) and `gen_struct` (1,911) (kept as `gen_wrongkind.py`; the
+counts match the earlier rounds'), and the scaling shapes at 100 and 400. A self-test checks the
+recording through each harness. The mutant suite links every mutant as a fixed-point build too.
+
+**Triage of every flag** (the reviewer's probe: 6 on the corpus; this gate is stricter):
+- `refsem/heap/cell_cycle_control.f`: H-1; fixed by B4b 26.
+- `refsem/parity/presentation_env_*.f` (5): `e := env()` is an open object (`any` with kinds
+  object); `unite` of two distinct open types returned `top_ty()`, so a second walk widened `e`
+  from object to everything. **Fixed, not suppressed** (principled rule, no "harmless widening"
+  exception in the check): `unite` with an open, unknown or beyond-the-depth-cap operand is now a
+  true join (`open_union`: the top-level kinds and the flags of both operands, anything below; an
+  operand that covers the result is returned itself). It was not an upper bound before: besides
+  the kinds, `legacy_text_number` and the callable flags were dropped against an unknown value and
+  regained from the next walk's operand. That second form flagged 1,199 programs in the first run
+  of the stricter state check (e.g. `fn(inner(x)) { return x.nope() }`: `inner`'s return changed
+  on every walk, queuing its caller; the converged result was one walk short of a fixed point).
+  Admission: unknown and top values are refused or treated as anything by every check, so only the
+  open-type kinds matter, and they are the kinds a single walk already gave.
+- After the fix: **0 non-fixed points** (results in 18.8).
+
+### 18.4 M-1: root cause of the quadratic term
+
+On `many` (n helpers `k_i(r)` each pushing a fresh array `[x, " s "]` into the one array passed to
+all of them) each helper's first walk makes one store into the shared class of `acc` that grows
+it: before the 16-class collapse a new origin, after it a new spelling (the class root is the
+smallest site id, and the helpers are walked in decreasing source order, so each store's new site
+becomes the root; the union `unite_sites` then also notifies the merged root). Each growth called
+`site_changed`, which called `enqueue` on every reader of the class: main and every helper walked
+so far, i.e. about n/2 on average, twice per helper. Measured on `4c9632b8` at 400 helpers: 785
+`site_changed` calls scanning 161,065 reader entries (80,600 from stores, 80,448 from unions); at
+3,200: 10,265,466 `enqueue` calls and 6,402 pushes. Nearly every call found the unit queued already
+(the helpers are all queued from the start), so `enqueues` (pushes only) stayed linear.
+
+**Fix (bounded, exact).** `Inference::notify` (`infer_notify.cpp`) replaces the whole-list scans of
+`site_changed`, `unite_sites` and `slot_changed`. Each reader list remembers the position in the
+dequeue record of the unit being walked at its last notification (`UnitSet::notified`); every reader
+in it then was queued, a unit leaves the queue only by `run()` dequeuing it, and every reader added
+since was the unit being walked when it joined (dequeued at or after that position). So the only
+readers `enqueue` can change are the units dequeued since the last notification; those found in the
+list (constant-time position lookup) are queued **in list order**, so the sequence of pushes is
+exactly that of the whole-list scan (same walks, same order, same results: walks and pushes are
+unchanged on every shape; classification unchanged, 18.8). A merged list takes the older of its
+parts' positions (an empty part does not count); a new list starts at the current position; a
+session compile scans whole lists (its `enqueue` defers some lambdas). The cost of a notification
+is the shorter of the list and the walks since its last one. Also: `untracked_call` returns at once
+when no unit was used as a value since its last call (each is escaped once). Mutant A37 restores
+the whole-list scan.
+
+**Metric.** `UnitKinds::work.reader_checks` counts every call of `enqueue` (a reader check whether it
+queues or not) plus every dequeue-record entry a windowed notification examines; `W` includes it.
+The B4a baseline is re-derived the same way (`work_build.sh`: the counter at the first line of B4a's
+`Inference::enqueue`; for commits that count already, only that line is added), as are the history
+(`16f24f36`, `a42035c1`, `e293105e`, `4c9632b8`, mutants A30 and A37). Sizes 100, 400, 800, 1,600 and
+3,200 are gated, 6,400 is printed as stress evidence; a cumulative rule (growth from 100 to 3,200 at
+most 1.10x B4a's) joins the per-step rule.
+
+### 18.5 Scaling results
+
+**Work gate** (`make test-runtime2-b4b-work`; `W` tip / B4a, the ratio; walks are unchanged from
+`4c9632b8` except `glob`'s, one fewer at every size (203 to 202 at 100 helpers): a global's growth
+now re-walks exactly its readers):
+
+| Shape | 100 | 400 | 800 | 1,600 | 3,200 | 6,400 (stress) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `glob` | 21,066 / 2,918 (7.22x) | 84,066 / 11,318 (7.43x) | 168,066 / 22,518 (7.46x) | 336,066 / 44,918 (7.48x) | 672,066 / 89,718 (7.49x) | 1,344,066 / 179,318 (7.50x) |
+| `many` | 18,065 / 5,553 (3.25x) | 66,965 / 22,053 (3.04x) | 132,165 / 44,053 (3.00x) | 262,565 / 88,053 (2.98x) | 523,365 / 176,053 (2.97x) | 1,044,965 / 352,053 (2.97x) |
+| `nestb` | 17,536 / 6,957 (2.52x) | 62,354 / 27,747 (2.25x) | 122,036 / 55,457 (2.20x) | 241,768 / 110,907 (2.18x) | 480,354 / 221,747 (2.17x) | 958,036 / 443,457 (2.16x) |
+| `containers` | 16,599 / 14,504 (1.14x) | 66,399 / 58,004 (1.14x) | 132,799 / 116,004 (1.14x) | 265,599 / 232,004 (1.14x) | 531,199 / 464,004 (1.14x) | 1,062,399 / 928,004 (1.14x) |
+
+`4c9632b8` on the corrected metric: `many` 4.95x, 10.20x, 17.44x, 31.96x, 61.05x, 119.22x (growth
+3.91x per doubling at the top, B4a 2.00x). The gate (`work.py --self-test` on the recorded counts and
+live): B4a passes; `4c9632b8` and `16f24f36` fail (`many`, 5 failures each: every step from 400 and
+the cumulative rule); `a42035c1` fails (`many`, `nestb`); `e293105e` fails (`containers`, `glob`,
+`many`, `nestb`); mutants A30 and A37 fail (`many`); the tip passes (0 failures).
+
+**Callgrind, analysis only** (the work harness: parse, plan, inference; instructions tip / B4a, one
+run each; `4c9632b8` for `many`):
+
+| Shape | 100 | 400 | 800 | 1,600 | 3,200 | 6,400 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `many` | 1.56x (4c9632b8 1.57x) | 1.65x (1.83x) | 1.67x (2.09x) | 1.68x (2.58x) | 1.67x (3.51x) | 1.66x (5.27x) |
+| `glob` | 1.61x | 1.75x | 1.75x | 1.72x | 1.63x | |
+| `nestb` | 1.51x | 1.47x | 1.40x | 1.37x | 1.31x | |
+| `containers` | 1.25x | 1.24x | 1.21x | 1.23x | 1.24x | |
+
+**Wall clock, whole compile** (guidance only; `compile_us`, median of 5 runs interleaved with B4a, 3
+at 3,200 and 6,400; local, idle 2-core machine; the 1.5x objective is for the combined Linode
+certification): `many` 0.95x, 1.23x, 1.31x, 1.26x, 1.25x, 1.18x (6,400) (was 1.54x at 1,600, 1.80x at
+3,200 and 1.92x at 6,400 on `4c9632b8`); `glob` 1.32x, 1.30x, 1.20x, 1.03x, 0.83x; `containers`
+1.27x, 1.24x, 1.26x, 1.30x, 1.23x; `nestb` 1.52x, 1.58x, 1.51x, 1.48x, 1.46x (the pre-existing
+shape near the bound, section 11; flat or falling with size, no superlinear term). No `analysis-limit`
+refusal at any size.
+
+### 18.6 Lows
+
+- L-1: section 18.3 (the gate, the open join).
+- L-2: `test-runtime2-b4b`, `test-runtime2-b4b-work` and `test-runtime2-b4b-mutants` export
+  `PYTHONDONTWRITEBYTECODE`; the first two save and check the repository state (`repo_state.py`,
+  ignored files included). Verified with the variable unset in the driver (`gate3.sh`:
+  `x-test-runtime2-b4b-bytecode`, `x-test-runtime2-b4b-work-bytecode`: 0 changes).
+- L-3: 18.7.
+- L-4 (P1): unchanged and recorded (section 10.1); A34 still caught (oracle, 4 cases).
+- L-5: sections 3, 13 and 15 corrected (the U1 claim, the "no superlinear term" claim limited to the
+  counted terms).
+
+### 18.7 U6 breadth (B5 prerequisite, not claimed fixed)
+
+The reviewer's `ses/s3b.in` (a function of an earlier statement stores into its parameter; a later
+statement reads the array), `s3.in` (a merged local) and `s3d.in` (through a global's inner element)
+exit 70 guard-off and are refused by production before any effect (`reference-guard:shared` /
+`inflow`, exit 1). Permanent fixtures `b4b/guardoff/u6_call_param_store.in`, `u6_call_mix_param.in`,
+`u6_call_global_inner.in`, listed in `expected_u6.txt` with the existing alias case: the guard-off
+suite fails if any of them stops showing the internal failure, so B5 must clear them (and empty the
+list) before removing the guard. Control `call_global_store_control.in` (the global store that is
+checked today: legacy's ordinary error) runs in the guard-off session suite.
+
+### 18.8 Verification on the final code (B4b 26 to 30)
+
+Code tree `b50f0674` (B4b 29); B4b 30 changes the mutant table only (A37's source file), and the
+gates it affects were re-run on `c98e1679`; B4b 31 changes the records. Result files
+`scratchpad/b4/gates/x-*.result` (drivers `gates-x.sh`, `gates-x2.sh`; `gate2.sh` with the full
+repository state, `gate3.sh` with `PYTHONDONTWRITEBYTECODE` unset).
+
+- **Gates: 40 result files, all pass, every one with the repository unchanged.** The 36 of the
+  earlier rounds plus `test-runtime2-b4b-fixpoint` and the two bytecode runs, and
+  `test-runtime2-b4b-mutants-A37`. `x-test-runtime2-b4b-mutants` reported A37 `SURVIVED` on
+  `b50f0674`: the mutant table still named `infer.cpp`, from which `notify` had moved, so the
+  mutant was not built in. B4b 30 fixed the table; on `c98e1679` A37 is caught (work gate, 6
+  failures). Its semantics are identical by construction, so only the work gate can see it. The
+  other 18 were caught on `b50f0674`. `test-runtime2-b4b` and `test-runtime2-b4b-fixpoint` were
+  re-run on `c98e1679`: a first run had seen this record being edited in the tree.
+- **Key numbers:** oracle 1,136 checks (864 before), 0 failures. `test-runtime2-b4b`: 6,890 checks,
+  incl. the generator's 1,568 programs (74 run). Guard-off gate: b4b `--guardoff` 6,488 checks;
+  `gen_alias` 1,500 programs, 509 run, 0 bad; fuzz 12,512; cross-check 2,072 scripts, 1,086 admitted
+  by both builds; repository unchanged. Work gate PASS, 0 failures; self-test PASS (7 recorded
+  inferences).
+- **Fixed-point gate:** 0 non-fixed points and 0 crashes, guard on and guard off. Inputs on each
+  build: corpus 2,072 scripts, run and classify-all; CP25-R 589 units; 14 sessions; generators
+  1,568 + 5,460 + 20,274 + 16,000 + 1,911 + 8 shapes.
+- **Mutants:** the b4b suite catches all 19 (A2, A19 to A32, A34 to A37). The fixed-point gate on
+  the b4b fixtures alone also catches A27 (13 non-fixed points), A32 (19), A35 (13) and A36 (11).
+  The other mutant suites pass: b4, b3, safety, collections, refsem.
+- **Classification** (`classify_tree.py` over the final `tests/runtime2`, 2,072 scripts, every
+  binary on the same corpus; CP25-R `classify-all`, 589 units). 0 programs newly admitted against
+  B4a, `a42035c1`, `16f24f36` and `4c9632b8`; 0 no longer admitted.
+  - Against `4c9632b8` and `16f24f36`: CP25-R 0 changes; `tests/runtime2` 1 change. In
+    `prevalidate/.../nift-limits.f` (refused in both) the first-reported reason under `classify`
+    moved from `type:<` 2:67 to `coro-future-flow:Member` 2:111. Its `classify-all` reasons list
+    is identical.
+  - Against `a42035c1`: that one and the three recorded `glob` admission differences (section 16).
+  - Against B4a: those, plus the five recorded H1/C4 fixtures that exit 70 on B4a (now refused),
+    and the earlier `push_alias_struct.f` reason. CP25-R: the one recorded reasons-list entry.
+  - The new `owner_*` fixtures: B4a and `4c9632b8` compile them (exit 70 at run time); the tip
+    compiles them with a checked dispatch (legacy's ordinary error).
+- **Generators**, guard on and off, against `4c9632b8` (`b4c/gen`) and B4a (`hv/gen`): identical
+  admission and output, 0 bad, 0 admission changes, 0 VM output changes, 0 new differences.
+
+  | Generator | Programs | Run by the VM (on / off) | Differences from legacy |
+  | --- | --- | --- | --- |
+  | `gen1` pass a | 20,274 | 1,297 / 1,318 | 131 |
+  | `gen1` pass b | 16,000 | 955 / 964 | 138 |
+  | `gen_struct` | 1,911 | 867 / 867 | 213, all D-009#5 |
+  | `gen_alias` (sample) | 1,500 | 509 / 9 | |
+
+- **Reproducers of all three B4b reviews** (121: `review-b4/repro*`, `review-b4b/repro`,
+  `review-b4b-final/repro` and `p`, `review-b4b-full/repro`, `p` and `ses`). Each was run on legacy,
+  on the guard-on VM, guard off, and on the guard-off fixed-point build.
+  - 0 production failures and 0 non-fixed points.
+  - The only internal failures are guard-off U6 sessions (18.7, recorded): `U6_session_alias`,
+    `s3`, `s3b`, `s3d`.
+  - All nine H-1 programs give legacy's ordinary error, guard on and off.
+  - The H1/H2/M1/P1/U1 evidence of the earlier reviews holds. The thread H1 reproducers and
+    `H2_compile_glob*` are refused (`builtin-receiver:trim`); the P1 reproducers print `5` and `k`;
+    the U1 `lambda_capture_*` fixtures pass in `test-runtime2-b4b`; M1 `m1_push_exposed.in` passes
+    in the guard-off gate.
+  - The remaining legacy differences are pre-existing: legacy's recursion-depth limit on
+    `chain_*2000`, the CP22 lambda correction `L2`, and D-009#5 `s6`.
+- **Nothing newly admitted reaches unchecked dispatch.** 0 newly admitted programs against every
+  baseline (classification). `dispatch_defects` 0 and no exit 70 outside the recorded U6 list in the
+  guard-off gate and the generators. The fixed-point gate shows no stale fact on any compiled unit.
+- **Run time** (callgrind instructions per iteration, the B4a built-in set): 1074, 903, 1187, 870,
+  2844, identical to B4a. Mutation group: identical (7 rows). Ops group: identical except
+  `string_concat`, 3,313 against B4a's 3,315.
+
+### 18.9 For the owner and B5
+
+- `nestb` wall clock is 1.46x to 1.58x B4a locally. This is pre-existing (section 11), flat or
+  falling with size, and decided by the Linode measurement (ruling 17:17).
+- B5 prerequisites unchanged and widened: U6 (`expected_u6.txt` now has 4 entries); the `trim`
+  runtime-kind decision (section 16).
+- B4a has the H-1 exit 70; b4-dispatch.md section 11 records it for the combined certification.

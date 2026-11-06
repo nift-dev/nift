@@ -532,3 +532,14 @@ checks); `test-runtime2-b3` (468 checks); `test-runtime2-safety` (33512 programs
 Classification (the `569e336f` binary against `07bc775f`): CP25-R `classify-all` (589 units):
 0 changes. `tests/runtime2` (1,974 scripts): 5 changes, the five new N1 fixtures, from the
 program error `import-scope:collision` to the refusal `import-collision`; no other script changes.
+
+## 11. Note for the combined certification (B4b review of `4c9632b8`, H-1)
+
+B4a (`0df0df6c`, and `e293105e`) has a production exit 70 on admitted programs that B4b 26
+fixes: a binding of a named function (a local, a parameter; also a method's or a module
+function's) is written by a lambda, the write grows only in a later walk of the lambda, and the
+function reads the binding after the call. The function was never walked again, so a Static
+`trim`/`to_upper` was compiled on a stale kind (`unexpected operands (compiler defect)`, exit 70;
+legacy: `trim: unsupported for this value`, exit 1). The fix (every unit that reads a binding
+slot is recorded and re-walked when it grows) and its fixtures, oracle cases, mutant A36 and the
+fixed-point gate: b4b-element-types.md section 18. A B4a binary must not be certified on its own.
