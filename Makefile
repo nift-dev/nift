@@ -1060,7 +1060,9 @@ $(B4B_FIXPOINT_OFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(B4B_FIXPOI
 		$(RT_REFREP_PROBE_OBJECTS) $(B4B_FIXPOINT_OBJ) $(LDFLAGS) $(LDLIBS) $(LIBFFI_A) -o $@
 .PHONY: test-runtime2-b4b-fixpoint
 test-runtime2-b4b-fixpoint: export PYTHONDONTWRITEBYTECODE := 1
-test-runtime2-b4b-fixpoint: $(B4B_FIXPOINT_NIFT) $(B4B_FIXPOINT_OFF_NIFT)
+# B4b 33 (review of ce0a9a44, L-3): the CP25-R step (cp12b_inventory's D-018c parser check) runs
+# .build/rt-parse-dump, so the target builds it (it passed before only where another gate had).
+test-runtime2-b4b-fixpoint: $(B4B_FIXPOINT_NIFT) $(B4B_FIXPOINT_OFF_NIFT) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	$(PYTHON) tests/runtime2/repo_state.py save "$(B4B_FIXPOINT_DIR)/repo-state.txt"
 	$(PYTHON) tests/runtime2/b4b/fixpoint.py --self-test --nift "$(CURDIR)/$(B4B_FIXPOINT_NIFT)"
 	$(PYTHON) tests/runtime2/b4b/fixpoint.py --nift "$(CURDIR)/$(B4B_FIXPOINT_NIFT)" \
