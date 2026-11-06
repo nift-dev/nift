@@ -73,7 +73,7 @@ namespace {
 // admission table's failure (text and error class from rt/op_admission.cpp).
 bool dispatch_failed(const Instr& in, const Proto* proto, const natives::BuiltinSpec& spec,
                      natives::Receiver actual, const Value& receiver, Fault& fault) {
-    DispatchFailure failure = dispatch_failure(actual, spec.name);
+    DispatchFailure failure = tagged_dispatch_failure(receiver, actual, spec.name);
     if (failure == DispatchFailure::Refuse || failure == DispatchFailure::None) {
         // Not admitted for this family: the inference let a kind through.
         note_dispatch_defect();

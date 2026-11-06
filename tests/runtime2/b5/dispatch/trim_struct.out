@@ -1,0 +1,3 @@
+a
+-- exit 1
+error: trim_struct.f:6:7: unknown value or malformed expression: xs[0].trim()

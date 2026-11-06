@@ -84,8 +84,28 @@ DispatchFailure dispatch_failure(Receiver family, std::string_view name) {
     switch (family) {
         case Receiver::String: case Receiver::Number: case Receiver::Array: return DispatchFailure::Unsupported;
         case Receiver::Null: case Receiver::Bool: case Receiver::Object: return DispatchFailure::Malformed;
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 11)  // T1: no failure for the tagged families
+        // B5 (owner 2026-11-07 04:47, scratchpad/b5/trim/PROPOSAL.md): legacy's
+        // tagged values (a map, set or stack; a struct instance, see
+        // tagged_dispatch_failure) given a plain family's method name.
+        case Receiver::Map: case Receiver::Set: case Receiver::Stack:
+            return plain_method_name(name) ? DispatchFailure::Malformed : DispatchFailure::Refuse;
+#endif
         default: return DispatchFailure::Refuse;
     }
+}
+
+DispatchFailure tagged_dispatch_failure(const Value& receiver, Receiver family, std::string_view name) {
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 11)
+    // A struct instance has no built-in family (Receiver::None); legacy reports
+    // a plain method name on it as on a map: "unknown value or malformed
+    // expression" (probed: b5-refsem.md section 8 B).
+    if (family == Receiver::None && receiver.is(Kind::Struct) && plain_method_name(name))
+        return DispatchFailure::Malformed;
+#else
+    (void)receiver;
+#endif
+    return dispatch_failure(family, name);
 }
 
 std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text,
@@ -123,8 +143,12 @@ MethodAdmission admit_dynamic_method(KindSet kinds, std::string_view name, std::
     return out;  // A3: every Dynamic case is refused
 #endif
     if (kinds == 0 || (kinds & kKindUnknown)) return out;
-    const bool plain = (kinds & ~(kKindScalar | kKindAggregate)) == 0;
     const bool collections = (kinds & ~kKindCollection) == 0;
+    // B5: a plain union may also hold legacy's tagged values (maps, sets,
+    // stacks, struct instances), each a failing family of the plain name.
+    const KindSet tagged = collections ? 0 : static_cast<KindSet>(kinds & kKindTagged);
+    const bool plain = !collections && (kinds & (kKindScalar | kKindAggregate)) != 0 &&
+                       (kinds & ~(kKindScalar | kKindAggregate | kKindTagged)) == 0;
     if (!plain && !collections) return out;
     if (plain && !plain_method_name(name)) return out;
     // Mixed collections: only the read-only natives every family has.
@@ -148,9 +172,22 @@ MethodAdmission admit_dynamic_method(KindSet kinds, std::string_view name, std::
         return true;
     };
     bool ok = true;
-    if (plain)
+    if (plain) {
         for (const Family& f : kPlainFamilies) ok = ok && consider(f);
-    else
+        for (const Family& f : kCollectionFamilies) {
+            if (!ok || !(tagged & f.kinds)) continue;
+            // A tagged family with its own native of the name stays refused.
+            if (natives::find_builtin(f.receiver, name)) { ok = false; break; }
+            const DispatchFailure failure = dispatch_failure(f.receiver, name);
+            if (failure == DispatchFailure::Refuse) { ok = false; break; }
+            ++families;
+            out.branches.push_back({static_cast<KindSet>(tagged & f.kinds), nullptr, failure});
+        }
+        if (ok && (tagged & kKindStruct)) {
+            ++families;
+            out.branches.push_back({kKindStruct, nullptr, DispatchFailure::Malformed});
+        }
+    } else
         for (const Family& f : kCollectionFamilies) ok = ok && consider(f);
     if (!ok || families < 2 || !any_native) {
         out.branches.clear();

@@ -197,7 +197,16 @@ void admission() {
     // Refused: unknown kinds, non-plain kinds, context-dependent pairs,
     // no native at all, a single family, wrong arity, unknown names.
     CHECK(admit_dynamic_method(K({kKindString, kKindUnknown}), "trim", 0).admission == Admission::Refuse);
-    CHECK(admit_dynamic_method(K({kKindString, kKindStruct}), "trim", 0).admission == Admission::Refuse);
+    // B5 (owner 2026-11-07 04:47): legacy's tagged values are failing families of a plain name;
+    // other non-plain kinds (handles, functions, ...) stay refused.
+    for (const KindSet tagged : {kKindStruct, kKindMap, kKindSet, kKindStack, KindSet(kKindMap | kKindStruct)}) {
+        const auto t = admit_dynamic_method(K({kKindString, tagged}), "trim", 0);
+        CHECK(t.admission == Admission::Dynamic);
+        for (const auto& b : t.branches)
+            if (!b.spec) CHECK(b.failure == DispatchFailure::Malformed && (b.kinds & kKindTagged) == b.kinds);
+    }
+    CHECK(admit_dynamic_method(K({kKindString, kKindStruct, kKindUnknown}), "trim", 0).admission == Admission::Refuse);
+    CHECK(admit_dynamic_method(kKindStruct, "trim", 0).admission == Admission::Refuse);
     CHECK(admit_dynamic_method(K({kKindString, kKindMutex}), "trim", 0).admission == Admission::Refuse);
     CHECK(admit_dynamic_method(K({kKindString, kKindFunction}), "trim", 0).admission == Admission::Refuse);
     CHECK(admit_dynamic_method(K({kKindString, kKindInt}), "to_double", 0).admission == Admission::Refuse);
@@ -221,7 +230,8 @@ void admission() {
     CHECK(dispatch_failure_message(DispatchFailure::Composite, "to_string", "v.to_string()") ==
           "to_string: use stringify() for composite values");
     CHECK(!dispatch_failure_catchable(DispatchFailure::Unsupported));
-    CHECK(dispatch_failure(Receiver::Map, "trim") == DispatchFailure::Refuse);
+    CHECK(dispatch_failure(Receiver::Map, "trim") == DispatchFailure::Malformed);  // B5
+    CHECK(dispatch_failure(Receiver::Map, "nosuch") == DispatchFailure::Refuse);
     CHECK(dispatch_failure(Receiver::String, "keys") == DispatchFailure::Unsupported);
     CHECK(dispatch_failure(Receiver::Bool, "join") == DispatchFailure::Malformed);
     CHECK(dispatch_failure(Receiver::Object, "to_string") == DispatchFailure::Composite);

@@ -25,7 +25,7 @@ fi
 fail=0
 for spec in 1:src/rt/infer_sites.cpp 3:src/rt/infer_session.cpp 4:src/rt/infer_session.cpp \
             6:src/rt/vm_ops.cpp 7:src/rt/compiler_array_mutation.cpp+src/rt/session_invocation.cpp \
-            8:src/rt/collection_sort.cpp; do
+            8:src/rt/collection_sort.cpp 11:src/rt/op_admission.cpp 12:src/rt/compiler_dispatch.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

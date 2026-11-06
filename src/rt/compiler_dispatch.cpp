@@ -18,6 +18,11 @@ namespace nift::rt::detail {
 int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::string_view name, std::uint16_t dst) {
     const MethodAdmission admitted = admit_dynamic_method(kinds(receiver), name, node.count);
     if (admitted.admission != Admission::Dynamic) return -1;
+    // B5: a struct instance among the receiver kinds fails only if no struct
+    // of the unit declares a method of that name (legacy would call it).
+    if (kinds(receiver) & kKindStruct)
+        for (const StructInfo& s : plan_.structs)
+            if (s.method(name)) return -1;
     for (const DispatchCandidate& branch : admitted.branches)
         if (branch.spec && !builtin_arguments_ok(node, *branch.spec, receiver)) return 0;
     if (admitted.fails()) {
@@ -31,7 +36,13 @@ int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::st
             if (branch.failure == DispatchFailure::Malformed && text(node).find('\n') != std::string_view::npos)
                 return fail(node, "builtin-receiver:" + std::string(name)) ? 1 : 0;
     }
-    return builtin_call(node, *admitted.spec, receiver, dst, true) ? 1 : 0;
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 12
+    // T2: the tagged sites lose the run-time kind check (compiled as static calls).
+    const bool flagged = (kinds(receiver) & kKindTagged) == 0;
+#else
+    const bool flagged = true;
+#endif
+    return builtin_call(node, *admitted.spec, receiver, dst, flagged) ? 1 : 0;
 }
 
 } // namespace nift::rt::detail

@@ -1,0 +1,2 @@
+-- exit 1
+error: trim_observable_argument_refused.f:6:7: not compiled for the VM (builtin-receiver:contains): `contains()` on this kind of receiver is not supported by the Runtime 2.0 VM yet

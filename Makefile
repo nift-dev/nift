@@ -995,8 +995,8 @@ test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES) $(RT_B4B_WORK)
 .PHONY: test-runtime2-b5 test-runtime2-b5-mutants
 test-runtime2-b5: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
 	bash tests/runtime2/b5/mutants.sh

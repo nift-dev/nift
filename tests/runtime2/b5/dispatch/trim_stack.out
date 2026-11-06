@@ -1,0 +1,2 @@
+-- exit 1
+error: trim_stack.f:5:7: not compiled for the VM (builtin-receiver:contains): `contains()` on this kind of receiver is not supported by the Runtime 2.0 VM yet

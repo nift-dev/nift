@@ -77,6 +77,8 @@ KindSet family_kinds(natives::Receiver family);
 
 // Legacy's failure class for a receiver family with no native of `name`.
 DispatchFailure dispatch_failure(natives::Receiver family, std::string_view name);
+// B5: dispatch_failure, plus a struct instance (no built-in family) for a plain method name.
+DispatchFailure tagged_dispatch_failure(const Value& receiver, natives::Receiver family, std::string_view name);
 // Its message (call_text: the call's source text, for Malformed; receiver: the
 // value, for Unrenderable).
 std::string dispatch_failure_message(DispatchFailure failure, std::string_view name, std::string_view call_text,
