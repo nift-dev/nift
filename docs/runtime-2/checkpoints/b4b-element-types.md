@@ -5,7 +5,7 @@ Status: **final repair round candidate, frozen for focused re-review** (B4b). Br
 (per-site types, mutant A2); the owner's B4b ruling (2026-11-06); the coordinator's approval of the
 design note with conditions C1-C8 (2026-11-06) and the owner's evidence requirement (section 3).
 Commits B4b 0 (this note) to B4b 6 (rejected tip `e293105e`), fix round B4b 7 to 14 (section 10),
-final repair round B4b 15 to 19 (sections 11 to 13: F1 convergence, F2 test isolation, P1 mutant
+final repair round B4b 15 to 21 (sections 11 to 13: F1 convergence, F2 test isolation, P1 mutant
 and audit, and a pre-existing U1 hole found on the way); tip, tree and gates: section 8.
 
 B4b changes no observable behaviour while the guard is on, except that programs which exited 70
@@ -160,23 +160,28 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
   by `method:send`; a mutex's value read back (`mutex_container.f`) is of unknown origin (refused
   `index-target`); an atomic holds only integers.
 - **C8**: sections 5-7.
+- **Final repair round** (B4b 15 to 18): `infer_prune.cpp` (opened classes read and stored as
+  anything; materialized reads kept per state of the site facts), `infer_bindings.cpp` (binding
+  lookup; the lambdas that read a binding), `covers` in `infer_types.cpp`, and the changes of
+  section 11 in `infer_sites.cpp`, `infer_walk.cpp`, `infer.cpp`, `infer_unit.h`; production
+  against `0df0df6c`: 23 files, +1011 -56 (`src/rt`).
 
 ## 3. The owner's properties and their evidence
 
 | Property | Evidence |
 | --- | --- |
-| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28) and U2 (51 oracle cases; mutants A2, A19-A22, A24, A26, A27, A29). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on `2e7cde13`: 0 failures over the b4b suite (28 fixtures, 1,568 generated), 1,500 alias programs, 12,512 fuzz programs and the 2,021-script cross-check |
-| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores); mutant A20 (one mutator dropped), A29 (session store paths) |
-| Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`; C2 (A24), C4 (A23; A28: an inexact callee or any thread/async entry widens every function used as a value). Measured on `2e7cde13`: H1 reproducers refused (no exit 70); the four exit-70 fixtures of B4a are now refused (section 6); generators 38,185 programs, 0 exit 70, 0 defects (section 5b); guard-off gate `dispatch_defects` 0 |
+| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28; and the pre-existing lambda-capture hole of section 13: oracle `lambda-capture-*`, 8 fixtures that exit 70 on B4a, mutant A32) and U2 (oracle cases of sections 2, 10, 11; mutants A2, A19-A22, A24, A26, A27, A29-A31); past 16 origins the kinds are anything, so such sites are Dynamic or refused (section 11). P1: the builder invariant and its mutant A34 (section 10.1). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on the final tree: 0 failures over the b4b suite (36 fixtures, the F1 shapes, 1,568 generated; 6,297 checks), 1,500 alias programs, 12,512 fuzz programs and the 2,029-script cross-check, each fixture in a temporary copy, the repository unchanged |
+| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores; a write that grows a binding a lambda captured, section 13); mutant A20 (one mutator dropped), A29 (session store paths), A32 (lambda readers) |
+| Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`; C2 (A24), C4 (A23; A28: an inexact callee or any thread/async entry widens every function used as a value); too many known origins read as anything (opened classes, A31). Measured on the final tree: H1 reproducers refused (no exit 70); the four exit-70 fixtures of B4a are refused and the eight lambda-capture ones run checked (sections 6, 13); generators 38,185 programs, 0 exit 70, 0 defects (section 5b); guard-off gate `dispatch_defects` 0 |
 | Session-persistent code cannot keep stale assumptions | Today: coherent recompilation and shape contracts (CP19, mutants 7/8), the guard for aliases; `session_effects` with the full reachability rule (review M1: oracle `session-push-exposed`, `-index-`, `-member-`, `-closure-exposed`, `session-late-store`, `session-store-after-call`; mutants A21 (8 cases), A29 (3 cases)); the reviewer's `rv_b4b_unit.cpp` 40 checks, 0 failures on the tip objects. After B5: **not yet** (U6, section 4): the guard-off gate shows it (`b4b/guardoff/u6_session_alias.in`, listed in `expected_u6.txt`, which B5 must empty; re-checked on the tip: guard-off exit 70 `unexpected operands (compiler defect): built-in trim`, production refused `reference-guard:inflow`) |
-| The wrong-kind generators find no internal failures | On `2e7cde13`: `b4b_types.py` generator (1,568), `gen_alias.py` (1,500, guard-off), `gen1.py` pass a (20,274) and pass b (16,000), `gen_struct.py` (1,911): 0 exit 70, signals, tag leaks, internal text or defects; the same admissions and VM output as B4a and `e293105e` (section 5b). P1 (a pre-existing codegen crash the review found) fixed in B4b 7 and 11 (section 10.1); a 390-program assignment-as-value probe set crashes 117 times on B4a and 0 times on the tip |
-| Performance stays within the limits | Run time identical (section 7). Compile time: the review H2 `glob` shape 1.32x, 1.29x, 1.26x, 1.18x B4a at 100, 400, 800, 1,600 helpers (gate `fx-compile-scaling`; e293105e: 1.68x to 22x), containers 1.32x/1.29x (section 10.3). **Not met for one shape (open F1, section 9):** the parameter-push shape `many` (guard-refused today, admitted after B5) costs about 19x B4a at 100 to 800 helpers and is refused `analysis-limit:kinds` from 16 helpers on; `nestb` (guard-off admitted) 3.4x at 100 rising to 5.9x at 800 |
+| The wrong-kind generators find no internal failures | On the final tree: `b4b_types.py` generator (1,568), `gen_alias.py` (1,500, guard-off), `gen1.py` pass a (20,274) and pass b (16,000), `gen_struct.py` (1,911): 0 exit 70, signals, tag leaks, internal text or defects; the same admissions and VM output as B4a and `a42035c1` (section 5b). P1 (a pre-existing codegen crash the review found) fixed in B4b 7 and 11 (section 10.1); a 390-program assignment-as-value probe set crashes 117 times on B4a and 0 times on the tip |
+| Performance stays within the limits | Run time identical (section 7, re-measured on the final tree). Compile time (section 11, gate `z-compile-scaling`, best of 7 against B4a at 100, 400, 800, 1,600 helpers): `glob` 1.35x/1.31x/1.22x/1.01x, `many` 1.31x/1.34x/1.31x/1.38x, `nestb` 1.48x/1.49x/1.43x/1.38x (close to the bound, section 11), containers 1.22x; no analysis-limit refusal at any size (F1 fixed); before: `many` 19x and refused from 16 helpers, `nestb` 3.4x to 5.9x |
 
 ## 4. Unflagged method-site classes (the B4a section 9 prerequisite)
 
 | Class | Receiver | Answer | Holds after B5 (guard removed)? |
 | --- | --- | --- | --- |
-| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8) | **Yes**: sharing changes contents, not which value a binding holds |
+| U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8). Captured cells: the claim "one slot" held, but a lambda walked before the slot's last growth was not walked again (exit 70 on B4a and `a42035c1`; fixed in B4b 15, section 13) | **Yes**: sharing changes contents, not which value a binding holds |
 | U2 | an element or member read (`xs[i]`, `o.k`, `for` binding, element-returning methods) | (a) per-site contents (B4b) | **Yes**: stores through every alias reach the sites by construction |
 | U3 | a struct field | (a) one slot per field (B3) | **Yes** |
 | U4 | map/set/stack contents | (a) per site (D-NEXT-refsem) | **Yes** |
@@ -186,16 +191,19 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 ## 5. Tests and evidence
 
-Figures on the fix-round tip `2e7cde13` (tree `40dc5d0d`) unless stated.
+Figures on the final repair round's gate tree (section 8) unless stated.
 
-- `make test-rt-b4b-types-unit` (`tests/rt/b4b_types_unit.cpp`, the primary oracle): 51 cases, 255
-  checks, 0 failures (section 2 lists the paths; the fix round's H1, H2 and M1 cases: section 10).
-- `make test-runtime2-b4b` (`tests/runtime2/b4b_types.py`): 25 scripts, 4 module trees, 5 sessions
-  (28 fixture programs: 4 run by the VM, equal to legacy; 24 refused before any effect); 11
+- `make test-rt-b4b-types-unit` (`tests/rt/b4b_types_unit.cpp`, the primary oracle): 442 checks, 0
+  failures (section 2 lists the paths; the fix round's H1, H2 and M1 cases: section 10; F1
+  convergence, U1 lambda captures and the P1 builder cases: sections 11, 13, 10.1).
+- `make test-runtime2-b4b` (`tests/runtime2/b4b_types.py`): 6,589 checks, 0 failures; 33 scripts
+  (the 8 `lambda_capture_*` added), 4 module trees, 5 sessions (36 fixture programs: 12 run by the
+  VM, equal to legacy; 24 refused before any effect); the F1 convergence step (4 shapes x 4 sizes);
+  11
   `b4b/codegen` P1 fixtures (9 run by the VM, equal to legacy; 2 `refused_*`); the C1 check; the
   wrong-kind generator (8 holder paths x 4 original kinds x 7 stored kinds, map, struct, int,
   string, array, atomic and mutex, x 7 observations: 1,568 programs, 74 run by the VM); the
-  container-heavy and `glob` scaling checks. 6,471 checks, 0 failures. Every program: never exit
+  container-heavy, `glob`, `many` and `nestb` scaling checks. Every program: never exit
   70, never an internal tag, `dispatch_defects` 0, refused before any effect or equal to legacy
   (D-009#5 allowed; legacy's shown handle tags are the approved B0/CP17/B4 difference).
 - `make test-runtime2-b4b-mutants`: section 5a.
@@ -204,24 +212,30 @@ Figures on the fix-round tip `2e7cde13` (tree `40dc5d0d`) unless stated.
 
 ### 5a. Mutants (each must fail the oracle or the suite)
 
-`test-runtime2-b4b-mutants` on `2e7cde13`: **12 caught**. Each mutant is also linked into a
+`test-runtime2-b4b-mutants` on the final gate tree: **16 caught** (counts of that run; on `2e7cde13`
+the first 12 rows had A2 28, A19 8 and A26 1 oracle cases and A26 4 suite checks: the oracle has
+grown). Each mutant is also linked into a
 guard-off CLI and run through the guard-off b4b suite and 600 alias programs (column "guard-off";
 informational, the mutant is caught by the oracle or the suite).
 
 | Mutant | File | Defect | Oracle cases | Suite checks | Guard-off |
 | --- | --- | --- | --- | --- | --- |
-| A2 | `infer_sites.cpp` | a store reaches only the binding stored through (the stale per-binding type) | 28 | 0 | failed |
-| A19 | `infer_sites.cpp` | stores inside functions and lambdas miss the caller's sites (callee/closure path) | 8 | 0 | failed |
+| A2 | `infer_sites.cpp` | a store reaches only the binding stored through (the stale per-binding type) | 37 | 0 | failed |
+| A19 | `infer_sites.cpp` | stores inside functions and lambdas miss the caller's sites (callee/closure path) | 18 | 0 | failed |
 | A20 | `infer_sites.cpp`, `infer_collection.cpp` | one mutator (`reverse`) dropped from the list (C1) | 1 | 0 | passed |
 | A21 | `infer_escape.cpp` | a call into an earlier session statement's code keeps the statement's site facts (C5) | 8 | 0 | passed |
 | A22 | `infer_sites.cpp` | an inner part has no derived site and a site-less value is taken as fresh (nested alias) | 1 | 0 | passed |
 | A23 | `infer_escape.cpp` | an escaping function keeps its known calls' parameter types (C4) | 9 | 9 | failed |
 | A24 | `infer_sites.cpp` | a mutator on a receiver that is not exactly an array is not modelled (C2) | 2 | 0 | passed |
 | A25 | `compiler_assign_expr.cpp` | P1: an assignment's constant value moved as a register | 0 | 8 (the codegen fixtures refused by the builder invariant) | failed |
-| A26 | `infer_sites.cpp` | H2: no merge beyond 16 sites | 1 (`collapsed-sites`) | 4 (the `glob` scaling check: 6.7x per doubling and more) | passed |
+| A26 | `infer_sites.cpp` | H2: no merge beyond 16 sites | 16 (`collapsed-sites` and the `converge-*` cases) | 5 (the scaling checks) | passed |
 | A27 | `infer_sites.cpp` | H2: a grown site's readers are not re-walked | 1 (`reader-rewalk-late`) | 0 | passed |
 | A28 | `infer_escape.cpp` | H1: an inexact callee widens no target | 6 | 9 | failed |
 | A29 | `infer_sites.cpp` | M1: a push/index/member store into an earlier statement's value exposes nothing | 3 (`session-push/index/member-exposed`) | 0 | passed |
+| A30 | `infer_walk.cpp` | F1: a push puts the class spelling in place of the binding (no fixed point) | 6 (`converge-*`) | 7 | failed |
+| A31 | `infer_sites.cpp`, `infer_prune.cpp` | F1: past 16 sites the collapsed class keeps its precision | 15 (`converge-*` anything checks) | 0 | passed |
+| A32 | `infer_bindings.cpp` | U1: a lambda keeps a captured binding's kinds read before it grew | 8 (`lambda-capture-*`) | 17 | failed |
+| A34 | `codegen.cpp` | P1: `FunctionBuilder::emit`'s operand invariant removed | 4 (`p1-*` rejection cases) | 0 | passed |
 
 B3's D11 (array mutators keep positional kinds outside sessions) now also keeps the sites'
 positions for a script's non-append mutator (`infer_collection.cpp`): B4b's per-site drop had
@@ -236,11 +250,11 @@ itself (section 10.1).
 `review-b4/repro2/gen1.py` and `gen_struct.py` (the reviewer's copies; only the path of
 `builtin_list.inc`, identical in `0df0df6c`, `e293105e` and the tip, and the work directory
 changed), the same parameters (pass a: `for`, `fnloop`; pass b: `NB=16000`, seed 7), run on the
-tip `nift` and, for the comparison, on a B4a `0df0df6c` binary built for it (byte-identical to the
-`--baseline` binary of the scaling gate). The `e293105e` figures are the reviewer's own jsonl
-(`review-b4b/gen/`).
+final tree's `nift` and, for the comparison, on a B4a `0df0df6c` binary built for it
+(byte-identical to the `--baseline` binary of the scaling gate) and the previous round's results
+on `2e7cde13`/`a42035c1` (`scratchpad/hv/gen/`; jsonl of this round: `scratchpad/f1/gen/`).
 
-| Generator | Programs | Run by the VM | Exit 70 / signal / tag leak / internal text / defects | Differences from legacy | Against B4a and `e293105e` |
+| Generator | Programs | Run by the VM | Exit 70 / signal / tag leak / internal text / defects | Differences from legacy | Against B4a and `a42035c1` |
 | --- | --- | --- | --- | --- | --- |
 | `gen1.py` pass a | 20,274 | 1,297 | 0 / 0 / 0 / 0 / 0 | 131 | identical: 0 admission changes, 0 VM output changes, 0 new differences |
 | `gen1.py` pass b | 16,000 | 955 | 0 / 0 / 0 / 0 / 0 | 138 | identical (same) |
@@ -255,12 +269,19 @@ Tooling of the earlier rounds (`scratchpad/b4/tools/classify_tree.py`, `classify
 `tests/runtime2/cp25/inventory.collect_classify_all`, `invcmp.py`); `NIFT_VM=classify`; the
 `tests/runtime2` corpus of the tip for every binary.
 
-**B4a `0df0df6c` against the tip `2e7cde13`.**
+Re-run on the final repair round's tree (B4b 15 to 18; corpus of that tree, 2,029 scripts, for
+every binary; the `a42035c1` binary is the one `make -q` reported current for its tree,
+`scratchpad/b4b/inv/nift-p1`). **Against `a42035c1`: CP25-R 589 units, 0 changes (reasons lists
+included); `tests/runtime2` 0 changes.** Against B4a the result is the previous round's, below,
+unchanged. The 8 `lambda_capture_*` fixtures are compiled by all three binaries (B4a's dispatch
+exits 70, the tip's is checked: section 13); the generated F1 shapes: section 11.
+
+**B4a `0df0df6c` against the tip** (`2e7cde13`; the same on the final tree).
 
 - CP25-R `classify-all` (589 units): **0 changes** of outcome, reason, line or column. One unit's
   reasons list (`vm-corpus/cp04/toplevel_alias.f`, refused `aliasing` in both) lists `aliasing` and
   `unresolved-name` once more each (the same as on `e293105e`).
-- `tests/runtime2` classify (2,021 scripts): 6 changes.
+- `tests/runtime2` classify (2,021 scripts then, 2,029 now): 6 changes.
 
   | Script | B4a | Tip | Why |
   | --- | --- | --- | --- |
@@ -288,12 +309,13 @@ admitted.
 
 ## 7. Performance (local callgrind and compile_us; guidance only)
 
-Run time (instructions per iteration, B4a tip against B4b tip): identical.
+Run time (instructions per iteration, B4a against the B4b tip): identical, re-measured on the
+final repair round's tree (callgrind, local).
 
 | Workload | B4a | B4b |
 | --- | --- | --- |
 | B4a built-in set: `s.trim()`, `a.contains(2)`, `i.to_string()`, `o.has("a")`, Dynamic `contains` | 1074, 903, 1187, 870, 2844 | 1074, 903, 1187, 870, 2844 |
-| `run.py --groups ops`: loop, add_local, call, array_index, array_push, object_member, string_concat, if_branch | 117, 188, 567, 436, 367, 763, 3313, 249 | identical |
+| `run.py --groups ops`: loop, add_local, call, array_index, array_push, object_member, string_concat, if_branch | 117, 188, 567, 436, 367, 763, 3315, 249 | 117, 188, 567, 436, 367, 763, 3313, 249 (string_concat within 0.1%) |
 | `vm_compare.py --groups mutation`: array_set, array_push_pop, array_insert_pop, map_set, set_add, stack_push_pop | 381, 1430, 2446, 1496, 1363, 2190 | identical |
 
 Compile time (`compile_us`, best of five, ms; the suites' scaling shapes and a container-heavy
@@ -310,43 +332,62 @@ fresh array pushed to and stored into, 4,000 sites at 1,000):
 At most 1.23x B4a (containers), inside the 1.5x bound. The container shape grows about 7x for 4x
 on both binaries (the existing walk, not B4b's); `test-runtime2-b4b` checks it stays within 12x.
 
-The run-time figures and the table above ran on B4b 3 (the frozen round). The fix round changes
-the inference and, in codegen, only the assignment-as-value result (B4b 7) and a build-time
-invariant in `FunctionBuilder::emit` (B4b 11); run time was not re-measured. Its compile-time
-figures are in section 10.3; the generators show the same VM output as B4a for every admitted
-program (section 5b).
+The compile-time table above ran on B4b 3 (the frozen round); the final compile-time figures are
+in section 11. The run-time rows were re-measured on the final tree (B4b 15 to 18): the fix
+rounds change the inference, the assignment-as-value result (B4b 7) and build-time checks only.
 
-## 8. Gates (local; result files `scratchpad/b4/gates/fx-*.result`)
+## 8. Gates (local; result files `scratchpad/b4/gates/z-*.result`)
 
-Run by `scratchpad/b4/gate.sh` on head `2e7cde13` (tree `40dc5d0d`), every gate exit 0, git status
-clean (0 entries) before and after each; `make -q nift` reports the tip `nift` up to date with that
-tree. The following commit (B4b 14) changes this record only.
+Run by `scratchpad/b4/gate2.sh` (as `gate.sh`, plus `tests/runtime2/repo_state.py` around each
+gate: tracked, untracked and ignored files) on head `f246345b` (tree `d89708e1`; the code of
+B4b 15 to 18 and this record's first draft), every gate's status clean (0 entries) before and
+after and the repository state unchanged; `make -q nift` reported `nift` current. One gate
+failed on that run and was fixed after it (`test-rt-refrep`, below); the commits after the
+gate tree change `tests/rt/refrep_production.sh` (B4b 20) and this record only (B4b 21), and
+`test-rt-refrep` was run again on B4b 20.
 
-| Gate | Result |
-| --- | --- |
-| `test-rt-lint` | PASS (703 files; rt-lint 0 problems) |
-| `test-rt-op-admission-unit` | 4,027 checks, 0 failures |
-| `test-rt-b4b-types-unit` | 255 checks, 0 failures |
-| `test-runtime2-b4b` | 6,471 checks, 0 failures |
-| `test-runtime2-b4b-mutants` | 12 caught (section 5a) |
-| `test-runtime2-guardoff` | PASS (section 10.2) |
-| `test-runtime2-b4`, `-b4-mutants` | 12,648 checks; 17 caught or covered |
-| `test-runtime2-b3`, `-b3-mutants` | 468 checks; 11 caught |
-| `test-runtime2-safety` | 33,512 programs |
-| `test-cp19-session-cli`, `test-cp19-functional` | PASS |
-| `test-runtime2-refsem` | 475 checks |
-| `test-runtime2-collections` | 278 checks |
-| `vm-modules-unit` | 179 checks |
-| `semantics-modules` (+ structs, `modules_d041 --legacy-today`) | 25, 26 probes; 22 fixtures |
-| compile scaling (`b4_dispatch.compile_scaling`; `b4b_types.py --quick --baseline` B4a) | PASS (section 10.3) |
+| Gate | Exit | Repository | Result |
+| --- | --- | --- | --- |
+| `test-rt-lint` | 0 | unchanged | PASS rt-lint: 0 problem(s); boundary 0 problems in 707 files |
+| `test-rt-op-admission-unit` | 0 | unchanged | op-admission-unit: 4027 checks, 0 failures |
+| `test-rt-b4b-types-unit` | 0 | unchanged | b4b-types-unit: 442 checks, 0 failures |
+| `test-runtime2-b4b` | 0 | unchanged | PASS b4b-types: 6589 checks, 0 failure(s) |
+| compile scaling (`b4_dispatch.compile_scaling`; `b4b_types.py --quick --baseline` B4a) | 0 | unchanged | PASS; the four shapes within 1.5x of B4a (section 11) |
+| `test-runtime2-guardoff` | 0 | unchanged | PASS: b4b `--guardoff` 6,297 checks; gen_alias 1,500 (0 bad); fuzz 12,512; cross-check 2,029 scripts, 0 failures; repo-state 0 changes (section 10.2) |
+| `test-runtime2-b4` | 0 | unchanged | PASS b4-dispatch: 12648 checks, 0 failure(s) |
+| `test-runtime2-b3` | 0 | unchanged | PASS b3-structs: 468 checks, 0 failure(s) |
+| `test-runtime2-safety` | 0 | unchanged | PASS runtime2 safety fuzz: 33512 programs (8512 exhaustive, 20000 sampled, 5000 session; seed 1; 1676 run twice) {"file:error-or-refusal": 22384, "fil |
+| `test-cp19-session-cli` | 0 | unchanged | PASS retained-reader numeric guard and legacy channels |
+| `test-cp19-functional` | 0 | unchanged | PASS retained-reader numeric guard and legacy channels |
+| `test-runtime2-refsem` | 0 | unchanged | PASS refsem-a: 475 checks, 0 failure(s) |
+| `test-runtime2-collections` | 0 | unchanged | PASS collections: 278 checks, 0 failure(s) |
+| `vm-modules-unit` | 0 | unchanged | rt vm modules unit: 179 checks, 0 failures |
+| `semantics-modules` (+ structs, `modules_d041 --legacy-today`) | 0 | unchanged | PASS modules-d041 (legacy-today): 22 fixtures, 0 failure(s) |
+| `test-runtime2-packages` | 0 | unchanged | packages: 830 checks, 0 failed |
+| `test-runtime2-args-cmd` | 0 | unchanged | PASS heap: cmd ends with the live heap of the string literal |
+| `test-runtime2-cp22` | 0 | unchanged | PASS cp22 print-order evidence |
+| `test-runtime2-cp23` | 0 | unchanged | PASS cp22 default: 87 case(s), 0 failure(s) |
+| `test-runtime2-coro-module` | 0 | unchanged | PASS coro-module: 0 failure(s) |
+| `test-runtime2-vm-default` | 0 | unchanged | PASS VM-default policy |
+| `test-rt-refrep` | 2, then 0 on the tip after B4b 20 | unchanged | FAIL `unexpected NIFT_RT_REFERENCE_PROBE build rules` (pre-existing since B4b 12: the guard-off sanitizer rule); after the fix (B4b 20) PASS, run again on `f805e3d3` (result `z2-test-rt-refrep`) |
+| `test-rt-mutation-protocol` | 0 | unchanged | mutation-protocol: 191 checks, 0 failures |
+| `test-rt-value` | 0 | unchanged | native-budget: 105 checks, 0 failures |
+| `vm-unit` | 0 | unchanged | rt vm unit: 40341 checks, 0 failures |
+| `vm-globals-unit` | 0 | unchanged | rt vm globals unit: 23 checks, 0 failures |
+| `vm-adversarial` | 0 | unchanged | PASS vm adversarial: 39612 programs, 0 non-approved differences, 196 approved {'D-001#4 recursion': 73, 'D-009#5 return prefix': 18, 'D-018c diagnosti |
+| `test-rt-isolation` | 0 | unchanged | PASS isolation: production cannot reach the storage-level test helpers |
+| `test-production-deps` | 0 | unchanged | PASS production-deps: 1508 production compile commands, no dependency in tests/ (-M, system headers included) |
+| `test-rt-build` | 0 | unchanged | PASS (its builder mutants caught) |
+| `test-runtime2-b4b-mutants` | 0 | unchanged | PASS b4b mutants: 16 caught |
+| `test-runtime2-b4-mutants` | 0 | unchanged | PASS b4 mutants: 17 caught or covered |
+| `test-runtime2-b3-mutants` | 0 | unchanged | PASS b3 mutants: 11 caught |
+| `test-runtime2-safety-mutants` | 0 | unchanged | PASS safety mutants: 7 caught |
+| `test-runtime2-collections-mutants` | 0 | unchanged | PASS collections mutants: 11 caught |
+| `test-runtime2-refsem-mutants` | 0 | unchanged | PASS refsem mutants: 23 caught |
 
-Not re-run on the fix round (last run on `301095af`, section 8 of the frozen round: PASS):
-`test-rt-build`, `test-rt-isolation`, `test-production-deps`, `test-runtime2-safety-mutants`,
-`-collections-mutants`, `-refsem-mutants`, `test-runtime2-packages`, `-args-cmd`, `-cp22`, `-cp23`,
-`-coro-module`, `-vm-default`, `test-rt-refrep`, `test-rt-mutation-protocol`, `test-rt-value`,
-`vm-unit`, `vm-globals-unit`, `vm-adversarial`. Not run locally (combined certification): full
-`make test`, `test-rt-vm-sanitize` with `test-runtime2-guardoff-sanitize`, `test-build-reuse`, perf
-campaigns.
+Not run locally (combined certification): full `make test`, `test-rt-vm-sanitize` with
+`test-runtime2-guardoff-sanitize`, `test-build-reuse`, perf campaigns (the owner's rule: heavy
+validation and benchmarks on Linode; the local compile-scaling figures are guidance).
 
 ## 9. Findings and carried items
 
@@ -360,32 +401,13 @@ campaigns.
 - **L1 (latent C2 hole)**, fixed in B4b 8: a union receiver whose object member of a mutator's name
   is callable took the member call before the mutator model; the compiler refuses such calls
   (`type:push`, `method:insert`), so it was unreachable. Oracle `union-callable-member`.
-- **F1 (open; found in the hand-over verification, not fixed): the H2 merge exhausts the walk
-  budget on a parameter-push shape.** `review-b4b/perf/many<N>.f` (N helpers
-  `fn(kN(r)) { r.push([<a literal of kind N mod 7>, " s "]) ... }`, each called once with one shared
-  `acc`): with 15 helpers the tip and the guard-off build compile it (guard-off admits it); from
-  16 helpers on both refuse it `analysis-limit:kinds` (the inference's walk budget), at about
-  19x B4a's compile time (B4a 100: 1.8 ms, tip 34.7 ms; 800: 14.3 ms against 281 ms; B4a and
-  `e293105e` refuse it `reference-guard:argument`). The cliff sits exactly at the 16-class merge
-  bound, which points at the merge (B4b 8) not converging for sites reached through a parameter;
-  the `glob` shape (a global `acc`, measured by the gate) and the same shape returning fresh
-  arrays pushed at top level (`ret<N>`: 1.1x to 1.3x B4a at 15 to 200, admitted) are not affected.
-  Today it is masked: the guard refuses the shape anyway, so no admitted program changes (section
-  6, 5b), only the compile time of the refusal. After B5 these programs would be refused by the
-  analysis limit instead of admitted. `nestb<N>` (the same with the pushed value passed in as a
-  parameter; refused `aliasing`, admitted by the guard-off build) is 3.4x B4a at 100 rising to
-  5.9x at 800 (`e293105e`: 23x at 800). Measurements: `ctime.sh`, median of 5 to 9, local, guidance
-  only. Needs an owner/coordinator decision before B5; the record does not claim property 6 for
-  these shapes.
-- **F2 (test hygiene, not fixed):** `tests/runtime2/b4b/guardoff.py` runs every fixture in its
-  source directory (as its suite does), so scripts that write files leave them in the tree; B4b 12
-  committed three such outputs (`cp16/probes/scripts/fs_symlink/link.txt`, `cp22/refuse/w.txt`,
-  `rt-diff-corpus/scripts/modes/out.txt`) and the status stayed clean. `fs_symlink/link.txt` is a
-  regular file where the probe's `setup.sh` creates a symlink (`ln -s real.txt link.txt` now fails
-  with "File exists" in the CP16 capture harness, which copies the probe directory). The CP16
-  `capture.py --check` of `fs_symlink` differs with and without the file (its stdout order differs
-  from `expected/` either way), and no Makefile gate runs that capture, so no gate result changes;
-  the cross-check should run each script in a temporary copy and the three files be removed.
+- **F1 (fixed in B4b 15, section 11):** the parameter-push shapes stopped at the walk budget from
+  16 helpers on (`analysis-limit:kinds`, about 19x B4a). Root cause: a push replaced the binding by
+  a type spelling its sites by class, which the next walk's parameter merge spelled again as made:
+  the walks oscillated. Now monotone; past 16 origins the contents read as anything.
+- **F2 (fixed in B4b 16, 17, section 12):** the guard-off cross-check wrote into fixture
+  directories and three outputs were committed; it now runs every fixture in a temporary copy, the
+  files are removed, and the gate fails if the repository changed (ignored files included).
 - **`nift eval --json` internal tag** (owner ruling): a function's tag in `--json` output is a
   release blocker assigned to the release-blocker audit (b4-dispatch.md section 9); B4b does not
   touch the JSON conversion path.
@@ -496,17 +518,18 @@ configuration: no Phase A reference guard, no `aliasing` location-alias refusal,
 shared references and a stale Static fact meets a foreign kind as `unexpected operands (compiler
 defect)`, exit 70). Guard-on gates stay mandatory; this gate is in addition.
 
-**Programs (counts on `2e7cde13`):**
+**Programs (counts on the final repair round's gate tree; `2e7cde13` in brackets):**
 
 | Step | Programs | Result |
 | --- | --- | --- |
-| `b4b_types.py --guardoff` | the b4b fixtures (9 run by the VM, 19 refused), the sessions incl. `b4b/guardoff/*.in`, the 1,568-program generator (259 run by the VM) | 6,203 checks, 0 failures |
+| `b4b_types.py --guardoff` | the b4b fixtures (17 run by the VM, 19 refused; [9, 19]), the sessions incl. `b4b/guardoff/*.in`, the F1 convergence shapes, the 1,568-program generator (259 run by the VM) | 6,297 checks, 0 failures [6,203] |
 | `gen_alias.py --sample 1500 --seed 1` | 1,500 transitive-alias programs | 509 run by the VM, 0 bad |
 | `safety/fuzz.py --seed 1 --sample 3000 --session-sample 1000` | 12,512 (8,512 exhaustive, 3,000 sampled, 1,000 session; 626 run twice) | PASS |
-| `b4b/guardoff.py` (cross-check) | every `.f` under `tests/runtime2` (module directories excluded): 2,021 scripts | 1,066 admitted by both builds (2 approved changes), 0 failures |
+| `b4b/guardoff.py` (cross-check) | every `.f` under `tests/runtime2` (module directories excluded), each in a temporary copy (section 12): 2,029 scripts [2,021] | 1,074 admitted by both builds (2 approved changes) [1,066], 0 failures |
+| `repo_state.py` | the repository before and after the steps (and its self-test) | unchanged |
 
 **Failure conditions.** In the cross-check, per script on the guard-off build (`NIFT_VM=require`,
-`timeout 30`, its own directory, stats on): exit 70 (unless approved `exit70`); a timeout (124,
+`timeout 30`, a temporary copy of its directory, stats on): exit 70 (unless approved `exit70`); a timeout (124,
 unless approved `timeout`); a signal or crash (exit > 124, 125-127, or negative); leaked internal
 text or tags (`compiler defect`, `internal failure`, `unexpected operands`, `cell reached`,
 `\x1fnift:`, `\u001fnift:`; the approved memory-budget stop excepted); a nonzero
@@ -521,7 +544,8 @@ defects; `fuzz.py`: its own checks (determinism included).
 `cp22/vm-only/v_sleep_ties.f` (output: equal sleeps, wake order unspecified),
 `cp22/vm-only/v_fifo_order.f` (output: parallel print order), `rt-diff-corpus/scripts/home-tmp/main.f`
 (output: prints its temporary directory), `memory/c1_push.f` (exit70: the heap-budget stop, the same
-on the guard-on build), `rt-diff-selftest-corpus/timeout/loop/main.f` (timeout: deliberate).
+on the guard-on build), `rt-diff-selftest-corpus/timeout/loop/main.f` (timeout: deliberate), `cp22/vm-only/v_thread_order.f`
+(output: parallel threads; final repair round, section 12).
 Expected U6 failure: `u6_session_alias.in` (`unexpected operands (compiler defect)`).
 
 **ASan/UBSan variant.** `make test-runtime2-guardoff-sanitize`
@@ -532,7 +556,7 @@ and the cross-check over `b4 b4b b3 refsem` without the twice-run. A prerequisit
 `test-rt-vm-sanitize`. **Not run locally** (not built: disk and time); it runs in the combined
 Linode certification campaign.
 
-Test hygiene: see F2 (the cross-check writes into fixture directories).
+Test hygiene: fixed in the final repair round (section 12).
 
 ### 10.3 H1, H2, M1 against the acceptance criteria
 
@@ -569,8 +593,9 @@ class's `readers_`. Evidence: oracle `collapsed-sites`, `collapsed-sites-read`, 
 
 Containers shape: 1.32x at 250, 1.29x at 1,000. Review reproducers `H2_compile_glob100.f`,
 `H2_compile_glob1600.f` (`ctime.sh`, median of 9): 1.25x and 1.26x on the tip. The ratio does not
-rise with size: growth is removed for these shapes. **Not met for the `many` and `nestb` shapes
-(F1).**
+rise with size: growth is removed for these shapes. The `many` and `nestb` shapes (F1) and the
+final figures for all four: section 11 (`glob` is now refused, `builtin-receiver:trim`, past 16
+origins; its compile time is measured all the same).
 
 **M1** (a later call into earlier session code opens every reachable container: push, index
 stores, member stores, captured cells, containers stored later into exposed ones). Implementation:
@@ -617,7 +642,7 @@ not the cause of the non-termination.
 
 - `add_element` joins the new type with the binding (`unite(*var, updated)`): a binding only grows.
   Mutant **A30** restores the replacement: the oracle's convergence cases fail (6), and the b4b
-  suite sees `analysis-limit:kinds` for the 16, 17 and 100-helper fixtures.
+  suite sees `analysis-limit:kinds` for `many` at 16, 17 and 100 helpers and in its scaling check.
 - Past 16 classes the collapsed class is **opened** (`classes()`, the approved design note's
   "more than 16 sites ... contents are anything"): its contents read as anything from then on, so
   a method on an element is Dynamic under the B4a precondition or refused where Dynamic is not
@@ -648,7 +673,25 @@ lambdas for a capture, section 13).
 guidance only; `test-runtime2-b4b` with `--baseline`, gate `z-compile-scaling`; the guard refuses
 `many` and `nestb` after the analysis on both binaries, so the times include the analysis):
 
-TABLE-F1
+| Shape | 100 | 400 | 800 | 1,600 |
+| --- | --- | --- | --- | --- |
+| `glob` tip / B4a (ms) | 1.71 / 1.27 | 6.50 / 4.95 | 14.0 / 11.5 | 28.4 / 28.1 |
+| ratio | 1.35x | 1.31x | 1.22x | 1.01x |
+| `many` tip / B4a (ms) | 2.19 / 1.67 | 8.60 / 6.40 | 18.1 / 13.9 | 41.0 / 29.7 |
+| ratio (before: 19x, refused from 16 helpers) | 1.31x | 1.34x | 1.31x | 1.38x |
+| `nestb` tip / B4a (ms) | 3.21 / 2.17 | 13.4 / 8.97 | 34.4 / 24.0 | 80.2 / 58.2 |
+| ratio (before: 3.4x at 100, 5.9x at 800) | 1.48x | 1.49x | 1.43x | 1.38x |
+| `containers` (250, 1,000) | 1.22x | 1.22x | | |
+
+All within 1.5x, and the ratio does not rise with the size: the growth is B4a's own (100 to 400
+helpers: 3.8x to 4.2x the time on the tip, 3.9x to 4.1x on B4a; each later doubling 2.0x to 2.6x
+on the tip, 2.0x to 2.7x on B4a; the slightly superlinear part is in both binaries, e.g. name
+lookup over main's 1,600 bindings). **`nestb` is close to the
+bound** (1.43x to 1.49x on this run; repeated local runs during development gave 1.37x to 1.67x
+with the machine loaded): the gate's 1.5x check may fail under load, which the zero-flakiness
+policy forbids. The remaining cost is spread over the per-read site work (`materialize`,
+classes), not a single term; reducing it further needs a cheaper representation of materialized
+reads, not done in this round. This is recorded for the reviewer, not hidden by a looser bound.
 
 Walks are linear (`many` and `nestb`: 2 walks per helper and 2 or 3 of main at every size, from
 3 per helper and 3 of main before the declaration rule; `glob`: 2 per helper). Instruction counts
