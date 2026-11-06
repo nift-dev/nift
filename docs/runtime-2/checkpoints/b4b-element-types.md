@@ -1,7 +1,11 @@
 # Checkpoint B4b: sound per-site element and member typing
 
-Status: **widened-group repair round candidate (B4b 22 to 25), frozen for a fresh independent
-re-review of the whole B4b scope** (B4b). The final repair round's tip `16f24f36` was REJECTED by
+Status: **receiver-identity repair round candidate (B4b 32 to 35), frozen for a narrow
+independent re-review** (N-1, the lows L-1 to L-3, and their interaction with the dependency model
+accepted in section 18; section 19). The tip `ce0a9a44` was REJECTED by the fourth independent
+review (N-1, section 19); `4c9632b8`, `16f24f36` and `e293105e` were rejected before (sections 18,
+14, 10). Earlier status: widened-group repair round candidate (B4b 22 to 25), frozen for a fresh
+independent re-review of the whole B4b scope (B4b). The final repair round's tip `16f24f36` was REJECTED by
 the independent review (section 14; report and reproducers kept). Branch
 `cand/b4-dispatch`, after the accepted B4a boundary `0df0df6c`. Plan: Phase B plan §5.7 and "B4"
 (per-site types, mutant A2); the owner's B4b ruling (2026-11-06); the coordinator's approval of the
@@ -175,12 +179,12 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 
 | Property | Evidence |
 | --- | --- |
-| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28; and the pre-existing lambda-capture hole of section 13: oracle `lambda-capture-*`, 8 fixtures that exit 70 on B4a, mutant A32; **corrected in B4b 26 (section 18):** the reverse edge, a lambda's write read by the unit that declares the binding, was not covered, a production exit 70 on B4a and `4c9632b8` (review H-1): every slot now records every reader unit; oracle `owner-*`, `field-lambda-reader`, 11 fixtures `b4b/scripts/owner_*.f` and `b4b/modules/owner_module`, mutant A36; and the fixed-point gate over the corpus and the generators, section 18) and U2 (oracle cases of sections 2, 10, 11; mutants A2, A19-A22, A24, A26, A27, A29-A31); past 16 origins the kinds are anything, so such sites are Dynamic or refused (section 11). P1: the builder invariant and its mutant A34 (section 10.1). **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on the final tree: 0 failures over the b4b suite (36 fixtures, the F1 shapes, 1,568 generated; 6,297 checks), 1,500 alias programs, 12,512 fuzz programs and the 2,029-script cross-check, each fixture in a temporary copy, the repository unchanged |
-| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores; a write that grows a binding a lambda captured, section 13; a lambda's write to its owner's binding, section 18); mutant A20 (one mutator dropped), A29 (session store paths), A32 (lambda readers), A36 (only lambdas recorded as readers) |
-| (widened-group repair round, section 17; **general invariant, section 18**) Invalidation | B4b 26 to 29 (section 18): one mechanism for every dependency edge (every fact recorded with the units that read it, every growth re-walks them all, whatever the lexical or call direction), and the fixed-point gate `test-runtime2-b4b-fixpoint` (the production analysis plus the after-convergence check, guard on and off, over `tests/runtime2`, CP25-R, the session fixtures and every generator; any non-fixed point fails, never repaired). Before: the 16f24f36 defect (a class opened by a union kept its precise readers; guard-off exit 70) fixed in B4b 22; the invalidation invariant checked directly as a fixed point on every oracle case and fixture (`verify_fixed_point`); 27 `widen` fixtures incl. A -> B -> C transitive merges, both orders, functions, lambdas, globals; mutant A35; audit of every opened-class shortcut (section 14). Re-verified on `0cd6d6ae`: 36 gates, generators, classification (0 changes against `16f24f36`; nothing newly admitted against B4a), run time identical (section 17) |
+| Every method-call site is statically proven or dynamically checked | B4a: admission is Static only on proven kinds, else Dynamic (flagged, under the precondition) or Refuse; `op-admission-unit` (4,027 checks), the spec x kind enumeration (3,000 programs) and the struct oracle (1,911) in `test-runtime2-b4`; mutants A3-A6. B4b: sound kinds for U1 (C4 incl. review H1: oracle `thread-unknown-callee`, `thread-unknown-returned`, `call-unknown-ternary`, `escape-*`; fixtures `b4b/scripts/*unknown_callee*.f`, `b4b/modules/escape_export`; mutants A23, A28; and the pre-existing lambda-capture hole of section 13: oracle `lambda-capture-*`, 8 fixtures that exit 70 on B4a, mutant A32; **corrected in B4b 26 (section 18):** the reverse edge, a lambda's write read by the unit that declares the binding, was not covered, a production exit 70 on B4a and `4c9632b8` (review H-1): every slot now records every reader unit; oracle `owner-*`, `field-lambda-reader`, 11 fixtures `b4b/scripts/owner_*.f` and `b4b/modules/owner_module`, mutant A36; and the fixed-point gate over the corpus and the generators, section 18) and U2 (oracle cases of sections 2, 10, 11; mutants A2, A19-A22, A24, A26, A27, A29-A31); past 16 origins the kinds are anything, so such sites are Dynamic or refused (section 11). P1: the builder invariant and its mutant A34 (section 10.1). **Corrected in B4b 32 (section 19):** the result of `reverse()`, `sort()` and the comparator sort is their receiver at run time, but had a new allocation site (review of `ce0a9a44`, N-1: guard-off exit 70, production refused); it now carries the receiver's sites (`kCollectionResults`, every method classified against the run-time contract); oracle `receiver-*` (12), 32 fixtures `b4b/scripts/receiver_*.f`, 2 modules, the `gen_alias` receiver holders and contexts, mutant A38. **Direct evidence:** the guard-off gate (`test-runtime2-guardoff`, shared references, so a stale Static fact shows as `compiler defect`, exit 70; section 10.2) on the final tree: 0 failures over the b4b suite (36 fixtures, the F1 shapes, 1,568 generated; 6,297 checks), 1,500 alias programs, 12,512 fuzz programs and the 2,029-script cross-check, each fixture in a temporary copy, the repository unchanged |
+| Every mutation path is in the type model | C1 check in `b4b_types.py` against the sources; `static_assert` on the effect table; oracle cases per path (alias, inner, callee, closure, global, thread, reorder, dynamic receiver incl. L1 `union-callable-member`, dynamic key, session push/index/member/closure stores; a write that grows a binding a lambda captured, section 13; a lambda's write to its owner's binding, section 18); mutant A20 (one mutator dropped), A29 (session store paths), A32 (lambda readers), A36 (only lambdas recorded as readers). **B4b 32 (section 19):** a method's *result* identity is part of the model too: `kCollectionResults` (`rt/infer_mutators.h`, `static_assert` on the enum) classifies every CollectionMethod's result (receiver, fresh, stored argument, element, callback, scalar), checked by `b4b_types.py` against the runtime sources; mutant A38 (the receiver-returning results fresh again) |
+| (widened-group repair round, section 17; **general invariant, section 18**) Invalidation | B4b 26 to 29 (section 18): one mechanism for every dependency edge (every fact recorded with the units that read it, every growth re-walks them all, whatever the lexical or call direction), and the fixed-point gate `test-runtime2-b4b-fixpoint` (the production analysis plus the after-convergence check, guard on and off, over `tests/runtime2`, CP25-R, the session fixtures and every generator; any non-fixed point fails, never repaired; **L-1 (section 19.5): the gate is evidence of edge completeness only**: a wrong transfer function settles to a stable wrong fixed point that the gate cannot see (N-1 and U6 pass it), so the semantic tests and generators remain necessary). Before: the 16f24f36 defect (a class opened by a union kept its precise readers; guard-off exit 70) fixed in B4b 22; the invalidation invariant checked directly as a fixed point on every oracle case and fixture (`verify_fixed_point`); 27 `widen` fixtures incl. A -> B -> C transitive merges, both orders, functions, lambdas, globals; mutant A35; audit of every opened-class shortcut (section 14). Re-verified on `0cd6d6ae`: 36 gates, generators, classification (0 changes against `16f24f36`; nothing newly admitted against B4a), run time identical (section 17) |
 | Unknown values cannot reach unchecked dispatch | `kOpenSite`/`agg_unknown_`; C2 (A24), C4 (A23; A28: an inexact callee or any thread/async entry widens every function used as a value); too many known origins read as anything (opened classes, A31). Measured on the final tree: H1 reproducers refused (no exit 70); the four exit-70 fixtures of B4a are refused and the eight lambda-capture ones run checked (sections 6, 13); generators 38,185 programs, 0 exit 70, 0 defects (section 5b); guard-off gate `dispatch_defects` 0 |
 | Session-persistent code cannot keep stale assumptions | Today: coherent recompilation and shape contracts (CP19, mutants 7/8), the guard for aliases; `session_effects` with the full reachability rule (review M1: oracle `session-push-exposed`, `-index-`, `-member-`, `-closure-exposed`, `session-late-store`, `session-store-after-call`; mutants A21 (8 cases), A29 (3 cases)); the reviewer's `rv_b4b_unit.cpp` 40 checks, 0 failures on the tip objects. After B5: **not yet** (U6, section 4): the guard-off gate shows it (`b4b/guardoff/u6_session_alias.in`, listed in `expected_u6.txt`, which B5 must empty; re-checked on the tip: guard-off exit 70 `unexpected operands (compiler defect): built-in trim`, production refused `reference-guard:inflow`) |
-| The wrong-kind generators find no internal failures | On the final tree: `b4b_types.py` generator (1,568), `gen_alias.py` (1,500, guard-off), `gen1.py` pass a (20,274) and pass b (16,000), `gen_struct.py` (1,911): 0 exit 70, signals, tag leaks, internal text or defects; the same admissions and VM output as B4a and `a42035c1` (section 5b). P1 (a pre-existing codegen crash the review found) fixed in B4b 7 and 11 (section 10.1); a 390-program assignment-as-value probe set crashes 117 times on B4a and 0 times on the tip |
+| The wrong-kind generators find no internal failures | **B4b 32 to 35 (section 19.8):** `gen_alias.py` has 9 receiver-returning holders and 3 contexts passing such a result to a function (12,600 programs; the receiver ones: 3,723 bad of 7,140 on `ce0a9a44` guard-off, 0 on the tip). On the final tree: `b4b_types.py` generator (1,568), `gen_alias.py` (1,500, guard-off), `gen1.py` pass a (20,274) and pass b (16,000), `gen_struct.py` (1,911): 0 exit 70, signals, tag leaks, internal text or defects; the same admissions and VM output as B4a and `a42035c1` (section 5b). P1 (a pre-existing codegen crash the review found) fixed in B4b 7 and 11 (section 10.1); a 390-program assignment-as-value probe set crashes 117 times on B4a and 0 times on the tip |
 | Performance stays within the limits | **B4b 28 (section 18):** the work metric counts every reader check; `many` was quadratic in them on `4c9632b8` (61x B4a's W at 3,200 helpers), linear now (2.97x, 2.00x per doubling; the gate fails `4c9632b8`, `16f24f36` and mutant A37); callgrind and wall clock: section 18. **Widened-group round:** compile scaling gated by deterministic analysis-work counts against B4a (section 15: linear on every shape; the 19x and `nestb` pathologies of `a42035c1`/`e293105e` fail it); wall clock guidance 1.06x to 1.54x (section 17; 1.5x is the Linode objective); run time identical (section 17). Final repair round: Run time identical (section 7, re-measured on the final tree). Compile time (section 11, gate `z-compile-scaling`, best of 7 against B4a at 100, 400, 800, 1,600 helpers): `glob` 1.35x/1.31x/1.22x/1.01x, `many` 1.31x/1.34x/1.31x/1.38x, `nestb` 1.48x/1.49x/1.43x/1.38x (close to the bound, section 11), containers 1.22x; no analysis-limit refusal at any size (F1 fixed); before: `many` 19x and refused from 16 helpers, `nestb` 3.4x to 5.9x |
 
 ## 4. Unflagged method-site classes (the B4a section 9 prerequisite)
@@ -188,10 +192,10 @@ in the inference (`infer_types`, `infer_collection`, `infer`, `infer_walk`, `inf
 | Class | Receiver | Answer | Holds after B5 (guard removed)? |
 | --- | --- | --- | --- |
 | U1 | a binding's own value (local, parameter, global, captured cell, module binding) | (a) its kinds are the union of every write to the binding. Parameters: every tracked call; a function whose callers are not all known (a native's callback, any call or thread/async entry whose targets are not exact: review H1) has parameters of anything (C4). The c56c4093-era claim "parameters: every call" was false for `thread(f, ...)` with inexact `f` (exit 70 on the B4b tip `e293105e`; fixed in B4b 8). Captured cells: the claim "one slot" held, but a lambda walked before the slot's last growth was not walked again (exit 70 on B4a and `a42035c1`; fixed in B4b 15, section 13). **Correction (review of `4c9632b8`, H-1):** B4b 15 fixed only the lambda-reader direction; a named function (or a method, or a module function) reading its own local or parameter after a lambda's write that grew in a later walk kept the earlier kinds (exit 70 in production on B4a and `4c9632b8`). Fixed in B4b 26 (section 18): every unit that reads a slot is recorded and re-walked when it grows, and the fixed-point gate checks the claim over the whole corpus and the generators | **Yes**: sharing changes contents, not which value a binding holds |
-| U2 | an element or member read (`xs[i]`, `o.k`, `for` binding, element-returning methods) | (a) per-site contents (B4b) | **Yes**: stores through every alias reach the sites by construction |
+| U2 | an element or member read (`xs[i]`, `o.k`, `for` binding, element-returning methods) | (a) per-site contents (B4b). **Correction (review of `ce0a9a44`, N-1):** "stores through every alias reach the sites" held only for aliases the model knew; the result of `reverse()`, `sort()` and the comparator sort *is* the receiver at run time but was given a new site, so a store through it never reached the receiver's sites (guard-off exit 70; production refused before any effect). Fixed in B4b 32 (section 19): every method's result identity is classified against the run-time contract (`kCollectionResults`), and a receiver-returning result carries the receiver's sites | **Yes, since B4b 32**: stores through every alias the run time creates reach the sites (the aliases of sections 2 and 18 and the receiver-returning results of section 19); the guard-off gate, the 32 `receiver_*` fixtures and the `gen_alias` receiver contexts check it. Not claimed for U6 (sessions) |
 | U3 | a struct field | (a) one slot per field (B3) | **Yes** |
 | U4 | map/set/stack contents | (a) per site (D-NEXT-refsem) | **Yes** |
-| U5 | a call result | (a) via U2 | **Yes** |
+| U5 | a call result | (a) via U2. **Correction (N-1):** a native's result was taken as a new container whenever it was an array or object; for `reverse()` and both sorts it is the receiver (section 19). Function and lambda results are their returns (with their sites), unchanged | **Yes, since B4b 32** (section 19) |
 | U6 | a value of an earlier session statement (session binding) | (a) its recorded structure, kept by CP19's per-binding shape contracts and coherent recompilation; an alias store is refused by the guard | **No**: the contracts are per root binding, so after B5 an alias store in a later statement bypasses them. B5 prerequisite: per-site session contracts, or earlier values' contents read as anything (measured on this tree: the cp19 session suites, refsem and b4 sessions, safety and args-cmd lose admitted cases), or the precondition at this class |
 | U7 | a transferred value (thread/async argument, mutex value, channel receive, awaited result) | (a) copies (D7): sender's sites, or unknown origin | **Yes**: transfers copy in both models |
 
@@ -1176,7 +1180,11 @@ more walk of every unit (each with its own walk serial and dequeue record, exact
 must queue no unit, grow no walk's own inputs (`self_changed_`), create no lambda unit, and change
 no per-node fact the compiler reads (kinds, `elements`, `callable_targets`, `callable_unknown`,
 `struct_ids`, `bindings`, `collection_*`, `nested_aggregates`, `future_holders`). It reports; the
-converged result is kept.
+converged result is kept. **Scope (L-1 of the review of `ce0a9a44`, section 19.5):** a fixed point
+is convergence, not soundness. The gate catches a missing propagation (a reader that saw a stale
+input recomputes on the extra walk); it cannot see a wrong transfer function or an unmodelled
+effect, which converge to a stable wrong fixed point (N-1 and U6 pass it). The semantic tests,
+the guard-off gate and the generators remain necessary.
 
 **Gate builds.** `B4B_FIXPOINT_NIFT` and `B4B_FIXPOINT_OFF_NIFT` (Makefile): the production CLI
 and the guard-off CLI with one object replaced, `infer_session.cpp` compiled with
@@ -1377,3 +1385,264 @@ repository state, `gate3.sh` with `PYTHONDONTWRITEBYTECODE` unset).
 - B5 prerequisites unchanged and widened: U6 (`expected_u6.txt` now has 4 entries); the `trim`
   runtime-kind decision (section 16).
 - B4a has the H-1 exit 70; b4-dispatch.md section 11 records it for the combined certification.
+
+## 19. Receiver-returning methods (B4b 32 to 35; independent review of `ce0a9a44`: REJECT)
+
+Owner ruling 2026-11-06 22:56 (Option A: fix N-1 inside B4b). The review's findings: N-1 (High for
+guard-off soundness and B5; production safe; pre-existing in B4b's allocation-site model), L-1 to
+L-3. The four REJECTs (of `e293105e`, `16f24f36`, `4c9632b8`, `ce0a9a44`) and their evidence stand;
+the dependency model the review judged coherent (section 18) is unchanged; nothing accepted earlier
+was undone. U6 stays a B5 prerequisite (section 18.7), and the `trim` runtime-kind decision stays
+with B5 (section 16).
+
+### 19.1 N-1: root cause
+
+`Inference::call` gave the result of every array method of the CollectionMethod table a new
+allocation site at the call (`fresh(call_id, collection_result(...))`). For `reverse()`, `sort()`
+and the comparator sort the result at run time is the receiver itself (B2 recorded it: "natives
+whose result is the receiver ... identity unchanged; the guard refuses observing them"). Their
+effect on the receiver was modelled (`SiteEffect::Reorder` stores into the receiver's sites); their
+result was not: `ys := xs.reverse(); ys[0] = 5` stored into the call's new site, never into `xs`'s
+class, so `xs`'s element type stayed `string` and a Static `trim` ran on an int on the guard-off
+build (`unexpected operands (compiler defect)`, exit 70; the guard-off fixed-point build exits 70
+too, not 86: a stable wrong fixed point). Production refuses all six before any effect
+(`reference-guard:inflow`/`shared`; the comparator sort `method:sort`). This is a transfer-model
+gap, not a missing dependency edge: no edge could carry a store into a site the result never named.
+
+### 19.2 The operation inventory and the run-time contract
+
+Every method family was classified from the existing inventory (the B1 protocol entries and
+`kCollectionEffects` in `rt/infer_mutators.h`, the CollectionMethod table in `rt/collection.h`, the
+CP14/CP15 natives in `rt/natives/builtin_list.inc`, the D-063 map/set/stack methods in
+`Inference::keyed_result`) and each result checked against the run-time contract: the sources (where
+the result register is written) and an identity probe per method on the guard-off build (reference
+semantics): the probe calls the method, prints `same(receiver, result)` where `same` accepts the
+shapes, mutates the result (a push, an index store) and prints the receiver
+(`scratchpad/b4/r32/identity_probe.py`, 107 probes, results `probes-ce0a/results.json` (`ce0a9a44`) and `probes-tip/results.json` (the tip), each run on
+legacy, guard on and guard off).
+
+| Methods | Result at run time (guard off) | Probe evidence (guard off: mutate the result, print the receiver) | Model (before and after B4b 32) |
+| --- | --- | --- | --- |
+| `reverse()`, `sort()`, comparator `sort(cmp)` | **(a) the receiver itself** (`vm_array_mutation.cpp` `s[Result]=s[Source]`; `collection_plain_sort.cpp` both returns; the comparator sort's codegen loads the receiver into the result) | `same(xs, r)` true; a push through `r` shows in `xs` (also for `[]`) | was a new site at the call (N-1); now **the receiver's sites** (`kCollectionResults` Receiver) |
+| `push(v)`, `insert(i, v)` | (c) the stored argument `v` (an element alias) | a push through `r` shows in `xs[3]` / `xs[0]` | the argument's type and sites (unchanged) |
+| `pop()`, `remove(i)`, `find`, `min_by`, `max_by`, `first()`, `last()`, `min()`, `max()`, `get(k)`, map `get`/`remove`, stack `pop`/`top`/`front` | (c) one of the receiver's elements or members | a push through `r` shows in the element still held (`first`, `last`, `min_by`, `max_by`); the removed element (`pop`, `remove`) is the old one | the element/member type, which carries the element sites (unchanged) |
+| `reduce(f, init)` | (c) a callback return or `init` (an alias of the argument when the callback returns its accumulator) | `same(xs, r)` true with `init = xs` | the callback returns joined with `init` (its sites; unchanged) |
+| `splice(i, k, items)` | (b) a new array of the removed elements | `same(xs, r)` false; the receiver unchanged by a store through `r` | fresh site (unchanged) |
+| `map`, `filter`, `sort_by`, `unique_by`, `slice`, `take`, `drop` (also `take(0)`, `take(10)`, `drop(0)`, `slice(0, n)`), `unique`, `flatten`, `chunk`, `group_by`, `index_by`, `partition`, `count_by`, `group_by_each`, `from_entries`, object `keys`/`values`/`entries`/`merge`/`merge_deep`/`pick`/`omit`, `copy`, `deepcopy`, `split`, `range`, `ls`, `stat` | (b) a fresh array or object (elements or members shared where the method copies references) | `same(xs, r)` false and a push through `r` does not reach `xs` for `map`, `filter`, `sort_by`, `unique_by`, `slice`, `take`, `drop`, `unique`, `flatten`, `copy`, `deepcopy` (and `splice`); the grouping methods' and object methods' results cannot be observed that way on the VM (refused: `same:argument-shape`, a nested push `opaque:legacy-runtime-error`, object stores `index-target`/`member-assign`), so for them the sources decide (`collection_helpers.cpp` builds `make_array`/`make_object`; the object natives build new objects); `pick` `same` false | fresh site, an open (`any`) result, or (`copy`, `deepcopy`, `merge`, `pick`, `omit`) the argument's or receiver's own sites, a sound over-approximation (unchanged) |
+| `validate(schema, v)`, free `min`/`max` of values | (c) an argument (`json_methods.cpp` `out = args[1]`) | `same(xs, r)` true with `v = xs` | the argument itself (unchanged) |
+| map `set(k, v)`, set `add(v)`/`remove(v)`, stack `push(v)` | (c) the stored argument, never the collection | `same(r, m)` false, `same(r, v)` true | the argument (unchanged) |
+| `any`, `all`, `find_index`, `count`, `size`, `length`, `empty`, `indexOf`, `contains`, `has`, `join`, `sum`, `clear` (null), string, number, bytes, file, stream, atomic and mutex methods, `stringify`/`prettify`/`highlight`, `same`, `type`, `is_*` | (c) a non-collection value | | scalar kinds (unchanged) |
+
+**Surprises (none the model got wrong besides N-1):** only `reverse()`, `sort()` and
+the comparator sort return their receiver. Two results alias an *argument*, not the receiver, and
+were already modelled as that argument (its sites): `reduce` (when the callback returns the
+accumulator, the result is `init`, e.g. `xs.reduce((a, e) => a, xs)` is `xs`) and
+`validate(schema, v)` (returns `v`). Map `set`, set `add` and stack `push` return the stored value,
+not the collection. String methods may share the receiver's storage (`out = args[0]` in
+`string_methods.cpp`), which is invisible (strings are immutable). `copy`, `deepcopy`, `merge`,
+`pick` and `omit` are fresh at run time but modelled with their argument's or receiver's sites: an
+over-approximation (their contents are merged with the source's), sound and unchanged.
+**Guard on and guard off differ** only in what is observable: with the guard on every probe that
+lets a receiver-returning result flow into a binding, argument, return or container is refused
+before any effect (`reference-guard:inflow`, `shared`, `argument`), and the comparator sort is
+refused in production on this toolchain (`method:sort`); the fresh and scalar rows run with the
+same output on both builds and legacy.
+
+### 19.3 The fix (B4b 32, B4b 34)
+
+`kCollectionResults` (`rt/infer_mutators.h`, next to `kCollectionEffects`) records each
+CollectionMethod's result identity (Receiver, Fresh, Stored, Element, Callback, Scalar), with a
+`static_assert` against the enum; `tests/runtime2/b4b_types.py` (`mutators`) checks the comments
+list the enum in order and that exactly the methods whose run-time result is the receiver
+(`s[Result]=s[Source]` in `vm_array_mutation.cpp`, `collection_plain_sort.cpp`, the comparator
+sort's codegen) are classified Receiver (checked non-vacuous: reclassifying `Sort` as Fresh fails).
+`Inference::collection_call` (`infer_collection.cpp`; B4b 34 moved it out of `infer.cpp`, which B4b
+32 had taken past rt-lint's 400 lines) gives a Receiver result the method's result type with the
+**receiver's own sites**; every other result keeps the call's allocation site as before. No new
+edge or re-walk: the result names the receiver's site classes, so the existing mechanism (section
+18.2) covers it: a read of the result records its reader on those classes (`materialize`), a store
+through it grows them and queues their readers (`site_store`, `site_changed`), and a union of
+classes moves the readers (`unite_sites`). A receiver without a site (an earlier session
+statement's value, U6) gives a result without one, stored and read exactly like the receiver (a
+store exposes, C5). The result keeps the `collection_array` provenance flag it had (the legacy
+aliasing rule `no_alias` reads it; admission unchanged, 19.9). Production diff against
+`ce0a9a44`: 4 files, +70 -1 (`src/rt`).
+
+### 19.4 Tests and the mutant
+
+- **Fixtures** (`tests/runtime2/b4b/scripts/receiver_*.f`, 32; `b4b/modules/receiver_module`,
+  `receiver_module_export`): the reviewer's six N1 programs (`receiver_n1*.f`) and adversarial
+  aliases: chains through aliases (`reverse()` then `sort()`, a comparator sort of a reverse
+  result; a literal chain `xs.reverse().sort()` is refused before any effect because legacy cannot
+  chain), nested collections (an element array reversed or sorted, a part of a comparator sort's
+  result, an outer element replaced through the result, a derived element site), stores and pushes
+  through the result, the result read back after a store through the receiver, passed to and
+  returned from functions, from a lambda, in a closure, in a global's function, in a loop, held in
+  an object member or array element, reassigned, an empty literal, a module function returning its
+  parameter's reverse and a module's own global sorted through an alias, and controls (`filter`'s
+  fresh result, `reduce`'s and `validate`'s argument aliases, a thread argument, a union receiver
+  refused `method:reverse`). Judged by `b4b_types.py` like every b4b fixture: guard on, refused
+  before any effect or equal to legacy; guard off, never an internal failure. On `ce0a9a44`'s
+  guard-off build 21 of the scripts and both modules exit 70; on the tip none (guard off: the ordinary
+  positioned `trim: unsupported for this value`, or a refusal).
+- **Oracle** (`b4b-types-unit`): 12 `receiver-*` cases (reverse, sort, comparator sort, push,
+  read back, chain, argument, in a function, returned, lambda, nested, global), each also checked
+  as a fixed point; 1,380 checks.
+- **`gen_alias.py`**: holders `rev`, `rev_back`, `sort`, `csort`, `rev_chain`, `rev_inner`,
+  `rev_outer`, `rev_fnret`, `sort_lam` (the second path is a receiver-returning result) and contexts
+  `rev_arg`, `sort_arg`, `csort_arg` (the mutated array reaches a function as such a result), for
+  every array-rooted holder: 12,600 programs (5,460 before), 7,140 of them receiver programs. On
+  `ce0a9a44` guard-off: 3,723 of the 7,140 bad (exit 70); on the tip 0, guard on and off, and 0 on
+  the guard-off fixed-point build.
+- **Mutant A38** (`infer_collection.cpp`, `-DNIFT_B4B_MUTANT=38`): the receiver-returning results
+  get a new site again. The mutant changes the built object (`infer_collection.o` differs;
+  `infer.o` does not use the macro). Caught: oracle 11 failing cases, guard-off suite 23 failures (gate run);
+  the b4b suite (guard on) and the fixed-point gate pass it (the guard refuses the programs; the
+  wrong model is a stable fixed point: L-1).
+
+### 19.5 L-1: fixed-point convergence is not soundness
+
+Corrected in sections 3 and 18.3: the fixed-point gate demonstrates that every dependency edge
+propagates (a unit that read a stale input recomputes on the extra walk, so a missing reader edge
+shows), not that the model is right. A wrong transfer function or an unmodelled effect (N-1, U6)
+converges to a stable wrong fixed point: on `ce0a9a44`'s guard-off fixed-point build the N-1
+programs exit 70, not 86, and mutant A38 passes the gate. Soundness rests on the oracle, the
+semantic fixtures, the guard-off gate and the generators; the gate stays a permanent check of edge
+completeness. (The reviewer's further suggestion, a full-state diff and the session shapes in the
+check, was recommended and not blocking; not done in this round.)
+
+### 19.6 L-2: the provenance-flag exception to monotonicity
+
+`unite(x, x)` returns `x` by identity, also for an open value (`any`) that carries a
+`collection_array`/`collection_object` flag; `unite(y, x)` with `y` below `x` goes through the open
+join (`open_union`), which drops those flags. These are "must" provenance flags (the value is a
+CP14B result container), so dropping one widens; the identity result is the exact join (it is an
+operand). Why it cannot narrow a possible run-time kind or affect dispatch:
+- The shortcut returns an operand itself, so the result covers both operands (soundness holds:
+  the reviewer's harness, re-run on the tip, `sound=0` over 549,081 pairs and 300,000 random
+  triples). The kinds, `any`, sites and callables of `x ⊔ x` are those of `x`; only the open join
+  adds (flags dropped, kinds of its base): it is the conservative side.
+- **The exception is flag-only:** on the realistic flat domain (741 values; every open value with
+  Unknown has every kind, as `any_ty` and `open_union` make them) the harness finds 108
+  monotonicity failures of 347,704 sampled triples; with the two must-flags left out of the order
+  (`IGNORE_MUST=1`, `scratchpad/b4/r32/lattice/`) **0 of 426,338**. Every failing triple differs only
+  in a provenance flag.
+- The flags are read by one consumer only: `UnitCompiler::no_alias` (`compiler_rules.cpp`, through
+  `UnitKinds::collection_arrays`/`collection_objects`, recorded per node by `infer_record.cpp`),
+  legacy's location-reference rule (P8), which can only refuse (`aliasing`) and is compiled out of
+  the guard-off build (`NIFT_RT_REFERENCE_PROBE`). No dispatch admission, Static proof or
+  runtime-kind check reads them (`grep`: no other use outside the inference).
+- Termination and stability: flags only go from set to cleared along a slot (a cleared open value
+  stays cleared: `open_union` returns it), so no oscillation (harness `stable=0`); the fixed-point
+  gate re-verified convergence on the corpus and every generator (section 19.8).
+- **Measured:** a probe build whose join never takes the identity shortcut for a flagged open value
+  (always the open join; `scratchpad/b4/r32/l2/nift-l2`) classifies `tests/runtime2` and CP25-R
+  identically to the tip: 0 changes on the 2,108 scripts and the 589 CP25-R units (outcome, reason, position and reasons list).
+
+Documented here as an exception to monotonicity (no code change): it is not a correctness issue.
+
+### 19.7 L-3: the parser dump
+
+`test-runtime2-b4b-fixpoint` now depends on `.build/rt-parse-dump` (B4b 33): the CP25-R step runs
+the D-018c parser check (`tests/runtime2/vm_sites.py`), which needs it. Demonstrated from a clean
+worktree (`git worktree add --detach` at `11be1944`, no `.build`): `make -j2
+test-runtime2-b4b-fixpoint` builds every prerequisite including `.build/rt-parse-dump` and passes: self-test, 0 non-fixed points and 0 crashes guard on and off over every input set (2,108 scripts, 589 CP25-R units, 14 sessions, every generator), repository unchanged; 28 min 23 s (`scratchpad/b4/r32/l3-clean.log`). The worktree was removed afterwards.
+
+### 19.8 Verification on the final code (B4b 32 to 34)
+
+Code tree `45f51589` (B4b 34, `11be1944`); B4b 35 changes this record only. Result files
+`scratchpad/b4/gates/w-*.result` (driver `gates-w.sh`: `gate2.sh` with the full repository state,
+`gate3.sh` with `PYTHONDONTWRITEBYTECODE` unset). A first run on B4b 33 stopped at
+`w-test-rt-lint` (`infer.cpp` 425 lines > 400); B4b 34 moved the rule, and every gate was run on
+`11be1944`.
+
+- **Gates: 42 result files, all exit 0, every one with the repository unchanged** (ignored files
+  included): the 40 of section 18.8 (A37 as its own gate) plus `w-test-runtime2-b4b-mutants-A38`
+  and `w-compile-scaling`.
+- **Key numbers:** oracle 1,380 checks (1,136 before), 0 failures. `test-runtime2-b4b`: 7,054
+  checks (fixtures 24 run by the VM and equal to legacy, 57 refused before any effect; generator
+  1,568, 74 run). Guard-off gate: b4b `--guardoff` 6,624 checks; `gen_alias` sample 1,500, 632
+  run, 0 bad; fuzz 12,512; cross-check 2,108 scripts, 1,087 admitted by both builds (approved
+  timing exceptions that differed in this run: 4), 0 failures; repository unchanged. Work gate
+  PASS with **the same W counts as section 18.5** (identical log), self-test PASS.
+- **Fixed-point gate:** 0 non-fixed points, 0 crashes, guard on and off: corpus 2,108 scripts (run
+  and classify-all), CP25-R 589 units, 14 sessions, generators 1,568 + **12,600** (`gen_alias`, with
+  the receiver contexts) + 20,274 + 16,000 + 1,911 + 8 shapes.
+- **Mutants:** the b4b suite catches all 20 (A2, A19 to A32, A34 to A38); the fixed-point gate on
+  the b4b fixtures also fails A27 (15 non-fixed points), A32 (19), A35 (13), A36 (11); A38 passes
+  it (L-1) and is caught by the oracle (11 cases) and the guard-off suite. b4, b3, safety,
+  collections and refsem mutant suites pass.
+- **Generators**, guard on and off (`scratchpad/b4/r32/gen`), against `ce0a9a44` (`b4r/gen`, the
+  same programs): `gen1` pass a (20,274; 1,297 / 1,318 run), pass b (16,000; 955 / 964),
+  `gen_struct` (1,911; 867 / 867): 0 bad, **0 admission changes, 0 VM output changes, 0 new
+  differences**. `gen_alias`, all 12,600 programs (with `--legacy`): guard on 27 run, 0 bad,
+  identical to `ce0a9a44`; guard off 5,166 run, 0 bad (`ce0a9a44`: 6,438 run, **3,723 bad**, all of
+  them receiver programs). Against `ce0a9a44` guard off: 0 changes on the 5,460 non-receiver
+  programs; on the receiver programs 2,619 now give the ordinary error where `ce0a9a44` exited 70,
+  and 1,272 are refused (`builtin-receiver:trim` 840, `collection-element:sort` 432: the element
+  may now be what the store put there), 1,104 of them exit 70 on `ce0a9a44`; the other 168 are
+  thread contexts (a transfer copies, D7, and the sender's sites over-approximate it): sound
+  guard-off narrowing; none newly admitted.
+- **Reproducers of all four B4b reviews** (163: the reviewer's list of 127 earlier ones and the 36
+  of `review-b4b-r4/repro`: 33 scripts and 3 modules), each on legacy, guard on, guard off, and both fixed-point builds:
+  0 production failures, 0 non-fixed points; the only internal failures are the four recorded
+  guard-off U6 sessions (`s3`, `s3b`, `s3d`, `U6_session_alias`), as in 18.8; the six N1 programs
+  give the ordinary positioned error guard off (`trim: unsupported for this value`) and are
+  refused guard on; the reviewer's other r4 programs (`g*`, `e*`, `f*`, modules) behave as the
+  review recorded (no internal failure on any build).
+- **Identity probes on the tip:** identical to `ce0a9a44`'s (107 of 107; the fix changes the
+  analysis, not the run time).
+- **No guard-off program reaches unchecked dispatch:** 0 newly admitted programs against every
+  baseline (19.9); `dispatch_defects` 0 and no exit 70 outside the recorded U6 list in the guard-off
+  gate, the fixtures, the reproducers and every generator.
+
+### 19.9 Classification
+
+`NIFT_VM=classify` over the tip's `tests/runtime2` (2,108 scripts, every binary on the same
+corpus) and CP25-R `classify-all` (589 units), tools of the earlier rounds
+(`scratchpad/b4/r32/cls`). **0 programs newly admitted against B4a, `4c9632b8` and `ce0a9a44`.**
+
+- Against `ce0a9a44` (`b4r/nift-final`, byte-identical to a rebuild of `ce0a9a44`'s `infer.cpp`):
+  CP25-R 0 changes; `tests/runtime2` 1 change, in a new fixture refused by both:
+  `receiver_nested_outer_store.f` (first reason `reference-guard:inflow` 3:7, now `type:index`
+  5:22: `r[0]` on an element that may now be the stored int).
+- Against `4c9632b8`: that one and the `nift-limits.f` reason of 18.8. Against B4a: those and the
+  recorded differences of 18.8 (the three `glob` admission differences; `escape_export`,
+  `call_unknown_callee`, `thread_unknown_callee`, `thread_unknown_callee_returned` compiled by B4a
+  with a dispatch that exits 70, refused now; `push_alias_struct.f`'s reason; CP25-R the one
+  reasons-list entry).
+- The L-2 probe build: 0 changes on both.
+
+### 19.10 Performance
+
+- **Analysis work:** the work gate's W identical to section 18.5 (no shape calls a receiver-returning
+  method). **Callgrind, analysis only** (`b4b-work`, tip / B4a; `ce0a9a44` in brackets):
+  `many` 1.56x (1.56x), 1.65x, 1.67x, 1.68x, 1.68x (1.67x), 1.66x at 6,400; `glob` 1.61x, 1.75x,
+  1.75x, 1.72x, 1.63x; `nestb` 1.51x, 1.48x (1.47x), 1.40x, 1.37x, 1.31x; `containers` 1.25x, 1.24x,
+  1.21x, 1.23x, 1.24x. Tip / `ce0a9a44`: 1.0000 to 1.0006 on every point.
+- **Compile scaling gate** (`w-compile-scaling`, median of 7 against B4a; guidance): `glob`
+  1.31x/1.32x/1.16x/1.01x, `many` 1.32x/1.31x/1.27x/1.25x, `nestb` 1.61x/1.45x/1.42x/1.41x,
+  containers 1.24x/1.31x/1.22x/1.26x; no analysis-limit refusal.
+- **Wall clock, whole compile** (guidance only; `compile_us`, median of 5 interleaved with B4a, 3
+  at 3,200 and 6,400; local 2-core machine): `many` 1.35x, 1.33x, 1.14x, 1.17x, 1.25x, 1.25x (6,400); `glob` 1.42x, 1.36x, 1.13x,
+  1.07x, 0.88x; `containers` 1.28x, 1.26x, 1.02x, 1.42x, 1.17x; `nestb` 1.56x, 1.50x, 1.44x, 1.33x,
+  1.48x (100 to 3,200 helpers). Within the run-to-run noise of section 18.5's figures (the analysis
+  instructions are unchanged, above); `nestb` stays the pre-existing shape near the bound. A first
+  run made while the clean-worktree build of 19.7 was compiling is discarded
+  (`scratchpad/b4/r32/wall-contended.txt`)
+- **Run time** (callgrind instructions per iteration, the B4a built-in set): 1074, 903, 1187, 870,
+  2844, identical to B4a (re-measured on both); mutation group identical to the previous round
+  (array set 381, push/pop 1,430, insert/pop 2,446, map set 1,496, set add 1,363, stack push/pop
+  2,190).
+
+### 19.11 For the owner and B5
+
+- N-1 is fixed in B4b (Option A); not a B5 prerequisite. B5 prerequisites unchanged: U6
+  (`expected_u6.txt`, 4 entries; the receiver-returning result of an earlier session statement's
+  value is siteless like the value, so it stays in that class) and the `trim` runtime-kind decision
+  (section 16).
+- Guard-off admission narrows on receiver programs (19.8: 1,272 `gen_alias` programs refused
+  guard-off, 168 of them thread-copy over-approximations); production admission is unchanged.
+- `nestb` wall clock remains the pre-existing case near 1.5x, decided by the Linode measurement.
+- L-1's optional full-state diff in the fixed-point check was not implemented (recommended, not
+  blocking).
