@@ -211,15 +211,23 @@ HOLDERS = {
 }
 
 
-def generator(nift, work, quick):
-    stats = {"programs": 0, "vm": 0}
+def generator_sources(quick):
+    """The wrong-kind generator's programs, (label, source) (also compiled by the fixed-point gate)."""
+    out = []
     for (h, (store, read)), (ok, o), (sk, s), obs in itertools.product(HOLDERS.items(), ORIGINAL.items(),
                                                                        STORED.items(), OBSERVE):
         if quick and (sk not in ("map", "int", "struct") or ok not in ("struct", "string")):
             continue
         src = STRUCT + store.replace("O", o).replace("S", s) + 'print("before")\n' + obs.replace("V", read) + "\n"
+        out.append(("generator %s %s->%s %s" % (h, ok, sk, obs), src))
+    return out
+
+
+def generator(nift, work, quick):
+    stats = {"programs": 0, "vm": 0}
+    for label, src in generator_sources(quick):
         stats["programs"] += 1
-        if judge("generator %s %s->%s %s" % (h, ok, sk, obs), nift, {"main.f": src}, work) == "vm":
+        if judge(label, nift, {"main.f": src}, work) == "vm":
             stats["vm"] += 1
     return stats
 

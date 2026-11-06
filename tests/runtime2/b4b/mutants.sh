@@ -3,7 +3,9 @@
 # mutant rebuilds the translation units holding its deliberate defect
 # (-DNIFT_B4B_MUTANT=n), links them into the inference oracle
 # (b4b-types-unit), the analysis-work harness (b4b-work) and nift; the oracle, the work
-# gate or the b4b suite must FAIL.
+# gate or the b4b suite must FAIL. B4b 27: with B4B_FIXPOINT_OBJECT (the Makefile's), each
+# mutant's CLI is also linked as a fixed-point build and the fixed-point gate runs on the b4b
+# fixtures (tests/runtime2/b4b, guard on): its result is reported for every mutant.
 #   mutants.sh <nift> [n ...]   (default: every mutant)
 set -u
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
@@ -30,14 +32,17 @@ declare -A FILES=(
   [32]="src/rt/infer_bindings.cpp"                              # A32: a lambda keeps a captured binding's kinds read before it grew (U1)
   [34]="src/rt/codegen.cpp"                                     # A34: FunctionBuilder::emit's operand invariant removed (P1)
   [35]="src/rt/infer_sites.cpp"                                 # A35: a class a union opens skips its earlier readers (review of 16f24f36)
+  [36]="src/rt/infer_bindings.cpp"                              # A36: only lambdas recorded as slot readers (4c9632b8: the owner of a lambda's write keeps a stale kind)
+  [37]="src/rt/infer.cpp"                                       # A37: every notification scans its whole reader list (4c9632b8: quadratic on `many`)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32 34 35)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32 34 35 36 37)
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"
 objects=${B4B_OBJECTS:?the Makefile passes the CLI objects}
 unit_objects=${B4B_UNIT_OBJECTS:?the Makefile passes the unit objects}
 guardoff_objects=${B4B_GUARDOFF_OBJECTS:-}  # the guard-off CLI's objects (review L4: end to end)
+fixpoint_object=${B4B_FIXPOINT_OBJECT:-}    # B4b 27: the fixed-point build's inference entry
 fail=0
 for n in "${list[@]}"; do
   replaced=(); built=()
@@ -68,12 +73,20 @@ for n in "${list[@]}"; do
       python3 tests/runtime2/b4b/gen_alias.py --nift "$OUT/guardoff-$n" --sample 600 --seed 1; } > "$OUT/g$n.log" 2>&1 \
       && guard=passed || guard=failed
   fi
-  if [ $unit -eq 0 ] && [ $suite -eq 0 ] && [ $workgate -eq 0 ] && [ "$guard" != failed ]; then
+  fixpoint="-"
+  if [ -n "$fixpoint_object" ]; then
+    flink=$(filter "$(printf '%s\n' $objects | grep -v '\.a$' | grep -vx src/rt/infer_session.o)")
+    $CXX $CXXFLAGS $flink "${built[@]}" "$fixpoint_object" -ldl $libs -o "$OUT/fixpoint-$n" \
+      || { echo "mutant A$n: fixed-point link failed"; exit 2; }
+    python3 tests/runtime2/b4b/fixpoint.py --nift "$OUT/fixpoint-$n" --corpus-only b4b > "$OUT/f$n.log" 2>&1 \
+      && fixpoint=passed || fixpoint=failed
+  fi
+  if [ $unit -eq 0 ] && [ $suite -eq 0 ] && [ $workgate -eq 0 ] && [ "$guard" != failed ] && [ "$fixpoint" != failed ]; then
     echo "mutant A$n (${FILES[$n]}): SURVIVED"; fail=1
   else
-    echo "mutant A$n (${FILES[$n]}): caught (oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases; suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks; work gate $(grep -c '^FAIL ' "$OUT/w$n.log") failures; guard-off $guard)"
+    echo "mutant A$n (${FILES[$n]}): caught (oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases; suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks; work gate $(grep -c '^FAIL ' "$OUT/w$n.log") failures; guard-off $guard; fixed-point gate $fixpoint$([ "$fixpoint" = failed ] && echo " ($(grep -c '^FAIL non-fixed' "$OUT/f$n.log") non-fixed points)"))"
   fi
-  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n" "$OUT/work-$n"
+  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n" "$OUT/work-$n" "$OUT/fixpoint-$n"
 done
 [ $fail -eq 0 ] && echo "PASS b4b mutants: ${#list[@]} caught" || echo "FAIL b4b mutants"
 exit $fail

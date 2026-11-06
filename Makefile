@@ -968,14 +968,22 @@ $(RT_B4B_WORK): tests/rt/b4b_work.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/b4b_work.cpp $(RT_UNIT_OBJECTS) -o "$@"
 .PHONY: test-runtime2-b4b-work
+test-runtime2-b4b-work: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b4b-work: $(RT_B4B_WORK)
+	$(PYTHON) tests/runtime2/repo_state.py save "$(TEST_DIR)/rt/b4b-work-repo-state.txt"
 	$(PYTHON) tests/runtime2/b4b/work.py --self-test
 	$(PYTHON) tests/runtime2/b4b/work.py --harness "$(CURDIR)/$(RT_B4B_WORK)"
+	$(PYTHON) tests/runtime2/repo_state.py check "$(TEST_DIR)/rt/b4b-work-repo-state.txt"
 .PHONY: test-runtime2-b4b test-runtime2-b4b-mutants
+# Review of 4c9632b8 (L-2): no bytecode is written into the source tree (b4b_types is imported by
+# work.py); the targets check that they leave the repository unchanged, as the guard-off gate does.
+test-runtime2-b4b: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES) $(RT_B4B_WORK)
+	$(PYTHON) tests/runtime2/repo_state.py save "$(TEST_DIR)/rt/b4b-repo-state.txt"
 	"$(RT_B4B_TYPES)"
 	$(PYTHON) tests/runtime2/b4b/work.py --harness "$(CURDIR)/$(RT_B4B_WORK)"
 	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/repo_state.py check "$(TEST_DIR)/rt/b4b-repo-state.txt"
 # B4b review (L4): the standing guard-off gate. The CLI linked with the B2
 # reference-probe compiler objects (-DNIFT_RT_REFERENCE_PROBE: no Phase A guard,
 # no `aliasing` refusal; arrays and objects shared), a TEST configuration that
@@ -1028,8 +1036,40 @@ test-runtime2-guardoff-sanitize: $(B4B_GUARDOFF_SAN_NIFT) $(TARGET)
 		--nift "$(CURDIR)/$(TARGET)" --dirs b4 b4b b3 refsem --twice 0
 	$(PYTHON) tests/runtime2/repo_state.py check "$(B4B_GUARDOFF_STATE)"
 test-rt-vm-sanitize: test-runtime2-guardoff-sanitize
-test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS) $(RT_REFREP_PROBE_OBJECTS)
+# B4b 27 (review of 4c9632b8, L-1): the fixed-point gate. The CLI (guard on) and the guard-off
+# CLI, each with the kind inference's entry compiled with -DNIFT_B4B_FIXPOINT_GATE (a TEST
+# configuration that never ships): every compile runs the production analysis to convergence,
+# then the after-convergence check (Inference::check_fixed_point: one more walk of every unit
+# must grow no analysis state and change no per-node fact); a non-fixed point fails the compile
+# (`B4B-FIXPOINT:`, exit 86), never repaired. tests/runtime2/b4b/fixpoint.py runs both over the
+# tests/runtime2 corpus, CP25-R, the session fixtures and the wrong-kind and alias generators.
+B4B_FIXPOINT_DIR := $(TEST_DIR)/b4b-fixpoint
+B4B_FIXPOINT_OBJ := $(B4B_FIXPOINT_DIR)/infer_session.o
+B4B_FIXPOINT_NIFT := $(B4B_FIXPOINT_DIR)/nift-fixpoint$(EXEEXT)
+B4B_FIXPOINT_OFF_NIFT := $(B4B_FIXPOINT_DIR)/nift-fixpoint-guardoff$(EXEEXT)
+$(B4B_FIXPOINT_OBJ): src/rt/infer_session.cpp $(wildcard src/rt/infer*.h) $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_B4B_FIXPOINT_GATE -c $< -o $@
+$(B4B_FIXPOINT_NIFT): $(CLI_OBJECTS) $(B4B_FIXPOINT_OBJ) $(LIBFFI_A)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(filter-out src/rt/infer_session.o,$(CLI_OBJECTS)) $(B4B_FIXPOINT_OBJ) \
+		$(LDFLAGS) $(LDLIBS) $(LIBFFI_A) -o $@
+$(B4B_FIXPOINT_OFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(B4B_FIXPOINT_OBJ) $(LIBFFI_A)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o) src/rt/infer_session.o,$(CLI_OBJECTS)) \
+		$(RT_REFREP_PROBE_OBJECTS) $(B4B_FIXPOINT_OBJ) $(LDFLAGS) $(LDLIBS) $(LIBFFI_A) -o $@
+.PHONY: test-runtime2-b4b-fixpoint
+test-runtime2-b4b-fixpoint: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b4b-fixpoint: $(B4B_FIXPOINT_NIFT) $(B4B_FIXPOINT_OFF_NIFT)
+	$(PYTHON) tests/runtime2/repo_state.py save "$(B4B_FIXPOINT_DIR)/repo-state.txt"
+	$(PYTHON) tests/runtime2/b4b/fixpoint.py --self-test --nift "$(CURDIR)/$(B4B_FIXPOINT_NIFT)"
+	$(PYTHON) tests/runtime2/b4b/fixpoint.py --nift "$(CURDIR)/$(B4B_FIXPOINT_NIFT)" \
+		--guardoff "$(CURDIR)/$(B4B_FIXPOINT_OFF_NIFT)"
+	$(PYTHON) tests/runtime2/repo_state.py check "$(B4B_FIXPOINT_DIR)/repo-state.txt"
+test-runtime2-b4b-mutants: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(B4B_FIXPOINT_OBJ)
 	B4B_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" B4B_UNIT_OBJECTS="$(RT_UNIT_OBJECTS) $(LDLIBS)" \
+		B4B_FIXPOINT_OBJECT="$(B4B_FIXPOINT_OBJ)" \
 		B4B_GUARDOFF_OBJECTS="$(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)" \
 		bash tests/runtime2/b4b/mutants.sh "$(CURDIR)/$(TARGET)"
 
