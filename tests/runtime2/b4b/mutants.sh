@@ -33,7 +33,7 @@ declare -A FILES=(
   [34]="src/rt/codegen.cpp"                                     # A34: FunctionBuilder::emit's operand invariant removed (P1)
   [35]="src/rt/infer_sites.cpp"                                 # A35: a class a union opens skips its earlier readers (review of 16f24f36)
   [36]="src/rt/infer_bindings.cpp"                              # A36: only lambdas recorded as slot readers (4c9632b8: the owner of a lambda's write keeps a stale kind)
-  [37]="src/rt/infer.cpp"                                       # A37: every notification scans its whole reader list (4c9632b8: quadratic on `many`)
+  [37]="src/rt/infer_notify.cpp"                                # A37: every notification scans its whole reader list (4c9632b8: quadratic on `many`)
 )
 list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32 34 35 36 37)
 CXX=${CXX:-g++}
