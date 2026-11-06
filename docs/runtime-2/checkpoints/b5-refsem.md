@@ -115,9 +115,15 @@ previously admitted, behaviour changed without an approved rule: 1 row, E-U6-1 (
 Approved differences are pinned exactly: `.r2.stdout/.stderr/.exit` goldens with
 `approved=<rule>` (for-s2, closures-s1, vm-corpus/cp11), `B5_APPROVED` (capture_origins),
 `APPROVED` (cp14b functional); each check also requires the pinned result to differ from legacy.
-The capture_origins "D5 ordinary binding" sub-family (a closure sees a later assignment to the
-loop variable: legacy 1, VM 7; `descriptor_write_calls` 2 2 against 2 3) follows the section 3
-Iteration row ("the loop binding is an ordinary binding"), not a Q3 example row: reviewer focus.
+**PENDING-OWNER (owner guidance 2026-11-07 06:47):** the capture_origins "D5 ordinary binding"
+sub-family is NOT a snapshot effect. Witness with no source mutation:
+`f:=()=>0; a:=[1]; for(x:a){f = ()=>x; x=7}; print(f())` gives legacy 1, B4b tip 1, B5 7. Cause:
+B5 2 set `ForState::live = false`, which disabled the lazy loop binding and its selector
+descriptor (through which a closure captured the loop variable as a source location that
+rebinding did not reach); B5 4 deleted that code. The new behaviour (a closure shares the loop
+binding, as for any captured local) is a capture-model change awaiting the owner's decision; its
+expected-changes row is PENDING-OWNER, not accepted. (The live-reads and element-mutation
+sub-families are snapshot/shared-reference effects.)
 
 ## 7. Mutants
 
@@ -200,6 +206,25 @@ STOP.**
   not on the receiver's family: B4a's table and precondition check the receiver only. That is a
   second mechanism; the owner's rule says stop. In the generated programs the sort runs before
   the tagged store, so each would print legacy-differing results only through Q3 sharing.
+
+**Comparator sort, owner guidance 2026-11-07 06:47 (item 1).** There is no compiler, stdlib or
+run-time failure. Facts: host GCC `g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0`, libstdc++
+`__GLIBCXX__ == 20240904`; production flags `-std=c++17 -O2 -Wall -Wextra -pedantic -pthread`, no
+`_GLIBCXX_*` macros. `src/rt/compiler_collection_sort.cpp` line 8:
+`#if (!defined(__GLIBCXX__) || __GLIBCXX__ != 20260321) && !defined(NIFT_RT_REFERENCE_PROBE)`
+`return fail(node,"method:sort");`. So production refuses `sort(comparator)` before any effect
+(`not compiled for the VM (method:sort)`), identically on the B4b tip 17f7964c's production
+binary (`cand-b4/nift`, same probe). Class: a deliberate toolchain-profile gate (owner decision
+2026-10-25, CP14B D4: the comparator's observable call schedule was frozen against GCC 15.2's
+libstdc++), not a build-flag issue, not B5's copy-sort-commit, not a harness defect. It is a
+portability limitation on every non-frozen toolchain (with the VM default and no fallback, such
+programs do not run); on the GCC 15.2/20260321 certification instance production admits it.
+B5's comparator-sort evidence locally is the probe build only (`NIFT_RT_REFERENCE_PROBE`), which
+is not production evidence: production comparator sort is exercised only on the certification
+instance. Not blocking as a wrong result; needs the owner's portability ruling.
+On item 2 (the 452 sort cases): they are not admitted (sort part STOP above), so no dynamic sort
+path exists to test; the guarantees list is the acceptance criterion for that part if the owner
+authorises the element-kind check.
 
 **Comparator sort on this host (owner question 5).** Not a `_GLIBCXX` assertion and not a
 strict-weak-ordering check: a Nift-side compile-time gate (owner decision 2026-10-25, CP14B D4):

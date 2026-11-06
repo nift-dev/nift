@@ -4808,6 +4808,13 @@ test-runtime2-for-s2-mutants: $(TARGET)
 test-rt-vm: test-runtime2-for-s2 test-runtime2-for-s2-mutants
 test-runtime2-for-s2-bench: $(TARGET)
 	python3 tests/runtime2/for_s2_bench.py --nift "$(CURDIR)/$(TARGET)"
+# B5 (owner 2026-11-07 06:47): the permanent snapshot-memory regression gate. for-s2 g9_million and
+# g9_million_write iterate a 1M-element array under NIFT_VM_HEAP_BUDGET=40000000: the array plus its
+# entry snapshot (32.8 MB peak) fit, a second copy or the old 2.25x reservation does not.
+.PHONY: test-runtime2-b5-snapshot-memory
+test-runtime2-b5-snapshot-memory: $(TARGET)
+	python3 tests/runtime2/for_s2.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-b5-snapshot-memory
 .PHONY: test-runtime2-for-s2-known-deps
 test-runtime2-for-s2-known-deps: $(TARGET)
 	python3 tests/runtime2/for_s2_known_deps.py --nift "$(CURDIR)/$(TARGET)"
