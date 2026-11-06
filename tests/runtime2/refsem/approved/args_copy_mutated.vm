@@ -1,0 +1,4 @@
+before
+--- stderr
+error: args_copy_mutated.f:8:1: cannot mutate const array: a
+--- exit 1

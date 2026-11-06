@@ -84,9 +84,15 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
         state.place = &state.source_holder;
     }
     if (iterable.kind == NodeKind::Ident && !snapshot) state.source_name = text(iterable);
-    state.live = !state.error_only && state.place != nullptr;
+    // B5 (D5; plan §3 Iteration, §8 Q3 rows 5-6; B2 coordinator ruling 1): a loop over a binding
+    // iterates the shallow snapshot taken at entry, as a loop over an expression result does (the
+    // held value, IterCheck c = 1): the length is invariant, the elements are the original
+    // references, and the body's mutations change the container, not the active iteration. The
+    // live re-read path (legacy's model: live element reads, lazy element locations) is unused.
 #if defined(NIFT_FOR_MUTANT) && NIFT_FOR_MUTANT == 1
-    state.snapshot_mutant = state.live;  // M1: a snapshot instead of live re-reads
+    state.live = !state.error_only && state.place != nullptr;  // M1 (B5): live re-reads again
+#else
+    state.live = false;
 #endif
 
     if (!state.error_only) {

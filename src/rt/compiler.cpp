@@ -5,7 +5,6 @@
 #include "rt/session_shape.h"
 
 #include "rt/compiler_coro.h"
-#include "rt/reference_guard.h"
 #include "rt/compiler_coro_admit.h"
 #include "rt/compiler_handles.h"
 
@@ -224,7 +223,6 @@ bool UnitCompiler::return_statement(const Node& node) {
         (session_ ? nested : ((kinds(node.a) & kKindTagged) || kinds_.collection_holders.count(node.a))))
         return fail(ast_.at(node.a), session_ ? "session:collection-result" : "eval:collection-result");
 #endif
-    if ((!expression_result_ || in_function_) && !no_alias(node.a, node)) return false;
     if (!in_function_ && !expression_result_ &&
         !kinds_within(node.a, kKindScalar, node, "type:script-return")) return false;
     // Other expression errors retain D-009#5 / D-018 attribution. Missing
@@ -333,18 +331,6 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
                 result.offset = probe.offset(); result.positioned = probe.positioned();
             }
         }
-        return result;
-    }
-    // D-NEXT-refsem: the Phase A forward-compatibility guard (reference_guard.h),
-    // on a unit the compiler otherwise admits (earlier refusals keep their reason).
-#if defined(NIFT_RT_REFERENCE_PROBE)  // B2 test configuration only (rt/reference_probe.h)
-    if (false &&
-#else
-    if (
-#endif
-        !check_reference_guard(ast, root, plan, kinds, limits.session != nullptr, result.reason, result.offset,
-                               limits.session ? &limits.session->capture_initializers : nullptr)) {
-        result.positioned = true;
         return result;
     }
     if (plan.coroutines) {  // CP22: the scheduler, and the post-compile coroutine checks

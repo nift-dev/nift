@@ -257,7 +257,6 @@ bool UnitCompiler::array_literal(const Node& node, std::uint16_t dst) {
     const auto scratch = fb_->top();
     for (std::uint32_t k = 0; k < node.count; ++k) {
         if (ast_.at(items[k]).kind == NodeKind::Spread) return fail(ast_.at(items[k]), "spread");
-        if (!no_alias(items[k], ast_.at(items[k]))) return false;
 #if defined(NIFT_SESSION_ADMISSION_MUTANT) && NIFT_SESSION_ADMISSION_MUTANT == 22
         // M22: a gap in the payload; the former reserve-only defect is masked
         // by CP22's accepted Ident scratch release and is not a detection.
@@ -342,7 +341,6 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
             if (s == key.id) return fail(prop, "object-duplicate-key");
         seen.push_back(key.id);
         std::uint16_t value = 0;
-        if (!no_alias(prop.b, prop)) return false;
         if (!expr_any(prop.b, value)) return false;
         fb_->set_offset(prop.begin);
         fb_->emit(OpCode::ObjectSet, object, static_cast<std::uint16_t>(key.id), value);

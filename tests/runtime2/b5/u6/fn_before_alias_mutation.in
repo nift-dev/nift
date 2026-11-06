@@ -1,0 +1,6 @@
+xs := [" x "]
+fn(rd()) { return xs[0].trim() }
+ys := xs
+ys[0] = 5
+print(rd())
+print("end")

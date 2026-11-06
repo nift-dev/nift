@@ -55,16 +55,13 @@ cases=[
 # conservative) refuses these before the statement runs: each mutates a session
 # array through a loop binding, aliases one (`old:=a`), or passes a session
 # function by name as a native's callback over one; earlier statements ran.
-GUARDED={
- 'nested-kind-widening':'reference-guard:shared-part',
- 'capture-nested-kind-widening':'reference-guard:lent',
- 'widened-callable-bound':'reference-guard:shared-part',
- 'replacement-loop-capture':'reference-guard:lent',
- 'wrapper-lexical-shadow':'reference-guard:lent',
- 'nested-loop-mutation':'reference-guard:shared-part',
- 'nested-loop-snapshot':'reference-guard:inflow',
- 'quoted-named-callback':'reference-guard:shared-part',
-}
+# B5 (D-NEXT-refsem-b, b5-refsem.md section 6): the guard is gone; every former GUARDED case
+# runs (see VM_B5 below for the ones whose output is an approved difference).
+GUARDED={}
+# B5: former GUARDED cases now refused for another, earlier-existing reason (before any effect).
+B5_REFUSED={'widened-callable-bound':'type:index'}
+# B5 approved differences (owner Q2: `const` is binding-only): the VM's channels; legacy errors.
+B5_VM={'const-captured-kind':(0,'ONCE\nnullbad\n','')}
 for name,source,units in cases:
  with tempfile.TemporaryDirectory(prefix='cp19-callable-') as td:
   root=Path(td);baseline=None;errors=1 if name in ('const-captured-kind','named-order-pre-error','widened-native-argument-error') else 0
@@ -78,16 +75,19 @@ for name,source,units in cases:
    channels=(r.returncode,r.stdout,r.stderr)
    if baseline is None:
     baseline=channels;assert r.returncode==0 and bool(r.stderr)==bool(errors),record;continue
-   if name in GUARDED:
-    reason=GUARDED[name]
+   if name in GUARDED or name in B5_REFUSED:
+    reason=GUARDED.get(name) or B5_REFUSED[name]
     assert r.returncode==1 and ('NIFT_VM session refused: %s:'%reason) in r.stderr,record
     assert rows and rows[-1]['reason']==reason and rows[-1]['vm_executions']==0 and rows[-1]['legacy_executions']==0,record
     assert all(x['vm_executions']==1 and x['legacy_executions']==0 for x in rows[:-1]),record
     continue
+   if name in B5_VM:
+    assert channels==B5_VM[name] and baseline!=channels,record
+    continue
    if name=='nested-loop-snapshot':
-    # D-040 ordinary values copy on write; legacy's outer alias is deliberately different.
+    # B5 (D-NEXT-refsem-b): the D-040 copy-on-write witness is legacy-equal now (shared rows).
     assert baseline==(0,'[[1,2],[2,2]]\n[[1,2],[2,2]]\n',''),baseline
-    assert channels==(0,'[[1,2],[2,2]]\n[[1],[2]]\n',''),record
+    assert channels==baseline,record
    else:
     assert channels==baseline, (baseline,record)
    assert len(rows)==units and all(x['outcome'] in ('vm','vm-error') and x['vm_executions']==1 and x['legacy_executions']==0 for x in rows),record

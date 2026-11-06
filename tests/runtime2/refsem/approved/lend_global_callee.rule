@@ -1,0 +1,2 @@
+§3 Call arguments: parameters share the caller's object (Q3 row 1: callee mutation visible)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:lent)

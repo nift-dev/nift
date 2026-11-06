@@ -1,0 +1,9 @@
+struct(C) { v := " x " }
+c := C()
+keep := [c]
+struct(C) { v := 5 }
+d := C()
+keep.push(d)
+print(keep[0].v.trim())
+print(keep[1].v + 1)
+print("end")

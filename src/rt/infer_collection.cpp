@@ -7,16 +7,11 @@
 namespace nift::rt::infer_detail {
 namespace {
 TyRef array_type(const TyRef& elem){auto t=std::make_shared<Ty>();t->kinds=kKindArray;
-    t->collection_array=true;t->elem=elem;
+    t->elem=elem;
     t->tuple=elem&&elem->kinds==0&&!elem->any;return t;}
-TyRef collection_value(const TyRef& value){
-    if(!(value->kinds&kKindAggregate))return value;
-    auto t=std::make_shared<Ty>(*value);
-    t->collection_array=(t->kinds&kKindArray)!=0;t->collection_object=(t->kinds&kKindObject)!=0;
-    return t;
-}
+TyRef collection_value(const TyRef& value){return value;}
 TyRef object_type(const TyRef& elem){auto t=std::make_shared<Ty>();t->kinds=kKindObject;
-    t->collection_object=true;t->elem=elem;return t;}
+    t->elem=elem;return t;}
 }
 TyRef Inference::collection_callables(const TyRef& callee,const std::vector<TyRef>& values,bool& grew) {
     std::vector<TyRef> arguments;arguments.reserve(values.size());
@@ -143,7 +138,7 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
         case M::Find:return collection_value(unite(element,kinds_ty(kKindNull)));
         case M::FindIndex:case M::Count:return kinds_ty(kKindInt);
         case M::MinBy:case M::MaxBy:return collection_value(element);
-        case M::Partition:{auto t=std::make_shared<Ty>();t->kinds=kKindObject;t->collection_object=true;
+        case M::Partition:{auto t=std::make_shared<Ty>();t->kinds=kKindObject;
             t->fields["matched"]=array_type(element);t->fields["unmatched"]=array_type(element);return t;}
         case M::IndexBy:return object_type(element);
         case M::CountBy:return object_type(kinds_ty(kKindInt));

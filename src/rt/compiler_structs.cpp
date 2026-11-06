@@ -96,7 +96,6 @@ bool UnitCompiler::struct_member(const Node& node, int s, bool is_this, std::uin
 
 // `x = e` / `this.x = e` / `p.x = e`.
 bool UnitCompiler::field_assign(const Node& node, NodeId receiver, const StructFieldInfo& field) {
-    if (!no_alias(node.b, node)) return false;
     std::uint16_t value = 0, type = 0, slot = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
     if (!fb_->constant(Value::integer(field.type), type)) return builder_ok();

@@ -1,0 +1,6 @@
+xs := [" x "]
+ys := xs
+fn(st(a)) { a[0] = 5; return 0 }
+st(ys)
+print(xs[0].trim())
+print("end")

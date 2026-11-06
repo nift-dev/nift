@@ -89,7 +89,10 @@ def main():
         with open(path, "w") as f:
             f.write(SPLICE_SELF)
         p = subprocess.run([nift, path], text=True, cwd=work, env=env, capture_output=True, timeout=60)
-        check(p.returncode != 0 and p.stdout == "" and "reference-guard:shared" in p.stderr,
+        # B5 (b5-refsem.md section 6): admitted; every splice argument is evaluated before the one
+        # commit (D-NEXT-refsem #4 ruling, B2 self-splice), so the replacement is the entry value:
+        # [1,1,2,3,3]. Legacy removes first ([1,1,3,3]): the approved splice-order difference.
+        check(p.returncode == 0 and p.stdout == "[1,1,2,3,3]\n" and p.stderr == "",
               "splice-self: %d %r %r" % (p.returncode, p.stdout, p.stderr[:200]))
 
         path = os.path.join(work, "linear.f")

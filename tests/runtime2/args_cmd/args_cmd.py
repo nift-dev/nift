@@ -222,8 +222,9 @@ def suite(root):
     vm, _ = run([NIFT, "-i", "-e", INLINE, "a"], work, None, home, SESSION_INPUT)
     check(legacy.returncode == 0 and legacy.stdout == "<command-line>\n1\n<a>\n<command-line>\n1\na\n",
           "-i -e, piped session: legacy output kept", repr((legacy.returncode, legacy.stdout)))
-    check(vm.returncode == 1 and vm.stdout == "" and "session refused: reference-guard:shared-part" in vm.stderr,
-          "-i -e, piped session: refused before the line runs (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+    # B5 (D-NEXT-refsem-b, b5-refsem.md section 6, case 1): the guard is gone; the loop runs, legacy-equal.
+    check(vm.returncode == 0 and vm.stdout == legacy.stdout and "refused" not in vm.stderr,
+          "-i -e, piped session: runs as legacy (B5)", repr((vm.returncode, vm.stdout, vm.stderr)))
     parity("-i -e, piped session without a loop over args", [NIFT, "-i", "-e", 'print(cmd); print(args.size()); print(args[0])', "a"],
            work, home, stdin=SESSION_INPUT, expect=["<command-line>\n1\na\n<command-line>\n1\na\n"], session=True)
     parity("bare piped session", [NIFT], work, home, stdin=SESSION_INPUT, expect=["<repl>\n0\n\n"], session=True)
@@ -257,8 +258,11 @@ def suite(root):
         vm, _ = run([NIFT, "rt.f", "a"], work, None, home)
         check(legacy.returncode == 1 and "cannot mutate const array: args" in legacy.stderr,
               "runtime error: " + label + ": legacy's const error kept", repr((legacy.returncode, legacy.stderr)))
-        check(vm.returncode == 1 and vm.stdout == "" and "(reference-guard:" in vm.stderr and "no part of it ran" in vm.stderr,
-              "runtime error: " + label + ": refused before any effect (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+        # B5 (D-NEXT-refsem-b, case 2): the immutable object's error (kImmutable), legacy's text and order.
+        check((vm.returncode, vm.stdout) == (legacy.returncode, legacy.stdout) and
+              "cannot mutate const array: args\n" in vm.stderr and "not compiled" not in vm.stderr,
+              "runtime error: " + label + ": legacy's const error, after earlier output (B5)",
+              repr((vm.returncode, vm.stdout, vm.stderr)))
     # The const binding is still classified (review of 2a1c228a, F1): pushing
     # an array or object onto `args` takes the const-array path and is refused
     # by the guard, never as `aliasing` (the path of a writable binding). Phrased
@@ -268,10 +272,13 @@ def suite(root):
                        ("args.push(x) with x := [1]", 'print("e")\nx := [1]\nargs.push(x)\n')):
         (work / "rt.f").write_text(src)
         vm, _ = run([NIFT, "rt.f", "a"], work, None, home)
-        check(vm.returncode == 1 and vm.stdout == "" and "the program was not executed" in vm.stderr,
-              "const args: " + label + ": refused before any effect", repr((vm.returncode, vm.stdout, vm.stderr)))
-        check("(reference-guard:" in vm.stderr and "(aliasing)" not in vm.stderr,
-              "const args: " + label + ": refused by the guard, not aliasing", repr(vm.stderr))
+        # B5 (D-NEXT-refsem-b, case 3): the const error after earlier output, never aliasing or a cycle
+        # (the immutability check precedes the cycle check, B1 stage order).
+        check(vm.returncode == 1 and vm.stdout == "e\n" and "cannot mutate const array: args\n" in vm.stderr,
+              "const args: " + label + ": the const error after earlier output (B5)",
+              repr((vm.returncode, vm.stdout, vm.stderr)))
+        check("(aliasing)" not in vm.stderr and "cycle" not in vm.stderr,
+              "const args: " + label + ": not aliasing, not a cycle", repr(vm.stderr))
     for label, src in (("out-of-range index", 'print(args[5])\n'),
                        ("calling args", 'print("e")\nargs("a")\n')):
         (work / "rt.f").write_text(src)
@@ -412,8 +419,10 @@ def suite(root):
     (work / "copy.f").write_text('b := args\nb.push("q")\nprint(b.size())\nprint(args.size())\n')
     vm, rows = run([NIFT, "copy.f", "a"], work, None, home)
     legacy, _ = run([NIFT, "copy.f", "a"], work, "0", home)
-    check(vm.returncode == 1 and vm.stdout == "" and "(reference-guard:inflow)" in vm.stderr and "no part of it ran" in vm.stderr,
-          "a copy of args then mutated: refused before any effect (Phase A guard)", repr((vm.returncode, vm.stdout, vm.stderr)))
+    # B5 (D-NEXT-refsem-b, owner Q1, case 4): `b` is the immutable args object: the error names `b`.
+    check(vm.returncode == 1 and vm.stdout == "" and "copy.f:2:1: cannot mutate const array: b\n" in vm.stderr,
+          "a copy of args then mutated: the const error through the alias (B5, Q1)",
+          repr((vm.returncode, vm.stdout, vm.stderr)))
     check(legacy.stdout == "2\n2\n", "D-040 control: legacy aliases the array", repr(legacy.stdout))
 
     # 6. eval binds neither name (legacy: unknown value; VM: refused, nothing run).

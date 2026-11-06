@@ -74,7 +74,6 @@ void Inference::seed_session() {
     if (!session_ && invocation_) for (const auto& entry : *invocation_) {
         if (entry.shadow != kNoNode) continue;  // the entry's own top-level binding replaces it
         external_.emplace(entry.symbol.name, vars_.size());
-        if (entry.symbol.const_array) const_arrays_.insert(vars_.size());
         // B4b: an invocation binding (`args`) is one allocation site of this unit.
         vars_.push_back(fresh(new_site(), entry.symbol.structure ? entry.symbol.structure :
                                                                    kinds_ty(entry.symbol.kinds)));
@@ -82,7 +81,6 @@ void Inference::seed_session() {
     HeapKinds heap;  // B5 (U6): the session heap's initial contents
     if (session_) for (const auto& symbol : session_->symbols) {
         external_.emplace(symbol.name, vars_.size());
-        if (symbol.const_array) const_arrays_.insert(vars_.size());
         const auto declaration = session_->declarations.find(symbol.name);
         if (declaration != session_->declarations.end()) binding_decls_[vars_.size()] = declaration->second;
         TyRef type = session_type(symbol.structure ? symbol.structure : kinds_ty(symbol.kinds), symbol.callable_shape);

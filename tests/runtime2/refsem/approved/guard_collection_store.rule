@@ -1,0 +1,2 @@
+§3 Element/field store: the stored reference is shared (Q3 row 3: m.set then mutate)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:shared)

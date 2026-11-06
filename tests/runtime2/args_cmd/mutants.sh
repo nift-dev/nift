@@ -6,12 +6,10 @@
 #   1 script_runner.cpp       scripts get no invocation bindings (binding removed)
 #   2 session_invocation.cpp  `args` loses its last argument (wrong value; scripts and sessions)
 #   3 compiler_call.cpp       `cmd(...)` calls the `cmd` string (the VM-session runtime bug)
-#   5 compiler_invocation.cpp the bindings are writable (no readonly/const array)
-#     Witnessed by classification (review of 2a1c228a, F1): `args.push(<array
-#     or object>)` takes the const-array path and is refused by the guard, while
-#     the writable binding's path refuses it as `aliasing`. Phase B must still
-#     re-witness it through the const-mutation error
-#     (tests/runtime2/refsem/pending/args_push_after_output.f, args_sort.f).
+#   5 session_invocation.cpp  `args` installed without kImmutable (B5, plan "B5": redefined;
+#     the old mutant 5, writable bindings in compiler_invocation.cpp, was witnessed only by the
+#     guard's classification and is retired with the guard). Caught by the const-error cases of
+#     args_cmd.py (args.push after output, args.sort, args.push(args), the alias `b := args`).
 #   6 compiler_invocation.cpp no top-level shadowing (`args := []` refused again)
 # Mutants 4, 7 and 8 (module rules) were retired with D-NEXT-packages #4: modules
 # now see the entry's bindings where resolution proves it, and a module's own
@@ -33,39 +31,10 @@ if make -s -n nift | grep -qE -- " -o nift$"; then
     echo "FAIL args/cmd mutants: ./nift is not current (run make nift)" >&2; exit 1
 fi
 fail=0
-# Tripwire (args/cmd x the reference guard): each form must still be refused
-# by the Phase A guard (reference-guard:*) on the real build, before any
-# effect; if one is admitted, it becomes a direct witness of mutant 5 (the
-# const-mutation error) and must be added as one.
-tw="$TMP/tripwire"; mkdir -p "$tw"
-tripwire_forms=(
-  'print("e")\nargs.push("z")\n' 'args.sort()\n' 'args.pop()\nprint(args.size())\n'
-  'fn(g()) { args.push("y") }\ng()\nprint(args.size())\n' 'f := () => args.push("y")\nf()\nprint(args.size())\n'
-  'args.insert(0, "y")\nprint(args.size())\n' 'x := args.push("y")\nprint(x)\n' 'print(args.reverse().size())\n'
-  'args.clear()\nprint(args.size())\n' 'args.remove(0)\nprint(args.size())\n'
-  'fn(f(x)) { x.push(1) }\nf(args)\nprint(args.size())\n'
-  'm := map()\nm.set("a", args)\nv := m.get("a")\nv.push(1)\nprint(args.size())\n')
-session_forms=('args.sort()\nprint(args.size())\n' 'x := args\nx.push("z")\nprint(args.size())\n')
-printf 'fn(grow(xs)) { xs.push("z")\n  return xs.size() }\nexport(grow)\n' > "$tw/m.f"
-tripwire_forms+=('import("m.f")\nprint(grow(args))\nprint(args.size())\n')
-for form in "${tripwire_forms[@]}"; do
-    printf "$form" > "$tw/p.f"
-    out=$(cd "$tw" && NIFT_VM=require "$ROOT/nift" p.f a b 2>&1 || true)
-    if ! grep -q "not compiled for the VM (reference-guard:" <<<"$out" || grep -qv '^error: \|^note: ' <<<"$out"; then
-        echo "FAIL tripwire: script form now admitted or refused otherwise: $(printf "$form" | tr '\n' ' ')"
-        echo "     add this form to args_cmd.py as a witness of mutant 5: ${out:0:200}"; fail=1
-    fi
-done
-for form in "${session_forms[@]}"; do
-    out=$(cd "$tw" && printf "$form" | NIFT_VM=require "$ROOT/nift" -i -e 'k := 1' a b 2>&1 || true)
-    if ! grep -q "NIFT_VM session refused: reference-guard:" <<<"$out"; then
-        echo "FAIL tripwire: session form now admitted or refused otherwise: $(printf "$form" | tr '\n' ' ')"
-        echo "     add this form to args_cmd.py as a witness of mutant 5: ${out:0:200}"; fail=1
-    fi
-done
-[ $fail = 0 ] && echo "PASS tripwire: ${#tripwire_forms[@]} script and ${#session_forms[@]} session forms still refused by the guard"
+# B5 (b5-refsem.md section 6): the guard tripwire is retired with the guard; its forms are direct
+# witnesses now (args_cmd.py section 2 and the mutant-5 cases).
 for spec in 1:src/rt/script_runner.cpp 2:src/rt/session_invocation.cpp 3:src/rt/compiler_call.cpp \
-            5:src/rt/compiler_invocation.cpp 6:src/rt/compiler_invocation.cpp; do
+            5:src/rt/session_invocation.cpp 6:src/rt/compiler_invocation.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

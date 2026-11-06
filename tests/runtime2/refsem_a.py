@@ -100,18 +100,19 @@ SESSIONS = [
     # (a struct declared, an unrelated array presented).
     ("cp19_unrelated_callback_shadow", 'struct(Point){x:=0;fn(get()){return x}};p:=Point()\n'
      '[1,2].map(x=>x+1).stringify()\np.get()\nexit\n', ("parity",)),
-    ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("refuse", "", "reference-guard:inflow")),
+    # B5 (b5-refsem.md section 6): the four former reference-guard refusals run; three are
+    # legacy-equal, one is the approved argument-sharing difference (§3, Q3 row 1).
+    ("session_array_copy", 'a := [1]\nb := a\nprint(b.length())\n', ("parity",)),
     ("session_array_map", 'xs := [3, 1, 2]\nys := xs.map((v) => v * 2)\nprint(ys.length())\n', ("parity",)),
     # Sessions are fully conservative: a session read is typed "anything", so
     # a top-level loop binding over a session array may hold a part of it
     # that a later statement could reach.
-    ("session_loop_read", 'a := [1, 2]\nfor (x : a) { print(x) }\n', ("refuse", "", "reference-guard:shared-part")),
+    ("session_loop_read", 'a := [1, 2]\nfor (x : a) { print(x) }\n', ("parity",)),
     # Review of ad9d842f: a function from an earlier statement mutates the
     # binding the call lends (Phase B: [1,2]; the copy model: [1]).
     ("session_lend_global_callee", 'a := [1]\nfn(f(x)) { a.push(2); print(x.stringify()); return 0 }\nf(a)\n',
-     ("refuse", "", "reference-guard:lent")),
-    ("session_loop_calls_mutator", 'a := [1]\nfn(g()) { a.push(1); return 0 }\nfor (x : a) { g() }\n',
-     ("refuse", "", "reference-guard:shared-part")),
+     ("vm", "[1,2]\n0\n", "[1]\n0\n")),
+    ("session_loop_calls_mutator", 'a := [1]\nfn(g()) { a.push(1); return 0 }\nfor (x : a) { g() }\n', ("parity",)),
     ("session_array_push", 'a := [1, 2]\na.push(3)\nprint(a.length())\n', ("parity",)),
     # Review round 2: map-typed session bindings were refused because the
     # session symbol's 16-bit kind fields truncated the collection bits (a base
@@ -133,6 +134,9 @@ SESSIONS = [
      '    n = v.length()\n  }\n  return n\n}\nfor (i : range(0, 3)) { print(f()) }\n', ("parity",)),
     ("session_saved_error", 'struct(C){v:=0;fn(fail()){throw error("original")}}\nc:=C()\n'
      'saved:=error("seed");try{c.fail()}catch(e){saved=e}\nprint(saved.message)\nprint(saved.source)\n', ("parity",)),
+    # B5 (b5-refsem.md section 6): formerly pending/args_session_loop (reference-guard:shared-part).
+    ("args_session_loop", 'print(cmd)\nprint(args.size())\nprint(args.join(","))\n', ("parity",),
+     ("-i", "-e", 'print(cmd); print(args.size()); for(a : args) { print("<" + a + ">") }', "a")),
 ]
 
 
@@ -178,8 +182,9 @@ def main():
         for f in fixtures("approved"):
             name = os.path.basename(f)
             base = f[:-2]
-            vo, ve, vr, st = run(nift, f, "require", work)
-            lo, le, lr, _ = run(nift, f, "0", work)
+            argv = tuple(open(base + ".args").read().split()) if os.path.exists(base + ".args") else ()
+            vo, ve, vr, st = run(nift, f, "require", work, args=argv)
+            lo, le, lr, _ = run(nift, f, "0", work, args=argv)
             vm_t, legacy_t = transcript(vo, ve, vr), transcript(lo, le, lr)
             if args.update:
                 open(base + ".vm", "w").write(vm_t)
@@ -277,12 +282,19 @@ def main():
             check(par == coop, "equiv %s: parallel\n%s\ncooperative\n%s" % (name, par, coop))
             want = open(base + ".vm").read() if os.path.exists(base + ".vm") else None
             check(par == want, "equiv %s: output\n%s\nexpected\n%s" % (name, par, want))
-        for name, stdin, want in SESSIONS:
-            vo, ve, vr = run_session(nift, stdin, work)
+        for entry in SESSIONS:
+            name, stdin, want = entry[:3]
+            argv = entry[3] if len(entry) > 3 else ()
+            vo, ve, vr = run_session(nift, stdin, work, argv=argv)
             if want[0] == "parity":
-                lo, le, lr = run_session(nift, stdin, work, mode="0")
+                lo, le, lr = run_session(nift, stdin, work, mode="0", argv=argv)
                 check((vo, ve, vr) == (lo, le, lr) and "refused" not in ve,
                       "session %s: legacy %r/%r/%d vs VM %r/%r/%d" % (name, lo, le, lr, vo, ve, vr))
+            elif want[0] == "vm":  # B5: an approved difference (the VM's output, legacy's witness)
+                lo, le, lr = run_session(nift, stdin, work, mode="0")
+                check(vr == 0 and vo == want[1] and lo == want[2] and "refused" not in ve,
+                      "session %s: VM %r/%r/%d (expected %r), legacy %r (expected %r)" % (name, vo, ve, vr, want[1],
+                                                                                            lo, want[2]))
             else:
                 check(vr == 1 and vo == want[1] and want[2] in ve,
                       "session %s: expected %s, got %d %r %r" % (name, want[2], vr, vo, ve[:200]))

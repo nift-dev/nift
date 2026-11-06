@@ -1,0 +1,6 @@
+outer := [[" x "], [" y "]]
+fst := outer[0]
+t := outer[0]
+t.push(5)
+print(fst[1].trim())
+print("end")

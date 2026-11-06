@@ -1,0 +1,8 @@
+xs := [" x "]
+fn(rd()) { return xs[0].trim() }
+fn(wr(v)) { xs[0] = v; return 0 }
+wr(" y ")
+print(rd())
+wr(5)
+print(rd())
+print("end")

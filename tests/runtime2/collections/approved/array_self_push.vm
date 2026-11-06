@@ -1,0 +1,4 @@
+ran
+--- stderr
+error: array_self_push.f:3:1: reference cycle: the stored value would contain itself
+--- exit 1

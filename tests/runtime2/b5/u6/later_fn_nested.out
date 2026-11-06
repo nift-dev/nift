@@ -1,0 +1,2 @@
+-- exit 1
+error: <stdin>:4:4: NIFT_VM session refused: alias-argument: passing an aliased array or object as an argument is not supported by the Runtime 2.0 VM yet

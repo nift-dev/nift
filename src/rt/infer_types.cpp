@@ -71,8 +71,6 @@ bool covers(const TyRef& a, const TyRef& b, int depth) {
     if ((b->historical_callable && !a->historical_callable) || (b->untracked_callable && !a->untracked_callable) ||
         (b->legacy_text_number && !a->legacy_text_number))
         return false;
-    if (a->collection_array && (b->kinds & kKindArray) && !b->collection_array) return false;
-    if (a->collection_object && (b->kinds & kKindObject) && !b->collection_object) return false;
     if (a->struct_id != b->struct_id && a->struct_id != -2) return false;
     for (std::uint32_t site : b->sites)
         if (!std::binary_search(a->sites.begin(), a->sites.end(), site)) return false;
@@ -120,8 +118,7 @@ TyRef open_union(const TyRef& a, const TyRef& b, const TyRef& base) {
     const bool text = a->legacy_text_number || b->legacy_text_number;
     const auto is = [&](const TyRef& t) {
         return t->any && t->kinds == kinds && t->historical_callable == historical &&
-               t->untracked_callable == untracked && t->legacy_text_number == text && !t->collection_array &&
-               !t->collection_object;
+               t->untracked_callable == untracked && t->legacy_text_number == text;
     };
     if (base && is(base)) return base;
     if (is(top_ty())) return top_ty();
@@ -153,10 +150,6 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     t->historical_callable = a->historical_callable || b->historical_callable;
     t->untracked_callable = a->untracked_callable || b->untracked_callable;
     t->legacy_text_number=a->legacy_text_number||b->legacy_text_number;
-    t->collection_array = (t->kinds & kKindArray) && (!(a->kinds & kKindArray) || a->collection_array) &&
-                          (!(b->kinds & kKindArray) || b->collection_array);
-    t->collection_object = (t->kinds & kKindObject) && (!(a->kinds & kKindObject) || a->collection_object) &&
-                           (!(b->kinds & kKindObject) || b->collection_object);
     t->struct_id = a->struct_id == b->struct_id ? a->struct_id : -2;
     t->sites = a->sites;  // D-NEXT-refsem: sorted union
     for (std::uint32_t site : b->sites)
@@ -189,8 +182,7 @@ TyRef unite(const TyRef& a, const TyRef& b, int depth) {
 
 bool same(const TyRef& a, const TyRef& b) {
     if (a.get() == b.get()) return true;
-    if(a&&b&&(a->collection_array!=b->collection_array||a->collection_object!=b->collection_object||
-              a->legacy_text_number!=b->legacy_text_number))return false;
+    if(a&&b&&a->legacy_text_number!=b->legacy_text_number)return false;
     const bool a_empty = !a || (a->kinds == 0 && !a->elem && !a->key && a->fields.empty() && !a->any);
     const bool b_empty = !b || (b->kinds == 0 && !b->elem && !b->key && b->fields.empty() && !b->any);
     if (a_empty || b_empty) return a_empty == b_empty;
@@ -344,20 +336,6 @@ bool holds_collection(const TyRef& t, int depth) {
         if (holds_collection(item, depth + 1)) return true;
     for (const auto& field : t->fields)
         if (holds_collection(field.second, depth + 1)) return true;
-    return false;
-}
-
-bool holds_aggregate_below(const TyRef& t) {
-    if (!t) return false;
-    if (t->any) return true;
-    const auto aggregate = [](const TyRef& c) {
-        return c && (c->any || (c->kinds & (kKindArray | kKindObject | kKindUnknown)) != 0);
-    };
-    if (aggregate(t->elem)) return true;
-    for (const TyRef& item : t->items)
-        if (aggregate(item)) return true;
-    for (const auto& field : t->fields)
-        if (aggregate(field.second)) return true;
     return false;
 }
 

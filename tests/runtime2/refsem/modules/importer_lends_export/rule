@@ -1,0 +1,2 @@
+§3 Modules/packages: an exported array is the same object for every importer, and module functions mutate it in place; §3 Call arguments share (Q3 row 1)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:lent)

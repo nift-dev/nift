@@ -1,0 +1,4 @@
+x
+1
+-- exit 1
+error: <stdin>: in earlier input, at line 1, column 20 of the unit that defined it: NIFT_VM session refused: session:legacy-method-precedence: this statement in an interactive session (legacy-method-precedence) is not supported by the Runtime 2.0 VM yet

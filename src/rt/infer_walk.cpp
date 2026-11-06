@@ -115,7 +115,6 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
         auto* var = find(ast_.text(ast_.at(root)));
         if (!var || (*var)->any) return;
         const auto slot = static_cast<std::size_t>(var - vars_.data());
-        if (root == receiver_id && const_arrays_.count(slot)) return;  // native const guard cannot mutate
         const auto next = session_mutation_shape(ast_, receiver_id, *var, value);
         merge_local(*var, next);
         propagate_session_alias(slot);

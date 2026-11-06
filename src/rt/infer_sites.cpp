@@ -298,12 +298,9 @@ void Inference::site_store(const TyRef& container, const TyRef& value_in, const 
 #if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 29)
         expose(value);
 #endif
-#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 2
-        return;  // B5-U2: a store through an earlier value does not reach the session heap
-#else
-        // B5 (U6): the store reaches the session heap (every earlier value's contents)
+        // B5 (U6): the store reaches the session heap (every earlier value's contents). Defence in
+        // depth: every caller reads its container through expr()/sited(), which gives it the heap's site.
         return site_store(heap_sited(container), value_in, key);
-#endif
     }
     const bool aggregate = container->any || (container->kinds & (kAggregate | kKindUnknown));
     if (!aggregate) return;

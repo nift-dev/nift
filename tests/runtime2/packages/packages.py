@@ -703,11 +703,21 @@ def section_f():
         "m.f": 'nift__args__m1 := "entry"\nimport("p.f")\nprint(pv())\nprint(nift__args__m1)\n'}, args=a,
            expect="pnift__args__m1\nentry\n")
     # Messages quote the original name, never the generated one.
+    # B5 (owner Q2: `const` is binding-only): the message case is a const binding's assignment;
+    # a const array's mutation runs (an approved difference, checked below against legacy's error).
     vm = parity("F messages quote the private binding as args", {
-        "p.f": 'const args := [1]\nfn(bad()) { args.push(2)\n return 1 }\nexport(bad)\n',
+        "p.f": 'const args := 1\nfn(bad()) { args = 2\n return 1 }\nexport(bad)\n',
         "m.f": 'import("p.f")\nprint(bad())\n'}, args=a)
-    check("cannot mutate const array: args\n" in vm.stderr and "nift__" not in vm.stderr,
+    check("cannot assign to const binding: args\n" in vm.stderr and "nift__" not in vm.stderr,
           "F messages say args, never the generated name", vm.stderr)
+    q2 = tree({"p.f": 'const args := [1]\nfn(bad()) { args.push(2)\n return args.size() }\nexport(bad)\n',
+               "m.f": 'import("p.f")\nprint(bad())\n'})
+    qv, _ = run(["m.f", "x"], q2)
+    ql, _ = run(["m.f", "x"], q2, mode="0")
+    check(qv.returncode == 0 and qv.stdout == "2\n" and ql.returncode == 1 and
+          "cannot mutate const array: args" in ql.stderr,
+          "F B5 Q2: a module's const array is mutable (binding-only const); legacy's error is the witness",
+          repr((qv.returncode, qv.stdout, qv.stderr, ql.returncode, ql.stderr)))
     # Refused before any effect.
     refused("F module top level reads the entry's args", {"lib.f": 'w := args.size()\nexport(w)\n',
                                                           "m.f": EARLY + 'import("lib.f")\nprint(w)\n'},
@@ -912,10 +922,10 @@ def section_r():
     check(len(seen) == 1 and "R/bad.f:1:1:" in next(iter(seen)), "R determinism: syntax error first", repr(seen))
     # Display names are whole identifiers (12 private-args modules).
     files = {"x%d.f" % k: 'args := [%d]\nfn(f%d()) { return args[0] }\nexport(f%d)\n' % (k, k, k) for k in range(1, 13)}
-    files["x11.f"] = 'const args := [11]\nfn(f11()) { args.push(1)\n return 1 }\nexport(f11)\n'
+    files["x11.f"] = 'const args := 11\nfn(f11()) { args = 1\n return 1 }\nexport(f11)\n'
     files["m.f"] = "".join('import("x%d.f")\n' % k for k in range(1, 13)) + "print(f1())\nprint(f12())\nprint(f11())\n"
     vm = parity("R 12 modules with private args", files)
-    check("cannot mutate const array: args\n" in vm.stderr and "nift__" not in vm.stderr,
+    check("cannot assign to const binding: args\n" in vm.stderr and "nift__" not in vm.stderr,
           "R display names at module index >= 10", vm.stderr)
     # classify / classify-all report program errors as program errors.
     root = tree({"m.f": EARLY + 'import("missing.f")\n'})

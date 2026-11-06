@@ -154,8 +154,6 @@ struct UnitKinds {
     std::unordered_map<NodeId, std::vector<NodeId>> callable_targets;
     std::unordered_map<NodeId, bool> callable_unknown;
     std::unordered_set<NodeId> collection_lambdas;
-    std::unordered_set<NodeId> collection_objects;
-    std::unordered_set<NodeId> collection_arrays;
     std::unordered_map<NodeId,NodeId> bindings;
     std::unordered_map<NodeId,KindSet> collection_elements;
     // D-063 (units that construct a collection, UnitPlan::collections).
@@ -179,10 +177,6 @@ struct UnitKinds {
     // bare-name receiver whose kinds are exactly kKindStruct and whose struct
     // is known here.
     std::unordered_map<NodeId, int> struct_ids;
-    // D-NEXT-refsem: expressions whose array/object value may hold an array or
-    // object below its top level (the forward-compatibility guard's deep
-    // freshness, rt/reference_guard.h).
-    std::unordered_set<NodeId> nested_aggregates;
     // CP22: expressions whose value is, or may contain at any depth, a future.
     std::unordered_set<NodeId> future_holders;
     bool converged = false;

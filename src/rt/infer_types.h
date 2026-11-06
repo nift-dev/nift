@@ -19,8 +19,6 @@ struct Ty {
     KindSet kinds = 0;
     bool historical_callable = false, untracked_callable = false;
     bool legacy_text_number = false;  // may have moved-from StrNumber storage
-    bool collection_array = false;  // CP14B array result provenance
-    bool collection_object = false;  // CP14B result-container provenance
     bool any = false;  // every kind at every depth
     TyRef elem;        // arrays: the elements (D-063: map values, set members, stack elements)
     TyRef key;         // D-063: map keys
@@ -93,6 +91,5 @@ bool holds_future(const TyRef& t, int depth = 0);
 bool holds_collection(const TyRef& t, int depth = 0);
 // D-NEXT-refsem: whether an element, item or member of `t` may be an array or
 // object (or anything).
-bool holds_aggregate_below(const TyRef& t);
 
 } // namespace nift::rt::infer_detail

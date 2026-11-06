@@ -59,7 +59,7 @@ bool UnitCompiler::declare(const Node& node) {
     if (made != plan_.struct_index.end()) {
         binding.struct_id = static_cast<int>(made->second);
         if (!struct_construct(ast_.at(node.b), binding.struct_id, reg)) return false;
-    } else if (!no_alias(node.b, node) || !expr_to(node.b, reg)) {
+    } else if (!expr_to(node.b, reg)) {
         return false;
     }
     std::uint16_t text_type = 0;
@@ -154,9 +154,9 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
-        // Const admission is limited to CP14B's guarded methods. The older
-        // generic index setter has no const lifecycle contract: retain refusal.
-        if(holder&&(holder->const_array||holder->const_scalar))
+        // B5 (owner Q2: `const` is binding-only): an element store into a const array is an
+        // ordinary store (an immutable object, `args`, fails in the protocol).
+        if(holder&&holder->const_scalar)
             return fail(target,write_refusal(holder,text(object),"declare-const"));
         const bool global = holder != nullptr && holder->global;
         const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
@@ -167,7 +167,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             return fail(target, "index-assign-target");
         if (!element_target_ok(target)) return false;
         if (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
-            !kinds_within(target.b, kKindNumber, target, "type:element-assignment") || !no_alias(node.b, node))
+            !kinds_within(target.b, kKindNumber, target, "type:element-assignment"))
             return false;
         if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
         if (global) {
@@ -201,7 +201,6 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
     const Binding b = *binding;
-    if (!no_alias(node.b, node)) return false;
     if (kinds(node.a) & kKindAtomic) return atomic_store(node, b);
     return assign_value(node, b);
 }

@@ -191,7 +191,6 @@ private:
     std::vector<TyRef> returns_;
     std::vector<TyRef> vars_;
     std::unordered_map<std::size_t,NodeId> binding_decls_;
-    std::unordered_set<std::size_t> const_arrays_;
     std::unordered_map<std::size_t, std::pair<std::size_t, NodeId>> session_for_aliases_;
     std::vector<std::size_t> persist_index_;
     Constants constants_;

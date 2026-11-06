@@ -1,0 +1,2 @@
+§3 Cycles (D1): a store that makes a reference reachable from itself is refused before the mutation with runtime.reference_cycle (Q3 row 8: legacy pushes a copy)
+B5 (b5-refsem.md section 6): was refused before any effect (aliasing)

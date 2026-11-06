@@ -1,0 +1,2 @@
+§3 Call arguments + errors-atomic rule (F2): arguments evaluated in order, then the call; the lent object is the same object
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:lent)

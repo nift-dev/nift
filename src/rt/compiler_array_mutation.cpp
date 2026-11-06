@@ -55,14 +55,15 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
         else if(!read_binding(binding,refreshed))return false;
         fb_->emit(OpCode::LoadNull,refreshed);
     }
-#if defined(NIFT_COLLECTION_MUTANT) && NIFT_COLLECTION_MUTANT == 11
-    if(false){
-#else
-    if(binding.const_array){
-#endif
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 7  // R-B7 (b5 mutants): args a binding-only check again
+    if(binding.const_array&&binding.invocation){
         if(!read())return false;
         const auto at=fb_->emit(OpCode::ArrayMutate,state,id,100);fb_->note(at,std::string(text(receiver)));
     }
+#endif
+    // B5 (D-NEXT-refsem-b, owner Q1/Q2): no static const-array mutation check. `const` is
+    // binding-only; `args` is immutable as an object (kImmutable, checked by the protocol
+    // through every alias).
     const NodeId* args=ast_.list(node);
     if(argc>0&&!expr_to(args[0],state+Item))return false;
     if(argc>1&&!expr_to(args[1],state+Returned))return false;

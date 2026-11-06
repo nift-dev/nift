@@ -32,7 +32,10 @@ std::vector<InvocationBinding> invocation_bindings(const std::string& command,
     install("cmd", make_string(command), strings);
     // B1: `args` is immutable through every holder (scripts, sessions and
     // modules all install this value); copy()/deepcopy() give mutable copies.
+#if !(defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 5) && !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 7)
+    // (test-only controls: args_cmd mutant 5, B5 R-B7: args without kImmutable)
     mutation::make_immutable(args);
+#endif
     install("args", std::move(args), array_type);
     return out;
 }

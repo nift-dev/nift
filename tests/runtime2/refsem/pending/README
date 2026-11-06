@@ -1,55 +1,18 @@
-Valid programs Phase A over-refuses (temporary limitations Phase B must
-eliminate), kept unchanged as regression evidence. NAME.f (a script) or
-NAME.session (a piped session's input); NAME.expected: the valid output
-(legacy's, and weekend/r2's where it ran there); NAME.reason: the Phase A
-refusal, raised before the refused statement has any effect. Phase B turns
-each into a parity case.
+Valid programs Phase A over-refused (temporary limitations Phase B had to
+eliminate). B5 (docs/runtime-2/checkpoints/b5-refsem.md section 6) converted
+every one; this directory is empty and must stay empty (a new over-refusal is
+a defect to fix, not an expectation):
 
-  (B3, b3-structs.md: ret_multiline_http_shape.f is now refsem/parity/, and
-  cp19_unrelated_callback_shadow.session the parity session
-  cp19_unrelated_callback_shadow in refsem_a.py SESSIONS, with its original
-  case restored in tests/runtime2/cp19/session_struct_cli.py.)
-  cp14b_loop_binding_pop.f          tests/runtime2/cp14b/design_mutations.py
-  cp14b_map_callback_store.f        witnesses (mutants copied-mutation-receiver,
-  cp14b_map_callback_pop_push.f     live-source-not-snapshot) refused by the
-                                    guard (reference-guard:lent); legacy's output
-                                    recorded. Here Phase B may change the meaning
-                                    (a mutation while a loop or callback holds
-                                    the array), so Phase B rules on each rather
-                                    than only admitting it. CP19/CP14B test
-                                    correction (owner decision, 2026-11-01)
+  cp14b_loop_binding_pop.f, cp14b_map_callback_store.f,
+  cp14b_map_callback_pop_push.f   -> parity/ ([[1]]; [1,2,3]/[1,99,3];
+                                     [1,2,3]/[1,2,9]: legacy-equal)
+  args_push_after_output.f, args_sort.f -> parity/ (e, then "cannot mutate
+                                     const array: args", exit 1: legacy-equal)
+  args_copy_push.f                -> approved/ (Q1: "cannot mutate const
+                                     array: b"; legacy grows args)
+  args_session_loop.session       -> refsem_a.py SESSIONS (legacy-equal)
 
-Optional per case: NAME.args (script arguments), NAME.exit and NAME.error
-(legacy's exit status and an error-text substring, when legacy's valid
-behaviour is an error), NAME.argv (a session's command line, JSON).
-
-args/cmd x the reference guard (integ/refsem-a; owner ruling "args/cmd x
-reference guard, Option 2, 2026-11-01": the guard stays frozen). Originals
-from tests/runtime2/args_cmd/args_cmd.py:
-  args_push_after_output.f  `print("e")`, then `args.push("z")`: legacy prints
-  args_sort.f               `e` and fails with "cannot mutate const array:
-                            args" (args.sort(): the same error). The VM refuses
-                            before any effect as reference-guard:unresolved, a
-                            misleading classification (Phase B would not change
-                            the meaning: `args` is a const array in every
-                            model). A temporary diagnostic-classification
-                            difference; correcting the diagnostic is a
-                            pre-release obligation.
-  args_session_loop.session `nift -i -e '...; for(a : args) {...}' a`, piped:
-                            refused (reference-guard:shared-part: a later
-                            statement is assumed able to mutate a session
-                            array). A temporary Phase A over-refusal; Phase B
-                            must admit it.
-  args_copy_push.f          `b := args; b.push("q")`: legacy aliases `args`
-                            and grows it (2, 2). Phase B must establish the
-                            final reference-and-immutability contract: aliasing
-                            must not bypass a genuinely immutable binding, and
-                            a successful mutation is NOT assumed to be the
-                            right answer. Phase B rules on it; it does not
-                            just admit it.
-
-  args_push_after_output.f and args_sort.f are the Phase B witnesses of
-  args/cmd mutant 5 (tests/runtime2/args_cmd/mutants.sh: the script bindings
-  made writable). In Phase A the mutant is caught by classification only
-  (`args.push(args)` is refused by the guard, not as `aliasing`); Phase B must
-  re-witness it through the const-mutation error these cases then reach.
+(B3, b3-structs.md: ret_multiline_http_shape.f is refsem/parity/, and
+cp19_unrelated_callback_shadow.session the parity session in SESSIONS.)
+The cp14b design mutants (copied-mutation-receiver, live-source-not-snapshot)
+are reinstated in tests/runtime2/cp14b/design_mutations.py.

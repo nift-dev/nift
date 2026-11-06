@@ -1,0 +1,6 @@
+rows := [[" x "]]
+r := rows[0]
+fn(st(t)) { t.push(5); return 0 }
+st(rows[0])
+print(r[1].trim())
+print("end")

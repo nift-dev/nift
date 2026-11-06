@@ -1,0 +1,2 @@
+§3 Iteration (D5): entry snapshot; the loop reads the element captured at entry (Q3 row 5: legacy reads live)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:lent)

@@ -1,0 +1,2 @@
+§3 Assignment, declaration: b := a shares (Q3 row 4)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:inflow)

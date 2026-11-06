@@ -276,6 +276,9 @@ public:
     // The comparator sort's working storage: the receiver's own storage, in
     // place, after the sort's stage 2.2 at its start (b2-refrep.md, E).
     static std::vector<Value>& sort_storage(const SortKey&, Value& array);
+    // B5 (owner Q7 ruling 2026-11-07: copy-sort-commit): the comparator sort's single commit of
+    // its sorted working copy (same elements, same length) into the receiver, once, on success.
+    static void commit_sorted(const SortKey&, Value& array, std::vector<Value>& sorted);
     // The same storage while the sort's controller runs (no relocation and no
     // allocation: the drain on an error unwind must not allocate).
     static std::vector<Value>& sort_items(const SortKey&, Value& array) noexcept {

@@ -1,0 +1,4 @@
+6
+true
+-- exit 1
+error: <stdin>:8:7: NIFT_VM session refused: session:legacy-method-precedence: this statement in an interactive session (legacy-method-precedence) is not supported by the Runtime 2.0 VM yet

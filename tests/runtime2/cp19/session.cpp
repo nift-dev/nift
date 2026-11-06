@@ -408,11 +408,13 @@ int main() {
         CHECK(!r.admitted && r.refusal == "builtin-bytes:bytes");
         CHECK(r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
         CHECK(session.value("nested").heap() == before.heap());
+        // B5 (D-NEXT-refsem-b, b5-refsem.md section 6): the guard is gone; the loop binding is the
+        // element itself (§3 Iteration), so the push reaches every row; the deepcopy stays apart.
         r = session.execute("for(row:nested){row.push(2.5)}", "nested-numeric", output);
-        CHECK(!r.admitted && r.refusal == "reference-guard:shared-part" && r.vm_executions == 0 && output.empty());
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1 && output.empty());
         r = session.evaluate("nested.stringify()", "nested-result", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
-        CHECK(string_view_of(r.value) == "[[1],[2]]");
+        CHECK(string_view_of(r.value) == "[[1,2.5],[2,2.5]]");
         r = session.evaluate("saved.stringify()", "nested-snapshot", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         CHECK(string_view_of(r.value) == "[[1],[2]]");

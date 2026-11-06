@@ -1,0 +1,3 @@
+runtime.reference_cycle
+[1,2]
+-- exit 0

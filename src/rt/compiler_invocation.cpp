@@ -33,9 +33,6 @@ bool UnitCompiler::invocation_prologue() {
         binding.invocation = true;
         binding.decl_kinds = symbol.kinds;
         binding.const_array = symbol.const_array; binding.readonly = symbol.readonly;
-#if defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 5  // test-only: writable bindings (args_cmd/mutants.sh)
-        binding.const_array = binding.readonly = false;
-#endif
         if (!fb_->alloc(binding.type_reg) || !fb_->alloc(binding.reg)) return builder_ok();
         std::uint16_t k = 0;
         if (entry.value.is(Kind::Array)) {

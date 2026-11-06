@@ -30,11 +30,6 @@ bool UnitCompiler::comparator_sort(const Node& node,std::uint16_t dst,const Bind
         fb_->emit(OpCode::Move,state+Selector,place);flags=0x20;place=0;
     }
     fb_->set_offset(collection_offset(node));
-    if(binding.const_array) {
-        if(!expr_to(node_id(receiver),state+Source))return false;
-        const auto at=fb_->emit(OpCode::ArrayMutate,state,static_cast<unsigned>(CollectionMethod::Sort),100);
-        fb_->note(at,std::string(text(receiver)));
-    }
     fb_->emit(OpCode::CollectionSort,state,place,flags);
     const auto loop=fb_->here();
     const auto done=fb_->emit(OpCode::JmpFalse,state+More);

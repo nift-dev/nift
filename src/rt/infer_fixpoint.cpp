@@ -71,13 +71,10 @@ void Inference::check_fixed_point() {
         if (a != b) stale_.push_back(id);
     }
     differ_set(result_.collection_lambdas, converged.collection_lambdas, stale_);
-    differ_set(result_.collection_objects, converged.collection_objects, stale_);
-    differ_set(result_.collection_arrays, converged.collection_arrays, stale_);
     differ_set(result_.collection_elements_of, converged.collection_elements_of, stale_);
     differ_set(result_.collection_holders, converged.collection_holders, stale_);
     differ_set(result_.collection_inspections, converged.collection_inspections, stale_);
     differ_set(result_.collection_text_numbers, converged.collection_text_numbers, stale_);
-    differ_set(result_.nested_aggregates, converged.nested_aggregates, stale_);
     differ_set(result_.future_holders, converged.future_holders, stale_);
     std::sort(stale_.begin(), stale_.end());
     stale_.erase(std::unique(stale_.begin(), stale_.end()), stale_.end());

@@ -1,0 +1,6 @@
+xs := [" x "]
+set0 := (v) => { xs[0] = v; return 0 }
+ys := xs
+set0(5)
+print(ys[0].trim())
+print("end")

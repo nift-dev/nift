@@ -18,7 +18,7 @@ struct State {
     std::size_t n=0,half=0,lo=0,hi=0,chunk=0,step=7,at=0;
     std::size_t i=0,j=0,k=0,end=0,mid=0,start=0;
     unsigned stage=0,pass=0,op=0,phase=0;
-    bool srcbuf=false,dstbuf=false,pending=false,done=false;
+    bool srcbuf=false,dstbuf=false,pending=false,done=false,aborted=false;
 };
 State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<BytesObject>()->data.data());}
 // The sort's own scratch array (Keys: made at init, held only here; B2: no
@@ -28,7 +28,16 @@ State& state(Value* s){return *reinterpret_cast<State*>(s[HashTable].heap_as<Byt
 // sort_items while the controller runs (no relocation, no allocation: drain).
 std::vector<Value>& scratch(Value& v){return v.heap_as<ArrayObject>()->items;}  // the native's own scratch array
 using mutation::SortKey;
-std::vector<Value>& receiver_items(const SortKey& k,Value& v){return mutation::SortController::items(k,v);}
+// B5 (owner Q7 ruling, 2026-11-07: copy-sort-commit): the sort works on its own copy of the
+// receiver's elements (KeepAlive, made at init: it keeps every element alive too) and commits it
+// into the receiver once, on success. A failing comparator (the drain) commits nothing: the
+// receiver is unchanged; aliases never see partially sorted storage; the receiver's identity
+// is kept (the result is the receiver).
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 8  // Q7 mutant: in place again (no copy, no commit)
+std::vector<Value>& working(const SortKey& k,Value* s){return mutation::SortController::items(k,s[Source]);}
+#else
+std::vector<Value>& working(const SortKey&,Value* s){return s[sort_slot::KeepAlive].heap_as<ArrayObject>()->items;}
+#endif
 Value moved_empty(Value* s,const Value& v) {
     if(v.is(Kind::Object))return s[sort_slot::EmptyObject];
     if(v.is(Kind::Array))return s[sort_slot::EmptyArray];
@@ -42,9 +51,9 @@ void move(Value* s,std::vector<Value>& src,std::size_t i,std::vector<Value>& dst
     dst[j]=std::move(src[i]);src[i]=std::move(empty);
 }
 void save(const SortKey& k,Value* s,std::size_t i) {
-    auto& a=receiver_items(k,s[Source]);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
+    auto& a=working(k,s);Value empty=moved_empty(s,a[i]);s[Item]=std::move(a[i]);a[i]=std::move(empty);
 }
-void restore(const SortKey& k,Value* s,std::size_t i){receiver_items(k,s[Source])[i]=std::move(s[Item]);}
+void restore(const SortKey& k,Value* s,std::size_t i){working(k,s)[i]=std::move(s[Item]);}
 bool request(Value* s,State& t,const Value& l,const Value& r) {
     s[sort_slot::Left]=l;s[sort_slot::Right]=r;s[More]=Value::boolean(true);t.pending=true;return true;
 }
@@ -79,7 +88,7 @@ bool next(const SortKey& k,Value* s,State& t) {
             ++t.stage;t.chunk=0;t.pass=0;continue;
         }
         if(t.stage==2) {
-            auto& a=receiver_items(k,s[Source]);auto& b=scratch(s[Keys]);const auto mid=(t.n+1)/2;
+            auto& a=working(k,s);auto& b=scratch(s[Keys]);const auto mid=(t.n+1)/2;
             if(mid<=t.n-mid) {
                 for(std::size_t q=0;q<mid;++q)move(s,a,q,b,q);
                 t.i=0;t.j=mid;t.k=0;t.mid=mid;t.end=t.n;t.op=3;
@@ -90,7 +99,11 @@ bool next(const SortKey& k,Value* s,State& t) {
             }
             t.stage=3;t.phase=0;return true;
         }
-        t.done=true;t.op=0;s[More]=Value::boolean(false);return false;
+        t.done=true;t.op=0;s[More]=Value::boolean(false);
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 8)
+        if(!t.aborted)mutation::SortController::commit_sorted(k,s[Source],working(k,s));  // the one commit
+#endif
+        return false;
     }
 }
 }
@@ -132,15 +145,15 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
     auto& t=state(s);
     if(t.done){s[More]=Value::boolean(false);return true;}
     if(!s[Source].is(Kind::Array)||array_size(s[Source])!=t.n)return false;
-    // B2 (b2-refrep.md, owner E): the receiver is sorted in place whoever
-    // holds it (the copy-on-write detach into a spare is gone); while the sort
-    // runs, kSortProtected refuses every mutation of it (Vm sort protection).
+    if(draining)t.aborted=true;  // an error unwind: finish without committing (receiver unchanged)
+    // B2 (owner E): while the sort runs, kSortProtected refuses every mutation of the
+    // receiver (Vm sort protection); B5 (Q7): the elements are sorted in the working copy.
     const bool responding=t.pending;t.pending=false;
     s[sort_slot::Left]=Value();s[sort_slot::Right]=Value();
     bool supplied=responding;
     for(;;) {
         if(!t.op&&!next(key,s,t))return true;
-        auto& a=receiver_items(key,s[Source]);auto& b=scratch(s[Keys]);
+        auto& a=working(key,s);auto& b=scratch(s[Keys]);
         if(t.op==1) {
             if(t.i>=t.end){t.op=0;continue;}
             if(t.phase==0) {
@@ -185,7 +198,7 @@ bool collection_sort_resume(Value* s,bool answer,bool draining) {
             while(t.j)move(s,b,--t.j,a,--t.k);
             t.op=0;continue;
         }
-        (void)draining;return false;
+        return false;
     }
 }
 }

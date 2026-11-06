@@ -11,7 +11,9 @@
 # 3. Control: the probe test binary does contain the marker.
 # 4. Behaviour: the production CLI keeps the comparator sort refusal the probe
 #    lifts (method:sort, before anything runs) on a toolchain outside the
-#    admitted libstdc++ profile, and the Phase A guard refusal the probe skips.
+#    admitted libstdc++ profile. B5 (b5-refsem.md): the Phase A guard and the
+#    `aliasing` refusal are deleted from every build; production must now share
+#    (the two former witnesses run and show the shared object).
 set -u
 nift=$1; lib=$2; probe=$3
 fail=0
@@ -43,16 +45,13 @@ if [ "$profile" != 20260321 ]; then
   else echo "PASS production keeps the comparator sort refusal (method:sort; libstdc++ $profile)"; fi
 else echo "SKIP comparator refusal: admitted libstdc++ profile $profile (the production VM runs it)"; fi
 out=$(cd "$tmp" && NIFT_VM=require "$nift" guard.f 2>&1); rc=$?
-if [ $rc -eq 0 ] || ! printf '%s' "$out" | grep -q 'reference-guard'; then
-  echo "FAIL: production reference guard not applied: rc=$rc $out"; fail=1
-else echo "PASS production keeps the reference guard ($(printf '%s' "$out" | grep -o '(reference-guard[^)]*)' | head -1))"; fi
-# Review L5: the probe also lifts the legacy location-alias refusal (compiler_rules.cpp
-# no_alias), which the marker symbol (compiler.cpp) does not witness: production must
-# still refuse an object alias with exactly `aliasing`.
-printf 'o := {"k": 1}\nc := o\nprint(c.k)\n' > "$tmp/alias.f"
+if [ $rc -ne 0 ] || [ "$out" != "2" ]; then
+  echo "FAIL: production does not share the argument (B5): rc=$rc $out"; fail=1
+else echo "PASS production shares the argument (B5: the guard is gone)"; fi
+printf 'o := {"k": [1]}\nc := o\ni := c["k"]\ni.push(2)\nprint(o.stringify())\n' > "$tmp/alias.f"
 out=$(cd "$tmp" && NIFT_VM=require "$nift" alias.f 2>&1); rc=$?
-if [ $rc -eq 0 ] || ! printf '%s' "$out" | grep -q '(aliasing)'; then
-  echo "FAIL: production location-alias refusal not applied: rc=$rc $out"; fail=1
-else echo "PASS production keeps the location-alias refusal (aliasing)"; fi
+if [ $rc -ne 0 ] || [ "$out" != '{"k":[1,2]}' ]; then
+  echo "FAIL: production does not share the object alias (B5): rc=$rc $out"; fail=1
+else echo "PASS production shares the object alias (B5: no aliasing refusal)"; fi
 [ $fail -eq 0 ] && echo "PASS reference probe: test configuration only (absent from $(basename "$nift") and $(basename "$lib"))"
 exit $fail

@@ -18,6 +18,10 @@ struct SortController {
     static std::vector<Value>& items(const SortKey& key, Value& array) noexcept {
         return Protocol::sort_items(key, array);
     }
+    // B5 (Q7): the comparator sort's single commit of its sorted working copy.
+    static void commit_sorted(const SortKey& key, Value& array, std::vector<Value>& sorted) {
+        Protocol::commit_sorted(key, array, sorted);
+    }
     // The plain sort's single commit of a permutation built on the side.
     static void commit_permutation(const SortKey& key, Value& array, std::vector<Value>& order) {
         Protocol::commit_permutation(key, array, order);

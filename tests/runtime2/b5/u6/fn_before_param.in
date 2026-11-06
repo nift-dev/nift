@@ -1,0 +1,8 @@
+fn(rd(a)) { return a[0].trim() }
+xs := [" x "]
+print(rd(xs))
+ys := xs
+ys.push(1)
+ys[0] = 7
+print(rd(xs))
+print("end")

@@ -161,8 +161,8 @@
  },
  "h_atomic_bool_array2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_bool_array_highlight_closure": {
   "exit": 1,
@@ -241,8 +241,8 @@
  },
  "h_atomic_bool_array_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_bool_map2_highlight_closure": {
   "exit": 1,
@@ -260,9 +260,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_map2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_map2_highlight_top": {
   "exit": 1,
@@ -285,9 +285,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_map2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_map2_prettify_top": {
   "exit": 1,
@@ -310,9 +310,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_map2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_map2_stringify_top": {
   "exit": 1,
@@ -481,8 +481,8 @@
  },
  "h_atomic_bool_object2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_bool_object_highlight_closure": {
   "exit": 1,
@@ -561,8 +561,8 @@
  },
  "h_atomic_bool_object_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_bool_stack2_highlight_closure": {
   "exit": 1,
@@ -580,9 +580,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_stack2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_stack2_highlight_top": {
   "exit": 1,
@@ -605,9 +605,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_stack2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_stack2_prettify_top": {
   "exit": 1,
@@ -630,9 +630,9 @@
   "stdout": "b\n"
  },
  "h_atomic_bool_stack2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\ntrue\n]\nafter\n"
  },
  "h_atomic_bool_stack2_stringify_top": {
   "exit": 1,
@@ -881,8 +881,8 @@
  },
  "h_atomic_int_array2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_int_array_highlight_closure": {
   "exit": 1,
@@ -961,8 +961,8 @@
  },
  "h_atomic_int_array_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_int_map2_highlight_closure": {
   "exit": 1,
@@ -980,9 +980,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_map2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_map2_highlight_top": {
   "exit": 1,
@@ -1005,9 +1005,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_map2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_map2_prettify_top": {
   "exit": 1,
@@ -1030,9 +1030,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_map2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_map2_stringify_top": {
   "exit": 1,
@@ -1201,8 +1201,8 @@
  },
  "h_atomic_int_object2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_int_object_highlight_closure": {
   "exit": 1,
@@ -1281,8 +1281,8 @@
  },
  "h_atomic_int_object_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_atomic_int_stack2_highlight_closure": {
   "exit": 1,
@@ -1300,9 +1300,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_stack2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_stack2_highlight_top": {
   "exit": 1,
@@ -1325,9 +1325,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_stack2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_stack2_prettify_top": {
   "exit": 1,
@@ -1350,9 +1350,9 @@
   "stdout": "b\n"
  },
  "h_atomic_int_stack2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\n",
+  "stdout": "b\n[\n1\n]\nafter\n"
  },
  "h_atomic_int_stack2_stringify_top": {
   "exit": 1,
@@ -1606,8 +1606,8 @@
  },
  "h_channel_array2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_channel_array_highlight_closure": {
   "exit": 1,
@@ -1686,8 +1686,8 @@
  },
  "h_channel_array_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_channel_interp_closure": {
   "exit": 1,
@@ -1765,9 +1765,9 @@
   "stdout": "b\n"
  },
  "h_channel_map2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_map2_highlight_top": {
   "exit": 1,
@@ -1790,9 +1790,9 @@
   "stdout": "b\n"
  },
  "h_channel_map2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_map2_prettify_top": {
   "exit": 1,
@@ -1815,9 +1815,9 @@
   "stdout": "b\n"
  },
  "h_channel_map2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_map2_stringify_top": {
   "exit": 1,
@@ -1991,8 +1991,8 @@
  },
  "h_channel_object2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_channel_object_highlight_closure": {
   "exit": 1,
@@ -2071,8 +2071,8 @@
  },
  "h_channel_object_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_channel_param": {
   "exit": 1,
@@ -2081,18 +2081,18 @@
  },
  "h_channel_print_array_closure": {
   "exit": 1,
-  "stderr": "error: p.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_channel_print_array_fn": {
   "exit": 1,
-  "stderr": "error: p.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_channel_print_array_module": {
   "exit": 1,
-  "stderr": "error: m.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_channel_print_array_session": {
   "exit": 0,
@@ -2160,9 +2160,9 @@
   "stdout": "b\n"
  },
  "h_channel_stack2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_stack2_highlight_top": {
   "exit": 1,
@@ -2185,9 +2185,9 @@
   "stdout": "b\n"
  },
  "h_channel_stack2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_stack2_prettify_top": {
   "exit": 1,
@@ -2210,9 +2210,9 @@
   "stdout": "b\n"
  },
  "h_channel_stack2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_channel_stack2_stringify_top": {
   "exit": 1,
@@ -2496,8 +2496,8 @@
  },
  "h_mutex_array2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_mutex_array_highlight_closure": {
   "exit": 1,
@@ -2576,8 +2576,8 @@
  },
  "h_mutex_array_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_mutex_interp_closure": {
   "exit": 1,
@@ -2655,9 +2655,9 @@
   "stdout": "b\n"
  },
  "h_mutex_map2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_map2_highlight_top": {
   "exit": 1,
@@ -2680,9 +2680,9 @@
   "stdout": "b\n"
  },
  "h_mutex_map2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_map2_prettify_top": {
   "exit": 1,
@@ -2705,9 +2705,9 @@
   "stdout": "b\n"
  },
  "h_mutex_map2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_map2_stringify_top": {
   "exit": 1,
@@ -2881,8 +2881,8 @@
  },
  "h_mutex_object2_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_mutex_object_highlight_closure": {
   "exit": 1,
@@ -2961,8 +2961,8 @@
  },
  "h_mutex_object_validate": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:4:7: validate: opaque runtime value is not serializable\n",
+  "stdout": "b\n"
  },
  "h_mutex_param": {
   "exit": 1,
@@ -2971,18 +2971,18 @@
  },
  "h_mutex_print_array_closure": {
   "exit": 1,
-  "stderr": "error: p.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_mutex_print_array_fn": {
   "exit": 1,
-  "stderr": "error: p.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_mutex_print_array_module": {
   "exit": 1,
-  "stderr": "error: m.f:3:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:1: print: value is not directly renderable\n",
+  "stdout": "b\n"
  },
  "h_mutex_print_array_session": {
   "exit": 0,
@@ -3050,9 +3050,9 @@
   "stdout": "b\n"
  },
  "h_mutex_stack2_highlight_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_stack2_highlight_top": {
   "exit": 1,
@@ -3075,9 +3075,9 @@
   "stdout": "b\n"
  },
  "h_mutex_stack2_prettify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_stack2_prettify_top": {
   "exit": 1,
@@ -3100,9 +3100,9 @@
   "stdout": "b\n"
  },
  "h_mutex_stack2_stringify_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:3:1: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "b\n"
+  "exit": 0,
+  "stderr": "error: opaque runtime value is not serializable\nerror: opaque runtime value is not serializable\n",
+  "stdout": "b\nafter\n"
  },
  "h_mutex_stack2_stringify_top": {
   "exit": 1,
@@ -3735,14 +3735,14 @@
   "stdout": "b\n"
  },
  "k_clear_array_loop": {
-  "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\n"
  },
  "k_clear_array_mapget": {
-  "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\n"
  },
  "k_clear_array_param": {
   "exit": 1,
@@ -3796,13 +3796,13 @@
  },
  "k_clear_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: clear\n",
+  "stdout": "b\n"
  },
  "k_clear_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: value has no member: clear\n",
+  "stdout": "b\n"
  },
  "k_clear_object_param": {
   "exit": 1,
@@ -3976,13 +3976,13 @@
  },
  "k_map_remove_array_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: remove: invalid index\n",
+  "stdout": "b\n"
  },
  "k_map_remove_array_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: remove: invalid index\n",
+  "stdout": "b\n"
  },
  "k_map_remove_array_param": {
   "exit": 1,
@@ -4276,13 +4276,13 @@
  },
  "k_set_add_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: add\n",
+  "stdout": "b\n"
  },
  "k_set_add_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: value has no member: add\n",
+  "stdout": "b\n"
  },
  "k_set_add_object_param": {
   "exit": 1,
@@ -4455,14 +4455,14 @@
   "stdout": ""
  },
  "k_stack_pop_array_loop": {
-  "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\n"
  },
  "k_stack_pop_array_mapget": {
-  "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "exit": 0,
+  "stderr": "",
+  "stdout": "b\n"
  },
  "k_stack_pop_array_param": {
   "exit": 1,
@@ -4516,13 +4516,13 @@
  },
  "k_stack_pop_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: pop\n",
+  "stdout": "b\n"
  },
  "k_stack_pop_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:6:1: value has no member: pop\n",
+  "stdout": "b\n"
  },
  "k_stack_pop_object_param": {
   "exit": 1,
@@ -4770,9 +4770,9 @@
   "stdout": "before\n"
  },
  "m_args_push_session": {
-  "exit": 1,
-  "stderr": "error: <stdin>:2:6: NIFT_VM session refused: reference-guard:shared-part: an array or object use whose output would change once arrays and objects are references (shared-part) is not supported by the Runtime 2.0 VM yet\nnote: this statement was not executed; earlier statements in this session may already have executed\nnote: the session stopped here: no later input was run (exit status 1)\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift -i -e '_s := 0' x\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": "before\n"
+  "exit": 0,
+  "stderr": "error: unknown value or malformed expression: a.push(1)\n",
+  "stdout": "before\nafter\n"
  },
  "m_args_push_try": {
   "exit": 1,
@@ -4821,13 +4821,13 @@
  },
  "m_clear_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: clear\n",
+  "stdout": "b\n"
  },
  "m_clear_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: clear\n",
+  "stdout": "b\n"
  },
  "m_clear_object_param": {
   "exit": 1,
@@ -4916,13 +4916,13 @@
  },
  "m_insert_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: insert\n",
+  "stdout": "b\n"
  },
  "m_insert_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: insert\n",
+  "stdout": "b\n"
  },
  "m_insert_object_param": {
   "exit": 1,
@@ -5011,13 +5011,13 @@
  },
  "m_pop_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: pop\n",
+  "stdout": "b\n"
  },
  "m_pop_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: pop\n",
+  "stdout": "b\n"
  },
  "m_pop_object_param": {
   "exit": 1,
@@ -5296,13 +5296,13 @@
  },
  "m_reverse_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: reverse\n",
+  "stdout": "b\n"
  },
  "m_reverse_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: reverse\n",
+  "stdout": "b\n"
  },
  "m_reverse_object_param": {
   "exit": 1,
@@ -5391,13 +5391,13 @@
  },
  "m_sort_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: sort\n",
+  "stdout": "b\n"
  },
  "m_sort_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: sort\n",
+  "stdout": "b\n"
  },
  "m_sort_object_param": {
   "exit": 1,
@@ -5581,13 +5581,13 @@
  },
  "m_splice3_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: splice\n",
+  "stdout": "b\n"
  },
  "m_splice3_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: splice\n",
+  "stdout": "b\n"
  },
  "m_splice3_object_param": {
   "exit": 1,
@@ -5676,13 +5676,13 @@
  },
  "m_splice_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: not compiled for the VM (reference-guard:lent): an array or object use whose output would change once arrays and objects are references (lent) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:16: value has no member: splice\n",
+  "stdout": "b\n"
  },
  "m_splice_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:4:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:5:1: value has no member: splice\n",
+  "stdout": "b\n"
  },
  "m_splice_object_param": {
   "exit": 1,

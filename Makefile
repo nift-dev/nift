@@ -492,7 +492,7 @@ RT_REFREP_MUTANTS := 24:src/rt/aggregate.cpp 25:src/rt/copy_graph.cpp 26:src/rt/
 	27:src/rt/vm_iter.cpp 28:src/rt/collection_helpers.cpp 29:src/rt/isolate_transfer_encode.cpp \
 	21:src/rt/mutation.cpp 30:src/rt/vm_ops.cpp \
 	31:src/rt/vm_report.cpp
-RT_REFREP_PROBE_SOURCES := src/rt/compiler.cpp src/rt/compiler_rules.cpp src/rt/compiler_collection_sort.cpp
+RT_REFREP_PROBE_SOURCES := src/rt/compiler.cpp src/rt/compiler_collection_sort.cpp
 RT_REFREP_PROBE_OBJECTS := $(patsubst src/rt/%.cpp,$(RT_REFREP_DIR)/probe/%.o,$(RT_REFREP_PROBE_SOURCES))
 # CP19_EXPR_OBJECTS (defined further down, so spelled out) with the probe objects.
 RT_REFREP_OBJECTS := $(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o) \
@@ -982,8 +982,24 @@ test-runtime2-b4b: $(TARGET) $(RT_B4B_TYPES) $(RT_B4B_WORK)
 	$(PYTHON) tests/runtime2/repo_state.py save "$(TEST_DIR)/rt/b4b-repo-state.txt"
 	"$(RT_B4B_TYPES)"
 	$(PYTHON) tests/runtime2/b4b/work.py --harness "$(CURDIR)/$(RT_B4B_WORK)"
-	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)"
+	# B5 (b5-refsem.md section 5): the production build shares references, so the suite runs in
+	# its shared-reference mode (formerly the guard-off gate's): no internal failure, tag,
+	# defect or nondeterminism; the semantics against legacy are the B5 fixtures' (test-runtime2-b5).
+	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(TARGET)" --guardoff
 	$(PYTHON) tests/runtime2/repo_state.py check "$(TEST_DIR)/rt/b4b-repo-state.txt"
+# B5 (docs/runtime-2/checkpoints/b5-refsem.md): the reference-semantics fixtures with their
+# hand-derived goldens (tests/runtime2/b5/run.py) on the production build; the comparator-sort
+# fixtures (owner Q7, copy-sort-commit) on the probe build as well, which skips only the
+# comparator's libstdc++ profile refusal (they run on the production build where the profile
+# matches, e.g. the certification instance). Mutants: tests/runtime2/b5/mutants.sh.
+.PHONY: test-runtime2-b5 test-runtime2-b5-mutants
+test-runtime2-b5: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort
+test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
+	bash tests/runtime2/b5/mutants.sh
 # B4b review (L4): the standing guard-off gate. The CLI linked with the B2
 # reference-probe compiler objects (-DNIFT_RT_REFERENCE_PROBE: no Phase A guard,
 # no `aliasing` refusal; arrays and objects shared), a TEST configuration that

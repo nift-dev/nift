@@ -37,7 +37,7 @@ module-starts-from-entry	refuse	coro-module-private-async	par.f:3:38
 mutex-array	refuse	coro-module-capture	main.f:5:6
 mutex-direct-evade	refuse	coro-module-capture	main.f:5:6
 mutex-direct-thread	refuse	coro-module-capture	main.f:3:6
-mutex-entry-inline	refuse	aliasing	main.f:3:77
+mutex-entry-inline	parity	-	-
 mutex-evade	refuse	coro-module-capture	main.f:5:6
 mutex-fn	refuse	coro-module-capture	main.f:5:6
 mx-direct	refuse	coro-module-capture	main.f:4:6

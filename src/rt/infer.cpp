@@ -120,8 +120,6 @@ void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
-    if (session_ && ((ast_.at(at).kind == NodeKind::Declare && (ast_.at(at).flags & kFlagConst)) ||
-        session_->const_captures.count(binding_decls_[slot]))) const_arrays_.insert(slot);
     if (session_ && (top_level_decls_.count(at) || (value->kinds & (kKindArray | kKindObject)))) {
         const auto type = ast_.at(at).kind == NodeKind::Declare ?
             infer_text_type(ast_.text(ast_.at(ast_.at(at).b))) : TextType{};

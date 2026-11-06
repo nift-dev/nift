@@ -1,0 +1,2 @@
+§3 Extraction: the element object itself (m.get(k), o["k"], loop binding of a map/set/stack)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:collection-element)

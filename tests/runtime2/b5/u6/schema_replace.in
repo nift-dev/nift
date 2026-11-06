@@ -1,0 +1,8 @@
+struct(C) { v := " x "; fn(t()) { return v.trim() } }
+c := C()
+print(c.t())
+struct(C) { v := 5; fn(t()) { return v + 1 } }
+d := C()
+print(d.t())
+print(c.t())
+print("end")

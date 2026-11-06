@@ -33,13 +33,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
                 return temp(result)&&array_mutation(expr,result,0);
             }
             const NodeId arg = ast_.list(expr)[0];
-            // records20k coverage (stage 4): legacy pushes an aggregate taken
-            // from a place as a location reference (refused: no_alias); a
-            // fresh value (call result, literal, operator result) is a value
-            // in both engines.
-            if (!no_alias(arg, ast_.at(arg)) ||
-                (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
-                 !kinds_within(callee.a, kKindArray, receiver, "type:push")))
+            // B5 (D-NEXT-refsem-b): the pushed value is shared, whatever it is
+            // written as (a place, a call result, a literal).
+            if (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
+                !kinds_within(callee.a, kKindArray, receiver, "type:push"))
                 return false;
             if (!expr_any(arg, value)) return false;
             // B2 (b2-refrep.md): re-read after the operand (as the take did);

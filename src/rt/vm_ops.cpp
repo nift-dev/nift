@@ -1,4 +1,7 @@
 #include "rt/vm_ops.h"
+#if defined(NIFT_B5_MUTANT)
+#include "rt/copy_graph.h"
+#endif
 #include "rt/dispatch_defect.h"  // B4
 #include "rt/vm.h"
 
@@ -352,8 +355,14 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
 bool push_value(Value& array, const Value& value, Fault& fault, const Note* note, const CycleGraph* graph,
                 bool* cycle) {
     if (!array.is(Kind::Array)) return push_kind_error(fault, note);
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 6  // R-B6 (b5 mutants, test-only): the pushed value is copied
+    Value copied = value;
+    if (value.is(Kind::Array) || value.is(Kind::Object)) (void)shallow_copy(value, copied, ~std::size_t(0));
+    const mutation::Outcome out = mutation::push(array, copied, [note] { return note_view(note); }, graph);
+#else
     // B1: the protocol; the growth is counted after the step (memory_ok), as before
     const mutation::Outcome out = mutation::push(array, value, [note] { return note_view(note); }, graph);
+#endif
     if (out.ok()) return true;
     if (out.failure == mutation::Failure::Cycle && cycle) { *cycle = true; return false; }
     return refused(fault, out);

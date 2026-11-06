@@ -1,4 +1,6 @@
 #include "rt/mutation.h"
+
+#include <cctype>
 #include "rt/mutation_collection.h"
 
 #include "rt/aggregate.h"
@@ -91,7 +93,32 @@ void make_immutable(Value& value) noexcept {
 
 namespace detail {
 
-Outcome immutable_failure(const Value& receiver, std::string_view receiver_text) {
+namespace {
+// B5 (owner Q1): the error names the receiver expression (`b` in `b.push(1)`), legacy's
+// "cannot mutate const array: args". A mutator call's note is its call text (the malformed-
+// expression diagnostic's); its receiver is the text before the method's `.`.
+std::string_view receiver_of_call(std::string_view text) {
+    if (text.empty() || text.back() != ')') return text;
+    int depth = 0;
+    std::size_t k = text.size();
+    while (k-- > 0) {
+        const char c = text[k];
+        if (c == ')') ++depth;
+        else if (c == '(' && --depth == 0) break;
+        else if (c == '"') {  // a string argument: skip to its opening quote
+            while (k-- > 0 && !(text[k] == '"' && (k == 0 || text[k - 1] != '\\'))) {}
+        }
+    }
+    if (k == static_cast<std::size_t>(-1) || k == 0) return text;
+    std::size_t name = k;
+    while (name > 0 && (std::isalnum(static_cast<unsigned char>(text[name - 1])) || text[name - 1] == '_')) --name;
+    if (name == k || name == 0 || text[name - 1] != '.') return text;
+    return text.substr(0, name - 1);
+}
+} // namespace
+
+Outcome immutable_failure(const Value& receiver, std::string_view receiver_text_in) {
+    const std::string_view receiver_text = receiver_of_call(receiver_text_in);
     if (!is_immutable(receiver) && receiver.is_heap() && is_sort_protected(receiver.heap()))
 #if defined(NIFT_SORT_WORDING_TEST)  // review M2 control: other words, same kind (classification never reads text)
         return failed(Failure::SortProtected, "array busy: a comparator sort owns it");
@@ -166,6 +193,13 @@ void Protocol::commit_permutation(const SortKey&, Value& array, std::vector<Valu
 }
 
 std::vector<Value>& Protocol::sort_storage(const SortKey&, Value& array) { return Storage::array_mut(array); }
+
+void Protocol::commit_sorted(const SortKey&, Value& array, std::vector<Value>& sorted) {
+    auto& items = Storage::array_mut(array);
+    if (items.size() != sorted.size()) return;  // never: the receiver is protected while the sort runs
+    for (std::size_t i = 0; i < items.size(); ++i) std::swap(items[i], sorted[i]);
+    heap_retally(array.heap());
+}
 
 // Stage 3 + 4 for an array edit: one structural change, then the heap tally.
 void Protocol::commit_array(Value& array, ArrayEdit edit, std::size_t index, std::size_t count,

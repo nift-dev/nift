@@ -13,7 +13,9 @@ import comparator_profile as cprof
 # (fully conservative): a session function as a native's callback over a session
 # array, and `b:=a` (the D-040 alias witness, whose value-copy result the `cow`
 # branch below accepted before Phase A).
-GUARDED={'array_callback':'reference-guard:shared-part','cow':'reference-guard:inflow'}
+# B5 (D-NEXT-refsem-b, b5-refsem.md section 6): the guard is gone; both former GUARDED cases are
+# legacy-equal (`b:=a` shares, as legacy's location alias does).
+GUARDED={}
 COMPARATOR_CASES={'array_sort'}
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True)
 a=ap.parse_args();binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text('')
@@ -104,10 +106,9 @@ for name,argv,stdin,rc,units in cases:
     assert all(s['vm_executions']==1 and s['legacy_executions']==0 for s in rows[:-1]),r
     continue
    if name == 'cow':
-    # Accepted D-040 array value-copy semantics; retain the raw legacy alias
-    # result as evidence instead of pretending these channels are identical.
+    # B5: the D-040 witness is legacy-equal now (b aliases a); legacy's result is pinned too.
     assert baseline == (0,'3\n[1,2,3]\n[1,2,3]\n',''),baseline
-    assert channels == (0,'3\n[1,2]\n[1,2,3]\n',''),r
+    assert channels == baseline,r
    else: assert channels==baseline,(name,baseline,r)
    assert len(rows)==units,(name,units,r)
    assert len([s for s in rows if s['outcome']=='vm-error']) == (1 if name in ('invocation_readonly','invocation_readonly_number') else 0),r

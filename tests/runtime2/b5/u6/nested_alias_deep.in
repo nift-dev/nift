@@ -1,0 +1,7 @@
+inner := [" x "]
+mid := [inner]
+outer := {"m": mid}
+o2 := outer
+o2["m"][0][0] = 5
+print(inner[0].trim())
+print("end")

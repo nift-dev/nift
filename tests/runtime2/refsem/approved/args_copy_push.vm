@@ -1,0 +1,3 @@
+--- stderr
+error: args_copy_push.f:2:1: cannot mutate const array: b
+--- exit 1

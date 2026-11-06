@@ -1,0 +1,2 @@
+-- exit 1
+error: r10_args_in_map.f:5:1: cannot mutate const array: v

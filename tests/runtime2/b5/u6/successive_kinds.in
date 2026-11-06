@@ -1,0 +1,12 @@
+xs := [" x "]
+ys := xs
+ys[0] = 5
+print(xs[0] + 1)
+ys[0] = true
+print(xs[0])
+ys[0] = [" q "]
+print(xs[0][0].trim())
+ys[0] = {"k": " z "}
+print(xs[0]["k"].trim())
+print(xs[0].trim())
+print("end")

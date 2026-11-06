@@ -1,0 +1,2 @@
+-- exit 1
+error: r09_args_alias.f:3:1: cannot mutate const array: b

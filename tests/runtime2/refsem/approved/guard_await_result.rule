@@ -1,0 +1,2 @@
+§3 Returns share + Cooperative async (D7): an awaited result is the callee's object; the future keeps it (every await gives the same object)
+B5 (b5-refsem.md section 6): was refused before any effect (reference-guard:inflow)

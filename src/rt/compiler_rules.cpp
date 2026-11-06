@@ -1,6 +1,4 @@
 #include "rt/compiler_rules.h"
-#include "rt/reference_probe.h"
-#include "rt/collection_copy.h"
 
 #include "rt/prepared_parse.h"
 #include "rt/text_type.h"
@@ -282,29 +280,6 @@ bool UnitCompiler::legacy_fatal(const Node& at, std::string message, std::uint16
 bool UnitCompiler::kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason) {
     if ((kinds(id) & ~allowed) == 0 || unknown_defers(kinds(id))) return true;  // Unknown: never within (D1)
     return fail(at, reason);
-}
-
-// Legacy binds a declaration, assignment, return, element or literal item
-// written as a place (name, member or index) to an aggregate as a location
-// reference (P8); the VM copies. Refused when the place can hold an array or
-// object.
-bool UnitCompiler::no_alias(NodeId value, const Node& at) {
-#if defined(NIFT_RT_REFERENCE_PROBE)  // B2 test configuration only (rt/reference_probe.h)
-    return true;
-#endif
-    const NodeKind kind = ast_.at(value).kind;
-    if (kind != NodeKind::Ident && kind != NodeKind::Member && kind != NodeKind::Index) return true;
-    const Binding* binding=kind==NodeKind::Ident?find_binding(text(ast_.at(value))):nullptr;
-    const bool ordinary=kind==NodeKind::Ident&&binding&&!binding->selector&&!binding->loop_binding;
-    if (session_ && ordinary && kinds(value) == kKindArray) return true;  // D-040 stable binding copies
-    if(ordinary&&(kinds(value)&kKindAggregate)&&
-       (!(kinds(value)&kKindArray)||kinds_.collection_arrays.count(value))&&
-       (!(kinds(value)&kKindObject)||kinds_.collection_objects.count(value)))return true;
-    if (ordinary&&kinds(value)==kKindArray&&
-        (collection_binding_copy(ast_,kinds_,at)||kinds_.collection_arrays.count(value)))
-        return true;  // D-040 binding copies and CP14B result containers only
-    if ((kinds(value) & (kKindAggregate | kKindUnknown)) == 0 || unknown_defers(kinds(value))) return true;
-    return fail(at, "aliasing");
 }
 
 // Legacy applies a prefix `!` to the rest of the evaluation unit (`!x + 1`
