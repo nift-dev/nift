@@ -142,11 +142,19 @@ void lifetime(bool cached) {
     }
     retained=Value(); CHECK(owner.expired()); CHECK(weak.expired() != cached);
 }
-void shared_callable(bool internal) {
+void shared_callable(bool internal, bool refused) {
     VmSession session;std::string output;
     auto r=session.execute("fn(applycb(v)){return v()};fn(makeo()){a:=[()=>1];return {\"putv\":v=>{a[0]=v;return 0},\"readv\":()=>{q:=a[0];return applycb(q)*2}}};o:=makeo();warm:=o.putv(()=>1)","seed",output);
     CHECK(r.admitted && r.execution.reason==StopReason::None);
     r=session.execute("o.putv(()=>\"bad\");print(\"WROTE\");o.readv()","same-unit",output);
+    // B5 (b5-refsem.md section 3, U6): `putv` escapes (C4: its parameter is unknown) and its
+    // store reaches the captured array through the session heap, so readv's element read is
+    // unknown and the statement is refused before any effect (expected-output change E-U6-1).
+    if (refused) {
+        CHECK(!r.admitted && r.vm_executions==0 && output.empty());
+        CHECK(r.refusal=="session:current-callable-proof");
+        return;
+    }
     CHECK(r.admitted && r.vm_executions==1 && !r.execution.catchable && output=="WROTE\n");
     CHECK(r.execution.reason==(internal ? StopReason::Internal : StopReason::Error));
     CHECK(r.execution.message==(internal ? "unexpected operands (compiler defect): arithmetic" :
@@ -232,7 +240,7 @@ int main(int argc,char** argv) {
     else if(test=="partial-target")partial_target(expect=="admitted");
     else if(test=="reporting-arguments")reporting_arguments(expect=="lost");
     else if(test=="windows")windows(expect=="broken");
-    else if(test=="shared-callable")shared_callable(expect=="internal");
+    else if(test=="shared-callable")shared_callable(expect=="internal", expect=="refused");
     else if(test=="array")array_payload(expect=="broken");
     else if(test=="reporting")reporting(expect=="raw");
     else if(test=="history")history(expect=="refused");

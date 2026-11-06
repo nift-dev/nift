@@ -1,0 +1,5 @@
+[
+" x "
+]
+-- exit 1
+error: <stdin>:4:1: NIFT_VM session refused: index-assign-target: this index assignment target is not supported by the Runtime 2.0 VM yet

@@ -1,0 +1,4 @@
+rows := [[" x "]]
+for (r : rows) { r[0] = 5 }
+print(rows[0][0].trim())
+print("end")

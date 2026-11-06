@@ -52,6 +52,11 @@ struct SessionSymbol {
     bool invocation = false;
     std::vector<std::uint32_t> params;   // KindSets
     std::vector<std::uint16_t> param_types;
+    // B5 (U6, b5-refsem.md section 3): set when the last published statement proved the value
+    // private (an array or object no other binding, capture, struct field or earlier value can
+    // reach): its structure then, every part materialized. The next statement gives the value its
+    // own site class with these contents; null: the value is in the session heap.
+    std::shared_ptr<const infer_detail::Ty> heap_contents;
 };
 // The script invocation bindings legacy installs for every program and
 // session (`cmd`: the script name, `args`: its arguments; readonly, `args` a
@@ -103,6 +108,10 @@ struct SessionCompileContext {
     std::uint32_t unit_begin = 0;  // generated retained definitions precede the current unit
     std::uint16_t slots = 0;
     bool inspect_tail = false, coherent_recompile = false;
+    // B5 (U6, b5-refsem.md section 3): every kind the contents of an array or object made by an
+    // earlier statement may hold, at any depth (monotone: published statements only add to it).
+    // Each unit's analysis reads every earlier value's contents as this union (Inference::heap_site_).
+    std::shared_ptr<const infer_detail::Ty> heap, heap_objects;  // earlier arrays' elements, objects' members
 };
 struct CompileLimits {
     SessionCompileContext* session = nullptr;  // private compile transaction, never the live namespace

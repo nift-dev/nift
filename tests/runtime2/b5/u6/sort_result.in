@@ -1,0 +1,5 @@
+xs := [" b ", " a "]
+ys := xs.sort()
+ys[0] = 5
+print(xs[0].trim())
+print("end")

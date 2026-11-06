@@ -4,9 +4,61 @@
 #include "rt/session_shape.h"
 #include "rt/collection.h"
 #include <algorithm>
+#include <map>
+#include <set>
 
 // rt-lint: cold-file incremental namespace facts in the shared kind inference
 namespace nift::rt::infer_detail {
+namespace {
+// B5 (U6): the session heap's two pools: every kind an earlier array's elements, and every kind
+// an earlier object's members, may hold, at any depth (an array is never the same object as an
+// object, so the two never alias). An instance or callable there is of an earlier statement:
+// struct -2 (any schema), callables historical; an open part makes both pools open.
+struct HeapKinds { Ty arrays, objects; };
+void heap_parts(const TyRef& t, HeapKinds& h, int depth = 0);
+void heap_add(const TyRef& part, Ty& pool, HeapKinds& h, int depth) {
+    if (!part) return;
+    pool.kinds |= part->kinds;
+    if (part->any) pool.any = true;
+    // a callable keeps the targets this unit knows for it (a capture's current closures)
+    pool.historical_callable = pool.historical_callable || part->historical_callable ||
+        ((part->kinds & kKindFunction) && part->callables.empty() && !part->untracked_callable);
+    pool.untracked_callable = pool.untracked_callable || part->untracked_callable;
+    for (std::uint32_t unit : part->callables)
+        if (std::find(pool.callables.begin(), pool.callables.end(), unit) == pool.callables.end())
+            pool.callables.push_back(unit);
+    heap_parts(part, h, depth + 1);
+}
+// `t` a value: its parts join the pool of its container kind.
+void heap_parts(const TyRef& t, HeapKinds& h, int depth) {
+    if (!t || depth > 64) return;
+    if (t->any) { h.arrays.any = h.objects.any = true; return; }
+    if (t->kinds & kKindArray) {
+        heap_add(t->elem, h.arrays, h, depth);
+        for (const auto& item : t->items) heap_add(item, h.arrays, h, depth);
+    }
+    if (t->kinds & kKindObject) {
+        heap_add(t->elem, h.objects, h, depth);
+        for (const auto& field : t->fields) heap_add(field.second, h.objects, h, depth);
+    }
+}
+TyRef heap_type(const Ty& kinds, std::uint32_t arrays, std::uint32_t objects) {
+    if (!kinds.kinds && !kinds.any) return {};
+    auto out = std::make_shared<Ty>();
+    out->kinds = kinds.kinds;
+    out->any = kinds.any;
+    if (out->kinds & kKindStruct) out->struct_id = -2;
+    out->historical_callable = kinds.historical_callable;
+    out->untracked_callable = kinds.untracked_callable;
+    out->callables = kinds.callables;
+    std::sort(out->callables.begin(), out->callables.end());
+    if (out->kinds & kKindArray) out->sites.push_back(arrays);  // its parts: the heap again
+    if (out->kinds & kKindObject) out->sites.push_back(objects);
+    std::sort(out->sites.begin(), out->sites.end());
+    return out;
+}
+} // namespace
+
 TyRef Inference::session_expression_seed(NodeId id) {
     if (!session_) return {};
     const auto seed = session_->capture_seeds.find(id);
@@ -27,6 +79,7 @@ void Inference::seed_session() {
         vars_.push_back(fresh(new_site(), entry.symbol.structure ? entry.symbol.structure :
                                                                    kinds_ty(entry.symbol.kinds)));
     }
+    HeapKinds heap;  // B5 (U6): the session heap's initial contents
     if (session_) for (const auto& symbol : session_->symbols) {
         external_.emplace(symbol.name, vars_.size());
         if (symbol.const_array) const_arrays_.insert(vars_.size());
@@ -49,6 +102,25 @@ void Inference::seed_session() {
                                     adapted->callables.end());
             type = std::move(adapted);
         }
+        // B5 (U6): an earlier statement's value. Private (proved by the last statement): its own
+        // site class, with its contents then; else the session heap (siteless here, sited()).
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 4)
+        if (symbol.heap_contents && (type->kinds & (kKindArray | kKindObject)) && !type->any) {
+            auto own = std::make_shared<Ty>(*type);
+            own->elem = symbol.heap_contents->elem;
+            own->items = symbol.heap_contents->items;
+            own->tuple = symbol.heap_contents->tuple;
+            own->fields = symbol.heap_contents->fields;
+            own->sites.assign(1, new_site());
+            type = std::move(own);
+        } else if (symbol.structure && !(symbol.kinds & kKindUnknown))  // Unknown: every use is refused
+            heap_parts(symbol.structure, heap);
+#else
+        if (symbol.structure) heap_parts(symbol.structure, heap);  // B5-U4: every earlier value private
+        if (symbol.heap_contents || (type->kinds & (kKindArray | kKindObject))) {
+            auto own = std::make_shared<Ty>(*type); own->sites.assign(1, new_site()); type = std::move(own);
+        }
+#endif
         vars_.push_back(type);
         if (session_locations_) {
             const auto location = session_->global_locations.find(symbol.name);
@@ -56,15 +128,164 @@ void Inference::seed_session() {
                 session_location_slot(location->second.key,vars_.size()-1);
         }
     }
+    if (!session_) return;
+    // B5 (U6): one site class for every earlier value, at every depth. Its contents: the published
+    // heap, every recorded structure's parts and every seed of earlier code (captures, parameters,
+    // call results), so a read of any earlier value's part sees what any of them may hold.
+    heap_site_ = new_site();
+    heap_objects_site_ = new_site();
+    for (std::uint32_t s : {heap_site_, heap_objects_site_}) {
+        nonpositional_.insert(s);
+        exposed_.insert(s);  // earlier (not recompiled) code reaches every earlier value (M1, C5)
+    }
+    if (session_->heap) heap_add(session_->heap, heap.arrays, heap, 0);
+    if (session_->heap_objects) heap_add(session_->heap_objects, heap.objects, heap, 0);
+    for (const auto& seed : session_->capture_seeds) heap_parts(seed.second, heap);
+    for (const auto& seed : session_->parameter_seeds) heap_parts(seed.second, heap);
+    for (const auto& seed : session_->call_result_seeds) heap_parts(seed.second, heap);
+    if (TyRef contents = heap_type(heap.arrays, heap_site_, heap_objects_site_))
+        agg_[heap_site_].values = std::move(contents);
+    if (TyRef contents = heap_type(heap.objects, heap_site_, heap_objects_site_))
+        agg_[heap_objects_site_].values = std::move(contents);
 }
+// B5 (U6): an earlier statement's value without a site here: in the heap pool of each container kind
+// it may be (an unknown container kind: the arrays' pool).
+TyRef Inference::heap_sited(const TyRef& t) {
+    auto out = std::make_shared<Ty>(*t);
+    if (t->kinds & kKindArray) out->sites.push_back(heap_site_);
+    if (t->kinds & kKindObject) out->sites.push_back(heap_objects_site_);
+    if (!(t->kinds & (kKindArray | kKindObject))) out->sites.push_back(heap_site_);
+    std::sort(out->sites.begin(), out->sites.end());
+    out->sites.erase(std::unique(out->sites.begin(), out->sites.end()), out->sites.end());
+    return out;
+}
+
+// B5 (U6): a value as the next statement records it: every part materialized from its sites
+// (stores through every alias joined in), no site numbers (they mean nothing in another unit).
+TyRef Inference::session_export(const TyRef& t, int depth) {
+    if (!t) return t;
+    if (depth > 8) return top_ty();
+    const TyRef m = (t->kinds & (kKindArray | kKindObject)) && !t->any ? sited(kNoNode, t) : t;
+    auto out = std::make_shared<Ty>(*m);
+    out->sites.clear();
+    out->elem = session_export(m->elem, depth + 1);
+    for (auto& item : out->items) item = session_export(item, depth + 1);
+    for (auto& field : out->fields) field.second = session_export(field.second, depth + 1);
+    return out;
+}
+
+void Inference::session_reach(const TyRef& t_in, int depth, std::map<std::uint32_t, int>& at, bool& shared) {
+    if (!t_in) return;
+    if (depth > 16 || t_in->any) { shared = true; return; }
+    if (t_in->kinds & (kKindFunction | kKindStruct | kKindCollection | kKindUnknown)) shared = true;
+    if (!(t_in->kinds & (kKindArray | kKindObject))) return;
+    const TyRef t = sited(kNoNode, t_in);
+    bool open = false;
+    for (std::uint32_t s : t->sites) if (s == kOpenSite) open = true;
+    for (std::uint32_t c : classes(t->sites, open)) {
+        if (opened_.count(c)) open = true;
+        const auto seen = at.find(c);
+        if (seen != at.end()) {
+            if (seen->second != depth) shared = true;  // one class at two depths
+            continue;
+        }
+        at.emplace(c, depth);
+    }
+    if (open) shared = true;
+    session_reach(t->elem, depth + 1, at, shared);
+    for (const auto& item : t->items) session_reach(item, depth + 1, at, shared);
+    for (const auto& field : t->fields) session_reach(field.second, depth + 1, at, shared);
+}
+
 void Inference::export_session() {
     if (!session_) return;
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 3
+    const auto shape = [](const TyRef& t) { return t; };  // B5-U3: the binding's type as written (B4b)
+#else
+    const auto shape = [this](const TyRef& t) { return session_export(t, 0); };
+#endif
     for (const auto& binding : binding_decls_)
-        result_.session_decl_shapes[binding.second] = vars_[binding.first];
+        result_.session_decl_shapes[binding.second] = shape(vars_[binding.first]);
     if (session_->coherent_recompile) for (const auto& binding : external_)
-        result_.binding_shapes[std::string(binding.first)] = vars_[binding.second];
+        result_.binding_shapes[std::string(binding.first)] = shape(vars_[binding.second]);
     for (const auto& binding : top_level_slots_)
-        result_.binding_shapes[std::string(binding.first)] = vars_[binding.second];
+        result_.binding_shapes[std::string(binding.first)] = shape(vars_[binding.second]);
+    // B5 (U6): which bindings are private. A binding's value is private when every site class it
+    // reaches (at every depth) is reached by no other binding, by no slot that outlives the
+    // statement other than a binding (a lambda's captures, a struct field) and by no earlier
+    // value (the heap), each class at one depth only, and nothing in it is open, a callable, an
+    // instance or a collection (whose holders the analysis does not bound).
+    std::map<std::string, std::size_t> names;
+    for (const auto& binding : external_) names[std::string(binding.first)] = binding.second;
+    for (const auto& binding : top_level_slots_) names[std::string(binding.first)] = binding.second;
+    std::set<std::size_t> top;
+    for (const auto& name : names) top.insert(name.second);
+    std::map<std::uint32_t, int> hidden;
+    bool everything = agg_unknown_;
+    {
+        bool open = false;
+        std::vector<std::uint32_t> heap_classes = classes({heap_site_, heap_objects_site_}, open);
+        for (std::uint32_t s : heap_classes) hidden.emplace(s, 0);
+        std::set<std::size_t> holders;
+        for (const auto& lambda : lambdas_)
+            for (const auto& scope : lambda.scopes)
+                for (const auto& entry : scope) if (!top.count(entry.second)) holders.insert(entry.second);
+        for (const StructInfo& s : plan_.structs)
+            for (const StructFieldInfo& f : s.fields) holders.insert(field_slot(f));
+        for (std::size_t slot : holders) {
+            bool ignored = false;
+            std::map<std::uint32_t, int> at;
+            session_reach(vars_[slot], 0, at, ignored);
+            for (const auto& entry : at) hidden.emplace(entry.first, 0);
+        }
+        everything = everything || open;
+    }
+    std::map<std::string, std::map<std::uint32_t, int>> reached;
+    std::map<std::uint32_t, int> count;
+    std::set<std::string> unbounded;
+    for (const auto& name : names) {
+        bool shared = false;
+        auto& at = reached[name.first];
+        session_reach(vars_[name.second], 0, at, shared);
+        if (shared) unbounded.insert(name.first);
+        for (const auto& entry : at) ++count[entry.first];
+    }
+    if (!everything)
+        for (const auto& name : names) {
+            const TyRef& type = vars_[name.second];
+            if (!type || type->any || !(type->kinds & (kKindArray | kKindObject)) || unbounded.count(name.first))
+                continue;
+            bool alone = true;
+            for (const auto& entry : reached[name.first])
+                if (count[entry.first] > 1 || hidden.count(entry.first)) alone = false;
+            if (alone) result_.session_private[name.first] = session_export(type, 0);
+        }
+    // B5 (U6): the heap's contents after this unit, with every part's own sites read.
+    HeapKinds heap;
+    bool open = false;
+    for (std::uint32_t root : {heap_site_, heap_objects_site_}) {
+        Ty& pool = root == heap_site_ ? heap.arrays : heap.objects;
+        for (std::uint32_t s : classes({root}, open)) {
+            if (opened_.count(s)) open = true;
+            const auto c = agg_.find(s);
+            if (c == agg_.end()) continue;
+            heap_add(session_export(c->second.values, 1), pool, heap, 0);
+            for (const auto& entry : c->second.named) heap_add(session_export(entry.second, 1), pool, heap, 0);
+        }
+    }
+    if (open || agg_unknown_) heap.arrays.any = heap.objects.any = true;
+    for (const auto& name : names)  // every value that stays in the heap (or joins it now)
+        if (!result_.session_private.count(name.first)) heap_parts(session_export(vars_[name.second], 0), heap);
+    const auto plain = [](const Ty& pool) -> TyRef {
+        TyRef t = heap_type(pool, kOpenSite, kOpenSite);
+        if (!t) return t;
+        auto out = std::make_shared<Ty>(*t);
+        out->sites.clear();
+        if (!out->callables.empty()) out->callables.clear(), out->historical_callable = true;
+        return out;
+    };
+    result_.session_heap = plain(heap.arrays);
+    result_.session_heap_objects = plain(heap.objects);
 }
 TyRef Inference::session_bottom_arguments(const Node& node) {
     for (std::uint32_t k=0;k<node.count;++k) expr(ast_.list(node)[k]);

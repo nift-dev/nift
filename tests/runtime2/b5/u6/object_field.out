@@ -1,0 +1,2 @@
+-- exit 1
+error: <stdin>:3:1: NIFT_VM session refused: static-error:member-assign: a statically certain program error the VM does not reproduce yet (member-assign) is not supported by the Runtime 2.0 VM yet

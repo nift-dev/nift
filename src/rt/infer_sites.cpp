@@ -12,6 +12,7 @@ namespace nift::rt::infer_detail {
 
 namespace {
 constexpr KindSet kAggregate = kKindArray | kKindObject;
+
 constexpr std::size_t kMaxSites = 16;  // H2: classes a value carries before they are merged
 
 TyRef with_site(const TyRef& t, std::uint32_t site) {
@@ -59,10 +60,14 @@ TyRef Inference::sited(NodeId id, const TyRef& t) {
             if (ast_.at(id).kind == NodeKind::Call) callee_nodes_.insert(ast_.at(id).a);
     }
     if (!t || t->any || !(t->kinds & kAggregate)) return t;
-    // A persistent session's earlier values keep their recorded structure:
-    // the session's shape contracts and coherent recompilation (CP19) keep
-    // it true while the reference guard is on (b4b-element-types.md, U6).
-    if (session_ && !has_site(t)) return t;
+    // B5 (U6): a persistent session's earlier value (no site in this unit) is
+    // in the session heap: its contents are what any earlier value may hold,
+    // grown by every store of this unit through any earlier value.
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 1
+    if (session_ && !has_site(t)) return t;  // B5-U1: earlier values keep their recorded structure (B4b)
+#else
+    if (session_ && !has_site(t)) return materialize(heap_sited(t));
+#endif
 #if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 22
     return materialize(has_site(t) ? t : fresh(id, t));
 #else
@@ -289,11 +294,16 @@ void Inference::site_store(const TyRef& container, const TyRef& value_in, const 
     const TyRef value = canonical(value_in);
     // M1 (C5): a store into an earlier statement's value (it has no site here)
     // makes the stored containers reachable by earlier code.
-    if (session_ && !container->any && !has_site(container)) {  // CP19 (U6) for the rest
+    if (session_ && !container->any && !has_site(container)) {
 #if !(defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 29)
         expose(value);
 #endif
-        return;
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 2
+        return;  // B5-U2: a store through an earlier value does not reach the session heap
+#else
+        // B5 (U6): the store reaches the session heap (every earlier value's contents)
+        return site_store(heap_sited(container), value_in, key);
+#endif
     }
     const bool aggregate = container->any || (container->kinds & (kAggregate | kKindUnknown));
     if (!aggregate) return;

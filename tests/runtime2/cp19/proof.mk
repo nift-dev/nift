@@ -9,7 +9,7 @@ $(TEST_DIR)/cp19/proof-alloc-switch: tests/runtime2/cp19/proof_alloc.cpp $(filte
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
 .PHONY: test-cp19-proof test-cp19-proof-alloc
 test-cp19-proof: $(TEST_DIR)/cp19/proof $(TEST_DIR)/cp19/proof-switch
-	@for binary in $^; do $$binary history admitted || exit $$?; for case in unknown-effect partial-target active active-method active-constructor active-collection active-indirect unknown field element return alias cell unknown-result; do $$binary $$case refused || exit $$?; done; $$binary reporting-arguments prefixed || exit $$?; $$binary windows clean || exit $$?; $$binary array clean || exit $$?; $$binary shared-callable guarded || exit $$?; $$binary reporting prefixed || exit $$?; $$binary identity clean || exit $$?; $$binary lifetime clean || exit $$?; done
+	@for binary in $^; do $$binary history admitted || exit $$?; for case in unknown-effect partial-target active active-method active-constructor active-collection active-indirect unknown field element return alias cell unknown-result; do $$binary $$case refused || exit $$?; done; $$binary reporting-arguments prefixed || exit $$?; $$binary windows clean || exit $$?; $$binary array clean || exit $$?; $$binary shared-callable refused || exit $$?; $$binary reporting prefixed || exit $$?; $$binary identity clean || exit $$?; $$binary lifetime clean || exit $$?; done
 test-cp19-proof-alloc: $(TEST_DIR)/cp19/proof-alloc $(TEST_DIR)/cp19/proof-alloc-switch
 	$(TEST_DIR)/cp19/proof-alloc
 	$(TEST_DIR)/cp19/proof-alloc-switch

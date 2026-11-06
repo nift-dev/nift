@@ -359,6 +359,19 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             return result;
         result.positioned = false;
     }
+    if (limits.session) {  // B5 (U6): monotone over published statements
+        const auto join = [](std::shared_ptr<const infer_detail::Ty>& into,
+                             const std::shared_ptr<const infer_detail::Ty>& add) {
+            if (add) into = into ? infer_detail::unite(into, add) : add;
+        };
+        join(limits.session->heap, kinds.session_heap);
+        join(limits.session->heap_objects, kinds.session_heap_objects);
+    }
+    if (limits.session)  // B5 (U6): every binding is private only as this statement proved it
+        for (auto& symbol : limits.session->symbols) {
+            const auto found = kinds.session_private.find(symbol.name);
+            symbol.heap_contents = found == kinds.session_private.end() ? nullptr : found->second;
+        }
     if (limits.session && limits.session->coherent_recompile)
         for (auto& symbol : limits.session->symbols) {
             const auto shape = kinds.binding_shapes.find(symbol.name);

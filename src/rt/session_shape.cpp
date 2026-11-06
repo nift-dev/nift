@@ -27,6 +27,7 @@ infer_detail::TyRef session_shape(const infer_detail::TyRef& type) {
     auto out = std::make_shared<infer_detail::Ty>(*type);
     out->callables.clear(); out->struct_id = -1;
     out->historical_callable = out->untracked_callable = false;
+    out->sites.clear();  // B5 (U6): another unit's site numbers mean nothing in the next one
     out->elem = session_shape(type->elem);
     for (auto& item : out->items) item = session_shape(item);
     for (auto& field : out->fields) field.second = session_shape(field.second);
@@ -37,6 +38,7 @@ infer_detail::TyRef session_historical_shape(const infer_detail::TyRef& type) {
     auto out = std::make_shared<infer_detail::Ty>(*type);
     out->historical_callable = (out->kinds & kKindFunction) != 0;
     out->untracked_callable = false;
+    out->sites.clear();  // B5 (U6)
     out->elem = session_historical_shape(type->elem);
     for (auto& item : out->items) item = session_historical_shape(item);
     for (auto& field : out->fields) field.second = session_historical_shape(field.second);

@@ -67,6 +67,9 @@ void VmSession::initialize_invocation(const std::string& command, const std::vec
     for (auto& binding : invocation_bindings(command, arguments)) {
         globals.push_back(make_cell(std::move(binding.value), binding.type));
         globals.push_back(Value::integer(binding.type));
+        // B5 (U6): the injected array is new and held by this binding only: private
+        if (binding.symbol.structure && (binding.symbol.structure->kinds & (kKindArray | kKindObject)))
+            binding.symbol.heap_contents = binding.symbol.structure;
         pending.symbols.push_back(std::move(binding.symbol));
     }
     pending.slots = static_cast<std::uint16_t>(globals.size());

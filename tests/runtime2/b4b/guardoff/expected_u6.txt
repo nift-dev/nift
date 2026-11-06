@@ -1,16 +1,13 @@
-# Guard-off (NIFT_RT_REFERENCE_PROBE) internal failures that are the recorded B5
+# Guard-off (NIFT_RT_REFERENCE_PROBE) internal failures that were the recorded B5
 # prerequisite U6 (b4b-element-types.md section 4): an earlier session statement's
-# value keeps its recorded structure, which only the guard keeps true. B5 must make
-# each of these pass (and delete it from this list). One per line: <file> <substring>.
-u6_session_alias.in unexpected operands (compiler defect)
-# Review of 4c9632b8 (L-3): the call path of the same class (B5 prerequisite, not fixed by B4b:
-# with the guard on all three are refused before any effect, reference-guard:shared/inflow).
-# A function defined in an earlier statement stores into its parameter, or through a global's
-# inner element, or a merged local; a later statement reads the earlier statement's array.
-u6_call_param_store.in unexpected operands (compiler defect)
-u6_call_global_inner.in unexpected operands (compiler defect)
-u6_call_mix_param.in unexpected operands (compiler defect)
-# Review of 17f7964c (R5-L3): a receiver-returning method's result in an earlier statement
-# (`ys := xs.reverse()`) is siteless like the earlier value, so a later store through it is the
-# same class (guard on: refused before any effect, reference-guard:inflow).
-u6_receiver_result.in unexpected operands (compiler defect)
+# value kept its recorded structure, which only the guard kept true. One per line:
+# <file> <substring>.
+#
+# B5 (b5-refsem.md section 3, U6): EMPTY. The session heap and private session classes
+# (Inference::heap_site_, SessionSymbol::heap_contents) make every store through any
+# earlier value reach every read of it; the five former entries (u6_session_alias.in,
+# u6_call_param_store.in, u6_call_global_inner.in, u6_call_mix_param.in,
+# u6_receiver_result.in) run in the guard-off session suite like every other fixture
+# (ordinary errors or refusals before any effect, never an internal failure), and
+# tests/runtime2/b5/u6/ adds 22 more. A new entry here is a soundness defect, not an
+# expectation.

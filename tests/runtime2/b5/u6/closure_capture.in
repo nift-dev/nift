@@ -1,0 +1,6 @@
+fn(mk(x)) { return () => x[0].trim() }
+a := [" x "]
+f := mk(a)
+a[0] = 5
+print(f())
+print("end")

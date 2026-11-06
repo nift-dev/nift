@@ -1,0 +1,6 @@
+a := [1]
+a = [" x "]
+b := a
+b[0] = 5
+print(a[0].trim())
+print("end")

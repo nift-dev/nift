@@ -1,0 +1,6 @@
+a := [" x "]
+m := map()
+m.set("k", a)
+m.get("k")[0] = 5
+print(a[0].trim())
+print("end")

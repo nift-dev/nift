@@ -1,0 +1,7 @@
+struct(S) { items := 0 }
+a := [" x "]
+s := S()
+s.items = a
+s.items[0] = 5
+print(a[0].trim())
+print("end")

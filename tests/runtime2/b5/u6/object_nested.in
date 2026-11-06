@@ -1,0 +1,5 @@
+o := {"in": [" x "]}
+i := o["in"]
+o["in"][0] = 5
+print(i[0].trim())
+print("end")

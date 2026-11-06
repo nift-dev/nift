@@ -1,0 +1,5 @@
+a := [" x "]
+g := () => { a[0] = 5; return 0 }
+g()
+print(a[0].trim())
+print("end")

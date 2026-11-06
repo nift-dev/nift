@@ -1,0 +1,5 @@
+o := {"k": " x "}
+p := o
+p["k"] = 5
+print(o["k"].trim())
+print("end")

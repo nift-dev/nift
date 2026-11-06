@@ -320,6 +320,18 @@ private:
     std::set<std::uint32_t> escaped_units_;
     std::uint32_t next_site_ = 0x80000000u;
     bool agg_unknown_ = false, sites_ready_ = false;
+    // B5 (U6, b5-refsem.md section 3): the session heap. In a persistent session every array and
+    // object an earlier statement made (a binding's value and its parts at every depth, a seed of
+    // earlier code) is one site class of this unit's analysis: its contents start as every kind any
+    // earlier value's contents may hold (SessionCompileContext::heap and the bindings' recorded
+    // structures, seed_session), and every store through any earlier value grows them, so no read
+    // of an earlier value keeps a statement-old assumption. Exposed (earlier code reaches it).
+    std::uint32_t heap_site_ = kOpenSite, heap_objects_site_ = kOpenSite;  // arrays' and objects' pools
+    TyRef heap_sited(const TyRef& t);  // an earlier value: in the pool(s) of its container kind(s)
+    TyRef session_export(const TyRef& t, int depth);  // a recorded structure: materialized, no sites
+    // B5 (U6): the site classes `t` reaches at every depth (class -> depth; `shared`: a part
+    // whose holders the analysis cannot bound, or one class at two depths).
+    void session_reach(const TyRef& t, int depth, std::map<std::uint32_t, int>& at, bool& shared);
 };
 
 } // namespace nift::rt::infer_detail

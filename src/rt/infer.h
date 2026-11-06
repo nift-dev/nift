@@ -137,6 +137,11 @@ struct UnitKinds {
     }
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_decl_shapes;
     std::unordered_map<std::string, std::shared_ptr<const infer_detail::Ty>> binding_shapes;
+    // B5 (U6): the session heap's contents after this unit (Inference::heap_site_), joined into
+    // SessionCompileContext::heap when the unit is published.
+    std::shared_ptr<const infer_detail::Ty> session_heap, session_heap_objects;
+    // B5 (U6): the bindings this unit proved private, with their structure (SessionSymbol::heap_contents).
+    std::unordered_map<std::string, std::shared_ptr<const infer_detail::Ty>> session_private;
     std::unordered_map<NodeId, std::shared_ptr<const infer_detail::Ty>> session_shapes;
     std::vector<KindSet> kinds;  // per NodeId (expressions)
     // CP12C slice 2: for an iterable expression node, the kinds of the values
