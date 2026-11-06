@@ -7,11 +7,16 @@
   work.py --self-test                             the gate's rules on the recorded measurements
 
 The shapes are the compile-scaling shapes of b4b_types.py (`glob`, `many`, `nestb`, `containers`)
-at 100, 400, 800 and 1,600 helpers. The harness (tests/rt/b4b_work.cpp) plans and infers each
-exactly as the compiler does and prints the inference's work counts (UnitKinds::work). The
-work W is the sum of the elementary operations: nodes walked, enqueues, site reads computed,
-site unions, reader moves, site entries mapped to classes and type-union entries; B4a's
-analysis has the first two and the type unions (no sites).
+at 100, 400, 800, 1,600 and 3,200 helpers (B4b 28), and 6,400 as stress evidence (measured and
+printed, not gated). The harness (tests/rt/b4b_work.cpp) plans and infers each exactly as the
+compiler does and prints the inference's work counts (UnitKinds::work). The work W is the sum
+of the elementary operations: nodes walked, enqueues, reader checks, site reads computed, site
+unions, reader moves, site entries mapped to classes and type-union entries; B4a's analysis has
+nodes, enqueues, reader checks and the type unions (no sites).
+B4b 28 (review of 4c9632b8, M-1): `reader_checks` counts every call of enqueue, whether it
+queues the unit or finds it queued: `enqueues` alone counts only the pushes, and a dependency
+list scanned again at every growth (4c9632b8's `site_changed` on `many`: ~n^2 calls, 6,402
+pushes at 3,200 helpers) looked linear.
 
 The budget is derived from B4a's measured counts (work_b4a.json, measured with work_build.sh at
 0df0df6c), never from the tip's:
@@ -19,6 +24,8 @@ The budget is derived from B4a's measured counts (work_b4a.json, measured with w
   growth     from each size to the next the tip's W grows by at most 1.10x B4a's growth of its W
              over the same step (B4a's analysis is linear on every shape: its own growth is the
              reference; a quadratic term fails at the first step)
+  cumulative from the smallest size to the largest gated one the tip's W grows by at most 1.10x
+             B4a's growth over the same range (a superlinear term spread over the steps fails)
   walks      the tip walks at most B4a's walks plus one walk per unit: the one re-walk of every
              reader when the shape's one site class widens past 16 origins (F1); `containers`
              has no widening and B4a's walks are its bound
@@ -36,10 +43,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import b4b_types  # noqa: E402  (the shapes)
 
-SIZES = (100, 400, 800, 1600)
+SIZES = (100, 400, 800, 1600, 3200)
+STRESS = (6400,)  # measured and printed (stress evidence), not gated
 SHAPES = (("glob", b4b_types.glob, 1), ("many", b4b_types.many, 1), ("nestb", b4b_types.nestb, 1),
           ("containers", b4b_types.containers, 0))  # the number of widenings of each shape
-FIELDS = ("nodes", "enqueues", "materializations", "site_unions", "reader_moves", "site_items", "unite_items")
+FIELDS = ("nodes", "enqueues", "reader_checks", "materializations", "site_unions", "reader_moves", "site_items",
+          "unite_items")
 GROWTH = 1.10
 
 
@@ -53,11 +62,11 @@ def measure(harness):
     try:
         files = []
         for name, make, _ in SHAPES:
-            for n in SIZES:
+            for n in SIZES + STRESS:
                 path = os.path.join(d, "%s%d.f" % (name, n))
                 open(path, "w").write(make(n))
                 files.append((name, n, path))
-        p = subprocess.run([harness] + [f for _, _, f in files], capture_output=True, text=True, timeout=600)
+        p = subprocess.run([harness] + [f for _, _, f in files], capture_output=True, text=True, timeout=1800)
         rows = [json.loads(line) for line in p.stdout.splitlines() if line.strip()]
         if p.returncode != 0 or len(rows) != len(files):
             sys.exit("work.py: the harness failed (exit %d): %s" % (p.returncode, p.stderr[-500:]))
@@ -87,12 +96,18 @@ def gate(tip, base, label="measured", quiet=False):
                                 (label, name, n, r["walks"], s["walks"], r["units"], bound))
             line.append("%d: W %d (B4a %d, %.2fx), walks %d (B4a %d)" %
                         (n, work(r), work(s), work(r) / work(s), r["walks"], s["walks"]))
-        for small, large in zip(SIZES, SIZES[1:]):
+        for small, large in list(zip(SIZES, SIZES[1:])) + [(SIZES[0], SIZES[-1])]:
             grow_t = work(t[str(large)]) / work(t[str(small)])
             grow_b = work(b[str(large)]) / work(b[str(small)])
             if grow_t > GROWTH * grow_b:
                 failures.append("%s %s %d->%d: W grows %.2fx, B4a %.2fx (bound %.2fx)" %
                                 (label, name, small, large, grow_t, grow_b, GROWTH * grow_b))
+        for n in STRESS:  # evidence only
+            if str(n) in t and str(n) in b:
+                r, s = t[str(n)], b[str(n)]
+                line.append("stress %d: W %d (B4a %d, %.2fx), growth from %d %.2fx (B4a %.2fx)" %
+                            (n, work(r), work(s), work(r) / work(s), SIZES[-1], work(r) / work(t[str(SIZES[-1])]),
+                             work(s) / work(b[str(SIZES[-1])])))
         if not quiet:
             print("work %s %s: %s" % (label, name, "; ".join(line)))
     return failures
@@ -100,15 +115,17 @@ def gate(tip, base, label="measured", quiet=False):
 
 def self_test():
     """The rules on the recorded measurements (work_history.json, work_build.sh at each commit): B4a
-    against itself and the B4b tips accepted for these counts pass; the two recorded pathologies
-    fail (a42035c1: `many` never converges, the F1 walks; `nestb` superlinear, the type unions of
-    the previous round; e293105e: superlinear on every shape but `containers`), and the mutant A30
-    (the F1 oscillation restored) fails."""
+    against itself passes; the recorded pathologies fail (a42035c1: `many` never converges, the F1
+    walks; `nestb` superlinear, the type unions of the previous round; e293105e: superlinear on
+    every shape, `containers` in its reader checks); B4b 28 (review of 4c9632b8, M-1): 16f24f36 and
+    4c9632b8 fail on `many` (the reader list of the shared class scanned at every growth: ~n^2
+    reader checks, which the earlier metric did not count), and the mutants A30 (the F1
+    oscillation restored) and A37 (the whole list scanned at every notification) fail."""
     history = json.load(open(os.path.join(HERE, "work_history.json")))
     base = json.load(open(os.path.join(HERE, "work_b4a.json")))["counts"]
     bad = 0
-    expect = {"0df0df6c": [], "16f24f36": [], "a42035c1": ["many", "nestb"], "e293105e": ["glob", "many", "nestb"],
-              "mutant-A30": ["many"]}
+    expect = {"0df0df6c": [], "16f24f36": ["many"], "4c9632b8": ["many"], "a42035c1": ["many", "nestb"],
+              "e293105e": ["containers", "glob", "many", "nestb"], "mutant-A30": ["many"], "mutant-A37": ["many"]}
     for commit, shapes in expect.items():
         failures = gate(history[commit], base, commit, quiet=True)
         failed = sorted({f.split()[1] for f in failures})

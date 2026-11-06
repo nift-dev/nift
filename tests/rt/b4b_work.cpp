@@ -37,10 +37,10 @@ int main(int argc, char** argv) {
         const UnitKinds k = infer_unit_kinds(ast, parsed.root, plan, 0, &globals);
         std::printf("{\"file\": \"%s\", \"planned\": %d, \"converged\": %d, \"units\": %zu, \"walks\": %zu, \"nodes\": %zu, "
                     "\"enqueues\": %zu, \"materializations\": %zu, \"site_unions\": %zu, \"reader_moves\": %zu, "
-                    "\"site_items\": %zu, \"unite_items\": %zu}\n",
+                    "\"site_items\": %zu, \"unite_items\": %zu, \"reader_checks\": %zu}\n",
                     argv[i], static_cast<int>(plan.ok), static_cast<int>(k.converged), plan.functions.size() + 1, k.walks, k.work.nodes,
                     k.work.enqueues, k.work.materializations, k.work.site_unions, k.work.reader_moves,
-                    k.work.site_items, k.work.unite_items);
+                    k.work.site_items, k.work.unite_items, k.work.reader_checks);
     }
     return status;
 }

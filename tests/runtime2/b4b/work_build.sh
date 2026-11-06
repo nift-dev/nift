@@ -9,6 +9,8 @@
 # replaces COMMIT's, and the counters are added at the points the current inference counts:
 #   nodes             the first line of Inference::expr and Inference::statement
 #   enqueues          Inference::enqueue, where a unit is pushed onto the worklist
+#   reader_checks     B4b 28: the first line of Inference::enqueue: every call, whether it pushes
+#                     the unit or finds it queued (every reader check of every dependency list)
 #   materializations  a site read computed (B4b before the memo of B4b 15: every aggregate read)
 #   site_unions       Inference::unite_sites, after its early return (B4b 8 on)
 #   reader_moves      the readers moved into the root's list by a union (B4b 8 on)
@@ -28,10 +30,20 @@ if [ "$commit" = . ]; then  # the working tree's inference (with MUTANT=n: a mut
 else
   git archive "$commit" src/rt | tar -x -C "$tmp" --wildcards 'src/rt/infer*'
 fi
+counted=0  # B4b 23 on (7011492f): the commit's inference counts already (all but reader_checks)
+if [ "$commit" != . ] && git show "$commit:src/rt/infer.h" | grep -q "struct Work"; then counted=1; fi
 cp src/rt/infer.h "$tmp/src/rt/infer.h"
 cd "$tmp"
 if [ "$commit" = . ]; then
   : # counted already
+elif [ $counted = 1 ]; then
+  python3 - src/rt/infer.cpp <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+old = "void Inference::enqueue(std::size_t unit) {\n"
+assert s.count(old) == 1, "enqueue"
+open(p, "w").write(s.replace(old, old + "    ++result_.work.reader_checks;\n"))
+PY
 else
 patch() {  # file, exact line, the line to put after it; fails if the line is not there once
   python3 - "$1" "$2" "$3" <<'PY'
@@ -44,6 +56,7 @@ open(path, "w").write(text.replace(line + "\n", line + "\n" + add + "\n"))
 PY
 }
 patch src/rt/infer.cpp "TyRef Inference::expr(NodeId id) {" "    ++result_.work.nodes;"
+patch src/rt/infer.cpp "void Inference::enqueue(std::size_t unit) {" "    ++result_.work.reader_checks;"
 python3 - src/rt/infer.cpp src/rt/infer_types.cpp <<'PY'
 import sys
 run, types = sys.argv[1:]
