@@ -976,12 +976,19 @@ $(B4B_GUARDOFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) $(filter-out $(RT_REFREP_PROBE_SOURCES:.cpp=.o),$(CLI_OBJECTS)) $(RT_REFREP_PROBE_OBJECTS) \
 		$(LDFLAGS) $(LDLIBS) $(LIBFFI_A) -o $@
 .PHONY: test-runtime2-guardoff
+# Review F2: every step runs its programs in temporary copies; the gate fails if it left the
+# repository changed (tracked, untracked or ignored files; tests/runtime2/repo_state.py).
+B4B_GUARDOFF_STATE := $(TEST_DIR)/b4b-guardoff/repo-state.txt
+test-runtime2-guardoff: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-guardoff: $(B4B_GUARDOFF_NIFT)
+	$(PYTHON) tests/runtime2/repo_state.py --self-test
+	$(PYTHON) tests/runtime2/repo_state.py save "$(B4B_GUARDOFF_STATE)"
 	$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --guardoff
 	$(PYTHON) tests/runtime2/b4b/gen_alias.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --sample 1500 --seed 1
 	$(PYTHON) tests/runtime2/safety/fuzz.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --seed 1 --sample 3000 \
 		--session-sample 1000
 	$(PYTHON) tests/runtime2/b4b/guardoff.py --guardoff "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/repo_state.py check "$(B4B_GUARDOFF_STATE)"
 # The ASan/UBSan variant of the guard-off build (owner ruling): the sanitizer CLI's
 # objects with the reference-probe compiler objects, on a sample. Expensive to build
 # locally; run by the combined certification (a prerequisite of test-rt-vm-sanitize).
@@ -996,7 +1003,9 @@ $(B4B_GUARDOFF_SAN_NIFT): $(SAN_OBJECTS) $(B4B_GUARDOFF_SAN_PROBE) $(SAN_LIBFFI_
 		$(filter-out $(patsubst src/rt/%.cpp,$(TEST_DIR)/san/src/rt/%.o,$(RT_REFREP_PROBE_SOURCES)),$(SAN_OBJECTS)) \
 		$(B4B_GUARDOFF_SAN_PROBE) $(SAN_LIBFFI_A) -o "$@"
 .PHONY: test-runtime2-guardoff-sanitize
+test-runtime2-guardoff-sanitize: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-guardoff-sanitize: $(B4B_GUARDOFF_SAN_NIFT) $(TARGET)
+	$(PYTHON) tests/runtime2/repo_state.py save "$(B4B_GUARDOFF_STATE)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/b4b_types.py --nift "$(CURDIR)/$(B4B_GUARDOFF_SAN_NIFT)" --guardoff --quick
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
@@ -1004,6 +1013,7 @@ test-runtime2-guardoff-sanitize: $(B4B_GUARDOFF_SAN_NIFT) $(TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) tests/runtime2/b4b/guardoff.py --guardoff "$(CURDIR)/$(B4B_GUARDOFF_SAN_NIFT)" \
 		--nift "$(CURDIR)/$(TARGET)" --dirs b4 b4b b3 refsem --twice 0
+	$(PYTHON) tests/runtime2/repo_state.py check "$(B4B_GUARDOFF_STATE)"
 test-rt-vm-sanitize: test-runtime2-guardoff-sanitize
 test-runtime2-b4b-mutants: $(TARGET) $(LIBFFI_A) $(RT_UNIT_OBJECTS) $(RT_REFREP_PROBE_OBJECTS)
 	B4B_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" B4B_UNIT_OBJECTS="$(RT_UNIT_OBJECTS) $(LDLIBS)" \

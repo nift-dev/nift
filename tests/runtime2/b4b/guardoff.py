@@ -3,8 +3,10 @@
 
   guardoff.py --guardoff NIFT_GUARDOFF --nift NIFT [--dirs D ...] [--twice N]
 
-For every script fixture under the given tests/runtime2 directories (run in its own
-directory, as its suite runs it), on the guard-off build (the B2 reference-probe compiler:
+For every script fixture under the given tests/runtime2 directories (run in a fresh
+temporary copy of its own directory, or of its parent when the script names `../`, at the
+same absolute path for every run of it, so the source tree is never written; review F2), on
+the guard-off build (the B2 reference-probe compiler:
 no Phase A guard, shared references) it fails on:
   - exit 70, a signal or crash (exit >= 128, or a negative status), a timeout;
   - leaked internal diagnostics or tags (`compiler defect`, `internal failure`, `\\x1fnift:`,
@@ -30,13 +32,28 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|\\u001fnift:|cell reached")
 
 
+WORK = [None]  # one temporary root per process: every run's copy is made at the same path
+
+
+def copy_of(path):
+    """A fresh copy of the script's directory (its parent's when the script names `../`) under
+    WORK; returns the copied script's directory."""
+    src = os.path.dirname(path)
+    with open(path, encoding="utf-8", errors="replace") as f:
+        base = os.path.dirname(src) if "../" in f.read() else src
+    tree = os.path.join(WORK[0], "tree")
+    shutil.rmtree(tree, ignore_errors=True)
+    shutil.copytree(base, os.path.join(tree, os.path.basename(base)), symlinks=True)
+    return os.path.join(tree, os.path.basename(base), os.path.relpath(src, base))
+
+
 def run(nift, path, mode="require"):
     d = tempfile.mkdtemp(prefix="b4b-guardoff-")
     st = os.path.join(d, "s.jsonl")
     env = {"PATH": "/usr/bin:/bin", "HOME": d, "TMPDIR": d, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
            "NO_COLOR": "1", "NIFT_VM": mode, "NIFT_VM_STATS": st}
     try:
-        p = subprocess.run(["timeout", "30", nift, os.path.basename(path)], cwd=os.path.dirname(path), env=env,
+        p = subprocess.run(["timeout", "30", nift, os.path.basename(path)], cwd=copy_of(path), env=env,
                            stdin=subprocess.DEVNULL, capture_output=True)
         rows = []
         if os.path.exists(st):
@@ -62,6 +79,14 @@ def main():
     ap.add_argument("--twice", type=int, default=300)
     args = ap.parse_args()
     args.guardoff, args.nift = os.path.abspath(args.guardoff), os.path.abspath(args.nift)
+    WORK[0] = tempfile.mkdtemp(prefix="b4b-guardoff-copies-")
+    try:
+        return cross_check(args)
+    finally:
+        shutil.rmtree(WORK[0], ignore_errors=True)
+
+
+def cross_check(args):
     approved = {}
     for line in open(os.path.join(HERE, "guardoff", "approved_changes.txt")):
         if line.strip() and not line.startswith("#"):
