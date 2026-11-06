@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """B4b alias generator (the B4b reviewer's, kept as a standing test): a string slot reachable by
 two paths is replaced through one path (in some context: top level, functions, closures,
-callbacks, thread, async) and observed through the other with a string-only method.
+callbacks, thread, async, a function given a receiver-returning method's result) and observed through the other with a string-only method. B4b 32: holders whose second path is a receiver-returning method's result
+(reverse(), sort(), a comparator sort), and contexts passing such a result to a function.
 
   gen_alias.py --nift NIFT [--sample N] [--seed S] [--out OUT.jsonl] [--legacy]
 
@@ -50,7 +51,22 @@ T = {
  "three_rev":  ('xs := [S]\no := {"in": xs}\narr := [o]\n', 'xs', '{R}[0]', '{R}', 'arr[0].in[0]'),
  "mapget":     ('xs := [S]\nm := map()\nm.set("k", xs)\nys := m.get("k")\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
  "loopvar":    ('xs := [[S]]\n', 'xs', None, None, 'xs[0][0]'),
+ # B4b 32 (review of ce0a9a44, N-1): the second path is the result of a receiver-returning method
+ # (reverse(), sort(), a comparator sort: the result is the receiver itself), directly, chained
+ # through aliases, of a nested element, or returned by a function or a lambda.
+ "rev":        ('xs := [S]\nys := xs.reverse()\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
+ "rev_back":   ('xs := [S]\nys := xs.reverse()\n', 'xs', '{R}[0]', '{R}', 'ys[0]'),
+ "sort":       ('xs := [S]\nys := xs.sort()\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
+ "csort":      ('xs := [S]\nys := xs.sort((p, q) => true)\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
+ "rev_chain":  ('xs := [S]\nys := xs.reverse()\nzs := ys.sort()\n', 'zs', '{R}[0]', '{R}', 'xs[0]'),
+ "rev_inner":  ('xs := [[S]]\ninner := xs[0]\nys := inner.reverse()\n', 'ys', '{R}[0]', '{R}', 'xs[0][0]'),
+ "rev_outer":  ('xs := [[S]]\nys := xs.sort((p, q) => true)\n', 'ys', '{R}[0][0]', None, 'xs[0][0]'),
+ "rev_fnret":  ('fn(rv(a)) { return a.reverse() }\nxs := [S]\nys := rv(xs)\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
+ "sort_lam":   ('rl := (a) => a.sort()\nxs := [S]\nys := rl(xs)\n', 'ys', '{R}[0]', '{R}', 'xs[0]'),
 }
+# the holders whose mutation root is an array: the receiver-returning contexts apply to them
+RECEIVER_ROOT = {"alias", "alias_rev", "inner", "aoa", "three_rev", "mapget", "rev", "rev_back", "sort", "csort",
+                 "rev_chain", "rev_inner", "rev_fnret", "sort_lam"}
 V = {"int": "5", "array": "[1]", "map": "map()", "struct": "C()", "object": '{"z": 1}'}
 def mutation(form, slot, arr, R, v):
     if form == "set": return (slot.replace("{R}", R) + " = " + v) if slot else None
@@ -73,9 +89,13 @@ def ctx(c, setup, root, mut):
     if c == "reduce_cb": return setup + "r := [1].reduce((acc, x) => {\n  " + body.replace(root, "acc", 1) + "\n  return acc\n}, " + root + ")\n"
     if c == "thread": return setup + "fn(w(a)) {\n  " + body.replace(root, "a", 1) + "\n  return 0\n}\nt := thread(w, " + root + ")\nt.join()\n"
     if c == "async": return setup + "fn[async](w(a)) {\n  " + body.replace(root, "a", 1) + "\n  return 0\n}\nr := await w(" + root + ")\n"
+    # B4b 32: the mutated array reaches a function as a receiver-returning method's result
+    if c in ("rev_arg", "sort_arg", "csort_arg"):
+        call = {"rev_arg": ".reverse()", "sort_arg": ".sort()", "csort_arg": ".sort((p, q) => true)"}[c]
+        return setup + "fn(f(a)) {\n  " + body.replace(root, "a", 1) + "\n  return 0\n}\nf(" + root + call + ")\n"
     raise ValueError(c)
 CTX = ["top", "fn", "global_fn", "closure", "ret_closure", "obj_fn", "map_cb", "filter_cb", "sort_cb", "apply",
-       "stored_fn", "reduce_cb", "thread", "async"]
+       "stored_fn", "reduce_cb", "thread", "async", "rev_arg", "sort_arg", "csort_arg"]
 def obs(o, path):
     if o == "top": return 'print("before")\nprint(' + path + '.trim())\n'
     if o == "loop": return 'print("before")\nfor (i : [1]) { print(' + path + '.trim()) }\n'
@@ -95,6 +115,7 @@ def items():
                     mut = mutation(form, slot, arr, root, v)
                 if mut is None: continue
                 for c in CTX:
+                    if c.endswith("_arg") and name not in RECEIVER_ROOT: continue
                     for o in ["top", "loop", "fnobs"]:
                         src = PRE + ctx(c, setup, root, mut) + obs(o, path)
                         out.append({"t": name, "form": form, "v": vk, "ctx": c, "obs": o, "src": src})

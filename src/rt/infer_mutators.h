@@ -60,6 +60,53 @@ static_assert(sizeof(kCollectionEffects) / sizeof(kCollectionEffects[0]) ==
 
 inline SiteEffect collection_effect(CollectionMethod m) { return kCollectionEffects[static_cast<std::size_t>(m)]; }
 
+// B4b 32 (review of ce0a9a44, N-1): what an array method's result is at run time, under reference
+// semantics (the guard-off build; each entry verified by an identity probe that mutates the result
+// and observes the receiver, b4b-element-types.md section 19). Receiver: the result is the receiver
+// itself (vm_array_mutation.cpp `s[Result]=s[Source]`, collection_plain_sort.cpp, the comparator
+// sort's codegen loads the receiver), so the inference gives it the receiver's sites (an alias),
+// never a new allocation site. Fresh: a new array or object (its elements or members are the
+// receiver's, which carry their own sites). Stored: the argument the method stores. Element: one of
+// the receiver's elements. Callback: a callback's return or the initial argument (reduce). Scalar: a
+// bool, int or null.
+enum class ResultIdentity : std::uint8_t { Receiver, Fresh, Stored, Element, Callback, Scalar };
+
+inline constexpr ResultIdentity kCollectionResults[] = {
+    ResultIdentity::Stored,    // Push
+    ResultIdentity::Element,   // Pop
+    ResultIdentity::Stored,    // Insert
+    ResultIdentity::Element,   // Remove
+    ResultIdentity::Scalar,    // Clear
+    ResultIdentity::Fresh,     // Splice (the removed elements)
+    ResultIdentity::Receiver,  // Reverse
+    ResultIdentity::Receiver,  // Sort
+    ResultIdentity::Receiver,  // ComparatorSort
+    ResultIdentity::Fresh,     // Map
+    ResultIdentity::Fresh,     // Filter
+    ResultIdentity::Callback,  // Reduce
+    ResultIdentity::Scalar,    // Any
+    ResultIdentity::Scalar,    // All
+    ResultIdentity::Element,   // Find
+    ResultIdentity::Scalar,    // FindIndex
+    ResultIdentity::Scalar,    // Count
+    ResultIdentity::Fresh,     // SortBy
+    ResultIdentity::Fresh,     // GroupBy
+    ResultIdentity::Fresh,     // IndexBy
+    ResultIdentity::Fresh,     // Partition
+    ResultIdentity::Fresh,     // UniqueBy
+    ResultIdentity::Element,   // MinBy
+    ResultIdentity::Element,   // MaxBy
+    ResultIdentity::Fresh,     // CountBy
+    ResultIdentity::Fresh,     // GroupByEach
+};
+static_assert(sizeof(kCollectionResults) / sizeof(kCollectionResults[0]) ==
+                  static_cast<std::size_t>(CollectionMethod::CountMethods),
+              "every CollectionMethod has a classified result identity");
+
+inline ResultIdentity collection_result_identity(CollectionMethod m) {
+    return kCollectionResults[static_cast<std::size_t>(m)];
+}
+
 // Every mutating entry point of the protocol and the inference's model of it.
 struct ProtocolEntry {
     const char* entry;  // the rt/mutation.h function

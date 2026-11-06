@@ -5,6 +5,7 @@
 #include "rt/text_type.h"
 #include "rt/infer_atomic.h"
 #include "rt/infer_builtins.h"
+#include "rt/infer_mutators.h"
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/number.h"
@@ -14,6 +15,16 @@
 // rt-lint: cold-file compile-time analysis, once per unit
 namespace nift::rt {
 namespace infer_detail {
+namespace {
+// B4b 32 (review of ce0a9a44, N-1): the result of a receiver-returning array method
+// (kCollectionResults, rt/infer_mutators.h): the method's result type (the receiver's elements,
+// positions dropped by the reorder) with the receiver's own sites, so both name one site class.
+TyRef receiver_alias(const TyRef& recv, const TyRef& result) {
+    auto t = std::make_shared<Ty>(*result);
+    t->sites = recv->sites;
+    return t;
+}
+} // namespace
 Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const GlobalPlan* globals,
                      const SessionCompileContext* session, const std::vector<InvocationBinding>* invocation)
     : ast_(ast), root_(root), plan_(plan), globals_(globals), session_(session), invocation_(invocation) {
@@ -363,7 +374,21 @@ TyRef Inference::call(const Node& n) {
             return mixed ? any_ty() : keyed_result(n, recv, values, key);  // mixed: refused by the compiler
         const int collection = collection_method(key);
         if (collection >= 0 && recv->kinds == kKindArray) {
-            const auto result = fresh(call_id, collection_result(n, recv, values, collection));
+            TyRef result = collection_result(n, recv, values, collection);
+#if defined(NIFT_B4B_MUTANT) && NIFT_B4B_MUTANT == 38
+            (void)&receiver_alias;
+            result = fresh(call_id, result);  // A38: reverse()/sort() give a new array (ce0a9a44, review N-1)
+#else
+            // B4b 32 (review of ce0a9a44, N-1): reverse() and both sorts return their receiver, so the
+            // result is an alias: it carries the receiver's sites (its classes, through the one
+            // dependency mechanism: a store through the result reaches the receiver's readers), never
+            // a new site. A receiver without a site (an earlier session statement's value, U6) gives
+            // a result without one, read and stored exactly like the receiver.
+            if (collection_result_identity(static_cast<CollectionMethod>(collection)) == ResultIdentity::Receiver)
+                result = receiver_alias(recv, result);
+            else
+                result = fresh(call_id, result);
+#endif
             if (const auto h = session_ ? session_collection_call(n, values, collection) : nullptr)
                 return session_effects(h, n);
             return result;

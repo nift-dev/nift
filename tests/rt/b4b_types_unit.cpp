@@ -370,6 +370,29 @@ int main() {
     expect("reverse", "xs := [1, \"a\"]\nys := xs\nys.reverse()\nprint(xs[0])\n", "xs[0]", kKindString);
     expect("sort", "xs := [1, \"a\"]\nys := xs\nys.sort()\nprint(xs[0])\n", "xs[0]", kKindString);
     expect("pop", "xs := [1, \"a\"]\nys := xs\nys.pop()\nys.push(\"b\")\nprint(xs[1])\n", "xs[1]", kKindString);
+    // B4b 32 (review of ce0a9a44, N-1): reverse() and both sorts return their receiver, so a store
+    // through the result is a store into the receiver (and the result reads the receiver's stores).
+    expect("receiver-reverse", "xs := [1]\nys := xs.reverse()\nys[0] = \"s\"\nprint(xs[0])\n", "xs[0]", kKindString);
+    expect("receiver-sort", "xs := [1]\nys := xs.sort()\nys[0] = \"s\"\nprint(xs[0])\n", "xs[0]", kKindString);
+    expect("receiver-comparator-sort", "xs := [1]\nys := xs.sort((p, q) => true)\nys.push(\"s\")\nprint(xs[1])\n",
+           "xs[1]", kKindString);
+    expect("receiver-push", "xs := [1]\nys := xs.reverse()\nys.push(\"s\")\nprint(xs[1])\n", "xs[1]", kKindString);
+    expect("receiver-read-back", "xs := [1]\nys := xs.reverse()\nxs[0] = \"s\"\nprint(ys[0])\n", "ys[0]",
+           kKindString);
+    expect("receiver-chain", "xs := [1]\nys := xs.reverse()\nzs := ys.sort()\nzs[0] = \"s\"\nprint(xs[0])\n",
+           "xs[0]", kKindString);
+    expect("receiver-argument", "fn(h(a)) { a.push(\"s\")\nreturn 0 }\nxs := [1]\nh(xs.reverse())\nprint(xs[1])\n",
+           "xs[1]", kKindString);
+    expect("receiver-in-function", "fn(f(a)) { b := a.reverse()\nb[0] = \"s\"\nreturn 0 }\nxs := [1]\nf(xs)\n"
+           "print(xs[0])\n", "xs[0]", kKindString);
+    expect("receiver-returned", "fn(r(a)) { return a.sort() }\nxs := [1]\nys := r(xs)\nys[0] = \"s\"\nprint(xs[0])\n",
+           "xs[0]", kKindString);
+    expect("receiver-lambda", "f := (a) => a.reverse()\nxs := [1]\nys := f(xs)\nys[0] = \"s\"\nprint(xs[0])\n",
+           "xs[0]", kKindString);
+    expect("receiver-nested", "xs := [[1]]\ninner := xs[0]\nys := inner.reverse()\nys[0] = \"s\"\nprint(xs[0][0])\n",
+           "xs[0][0]", kKindString);
+    expect("receiver-global", "xs := [1]\nfn(g()) { ys := xs.sort()\nys[0] = \"s\"\nreturn 0 }\ng()\nprint(xs[0])\n",
+           "xs[0]", kKindString);
     // C2: a mutating method on a receiver that may be an array (a union).
     expect("dynamic-receiver",
            "xs := [1]\nv := xs\nif (true) { v = \"q\" }\nv.insert(0, \"s\")\nprint(xs[1])\n", "xs[1]", kKindString);

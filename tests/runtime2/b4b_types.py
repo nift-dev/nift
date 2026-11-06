@@ -178,6 +178,26 @@ def mutators():
     commented = re.findall(r"//\s*([A-Za-z ]+?)\s*(?:\(|$)", effects, re.M)
     listed = [w for c in commented for w in c.split()]
     check(listed == names, "mutators: kCollectionEffects comments %r do not list CollectionMethod %r" % (listed, names))
+    # B4b 32 (review of ce0a9a44, N-1): every CollectionMethod's result identity is classified, in
+    # order, and the methods whose run-time result is the receiver itself are Receiver there.
+    results = re.search(r"kCollectionResults\[\] = \{(.*?)\};", table, re.S).group(1)
+    rows = re.findall(r"ResultIdentity::(\w+),\s*//\s*(\w+)", results)
+    check([n for _, n in rows] == names, "mutators: kCollectionResults comments %r do not list CollectionMethod %r"
+          % ([n for _, n in rows], names))
+    identity = dict((n, k) for k, n in rows)
+    vm = open(os.path.join(ROOT, "src", "rt", "vm_array_mutation.cpp")).read()
+    receiver = set(re.findall(r"case M::(\w+):[^\n]*s\[Result\]=s\[Source\]", vm))
+    if "s[Result]=s[Source]" in open(os.path.join(ROOT, "src", "rt", "collection_plain_sort.cpp")).read():
+        receiver.add("Sort")
+    sort = open(os.path.join(ROOT, "src", "rt", "compiler_collection_sort.cpp")).read()
+    if re.search(r"expr_to\(node_id\(receiver\),dst\)", sort):  # the comparator sort's result: the receiver
+        receiver.add("ComparatorSort")
+    check({"Reverse", "Sort", "ComparatorSort"} <= receiver,
+          "mutators: the receiver-returning methods were not found in the runtime sources: %r" % sorted(receiver))
+    for name in names:
+        check((identity.get(name) == "Receiver") == (name in receiver),
+              "mutators: %s's result identity is %s in rt/infer_mutators.h, the runtime %s its receiver"
+              % (name, identity.get(name), "returns" if name in receiver else "does not return"))
     natives = os.path.join(ROOT, "src", "rt", "natives")
     for f in sorted(os.listdir(natives)):
         if f.endswith(".cpp"):
