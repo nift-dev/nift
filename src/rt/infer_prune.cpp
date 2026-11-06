@@ -19,7 +19,7 @@ TyRef Inference::materialize(const TyRef& t) {
     const std::size_t unit = current_unit();
     if (hit != materialized_.end() && hit->second.in == t) {
         if (hit->second.unit != unit) {  // the lists only grow while the version holds
-            for (std::uint32_t s : hit->second.read) readers_[s].insert(unit);
+            for (std::uint32_t s : hit->second.read) add_reader(readers_[s], unit);
             hit->second.unit = unit;
         }
         return hit->second.out;
@@ -27,7 +27,7 @@ TyRef Inference::materialize(const TyRef& t) {
     std::vector<std::uint32_t> read;
     TyRef out = materialize_now(t, read);
     ++result_.work.materializations;
-    for (std::uint32_t s : read) readers_[s].insert(unit);  // H2: this unit depends on them
+    for (std::uint32_t s : read) add_reader(readers_[s], unit);  // H2: this unit depends on them
     if (memo_version_ == site_version_) materialized_[t.get()] = Materialized{t, out, std::move(read), unit};
     return out;
 }

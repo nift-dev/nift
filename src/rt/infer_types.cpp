@@ -66,8 +66,7 @@ namespace {
 bool covers(const TyRef& a, const TyRef& b, int depth) {
     if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return true;
     if (!a || a.get() == empty_ty().get()) return false;
-    if (a->any || b->any || depth > kMaxDepth)
-        return a.get() == (((a->kinds | b->kinds) & kKindUnknown) ? any_ty() : top_ty()).get();
+    if (a->any || b->any || depth > kMaxDepth) return a.get() == unite(a, b, depth).get();  // B4b 27
     if ((a->kinds | b->kinds) != a->kinds) return false;
     if ((b->historical_callable && !a->historical_callable) || (b->untracked_callable && !a->untracked_callable) ||
         (b->legacy_text_number && !a->legacy_text_number))
@@ -102,12 +101,48 @@ bool covers(const TyRef& a, const TyRef& b, int depth) {
 
 thread_local std::size_t* unite_work = nullptr;
 
+// B4b 27 (review of 4c9632b8, L-1): the join when the result is open (`any`: its kinds at the top,
+// every kind at every depth below): an open operand, an unknown one (`base` any_ty), or beyond
+// the depth cap (`base` top_ty). The result has the top-level kinds and the flags of both
+// operands (and `base`'s kinds), so it is an upper bound of both. It used to be any_ty or
+// top_ty themselves, which are not: an open object joined with another became top (every kind
+// at the top), so `e := env()` widened from object to everything on its second walk (the five
+// `presentation_env_*` non-fixed points), and a moved-from number (legacy_text_number) or a
+// collection joined with an unknown value lost the flag or the kind, then got it back from the
+// next walk's operand (a binding or return that changed on every walk, never a fixed point;
+// e.g. `return x.nope()`). Admission is unchanged by the flags of an unknown or top value (every
+// check refuses those, or treats them as anything). An operand that covers the result is
+// returned itself (no growth: the fixed point of a re-walk), and `base` when it is the result.
+TyRef open_union(const TyRef& a, const TyRef& b, const TyRef& base) {
+    const KindSet kinds = a->kinds | b->kinds | (base ? base->kinds : 0);
+    const bool historical = a->historical_callable || b->historical_callable;
+    const bool untracked = a->untracked_callable || b->untracked_callable;
+    const bool text = a->legacy_text_number || b->legacy_text_number;
+    const auto is = [&](const TyRef& t) {
+        return t->any && t->kinds == kinds && t->historical_callable == historical &&
+               t->untracked_callable == untracked && t->legacy_text_number == text && !t->collection_array &&
+               !t->collection_object;
+    };
+    if (base && is(base)) return base;
+    if (is(top_ty())) return top_ty();
+    if (is(a)) return a;
+    if (is(b)) return b;
+    auto t = std::make_shared<Ty>();
+    t->kinds = kinds;
+    t->any = true;
+    t->historical_callable = historical;
+    t->untracked_callable = untracked;
+    t->legacy_text_number = text;
+    return t;
+}
+
 TyRef unite(const TyRef& a, const TyRef& b, int depth) {
     if (!a || a.get() == empty_ty().get()) return b ? b : empty_ty();
     if (!b || b.get() == empty_ty().get() || a.get() == b.get()) return a;
-    if (a->any || b->any || depth > kMaxDepth) {
-        if ((a->kinds | b->kinds) & kKindUnknown) return any_ty();
-        return top_ty();
+    if (a->any || b->any || depth > kMaxDepth) {  // B4b 27: the join (open_union)
+        if ((a->kinds | b->kinds) & kKindUnknown) return open_union(a, b, any_ty());
+        if (depth > kMaxDepth) return open_union(a, b, top_ty());
+        return open_union(a, b, nullptr);
     }
     if (unite_work)  // B4b 23: one type plus the entries of both operands
         *unite_work += 1 + a->sites.size() + b->sites.size() + a->fields.size() + b->fields.size() +

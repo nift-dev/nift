@@ -42,6 +42,7 @@ struct Unit {
     GlobalPlan globals;
     UnitKinds kinds;
     std::vector<NodeId> stale;
+    std::vector<std::string> state;  // B4b 27: analysis state the extra walk grew
 };
 
 std::unique_ptr<Unit> infer(const std::string& source, const SessionCompileContext* session = nullptr) {
@@ -62,15 +63,20 @@ std::unique_ptr<Unit> infer(const std::string& source, const SessionCompileConte
     u->kinds = inference.run(0);
     CHECK(u->kinds.converged);
     u->stale = inference.stale();
+    u->state = inference.state_changed();
     return u;
 }
 
 // B4b 22: the fixed-point check on its own (the stale nodes, with their text, on failure).
+// B4b 27: and no analysis state grows on that walk (no unit queued again, no walk growing its inputs).
 void fixed_point(const char* name, const Unit& u) {
     CHECK(u.stale.empty());
     if (!u.stale.empty())
         std::fprintf(stderr, "  case %s: not a fixed point: %zu node(s) change on one more walk, first `%s`\n", name,
                      u.stale.size(), std::string(u.ast->text(u.ast->at(u.stale[0]))).c_str());
+    CHECK(u.state.empty());
+    if (!u.state.empty())
+        std::fprintf(stderr, "  case %s: not a fixed point: %s\n", name, u.state[0].c_str());
 }
 
 std::string read_file(const std::string& path) {
@@ -189,6 +195,7 @@ void convergence(const char* name, std::string (*shape)(int), std::string_view o
         inference.verify_fixed_point();
         u->kinds = inference.run(0);
         u->stale = inference.stale();
+        u->state = inference.state_changed();
         fixed_point((std::string(name) + "-" + std::to_string(n)).c_str(), *u);
         const std::size_t units = static_cast<std::size_t>(n) + 1;
         const bool converged = u->kinds.converged && u->kinds.walks <= 4 * units + 16;
@@ -291,6 +298,46 @@ int main() {
            "o := {\"a\": \" s \"}\ng := () => { return o.a }\no = q()\nprint(g())\n", "o.a", kKindInt);
     expect("lambda-capture-callback", pre + "xs := [\" s \"]\nys := [1]\nr := ys.map((v) => xs[0])\nxs = q()\n"
            "print(ys.map((v) => xs[0]))\n", "xs[0]", kKindInt);
+    // B4b 26 (review of 4c9632b8, H-1): the reverse edge. A lambda writes a binding of the unit
+    // that declares it (a named function's local or parameter, a method's, a nested lambda's
+    // owner), the write grows only in a later walk of the lambda (q()'s return is known later),
+    // and the declaring unit reads the binding after the call: it is walked again (every reader
+    // of a slot is recorded, whatever its unit). Was a stale [string] on B4a and 4c9632b8.
+    const std::string own = "fn(m()) {\n  xs := [\" s \"]\n  w := () => { xs = q()\n  return 0 }\n";
+    expect("owner-local", pre + own + "  w()\n  return xs[0]\n}\nprint(m())\n", "xs[0]", kKindInt);
+    expect("owner-param", pre + "fn(m(xs)) {\n  w := () => { xs = q()\n  return 0 }\n  w()\n  return xs[0]\n}\n"
+           "print(m([\" s \"]))\n", "xs[0]", kKindInt);
+    expect("owner-object", "fn(t()) { return {\"k\": 1} }\nfn(q()) { return t() }\nfn(m()) {\n  o := {\"k\": \" s \"}\n"
+           "  w := () => { o = q()\n  return 0 }\n  w()\n  return o.k\n}\nprint(m())\n", "o.k", kKindInt);
+    expect("owner-loop", pre + own + "  i := 0\n  while(i < 2) {\n    print(xs[0])\n    w()\n    i += 1\n  }\n"
+           "  return 0\n}\nm()\n", "xs[0]", kKindInt);
+    expect("owner-callback", pre + own + "  r := [0].map((v) => w())\n  return xs[0]\n}\nprint(m())\n", "xs[0]",
+           kKindInt);
+    expect("owner-nested", pre + "fn(m()) {\n  xs := [\" s \"]\n  o := () => {\n    w := () => { xs = q()\n"
+           "    return 0 }\n    return w()\n  }\n  o()\n  return xs[0]\n}\nprint(m())\n", "xs[0]", kKindInt);
+    expect("owner-method", pre + "struct(C) {\n  a := 1\n  fn(m()) {\n    xs := [\" s \"]\n"
+           "    w := () => { xs = q()\n    return 0 }\n    w()\n    return xs[0]\n  }\n}\nc := C()\nprint(c.m())\n",
+           "xs[0]", kKindInt);
+    expect("owner-delayed-global", "fn(d3()) { return 5 }\nfn(d2()) { return d3() }\nfn(d1()) { return d2() }\n"
+           "src := [\" s \"]\nfn(grow()) {\n    src[0] = d1()\n    return 0\n}\nfn(attempt()) {\n    a := [\" x \"]\n"
+           "    set_a := () => { a = [src[0]]; return 0 }\n    set_a()\n    return a[0]\n}\nprint(attempt())\n"
+           "grow()\nprint(attempt())\n", "a[0]", kKindInt);
+    expect("owner-main-lambda-write", pre + "xs := [\" s \"]\nw := () => { xs = q()\nreturn 0 }\nw()\nprint(xs[0])\n",
+           "xs[0]", kKindInt);
+    // A struct field's slot read by a lambda through a member access, grown later by a method.
+    expect("field-lambda-reader", "fn(t()) { return 2.5 }\nfn(q()) { return t() }\nstruct(C) {\n  a := 1\n"
+           "  fn(grow()) { a = q()\n  return 0 }\n}\nc := C()\ng := () => { return c.a }\nprint(g())\nc.grow()\n"
+           "print(g())\n", "c.a", kKindFrac);
+    // B4b 27 (L-1): the join with an open value keeps the top-level kinds (env(): an open object),
+    // so a re-walk does not widen it to everything; and the result is a fixed point.
+    {
+        const auto u = infer("fn(f()) { e := env()\n  return e }\nprint(f())\nprint(f())\n");
+        const KindSet got = last(*u, "e");
+        CHECK(got == kKindObject);
+        if (got != kKindObject)
+            std::fprintf(stderr, "  case open-join-env: e has kinds %#llx\n", static_cast<unsigned long long>(got));
+        fixed_point("open-join-env", *u);
+    }
     // An element replaced through an alias, observed through the original binding, and the reverse.
     expect("alias", "xs := [1]\nys := xs\nys[0] = \"s\"\nprint(xs[0])\n", "xs[0]", kKindString);
     expect("alias-reverse", "xs := [1]\nys := xs\nxs[0] = \"s\"\nprint(ys[0])\n", "ys[0]", kKindString);

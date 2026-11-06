@@ -32,6 +32,10 @@ void Inference::untracked_call() {
     return;  // A28: an inexact callee does not widen its possible targets (H1)
 #endif
     untracked_seen_ = true;
+    // B4b 28: every unit of value_units_ (a growing set) has been escaped by an earlier call
+    // already (escape_callables escapes each unit once): nothing to do again.
+    if (value_units_.size() == untracked_escaped_) return;
+    untracked_escaped_ = value_units_.size();
     auto as_value = std::make_shared<Ty>();
     for (std::size_t unit : value_units_) as_value->callables.push_back(static_cast<std::uint32_t>(unit));
     escape_callables({as_value});

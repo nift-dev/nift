@@ -1,4 +1,5 @@
 #include "rt/infer_session.h"
+#include "rt/infer_fixpoint.h"
 #include "rt/compiler.h"
 #include "rt/session_shape.h"
 #include "rt/collection.h"
@@ -146,7 +147,18 @@ namespace nift::rt {
 UnitKinds infer_unit_kinds(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t max_walks,
                            const GlobalPlan* globals, const SessionCompileContext* session,
                            const std::vector<InvocationBinding>* invocation) {
+#ifdef NIFT_B4B_FIXPOINT_GATE
+    // B4b 27 (tests/runtime2/b4b/fixpoint.py): the same analysis, then the fixed-point check of
+    // every converged result; a non-fixed point fails the compile (never repaired).
+    infer_detail::Inference inference(ast, root, plan, globals, session, invocation);
+    inference.verify_fixed_point();
+    UnitKinds out = inference.run(max_walks);
+    if (out.converged && (!inference.stale().empty() || !inference.state_changed().empty()))
+        fixpoint_gate_fail(ast, inference.stale(), inference.state_changed(), session != nullptr);
+    return out;
+#else
     return infer_detail::Inference(ast, root, plan, globals, session, invocation).run(max_walks);
+#endif
 }
 
 } // namespace nift::rt

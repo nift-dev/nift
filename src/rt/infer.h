@@ -188,6 +188,10 @@ struct UnitKinds {
     struct Work {
         std::size_t nodes = 0;             // expressions and statements visited by the walks
         std::size_t enqueues = 0;          // units queued for a walk
+        // B4b 28 (review of 4c9632b8, M-1): every reader check, i.e. every call of enqueue, whether
+        // it queues the unit or finds it queued already (`enqueues` counts only the former, so a
+        // dependent list re-scanned at every growth looked linear)
+        std::size_t reader_checks = 0;
         std::size_t materializations = 0;  // site reads computed (not taken from the memo)
         std::size_t site_unions = 0;       // site classes merged
         std::size_t reader_moves = 0;      // reader entries moved by those merges

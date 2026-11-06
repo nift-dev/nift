@@ -185,12 +185,18 @@ void Inference::unite_sites(std::uint32_t a, std::uint32_t b) {
     if (rb != readers_.end()) {
         UnitSet readers = std::move(rb->second);
         readers_.erase(rb);
-        if (b_grew) for (std::size_t u : readers.list) enqueue(u);
+        if (b_grew) notify(readers);
         // F1: the smaller list joins the larger (the root is the smaller id,
         // so a class grown site by site in decreasing order would otherwise
         // copy its whole list at every merge: quadratic in the sites).
         UnitSet& into_readers = readers_[a];
+        // B4b 28: the merged list was all queued as of the older of the two notifications (an
+        // empty list holds for any: the other's)
+        const std::size_t notified = into_readers.list.empty() ? readers.notified
+                                     : readers.list.empty()    ? into_readers.notified
+                                                               : std::min(into_readers.notified, readers.notified);
         if (into_readers.size() < readers.size()) std::swap(into_readers, readers);
+        into_readers.notified = notified;
         result_.work.reader_moves += readers.size();
         for (std::size_t u : readers.list) into_readers.insert(u);
     }
@@ -258,7 +264,7 @@ void Inference::site_changed(std::uint32_t r) {
     self_changed_ = true;
     const auto found = readers_.find(r);
     if (found == readers_.end()) return;
-    for (std::size_t u : found->second.list) enqueue(u);
+    notify(found->second);  // B4b 28: the readers dequeued since its last growth
 }
 
 void Inference::site_grew() {

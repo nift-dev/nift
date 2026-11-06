@@ -79,7 +79,7 @@ int Inference::receiver_struct(NodeId object) {
 TyRef* Inference::struct_field(int s, std::string_view name) {
     if (s < 0) return nullptr;
     const StructFieldInfo* f = plan_.structs[static_cast<std::size_t>(s)].field(name);
-    return f ? &vars_[field_slot(*f)] : nullptr;
+    return f ? note_read(&vars_[field_slot(*f)]) : nullptr;  // B4b 26: a field's readers (every unit)
 }
 
 TyRef Inference::method_call(std::size_t f, const Node& n) {
@@ -142,7 +142,7 @@ void Inference::add_element(NodeId receiver_id, const TyRef& value, bool key) {
     if (!same(next, *var)) {
         *var = next;
         self_changed_ = true;
-        into_lambda_readers(var);  // U1
+        slot_changed(var);  // B4b 26: every reader of the binding (U1)
     }
 }
 

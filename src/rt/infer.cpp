@@ -57,6 +57,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
         const std::size_t unit = queue_.front();
         queue_.pop_front();
         queued_[unit] = self_changed_ = false;
+        dequeued_.push_back(unit);  // B4b 28 (notify)
         ++walk_serial_;
         walk_unit(unit);
         if (session_locations_ && !session_locations_converged()) return std::move(result_);
@@ -70,6 +71,7 @@ UnitKinds Inference::run(std::size_t max_walks) {
 }
 
 void Inference::enqueue(std::size_t unit) {
+    ++result_.work.reader_checks;  // B4b 28: every check, queued or not
     if (session_ && unit > plan_.functions.size()) {
         const auto index = unit - plan_.functions.size() - 1;
         if (index < lambdas_.size() && lambdas_[index].scopes.empty() &&
@@ -94,11 +96,10 @@ bool Inference::merge(TyRef& into, const TyRef& value) {
 void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (!merge(into, value)) return;
     if (session_locations_) session_sync_locations();
-    into_lambda_readers(&into);  // U1: the lambdas that read this binding walk again
-    self_changed_ = true;  // a global's slot is shared by every unit using it (CP12b):
-    if (session_) {
+    slot_changed(&into);  // B4b 26: every unit that read the slot (a global's, a field's too) walks again
+    self_changed_ = true;
+    if (session_)  // a session's earlier statements' code is not walked here (U6, B5): everything
         for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
-    } else for (std::size_t u = 0; globals_.shared(vars_, &into) && u <= plan_.functions.size(); ++u) enqueue(u);
 }
 
 void Inference::merge_return(const TyRef& value) {  // the callers read the return
@@ -129,8 +130,8 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     } else {
         // F1: a binding that grows where it is declared, before this walk read
         // it, needs no second walk of this unit: every read of it in this
-        // walk comes after (other units that read it are enqueued by
-        // merge_local: functions for a global, lambdas for a capture).
+        // walk comes after (every other unit that read it is enqueued by
+        // merge_local: the slot's recorded readers, B4b 26).
         const bool changed = self_changed_;
         const bool read = slot < slot_read_.size() && slot_read_[slot] == walk_serial_;
         merge_local(vars_[slot], value);

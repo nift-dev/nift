@@ -39,6 +39,10 @@ public:
     // invalidation invariant, checked directly: b4b_types_unit.cpp `fixpoint-*`).
     void verify_fixed_point() { verify_ = true; }
     const std::vector<NodeId>& stale() const { return stale_; }
+    // B4b 27: analysis state the extra walk grew (a unit queued again, a walk that grew its own
+    // inputs, new lambda units): not a fixed point even when no node's facts changed.
+    const std::vector<std::string>& state_changed() const { return state_changed_; }
+    std::size_t units_count() const { return plan_.functions.size() + 1 + lambdas_.size(); }
 
 private:
     void enqueue(std::size_t unit);
@@ -89,8 +93,13 @@ private:
 
     TyRef* find(std::string_view name);
     TyRef* find_binding(std::string_view name);
-    bool into_lambda_readers(const TyRef* var);  // U1: enqueue the lambdas that read `var`
-    std::unordered_map<std::size_t, std::set<std::size_t>> lambda_readers_;  // binding slot -> lambda units
+    // B4b 26 (the general dependency invariant, b4b-element-types.md section 18): every binding
+    // slot (a local, a parameter, a capture, a global, a struct field) records every unit whose
+    // walk read it, whatever the unit's lexical relation to the slot's declaration (the declaring
+    // function, a lambda, main, a method, a module function); when the slot grows, in any unit's
+    // walk, every reader but the unit being walked (`self_changed_`) is queued again.
+    TyRef* note_read(TyRef* var);              // `var` read by the current unit (find, struct_field)
+    bool slot_changed(const TyRef* var);       // `var` grew: its readers walk again
     std::vector<std::size_t> slot_read_;  // F1: per binding slot, the last walk that read it
     std::size_t walk_serial_ = 0;
 
@@ -175,6 +184,7 @@ private:
     UnitKinds result_;
     bool verify_ = false;
     std::vector<NodeId> stale_;
+    std::vector<std::string> state_changed_;
     void check_fixed_point();
     std::vector<std::vector<TyRef>> params_;
     std::vector<TyRef> returns_;
@@ -248,30 +258,57 @@ private:
     std::unordered_map<std::uint32_t, std::uint32_t> parent_;
     // F1: a class's readers in the order they first read it; membership in
     // constant time (a collapsed class is read by every unit of the shape).
+    // B4b 28 (review of 4c9632b8, M-1): `notified` is the position in dequeued_ of the unit
+    // being walked when the list was last notified (Inference::notify): every reader in the
+    // list then was queued, so a later notification need only look at the units dequeued
+    // since (each one's position in the list in constant time), never the whole list again.
     struct UnitSet {
+        static constexpr std::size_t kNone = static_cast<std::size_t>(-1);
         std::vector<std::size_t> list;
-        std::vector<bool> has;  // built once the list is long
+        std::vector<std::uint32_t> pos;  // per unit, its index in `list` + 1 (built once the list is long)
+        std::size_t notified = 0;
         void insert(std::size_t u) {
             if (list.size() < 16) {
                 for (std::size_t v : list)
                     if (v == u) return;
                 list.push_back(u);
                 if (list.size() == 16)
-                    for (std::size_t v : list) mark(v);
+                    for (std::size_t k = 0; k < list.size(); ++k) mark(list[k], k);
                 return;
             }
-            if (u < has.size() && has[u]) return;
-            mark(u);
+            if (u < pos.size() && pos[u]) return;
+            mark(u, list.size());
             list.push_back(u);
         }
-        void mark(std::size_t u) {
-            if (u >= has.size()) has.resize(u + 1, false);
-            has[u] = true;
+        std::size_t index(std::size_t u) const {
+            if (list.size() < 16) {
+                for (std::size_t k = 0; k < list.size(); ++k)
+                    if (list[k] == u) return k;
+                return kNone;
+            }
+            return u < pos.size() && pos[u] ? pos[u] - 1 : kNone;
+        }
+        void mark(std::size_t u, std::size_t at) {
+            if (u >= pos.size()) pos.resize(u + 1, 0);
+            pos[u] = static_cast<std::uint32_t>(at + 1);
         }
         std::size_t size() const { return list.size(); }
     };
+    // B4b 28: queue every reader in `readers` (but `skip`) that is not queued, in list order: the
+    // same units in the same order as enqueue() of the whole list, at the cost of the shorter of
+    // the list and the walks since its last notification.
+    void notify(UnitSet& readers, std::size_t skip = UnitSet::kNone);
+    // B4b 28: `unit` (the unit being walked) reads what `readers` lists: a new list starts at
+    // the current position (each later member is the unit walked when it joins)
+    void add_reader(UnitSet& readers, std::size_t unit) {
+        if (readers.list.empty()) readers.notified = dequeued_.empty() ? 0 : dequeued_.size() - 1;
+        readers.insert(unit);
+    }
+    std::vector<std::size_t> dequeued_;  // B4b 28: the units in the order run() took them
     std::unordered_map<std::uint32_t, UnitSet> readers_;
+    std::unordered_map<std::size_t, UnitSet> slot_readers_;  // B4b 26: binding slot -> reader units
     bool earlier_called_ = false, closure_exposed_ = false, untracked_seen_ = false;
+    std::size_t untracked_escaped_ = 0;  // B4b 28: value_units_ already escaped by untracked_call
     const std::string* store_key(NodeId index, std::string& storage) const;  // a literal string index
     void element_update(NodeId target, const TyRef& value, Op op);          // `xs[i] += v`, `o.k++`
     std::map<std::uint32_t, SiteContents> agg_;
