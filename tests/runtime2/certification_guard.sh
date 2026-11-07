@@ -257,6 +257,17 @@ checks = [
     ('blocked: no scanner reference', br('ERROR scanner parity: NIFT_REF must name a reference nift binary') is not None, True),
     ('fail lines normalised', fl('FAIL /a/t/x.f: bad\nok\nFAIL /tmp/q1/y\n', ['/a']) == fl('FAIL /b/t/x.f: bad\nFAIL /tmp/z9/y\n', ['/b']), True),
     ('fail lines differ', fl('FAIL x: 1\n') == fl('FAIL x: 2\n'), False),
+    # H2b: no FAIL lines on either side is not an identical failure by itself
+    ('identity: crash vs assertion, no FAIL lines', certify.same_failure(
+        certify.failure_identity('running tests/c.sh\nSegmentation fault\nmake: *** [M:3: t] Error 139\n'),
+        certify.failure_identity('running tests/c.sh\nassertion x failed\nmake: *** [M:3: t] Error 2\n')), False),
+    ('identity: empty logs never match', certify.same_failure(certify.failure_identity(''), certify.failure_identity('')), False),
+    ('identity: same FAIL lines and status match', certify.same_failure(
+        certify.failure_identity('running tests/k.sh\nFAIL k: 1\nmake: *** [M:3: t] Error 1\n', ['/a']),
+        certify.failure_identity('running tests/k.sh\nFAIL k: 1\nmake: *** [M:9: t] Error 1\n', ['/b'])), True),
+    ('identity: same FAIL lines, other status', certify.same_failure(
+        certify.failure_identity('running tests/k.sh\nFAIL k: 1\nmake: *** [M:3: t] Error 1\n'),
+        certify.failure_identity('running tests/k.sh\nFAIL k: 1\nmake: *** [M:3: t] Error 2\n')), False),
     ('preflight ok', pp(GOOD), []),
     ('preflight GCC 13', len(pp({**GOOD, 'cxx': 'g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0'})), 1),
     ('preflight clang', len(pp({**GOOD, 'cxx': 'clang version 15.2.0'})), 1),
@@ -277,6 +288,43 @@ print(f'PASS certify harness self-test ({len(checks)} cases: inventory, report c
 PYC
 harness_status=$?
 [ "$harness_status" -eq 0 ] || exit "$harness_status"
+
+# H2 toy-Makefile negative controls (review of 0d853db4): scripts/certify.py itself, on a candidate
+# and a baseline toy tree. (a) a later recipe line failing only on the candidate, behind a first line
+# that fails identically on the baseline; (b) a crash against an assertion with no FAIL lines; (c)
+# different FAIL lines at the same step on the v4.12.0 baseline: each must be FAILED-NEW (exit 1).
+# Positive control: an identical failure is FAILED-BASELINE (exit 0).
+TOY=$(mktemp -d)
+trap 'rm -rf "$TOY"' EXIT
+toy() {  # toy DIR TARGET RECIPE-LINES...
+    local dir=$1 target=$2; shift 2
+    mkdir -p "$dir/scripts"; cp scripts/certify.py "$dir/scripts/"
+    { printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n'
+      printf 'certify-targets: %s\n.PHONY: %s\n%s: nift\n' "$target" "$target" "$target"
+      for l in "$@"; do printf '\t@%s\n' "$l"; done; } >> "$dir/Makefile"
+}
+toy "$TOY/a/cand" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 1'
+toy "$TOY/a/base" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 0'
+toy "$TOY/b/cand" test-rt-crash 'echo "running tests/crashy.sh"; echo "Segmentation fault"; exit 139'
+toy "$TOY/b/base" test-rt-crash 'echo "running tests/crashy.sh"; echo "assertion failed: x"; exit 2'
+toy "$TOY/c/cand" test-rt-cases 'echo "running tests/cases.sh"; echo "FAIL case-new-1"; echo "FAIL case-new-2"; exit 1'
+toy "$TOY/c/base" test-rt-cases 'echo "running tests/cases.sh"; echo "FAIL case-old-9"; exit 1'
+toy "$TOY/p/cand" test-rt-same 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
+toy "$TOY/p/base" test-rt-same 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
+toyrun() {  # toyrun CASE TARGET BASELINE-FLAG WANT-RC WANT-CLASS
+    local out rc
+    out=$(cd "$TOY/$1/cand" && python3 scripts/certify.py --jobs 1 --targets "$2" --unprivileged-user '' \
+          --baseline "$([ "$3" = v4 ] && echo "$TOY/$1/base")" \
+          $([ "$3" = reg ] && echo --regression-baseline "17f7964c=$TOY/$1/base") 2>/dev/null); rc=$?
+    if [ "$rc" -ne "$4" ] || ! grep -q "^  $5 *$2:" <<<"$out"; then
+        echo "FAIL certification guard toy control $1 ($2): exit $rc, wanted $4 and $5"; echo "$out" | tail -5; exit 1
+    fi
+    echo "PASS certification guard toy control $1: $2 is $5 (exit $rc)"
+}
+toyrun a test-rt-multi reg 1 FAILED-NEW
+toyrun b test-rt-crash reg 1 FAILED-NEW
+toyrun c test-rt-cases v4 1 FAILED-NEW
+toyrun p test-rt-same reg 0 FAILED-BASELINE
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an
@@ -315,8 +363,13 @@ checks = [
     # Same, if the unprivileged baseline failed at the earlier step only.
     ('masking: baseline fails earlier', case(unpriv_rc=1, base_rc=1, base_has_target=True,
         cand_step=sig(LATER), base_step=sig(ROOT_ONLY)), 'FAIL'),
-    ('genuine pre-existing (same step, same user)', case(unpriv_rc=1, base_rc=1, base_has_target=True,
-        cand_step=sig(LATER), base_step=sig(LATER)), 'BASELINE-FAILURE'),
+    ('genuine pre-existing (same step, same user, identical)', case(unpriv_rc=1, base_rc=1, base_has_target=True,
+        cand_step=sig(LATER), base_step=sig(LATER), base_identical=True), 'BASELINE-FAILURE'),
+    # H2c (review of 0d853db4): the same step with different FAIL lines or statuses is not pre-existing.
+    ('same step, not identical', case(unpriv_rc=1, base_rc=1, base_has_target=True,
+        cand_step=sig(LATER), base_step=sig(LATER), base_identical=False), 'FAIL'),
+    ('same step, identity unknown', case(unpriv_rc=1, base_rc=1, base_has_target=True,
+        cand_step=sig(LATER), base_step=sig(LATER)), 'FAIL'),
     ('unidentified steps never excuse', case(base_rc=1, base_has_target=True, cand_step=None, base_step=None), 'FAIL'),
     ('target absent from baseline', case(base_rc=2, base_has_target=False), 'FAIL'),
     ('no baseline available', case(), 'FAIL'),

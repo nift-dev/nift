@@ -291,6 +291,37 @@ def fail_lines(text, roots=()):
     return out
 
 
+_MAKE_ERR = re.compile(r"^make(?:\[\d+\])?: \*\*\* \[[^\]]*\] (.*)$")
+_SIGNAL = re.compile(r"Segmentation fault|Aborted|Killed|Bus error|core dumped|Floating point exception")
+_TIMING = re.compile(r"^\s*(real|user|sys)\s")
+
+
+def failure_identity(text, roots=(), rc=None):
+    """H2 (review of 0d853db4): what makes two failures the same failure. The failing step (or
+    None), the exit statuses and signals (make's `Error N`, a signal text, or the command's own rc),
+    and the normalised FAIL lines; when a log has no FAIL line, its normalised last lines instead.
+    None when there is nothing to compare (no FAIL line and no output): never identical."""
+    lines = text.splitlines()
+    codes = tuple(m.group(1).strip() for m in map(_MAKE_ERR.match, lines) if m)
+    sigs = tuple(sorted(set(_SIGNAL.findall(text))))
+    fails = frozenset(fail_lines(text, roots))
+    tail = ()
+    if not fails:
+        def norm(l):
+            for r in roots:
+                l = l.replace(str(r), "<ROOT>")
+            return re.sub(r"/tmp/\S+", "<TMP>", l.strip())
+        body = [norm(l) for l in lines if l.strip() and not l.startswith(("make", "$ ")) and not _TIMING.match(l)]
+        tail = tuple(body[-15:])
+        if not tail:
+            return None
+    return (failure_signature(text), codes or (rc,), sigs, fails, tail)
+
+
+def same_failure(a, b):
+    return a is not None and b is not None and a == b
+
+
 def recipe_lines(cwd, target, old=()):
     """C2: the commands `make -k target -o old...` would run, one per recipe line (continuations
     joined), from `make -n`."""
@@ -306,14 +337,14 @@ def recipe_lines(cwd, target, old=()):
     return lines
 
 
-def run_lines(cwd, target, old, logdir, timeout, extra_env=None):
+def run_lines(cwd, target, old, logdir, timeout, extra_env=None, tag=""):
     """C2: a failing recipe stops at its first failing line, hiding the rest: run every line on its
-    own (the target's prerequisites are built) and return [(command, rc)]."""
+    own (the target's prerequisites are built) and return [(command, rc, failure identity)]."""
     results = []
     env = clean_env()
     env.update(extra_env or {})
     for i, cmd in enumerate(recipe_lines(cwd, target, old), 1):
-        log = logdir / f"{target}.line{i}.log"
+        log = logdir / f"{target}{tag}.line{i}.log"
         with open(log, "w") as f:
             f.write(f"$ {cmd}\n")
             f.flush()
@@ -322,8 +353,17 @@ def run_lines(cwd, target, old, logdir, timeout, extra_env=None):
                                     timeout=timeout).returncode
             except subprocess.TimeoutExpired:
                 rc = 124
-        results.append((cmd[:200], rc))
+        results.append((cmd, rc, failure_identity(log.read_text(errors="replace"), [cwd], rc) if rc else None))
     return results
+
+
+def lines_match(cand, base, croot, broot):
+    """H2a: every recipe line that fails on its own on the candidate fails identically on the
+    baseline (same command, same failure identity). Returns the candidate lines that do not."""
+    norm = lambda c, r: c.replace(str(r), "<ROOT>")
+    have = {norm(c, broot): ident for c, rc, ident in base if rc}
+    return [i for i, (c, rc, ident) in enumerate(cand, 1)
+            if rc and not same_failure(ident, have.get(norm(c, croot)))]
 
 
 def blocked_reason(text):
@@ -618,8 +658,11 @@ def decide(f):
         return "SKIPPED-ENVIRONMENTAL", f"fails only as root; passes as unprivileged user '{f['user']}'"
     if f.get("base_rc") not in (None, 0) and f.get("base_has_target"):
         cs, bs = f.get("cand_step"), f.get("base_step")
+        if cs is not None and cs == bs and f.get("base_identical") is True:
+            return "BASELINE-FAILURE", f"identical failure on the v4.12.0 baseline (same step, statuses and FAIL lines), same user: {cs}"
         if cs is not None and cs == bs:
-            return "BASELINE-FAILURE", f"also fails on the v4.12.0 baseline at the same step, same user: {cs}"
+            return "FAIL", (f"the v4.12.0 baseline fails at the same step but not identically (statuses or FAIL lines "
+                            f"differ, or a recipe line fails only on the candidate); see {f.get('cand_log')}")
         return "FAIL", (f"baseline also fails, but at a different or unidentified step "
                         f"(candidate: {cs}; baseline: {bs}); see {f.get('cand_log')}")
     return "FAIL", f"see .build/certify/{t}.log"
@@ -826,6 +869,9 @@ def main():
                     f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
                     f["base_step"] = failure_signature(btext)
                     f["cand_log"] = str(cand_log.relative_to(ROOT))
+                    f["base_identical"] = same_failure(failure_identity(cand_log.read_text(errors="replace"), [ROOT, user_copy] if user_copy else [ROOT]),
+                                                       failure_identity(btext, [base_dir]))
+                    base_tree_used = base_dir
             # C2: the regression baselines, each compared on its own (same step AND same FAIL lines).
             if not f["unverified"] and f.get("unpriv_rc") != 0 and regressions:
                 ctext = cand_log.read_text(errors="replace")
@@ -834,16 +880,31 @@ def main():
                     rlog = logdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
                     rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
                     rtext = rlog.read_text(errors="replace")
-                    same = (rrc != 0 and "No rule to make target" not in rtext
-                            and failure_signature(ctext) is not None and failure_signature(ctext) == failure_signature(rtext)
-                            and fail_lines(ctext, [ROOT]) == fail_lines(rtext, [tree]))
+                    same = (rrc != 0 and "No rule to make target" not in rtext and failure_signature(ctext) is not None
+                            and same_failure(failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree])))
                     r["regression"][name] = same
-        r["status"], r["reason"] = decide(f)
+        line_note = ""
         if r["rc"] != 0 and recipe.get(t, "").count("\n") > 1:
-            # C2: the lines after the failing one would never run: each line on its own.
-            r["lines"] = run_lines(ROOT, t, olds[t], logdir, a.timeout, extra)
-            r["reason"] += "; recipe lines failing on their own: " + (", ".join(
-                f"{i}" for i, (_, lrc) in enumerate(r["lines"], 1) if lrc != 0) or "none")
+            # C2: the lines after the failing one would never run: each line on its own. H2a: a
+            # baseline matches only if every line failing on the candidate fails identically there.
+            cand_lines = run_lines(ROOT, t, olds[t], logdir, a.timeout, extra)
+            r["lines"] = [(c[:200], lrc) for c, lrc, _ in cand_lines]
+            failing = [i for i, (_, lrc, _) in enumerate(cand_lines, 1) if lrc]
+            line_note = "recipe lines failing on their own: " + (", ".join(map(str, failing)) or "none")
+            if f.get("base_identical"):
+                bl = run_lines(base_tree_used, t, olds[t], logdir, a.timeout, extra, ".baseline")
+                only = lines_match(cand_lines, bl, ROOT, base_tree_used)
+                if only:
+                    f["base_identical"] = False
+                    line_note += f"; on the candidate only (not v4.12.0): {', '.join(map(str, only))}"
+            for name, tree in regressions.items():
+                if r.get("regression", {}).get(name):
+                    tag = ".regression-" + re.sub(r"[^\w.-]", "_", name)
+                    only = lines_match(cand_lines, run_lines(tree, t, olds[t], logdir, a.timeout, extra, tag), ROOT, tree)
+                    if only:
+                        r["regression"][name] = False
+                        line_note += f"; on the candidate only (not {name}): {', '.join(map(str, only))}"
+        r["status"], r["reason"] = decide(f)
         logtext = (logdir / f"{t}.log").read_text(errors="replace") if (logdir / f"{t}.log").exists() else ""
         r["blocked"] = blocked_reason(logtext)
         if COMPARATOR_SKIP in logtext:
@@ -853,7 +914,9 @@ def main():
             r["reason"] = r["blocked"] or r["reason"]
         elif r["class"] == "FAILED-BASELINE" and r["status"] == "FAIL":
             r["reason"] = "identical failure on regression baseline(s): " + ", ".join(
-                n for n, same in r["regression"].items() if same)
+                n for n, same in r["regression"].items() if same) + "; " + r["reason"]
+        if line_note:
+            r["reason"] += "; " + line_note  # H2a: never overwritten
     for t in planned:
         if t not in results:
             results[t] = {"rc": None, "status": None, "class": "NOT-RUN", "reason": "planned, not run"}
