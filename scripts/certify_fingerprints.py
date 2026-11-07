@@ -291,6 +291,41 @@ def not_executed(gate, text, roots=()):
     return out
 
 
+# owner 2026-11-08 06:46: each abort-hidden check has a category (A release-critical, B unrelated
+# historical feature) in the reviewed table scripts/certify_hidden_checks.tsv.
+HIDDEN_TABLE = "scripts/certify_hidden_checks.tsv"
+_HIDDEN_LABEL = re.compile(r"^NOT EXECUTED (?P<script>[^:]+): (?P<check>.*)$")
+
+
+def hidden_categories(text):
+    """{(gate, script, check): (category, reason)} from the table's text; check `*` is the
+    script's unnamed checks. Raises ValueError on a malformed row or a category other than A/B."""
+    table = {}
+    for n, line in enumerate(text.splitlines(), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        f = line.split("\t")
+        if len(f) != 5 or f[3] not in ("A", "B") or not all(x.strip() for x in f):
+            raise ValueError(f"{HIDDEN_TABLE}:{n}: malformed row {line!r}")
+        if (f[0], f[1], f[2]) in table:
+            raise ValueError(f"{HIDDEN_TABLE}:{n}: duplicate row for {f[0]} {f[1]} {f[2]}")
+        table[(f[0], f[1], f[2])] = (f[3], f[4])
+    return table
+
+
+def hidden_category(table, gate, label):
+    """(category, reason) of a not-executed check: its own row, else its script's `*` row; an
+    unexecuted check without a row (any other required skip included) is ("A", "unclassified")."""
+    m = _HIDDEN_LABEL.match(label)
+    if m:
+        script, check = m.group("script"), m.group("check")
+        if (gate, script, check) in table:
+            return table[(gate, script, check)]
+        if (gate, script, "*") in table:
+            return table[(gate, script, "*")]
+    return ("A", "unclassified: no row in " + HIDDEN_TABLE + " (read as release-critical)")
+
+
 EXPECTED_BASELINE = [
     "test-v44-language-foundation", "test-rt-vm", "test-runtime2-host-deps",
     "cp25r-inventory", "test-cp19-s1-dispatch", "test-rt-host-mutants", "test-rt-parser",

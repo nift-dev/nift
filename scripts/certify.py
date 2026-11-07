@@ -56,10 +56,18 @@ Combined-candidate harness (docs/runtime-2/checkpoints/combined-b3-b5.md, owner 
      preflight problem exits 2 before running anything; any comparator gate that reports SKIP
      fails the campaign.
 
-Exit status: 2 preflight failed (full campaign) or nothing planned; 1 when any required gate is
-FAILED-NEW or a comparator gate skipped; 3 when none failed but some are BLOCKED or NOT-RUN (not
-certified); 0 when every required gate is PASSED or FAILED-BASELINE (--strict: only PASSED). Logs:
-.build/certify/<target>.log; summary: .build/certify/summary.json and summary.txt.
+Campaign verdict (owner 2026-11-08 06:46; campaign_verdict()), one exit status each:
+  FAILED     exit 1: a FAILED-NEW gate, comparator coverage skipped, a gate NOT-RUN, SKIP or
+             BLOCKED by anything other than required checks that did not execute, or (--strict)
+             FAILED-BASELINE;
+  PARTIAL    exit 4: nothing failed, every executed assertion passed or is FAILED-BASELINE, and the
+             only gaps are REQUIRED checks that did not execute (a gate that passed with a required
+             skip, checks an early abort hid). Never a pass; each unexecuted check is listed with
+             its category (scripts/certify_hidden_checks.tsv: A release-critical, B unrelated
+             historical; no row reads as A), and any A makes the report "NOT RELEASE-QUALIFYING";
+  CERTIFIED  exit 0: every gate PASSED or FAILED-BASELINE (--strict: only PASSED), nothing hidden.
+Exit 2: preflight failed (full campaign), nothing planned, or the category table is unusable.
+Logs: .build/certify/<target>.log; summary: .build/certify/summary.json and summary.txt.
 """
 import argparse, concurrent.futures as cf, json, os, pwd, re, shutil, signal, subprocess, sys, time
 from pathlib import Path
@@ -1365,6 +1373,12 @@ def main():
     a = ap.parse_args()
     if a.merge:
         return merge_summaries(a.merge)
+    # owner 2026-11-08 06:46: the reviewed category table of abort-hidden checks (the runner's own)
+    try:
+        hidden_table = FP.hidden_categories((Path(__file__).resolve().parent / "certify_hidden_checks.tsv").read_text())
+    except (OSError, ValueError) as e:
+        print(f"certify: the hidden-check category table is unusable: {e}", file=sys.stderr)
+        return 2
 
     deps, recipe = make_db(ROOT, AGGREGATE)
     inv = inventory(deps)
@@ -1709,33 +1723,67 @@ def main():
                      f"({sum(1 for x in unexecuted if x[3])} required, {sum(1 for x in unexecuted if not x[3])} not required here)")
         lines += [f"  {'REQUIRED' if req else 'not-required'} {t}: {l}  [needs: {why}]" for t, l, why, req in unexecuted]
     # every planned gate is a required gate of the certification plan (MANDATORY is the subset the
-    # plan check insists on); in certification mode any of them PARTIAL or SKIP fails the campaign
+    # plan check insists on)
     partial_mandatory = sorted(t for t, r in results.items() if r.get("assertion") in ("PARTIAL", "SKIP"))
     summary["assertion_counts"] = {k: sum(1 for r in results.values() if r.get("assertion") == k)
                                    for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
     certify_mode = a.certify or full
-    if certify_mode and partial_mandatory:
-        lines.append("CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: " + ", ".join(partial_mandatory))
-    # confirmation of c8817214, C2 (D3): a REQUIRED assertion that never executed fails a campaign
-    # whatever its gate's class (FAILED-BASELINE included): the checks a script's abort hid, and
-    # any other required skip of a failing gate. The owner may later accept named hidden checks.
-    unexecuted = sorted(t for t, r in results.items() if r.get("assertion") not in ("PARTIAL", "SKIP")
-                        and any(req for _, _, req in r.get("skipped") or []))
-    if certify_mode and unexecuted:
-        lines.append("CAMPAIGN FAILED: required assertions not executed in: " + ", ".join(unexecuted))
+    verdict, gaps, why_failed = campaign_verdict(results, counts, comparator_skipped, a.strict, hidden_table)
+    summary["verdict"] = verdict
+    summary["not_executed_required"] = [{"gate": t, "check": l, "category": c, "category_reason": cr}
+                                        for t, l, c, cr in gaps]
+    lines.append(f"CAMPAIGN VERDICT: {verdict} (exit {VERDICT_EXIT[verdict]})"
+                 + ("" if certify_mode else " [not a --certify campaign]"))
+    if verdict == "FAILED":
+        lines += [f"  FAILED: {w}" for w in why_failed]
+    if gaps:
+        lines.append(f"REQUIRED CHECKS NOT EXECUTED: {len(gaps)} (category A: {sum(1 for g in gaps if g[2] == 'A')}, "
+                     f"B: {sum(1 for g in gaps if g[2] == 'B')})")
+        lines += [f"  [{c}] {t}: {l}  ({cr})" for t, l, c, cr in gaps]
+    if verdict == "PARTIAL":
+        lines.append("PARTIAL is not a pass: required checks did not execute (owner 2026-11-08 06:46)")
+    if gaps and any(g[2] == "A" for g in gaps):
+        lines.append("NOT RELEASE-QUALIFYING: a Category A (release-critical) check did not execute")
     (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     not_passed = sum(counts[k] for k in classes[:-1])
     if not_passed:
-        lines.append(f"NOT CERTIFIED HERE: {not_passed} required gate(s) are not PASSED (only PASSED counts as a pass)")
+        lines.append(f"NOT PASSED: {not_passed} required gate(s) are not PASSED (only PASSED counts as a pass)")
     (logdir / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    if counts["FAILED-NEW"] or comparator_skipped or (certify_mode and (partial_mandatory or unexecuted)):
-        return 1
-    if counts["BLOCKED"] or counts["NOT-RUN"]:
-        return 3
-    if a.strict and counts["FAILED-BASELINE"]:
-        return 1
-    return 0
+    return VERDICT_EXIT[verdict]
+
+
+# owner 2026-11-08 06:46: three campaign verdicts, each with its own exit status.
+VERDICT_EXIT = {"CERTIFIED": 0, "FAILED": 1, "PARTIAL": 4}
+
+
+def campaign_verdict(results, counts, comparator_skipped, strict, hidden_table):
+    """(verdict, gaps, why_failed). FAILED: a FAILED-NEW gate, comparator coverage skipped, a gate
+    that did not run or is blocked for any reason other than required checks that did not execute
+    (a SKIP or NOT-RUN gate, an environment block), or FAILED-BASELINE under --strict. PARTIAL:
+    otherwise, when a REQUIRED check did not execute (a gate that passed with a required skip, or
+    checks an abort hid): every executed assertion passed or is FAILED-BASELINE. CERTIFIED: the
+    rest. gaps: [(gate, check, category, reason)] for every required check not executed."""
+    gaps = []
+    for t in sorted(results):
+        for label, _why, req in results[t].get("skipped") or []:
+            if req:
+                cat, reason = FP.hidden_category(hidden_table, t, label)
+                gaps.append((t, label, cat, reason))
+    why = []
+    if counts["FAILED-NEW"]:
+        why.append("FAILED-NEW: " + ", ".join(sorted(t for t, r in results.items() if r["class"] == "FAILED-NEW")))
+    if comparator_skipped:
+        why.append("comparator coverage skipped in " + ", ".join(comparator_skipped))
+    incomplete = sorted(t for t, r in results.items()
+                        if r["class"] == "NOT-RUN" or (r["class"] == "BLOCKED" and r.get("assertion") != "PARTIAL"))
+    if incomplete:
+        why.append("not run or blocked (not only by unexecuted checks): " + ", ".join(incomplete))
+    if strict and counts["FAILED-BASELINE"]:
+        why.append("FAILED-BASELINE under --strict")
+    if why:
+        return "FAILED", gaps, why
+    return ("PARTIAL" if gaps else "CERTIFIED"), gaps, []
 
 
 if __name__ == "__main__":

@@ -1,0 +1,59 @@
+# Checks hidden by an early abort (scripts/certify_fingerprints.py ABORT_CASES, not_executed): their
+# category for the campaign verdict (owner 2026-11-08 06:46; docs/runtime-2/checkpoints/combined-b3-b5.md
+# section 28). A = release-critical (B3-B5 semantics, mutation, ownership, reference lifetimes,
+# assignment, privacy, dispatch, snapshot iteration, runtime safety); B = an unrelated historical
+# feature. A PARTIAL campaign with any unexecuted A check (or an unclassified one, read as A) is
+# "not release-qualifying". Reviewed table: a change here is a reviewed change.
+# Columns (tab-separated): gate, script, check (the name ABORT_CASES gives, or * for the script's
+# unnamed checks: "every check after line N" / "after its failing command"), category, reason.
+test-v44-language-foundation	v44_ast_expression_smoke.sh	hot-loop sum	A	runtime safety: integer arithmetic in a hot loop (precision, overflow)
+test-v44-language-foundation	v44_ast_expression_smoke.sh	big-int equality	A	runtime safety: equality of integers beyond 2^53 (precision)
+test-v44-language-foundation	v44_ast_expression_smoke.sh	large-value compound	A	assignment: compound assignment on large values (D2's family B)
+test-v44-language-foundation	v44_ast_expression_smoke.sh	live binding	A	assignment and reference lifetimes: a binding read after it is rebound
+test-v44-language-foundation	v44_ast_expression_smoke.sh	precedence	A	expression semantics: operator precedence and evaluation (D2's family A)
+test-v44-language-foundation	v44_ast_expression_smoke.sh	*	A	expression semantics (the script's other checks)
+test-v44-language-foundation	v44_element_assignment_smoke.sh	array element assignment	A	mutation and assignment (B5 shared arrays)
+test-v44-language-foundation	v44_element_assignment_smoke.sh	object member assignment	A	mutation and assignment (B5 shared objects)
+test-v44-language-foundation	v44_element_assignment_smoke.sh	nested grid assignment	A	mutation through a nested location (reference lifetimes)
+test-v44-language-foundation	v44_element_assignment_smoke.sh	compound element assignment	A	assignment: compound on an element target
+test-v44-language-foundation	v44_element_assignment_smoke.sh	element read-after-write	A	mutation: a read after an element store
+test-v44-language-foundation	v44_element_assignment_smoke.sh	out-of-range element assignment	A	runtime safety: an out-of-range store is an error
+test-v44-language-foundation	v44_element_assignment_smoke.sh	const array element assignment	A	B5 const binding-only (owner ruling Q2 option B)
+test-v44-language-foundation	v44_element_assignment_smoke.sh	*	A	mutation and assignment (the script's other checks)
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	1 destructuring then parent growth	A	reference lifetimes: an extracted element after its parent grows
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	2 nested extraction then growth	A	reference lifetimes: a retained location under growth
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	3 array of struct handles with growth	A	reference lifetimes: struct handles in a growing array
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	4 map of struct handles with growth	A	reference lifetimes: struct handles in a growing map
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	5 @for over a map whose body mutates it	A	snapshot iteration: a map mutated by its loop body
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	6 @for over an array whose body mutates it	A	snapshot iteration: an array mutated by its loop body
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	CP34 escaped reference through an object member	A	reference lifetimes: a reference escaping through a member
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	CP34 reference escaping a loop scope	A	reference lifetimes: a reference escaping a loop scope
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	CP34 heavy reallocation with composed locations	A	reference lifetimes and runtime safety: reallocation under composed locations
+test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	*	A	reference lifetimes (the script's other checks)
+test-v44-language-foundation	v44_ast_constant_fold_smoke.sh	*	A	expression semantics: constant folding must not change results
+test-v44-language-foundation	v44_perf_scaling_smoke.sh	*	B	performance scaling of the v4.4 AST evaluator (no semantics asserted)
+test-v44-language-foundation	v44_cp2_variadic_functions_smoke.sh	*	B	v4.4 variadic function syntax
+test-v44-language-foundation	v44_struct_variadic_methods_smoke.sh	*	B	v4.4 variadic struct methods (syntax; method dispatch itself is covered by the B4 gates)
+test-v44-language-foundation	v44_cp3_variadic_lambdas_smoke.sh	*	B	v4.4 variadic lambda syntax
+test-v44-language-foundation	v44_cp4_spread_smoke.sh	*	B	v4.4 spread syntax
+test-v44-language-foundation	v44_cp5_generalized_native_smoke.sh	*	B	v4.4 generalized native calls
+test-v44-language-foundation	v44_cp6_cp7_glob_filesystem_smoke.sh	*	B	v4.4 glob and filesystem built-ins
+test-v44-language-foundation	v44_cp8_structured_wildcards_smoke.sh	*	B	v4.4 structured wildcards
+test-v44-language-foundation	v44_cp9_map_markup_smoke.sh	*	B	v4.4 map markup rendering
+test-v44-language-foundation	v44_cp10_filesystem_authority_smoke.sh	*	B	v4.4 filesystem authority (host permissions, not the language)
+test-v46-relative-imports	v44_relative_import_ownership_smoke.sh	*	B	module import paths: which module owns a relative import (v4.4/v4.6 modules; not reference ownership)
+test-v46-relative-imports	v46_import_worker_ownership_smoke.sh	*	B	module imports in workers: import-path ownership (v4.6 modules; not reference ownership)
+test-v44-packages	package_transaction_smoke.py	*	B	package transactions (install/update provenance)
+test-runtime2-cp03-simplify	cp03_missing_tracer.sh	*	B	the CP03 host-op tracer's missing-tracer case
+test-v44-packages	package_callable_closure_smoke.sh	*	B	packages: an exported callable closure through a package
+test-v44-packages	package_combined_dogfood.sh	*	B	packages: combined dogfood install
+test-v44-packages	package_hardening_smoke.sh	*	B	packages: manifest and path hardening
+test-v44-packages	package_metadata_smoke.sh	*	B	packages: metadata
+test-v44-packages	package_module_export_smoke.sh	*	B	packages: module exports
+test-v44-packages	package_refs_smoke.sh	*	B	packages: git refs and locks
+test-v44-packages	package_sqlite_dogfood.sh	*	B	packages: the sqlite package
+test-v44-packages	package_tools_dogfood.sh	*	B	packages: package tools
+test-v44-packages	v44_relative_import_ownership_smoke.sh	*	B	module import paths (as in test-v46-relative-imports)
+test-v44-packages	v46_resource_paths.py	*	B	package resource paths
+test-runtime2-cp03-simplify	missing_tracer_caller.sh	*	B	the CP01/CP03 host-op tracer's caller case
+test-runtime2-cp03-simplify	cp03_simplify.sh	*	B	CP03 incremental-build simplification

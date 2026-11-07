@@ -534,7 +534,7 @@ trap 'rm -rf "$TOY"' EXIT
 toy() {  # toy DIR TARGET RECIPE-LINES...  (CERTIFY_PY: the runner copied in, default the tree's)
     local dir=$1 target=$2; shift 2
     mkdir -p "$dir/scripts"; cp "${CERTIFY_PY:-scripts/certify.py}" "$dir/scripts/certify.py"
-    cp scripts/certify_fingerprints.py "$dir/scripts/"
+    cp scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv "$dir/scripts/"
     { printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n'
       printf 'certify-targets: %s\n.PHONY: %s\n%s: nift\n' "$target" "$target" "$target"
       for l in "$@"; do printf '\t@%s\n' "$l"; done; } >> "$dir/Makefile"
@@ -639,8 +639,8 @@ toyrun tp test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun p test-runtime2-rt-diff-selftest reg 0 FAILED-BASELINE
 toyrun v test-runtime2-rt-diff-selftest reg 0 FAILED-BASELINE
 # D3 toy controls: a gate that passes with a required assertion skipped is PARTIAL (reported
-# BLOCKED) and a gate whose only result is a skip is SKIP (NOT-RUN); in certification mode
-# (--certify) either fails the campaign (exit 1); an other-platform skip stays PASSED.
+# BLOCKED; the campaign verdict PARTIAL, exit 4, owner 2026-11-08 06:46) and a gate whose only
+# result is a skip is SKIP (NOT-RUN; verdict FAILED, exit 1); an other-platform skip stays PASSED.
 toy "$TOY/s1/cand" test-rt-partial 'echo "running tests/runtime2/read_limit.py"; echo "PASS limits"; echo "SKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)"; exit 0'
 toy "$TOY/s2/cand" test-rt-skipall 'echo "running tests/refs.sh"; echo "SKIP package refs/local lock (git unavailable)"; exit 0'
 toy "$TOY/s3/cand" test-rt-platform 'echo "running tests/w.py"; echo "PASS w"; echo "SKIP CP20 Windows pipeline (POSIX host)"; exit 0'
@@ -652,21 +652,88 @@ skiprun() {  # skiprun CASE TARGET WANT-RC WANT-TEXT
     fi
     echo "PASS certification guard D3 control $1: $2 (exit $rc) as expected"
 }
-# confirmation of c8817214, C2 (D3): a FAILED-BASELINE gate whose script aborted (hiding later
-# checks) still fails a --certify campaign
+# owner 2026-11-08 06:46 (replaces C2's "fail the campaign"): checks an abort hid make the verdict
+# PARTIAL (exit 4, never a pass) when nothing failed; each is listed with its category from
+# scripts/certify_hidden_checks.tsv, and a Category A gap makes it NOT RELEASE-QUALIFYING. Any
+# FAILED-NEW still makes it FAILED (exit 1).
+hiddenrun() {  # hiddenrun CASE TARGET WANT-RC TEXT... (each TEXT must appear; a TEXT starting with ! must not)
+    local c=$1 t=$2 want=$3 out rc x; shift 3
+    out=$(cd "$TOY/$c/cand" && python3 scripts/certify.py --jobs 1 --certify --targets "$t" --unprivileged-user '' \
+          --baseline '' --regression-baseline "17f7964c=$TOY/$c/r1" 2>/dev/null); rc=$?
+    [ "$rc" -eq "$want" ] || { echo "FAIL certification guard verdict control $c: exit $rc, wanted $want"; echo "$out" | tail -8; exit 1; }
+    for x in "$@"; do
+        if [ "${x#!}" != "$x" ]; then grep -qF -- "${x#!}" <<<"$out" && { echo "FAIL certification guard verdict control $c: unexpected '${x#!}'"; exit 1; }
+        else grep -qF -- "$x" <<<"$out" || { echo "FAIL certification guard verdict control $c: missing '$x'"; echo "$out" | tail -8; exit 1; }; fi
+    done
+    echo "PASS certification guard verdict control $c: $t (exit $rc) as expected"
+}
 ABORTED='echo "python3 tests/package_transaction_smoke.py"; echo "Traceback (most recent call last):"; echo "  File \"/x/tests/package_transaction_smoke.py\", line 330, in <module>"; echo "AssertionError: same.f failed"; exit 1'
 toy "$TOY/ab/cand" test-v44-packages "$ABORTED"; toy "$TOY/ab/r1" test-v44-packages "$ABORTED"
-out=$(cd "$TOY/ab/cand" && python3 scripts/certify.py --jobs 1 --certify --targets test-v44-packages --unprivileged-user '' \
-      --baseline '' --regression-baseline "17f7964c=$TOY/ab/r1" 2>/dev/null); rc=$?
-if [ "$rc" -ne 1 ] || ! grep -q "FAILED-BASELINE  test-v44-packages" <<<"$out" \
-   || ! grep -q "CAMPAIGN FAILED: required assertions not executed in: test-v44-packages" <<<"$out" \
-   || ! grep -q "NOT EXECUTED package_transaction_smoke.py: every check after line 330" <<<"$out"; then
-    echo "FAIL certification guard D3 control ab: exit $rc"; echo "$out" | tail -6; exit 1
-fi
-echo "PASS certification guard D3 control ab: FAILED-BASELINE with abort-hidden checks fails --certify (exit $rc)"
-skiprun s1 test-rt-partial 1 "BLOCKED          test-rt-partial: PARTIAL"
-skiprun s1 test-rt-partial 1 "CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: test-rt-partial"
-skiprun s1 test-rt-partial 1 "needs: MemAvailable >= 4096 MiB"
+hiddenrun ab test-v44-packages 4 "FAILED-BASELINE  test-v44-packages" "CAMPAIGN VERDICT: PARTIAL (exit 4)" \
+    "[B] test-v44-packages: NOT EXECUTED package_transaction_smoke.py: every check after line 330" \
+    "PARTIAL is not a pass" "!NOT RELEASE-QUALIFYING"
+# Category A hidden checks (the root-path reproducers stop at line 20) are listed as A and make the
+# report NOT RELEASE-QUALIFYING. (A toy language-foundation is load-sensitive: a failure there is
+# FAILED-NEW under exclusive execution, so this toy's verdict is FAILED; the PARTIAL-with-A verdict
+# is table-tested below.)
+ABORTED_A='echo "tests/v44_root_path_corruption_reproducers.sh"; echo "CERTIFY-ERR v44_root_path_corruption_reproducers.sh:20 rc=1 cmd=false" >&2; exit 1'
+toy "$TOY/ac/cand" test-v44-language-foundation "$ABORTED_A"; toy "$TOY/ac/r1" test-v44-language-foundation "$ABORTED_A"
+hiddenrun ac test-v44-language-foundation 1 "CAMPAIGN VERDICT: FAILED (exit 1)" \
+    "[A] test-v44-language-foundation: NOT EXECUTED v44_root_path_corruption_reproducers.sh: 1 destructuring then parent growth" \
+    "[A] test-v44-language-foundation: NOT EXECUTED v44_root_path_corruption_reproducers.sh: CP34 heavy reallocation with composed locations" \
+    "NOT RELEASE-QUALIFYING"
+# campaign_verdict(), table-tested; and the category table: every named ABORT_CASES check has a row
+python3 -B - <<'VERDICT' || exit 1
+import sys
+sys.path.insert(0, "scripts")
+import certify, certify_fingerprints as FP
+table = FP.hidden_categories(open("scripts/certify_hidden_checks.tsv").read())
+G = "test-v44-language-foundation"
+A = ("NOT EXECUTED v44_root_path_corruption_reproducers.sh: 2 nested extraction then growth", "aborted", True)
+B = ("NOT EXECUTED package_transaction_smoke.py: every check after line 330", "aborted", True)
+def counts(results):
+    return {k: sum(1 for r in results.values() if r["class"] == k)
+            for k in ("FAILED-NEW", "FAILED-BASELINE", "BLOCKED", "NOT-RUN", "PASSED")}
+def v(results, strict=False, comparator=()):
+    return certify.campaign_verdict(results, counts(results), list(comparator), strict, table)
+cases = [
+    ("all passed", {"x": {"class": "PASSED"}}, "CERTIFIED", []),
+    ("baseline failure, nothing hidden", {"x": {"class": "FAILED-BASELINE"}}, "CERTIFIED", []),
+    ("baseline failure under --strict", {"x": {"class": "FAILED-BASELINE"}}, "FAILED", [], True),
+    ("baseline failure hiding A checks", {G: {"class": "FAILED-BASELINE", "skipped": [A]}}, "PARTIAL", ["A"]),
+    ("baseline failure hiding B checks", {"test-v44-packages": {"class": "FAILED-BASELINE", "skipped": [B]}}, "PARTIAL", ["B"]),
+    ("a pass with a required skip (unclassified: A)", {"x": {"class": "BLOCKED", "assertion": "PARTIAL",
+                                                         "skipped": [("SKIP y", "needs z", True)]}}, "PARTIAL", ["A"]),
+    ("a not-required skip only", {"x": {"class": "PASSED", "skipped": [("SKIP y", "other OS", False)]}}, "CERTIFIED", []),
+    ("hidden checks and a FAILED-NEW", {G: {"class": "FAILED-BASELINE", "skipped": [A]}, "y": {"class": "FAILED-NEW"}}, "FAILED", ["A"]),
+    ("hidden checks and an environment block", {G: {"class": "FAILED-BASELINE", "skipped": [A]},
+                                                 "y": {"class": "BLOCKED", "assertion": "BLOCKED"}}, "FAILED", ["A"]),
+    ("a SKIP gate", {"x": {"class": "NOT-RUN", "assertion": "SKIP", "skipped": [("SKIP y", "z", True)]}}, "FAILED", ["A"]),
+    ("comparator skipped", {"x": {"class": "PASSED"}}, "FAILED", [], False, ["x"]),
+]
+bad = 0
+for case in cases:
+    name, results, want, cats = case[:4]
+    verdict, gaps, _ = v(results, *case[4:])
+    ok = verdict == want and [g[2] for g in gaps] == cats
+    bad += not ok
+    print("%s certification guard verdict table: %s -> %s %s" % ("PASS" if ok else "FAIL", name, verdict, [g[2] for g in gaps]))
+assert certify.VERDICT_EXIT == {"CERTIFIED": 0, "FAILED": 1, "PARTIAL": 4}, certify.VERDICT_EXIT
+missing = [(g, s, n) for g, scripts in FP.ABORT_CASES.items() for s, named in scripts.items() if named != "complete"
+           for _, n in named if (g, s, n) not in table]
+print("%s certification guard category table: %d rows, every named abort-hidden check classified%s"
+      % ("FAIL" if missing else "PASS", len(table), (": missing %s" % missing) if missing else ""))
+sys.exit(1 if bad or missing else 0)
+VERDICT
+# hidden checks plus a FAILED-NEW (the same abort, a different failure on the baseline): FAILED
+toy "$TOY/ad/cand" test-v44-packages "$ABORTED"
+toy "$TOY/ad/r1" test-v44-packages 'echo "python3 tests/package_transaction_smoke.py"; echo "FAIL other"; exit 1'
+hiddenrun ad test-v44-packages 1 "FAILED-NEW       test-v44-packages" "CAMPAIGN VERDICT: FAILED (exit 1)" \
+    "[B] test-v44-packages: NOT EXECUTED package_transaction_smoke.py" "!CAMPAIGN VERDICT: PARTIAL"
+skiprun s1 test-rt-partial 4 "BLOCKED          test-rt-partial: PARTIAL"
+skiprun s1 test-rt-partial 4 "CAMPAIGN VERDICT: PARTIAL (exit 4)"
+skiprun s1 test-rt-partial 4 "needs: MemAvailable >= 4096 MiB"
+skiprun s1 test-rt-partial 4 "NOT RELEASE-QUALIFYING"
 skiprun s2 test-rt-skipall 1 "NOT-RUN          test-rt-skipall: SKIP"
 skiprun s3 test-rt-platform 0 "PASSED 1"
 skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows pipeline"
@@ -674,7 +741,7 @@ skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows 
 toy "$TOY/s4/cand" test-rt-silent 'true'
 skiprun s4 test-rt-silent 1 "NOT-RUN          test-rt-silent: SKIP"
 # R4-5: a silent recipe whose command make echoes over two lines (a continuation) is SKIP too
-mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py scripts/certify_fingerprints.py "$TOY/s5/cand/scripts/"
+mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv "$TOY/s5/cand/scripts/"
 printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\ncertify-targets: test-rt-cont\n.PHONY: test-rt-cont\ntest-rt-cont: nift\n\ttrue \\\n\t  \&\& true\n' > "$TOY/s5/cand/Makefile"
 skiprun s5 test-rt-cont 1 "NOT-RUN          test-rt-cont: SKIP"
 # owner 23:10: each result states its environment
