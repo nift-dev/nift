@@ -29,6 +29,7 @@ import sys
 import tempfile
 from multiprocessing import Pool
 
+sys.dont_write_bytecode = True  # never leave __pycache__ in the tree
 HERE = os.path.dirname(os.path.abspath(__file__))
 TREE_DEFAULT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 sys.path.insert(0, HERE)

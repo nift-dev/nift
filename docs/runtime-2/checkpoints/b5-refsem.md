@@ -1,11 +1,16 @@
 # Checkpoint B5: guard removal, the reference-semantics switch (D-NEXT-refsem-b)
 
-Status: **FREEZE-READY (B5 13), with open owner decisions (section 10.11).** Owner decisions of
-2026-11-07 06:55: D1 approved and fixtured, D2 recorded as a release blocker, D3 accepted and gated,
-D4 (bounded Option 2) STOPPED with its cause traced (10.5). Final gates: section 10.8. History: earlier stop at the owner's B decision point
-(section 8): A (E-U6-1) is a STOP with alternatives; B (`trim`/dispatch, approved 2026-11-07
-04:47) is not implemented. The full gate set was deliberately not run (the coordinator requires
-it on the final code, after B); a pre-B smoke set was (section 5). Branch `cand/b5-refsem` from
+Status: **FIX-UP FROZEN (B5 15) after the independent REJECT of the B5 13 freeze `1d9053f6`
+(tree `e3f1767d`); awaiting the targeted independent re-review (section 11).** The REJECT and
+its evidence are preserved unchanged (`scratchpad/review-b5/REVIEW.md`, F1-F12). Owner decisions:
+2026-11-07 06:55 (D1 approved and fixtured; D2 release blocker; D3 accepted and gated; D4 bounded
+Option 2), 09:06 (D4 conservative refusal accepted for the B5 checkpoint only, release blocker;
+the 25 trim rows are documented precision limitations) and 11:07 (D4 corrected list; record and
+test fix-up), all recorded in 11.1-11.2. Item B (`trim`/dispatch, approved 04:47) IS implemented
+(B5 7, B5 8; section 8 B). Local coverage is PARTIAL by design (11.9: what ran, what is deferred
+to the combined Linode certification and why); this is not a local certification. History below
+(sections 1-10) is kept as written at the time; where a later section corrects it, the
+correction is marked. Branch `cand/b5-refsem` from
 the accepted B4b tip `17f7964c` (tree `ef8c508d`). Commits B5 0 (B4b closure), B5 1 (U6), B5 2
 (the switch, Q7, loop snapshots, first conversions), B5 3 (record), B5 4 (lazy loop locations
 and selector cells deleted, B2 L2; loop/closure/cp14b/cp18 conversions), B5 5 (cp11, rt units,
@@ -62,7 +67,7 @@ now (each gives the §3 result or a refusal before any effect). Mutants B5-U1 (r
 kept), U3 (unmaterialized export), U4 (everything private) are caught; U2 is equivalent (every
 store's container is read through `sited()`), retired.
 
-**Precision cost E-U6-1 (owner reopened it 2026-11-07 04:47; section 8 A: STOP, alternatives listed):** cp19 proof `shared-callable` (an escaped
+**Precision cost E-U6-1 (owner reopened it 2026-11-07 04:47; section 8 A: STOP, alternatives listed; mechanism text in 8 A superseded by 10.5; final classification 11.1: one of four D4 admission regressions, release blocker):** cp19 proof `shared-callable` (an escaped
 closure's unknown parameter stored into a closure-captured array, read by a sibling closure) was
 admitted with a run-time callable guard; it is now refused before any effect
 (`session:current-callable-proof`). CP19 admission mutant 13 (capture-location sync) is subsumed
@@ -103,7 +108,8 @@ Known pre-existing failures (identical at 17f7964c, not B5's):
   release scope), `-shared-eval` (expects `NIFT_VM=require` in a refusal note the CLI no longer
   prints), `-admission-mutants`, `-session-mutants`: identical on the B4b-tip code per the
   previous implementer (`base-*.result`, built at B5 0 = B4b code); a run on an exact 17f7964c
-  build is still to do (section 9).
+  build is still to do (section 9). **[Corrected in 11.5: proof-cli and admission-mutants are NOT
+  identical; s1-dispatch has 9 failures, one of them `builtin-lazy-args:setenv`.]**
 
 ## 6. Expected-output changes
 
@@ -114,12 +120,15 @@ semantics 158 rows; **iii** previously admitted, behaviour changed by an approve
 **p** outcome preserved, only the expectation's form changed 7 rows (a heap budget, a refusal
 reason, a stale pre-existing expectation, a harness baseline, mutant retirements); **ii**
 previously admitted, behaviour changed without an approved rule: 1 row, E-U6-1 (section 8 A).
-Counts after B5 12: **i 166, ii 1 (E-U6-1, owner decision pending), iii 7 (incl. the D1 row), p 9**;
-no PENDING-OWNER row remains.
+Counts after B5 12: i 166, ii 1, iii 7 (incl. the D1 row), p 9. **Counts after the fix-up (B5 15,
+11.6): i 169, ii 4 (the four D4 admission regressions: accepted for the B5 checkpoint only,
+release blockers), iii 8, p 13.** One row is for owner confirmation (the receiver-returning
+`reverse()`/`sort()` break, class i, 11.6); no other PENDING-OWNER row remains.
 Approved differences are pinned exactly: `.r2.stdout/.stderr/.exit` goldens with
 `approved=<rule>` (for-s2, closures-s1, vm-corpus/cp11), `B5_APPROVED` (capture_origins),
 `APPROVED` (cp14b functional); each check also requires the pinned result to differ from legacy.
-**PENDING-OWNER (owner guidance 2026-11-07 06:47):** the capture_origins "D5 ordinary binding"
+**[Resolved: owner 2026-11-07 06:55 decision 1 approved it (10.1); the paragraph below is the
+historical PENDING-OWNER text.]** (owner guidance 2026-11-07 06:47): the capture_origins "D5 ordinary binding"
 sub-family is NOT a snapshot effect. Witness with no source mutation:
 `f:=()=>0; a:=[1]; for(x:a){f = ()=>x; x=7}; print(f())` gives legacy 1, B4b tip 1, B5 7. Cause:
 B5 2 set `ForState::live = false`, which disabled the lazy loop binding and its selector
@@ -339,14 +348,19 @@ witness, necessary; sound admission needs a persisted, transitive per-callable h
 summary checked against a complete scan of the session's targets: new session effect tracking,
 outside Option 2 (owner STOP clause). Estimate 250-400 production lines, high risk
 (`scratchpad/b5/cp19/OPTIONS.md`, "B5 D4"). E-U6-1 stays class ii, refused before any effect:
-**owner decision needed.** The same family also explains cp19 admission-mutant case `loop`
-(10.6). Not affected: D1 (no session), the vm_adversarial groups.
+**owner decision needed** (given 09:06 and 11:07: 11.1). **[Corrected in 11.1: "the same family
+also explains cp19 admission-mutant case `loop`" is wrong. B4b production never admitted `loop`
+(its seed statement is refused `reference-guard:lent`), and a build without the heap exposure
+still refuses it.]** Not affected: D1 (no session), the vm_adversarial groups.
 
 ### 10.6 Pre-existing failures, on an exact 17f7964c build (temporary worktree, deleted)
 
 `git worktree add --detach` 17f7964c (tree ef8c508d), `make nift` (339 s), each target run there
 (`scratchpad/b5/gates17f/`). A pre-existing failure is not a waiver: each goes to the
-release-blocker audit.
+release-blocker audit. **[Corrected in 11.5 from the reviewer's signature table: the
+test-cp19-proof-cli row ("identical") is wrong (with the legacy oracle B5 fails 5 cases,
+17f7964c 1); the admission-mutants row's 17f column omits `loop` and `nested` and its B5 cause
+for `loop` is not the E-U6-1 family; s1-dispatch has 9 failures, not 8.]**
 
 | Target | 17f7964c | B5 | Cause | Resolve before release? |
 | --- | --- | --- | --- | --- |
@@ -398,7 +412,8 @@ loopclosure; sort-refusals 564), -b4b-fixpoint, -b4-mutants, -b4b-mutants, -b5-m
 20,274 programs, 0 bad), gen_struct (production, 1,911, 0 bad), gen_alias (production, 12,600, 0
 bad), sort-refusals on the probe build.
 
-**FAIL (7 make targets), all pre-existing (10.6), failure signatures identical to the fin batch:**
+**FAIL (7 make targets), all pre-existing (10.6), failure signatures identical to the fin batch
+[corrected in 11.5: "identical" is wrong for proof-cli and admission-mutants]:**
 cp25r-inventory (6 unclassified reasons), test-cp19-admission-mutants (case `loop` control only:
 the other 13 cases' controls pass when run one by one), test-cp19-proof-cli, test-cp19-s1-dispatch,
 test-cp19-session-mutants, test-cp19-shared-eval, test-runtime2-cp14b (`script_return_kernel_error`).
@@ -436,10 +451,591 @@ production); the full `make test`, sanitizers (incl. `test-runtime2-guardoff-san
 regression suite, the cp19 targets with `CP19_LEGACY_ORACLE`; wall-clock: trim checked-path
 overhead and the website-build benchmarks against v4.12; the 1M snapshot memory gate.
 
-### 10.11 Owner decisions still needed
+### 10.11 Owner decisions still needed (as of the B5 13 freeze; superseded)
 
+**[Superseded: decided 2026-11-07 09:06 and 11:07, after the freeze; see 11.1 and 11.2.]**
 1. E-U6-1 / D4: accept the refusal as a documented precision limitation, or approve the
    heap-effect-summary design (10.5); the cp19 admission-mutant `loop` case follows it.
 2. The 25 flagged trim-audit rows (10.7) are refusals before any effect with no approved rule
    (precision gaps, not semantic changes): reviewer/owner classification.
 3. The release-blocker audit list of 10.6.
+
+## 11. Fix-up after the independent REJECT of 1d9053f6 (B5 14, B5 15)
+
+The independent review of the B5 13 freeze (`1d9053f6`, tree `e3f1767d`) REJECTED it narrowly
+(`scratchpad/review-b5/REVIEW.md`, findings F1-F12; evidence `gates/ adv/ trim/ d1/ probes/ p/ d4/
+h/`), preserved unchanged. Owner 2026-11-07 11:07: a separate fix-up agent (not the reviewer), no
+B5 restart, no session-analysis redesign; record and tests only. **No production source changed**:
+B5 14 touches tests, harness and the Makefile; B5 15 the record. The production binary is the one
+the review built (sha256 `ac283072f622c473…`, 11.12). Every claim below was re-checked by the
+fix-up on this tree (evidence `scratchpad/b5-fixup/`) unless it says it quotes the review.
+
+### 11.1 D4: the corrected admission-regression list (owner 2026-11-07 09:06, corrected 11:07)
+
+**Decision.** D4 conservative refusal is ACCEPTED FOR THE B5 CHECKPOINT ONLY; no session-effects
+redesign in B5; the broad session-heap invalidation stays until a sound replacement exists. The
+admission regressions are **exactly four** interactive-session programs, each admitted
+legacy-equal by B4b production `17f7964c` and refused on B5 before any effect of the refused
+statement. They are **RELEASE BLOCKERS, not waived**: B5 may be ACCEPT-WITH-CONDITIONS with them
+documented; no release until they are resolved or explicitly reconsidered. The release audit
+evaluates the affected session operations **as a group**, not only the four fixtures, and must
+cover each cause below (one root cause must not be assumed).
+
+| cp19 proof-cli case | 17f7964c production | B5 (statement, reason, reported location) | cause (re-checked) |
+| --- | --- | --- | --- |
+| shared-callable-replacement (= E-U6-1; minimal witness `fn(ap(v)){return v()};fn(mk()){a:=[()=>1];return {"f":()=>{q:=a[0];return ap(q)}}};o:=mk()` / `print(o.f())`) | legacy-equal (`WROTE`, then the ordinary arithmetic error) | statement 2, `session:current-callable-proof`, "no exact position" | D4: a fact-proved historical call opens every exposed class; `infer_session.cpp:137` exposes both session-heap classes. A build without that exposure admits it, legacy-equal |
+| field: `a:=[1];fn(g(p)){return p.cb(0)+a[0]};warm:=g({"cb":v=>v+1})` / `a.push("bad")` / `g({"cb":v=>v+2})` | legacy-equal (`"bad"`, `3`) | statement 2, **a plain `a.push("bad")`**, `session:callable-flow`, located in the earlier unit that defined the reader (line 1, column 24) | NOT the D4 cause: a callable flowing through an object field; still refused without the exposure |
+| element: `a:=[1];fn(g(p)){q:=p[0];return q(0)+a[0]};warm:=g([v=>v+1])` / `a.push("bad")` / `g([v=>v+2])` | legacy-equal (`"bad"`, `3`) | statement 2, **a plain `a.push("bad")`**, `session:current-callable-proof`, start line 2 | D4 cause plus a second refusal: without the exposure statement 2 runs and statement 3 is still refused `session:current-callable-proof` |
+| sibling-effects (sibling closures over a captured array; a later statement stores through one) | legacy-equal | statement 3, `session:callable-flow`, `<stdin>:3:6` | D4 cause (a build without the exposure admits it, legacy-equal) |
+
+So **a plain later `a.push(...)` is refused when earlier code reads `a[0]`** (field, element).
+
+**Why the earlier list (shared-callable + `loop`, 09:06) was wrong** (preserved evidence):
+- The three extra regressions only show when `test-cp19-proof-cli` gets its legacy oracle
+  (`CP19_LEGACY_ORACLE`); the implementer never ran it that way and recorded the target as
+  "pre-existing, identical". With the oracle: 17f7964c fails 1 case (`comparator`, the D2
+  profile gate), B5 fails 5 (review F1; reproduced by the fix-up with
+  `/home/claude/review/cand-b4/nift` as the oracle, and by pointing the new pins at the 17f7964c
+  binary, which admits all four and fails the pins: `scratchpad/b5-fixup/proofcli/`).
+- `loop` (cp19 admission-mutants) was judged from the 17f7964c **guard-off probe** control, not
+  production. 17f7964c production refuses its **seed** statement (`reference-guard:lent`,
+  `<stdin>:1:78`); the guard-off probe prints `3 3`; B5 runs statement 1 and refuses statement 2
+  (`session:current-callable-proof`). It is a precision gap against the guard-off reference
+  model, **not** a regression of a program production admitted (review F2), and the no-exposure
+  build still refuses it, so "the same family also explains `loop`" (10.5) was unsupported.
+  Owner 11:07: removed from the D4 list.
+- Fix-up re-check of the causes: a scratch build of `infer_session.cpp` without
+  `exposed_.insert(s)` for the two heap classes (never in the tree; deleted) gives exactly the
+  review's results: shared-callable-replacement and sibling-effects legacy-equal; element
+  statement 2 runs, statement 3 refused; field and `loop` still refused; the minimal witness
+  prints 1.
+
+**Pins.** `tests/runtime2/cp19/session_proof_cli.py` EXPECTED_REFUSALS holds the four, separate
+from the 36 passing cases: each must be refused at its statement with its reason and exact
+reported location, with exactly the oracle's output of the earlier statements, nothing of the
+refused statement, and `require-error` with no execution for it. When one is admitted again the
+target FAILS ("EXPECTED REFUSAL NO LONGER OCCURS"), so the pin and this section are updated
+deliberately. `comparator` is a profile refusal (D2): refused `method:sort` at statement 1 off the
+GCC 15.2 profile, an ordinary passing case on it.
+
+### 11.2 Owner decisions recorded after the freeze
+
+- **2026-11-07 09:06** (postdates the freeze): D4 as above; **the 25 trim-audit rows are
+  documented precision limitations, NOT approved output changes**: 13 `method:splice`
+  (precision lost after a mutation) and 12 `builtin-receiver:trim` through a function-returned
+  `reverse()` (precision lost across a returned receiver alias); permanent fixtures, exact refusal
+  behaviour preserved. The review confirmed none of the 25 was admitted by 17f7964c (all 97 v2->v3
+  programs were refused there). Independent review authorised (done: REJECT).
+- **2026-11-07 11:07**: preserve the REJECT; D4 corrected scope exactly the four of 11.1; the
+  `push` refusal accepted for the B5 checkpoint only and a release blocker; the fix-up list
+  (11.3-11.10); then freeze and a targeted independent re-review (D4 classification, no
+  unapproved expectation change, mutant resolution, fixtures/generators, coverage reconciliation,
+  records).
+- **Release-blocker audit additions:** the multi-line comparator lambda error position defect
+  (review F4: an error inside a `sort((p, q) => { ... })` lambda spanning lines 2-7 is reported
+  at a line relative to the lambda, `4:8`, on the probe build, 17f7964c and legacy alike;
+  pre-existing, not B5; production refuses comparator sort on this host, but on the GCC 15.2
+  certification toolchain production would print the fabricated position; the owner's
+  no-fabricated-positions rule makes it release-blocking). Open release blockers from B5: D4
+  (11.1), D2 comparator-sort portability (10.2), F4, plus the pre-existing failures of 11.5.
+
+### 11.3 CP19 session-mutants m7 (review F7)
+
+The B4b-era witness (`nested:=[[1]]`, `for(row:nested){row.push(()=>7)}`,
+`derived:=nested[0][1]`, `derived = ()=>9`) never reached its property on B5: statement 3 is
+refused `type:index` (U6's single heap pool: `nested[0]` may be a number or a callable) on the
+control and the mutant alike, so m7 had been untested since Phase A on both trees. M7 deletes the
+root check of `session_shape_contract` (a session binding's new root shape must lie within its
+recorded structure). Rebuilt witness (`tests/runtime2/cp19/session_mutants.cpp`):
+`held:=[1];derived:=held[0];oldderived:=derived` then `derived = ()=>9;print("ONCE")`: refused
+before any effect, the binding unchanged (legacy also refuses: "cannot assign string to int
+binding"; 17f7964c refuses identically). The control refuses through the structural root contract
+after its coherent re-check (`session:binding-shape-contract`; a diagnostic scratch build shows
+the root check firing in both the first and the coherent compile); M7 falls to the coarser kind
+check (`session:binding-contract`). Coherent widening is still exercised (a callable rebound to
+another callable: admitted on both, retained alias keeps 7). The former witness stays pinned as the
+`type:index` precision gap, so it flags when fixed. `test-cp19-session-mutants` and `-switch`:
+PASS, m7 caught. Limitation, recorded honestly: a differential search (2,091 generated sessions,
+B5 production vs an M7 CLI in scratch) found no admission or output difference, only this refusal
+reason (32 sessions): under U6 the contents a stale recorded structure would describe are
+re-seeded from the session heap or the binding's private class, so the coherent recompile that M7
+skips is no longer needed for contents. M7 is therefore detected by its diagnostic, not by a
+wrong result.
+
+### 11.4 cp19 admission-mutants: every case now runs (new finding: m12 and m13 survive)
+
+The harness stopped at the first failing assertion; since the Phase A guard that hid every case
+after the first failing control. It now runs and reports all 14 cases and fails if any fails.
+Result on B5 (default and switch builds identical; 17f7964c binaries run read-only for
+comparison, `scratchpad/b5-fixup/gates/admission-mutants-percase{,-17f}.txt`):
+
+| case / mutant | 17f7964c | B5 |
+| --- | --- | --- |
+| wrapper m1 | control fails (guard) | PASS |
+| field m2, alias m4, schema m5, order m6, direct m7, capture m8, numeric m9, native-once m11 | PASS | PASS |
+| nested m7 | control fails (guard) | PASS |
+| loop m3 | control fails (seed refused by the guard) | control fails (statement 2 refused, 11.1); m3 not exercised |
+| native m10 | **mutant survives** | **mutant survives** (pre-existing) |
+| selector m12 | PASS | **mutant survives** (B5) |
+| shared m13 | PASS | **mutant survives** (B5) |
+
+**m12** (`session_callable.cpp`, `may_call` always true) can only make admission more
+conservative; **m13** (`infer_session_location.cpp`, capture-location inference skipped) produced
+an internal failure at 17f7964c; on B5 the session heap appears to subsume it (section 3 already
+said so for array contents). **m10** (session native dispatch forced to the string native)
+survives on both trees. **m3** (`cell.cpp`, source-slot plain capture) has no B5 witness: every
+probed session shape that reaches a source-slot capture calls a callable held in an earlier
+captured array, which the D4 family refuses. A differential search (2,144 sessions: the 40 proof-cli
+cases, the admission seeds and the 2,091 generated sessions of 11.3) on scratch CLIs built with
+each of m10, m12 and m13 found **no** difference from production. **PENDING-OWNER, not waived:**
+these four mutants have no discriminating witness on B5; `test-cp19-admission-mutants` (and
+`-switch`) FAIL and are listed in 11.5; restoring m3's witness is tied to the D4 release blocker.
+Not resolved in B5 because a witness for a mutant that only adds refusals (m12) or that the heap
+subsumes (m13) needs either a proof of equivalence or a new session shape, and the owner's
+fix-up scope asked only for m7.
+
+### 11.5 The failing targets: corrected signatures (review F5)
+
+Re-run by the fix-up on B5 15 (`scratchpad/b5-fixup/gates/`); the 17f7964c column quotes the
+review's runs (`RV/gates/b4a-*`) except where marked.
+
+| target | 17f7964c | B5 15 | class / resolution |
+| --- | --- | --- | --- |
+| test-cp19-proof-cli (with the oracle) | 1 case: comparator (D2) | **PASS** now: 35 legacy-equal, 4 D4 pins, comparator profile refusal | the 4 are release blockers (11.1); without the oracle the target fails loudly (exit 2) |
+| test-cp19-admission-mutants (+ -switch) | controls wrapper, loop, nested fail; m10 survives | FAIL: loop control; m10, m12, m13 survive | 11.4, PENDING-OWNER |
+| test-cp19-session-mutants (+ -switch) | m7 contract: statement 2 refused (guard) | **PASS** | 11.3 |
+| test-cp19-s1-dispatch | 9 FAIL (8 `callable:run`, 1 `builtin-lazy-args:setenv`); completion and mutants m1/m3 FAIL, m2/m4 PASS | identical (11.10) | known supported limitation (run()/cmd() deferred by the release scope; setenv lazy args); reclassify the expectations to the release scope |
+| test-cp19-shared-eval | `eval_entry.py` expects `NIFT_VM=require` in a refusal note | identical | stale harness; release audit |
+| test-runtime2-cp14b | `script_return_kernel_error` only; switch/effects/origins PASS | identical | precision regression after B3 N1; release audit |
+| cp25r-inventory | 6 unclassified reasons | identical | tooling (classify-all without the cooperative switches); release audit |
+| test-runtime2-vm-corpus | 155 FAIL lines | 124 (a strict subset) | default-environment goldens; release audit |
+| test-runtime2-cp18 | refused `b := a` (`reference-guard:inflow`, 7:6) | **PASS** | 11.7 |
+| test-runtime2-collections-mutants | PASS | **PASS** (was: mutant 15 survived) | 11.8 |
+
+### 11.6 Record corrections (review F3, F5, F8)
+
+compatibility.md (B5 table and limitations) and expected-changes.tsv now cover:
+- **`reverse()`/`sort()`/comparator `sort` return the receiver itself** (legacy sorts or
+  reverses in place and returns a copy): `ys := xs.reverse(); ys.push(3)` gives `xs.length()` 3
+  (legacy 2), `same(xs, ys)` true (legacy false), `c := a.sort(); c.push(0)` grows `a`. Basis:
+  plan section 3 Returns + B4b Option A (22:56). Verified on legacy/17f7964c/B5 (17f refuses both
+  probes `reference-guard:inflow`). **Not separately approved as a legacy break: listed for owner
+  confirmation** (the 20 trim category-b corrections rest on it).
+- **failing-kind `trim`/`to_upper`/`to_string` on a map/set/stack/struct with an unused (or
+  later-failing) result**: legacy exit 0 (it works on the internal tag), B5 the ordinary error at
+  the call, exit 1 (item B, 04:47). `e7_trim_loop_unused.f`: legacy `got got end` exit 0; B5 `got`,
+  `unknown value or malformed expression: v.trim()`, exit 1; 17f refused. "Legacy's family text"
+  applies only where legacy itself fails.
+- **nested-object `push` correction**: `k0 := stack(); aa := [{"a": [k0]}]; for (v : aa) { v.push(1) }`:
+  17f7964c printed nothing more and exited 0 (a wrong result in the accepted B4b baseline); B5
+  gives legacy's error (class iii).
+- **D1 loop-variable capture** (already present; distinct from snapshot iteration) and **the four
+  D4 regressions** (limitations table, release blockers).
+- The stale B4b `glob16` row: B5 item B does not admit it (re-checked: refused
+  `builtin-receiver:trim` on B5 as on 17f7964c).
+- New rows: cp18 conversion and budget (11.7), mutant 15 (11.8), m7 (11.3), `loop` (p, not a
+  regression). Counts: i 169, ii 4, iii 8, p 13.
+- Stale text marked in place: status line, section 3 (E-U6-1 mechanism superseded by 10.5),
+  section 5 and 10.6/10.8 ("identical" claims), section 6 (counts; the resolved PENDING-OWNER
+  paragraph), 10.5 (`loop`), 10.11 (superseded by 11.1-11.2).
+
+### 11.7 CP18 combined_cp14b (review F12)
+
+Contract: plan section 3 "Assignment, declaration": `b := a` shares (=L for arrays bound from a
+name), owner Q3. B5 CLI, legacy (both binaries) and the CP18 program API (libnift_c.so and the
+switch library) all print `[9,1,2,4,5]` for `a` and return 5; the pin kept D-040 #1 copy
+semantics (`[9,1,2,4]`, 4). Converted (class i: 17f7964c refused the program). **Why it also
+failed at 17f7964c:** its compile was refused by the Phase A guard (`collections.f:7:6:
+reference-guard:inflow`, the `b := a` line), so the target never got past check 1 there. The
+same run exposed a second, pre-existing stale expectation: with budget `1 << 18` the stop is at
+the map call's own reservation (`grow.f:3:6`), not the callback (`3:17`), identically on
+17f7964c and B5 through both libraries (budgets 300000-400000 stop at 3:17, 500000 completes);
+the budget is now 393216 (class p). `make test-runtime2-cp18` (C test, switch, COW): PASS.
+
+### 11.8 Collections mutant 15 (review F11)
+
+Mutant 15 changes one line of `UnitCompiler::for_setup` (`compiler_loops.cpp:74-78`):
+`snapshot = keyed && source_kinds != kKindMap`, so a map loop is treated like a non-keyed source.
+Under B5 `snapshot` no longer selects the iteration: every loop emits `IterCheck c = 1` on its held
+value and `for_step` reads `state.held` (B5 4 deleted the live path), so **the live map iteration
+the mutant was written to plant is unreachable** (shown: the mutant passes all 280 earlier checks,
+including the snapshot_insert/remove/update fixtures that differ under live iteration). Its only
+remaining effect: `snapshot` also gates `for_source_binding`/`source_name`, i.e. the
+vanished-element analysis (`for_source_may_shrink`). With the mutant a map loop over a binding
+whose body calls a method on the map and writes or captures the value is refused
+(`for-missing-write`, `for-capture-vanishing`): an admission loss, observable. Two parity fixtures
+(`collections/parity/snapshot_map_body_{write,capture}.f`: legacy-equal on production) catch it
+(4 failing checks); the mutant's description is updated; `test-runtime2-collections-mutants`:
+11 caught, PASS. The production comment at `compiler_loops.cpp:73` still says "M15: the map is
+re-read live"; left unchanged to keep production sources untouched (a comment-only follow-up).
+
+### 11.9 Generators and harness hygiene (review F6)
+
+- `tests/runtime2/b5/gen/` (gen1, gen_struct, genrun, gate.py) replaces the scratch-only tools; the
+  only input is the tree's `src/rt/natives/builtin_list.inc`. `make test-runtime2-b5-generators`:
+  gen1 20,274 programs (18,678 refused, 1,596 admitted, 192 admitted differing from legacy: 131
+  exactly as on 17f7964c, 61 newly admitted: 30 item B, 18 approved B4 "cannot be rendered as text",
+  13 error text only), 0 bad; gen_struct 1,911 (1,044 refused, 867 admitted, 213 differing from
+  legacy, all exactly as on 17f7964c, error text/position only), 0 bad. gen_struct previously
+  recorded no `bad` field, so its gate could not fail; it now has gen1's classification. Negative
+  controls (missing tree, truncated builtin table): exit 2, no program and no result written, for
+  both generators.
+- `.build/cp19` directory creation: `@mkdir -p $(dir $@)` added to the cp19 admission and session
+  mutant/control rules (Makefile and `admission_mutants.mk`); see 11.10 for the clean-directory check.
+- proof-cli: the oracle requirement is documented in the harness; the target fails loudly
+  (exit 2, "is NOT run without a legacy oracle (it never skips)") when `CP19_LEGACY_ORACLE` is unset
+  or not executable. Run: `make test-cp19-proof-cli CP19_LEGACY_ORACLE=/path/to/nift`.
+- The original 67 vm_adversarial expectations: `docs/runtime-2/evidence/b5/adversarial-67-original.json`
+  (each program's source and sha256, the original gate expectation: legacy-equal or refused before
+  any effect; the 17f7964c refusal with position; the legacy result with error position; the
+  current pin; the observed B5 result). Re-run by the fix-up: all 67 match their pin, legacy is
+  identical on both binaries, 17f7964c refused all 67, no file effects.
+
+### 11.10 Coverage reconciliation (review F6; owner 11:07 "reconcile 46 executed vs 220")
+
+**Inventory.** The review's 220 reproduces exactly as the targets *defined in the Makefile itself*
+whose name starts with `test-`, `cp25r` or `vm-`, contains `runtime2`, `-rt`, `cp` or `vm`, and is
+not a `test-v4*` (4.x line) target. The Makefile also includes `tests/runtime2/cp19/*.mk` and
+`tests/runtime2/cp23/certification.mk`, which define 23 more such targets (among them
+`test-cp19-proof`, `-proof-cli`, `-admission-mutants`, `-session-mutants-switch`, cp23
+allocation/cancellation/mutants); the fix-up inventories all **243**, plus the new
+`test-runtime2-b5-generators` = **244**.
+
+**Method.** Every target ran with `make -s` on the fix-up tree (B5 14 for batch 1, B5 15 for
+batch 2: the two differ only in `admission_mutants.py`), sequentially, with a disk floor, result
+files with exit status, duration, HEAD and `git status` hash in `scratchpad/b5-fixup/gates/`. Every
+failing target was re-run with `TARGET` pointing at a scratch copy of the 17f7964c production binary
+(`make -o`, never rebuilt; `c17-*.result`) or compared case by case. No production source changed
+during any run; the production binary was re-hashed after the runs (11.12).
+
+**Totals (244): ran 159 = PASS 120, FAIL 38, FLAKY 1; not run 85 = deferred to the combined Linode
+certification 71, umbrella targets whose components ran individually 7, prerequisites run inside
+another row 4, not applicable 3.** This is NOT a local certification: the sanitizer/TSan lanes,
+wall-clock measurements, the whole-runtime mutation campaigns and host process/terminal campaigns
+are Linode work.
+
+Of the 38 FAIL: **1 B5-introduced and new** (`test-runtime2-cp12c-probes`, 11.11), 2 the
+admission-mutants pair (11.4, PENDING-OWNER), 4 build-guard harness failures (mutant sub-builds
+rejected by the production build guard; harness and guard unchanged since 17f7964c), 1 stale
+mutant that no longer compiles (cp17-routing-mutants), 4 unit link / source-list defects identical
+on 17f7964c, and 26 that fail identically (same exit, same or fewer
+FAIL lines) with the 17f7964c binary, including the known cp14b, cp25r-inventory, vm-corpus,
+s1-dispatch and shared-eval. `test-runtime2-cp01-simplify` is FLAKY on both binaries (incremental
+build timing; different scenarios fail each run): under the zero-flakiness policy it needs a test
+infrastructure fix; not B5.
+
+**test-rt-vm own recipe** (34 lines after its prerequisites; `scratchpad/b5-fixup/rtvm_own.sh`,
+run line by line on B5 and on the 17f7964c binary): vm-unit **40,347 checks, 0 failures** (rebuilt
+and run), vm-globals 23, vm-modules 179, prepared-parse 100,136 checks, rt-lint, vm_adversarial
+(seed 1, count 600) and 22 more lines PASS. Fail on both trees: vm_parity `--rt-diff` (B5 1
+failure: the rt-diff comparison, identical counts "30 differing, 16 approved" on 17f7964c, which
+fails 8 including six corpus guard refusals B5 removes), vm_builtins (17f 2, B5 5: the 3 extra are
+"expected fallback reference-guard:*/builtin-receiver:empty, got compiled"), vm_modules (3 on
+both). **Pass on 17f7964c and fail on B5 (new, 11.11):** vm_subset (1), vm_subset_gen (5),
+vm_records_coverage (6), vm_engine_selection (1), vm_former_replay (10), vm_review_cp12 (4).
+
+Also run outside make: gen_alias on production (12,600 programs, 5,532 on the VM, 0 bad),
+sort_refusals on the probe build (564, all `collection-element:sort`, none before an effect),
+`tests/runtime2/b5/run.py --dirs sort` on the probe build (4 PASS; **comparator-sort atomicity is
+probe-build evidence only, not production**: production refuses comparator sort on this GCC 13.3
+host, D2), the admission mutants case by case on B5 and on the 17f7964c binaries (11.4), the
+clean-directory check of the cp19 `mkdir` fix (admission-control and session-control linked into an
+empty `TEST_DIR` outside the tree: PASS).
+
+Gates the owner named, all run: every B5 correctness and mutation gate (b5, b5-mutants,
+b5-generators, b5-snapshot-memory, collections(-mutants), cp18, cp19 session/admission/proof-cli
+mutants and witnesses), B3/B4/B4b regression (b3, b3-mutants, b4, b4-mutants, b4b, b4b-work,
+b4b-fixpoint, b4b-mutants, b4b-types/op-admission/struct-render units), classification and semantic
+comparisons (vm_adversarial, vm_parity, rt-diff, cp25r, cp25r-inventory, vm-corpus(-complete),
+vm-default, safety fuzz), guard-off and session soundness (guardoff, cp19 session/session-cli/proof,
+U6 fixtures), snapshot loops (for-s2(-mutants, -known-deps), capture-origins, closures-s1(-mutants,
+-stress), loopclosure), comparator sort (cp14b-sort, b5/sort: probe build). Disk: the run stayed
+above 700 MB free; scratch binaries and corpora were deleted afterwards.
+
+<!-- coverage table follows -->
+| target | ran | result | note / reason |
+| --- | --- | --- | --- |
+| cp25r-inventory | ran | FAIL | FAIL, pre-existing, identical on 17f7964c (11.5) |
+| test-cp15-numeric-repair | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp17-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp18-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp18-bytes-sanitize | not run | deferred | sanitizer lane (ASan/UBSan build of nift and the bytes tests): Linode combined certification |
+| test-cp18-bytes-tsan | not run | deferred | TSan build: Linode combined certification |
+| test-cp19-admission-mutants | ran | FAIL | FAIL: loop control (precision gap) + m10/m12/m13 survive (11.4, PENDING-OWNER) |
+| test-cp19-admission-mutants-switch | ran | FAIL | FAIL: as the default build (11.4) |
+| test-cp19-admission-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp19-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp19-certify | not run | umbrella | = test-cp19-functional + -mutants + -sanitize + -host: components run (cp19 rows) except the sanitizer lane (deferred) |
+| test-cp19-cleanup-cli | ran | PASS |  |
+| test-cp19-expression-development | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp19-expression-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp19-functional | not run | umbrella | = cp19 jobs, session, resources, proof, operand-windows, job-cli, resource-cli, session-cli: each run separately |
+| test-cp19-host | not run | umbrella | = test-cp19-cleanup-cli: run separately |
+| test-cp19-host-sanitize | not run | deferred | sanitizer build of nift and every cp19 host suite: Linode |
+| test-cp19-job-cli | ran | PASS |  |
+| test-cp19-job-mutants | ran | PASS |  |
+| test-cp19-jobs | ran | PASS |  |
+| test-cp19-mutants | not run | umbrella | = cp19 job/proof/resource/session(+switch)/admission(+switch) mutants and resource/proof alloc: each run separately |
+| test-cp19-operand-windows | ran | PASS |  |
+| test-cp19-proof | ran | PASS |  |
+| test-cp19-proof-alloc | ran | PASS |  |
+| test-cp19-proof-cli | ran | PASS |  |
+| test-cp19-proof-mutants | ran | PASS |  |
+| test-cp19-proof-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp19-r1 | ran | FAIL | FAIL, pre-existing (depends on shared-eval), identical |
+| test-cp19-r1-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp19-resource-alloc | ran | PASS |  |
+| test-cp19-resource-cli | ran | PASS |  |
+| test-cp19-resource-mutants | ran | PASS |  |
+| test-cp19-resources | ran | PASS |  |
+| test-cp19-s1-dispatch | ran | FAIL | FAIL, pre-existing, identical (10 FAIL lines on both) |
+| test-cp19-s1-dispatch-unit | ran | PASS |  |
+| test-cp19-sanitize | not run | deferred | umbrella of the cp19 sanitizer lanes: Linode |
+| test-cp19-session | ran | PASS |  |
+| test-cp19-session-cli | ran | PASS |  |
+| test-cp19-session-mutants | ran | PASS |  |
+| test-cp19-session-mutants-switch | ran | PASS |  |
+| test-cp19-session-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp19-shared-eval | ran | FAIL | FAIL, pre-existing, identical |
+| test-cp19-shell-exception | ran | PASS |  |
+| test-cp20-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-cp20-fd-leak | ran | PASS |  |
+| test-cp20-host-fd-mutant | not run | deferred | builds a host fd mutant nift; process host untouched by B5; Linode |
+| test-cp20-launch-bench | not run | deferred | wall-clock benchmark: Linode only (owner rule) |
+| test-cp20-r1 | ran | PASS |  |
+| test-cp20-r1-flake | not run | deferred | 20-round PTY flake campaign (load-sensitive): Linode |
+| test-cp20-r1-windows | not run | n/a | Windows pipeline test (skips with 77 off Windows); Windows lane of the release validation |
+| test-cp20-shell-spawn | ran | PASS |  |
+| test-cp20-shell-spawn-mutants | not run | deferred | builds 11 shell-spawn mutant nifts (disk); process host untouched by B5; Linode |
+| test-cp21-bytes | ran | PASS |  |
+| test-cp21-d3-mandatory | not run | deferred | fd-inheritance D3 campaign with fault injection and mutant children; terminal/process host untouched by B5; Linode |
+| test-cp21-d3-mutant | not run | deferred | as test-cp21-d3-mandatory |
+| test-cp21-evidence-control | not run | deferred | depends on the cp21 mutant campaigns; Linode |
+| test-cp21-fd-inheritance | not run | deferred | fd-inheritance harness with LD_PRELOAD fault injection; process host untouched by B5; Linode |
+| test-cp21-fd-inheritance-mutants | not run | deferred | fd-inheritance mutant campaign; Linode |
+| test-cp21-fd-protocol-unit | ran | PASS |  |
+| test-cp21-interactive-host | not run | deferred | interactive PTY host test with a tty-audit preload; needs a controlling terminal setup; Linode |
+| test-cp21-interactive-host-mutants | not run | deferred | builds 5 interactive-host mutant nifts; Linode |
+| test-cp21-make-failure-control | not run | deferred | make-failure control of the cp21 campaign; Linode |
+| test-cp21-mutant1-controls | not run | deferred | cp21 mutant controls (mutant nift builds); Linode |
+| test-cp21-parser-target-mutant | not run | deferred | cp21 protocol mutant; Linode |
+| test-cp21-prompt-latency | not run | deferred | wall-clock latency measurement: Linode only |
+| test-cp21-terminal-lease | ran | PASS |  |
+| test-cp21-terminal-recovery | not run | deferred | terminal recovery with a restore-fault preload; needs a terminal; Linode |
+| test-cp21-terminal-recovery-mutants | not run | deferred | terminal recovery mutants; Linode |
+| test-cp21-tty-audit-guards | ran | PASS |  |
+| test-cp23-allocation | ran | PASS |  |
+| test-cp23-cancellation | ran | PASS |  |
+| test-cp23-certify | not run | umbrella | = cp23 + cancellation + cp19-combined + mutants + allocation (run) + cp23 sanitize/tsan (deferred) |
+| test-cp23-cp19-combined | ran | PASS |  |
+| test-cp23-isolate-task-unit | ran | PASS |  |
+| test-cp23-mutants | ran | PASS |  |
+| test-cp23-ownership-unit | ran | PASS |  |
+| test-cp23-parallel-unit | ran | PASS |  |
+| test-cp23-shared-unit | ran | PASS |  |
+| test-cp23-shared-unit-sanitize | not run | deferred | sanitizer build: Linode |
+| test-cp23-snapshot-constants | not run | deferred | needs the ASan and TSan unit builds as prerequisites: Linode |
+| test-cp25r | ran | PASS |  |
+| test-rt-b4b-types-unit | ran | PASS |  |
+| test-rt-build | ran | PASS |  |
+| test-rt-builtins | ran | FAIL | FAIL, pre-existing: builtins-unit link error (shared_* symbols missing from the unit source list), identical |
+| test-rt-builtins-guards | not run | deferred | runs the builtins benchmark binary against recorded guards (performance): Linode |
+| test-rt-builtins-isolation | not run | via | prerequisite of test-rt-builtins (run there) |
+| test-rt-builtins-probe | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-rt-builtins-sanitize | not run | deferred | sanitizer build: Linode |
+| test-rt-case-conversion | ran | FAIL | FAIL, pre-existing: same unit link error, identical |
+| test-rt-case-conversion-negative | not run | via | prerequisite of test-rt-builtins (run there) |
+| test-rt-error-oom | ran | PASS |  |
+| test-rt-error-oom-sanitize | not run | deferred | sanitizer build: Linode |
+| test-rt-handles | not run | deferred | handle units under ulimit -v 4 GB with 300 s budgets; host handles untouched by B5; Linode |
+| test-rt-handles-guards | not run | deferred | runs the handle benchmark binary against recorded guards (performance): Linode |
+| test-rt-handles-sanitize | not run | deferred | sanitizer build: Linode |
+| test-rt-handles-tsan | not run | deferred | TSan build: Linode |
+| test-rt-heap-saturation | ran | PASS |  |
+| test-rt-host | not run | umbrella | host layer/process units + f6 cleanup + cp17 n2/handles/handle-allocation: components run where listed, handle allocation deferred |
+| test-rt-host-mutants | not run | deferred | umbrella of host mutation lanes (f6, cp17 routing/n2-rebuild/handle/unwind mutants, host_mutants.sh building mutant nifts): host layer untouched by B5 (no change outside the compiler/inference/VM files of B5); combined certification |
+| test-rt-host-random-budget | ran | FAIL | FAIL, pre-existing: same unit link error, identical |
+| test-rt-host-sanitize | not run | deferred | sanitizer builds (f6, handles, cp17): Linode |
+| test-rt-host-sources-list | ran | FAIL | FAIL, pre-existing: host_error.cpp listed twice, identical |
+| test-rt-host-tsan | not run | deferred | TSan build: Linode |
+| test-rt-isolate-transfer-unit | ran | PASS |  |
+| test-rt-isolation | ran | PASS |  |
+| test-rt-lint | ran | PASS |  |
+| test-rt-memory-c1 | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-rt-memory-c2 | ran | PASS |  |
+| test-rt-mutation-protocol | ran | PASS |  |
+| test-rt-mutation-protocol-mutants | ran | PASS |  |
+| test-rt-op-admission-unit | ran | PASS |  |
+| test-rt-parser | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-rt-parser-asan | not run | deferred | ASan build: Linode |
+| test-rt-protocol-compile-fail | ran | PASS |  |
+| test-rt-refrep | ran | PASS |  |
+| test-rt-refrep-mutants | ran | PASS |  |
+| test-rt-refrep-production | ran | PASS |  |
+| test-rt-sort-forgery | ran | PASS |  |
+| test-rt-sort-protection-mutants | ran | PASS |  |
+| test-rt-source-map | ran | PASS |  |
+| test-rt-source-map-retry | ran | PASS |  |
+| test-rt-source-map-sanitize | not run | deferred | sanitizer build: Linode |
+| test-rt-source-map-tsan | not run | deferred | TSan build: Linode |
+| test-rt-struct-render-unit | ran | PASS |  |
+| test-rt-value | ran | PASS |  |
+| test-rt-value-sanitize | not run | deferred | sanitizer build (needs unlimited ulimit -v): Linode |
+| test-rt-vm | not run | umbrella | prerequisites run as separate rows; its own recipe (vm-unit, globals, modules, prepared parse, rt-lint, vm_parity, vm_adversarial, vm_subset, ... 34 lines) run line by line (row test-rt-vm own recipe) |
+| test-rt-vm-mutants | not run | deferred | builds the VM mutant set and runs vm_mutation_gate with rt-diff over the corpus (whole-runtime mutation campaign; disk); Linode |
+| test-rt-vm-policy-tooling | ran | PASS |  |
+| test-rt-vm-sanitize | not run | deferred | umbrella of every VM sanitizer lane (sanitized nift, vm-unit, cp14b/cp22/coro/collections/refsem/b3/b4/guardoff): Linode |
+| test-runtime2-args-cmd | ran | PASS |  |
+| test-runtime2-args-cmd-mutants | ran | PASS |  |
+| test-runtime2-b3 | ran | PASS |  |
+| test-runtime2-b3-mutants | ran | PASS |  |
+| test-runtime2-b3-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-b4 | ran | PASS |  |
+| test-runtime2-b4-mutants | ran | PASS |  |
+| test-runtime2-b4-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-b4b | ran | PASS |  |
+| test-runtime2-b4b-fixpoint | ran | PASS |  |
+| test-runtime2-b4b-mutants | ran | PASS |  |
+| test-runtime2-b4b-work | ran | PASS |  |
+| test-runtime2-b5 | ran | PASS |  |
+| test-runtime2-b5-generators | ran | PASS |  |
+| test-runtime2-b5-mutants | ran | PASS |  |
+| test-runtime2-b5-snapshot-memory | ran | PASS |  |
+| test-runtime2-capture-origins | ran | PASS |  |
+| test-runtime2-certification-guard | ran | PASS |  |
+| test-runtime2-closure-cycle-stress | ran | PASS |  |
+| test-runtime2-closures-s1 | ran | PASS |  |
+| test-runtime2-closures-s1-mutants | ran | PASS |  |
+| test-runtime2-closures-s1-prepare | not run | n/a | maintenance mode (--prepare regenerates goldens), not a gate |
+| test-runtime2-closures-s1-stress | ran | PASS |  |
+| test-runtime2-closures-s1-stress-prepare | not run | n/a | maintenance mode (--prepare regenerates goldens), not a gate |
+| test-runtime2-collections | ran | PASS |  |
+| test-runtime2-collections-mutants | ran | PASS |  |
+| test-runtime2-collections-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-collections-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-coro-module | ran | PASS |  |
+| test-runtime2-coro-module-mutants | ran | PASS |  |
+| test-runtime2-coro-module-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-coro-module-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-cp01-simplify | ran | FLAKY | FLAKY on both binaries (incremental-build timing: 4, 1, 1 failures on B5; 3, 2 on 17f7964c, different scenarios each run) |
+| test-runtime2-cp03-simplify | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-cp12c-mutant-controls | ran | PASS |  |
+| test-runtime2-cp12c-probes | ran | FAIL | FAIL, NEW (B5): 48 legacy differences in the src set; 0 at 17f7964c; all loops mutating/rebinding the iterated source or capturing the loop variable (D5/D1); 24 refused, 20 vm-error and 4 legacy-equal at 17f; expectations not converted (11.11) |
+| test-runtime2-cp13b | ran | PASS |  |
+| test-runtime2-cp13b-mutants | ran | FAIL | FAIL, pre-existing harness: mutant sub-builds rejected by the production build guard (test-only switch on CXXFLAGS); guard and harness unchanged since 17f7964c |
+| test-runtime2-cp14b | ran | FAIL | FAIL, pre-existing: script_return_kernel_error only (11.5) |
+| test-runtime2-cp14b-design-mutants | ran | PASS |  |
+| test-runtime2-cp14b-mutants | not run | deferred | cp14b compiled mutation campaign (builds a mutant per site) plus the design mutants; design mutants run separately; Linode for the campaign |
+| test-runtime2-cp14b-profile | ran | PASS |  |
+| test-runtime2-cp14b-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-cp14b-sort | ran | PASS |  |
+| test-runtime2-cp14b-witnesses | ran | PASS |  |
+| test-runtime2-cp16-engine-parity | ran | PASS |  |
+| test-runtime2-cp16-legacy | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-cp16-n1 | ran | PASS |  |
+| test-runtime2-cp17-handle-allocation | not run | deferred | handle allocation campaigns with 1800 s and 3600 s budgets; host handles untouched by B5; Linode |
+| test-runtime2-cp17-handle-mutants | not run | deferred | handle mutant builds; host handles untouched by B5; Linode |
+| test-runtime2-cp17-handles | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-cp17-n2 | ran | PASS |  |
+| test-runtime2-cp17-n2-rebuild | ran | PASS |  |
+| test-runtime2-cp17-n2-rebuild-mutant | not run | deferred | rebuild-mutant campaign (rebuilds through make); host code untouched by B5; Linode |
+| test-runtime2-cp17-routing-mutants | ran | FAIL | FAIL, pre-existing harness: a mutant of src/ParserScript.cpp no longer compiles (stale mutant; file and harness unchanged by B5) |
+| test-runtime2-cp17-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-cp17-tripwire | ran | PASS |  |
+| test-runtime2-cp17-unwind-mutants | not run | deferred | unwind mutant builds; Linode |
+| test-runtime2-cp18 | ran | PASS |  |
+| test-runtime2-cp18-cow | not run | via | prerequisite of test-runtime2-cp18 (run there) |
+| test-runtime2-cp18-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-cp18-switch | not run | via | prerequisite of test-runtime2-cp18 (run there) |
+| test-runtime2-cp22 | ran | PASS |  |
+| test-runtime2-cp22-mutants | not run | deferred | 25 coroutine mutant nift builds (about 240 MB; this host has about 1 GB free); coroutine code untouched by B5; Linode |
+| test-runtime2-cp22-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-cp22-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-cp23 | ran | PASS |  |
+| test-runtime2-cp23-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-cp23-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-d040-witnesses | ran | PASS |  |
+| test-runtime2-diagnostics | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-dynamic-reads | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-f6-cleanup | ran | PASS |  |
+| test-runtime2-f6-mutants | not run | deferred | f6 cleanup mutant builds; host code untouched by B5; Linode |
+| test-runtime2-f6-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-for-s2 | ran | PASS |  |
+| test-runtime2-for-s2-bench | not run | deferred | wall-clock benchmark: Linode only |
+| test-runtime2-for-s2-known-deps | ran | PASS |  |
+| test-runtime2-for-s2-mutants | ran | PASS |  |
+| test-runtime2-for-s2-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-fs-freedom | ran | PASS |  |
+| test-runtime2-guardoff | ran | PASS | PASS on rerun (first run invalidated by a concurrent record edit: repo-state) |
+| test-runtime2-guardoff-sanitize | not run | deferred | sanitizer build of the guard-off probe: Linode (named in 10.10) |
+| test-runtime2-host-deps | ran | FAIL | FAIL, pre-existing: 1 FAIL line on B5, 3 with the 17f7964c binary (TARGET override) |
+| test-runtime2-host-memory | ran | PASS |  |
+| test-runtime2-inventory-host-mutant | ran | PASS |  |
+| test-runtime2-inventory-links | ran | PASS |  |
+| test-runtime2-kind-bits | ran | PASS |  |
+| test-runtime2-literals | ran | PASS |  |
+| test-runtime2-literals-decimal-negative | ran | FAIL | FAIL, pre-existing: "expected exactly one Decimal inference line", identical with the 17f7964c binary |
+| test-runtime2-literals-f1-negative | ran | FAIL | FAIL, pre-existing harness: sub-build rejected by the build guard |
+| test-runtime2-literals-mutants | ran | FAIL | FAIL, pre-existing harness: sub-build rejected by the build guard (as cp13b-mutants) |
+| test-runtime2-literals-scaling | not run | deferred | timed scaling runs (--runs 3): Linode only |
+| test-runtime2-modified-race | ran | PASS |  |
+| test-runtime2-module-host-order-mutant | ran | FAIL | FAIL, pre-existing harness: sub-build rejected by the build guard |
+| test-runtime2-packages | ran | PASS |  |
+| test-runtime2-packages-legacy | ran | PASS |  |
+| test-runtime2-packages-mutants | ran | PASS |  |
+| test-runtime2-prevalidate-gate | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-process-capture | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-refrep-cli | ran | PASS |  |
+| test-runtime2-refsem | ran | PASS |  |
+| test-runtime2-refsem-mutants | ran | PASS |  |
+| test-runtime2-refsem-sanitize | not run | deferred | sanitizer build: Linode |
+| test-runtime2-refsem-stale-vm | ran | PASS |  |
+| test-runtime2-refsem-tsan | not run | deferred | TSan build: Linode |
+| test-runtime2-rt-diff | ran | PASS |  |
+| test-runtime2-rt-diff-selftest | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-safety | ran | PASS |  |
+| test-runtime2-safety-mutants | ran | PASS |  |
+| test-runtime2-scanner-parity | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
+| test-runtime2-vm-corpus | ran | FAIL | FAIL, pre-existing: 124 FAIL lines (17f7964c: 155) |
+| test-runtime2-vm-corpus-complete | ran | PASS |  |
+| test-runtime2-vm-default | ran | PASS |  |
+
+### 11.11 New findings of the fix-up (not in the review; not resolved here)
+
+1. **`test-runtime2-cp12c-probes` fails on B5 and passes on 17f7964c** (48 legacy differences in
+   `cp12c-probes/src`; `src2` passes). Every one is a loop whose body mutates or rebinds the
+   iterated source (or calls a function that does) or captures the loop variable: the CP12C
+   live-loop probes, written for the live model B5 deleted. At 17f7964c 24 were refused, 20 ended
+   in the legacy-equal vanished-element error and now run to exit 0 (nothing vanishes under the
+   entry snapshot), 4 were legacy-equal live reads and now print the entry snapshot
+   (`g02/g03_*_global_fn_*`, `t14_obj_replace_values`, `t17_restored_before_read`). All consistent
+   with D5 and D1, but **not converted**: like the for-s2 and capture_origins conversions, each
+   needs its result checked and pinned with its rule before the expectation changes.
+2. **Six test-rt-vm recipe lines pass on 17f7964c and fail on B5**, all "expected a refusal
+   (`aliasing`, `reference-guard:*`) or a fallback, got compiled/vm-error", except vm_former_replay:
+   10 `arr.push(arr)` programs now give the approved catchable reference-cycle error (D-NEXT-refsem
+   #4; legacy pushes a copy). The 5 vm_subset_gen programs checked by the fix-up are legacy-equal
+   (stdout, exit, error text). The rest are unverified: obsolete expectations after the approved
+   guard removal **by their failure text**, to be converted with per-program verification.
+3. **cp19 admission mutants m12 and m13 survive on B5** (11.4).
+
+Items 1-2 were invisible to the freeze and to the review because `test-rt-vm` was never run whole
+(its prerequisite `test-runtime2-cp14b` fails, so make never reaches its recipe) and cp12c-probes
+was not in either gate list. They are test-expectation work, not production defects found so far;
+**PENDING: owner decision whether the conversion belongs to this fix-up round or a follow-up before
+integration.**
+
+### 11.12 Freeze record (B5 16)
+
+- Commits: B5 14 `af36ad9a` (tests, harness, Makefile, adversarial originals), B5 15 `8a568abb`
+  (admission-mutants harness), B5 16 (this record, compatibility.md, expected-changes.tsv).
+- Production binary: `nift` sha256 `ac283072f622c473b117d76d4d2e4397606743a8804bee5c0fa1565145ac05b7`
+  after all runs, equal to the review's build of `1d9053f6`. `git diff 1d9053f6 HEAD` touches no
+  `src/`, `include/`, `scripts/` or vendored file.
+- Repository: `git status --porcelain` empty after the commit; `--ignored` lists build products only
+  (`.build/`, objects, `.d`, `.cfg`, `nift`, `libnift_c.so`).
+- Not pushed, not tagged; runtime-2, weekend/r2, cand/b4-dispatch, cand-b4 and rv-b5 untouched
+  (cand-b4: its `./nift` and test binaries run read-only; `git status --porcelain` empty).
+- For the targeted re-review: 11.1 (D4 classification), 11.6/expected-changes (no unapproved
+  expectation change: the one derived break is flagged for owner confirmation), 11.3/11.4/11.8
+  (mutants), 11.9 (fixtures, generators), 11.10 (coverage), 11.11 (open items).
