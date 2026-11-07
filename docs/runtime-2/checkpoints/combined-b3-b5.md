@@ -59,7 +59,7 @@ Atomicity: a failed container mutation leaves the receiver unchanged (bounds, re
 throwing argument); an argument's side effects (here: the rebinding) remain. Checked by
 `atomic_*` fixtures (catchable cycle errors, and fatal bounds errors observed in sessions).
 
-### 2.1 Legacy behaviour the contract does not follow (PENDING-OWNER: approve as differences)
+### 2.1 Legacy behaviour the contract does not follow (APPROVED as differences, owner 2026-11-07 22:13 D1; recorded in evidence/b5/expected-changes.tsv as class iii; not legacy parity)
 
 Legacy is not consistent, so no single order matches every legacy result. The repair follows
 legacy's canonical evaluator and the approved reference semantics (plan section 3/5.3: the
@@ -89,7 +89,7 @@ Also observed, not changed by the repair (the VM already differed and is correct
 5. legacy fails (`remove: index out of range`) when the argument drops the receiver's last other
    reference; the VM keeps the retained receiver alive.
 
-### 2.2 Same root cause outside H-A (STOP: not fixed, PENDING-OWNER)
+### 2.2 Same root cause outside H-A (STOP: not fixed; RELEASE BLOCKER, owner 2026-11-07 22:13 D2, bounded investigation to be briefed separately)
 
 The same main-frame-register pattern affects operators, which are not receiver operations:
 `x := 1; fn(g()) { x = 10; return 1 }; print(x + g())` prints 11 (legacy 2; semantics.md requires
@@ -255,11 +255,10 @@ Added (owner 2026-11-07 18:00 D4/D5):
   of tooling.md's layer table.
 - **H-A**: the defect being fixed before certification; **fixed here pending independent
   verification** (the first repair was REJECTED for H1, section 10); kept in this history after
-  resolution.
+  resolution. Its legacy differences in 2.1 (items 1-3) are APPROVED (owner 2026-11-07 22:13 D1).
 - **Operand order of top-level bindings outside receivers** (review of 0d853db4 M2; 2.2): `x + g()`,
-  `x == g()`, `s + k()`, `x += g()` (every context), `[x, g()]`. Open release blocker, pending
-  the owner's scope decision; not fixed. Its two PENDING-OWNER legacy
-  differences (2.1) and the related operator/compound finding (2.2, not fixed).
+  `x == g()`, `s + k()`, `x += g()` (every context), `[x, g()]`. RELEASE BLOCKER (owner 2026-11-07
+  22:13 D2); not started in this round; a bounded investigation will be briefed separately.
 - **M-3** `for-capture-vanishing` / `for-missing-write`: deferred precision limitation (safely
   refused before any effect, not previously admitted: 17f7964c refuses them too). Fixtures in
   tree, run by `test-runtime2-b5`: `tests/runtime2/b5/precision/m3_nested_loop_shared.f` (the
@@ -336,7 +335,7 @@ legacy's prepared loop evaluator differs there as recorded in 2.1 item 2.
   positive control (identical failure) is FAILED-BASELINE (exit 0). The 0d853db4 `certify.py`
   fails control (a) (FAILED-BASELINE, exit 0). Table cases: 37 harness, 31 classification.
 
-### M1 (recorded, PENDING-OWNER; fixture and compatibility row)
+### M1 (recorded; fixture and compatibility row; APPROVED 2026-11-07 22:13, owner D1.3)
 
 `r := b[g()]` in loop code (`g` rebinds `b`): legacy 8 and 17f7964c 8 (legacy evaluates the key
 twice; 17f7964c read late), now 2 (operands once, receiver first). A previously admitted program
@@ -386,3 +385,108 @@ the run only by this record's edits.
 | FAILED-BASELINE, BLOCKED, NOT-RUN | none among the rerun gates (section 9's results for the others stand: the C7 change touches only the loop-binding and `location_source` write-backs) |
 
 M15 on the generator: 12 bad (caught). The 0d853db4 `certify.py` fails toy control (a).
+
+## 11. Confirmation round on c73a7692: CONFIRMED-WITH-CONDITIONS; cleanup (C10-C12)
+
+Review: `scratchpad/review-ha/CONFIRM-HA-R2.md`. H1, H2(a)-(c), M1, M2 and L1-L4 confirmed; one
+condition (F1) and three cleanups. No production change in this round: the binary stays
+`91a49efa43715613ff96c6aae31b0844ff4b192e323addd3e64b1b6e677fefcf`.
+
+- **F1 (fixed, C10).** `failure_identity` looked only at the FAIL lines when there were any, so
+  `FAIL suite` with `bad case: case-NEW` matched `FAIL suite` with `bad case: case-old`, and a
+  vm_parity run with `31 differing` would have matched the baseline's `30 differing` (its FAIL line
+  is only `FAIL vm parity: 1 failure(s)`). The identity now always includes the normalised last 15
+  lines (detail and summary lines) as well as the FAIL lines, all through one `normalise()`:
+  checkout roots, `/tmp` paths, timestamps, clock times, durations (`123ms`, `"execute_us":44.2`),
+  `pid N` and addresses; counts are kept. Guard controls: the reviewer's detail toy (regression and
+  v4.12.0 paths) and a vm_parity-style count change are FAILED-NEW; a control whose only
+  differences are a pid, a temporary path, durations and a timestamp is FAILED-BASELINE.
+  Stability of the known baseline-failing gates under the new identity: section 11.1.
+- **F2 (fixed, C10).** The guard runs the 0d853db4 `certify.py` (`git show
+  0d853db4:scripts/certify.py`) on control (a): it reports FAILED-BASELINE, exit 0 (laundered),
+  where the tree's runner reports FAILED-NEW. Where that commit is absent from the repository the
+  control prints NOT RUN and points to this record.
+- **F3 (recorded).** The `compiler_stmt_expr.cpp` write-back guard (`&& !may_rebind(arg)` on the
+  `location_source` path; loop bindings go through `array_mutation`) is believed unreachable. A
+  scratch build of the reviewer's mutant mG (the guard removed; `src/` unchanged) gives the same
+  output as production on every probe tried: a named iterable pushed at top level with a
+  rebinding argument before and after the loop, inside the loop, in a function, with an
+  assignment-expression argument, and with a closure over the loop variable
+  (`scratchpad/combined-fix/f3/{a..f}.f`); the reviewer's `r2/o01_locsrc.f` and `o02_locsrc_top.f`
+  are refused (`for-capture-vanishing`). The evalorder and precision fixtures (50) and the
+  generator (840, 0 bad) also pass on mG. The guard is kept as harmless defence; no fixture
+  reaches it.
+- **F4 (fixed, C12).** compatibility.md's loop-binding row now says 17f7964c printed the
+  legacy-equal `[7,4]` (a previously admitted program whose output changes); the dangling fragment
+  in section 8 is removed; `results2.txt` recorded `head=0d853db4` because the gates ran on the
+  uncommitted C7-C9 working tree (same binary); this round's results file records the head of the
+  commit the gates ran on.
+
+### 11.1 Identity stability of known baseline-failing gates
+
+Known baseline-failing gates (each identical on 17f7964c/fc987ec1, section 9 and b5-refsem.md
+11.10): test-runtime2-cp14b; test-runtime2-rt-diff-selftest; test-rt-vm's own recipe lines
+vm_parity `--rt-diff` and vm_modules; cp25r-inventory, test-cp15-numeric-repair, test-cp17-bytes,
+test-cp18-bytes, test-runtime2-diagnostics, test-runtime2-prevalidate-gate,
+test-runtime2-literals-{mutants,decimal-negative,f1-negative}, test-rt-builtins-probe,
+test-rt-memory-c1, test-cp19-expression-development, the cp19 admission-mutants pair and the
+remaining B5-inventory FAILs (37 in all), and the `make test` components of the review
+(v42_struct_private_smoke and four others).
+
+Each gate run twice on the same binary (91a49efa), identities compared with the new
+`failure_identity` (`scratchpad/combined-fix/stab/`):
+
+| Gate | Result |
+| --- | --- |
+| vm_parity `--seed 1 --gen 300 --rt-diff` (test-rt-vm own recipe) | identical (1 FAIL line, `30 differing, 16 approved` in the tail) |
+| vm_modules `--gen 100 --seed 1` | identical (3 FAIL lines) |
+| test-runtime2-cp14b | identical (`Error 1`, 1 FAIL line; the `real/user/sys` lines differ and are excluded/normalised) |
+| test-runtime2-rt-diff-selftest (about 10 min each) | identical (`Error 1`, 8 FAIL lines) |
+
+The other known baseline failures were not rerun twice here (time); they get the same identity
+mechanism on Linode, where a varying value that is not normalised shows as FAILED-NEW (the
+conservative direction) rather than as a pass. Normalisation of varying values is a guard control
+(`test-rt-vary`: pid, `/tmp` path, durations, timestamp differ; FAILED-BASELINE).
+
+## 12. Owner decisions 2026-11-07 22:13 (D1-D4), folded into the F1 round (C11)
+
+- **D1, APPROVED: three evaluation-order differences from legacy**, recorded in
+  `docs/runtime-2/evidence/b5/expected-changes.tsv` (three class iii rows: legacy output, candidate
+  output, cause and order, permanent test) and compatibility.md (status APPROVED 2026-11-07 22:13;
+  none described as legacy parity): (1) the element store whose value rebinds the receiver
+  (`evalorder/legacy_fn_store.f`); (2) receiver rebinding in loop bodies, captured loop bindings
+  included (`legacy_loop_order.f`, `loopbind_*`: `[7] [7]` against legacy `[7,4] [7,4]`); (3) `b[g()]`
+  in a loop declaration, key evaluated once (`legacy_loop_decl_read.f`: 2 against legacy 8). The
+  fixtures' headers say APPROVED.
+- **D2: the ordinary-operator late read is a RELEASE BLOCKER** (2.2, section 8). Not started in
+  this round.
+- **D3, assertion classes** (`scripts/certify.py`): every gate's assertions are PASS, PARTIAL,
+  SKIP, FAIL or BLOCKED. Skip markers are found mechanically (`SKIP`/`SKIPPED` at a line start,
+  `skipping`, `N ... skipped` with N > 0); `KNOWN_CONDITIONAL` lists the conditional checks the
+  tree prints, with each requirement and whether it is required on the Linux campaign host
+  (other-platform checks are not: their CI lanes); an unknown skip is required. PARTIAL (a
+  required assertion skipped while others ran) maps to BLOCKED, SKIP (only skips) to NOT-RUN, FAIL
+  to FAILED-NEW/FAILED-BASELINE, BLOCKED to BLOCKED, PASS to PASSED. The summary lists every
+  required assertion that did not execute, with its requirement. In certification mode
+  (`--certify`, implied by a full campaign) any planned gate that is PARTIAL or SKIP fails the
+  campaign (exit 1). Guard: 14 table cases and toy controls (PARTIAL with the read_limit RAM skip,
+  SKIP, an other-platform skip that stays PASSED). Local logs: the only required skips are the
+  comparator ones (GCC 13.3 here).
+- **D4, oracle provenance, no extra hardening.** The preflight checks: the oracle's checkout is
+  at `ce8cd36a` (tag v4.12.0), clean, and `make -q nift` current; the binary was built during the
+  campaign (`--campaign-start EPOCH` / `NIFT_CAMPAIGN_START`, required; the oracle's mtime must be
+  later); and the oracle and the candidate are distinct (different sha256 and real path). The
+  facts record the oracle's sha256, real path and build command
+  (`git worktree add --detach <tree> ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb && make -C <tree>
+  -j"$(nproc)" nift`) in `.build/certify/_preflight.json` and summary.json. Deliberate substitution
+  (copying another binary over the oracle's checkout after the build) is an **accepted
+  threat-model limitation** (L1).
+
+### 12.1 Linode instance minimums (every mandatory assertion executes)
+
+| Resource | Minimum | Why |
+| --- | --- | --- |
+| RAM | 8 GB plan (MemAvailable >= 4096 MiB while read_limit.py runs, with the campaign's other jobs) | `tests/runtime2/read_limit.py` skips its default 1 GiB limit check below 4 GiB available; this host (7.7 GB) runs it |
+| Disk | 40 GB free | measured: the worktree with the production, guard-off and test builds is 1.7 GB; one sanitizer object set is about 1.5 GB (112 of 303 ASan objects took 541 MB), and the campaign builds ASan/UBSan and TSan sets plus sanitized variants (guard-off, cp18, cp19, cp23); three baseline trees (v4.12.0, 17f7964c, weekend/r2) each rebuild nift and their test artefacts; logs |
+| Cores | 2 (4 recommended) | no gate depends on the core count for its assertions (cp22 print_order uses max(2, hardware concurrency)); cores only change the duration (test-rt-vm alone took 33 min on 2-4 cores here) |
+| Toolchain and tools | GCC 15.2 with `__GLIBCXX__` 20260321; python3; git; strace; GNU time at `/usr/bin/time`; setpriv (util-linux); cc; coreutils; `/proc` with `/proc/self/mem`; `/dev/shm` as a separate tmpfs; a symlink-capable filesystem; an unprivileged user (`tester`) | each is the requirement of a `KNOWN_CONDITIONAL` check |

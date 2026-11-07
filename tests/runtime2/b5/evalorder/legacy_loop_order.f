@@ -1,4 +1,4 @@
-// H-A (docs/runtime-2/checkpoints/combined-b3-b5.md): PENDING-OWNER: legacy's prepared loop evaluator reads the receiver late (push: [7,4], [1]) or loses the mutation (insert: [7], [1]); the VM uses the canonical order in loops too.
+// H-A (docs/runtime-2/checkpoints/combined-b3-b5.md): APPROVED 2026-11-07 22:13 (owner D1.2), a difference, not legacy parity: legacy's prepared loop evaluator reads the receiver late (push: [7,4], [1]) or loses the mutation (insert: [7], [1]); the VM uses the canonical order in loops too.
 b := [1]
 keep := b
 g := () => { b = [7]; return 4 }
