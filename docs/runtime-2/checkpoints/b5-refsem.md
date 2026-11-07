@@ -1,7 +1,9 @@
 # Checkpoint B5: guard removal, the reference-semantics switch (D-NEXT-refsem-b)
 
-Status: **FIX-UP FROZEN (B5 15) after the independent REJECT of the B5 13 freeze `1d9053f6`
-(tree `e3f1767d`); awaiting the targeted independent re-review (section 11).** The REJECT and
+Status: **SECOND FIX-UP FROZEN (B5 21, section 12) on the first fix-up `09651e11`, after the
+independent REJECT of the B5 13 freeze `1d9053f6` (tree `e3f1767d`); awaiting the targeted
+independent re-review (owner 2026-11-07 14:00: m12/m13, the 54+ conversions, receiver identity,
+D4 classifications).** (First fix-up: section 11.) The REJECT and
 its evidence are preserved unchanged (`scratchpad/review-b5/REVIEW.md`, F1-F12). Owner decisions:
 2026-11-07 06:55 (D1 approved and fixtured; D2 release blocker; D3 accepted and gated; D4 bounded
 Option 2), 09:06 (D4 conservative refusal accepted for the B5 checkpoint only, release blocker;
@@ -761,8 +763,8 @@ above 700 MB free; scratch binaries and corpora were deleted afterwards.
 | test-cp18-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
 | test-cp18-bytes-sanitize | not run | deferred | sanitizer lane (ASan/UBSan build of nift and the bytes tests): Linode combined certification |
 | test-cp18-bytes-tsan | not run | deferred | TSan build: Linode combined certification |
-| test-cp19-admission-mutants | ran | FAIL | FAIL: loop control (precision gap) + m10/m12/m13 survive (11.4, PENDING-OWNER) |
-| test-cp19-admission-mutants-switch | ran | FAIL | FAIL: as the default build (11.4) |
+| test-cp19-admission-mutants | ran | FAIL | FAIL: loop control (precision gap) + m10/m12/m13 survive (11.4, PENDING-OWNER). **12.1: m13 caught (shared-scalar), m12 retired unreachable (tripwire); still FAIL: loop (D4/m3), native (m10)** |
+| test-cp19-admission-mutants-switch | ran | FAIL | FAIL: as the default build (11.4; 12.1) |
 | test-cp19-admission-sanitize | not run | deferred | sanitizer build: Linode |
 | test-cp19-bytes | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
 | test-cp19-certify | not run | umbrella | = test-cp19-functional + -mutants + -sanitize + -host: components run (cp19 rows) except the sanitizer lane (deferred) |
@@ -920,7 +922,7 @@ above 700 MB free; scratch binaries and corpora were deleted afterwards.
 | test-runtime2-cp01-simplify | ran | FLAKY | FLAKY on both binaries (incremental-build timing: 4, 1, 1 failures on B5; 3, 2 on 17f7964c, different scenarios each run) |
 | test-runtime2-cp03-simplify | ran | FAIL | FAIL, pre-existing: same exit and same FAIL-line count with the 17f7964c binary (TARGET override) |
 | test-runtime2-cp12c-mutant-controls | ran | PASS |  |
-| test-runtime2-cp12c-probes | ran | FAIL | FAIL, NEW (B5): 48 legacy differences in the src set; 0 at 17f7964c; all loops mutating/rebinding the iterated source or capturing the loop variable (D5/D1); 24 refused, 20 vm-error and 4 legacy-equal at 17f; expectations not converted (11.11) |
+| test-runtime2-cp12c-probes | ran | PASS | was FAIL (11.11); **12.2: 48 differences pinned (47 snapshot, 1 D1), PASS on B5 20** |
 | test-runtime2-cp13b | ran | PASS |  |
 | test-runtime2-cp13b-mutants | ran | FAIL | FAIL, pre-existing harness: mutant sub-builds rejected by the production build guard (test-only switch on CXXFLAGS); guard and harness unchanged since 17f7964c |
 | test-runtime2-cp14b | ran | FAIL | FAIL, pre-existing: script_return_kernel_error only (11.5) |
@@ -1039,3 +1041,229 @@ integration.**
 - For the targeted re-review: 11.1 (D4 classification), 11.6/expected-changes (no unapproved
   expectation change: the one derived break is flagged for owner confirmation), 11.3/11.4/11.8
   (mutants), 11.9 (fixtures, generators), 11.10 (coverage), 11.11 (open items).
+
+## 12. Second fix-up from 09651e11 (owner 2026-11-07 14:00; B5 17 to B5 21)
+
+Bounded test-and-record round from the frozen candidate `09651e11` (tree `6e1f7a0a`), by an agent
+that is neither the earlier fix-up agent nor the reviewer of `1d9053f6`. **No production source
+changed**: B5 17-20 touch tests, harnesses, the Makefile's `test-runtime2-b5` recipe, fixtures,
+compatibility.md and evidence; B5 21 is this record. Evidence:
+`scratchpad/b5-fixup2/` (`instr/` instrumentation sources, corpora and results; `m13/`, `m12/`;
+`cp12c/`; `rtvm/`; `gates/`). Scratch binaries (two mutant CLIs, the instrumented CLI and its m3
+variant) were built outside the tree with production flags, logged and deleted.
+
+### 12.1 cp19 admission mutants m12 and m13 (owner 14:00: resolve before acceptance)
+
+**m13** (`infer_session_location.cpp`, `session_begin_locations` returns at once). Property
+removed: capture-location inference, which unifies the inference types of every slot of one
+compile that names the same captured cell (a template closure's capture declaration, a session
+global; source-slot edges). Under B5 the only edges left are source-slot identity edges (selector
+cells were deleted in B5 4), so the unification joins whole slot types. **REACHABLE and
+detectable.** For array/object contents it is subsumed by the U6 session heap (every earlier
+value is heap-sited, `materialize` joins the pool, which holds every seed part and store): the
+old `shared` witness (`a[0]` written through one sibling, read through the other) gives
+identical inference results with and without the mutation. It is **not** subsumed for the root
+kind of a captured binding when the stored value keeps the binding tag: tag 4 covers string,
+function, future, collection and struct. Witness (new case `shared-scalar`):
+`fn(mk()){a:="s";return {"wr":v=>{a=v;return 0},"rd":()=>a.to_upper()}};o:=mk();w:=1` then
+`o.wr(()=>4);x:=o.rd()`. Production (and 17f7964c) refuses the probe before any effect,
+`builtin-receiver:to_upper`; m13 admits it and stops in an internal failure, `unexpected
+operands (compiler defect): built-in to_upper` (exit 70 on the CLI): an unchecked dispatch on a
+stale kind, a B4 invariant-1 violation. `test-cp19-admission-mutants` and `-switch`: shared-scalar
+PASS in both directions (control refuses, m13 internal; control fails the mutant expectation,
+m13 fails the control expectation).
+
+Evidence (`instr/`): an instrumented CLI (production objects except `infer.cpp`,
+`infer_session_location.cpp`, `session_callable.cpp`, each a copy with logging only, plus a
+run-time switch that applies the m13 mutation) records a canonical digest of every `UnitKinds`
+result the compiler consumes. Its production mode is output-identical to the production binary
+on every session run. Over 3,462 sessions (1,230 targeted: sibling closures, globals and loop
+source roots sharing one captured cell, 8 shapes x 7 stored kinds x 5 reads, same and later
+statement; 141 fixture sessions: every tests/**/*.in, the cp19 proof-cli cases, admission seeds,
+the m3/m7 probes; 2,091 generated sessions of 11.3): 159 sessions have a different inference
+digest under m13 and 11 a different output, all in the targeted corpus; 2 of the 11 are internal
+failures (`to_upper`, `length/size`), 2 admit and run a statement production refuses (the next
+statement is then refused), 7 refuse at another position or for another reason. The real
+m13 CLI (harness object) gives the same results as the run-time switch
+(`m13/output-diffs.txt`).
+
+**m12** (`session_callable.cpp`, `may_call` always true). **UNREACHABLE on B5; retired with a
+bounded proof, kept as a tripwire.** `may_call` has one call site (line 74, plus its own
+recursion): a function upvalue that is a cell for which `cell_plain_capture` returns null. That
+function returns null for a cell only when the terminal cell's binding type is negative and not
+`kSourceSlot` (-3), or the source-slot chain is broken or deeper than 64. (a) B5 4 deleted the
+selector cell (-2), the only producer of such a cell on 17f7964c (the `selector` witness caught
+m12 there through a loop variable capture). (b) Every remaining cell comes from `make_cell` with
+a binding type from `BindType`/`text_binding_type`/`binding_tag` (>= 0 except -1 for a
+`Kind::Handle` or `Kind::Cell` value), `LoadI 9` (try/catch), session invocation types (tags of
+strings/arrays/objects), or isolate-transfer decode (copied from an existing cell); a source slot
+always wraps one fresh ordinary cell and `cell_rebind` keeps that shape, so chains have depth 2.
+(c) A cell is never a script value, and a closure capturing a binding whose kinds include a host
+handle is refused before compile (`compiler_unit.cpp:231`, `host-handle-flow`; probes
+`m12/h1-h5.in` all refused at statement 1, nothing executed). Executable evidence: the same
+instrumented CLI logs every arrival at that call site: **0 arrivals in all 3,462 sessions**. A
+positive control (the instrumented objects linked with the m3 `cell.cpp`, which makes source-slot
+captures non-plain) arrives there in 5 sessions (`binding_type=-3`, `may_call` both 0 and 1), so
+the instrumentation does detect the branch. Even where reachable, m12 can only add refusals
+(an incomplete shape), never admit or change a result.
+
+**Harness** (`admission_mutants.py`): `selector` (m12) and `shared` (m13) stay as control
+witnesses; their mutant rows are TRIPWIRES that require the mutant to behave exactly as the
+control and FAIL if it ever differs ("re-check 12.1"). `test-cp19-admission-mutants` and
+`-switch` still FAIL, deliberately, with exactly 2 of 15 cases: `loop` (control refused: the D4
+family; **m3 has no B5 witness, the coverage obligation is retained and tied to the D4 release
+blocker**) and `native` (**m10 survives on B5 and on 17f7964c: a pre-existing test-adequacy
+finding, moved to the release-blocker audit to be reconsidered, not accepted**).
+
+### 12.2 test-runtime2-cp12c-probes: the 48 differences, each classified
+
+Each of the 48 `cp12c-probes/src` probes that differ from legacy under NIFT_VM=1 on B5 was run
+on legacy (NIFT_VM=0), 17f7964c (NIFT_VM=1 and require) and B5 (NIFT_VM=1 and require,
+identical), its B5 result derived by hand from the rule, and, where the cause was ambiguous,
+checked against closure-free or loop-free controls (`cp12c/controls/`). Rules (kept distinct):
+**snapshot** = snapshot iteration (owner 2026-11-01 "loops iterate a snapshot taken at entry",
+2026-11-02 "snapshot iteration kept"; plan section 3 Iteration, D5; Q3 rows 5-6), including its
+element-identity clause ("elements are the original references; mutation through the binding
+mutates the element"); **D1** = per-iteration loop-variable binding (owner 2026-11-07 06:55
+decision 1). Criterion: D1 only where the difference needs a closure observing a later
+assignment to its own iteration's binding; snapshot where the loop binding's value is the entry
+element (the closure-free control shows the same difference) or a closure reads that element
+after the source was written, rebound or emptied.
+
+| rule (sub-rule) | n | 17f7964c | probes |
+| --- | --- | --- | --- |
+| snapshot (live reads) | 19 | refused (lent / aliasing) | capture_live_at_creation, capture_mixed_live, capture_nested_live, capture_source_after, capture_source_repeated, captured_compound_write, captured_postfix_inc, captured_prefix_inc, eager_prefix_statement, f08_alias_mutate, f13_global_from_fn_loop_elem, f24_global_elem_write_via_fn, m10_unvisited_change, prefix_dec_live_source, prefix_live_source, t09_pop_current, t10_pop_later, t16_same_iter_modify, write_before_live_capture |
+| snapshot (element mutation) | 4 | refused (shared-part) | capture_named_aggregate, capture_named_repeated, selector_missing_cached_write, selector_missing_side_effect |
+| snapshot (nothing vanishes) | 16 | legacy-equal vanished-element error | f01, f02, f03, f04, f05b, f11, f12, f14, f17, f20, f22, t06, t08, t24, t26, t29 |
+| snapshot (live reads by a closure after the loop) | 4 | legacy-equal vanished-element error | nested_selector_missing_call, nested_selector_missing_print, selector_missing_index, selector_missing_member |
+| snapshot (live reads, source rebound) | 4 | legacy-equal live reads | g02_obj_global_fn_same_keys, g03_arr_global_fn_same_len, t14_obj_replace_values, t17_restored_before_read |
+| D1 | 1 | refused (lent) | escape_before_assign (`f()` after the loop: 7; legacy 2) |
+
+**47 snapshot, 1 D1; all 48 converted; 0 PENDING-OWNER.** The classification of the programs
+shared with `capture_origins.py` (selector_missing_*, capture_named_*, capture_source_*) matches
+its existing B5_APPROVED labels. Supplementary finding (not a cp12c case): legacy also treats an
+ordinary element binding as a location (`x := a[0]; a = []; x[0]` fails "reference target no
+longer exists"); 17f7964c refuses that (`aliasing`) and B5 prints 1 (shared references); it is a
+consequence of the approved reference model, recorded here only. The harness pins each B5 result
+(stdout, no stderr, exit 0, for NIFT_VM=1 and require), fails a pin that becomes legacy-equal or
+goes missing, and keeps every other probe legacy-equal; negative control: on the 17f7964c binary
+all 48 pinned probes fail. Originals and every result:
+`docs/runtime-2/evidence/b5/cp12c-probes-original.json`. expected-changes.tsv: class i (24) and
+iii (20 + 4) rows.
+
+### 12.3 test-rt-vm: the 6 recipe lines (27 cases)
+
+Each case was run on legacy, 17f7964c and B5 (`docs/runtime-2/evidence/b5/rt-vm-originals.json`).
+Every one was refused before any effect at 17f7964c by the Phase A guard.
+
+| line | case(s) | legacy | B5 | conversion | rule |
+| --- | --- | --- | --- | --- | --- |
+| vm_subset | async-capture-aliased | 2 | 2 | UNSUPPORTED (`aliasing`) -> supported | guard removal, legacy-equal |
+| vm_subset_gen | aliasing trigger `tr := tq; print(tr)` (5 generated programs) | legacy's error "print: value is not directly renderable" | the same, reported by the VM | acceptable outcome `fallback:aliasing` -> `vm-error` (byte equality with legacy still required) | guard removal, legacy-equal |
+| vm_records_coverage | push-member-after-call, decl-from-pushed-element, push-binding, push-member, push-index-loop | as B5 | as legacy | REFUSED (`aliasing`) -> SUPPORTED | guard removal, legacy-equal |
+| vm_records_coverage | push_arrlit_fnloop | `[]` | `[[0,1],[1,2]]` | REFUSED (`reference-guard:argument`) -> pinned B5_APPROVED | arguments share identity (owner 2026-11-01) |
+| vm_engine_selection | vm-d040-copy | 2 | 2 | `fallback` -> `vm` | guard removal, legacy-equal |
+| vm_review_cp12 | chain199/201-alias | 2 | 2 | refusal `reference-guard:inflow` -> any accepted verdict | guard removal, legacy-equal |
+| vm_review_cp12 | chain199/201-aliasret | 1 | 2 | refusal `aliasing` -> pinned | returns share identity (owner 2026-11-01) |
+| vm_former_replay | aggregates-10-* (`arr.push(arr)`, 10 contexts) | pushes a copy, runs on | `before`, then "reference cycle: the stored value would contain itself" at the push (line, column 1; `return: ` in the two fnnest contexts), exit 1 | pinned, derived from the source | cycle refused before mutation (owner 2026-11-01; D-NEXT-refsem #4) |
+
+"Guard removal" = owner 2026-11-02 (arrays/objects are shared references implemented directly by
+the runtime, no replacement static guard). Every approved difference has its compatibility.md
+row (arguments, returns, `a.push(a)`). Each pinned harness fails a pin that legacy starts to
+match. Negative control: the changed expectations fail on the 17f7964c binary. **New test**
+`tests/runtime2/b5/cycle/push_self_unchanged.f` (in `test-runtime2-b5`, production and probe
+builds, NIFT_VM=require): six refused cycles (`arr.push(arr)`, through the alias, one and two
+levels down, through an object, an element store); after each, the receiver's length and
+contents, the alias's, the identity of the receiver, its alias and its parts (`same`), and a
+container holding a part are unchanged; afterwards the receiver is an ordinary shared array
+again. Golden hand-derived.
+
+### 12.4 Receiver-returning reverse()/sort()/comparator sort (APPROVED 14:00)
+
+compatibility.md and expected-changes.tsv now mark the row **APPROVED by the owner 2026-11-07
+14:00** (previously "for owner confirmation") and record that comparator sort may use temporary
+storage internally (copy-sort-commit) while returning the original receiver: returning the
+receiver is not the same as sorting in place. Tests:
+- `tests/runtime2/b5/receiver/reverse_sort_receiver.f` (production and probe): for `reverse()` and
+  plain `sort()`, the result is `same` as the receiver and as its alias, the alias and a holding
+  container observe the mutation, a mutation through the result reaches all of them (no fresh
+  identity), a call through the alias returns the same array, element identity is kept. Legacy
+  differs on 12 of the 20 lines; 17f7964c refuses it (`aliasing`).
+- `tests/runtime2/b5/sort/comparator_receiver.f` with the existing `aliased_reads.f` (atomic
+  commit: every alias read during the sort sees the original order), `failure_injection.f`
+  (comparator failing at every call k: receiver and alias unchanged), `nested_identity.f`,
+  `receiver_mutation.f`: identity through the alias, aliases observe the success, no fresh
+  identity, a failing comparator leaves no result, the receiver, its alias and its element
+  identities unchanged, then a normal sort of the same receiver.
+- **Comparator-sort tests run only on the NIFT_RT_REFERENCE_PROBE build** (`nift-guardoff`) on this
+  GCC 13.3 host: production refuses comparator sort here (`method:sort`, D2 release blocker); the
+  GCC 15.2 production run belongs to the combined Linode campaign.
+
+### 12.5 Gates rerun on B5 20 (`scratchpad/b5-fixup2/gates/f-*`)
+
+Sequential `make -s` runs on B5 20 (`fc0d96ac`), result files with exit, HEAD and the
+`git status --porcelain` hash (empty tree status throughout):
+
+| gate | result |
+| --- | --- |
+| test-cp19-admission-mutants / -switch | FAIL by design: 13 of 15 cases PASS (shared-scalar catches m13; selector/shared tripwires hold), `loop` (D4, m3) and `native` (m10) fail |
+| test-runtime2-cp12c-probes | **PASS** (142 src cases, 48 pinned; src2 6) |
+| test-runtime2-cp12c-mutant-controls | PASS |
+| test-runtime2-capture-origins (reads cp12c-probes sources) | PASS (82 cases) |
+| test-runtime2-b5 (incl. new cycle, receiver; sort on the probe build) | PASS (71 production, 76 probe, sort-refusals 564) |
+| test-runtime2-b5-mutants (run.py over every b5 dir) | PASS |
+| test-runtime2-d040-witnesses (hashes the vm_review_cp12 programs) | PASS |
+| test-rt-vm-policy-tooling | PASS |
+| test-rt-vm own recipe (34 lines, line by line) | 31 PASS (vm-unit 40,347 checks 0 failures; the six lines of 12.3 now PASS); 3 FAIL, all failing on 17f7964c too: vm_parity `--rt-diff` (1), vm_builtins (4 cases, see 12.7), vm_modules (2 import-collision wording cases) |
+
+Production binary `nift` sha256 `ac283072f622c473b117d76d4d2e4397606743a8804bee5c0fa1565145ac05b7`
+after all runs (unchanged); `git diff 09651e11 HEAD -- src include scripts` is empty.
+
+### 12.6 Coverage reconciliation (update of 11.10)
+
+Inventory unchanged: **244** targets. Rerun this round: the nine targets of 12.5 plus the
+test-rt-vm own recipe; every other result is carried from the B5 14/15 runs of 11.10, valid
+because the production binary is byte-identical and none of those targets' inputs changed (the
+harness files edited here are consumed only by the rerun targets and by the deferred
+test-rt-vm-sanitize / test-rt-vm-mutants lanes; the Makefile change is the test-runtime2-b5
+recipe only).
+
+**Totals (244): ran 159 = PASS 121, FAIL 37, FLAKY 1; not run 85 = deferred to Linode 71,
+umbrella 7, prerequisites run elsewhere 4, not applicable 3** (14 umbrella/nested/n.a.). Change from
+11.10: test-runtime2-cp12c-probes FAIL -> PASS. Of the 37 FAIL: 0 B5-introduced unexplained;
+2 the admission-mutants pair (now only `loop`/D4-m3 and `native`/m10, both release-audit items);
+4 build-guard harness failures; 1 stale mutant (cp17-routing-mutants); 4 unit link / source-list
+defects; 26 identical on 17f7964c (11.10). test-rt-vm (umbrella row): its own recipe is 31/34
+(was 25/34), the 3 remaining lines failing on both trees. test-runtime2-cp01-simplify stays FLAKY
+(zero-flakiness policy: infrastructure fix needed, not B5). **This is not a local certification**:
+sanitizer/TSan lanes, wall-clock measurements, whole-runtime mutation campaigns, host
+process/terminal campaigns and the GCC 15.2 production comparator-sort run are Linode work.
+
+### 12.7 Open items after this round
+
+- **PENDING-OWNER: none new.** No cp12c or test-rt-vm case needed an unapproved rule.
+- Release blockers unchanged: D4 (11.1, incl. m3's coverage obligation), D2 comparator-sort
+  portability, F4 multi-line comparator position, the pre-existing failures of 11.5; **m10** added
+  to the release-blocker audit as a pre-existing test-adequacy finding to be reconsidered.
+- Not converted here (outside the six lines; fail on 17f7964c too): vm_builtins' 3 extra B5 lines
+  ("expected fallback reference-guard:*/builtin-receiver:empty, got compiled"), vm_parity
+  `--rt-diff` (1 on B5, 8 on 17f7964c), vm_modules (3 on both). vm_builtins' four B5 cases (`shapes@loop`, `shapes@fn-loop`: expected `reference-guard:inflow`;
+`w3-mixed`: `builtin-receiver:empty`; `f4-sort`: `reference-guard:shared`; all now compiled) are
+guard-era refusal expectations of the same kind as 12.3 but were outside this round's six lines:
+**not converted, to be verified case by case in a follow-up before integration.**
+- `compiler_loops.cpp:73` stale "M15" comment (comment-only follow-up, production file untouched).
+
+### 12.8 Freeze record (B5 21)
+
+- Commits: B5 17 `f3df39b9` (admission mutants), B5 18 `bd7185a0` (cp12c-probes), B5 19
+  `58bcb9bc` (test-rt-vm conversions, cycle test), B5 20 `fc0d96ac` (receiver tests,
+  compatibility/expected-changes), B5 21 (this record).
+- Production binary unchanged (sha256 `ac283072...`); no `src/`, `include/` or `scripts/` change
+  since `09651e11`.
+- `git status --porcelain` empty after the commit; `--ignored` lists build products only.
+  Scratch mutant/instrumented CLIs and objects deleted after logging; no generated corpus in the
+  tree.
+- Not pushed, not tagged; runtime-2, weekend/r2, cand/b4-dispatch, cand-b4 (its `./nift` run
+  read-only) and rv-b5 untouched.
+- For the targeted re-review (owner 14:00): 12.1 (m12/m13), 12.2-12.3 (the 48 + 27 conversions
+  and their rules), 12.4 (receiver identity), D4 classifications unchanged (11.1).
