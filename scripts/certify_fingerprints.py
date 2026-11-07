@@ -193,7 +193,9 @@ READ_LIMIT_TABLE = [
     ("page-build", r"page build: (?P<what>initial build|limit is a build failure naming the operation and limit"
                    r"|last-good output preserved|no interrupted-state marker"
                    r"|next build after the fix succeeds without --repair|up to date afterwards"
-                   r"|forced race, an unsequenced edit needs a rebuild|forced race, a sequenced edit is up to date)"),
+                   r"|forced race, an unsequenced edit needs a rebuild|forced race, a sequenced edit is up to date"
+                   r"|forced race, build after the unsequenced edit|forced race, rebuild"
+                   r"|forced race, build after the sequenced edit)"),
     ("read-line-catchable", r"read_line on a (?P<name>.+?): catchable read error"),
     ("stdin-exact", r"read\(\): stdin line of exactly the limit"),
     ("stdin-over", r"read\(\): stdin line one byte over is a limit error"),

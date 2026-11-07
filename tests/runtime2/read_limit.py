@@ -378,14 +378,17 @@ def page_build(work):
     import ticks
     ticks.age(str(site))
     (site / "data.txt").write_text("v3\n")
-    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    built = subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    check("page build: forced race, build after the unsequenced edit", built.returncode == 0, built.stdout + built.stderr)
     stamp(os.stat(site / "data.txt").st_mtime_ns)
     status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
     check("page build: forced race, an unsequenced edit needs a rebuild", "up to date" not in status, status)
-    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    built = subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    check("page build: forced race, rebuild", built.returncode == 0, built.stdout + built.stderr)
     (site / "data.txt").write_text("v4\n")
     floor = sequenced(site, site / "data.txt")
-    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    built = subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    check("page build: forced race, build after the sequenced edit", built.returncode == 0, built.stdout + built.stderr)
     stamp(floor)
     status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
     check("page build: forced race, a sequenced edit is up to date", "up to date" in status, status)
