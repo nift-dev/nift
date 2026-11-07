@@ -1362,7 +1362,7 @@ def main():
                     if os.environ.get("NIFT_CAMPAIGN_START", "").isdigit() else None,
                     help="the campaign's start (epoch seconds); the CP19 oracle must be built after it")
     ap.add_argument("--certify", action="store_true",
-                    help="certification mode (implied by a full campaign): a mandatory gate that is PARTIAL or SKIP fails the campaign")
+                    help="certification mode (implied by a full campaign); the verdict is CERTIFIED (0), PARTIAL (4) or FAILED (1)")
     ap.add_argument("--list", action="store_true", help="dry run: print the plan, the inventory check and the preflight, then exit")
     ap.add_argument("--check-plan", action="store_true", help="exit 1 when the plan misses an inventory or mandatory gate")
     ap.add_argument("--drop", action="append", default=[], metavar="TARGET",
