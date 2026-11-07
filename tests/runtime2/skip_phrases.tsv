@@ -66,6 +66,7 @@ tests/rt/refrep_production.sh	detected	-	else echo "SKIP comparator refusal: adm
 tests/rt/value_d040.cpp	detected	-	else std::printf("large_accounting skipped (no-large)\n");
 tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP partial cross-device move (root without setpriv)"; fi
 tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP cross-device move cases (/dev/shm missing or on the same filesystem)"; fi
+tests/runtime2/certification_guard.sh	detected	-	'note: running as root; unreadable-file check skipped (root bypasses permissions)\nskipping the symlink case')]),
 tests/runtime2/certification_guard.sh	detected	-	'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
 tests/runtime2/certification_guard.sh	justified	the guard's own heredoc opener for this scan, not a message	python3 -B - <<'PYSKIP' || exit 1
 tests/runtime2/certification_guard.sh	detected	-	fake = ('tests/runtime2/new_gate.sh', 'echo "SKIP new check (tool missing)"')

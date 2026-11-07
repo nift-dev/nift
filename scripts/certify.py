@@ -345,7 +345,7 @@ def own_output(text, commands=()):
     return [l for l in text.splitlines() if l.strip() and not _MAKE_NOISE.match(l) and l.strip() not in echoed]
 
 
-def assertion_class(rc, text, blocked=None, silent=False):
+def assertion_class(rc, text, blocked=None, silent=False, skipped=None):
     """D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
     PARTIAL: it passed, but a required assertion was skipped; SKIP: every result line is a skip, or
     (R3-4) it printed nothing of its own (`silent`) and is not silent by design."""
@@ -355,11 +355,23 @@ def assertion_class(rc, text, blocked=None, silent=False):
         return "FAIL"
     if silent:
         return "SKIP"
-    req = [x for x in skipped_assertions(text) if x[2]]
+    req = [x for x in (skipped if skipped is not None else skipped_assertions(text)) if x[2]]
     if not req:
         return "PASS"
     ran = any(re.search(r"^\s*(PASS|ok)\b|\bpassed\b", l) for l in text.splitlines())
     return "PARTIAL" if ran else "SKIP"
+
+
+def skip_outcome(skipped, silent=False):
+    """Owner 23:14: one of four distinct outcomes. `zero-skipped`; `inapplicable-only` (every skipped
+    line is an explicitly inapplicable check: another platform, or root-only and run as the
+    unprivileged user); `mandatory-skipped` (at least one required check skipped; a
+    KNOWN_CONDITIONAL entry excuses only its own line); `not-executed` (no output of its own)."""
+    if silent:
+        return "not-executed"
+    if not skipped:
+        return "zero-skipped"
+    return "mandatory-skipped" if any(req for _, _, req in skipped) else "inapplicable-only"
 
 
 def report_class(status, regression=None, blocked=None, assertion=None):
@@ -525,6 +537,13 @@ def preflight_problems(f):
         missing = [x for x in want_flags if x not in b.get("args", [])]
         if missing:
             out.append(f"./nift's build lacks the profile flags {missing}")
+    # owner 23:14: a stale executable never passes: it must be current for the tree (make -q nift)
+    # and, with a campaign start, built after it
+    if f.get("build_current") is False:
+        out.append("./nift is not current for the source tree (make -q nift)")
+    if f.get("campaign_start") is not None and f.get("binary_mtime") is not None and \
+            f["binary_mtime"] < f["campaign_start"]:
+        out.append(f"./nift predates the campaign start ({f['binary_mtime']} < {f['campaign_start']})")
     if f.get("cxxflags_env") is not None and f["cxxflags_env"].split() != \
             ((f.get("profile") or {}).get("flags") or "").split():
         out.append(f"CXXFLAGS is overridden in the environment ({f['cxxflags_env']!r}), not the profile flags")
@@ -691,6 +710,18 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     except OSError:
         facts["cxx_version_sha256"] = None
     facts["build_sig"] = build_signature(root)
+    # owner 23:14: the source tree the binary was built from, and whether the binary is current
+    git = lambda *a: subprocess.run(["git", "-C", str(root)] + list(a), capture_output=True, text=True).stdout.strip()
+    facts["source"] = {"head": git("rev-parse", "HEAD"), "tree": git("rev-parse", "HEAD^{tree}"),
+                       "clean": git("status", "--porcelain", "--untracked-files=no") == ""}
+    facts["build_invocation"] = "make nift (CXX=%s, CXXFLAGS=%s)" % (cxx, os.environ.get("CXXFLAGS", "<Makefile default>"))
+    facts["build_current"] = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True,
+                                            env=clean_env()).returncode == 0
+    facts["campaign_start"] = campaign_start
+    try:
+        facts["binary_mtime"] = int(os.stat(Path(root) / "nift").st_mtime)
+    except OSError:
+        facts["binary_mtime"] = None
     facts["cxxflags_env"] = os.environ.get("CXXFLAGS")
     facts["environment"] = environment_record(root)
     try:
@@ -1305,7 +1336,11 @@ def main():
             if urc == 0:
                 r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
                     (l + " [ran as " + user + ": passed]", why, False) for l, why, _ in rootonly]
-        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent)
+        elif rootonly:  # never run anywhere: a required check that did not execute
+            r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
+                (l, why + " (no unprivileged run available)", True) for l, why, _ in rootonly]
+        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent, r["skipped"])
+        r["skip_outcome"] = skip_outcome(r["skipped"], silent)
         if r.get("unprivileged_check") not in (None, 0):
             r["assertion"] = "FAIL"
         if silent:
@@ -1344,7 +1379,10 @@ def main():
         "environment": env_record,
         "certified_binary": {"sha256": facts.get("candidate_sha256"),
                              "profile": (facts.get("profile") or {}).get("compiler"),
-                             "build_signature": facts.get("build_sig")},
+                             "compiler": facts.get("cxx"), "compiler_resolved": facts.get("cxx_resolved"),
+                             "stdlib_sha256": (facts.get("profile_files") or {}).get("libstdc++.so"),
+                             "build_invocation": facts.get("build_invocation"),
+                             "build_signature": facts.get("build_sig"), "source": facts.get("source")},
         "targets": {t: results[t] for t in sorted(results)},
     }
     (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

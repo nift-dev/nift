@@ -355,6 +355,19 @@ checks = [
         ('tools: dotnet 9', {'tools': {'dotnet': '9.0.100'}}, 1),
         ('tools: dotnet 10', {'tools': {'dotnet': '10.0.100'}}, 0),
         ('tools: python 3.10', {'tools': {'python3': 'Python 3.10.12'}}, 1)]],
+    # owner 23:14: four outcomes; a KNOWN_CONDITIONAL entry excuses only its own line
+    ('outcome zero', certify.skip_outcome([]), 'zero-skipped'),
+    ('outcome inapplicable', certify.skip_outcome([('SKIP CP20 Windows pipeline (POSIX host)', 'Windows', False)]), 'inapplicable-only'),
+    ('outcome mandatory', certify.skip_outcome([('x', 'y', False), ('z', 'w', True)]), 'mandatory-skipped'),
+    ('outcome not executed', certify.skip_outcome([], True), 'not-executed'),
+    ('root line plus another skip is PARTIAL', certify.assertion_class(0,
+        'PASS sha256\nnote: running as root; unreadable-file check skipped (root bypasses permissions)\n'
+        'skipping the symlink case\n', None, False,
+        [(l, w, r if 'running as root' not in l else False) for l, w, r in certify.skipped_assertions(
+            'note: running as root; unreadable-file check skipped (root bypasses permissions)\nskipping the symlink case')]),
+        'PARTIAL'),
+    ('stale binary', len(pp({**GOOD, 'build_current': False})), 1),
+    ('binary predates the campaign', len(pp({**GOOD, 'binary_mtime': 500})), 1),
     # R4-1: real in-tree lines of planned gates
     ('rt-parser paren oracle (by design)', certify.assertion_class(0,
         'PASS corpus\nparen oracle: skipped 7 nondeterministic entries (tools/rt-diff/ignore.txt)\n'), 'PASS'),
