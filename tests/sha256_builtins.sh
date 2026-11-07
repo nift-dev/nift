@@ -24,6 +24,17 @@ case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
 esac
 PY="$(command -v python3 || command -v python)"
+# Flakiness fix (2026-11-08): an edit made right before a build could share the
+# filesystem's timestamp tick with the page-info that build writes; the v4.12
+# modified rule (and hybrid's) then rebuilds the page once more and `status`
+# is not up to date. `sleep 1.1` before an edit only separated it from the
+# PREVIOUS build. Now every input written before a build is sequenced instead
+# (tests/runtime2/cp01/ticks.py): the project (and the external directory) is
+# aged as a whole, keeping its order, and the written files are stamped just
+# before the filesystem clock, so they are strictly newer than the last build
+# and strictly older than the next. The edits are real content changes.
+TICKS="$(cd "$(dirname "$0")" && pwd)/runtime2/cp01/ticks.py"
+sequenced() { "$PY" "$TICKS" "$@" >/dev/null || bad "sequencing the edit of $*"; }
 nat() {
   if [ "$IS_WINDOWS" -eq 1 ] && command -v cygpath >/dev/null 2>&1; then
     cygpath -m "$1"
@@ -245,6 +256,7 @@ EOF
   digest_of() { printf '%s' "$1" | toolsum; }
   has() { grep -q -- "$2" public/index.html && pass "[$mode] $1" || bad "[$mode] $1 (missing '$2')"; }
   up_to_date() { if "$NIFT" status | grep -q "up to date"; then pass "[$mode] $1"; else bad "[$mode] $1: $("$NIFT" status | sed -n 2,4p | tr '\n' ' ')"; fi; }
+  sequenced data/x.bin "$X/e.bin" data/t.txt content/index.html .nift/config.json
   NIFT_TRACE_HOST=3 "$NIFT" build --all 3>trace.jsonl >/dev/null 2>&1
   has "initial digest" "H:$(digest_of v1)"
   has "external digest" "E:$(digest_of e1)"
@@ -258,23 +270,22 @@ EOF
     { grep -qF "\"op\":\"read\",\"arg\":\"$P/data/x.bin\",\"res\":\"2\"" trace.jsonl ||
       grep -qF "\"op\":\"read\",\"arg\":\"$P_real/data/x.bin\",\"res\":\"2\"" trace.jsonl; } && pass "[$mode] Host-op trace records the read" || bad "[$mode] trace: $(grep x.bin trace.jsonl)"; fi
   up_to_date "unchanged inputs stay up to date"
-  sleep 1.1
-  printf 'v2' > data/x.bin; "$NIFT" build >/dev/null 2>&1
+  printf 'v2' > data/x.bin; sequenced --age "$P" --age "$X" data/x.bin; "$NIFT" build >/dev/null 2>&1
   has "edited hashed file rebuilds the page" "H:$(digest_of v2)"
   up_to_date "up to date after rebuild"
-  printf 'e2' > "$X/e.bin"; "$NIFT" build >/dev/null 2>&1
+  printf 'e2' > "$X/e.bin"; sequenced --age "$P" --age "$X" "$X/e.bin"; "$NIFT" build >/dev/null 2>&1
   has "edited external file rebuilds the page" "E:$(digest_of e2)"
-  printf 'm' > data/maybe.bin; "$NIFT" build >/dev/null 2>&1
+  printf 'm' > data/maybe.bin; sequenced --age "$P" --age "$X" data/maybe.bin; "$NIFT" build >/dev/null 2>&1
   has "caught missing file appearing rebuilds the page" "M:$(digest_of m)"
   # Pre-existing defect fixed with this checkpoint: a try block that fails
   # recoverably used to discard the dependencies it had already recorded.
-  printf 't2' > data/t.txt; "$NIFT" build >/dev/null 2>&1
+  printf 't2' > data/t.txt; sequenced --age "$P" --age "$X" data/t.txt; "$NIFT" build >/dev/null 2>&1
   has "read inside a failed try block stays a dependency" "T:t2-caught"
   up_to_date "up to date at the end"
   # Hash mode compares content snapshots; hybrid (like @input) rebuilds on a
   # newer mtime, and modified mode is mtime-only by design.
   if [ "$mode" = hash ]; then
-    sleep 1.1; touch data/x.bin
+    touch data/x.bin; sequenced --age "$P" --age "$X" data/x.bin
     up_to_date "touch without content change (content snapshot)"
   fi
   cd "$W"
@@ -289,10 +300,41 @@ for mode in modified hash; do
   sed "s/\"incremental-mode\": \"modified\"/\"incremental-mode\": \"$mode\"/" .nift/config.json > .nift/config.json.tmp && mv .nift/config.json.tmp .nift/config.json
   mkdir -p data; printf 'o1' > data/o.txt
   echo 'O:@script { v := open("data/o.txt"); try { touch("data/o.txt"); z := open("data/missing") } catch(e) { v = v + "-c" }; return v }' > content/index.html
+  sequenced data/o.txt content/index.html .nift/config.json
   "$NIFT" build --all >/dev/null 2>&1
   grep -q "O:o1-c" public/index.html && pass "[$mode] write in failed try: initial" || bad "[$mode] write in failed try: initial"
-  sleep 1.1; printf 'o2' > data/o.txt; "$NIFT" build >/dev/null 2>&1
+  printf 'o2' > data/o.txt; sequenced --age "$P" data/o.txt; "$NIFT" build >/dev/null 2>&1
   grep -q "O:o2-c" public/index.html && pass "[$mode] write in failed try keeps the earlier read as a dependency" || bad "[$mode] write in failed try: stale page ($(grep O: public/index.html))"
+  cd "$W"
+done
+
+# Regression test for the flakiness fix: force the race. The fastest possible
+# build stamps its page-info with the earliest time it legally can: the edit's
+# own mtime for an unsequenced edit (the old test: the page stays "needs
+# rebuilding", as seen at random before), the clock after the edit for a
+# sequenced one (up to date). Deterministic: the page-info mtimes are set.
+stamp_infos() { "$PY" -c 'import os,sys
+for dp,_,fs in os.walk(".nift"):
+    for f in fs:
+        if f.endswith(".info.json"): os.utime(os.path.join(dp,f), ns=(int(sys.argv[1]),int(sys.argv[1])))' "$1"; }
+for mode in modified hybrid; do
+  P="$W/race-$mode"; mkdir -p "$P"
+  (cd "$P" && "$NIFT" init >/dev/null 2>&1) || { bad "[$mode] race init"; continue; }
+  cd "$P"
+  sed "s/\"incremental-mode\": \"modified\"/\"incremental-mode\": \"$mode\"/" .nift/config.json > .nift/config.json.tmp && mv .nift/config.json.tmp .nift/config.json
+  mkdir -p data; printf 'r1' > data/x.bin
+  echo 'H:@script { return sha256_file("data/x.bin") }' > content/index.html
+  sequenced data/x.bin content/index.html .nift/config.json; "$NIFT" build --all >/dev/null 2>&1
+  "$PY" "$TICKS" --age "$P" .nift/config.json >/dev/null
+  printf 'r2' > data/x.bin; "$NIFT" build >/dev/null 2>&1
+  stamp_infos "$("$PY" -c 'import os; print(os.stat("data/x.bin").st_mtime_ns)')"
+  if "$NIFT" status | grep -q "up to date"; then bad "[$mode] forced race, unsequenced edit: the same-tick page-info was not caught"
+  else pass "[$mode] forced race, unsequenced edit: same-tick page-info needs rebuilding (the old flake)"; fi
+  "$NIFT" build >/dev/null 2>&1
+  printf 'r3' > data/x.bin; t=$("$PY" "$TICKS" --age "$P" data/x.bin); "$NIFT" build >/dev/null 2>&1
+  stamp_infos "$t"
+  up_to_date "forced race, sequenced edit: up to date after the fastest build"
+  grep -q "H:$(digest_of r3)" public/index.html && pass "[$mode] forced race: the sequenced edit is built" || bad "[$mode] forced race: r3 not built"
   cd "$W"
 done
 

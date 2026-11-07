@@ -998,3 +998,30 @@ settle is `[20, 0, 0, 0]`.
 `taskset -c 0`, 1 under `nice -n 19` with two CPU-bound processes on both cores, 2 with one
 CPU-bound process, 2 with `make -j2`, and 2 pairs run concurrently: 32 of 32 PASS. The fixed
 `ONLY=basic` scenarios pass 5 of 5 on each of weekend/r2, v4.12.0, 17f7964c and fc987ec1.
+
+## 21. test-sha256 flakiness: same cause, real content changes, no clock dependence (C24)
+
+**Reproduced:** `[hybrid] up to date after rebuild` failed in 1 of 6 candidate runs and 2 of 5
+fc987ec1 runs (§17.1), and `[modified] up to date after rebuild: 1 of 1 tracked file needs
+rebuilding` failed in every run on every binary. Cause: the CP01 mechanism (§20). `sleep 1.1`
+before the edit only separated it from the previous build; `printf 'v2' > data/x.bin; nift
+build` then wrote the page-info in the edit's timestamp tick, so the modified rule (always, the
+build being fast) and the hybrid rule (when it is fast) still saw the dependency as not older.
+
+**Fix (test-only):** the test no longer waits for the clock. Every input written before a build
+is sequenced with `tests/runtime2/cp01/ticks.py`: `--age DIR` first moves every file of the
+project (and of the external directory) 10 s into the past, all by the same amount, so their
+order and each page-info's relation to its dependencies are unchanged, and the edited files are
+then stamped T - 1 ns (T: the filesystem clock now): strictly newer than everything the previous
+build wrote, strictly older than everything the next build writes. All four `sleep 1.1` are gone.
+The edits are real content changes (v1→v2, e1→e2, a new maybe.bin, t1→t2, o1→o2); the hash-mode
+`touch` without a content change is sequenced the same way (newer mtime, same content).
+
+**Regression test** (in the test itself, modified and hybrid): it forces the fastest build by
+stamping the page-info with the earliest legal time. An unsequenced edit (the old test) leaves
+the page "needs rebuilding" every time; a sequenced edit is up to date and built.
+
+**Determinism:** 20 consecutive `make test-sha256` runs, 3 under `taskset -c 0`, 3 with two
+CPU-bound processes, 2 run concurrently with a second copy: no `[mode]` line fails in any run,
+and the failure fingerprints of all 28 make runs are equal (the 21 remaining FAIL lines are the
+deterministic VM refusals: bytes(), open_bytes, builtin arity, fn-name-reserved).
