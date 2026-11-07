@@ -448,6 +448,24 @@ harness_status=$?
 # extractor and a table test on its real log (positive, new failure, changed diagnostic,
 # substitution with the same count, wording-only change); a gate without one fails here.
 python3 -B tests/runtime2/certify_fingerprints_selftest.py || exit 1
+# C21: the preflight's make derivations read the Makefile under `make -n`: with an environment that
+# changes the libffi and object signatures (OS=Windows_NT) they must not rewrite them, or the tree
+# is left out of date after the preflight
+python3 -B - <<'PYDRY' || exit 1
+import glob, os, sys
+sys.path.insert(0, "scripts")
+import certify
+files = sorted(glob.glob(".build/libffi/*.nift-toolchain-signature") + glob.glob(".build/obj-config/*.flags"))
+before = {f: os.stat(f).st_mtime_ns for f in files}
+env = {k: v for k, v in certify.clean_env().items()}
+env["OS"] = "Windows_NT"
+res = certify.make_print(certify.ROOT, "$(TARGET)", env)
+after = {f: os.stat(f).st_mtime_ns for f in files}
+if res.returncode != 0 or res.stdout != "nift.exe" or before != after:
+    sys.exit(f"FAIL certification guard dry derivation: rc {res.returncode} {res.stdout!r}; "
+             f"rewritten {[f for f in files if before[f] != after[f]]}")
+print(f"PASS certification guard dry derivation: OS=Windows_NT read under make -n, {len(files)} signatures untouched")
+PYDRY
 
 # R3-1: the skip-phrase inventory. Every tracked line that prints skip / not-run / unverified
 # wording is listed in tests/runtime2/skip_phrases.tsv as detected (certify.py's markers catch it)

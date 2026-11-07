@@ -819,6 +819,21 @@ def makefile_env_vars(root):
     return sorted(names)
 
 
+def make_print(root, expr, env):
+    """The expansion of `expr` in the tree's Makefile, read under `make -n`: reading the Makefile
+    otherwise rewrites the libffi and object signatures when the environment changes them, which
+    would leave the tree out of date (`make -q nift`) after the preflight."""
+    res = subprocess.run(["make", "-n", "-s", "--no-print-directory", "--eval",
+                          f"certify-print: ; @echo '{expr}'", "certify-print"], cwd=root,
+                         capture_output=True, text=True, env=env)
+    out = res.stdout.strip()
+    if res.returncode == 0 and out.startswith("echo '") and out.endswith("'") and "\n" not in out:
+        res.stdout = out[len("echo '"):-1]
+    else:
+        res.returncode = res.returncode or 1
+    return res
+
+
 def compiler_identity(cmd):
     """C21 (release audit): the compiler itself, not a wrapper: real path, ELF or not, sha256, and
     the Debian package and version that own it."""
@@ -895,10 +910,8 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     facts["cc_resolved"] = os.path.realpath(shutil.which(cc) or cc)
     # R5-2: the arguments the Makefile itself gives the objects (no environment overrides, no
     # make flag variables), written the way the build signature writes them ($TEST_DIR)
-    sig = subprocess.run(["make", "-s", "--no-print-directory", "--eval",
-                          "certify-print-sig: ; @echo $(OBJ_SIGNATURE_ARGS)", "certify-print-sig"], cwd=root,
-                         capture_output=True, text=True, env={k: v for k, v in clean_env().items()
-                                                              if k not in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS", "CFLAGS")})
+    sig = make_print(root, "$(OBJ_SIGNATURE_ARGS)", {k: v for k, v in clean_env().items()
+                                                      if k not in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS", "CFLAGS")})
     ok = sig.returncode == 0 and sig.stdout.count("---") == 1
     fix = lambda toks: [t.replace("-I.build/", "-I$TEST_DIR/") if t.startswith("-I.build/") else t for t in toks]
     facts["expected_args"] = fix(sig.stdout.split("---")[0].split()[1:]) if ok else None
@@ -907,12 +920,10 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
                                                  f"{(sig.stderr or sig.stdout).strip()[:200]}")
     # C21: the link line's variables as the campaign's make sees them, against make's own (every
     # environment-settable or branch-selecting variable removed, CXX kept)
-    link_eval = ["make", "-s", "--no-print-directory", "--eval",
-                 "certify-print-link: ; @echo '$(CXX) ;; $(CXXFLAGS) ;; $(LDFLAGS) ;; $(LDLIBS) ;; $(TARGET)'", "certify-print-link"]
+    link = "$(CXX) ;; $(CXXFLAGS) ;; $(LDFLAGS) ;; $(LDLIBS) ;; $(TARGET)"
     scrub = set(makefile_env_vars(root)) - {"CXX", "CC"}
-    as_built = subprocess.run(link_eval, cwd=root, capture_output=True, text=True, env=clean_env())
-    own = subprocess.run(link_eval, cwd=root, capture_output=True, text=True,
-                         env={k: v for k, v in clean_env().items() if k not in scrub})
+    as_built = make_print(root, link, clean_env())
+    own = make_print(root, link, {k: v for k, v in clean_env().items() if k not in scrub})
     facts["link"] = {"as_built": as_built.stdout.strip() if as_built.returncode == 0 else None,
                      "own": own.stdout.strip() if own.returncode == 0 else None}
     facts["cxx_identity"] = compiler_identity(cxx)

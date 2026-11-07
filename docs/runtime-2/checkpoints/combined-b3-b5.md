@@ -946,3 +946,14 @@ The selftest now inserts 14 diagnostics at both positions on all 13 gates (26 po
   builtins step prints `fail=1`, a flag).
 Guard cases: wrapper script, other compiler package, OS=Windows_NT, link line differs or cannot be
 derived.
+
+**C22 (found while freezing C21).** Reading the Makefile rewrites the libffi toolchain signatures
+and the object configuration signatures when their content changes. My own C21 probe ran the link
+derivation with `OS=Windows_NT`, which rewrote `.build/libffi/*.nift-toolchain-signature` (back to
+the same Linux text on the next read, but newer than the libffi stamp), so `make -q nift` reported
+the tree out of date. I restored their mtimes to the stamp's (`touch -r`; the content is the
+current toolchain's, unchanged), and `make -q nift` = 0 with the binary still `91a49efa…`. Fix:
+every preflight derivation now reads the Makefile under `make -n` (the Makefile's own NIFT_DRY
+mode, which only marks stale signatures instead of writing them) and parses the echoed command.
+Guard: with `OS=Windows_NT` the derivation returns `nift.exe` and the 8 signature files keep
+their mtimes.
