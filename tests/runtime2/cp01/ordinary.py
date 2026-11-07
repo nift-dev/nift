@@ -3,17 +3,18 @@
 
 usage: ordinary.py label=/path/to/nift ...
 
-Every edit in the ORDINARY scenarios is made after sleeping past a timestamp
-tick (50 ms), and the harness checks that the edited file's mtime is strictly
-greater than every existing page-info mtime ("distinguishable metadata").
+Every edit in the ORDINARY scenarios is made after ageing the whole site (every
+file moved 10 s into the past, order kept), and the harness checks that the
+edited file's mtime is strictly greater than every existing page-info mtime
+("distinguishable metadata"). No scenario waits for the clock.
 Oracle: after every build, public/ must equal a clean `build --all` of a copy
 of the same sources made with the same binary; and `nift status` / a following
 `nift build` must agree (no stale page reported up to date).
 Same-tick / sub-tick cases are reported separately (IMMEDIATE) and are outside
 the owner's modified-mode contract except where noted.
 
-Edits are sequenced (CP01 flakiness fix, 2026-11-08): the 50 ms sleep before an
-edit only separates it from the PREVIOUS build. The build that follows an edit
+Edits are sequenced (CP01 flakiness fix, 2026-11-08): ageing the site before an
+edit only separates it from the PREVIOUS build (it replaced a 50 ms sleep). The build that follows an edit
 can finish inside the filesystem's coarse timestamp tick (4 ms here; with
 multigrain timestamps its page-info then gets exactly the edit's mtime), and the
 v4.12 rule (rebuild when a dependency is not older than the page-info) then
@@ -28,7 +29,6 @@ i.e. the fastest possible build, deterministically.
 """
 import json, os, shutil, signal, subprocess, sys, tempfile, time
 
-TICK = 0.05
 BASE = tempfile.mkdtemp(prefix="cp01-ordinary-")
 
 def run(nift, cwd, *args, env=None, timeout=600):
@@ -49,6 +49,12 @@ def write(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f: f.write(text)
 
+def sequence_site(root):
+    """The generated inputs, stamped just before the clock: older than the first build's writes."""
+    files = [os.path.join(dp, f) for dp, _, fs in os.walk(root) for f in fs]
+    if files:
+        ticks.sequence(files)
+
 def mksite(root, n, mode="modified", threads=1, pad=0):
     for d in (".nift", "content", "templates", "public"): os.makedirs(os.path.join(root, d), exist_ok=True)
     json.dump({"config": {"content-dir": "content/", "content-ext": ".html", "output-dir": "public/", "output-ext": ".html",
@@ -63,6 +69,7 @@ def mksite(root, n, mode="modified", threads=1, pad=0):
     write(f"{root}/templates/part.html", "PART1\n")
     for i in range(n): write(f"{root}/content/p{i}.html", f"<p>page {i}</p>\n" + "x" * pad)
     write(f"{root}/content/index.html", 'INDEX @input("content/p1.html")\n')
+    sequence_site(root)
 
 def set_mode(root, mode):
     c = json.load(open(f"{root}/.nift/config.json")); c["config"]["incremental-mode"] = mode
@@ -143,7 +150,10 @@ class Ctx:
         return len(built(out))
 
     def edit(self, root, rel, text, append=False):
-        time.sleep(TICK)
+        # review of a977376e: no sleep. The whole site is aged first (every file moved 10 s into
+        # the past, order kept), so the edit is newer than everything the previous build wrote
+        # without waiting for the clock; then it is sequenced before the next build.
+        ticks.age(root)
         if append: open(f"{root}/{rel}", "a").write(text)
         else: write(f"{root}/{rel}", text)
         path = f"{root}/{rel}"
@@ -157,7 +167,6 @@ class Ctx:
 def scen_basic(c):
     r = tempfile.mkdtemp(dir=BASE); mksite(r, 30)
     rc, out = c.build(r, "build", "--all"); c.check(r, "S0 initial", None, out, rc)
-    time.sleep(TICK)
     # S5 repeated no-op builds, nothing rewritten
     snap = {p: os.stat(os.path.join(dp, p)).st_mtime_ns for dp, _, fs in os.walk(r) for p in fs if not dp.endswith("/.nift") or True}
     before = {os.path.join(dp, f): os.stat(os.path.join(dp, f)).st_mtime_ns for dp, _, fs in os.walk(r) for f in fs}
@@ -191,7 +200,7 @@ def scen_basic(c):
     rc, out = c.build(r, "build"); c.check(r, "S4d remove dependency", [f"p{i}" for i in range(10)], out, rc)
     c.edit(r, "templates/new.html", "NEW3\n")
     rc, out = c.build(r, "build"); c.check(r, "S4e edit removed dependency (no rebuild)", [], out, rc)
-    time.sleep(TICK); os.remove(f"{r}/templates/new.html")
+    os.remove(f"{r}/templates/new.html")
     rc, out = c.build(r, "build"); c.check(r, "S4f delete removed dependency (no rebuild)", [], out, rc)
     # S6 targeted one-page and full rebuilds
     c.edit(r, "content/p20.html", "<p>p20 E</p>\n"); c.edit(r, "content/p21.html", "<p>p21 E</p>\n")
@@ -201,7 +210,6 @@ def scen_basic(c):
         c.fails.append(f"S6a targeted build output was neither p20 nor the targeted summary: {out[-200:]}")
     rc, out = c.build(r, "build"); c.check(r, "S6b remaining edit after targeted build", ["p21"], out, rc)
     rc, out = c.build(r, "build", "--all"); c.check(r, "S6c build --all", [f"p{i}" for i in range(30)] + ["index"], out, rc)
-    time.sleep(TICK)
     nb = [c.built_count(r, "S6d no-op") for _ in range(5)]
     if any(nb): c.fails.append(f"S6d no-op after --all rebuilt {nb}")
     # S8 mode switching modified -> hash -> modified, with edits
@@ -209,11 +217,10 @@ def scen_basic(c):
     c.notes.append(f"S8a switch modified->hash rebuilt {len(built(out))}")
     c.edit(r, "content/p3.html", "<p>p3 hash edit</p>\n")
     rc, out = c.build(r, "build"); c.check(r, "S8b edit in hash mode", ["p3"], out, rc)
-    set_mode(r, "modified"); time.sleep(TICK); rc, out = c.build(r, "build"); c.check(r, "S8c switch back to modified", None, out, rc)
+    set_mode(r, "modified"); ticks.age(r); c.floor = ticks.sequence([f"{r}/.nift/config.json"]); rc, out = c.build(r, "build"); c.check(r, "S8c switch back to modified", None, out, rc)
     c.notes.append(f"S8c switch hash->modified rebuilt {len(built(out))}")
     c.edit(r, "templates/part.html", "PART3\n")
     rc, out = c.build(r, "build"); c.check(r, "S8d edit after switching back", [f"p{i}" for i in range(10)], out, rc)
-    time.sleep(TICK)
     nb = [c.built_count(r, "S6d no-op") for _ in range(5)]
     if any(nb): c.fails.append(f"S8e no-op after mode switches rebuilt {nb}")
 
@@ -280,7 +287,7 @@ def scen_immediate(c, cycles):
                 if rc != 0: c.fails.append(f"I follow-up build failed rc={rc} at cycle {i}")
             if f"MARK-{i}" not in open(f"{r}/public/p1.html").read():
                 persistent += 1
-                time.sleep(TICK); write(f"{r}/content/p1.html", f"REPAIR-{i}\n")
+                ticks.age(r); write(f"{r}/content/p1.html", f"REPAIR-{i}\n"); ticks.sequence([f"{r}/content/p1.html"])
                 rc, _ = run(c.nift, r, "build")
                 if rc != 0: c.fails.append(f"I repair build failed rc={rc} at cycle {i}")
     c.notes.append(f"I immediate edit->build {cycles} cycles: missed {miss}, persistent after 3 more builds {persistent}")

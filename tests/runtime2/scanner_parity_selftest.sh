@@ -47,6 +47,7 @@ else
     || { echo "FAIL scanner parity self-test: a real difference was not reported"; fail=1; }
   grep -q "v_thread_order" "$o" && { echo "FAIL scanner parity self-test: a VM-only fixture was compared"; fail=1; }
   grep -q "1 cp22 VM-only fixtures left to test-runtime2-cp22" "$o" || { echo "FAIL scanner parity self-test: VM-only fixture not counted"; fail=1; }
-  [ "$fail" -eq 0 ] && echo "PASS scanner parity self-test: 6 fixed runs byte-identical; differences reported masked; no job message; VM-only fixture counted"
+  grep -q "^> PASS socket proof (port <PORT>)$" "$o" || { echo "FAIL scanner parity self-test: the port is not masked narrowly"; fail=1; }
+  [ "$fail" -eq 0 ] && echo "PASS scanner parity self-test: 6 fixed runs byte-identical; the port masked alone; no job message; VM-only fixture counted"
 fi
 exit "$fail"

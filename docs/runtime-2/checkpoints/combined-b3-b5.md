@@ -644,8 +644,14 @@ the build and the loader use, at the same version:
 
     V=15.2.0-16ubuntu1
     apt-get install gcc-15=$V g++-15=$V cpp-15=$V libstdc++-15-dev=$V libgcc-15-dev=$V \
-        gcc-15-base=$V libstdc++6=$V libgcc-s1=$V
-    apt-mark hold gcc-15 g++-15 cpp-15 libstdc++-15-dev libgcc-15-dev gcc-15-base libstdc++6 libgcc-s1
+        gcc-15-base=$V libstdc++6=$V libgcc-s1=$V \
+        gcc-15-x86-64-linux-gnu=$V g++-15-x86-64-linux-gnu=$V cpp-15-x86-64-linux-gnu=$V
+    apt-mark hold gcc-15 g++-15 cpp-15 libstdc++-15-dev libgcc-15-dev gcc-15-base libstdc++6 libgcc-s1 \
+        gcc-15-x86-64-linux-gnu g++-15-x86-64-linux-gnu cpp-15-x86-64-linux-gnu
+
+(Review of a977376e: the arch-named `*-15-x86-64-linux-gnu` packages own the real compiler
+binaries, `/usr/bin/x86_64-linux-gnu-g++-15` and `-gcc-15`, which the preflight requires `dpkg -S`
+to show at this version, C21.)
 
 (packages.ubuntu.com, resolute: `libstdc++6-15-dbg` is built from source gcc-15
 15.2.0-16ubuntu1 and depends on `libstdc++6 (>= 15.2.0-16ubuntu1)`.) Whatever apt resolves, the
@@ -1126,3 +1132,29 @@ incompatibilities; none is an approved B5 change; none is a candidate defect.**
 None has an rt-diff approval policy, which is why vm_parity fails on every tree. Approving them
 (or not) is an owner decision about the reference-semantics difference; it is not waived here.
 The full table: `scratchpad/combined-fix/item2/rtdiff-table.md`.
+
+## 24. Review of C21-C25 (a977376e): ACCEPT-WITH-CONDITIONS; follow-ups (C27)
+
+Root cause, mutants and regression tests confirmed, and the cp22 VM-only exclusion. Follow-ups:
+- **Port mask narrowed.** socket_proof.f is listed with mask `port`: only `port <digits>` is
+  replaced (`port <PORT>`), every other digit is compared; the selftest checks the masked line.
+- **No sleep left in ordinary.py's tick handling.** The reviewer confirmed the 50 ms pause was
+  load-bearing (it separated an edit from the previous build). `edit()` now ages the whole site
+  first (`ticks.age`, order kept) and then sequences the edit; the generated sites are sequenced
+  before their first build; S8c's config switch is sequenced like an edit; the other tick sleeps
+  are gone. tick_order_selftest still passes (and still reproduces the old failures unsequenced); the gate passed 6 of 6 runs after the change (4 plain, 1 `taskset -c 0`, 1 with a CPU-bound process).
+  The only `time.sleep` left is the interrupt scenario's kill delay (it must interrupt a build).
+- **GCC and loader redirection refused.** The preflight refuses COMPILER_PATH, GCC_EXEC_PREFIX,
+  LIBRARY_PATH, CPATH, C_INCLUDE_PATH, CPLUS_INCLUDE_PATH, OBJC(PLUS)_INCLUDE_PATH,
+  GCC_COMPARE_DEBUG, DEPENDENCIES_OUTPUT, SUNPRO_DEPENDENCIES, LD_LIBRARY_PATH, LD_PRELOAD and
+  LD_AUDIT in the environment (guard cases for three). §14.1's hold list adds the arch-named
+  `gcc-15/g++-15/cpp-15-x86-64-linux-gnu` packages.
+- **Record correction (C22, §19).** The libffi signature rewrite was caused by environment probes
+  that read the Makefile: my `OS=Windows_NT` probe and also the reviewer's `LIBFFI_CFLAGS` and
+  `CFLAGS` probes. Since C22 every preflight derivation reads the Makefile under `make -n`, and the
+  tree is verified clean (`make -q nift` = 0, binary `91a49efa…`).
+
+**Release audit (record only; the owner closed diagnostic-list growth):** the scanner self-test's
+unfixed mode restores the three old behaviours together and does not show each cause on its own;
+three rare diagnostics are not in the shared list: a bare `KeyboardInterrupt`, `SystemExit: N`
+and `terminate called without an active exception`.

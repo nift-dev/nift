@@ -616,6 +616,9 @@ def preflight_problems(f):
         if not (ident.get("package") or "").startswith(pkg) or (want_ver and ident.get("version") != want_ver):
             out.append(f"{ident.get('path')} is owned by {ident.get('package')} {ident.get('version')}, "
                        f"not {pkg} {want_ver}")
+    if f.get("driver_env"):
+        out.append(f"compiler or loader redirection variables are set in the environment ({sorted(f['driver_env'])}): "
+                   f"the profiled compiler, headers and libstdc++ must be the ones the profile hashes")
     if f.get("make_env"):
         out.append(f"make flag variables are set in the environment ({sorted(f['make_env'])}): they can override "
                    f"the build's variables (GNUMAKEFLAGS='CXXFLAGS=-O0' would reach both the build and the derivation)")
@@ -801,6 +804,11 @@ def build_signature_c(root):
 # make's own flag variables. CXX and CC are the campaign's compilers (bound to the signature's
 # resolved compiler); CXXFLAGS may only equal the profile flags.
 MAKE_FLAG_VARS = ("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS", "MAKEOVERRIDES")
+# Review of a977376e: environment variables that redirect the GCC driver (its programs, headers,
+# libraries) or the dynamic loader (which libstdc++ a test binary runs with)
+DRIVER_VARS = ("COMPILER_PATH", "GCC_EXEC_PREFIX", "LIBRARY_PATH", "CPATH", "C_INCLUDE_PATH",
+               "CPLUS_INCLUDE_PATH", "OBJC_INCLUDE_PATH", "OBJCPLUS_INCLUDE_PATH", "GCC_COMPARE_DEBUG",
+               "DEPENDENCIES_OUTPUT", "SUNPRO_DEPENDENCIES", "LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
 ENV_ALLOWED = ("CXX", "CC", "CXXFLAGS")
 
 
@@ -905,6 +913,7 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     facts["flags_env"] = {v: os.environ.get(v) for v in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS") if os.environ.get(v)}
     # F3: make's flag variables (GNUMAKEFLAGS too) and every `?=` make variable set in the environment
     facts["make_env"] = {v: os.environ[v] for v in MAKE_FLAG_VARS if os.environ.get(v)}
+    facts["driver_env"] = {v: os.environ[v] for v in DRIVER_VARS if os.environ.get(v) is not None}
     facts["makefile_env"] = {v: os.environ[v] for v in makefile_env_vars(root)
                              if v not in ENV_ALLOWED and os.environ.get(v) is not None}
     cc = os.environ.get("CC", "cc")

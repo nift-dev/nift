@@ -128,6 +128,7 @@ PY
 #   compared and reported with digits masked; a reference that differs between
 #   two runs is masked as before, and the reported diff is now the masked one.
 MASKS="$REPO/tests/runtime2/scanner_parity_masks.tsv"
+mask_port() { sed -E 's/port [0-9]+/port <PORT>/g'; }
 # NIFT_PARITY_UNFIXED=1 restores the three old behaviours (the regression test
 # shows they make two runs differ); only with NIFT_PARITY_SCRIPTS.
 UNFIXED=0; [ -n "$RESTRICTED" ] && [ "${NIFT_PARITY_UNFIXED:-}" = 1 ] && UNFIXED=1
@@ -139,14 +140,15 @@ while IFS= read -r script; do
   (cd "$W/sa" && timeout 30 "$NIFT" "$REPO/$script" >"$W/s.a.out" 2>"$W/s.a.err" </dev/null; echo $? >"$W/s.a.rc") 2>>"$MSGS"
   (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.b.out" 2>"$W/s.b.err" </dev/null; echo $? >"$W/s.b.rc") 2>>"$MSGS"
   scripts=$((scripts+1))
-  listed=0; [ "$UNFIXED" -eq 0 ] && grep -q "^$script	" "$MASKS" 2>/dev/null && listed=1
+  listed=0; [ "$UNFIXED" -eq 0 ] && grep -q "^$script	port	" "$MASKS" 2>/dev/null && listed=1
   if ! cmp -s "$W/s.a.rc" "$W/s.b.rc" || ! cmp -s "$W/s.a.out" "$W/s.b.out" || ! cmp -s "$W/s.a.err" "$W/s.b.err"; then
     # Only a script whose reference output is itself nondeterministic (timing
     # probes) is compared with digits masked; stdout, stderr and exit code are
     # always all compared.
     (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.c.out" 2>"$W/s.c.err" </dev/null) 2>>"$MSGS"
     mask=cat
-    if [ "$listed" -eq 1 ] || ! cmp -s "$W/s.b.out" "$W/s.c.out" || ! cmp -s "$W/s.b.err" "$W/s.c.err"; then mask="tr -d 0-9"; fi
+    if [ "$listed" -eq 1 ]; then mask=mask_port   # only the allocated port number (review of a977376e)
+    elif ! cmp -s "$W/s.b.out" "$W/s.c.out" || ! cmp -s "$W/s.b.err" "$W/s.c.err"; then mask="tr -d 0-9"; fi
     if ! cmp -s "$W/s.a.rc" "$W/s.b.rc" ||
        ! diff -q <($mask <"$W/s.a.out") <($mask <"$W/s.b.out") >/dev/null ||
        ! diff -q <($mask <"$W/s.a.err") <($mask <"$W/s.b.err") >/dev/null; then
