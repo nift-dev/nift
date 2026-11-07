@@ -309,11 +309,22 @@ def preflight_problems(f):
         out.append("NIFT_CP14B_REQUIRE_COMPARATOR=1 is not set (comparator tests would SKIP instead of failing)")
     if not f.get("oracle"):
         out.append("no CP19 legacy oracle: pass --legacy-oracle (a v4.12.0 binary built from tag v4.12.0)")
-    elif f.get("oracle_version") != "v4.12.0":
-        out.append(f"the CP19 legacy oracle {f.get('oracle')} is not v4.12.0 (reports: {f.get('oracle_version')})")
+    else:
+        # The version string alone does not identify the oracle (Runtime 2.0 builds still report
+        # v4.12.0): it must be the `nift` of a checkout of the frozen tag's commit, clean and
+        # built from it (make -q nift).
+        if f.get("oracle_version") != "v4.12.0":
+            out.append(f"the CP19 legacy oracle {f.get('oracle')} is not v4.12.0 (reports: {f.get('oracle_version')})")
+        if f.get("oracle_commit") != V4120_COMMIT:
+            out.append(f"the CP19 legacy oracle is not built from v4.12.0 = {V4120_COMMIT[:12]} "
+                       f"(its checkout is at: {f.get('oracle_commit')})")
+        if f.get("oracle_clean") is not True or f.get("oracle_current") is not True:
+            out.append("the CP19 legacy oracle's checkout has tracked changes or its nift is not built from it "
+                       f"(clean: {f.get('oracle_clean')}, make -q nift: {f.get('oracle_current')})")
     return out
 
 
+V4120_COMMIT = "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"  # tag v4.12.0
 COMPARATOR_PROGRAM = "xs := [3, 1, 2]\nxs.sort((p, q) => p < q)\nprint(xs.stringify())\n"
 
 
@@ -349,6 +360,14 @@ def preflight_facts(root, oracle):
             facts["oracle_version"] = m.group(0) if m else (v.stdout + v.stderr).strip()[:60]
         except OSError as e:
             facts["oracle_version"] = f"not runnable: {e}"
+        tree = Path(oracle).resolve().parent
+        git = lambda *a: subprocess.run(["git", "-C", str(tree)] + list(a), capture_output=True, text=True)
+        head = git("rev-parse", "HEAD")
+        facts["oracle_commit"] = head.stdout.strip() if head.returncode == 0 else "not a git checkout"
+        st = git("status", "--porcelain", "--untracked-files=no")
+        facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
+        facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and subprocess.run(
+            ["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env()).returncode == 0)
     return facts
 
 

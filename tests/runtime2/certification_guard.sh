@@ -231,7 +231,8 @@ ip, rc, pp, fl, br = (certify.inventory_problems, certify.report_class, certify.
 INV = ['test-runtime2-a', 'test-runtime2-b', 'test-runtime2-prep']
 DEF = set(INV) | {'test-x'}
 GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', require_env='1',
-            oracle='/o/nift', oracle_version='v4.12.0')
+            oracle='/o/nift', oracle_version='v4.12.0', oracle_commit=certify.V4120_COMMIT, oracle_clean=True,
+            oracle_current=True)
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -263,6 +264,10 @@ checks = [
     ('preflight switch unset', len(pp({**GOOD, 'require_env': None})), 1),
     ('preflight no oracle', len(pp({**GOOD, 'oracle': None})), 1),
     ('preflight wrong oracle', len(pp({**GOOD, 'oracle_version': 'v4.11.0'})), 1),
+    ('preflight oracle from another commit (a Runtime 2.0 build reports v4.12.0 too)',
+        len(pp({**GOOD, 'oracle_commit': '7a89b77a'})), 1),
+    ('preflight oracle checkout modified', len(pp({**GOOD, 'oracle_clean': False})), 1),
+    ('preflight oracle not built from its checkout', len(pp({**GOOD, 'oracle_current': False})), 1),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
