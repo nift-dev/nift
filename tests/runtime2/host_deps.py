@@ -31,6 +31,13 @@ import resource
 import time
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cp01"))
+import ticks  # noqa: E402  (the shared edit sequencing, record section 20)
+
+# Edits made by a step, sequenced before its build in the mtime-based modes (see edit()).
+TOUCHED = []
+
 NIFT = os.path.abspath(os.environ.get("NIFT_BIN") or "./nift")
 KEEP = "--keep" in sys.argv
 MODES = ["modified", "hash", "hybrid"]
@@ -176,6 +183,7 @@ D:@script { mkdir("copies"); cp("data/cp-src.txt", "copies/cp-copy.txt"); fD := 
 def write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
+    TOUCHED.append(path)
 
 
 def setup(work, mode):
@@ -222,8 +230,69 @@ def setup(work, mode):
 
 def edit(path, text):
     # Keep the size and rewrite within the same second on purpose: the modes
-    # must not depend on coarse mtimes or sizes to notice the edit.
+    # must not depend on coarse mtimes or sizes to notice the edit. In the
+    # mtime-based modes (modified, hybrid) the step's edits are then sequenced
+    # before the build (sequence_step): an edit in the same timestamp tick as
+    # the page-info the next build writes is, by the v4.12 rule, rebuilt once
+    # more, and "up to date afterwards" failed at random (flakiness fix,
+    # 2026-11-08, record section 23). Hash mode keeps the raw same-second edit.
     path.write_text(text)
+    TOUCHED.append(path)
+
+
+def sequence_step(mode, *dirs):
+    """Age the project and the external directory as a whole (order kept) and stamp the step's
+    edits just before the filesystem clock: strictly newer than the last build, strictly older
+    than the next, whatever the scheduling (tests/runtime2/cp01/ticks.py)."""
+    touched = [p for p in TOUCHED if p.exists()]
+    TOUCHED.clear()
+    if mode == "hash" or not touched:
+        return None
+    for d in dirs:
+        ticks.age(str(d))
+    return ticks.sequence([str(p) for p in touched])
+
+
+def forced_race(mode, work):
+    """Regression test for the flakiness fix: force the fastest build (page-info stamped with the
+    earliest legal time). An unsequenced edit (the old test) leaves the page needing a rebuild
+    every time; a sequenced edit is up to date."""
+    root = work / "race"
+    for d in (".nift", "content", "templates", "public", "data"):
+        (root / d).mkdir(parents=True, exist_ok=True)
+    (root / ".nift" / "config.json").write_text(json.dumps({"config": {
+        "content-dir": "content/", "content-ext": ".html", "output-dir": "public/", "output-ext": ".html",
+        "default-template": "templates/t.html", "build-threads": 1, "incremental-mode": mode, "minify-exts": []}}))
+    (root / ".nift" / "tracked.json").write_text(json.dumps({"tracked": [
+        {"name": "index", "title": "I", "template": "templates/t.html"}]}))
+    (root / "templates" / "t.html").write_text("@content\n")
+    (root / "content" / "index.html").write_text('R:@script { return open("data/r.txt") }\n')
+    (root / "data" / "r.txt").write_text("r1\n")
+    TOUCHED.clear()
+    ticks.sequence([str(root / f) for f in ("templates/t.html", "content/index.html", "data/r.txt", ".nift/config.json")])
+    nift(root, "build", "--all")
+
+    def stamp(ns):
+        for info in (root / ".nift").rglob("*.info.json"):
+            os.utime(info, ns=(ns, ns))
+    ticks.age(str(root))
+    edit(root / "data" / "r.txt", "r2\n")
+    TOUCHED.clear()
+    nift(root, "build")
+    stamp(os.stat(root / "data" / "r.txt").st_mtime_ns)
+    caught = not UP_TO_DATE.search(nift(root, "status").stdout)
+    print(("PASS" if caught else "FAIL") + " [%s] forced race, unsequenced edit: same-tick page-info needs rebuilding" % mode)
+    if not caught:
+        failures.append((mode, "forced race unsequenced"))
+    nift(root, "build")
+    edit(root / "data" / "r.txt", "r3\n")
+    floor = sequence_step(mode, root)
+    nift(root, "build")
+    stamp(floor)
+    ok = UP_TO_DATE.search(nift(root, "status").stdout) is not None and "R:r3" in page_lines(root)
+    print(("PASS" if ok else "FAIL") + " [%s] forced race, sequenced edit: up to date after the fastest build" % mode)
+    if not ok:
+        failures.append((mode, "forced race sequenced"))
 
 
 def scenario(mode, work):
@@ -280,7 +349,9 @@ def scenario(mode, work):
         print("SKIP [%s] permission steps (root without setpriv)" % mode)
     steps += [("no-op", lambda: None)]
     for name, action in steps:
+        TOUCHED.clear()
         action()
+        sequence_step(mode, root, ext)
         compare(mode, name, root, oracle)
     mid_stream(mode, root, oracle)
     move_source(mode, root)
@@ -372,6 +443,8 @@ def main():
         work = Path(tempfile.mkdtemp(prefix="host-deps-%s-" % mode))
         try:
             scenario(mode, work)
+            if mode != "hash":
+                forced_race(mode, work)
         except Exception as error:  # report and continue with the next mode
             failures.append((mode, "exception"))
             print("FAIL [%s] %s" % (mode, error))

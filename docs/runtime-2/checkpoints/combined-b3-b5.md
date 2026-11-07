@@ -1064,3 +1064,65 @@ scripts and sites each; before the fix, two plain runs differed).
 
 Also in C25: test-sha256's forced-race block compares `status` output without a pipeline
 (test-integrity reported the pipe; findings are back to 57).
+
+## 23. Item 2: the three stopped gates get extractors; rt-diff classification (C26)
+
+Harness and tests only; `src/` and the binary (`91a49efa…`) unchanged. STOPPED is now empty and all
+16 expected-baseline gates have extractors and selftest rows.
+
+**Runner-level diagnostics, the same on every tree** (`certify.runner_env`, from the runner's own
+checkout; the trees' scripts are unchanged, so baseline logs are produced the same way):
+- `scripts/certify_errtrace.bash` through `BASH_ENV` (test-v44-language-foundation): when a command
+  makes a bash script exit under `set -e`, it prints `CERTIFY-ERR <script>:<line> rc=<status>
+  cmd=<command>`; nothing for failures the script handles. The silent failure is
+  `v44_ast_expression_smoke.sh:52 rc=1` (the `while(9007199254740993 == 9007199254740992)` probe;
+  category from the status: exit, signal:N, or timeout for 124). Recipe lines run on their own
+  (2, 4, 5, 8-14, 16 fail) each have a fingerprint: CERTIFY-ERR cases, the differential corpus's
+  FAIL cases, or the step's refusal (step and source position).
+- `scripts/certify_site/sitecustomize.py` through `PYTHONPATH` (test-rt-vm): vm_parity's
+  `shutil.rmtree` of its work directory first copies rt-diff's report to `<log>.kept` (outside the
+  deleted directory) and prints `CERTIFY-RTDIFF <entry> <channel> <first difference>` per
+  unapproved difference and `CERTIFY-RTDIFF-SUMMARY differing=N` (the gate's own count). vm_parity's
+  category totals are not compared. vm_modules (`probe:export_collision`, `d041:export_clash`) is
+  an ordinary FAIL extractor.
+
+**test-runtime2-host-deps: the approved read_limit.py case-ID table** (`READ_LIMIT_TABLE`, 27
+entries, one per `check()` call). A FAIL line of read_limit.py must match exactly one entry; the
+case is the entry and its name arguments, the exit code in the name is its status; durations, RSS
+figures and the cut stderr detail are not compared. A line matching none or several is UNMAPPED
+and blocks: its fingerprint never equals anything, itself included. Guard: a selftest control
+and a toy (`um`: identical unmapped line on candidate and regression baseline → FAILED-NEW). All 33
+real failures map.
+
+**host-deps was flaky too (found here).** `host_deps.py` (`[modified] page(x).metadata edit: not up
+to date after building`) has the CP01 cause: it rewrites inputs within the same second on purpose,
+and in the mtime-based modes the following build could share the edit's tick. In modified and
+hybrid modes each step's edits are now sequenced with `ticks.py` (project and external directory
+aged as a whole, edits stamped just before the clock); hash mode keeps the raw same-second edit
+(its point). A forced fastest-build check per mtime mode reproduces the old failure with an
+unsequenced edit and passes with a sequenced one.
+
+**Cross-binary equality** (this tree's harness, candidate vs fc987ec1 binary): language-foundation
+(1 case) and host-deps (33 cases) equal; rt-diff's 30 unapproved differences identical on
+fc987ec1, 17f7964c and weekend/r2 (below).
+
+### 23.1 rt-diff's unapproved differences: 30, not 14
+
+Correction: §15/§R5-1a's "14" came from reading `30 differing, 16 approved` as 30 - 16. rt-diff
+counts them separately: 30 entries differ and are not approved; 16 others are approved.
+
+Evidence: each binary run through this tree's vm_parity (same corpus, generator seed, policies)
+with the report kept; the difference lists are compared entry by entry, channel by channel, first
+difference included. All 30 are identical on fc987ec1 (the B5 base), 17f7964c (accepted B4b) and
+weekend/r2 (before B3), so none is introduced by B3-B5 or by the H-A fix: **all 30 are historical
+incompatibilities; none is an approved B5 change; none is a candidate defect.**
+
+| Group | Entries | Legacy (a) / VM (b) | What it is |
+| --- | --- | --- | --- |
+| Reference semantics (shared arrays) | 24 generated (`gen/g00002` … `gen/g00190`, 3 ending in a VM error) | `[1,2]` / `[1,2,99]` | a callee's push to an argument is visible to the caller on the VM; legacy copies (weekend-refsem-a §11: Phase B makes `f(a)`'s mutation visible) |
+| Same, corpus | `semantics/copy_at_call.f`, `semantics/copy_at_return.f`, `vm-corpus/cp11/arrays.f` | `[1]`/`[1,9]`, `[1]`/`[1,5]`, `4`/`5` | the same reference-semantics change (`arrays.f`: "5/4 becomes 5/5 in Phase B") |
+| Legacy reference-target errors | `smoke/location_method_receiver/002-missing`, `smoke/v44_element_assignment_smoke/003-const`, `smoke/v44_root_path_reference_smoke/001-missing` | exit 1 with `reference target no longer exists` / exit 0 or another error | legacy's reference objects end when their target goes; the VM's shared values do not |
+
+None has an rt-diff approval policy, which is why vm_parity fails on every tree. Approving them
+(or not) is an owner decision about the reference-semantics difference; it is not waived here.
+The full table: `scratchpad/combined-fix/item2/rtdiff-table.md`.

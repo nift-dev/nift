@@ -26,6 +26,35 @@ ROOT = "/home/claude/review/cand-b5"
 # gate: {new|diag|subst|wording: [(old, new), ...]} (each old must occur in the log; first
 # occurrence replaced). `diag: None` states why the gate has no diagnostic beyond its case id.
 TABLE = {
+    # owner 03:27: the runner keeps rt-diff's report and prints each unapproved difference
+    "test-rt-vm": {
+        "count_source": "own: rt-diff's `differing` count (CERTIFY-RTDIFF-SUMMARY differing=N)",
+        "new": [("CERTIFY-RTDIFF-SUMMARY", 'CERTIFY-RTDIFF semantics/new_case.f stdout {"a": "1", "b": "2", "line": 1}\nCERTIFY-RTDIFF-SUMMARY')],
+        "diag": [('"b": "[1,2,99]", "line": 4}', '"b": "[1,2,98]", "line": 4}')],
+        "subst": [("CERTIFY-RTDIFF gen/g00002/main.f combined", "CERTIFY-RTDIFF gen/g00003/main.f combined")],
+        # vm_parity's category totals (the HEAD-only 'approved B5 Q3') are wording, not failures
+        "wording": [("{'approved B5 Q3': 1, ", "{")],
+    },
+    # owner 03:27: the runner's errtrace (BASH_ENV) names the silent smoke failure
+    "test-v44-language-foundation": {
+        "count_source": "none: the smoke scripts print no failure count",
+        "new": [("make: ***", "tests/v44_ast_constant_fold_smoke.sh\nCERTIFY-ERR v44_ast_constant_fold_smoke.sh:12 rc=1 "
+                 "cmd=check x\nmake: ***")],
+        "diag": [("rc=1 cmd=", "rc=139 cmd=")],
+        "subst": [("v44_ast_expression_smoke.sh:52", "v44_ast_expression_smoke.sh:60")],
+        "wording": [("(cwd=", "(directory=")],
+    },
+    # owner 03:27: the approved read_limit.py case-ID table
+    "test-runtime2-host-deps": {
+        "count_source": "own: `N failure(s)` (read_limit.py)",
+        "new": [("PASS open: file of exactly the limit is read whole", "FAIL open: file of exactly the limit is read whole 99")],
+        "diag": [("FAIL open() of a regular file 3 x the limit: fatal open limit error (exit 70)",
+                  "FAIL open() of a regular file 3 x the limit: fatal open limit error (exit 71)")],
+        "subst": [("FAIL read_line: line of exactly the limit", "FAIL ifstream read_all: exact limit")],
+        "wording": [("baseline VmPeak 14 MiB", "baseline VmPeak 15 MiB"),
+                    ("FAIL run(yes) never ends: fatal run limit error (exit 1, 0.01s)",
+                     "FAIL run(yes) never ends: fatal run limit error (exit 1, 0.04s)")],
+    },
     "test-v44-shell-restricted": {
         "count_source": "own: the harnesses' `FAILED: a, b` lines (names counted)",
         "new": [("PASS ctrl-d-exits", "FAIL ctrl-d-exits")],
@@ -246,6 +275,18 @@ for gate, row in sorted(TABLE.items()):
         text = open(os.path.join(LOGS, gate + ".txt"), errors="replace").read()
         check(f"{gate} own count found", F.fingerprint(gate, text, [ROOT])["count"] is not None)
         n += 1
+
+# owner 03:27: a read_limit.py failure that maps to no table entry (or to several) blocks: its
+# fingerprint never equals anything, not even itself
+text = open(os.path.join(LOGS, "test-runtime2-host-deps.txt"), errors="replace").read()
+unmapped = text.replace("FAIL default limit: open_bytes(/dev/zero) stops at 1073741824 bytes",
+                        "FAIL a check nobody listed: it failed", 1)
+fp = F.fingerprint("test-runtime2-host-deps", unmapped, [ROOT])
+check("host-deps unmapped failure blocks", fp is not None and not F.same(fp, fp)
+      and any("unmapped failure (blocks)" in d for d in F.differences(fp, fp)))
+check("host-deps every real failure maps", not any(c[1] == "UNMAPPED" for c in
+      F.fingerprint("test-runtime2-host-deps", text, [ROOT])["cases"]))
+n += 2
 
 # no failing case found: no fingerprint, never equal (never "same step")
 check("no case: no fingerprint", F.fingerprint("test-v44-shell-restricted", "PASS a\nmake: *** [x] Error 1\n") is None)

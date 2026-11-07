@@ -517,6 +517,7 @@ def run_lines(cwd, target, old, logdir, timeout, extra_env=None, tag=""):
     results = []
     env = clean_env()
     env.update(extra_env or {})
+    env.update(runner_env(target, cwd, logdir / f"{target}{tag}.lines"))
     for i, cmd in enumerate(recipe_lines(cwd, target, old), 1):
         log = logdir / f"{target}{tag}.line{i}.log"
         with open(log, "w") as f:
@@ -1054,6 +1055,23 @@ def clean_env():
     return env
 
 
+def runner_env(target, cwd, log=None):
+    """Owner 03:27: a gate's runner-level diagnostics, the same for the candidate and every
+    baseline tree (the runner's own files, from this checkout; the trees' scripts unchanged):
+    errtrace (certify_errtrace.bash through BASH_ENV) and keep_rtdiff (certify_site/
+    sitecustomize.py through PYTHONPATH, keeping rt-diff's report beside the log)."""
+    spec = FP.SPECS.get(target)
+    env = {}
+    if spec is not None and spec.errtrace:
+        env["BASH_ENV"] = str(ROOT / "scripts/certify_errtrace.bash")
+    if spec is not None and spec.keep_rtdiff:
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(ROOT / "scripts/certify_site"),
+                                                          os.environ.get("PYTHONPATH")]))
+        env["PYTHONDONTWRITEBYTECODE"] = "1"  # no __pycache__ in the runner's directory
+        env["CERTIFY_KEEP_DIR"] = str(Path(log).resolve()) + ".kept" if log else str(Path(cwd) / ".certify-kept")
+    return env
+
+
 def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
     """Run one make target with a private TMPDIR (so tests that use fixed names
     under the temp directory, e.g. temp_directory_path()/"nift-host-seam-pg",
@@ -1068,7 +1086,8 @@ def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
     # The target's own log may sit inside the checkout (.build/certify). Tests
     # that snapshot the checkout exclude exactly this one file (and nothing else).
     env["NIFT_CERTIFY_TARGET_LOG"] = str(Path(log).resolve())
-    env.update(extra_env or {})
+    extra_env = {**(extra_env or {}), **runner_env(target, cwd, log)}
+    env.update(extra_env)
     # C2: -k (a failing prerequisite stops nothing else); an umbrella's own recipe runs with its
     # gate prerequisites marked old (they are entries of their own).
     args = ["-k", target] + [x for p in old for x in ("-o", p)]

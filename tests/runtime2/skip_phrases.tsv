@@ -31,6 +31,7 @@ scripts/certify.py	detected	-	r["skipped"] = skipped_assertions(logtext, echo)
 scripts/certify.py	detected	-	r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} (.build/certify/{t}.unprivileged.log)"
 scripts/certify.py	detected	-	order = ["FAIL", "BASELINE-FAILURE", "UNVERIFIED", "SKIPPED-ENVIRONMENTAL", "FLAKY", "PASS"]
 scripts/certify.py	detected	-	for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
+scripts/certify_fingerprints.py	detected	-	while i < len(lines) and lines[i].strip() and not re.match(r"^\s*(?:PASS|FAIL|SKIP|ok|note)\b", lines[i]) \
 scripts/certify_fingerprints.py	detected	-	while i < len(lines) and lines[i].strip() and not re.match(r"^\s*(?:PASS|FAIL|SKIP|DIFF|ok|note)\b", lines[i]) \
 scripts/guard_outcome.py	detected	-	report a skipped or unsupported run as success.
 scripts/memory_safety.py	detected	-	print("SKIP: rss mode requires /usr/bin/time but it is unavailable; "

@@ -1,0 +1,10 @@
+$ make -k test-v44-language-foundation  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-22120/test-v44-language-foundation)
+.build/parser-statement-state-unit
+tests/v44_ast_expression_smoke.sh
+CERTIFY-ERR v44_ast_expression_smoke.sh:52 rc=1 cmd=out=$(run_script <<'F'
+x := 0
+while(9007199254740993 == 9007199254740992) { x += 1 }
+print(x)
+F
+)
+make: *** [Makefile:3210: test-v44-language-foundation] Error 1

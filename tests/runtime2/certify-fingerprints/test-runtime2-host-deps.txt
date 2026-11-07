@@ -1,0 +1,485 @@
+$ make -k test-runtime2-host-deps  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-runtime2-host-deps)
+".build/read-limit-unit"
+read-limit unit: all checks passed
+NIFT_BIN="/home/claude/review/cand-b5/nift" python3 tests/runtime2/host_deps.py
+PASS [modified] open() edit: incremental == clean
+PASS [modified] open() edit: up to date afterwards
+PASS [modified] open_bytes() edit: incremental == clean
+PASS [modified] open_bytes() edit: up to date afterwards
+PASS [modified] file().open(r) edit: incremental == clean
+PASS [modified] file().open(r) edit: up to date afterwards
+PASS [modified] file().open(rw) edit: incremental == clean
+PASS [modified] file().open(rw) edit: up to date afterwards
+PASS [modified] ifstream read_line edit: incremental == clean
+PASS [modified] ifstream read_line edit: up to date afterwards
+PASS [modified] ifstream read_all edit: incremental == clean
+PASS [modified] ifstream read_all edit: up to date afterwards
+PASS [modified] ifstream extraction edit: incremental == clean
+PASS [modified] ifstream extraction edit: up to date afterwards
+PASS [modified] external absolute edit: incremental == clean
+PASS [modified] external absolute edit: up to date afterwards
+PASS [modified] external parent-traversal edit: incremental == clean
+PASS [modified] external parent-traversal edit: up to date afterwards
+PASS [modified] symlink target edit (open): incremental == clean
+PASS [modified] symlink target edit (open): up to date afterwards
+PASS [modified] symlink target edit (ifstream): incremental == clean
+PASS [modified] symlink target edit (ifstream): up to date afterwards
+PASS [modified] missing file appears (open): incremental == clean
+PASS [modified] missing file appears (open): up to date afterwards
+PASS [modified] missing file appears (open_bytes): incremental == clean
+PASS [modified] missing file appears (open_bytes): up to date afterwards
+PASS [modified] missing file appears (ifstream): incremental == clean
+PASS [modified] missing file appears (ifstream): up to date afterwards
+PASS [modified] missing file appears (file().open): incremental == clean
+PASS [modified] missing file appears (file().open): up to date afterwards
+PASS [modified] appeared file edited (ifstream): incremental == clean
+PASS [modified] appeared file edited (ifstream): up to date afterwards
+PASS [modified] appeared file removed (open_bytes): incremental == clean
+PASS [modified] appeared file removed (open_bytes): up to date afterwards
+PASS [modified] page(x).content edit: incremental == clean
+PASS [modified] page(x).content edit: up to date afterwards
+PASS [modified] page(x).metadata edit: incremental == clean
+PASS [modified] page(x).metadata edit: up to date afterwards
+PASS [modified] page(x).metadata external front matter edit: incremental == clean
+PASS [modified] page(x).metadata external front matter edit: up to date afterwards
+PASS [modified] async function open() edit: incremental == clean
+PASS [modified] async function open() edit: up to date afterwards
+PASS [modified] async function exists() target appears: incremental == clean
+PASS [modified] async function exists() target appears: up to date afterwards
+PASS [modified] thread() worker ifstream edit: incremental == clean
+PASS [modified] thread() worker ifstream edit: up to date afterwards
+PASS [modified] cp() source edit: incremental == clean
+PASS [modified] cp() source edit: up to date afterwards
+PASS [modified] file().copy() source edit: incremental == clean
+PASS [modified] file().copy() source edit: up to date afterwards
+PASS [modified] unreadable becomes readable (open): incremental == clean
+PASS [modified] unreadable becomes readable (open): up to date afterwards
+PASS [modified] unreadable becomes readable (ifstream): incremental == clean
+PASS [modified] unreadable becomes readable (ifstream): up to date afterwards
+PASS [modified] formerly unreadable edited: incremental == clean
+PASS [modified] formerly unreadable edited: up to date afterwards
+PASS [modified] no-op: incremental == clean
+PASS [modified] no-op: up to date afterwards
+SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract
+PASS [modified] move: up to date after moving the sources
+PASS [modified] file().move: source reappearing rebuilds the page
+PASS [modified] file().move: new source moved
+PASS [modified] mv(): source reappearing rebuilds the page
+PASS [modified] mv(): new source moved
+PASS [hash] open() edit: incremental == clean
+PASS [hash] open() edit: up to date afterwards
+PASS [hash] open_bytes() edit: incremental == clean
+PASS [hash] open_bytes() edit: up to date afterwards
+PASS [hash] file().open(r) edit: incremental == clean
+PASS [hash] file().open(r) edit: up to date afterwards
+PASS [hash] file().open(rw) edit: incremental == clean
+PASS [hash] file().open(rw) edit: up to date afterwards
+PASS [hash] ifstream read_line edit: incremental == clean
+PASS [hash] ifstream read_line edit: up to date afterwards
+PASS [hash] ifstream read_all edit: incremental == clean
+PASS [hash] ifstream read_all edit: up to date afterwards
+PASS [hash] ifstream extraction edit: incremental == clean
+PASS [hash] ifstream extraction edit: up to date afterwards
+PASS [hash] external absolute edit: incremental == clean
+PASS [hash] external absolute edit: up to date afterwards
+PASS [hash] external parent-traversal edit: incremental == clean
+PASS [hash] external parent-traversal edit: up to date afterwards
+PASS [hash] symlink target edit (open): incremental == clean
+PASS [hash] symlink target edit (open): up to date afterwards
+PASS [hash] symlink target edit (ifstream): incremental == clean
+PASS [hash] symlink target edit (ifstream): up to date afterwards
+PASS [hash] missing file appears (open): incremental == clean
+PASS [hash] missing file appears (open): up to date afterwards
+PASS [hash] missing file appears (open_bytes): incremental == clean
+PASS [hash] missing file appears (open_bytes): up to date afterwards
+PASS [hash] missing file appears (ifstream): incremental == clean
+PASS [hash] missing file appears (ifstream): up to date afterwards
+PASS [hash] missing file appears (file().open): incremental == clean
+PASS [hash] missing file appears (file().open): up to date afterwards
+PASS [hash] appeared file edited (ifstream): incremental == clean
+PASS [hash] appeared file edited (ifstream): up to date afterwards
+PASS [hash] appeared file removed (open_bytes): incremental == clean
+PASS [hash] appeared file removed (open_bytes): up to date afterwards
+PASS [hash] page(x).content edit: incremental == clean
+PASS [hash] page(x).content edit: up to date afterwards
+PASS [hash] page(x).metadata edit: incremental == clean
+PASS [hash] page(x).metadata edit: up to date afterwards
+PASS [hash] page(x).metadata external front matter edit: incremental == clean
+PASS [hash] page(x).metadata external front matter edit: up to date afterwards
+PASS [hash] async function open() edit: incremental == clean
+PASS [hash] async function open() edit: up to date afterwards
+PASS [hash] async function exists() target appears: incremental == clean
+PASS [hash] async function exists() target appears: up to date afterwards
+PASS [hash] thread() worker ifstream edit: incremental == clean
+PASS [hash] thread() worker ifstream edit: up to date afterwards
+PASS [hash] cp() source edit: incremental == clean
+PASS [hash] cp() source edit: up to date afterwards
+PASS [hash] file().copy() source edit: incremental == clean
+PASS [hash] file().copy() source edit: up to date afterwards
+PASS [hash] unreadable becomes readable (open): incremental == clean
+PASS [hash] unreadable becomes readable (open): up to date afterwards
+PASS [hash] unreadable becomes readable (ifstream): incremental == clean
+PASS [hash] unreadable becomes readable (ifstream): up to date afterwards
+PASS [hash] formerly unreadable edited: incremental == clean
+PASS [hash] formerly unreadable edited: up to date afterwards
+PASS [hash] no-op: incremental == clean
+PASS [hash] no-op: up to date afterwards
+PASS [hash] edit during streaming: page needs rebuilding
+PASS [hash] after edit during streaming: incremental == clean
+PASS [hash] after edit during streaming: up to date afterwards
+PASS [hash] move: up to date after moving the sources
+PASS [hash] file().move: source reappearing rebuilds the page
+PASS [hash] file().move: new source moved
+PASS [hash] mv(): source reappearing rebuilds the page
+PASS [hash] mv(): new source moved
+PASS [hybrid] open() edit: incremental == clean
+PASS [hybrid] open() edit: up to date afterwards
+PASS [hybrid] open_bytes() edit: incremental == clean
+PASS [hybrid] open_bytes() edit: up to date afterwards
+PASS [hybrid] file().open(r) edit: incremental == clean
+PASS [hybrid] file().open(r) edit: up to date afterwards
+PASS [hybrid] file().open(rw) edit: incremental == clean
+PASS [hybrid] file().open(rw) edit: up to date afterwards
+PASS [hybrid] ifstream read_line edit: incremental == clean
+PASS [hybrid] ifstream read_line edit: up to date afterwards
+PASS [hybrid] ifstream read_all edit: incremental == clean
+PASS [hybrid] ifstream read_all edit: up to date afterwards
+PASS [hybrid] ifstream extraction edit: incremental == clean
+PASS [hybrid] ifstream extraction edit: up to date afterwards
+PASS [hybrid] external absolute edit: incremental == clean
+PASS [hybrid] external absolute edit: up to date afterwards
+PASS [hybrid] external parent-traversal edit: incremental == clean
+PASS [hybrid] external parent-traversal edit: up to date afterwards
+PASS [hybrid] symlink target edit (open): incremental == clean
+PASS [hybrid] symlink target edit (open): up to date afterwards
+PASS [hybrid] symlink target edit (ifstream): incremental == clean
+PASS [hybrid] symlink target edit (ifstream): up to date afterwards
+PASS [hybrid] missing file appears (open): incremental == clean
+PASS [hybrid] missing file appears (open): up to date afterwards
+PASS [hybrid] missing file appears (open_bytes): incremental == clean
+PASS [hybrid] missing file appears (open_bytes): up to date afterwards
+PASS [hybrid] missing file appears (ifstream): incremental == clean
+PASS [hybrid] missing file appears (ifstream): up to date afterwards
+PASS [hybrid] missing file appears (file().open): incremental == clean
+PASS [hybrid] missing file appears (file().open): up to date afterwards
+PASS [hybrid] appeared file edited (ifstream): incremental == clean
+PASS [hybrid] appeared file edited (ifstream): up to date afterwards
+PASS [hybrid] appeared file removed (open_bytes): incremental == clean
+PASS [hybrid] appeared file removed (open_bytes): up to date afterwards
+PASS [hybrid] page(x).content edit: incremental == clean
+PASS [hybrid] page(x).content edit: up to date afterwards
+PASS [hybrid] page(x).metadata edit: incremental == clean
+PASS [hybrid] page(x).metadata edit: up to date afterwards
+PASS [hybrid] page(x).metadata external front matter edit: incremental == clean
+PASS [hybrid] page(x).metadata external front matter edit: up to date afterwards
+PASS [hybrid] async function open() edit: incremental == clean
+PASS [hybrid] async function open() edit: up to date afterwards
+PASS [hybrid] async function exists() target appears: incremental == clean
+PASS [hybrid] async function exists() target appears: up to date afterwards
+PASS [hybrid] thread() worker ifstream edit: incremental == clean
+PASS [hybrid] thread() worker ifstream edit: up to date afterwards
+PASS [hybrid] cp() source edit: incremental == clean
+PASS [hybrid] cp() source edit: up to date afterwards
+PASS [hybrid] file().copy() source edit: incremental == clean
+PASS [hybrid] file().copy() source edit: up to date afterwards
+PASS [hybrid] unreadable becomes readable (open): incremental == clean
+PASS [hybrid] unreadable becomes readable (open): up to date afterwards
+PASS [hybrid] unreadable becomes readable (ifstream): incremental == clean
+PASS [hybrid] unreadable becomes readable (ifstream): up to date afterwards
+PASS [hybrid] formerly unreadable edited: incremental == clean
+PASS [hybrid] formerly unreadable edited: up to date afterwards
+PASS [hybrid] no-op: incremental == clean
+PASS [hybrid] no-op: up to date afterwards
+PASS [hybrid] edit during streaming: page needs rebuilding
+PASS [hybrid] after edit during streaming: incremental == clean
+PASS [hybrid] after edit during streaming: up to date afterwards
+PASS [hybrid] move: up to date after moving the sources
+PASS [hybrid] file().move: source reappearing rebuilds the page
+PASS [hybrid] file().move: new source moved
+PASS [hybrid] mv(): source reappearing rebuilds the page
+PASS [hybrid] mv(): new source moved
+all host-deps checks passed
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/runtime2/file_copy_move_freedom.sh
+PASS page build with external file().copy/move
+PASS output has ABS
+PASS output has REL
+PASS output has LINK
+PASS output has MOVE
+PASS output has INNER
+PASS output has OVER
+PASS output has INTODIR
+PASS absolute copy written
+PASS parent-traversal copy written
+PASS copy through a symlinked directory lands in the target
+PASS move to an external directory
+PASS file().copy into an existing directory keeps the name (as cp())
+PASS copy onto a symlinked file writes through it (as cp())
+PASS --fs-root still restricts file().copy
+PASS standalone external file().copy
+PASS cross-device file().move and mv() (to /dev/shm)
+PASS refused: a := file("data/abs.txt"); b := a.copy(".nift/tracked.json")
+PASS refused: cp("data/abs.txt", ".nift/tracked.json")
+PASS refused: touch(".nift/x")
+PASS refused: o := ofstream(".nift/y"); close(o)
+PASS index untracked
+PASS untracking leaves external copies alone
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/runtime2/build_write_ownership.sh
+PASS refused: file().copy onto another page's output
+PASS refused: cp() onto another page's output
+PASS refused: cp() through a symlinked directory
+PASS refused: cp() through a .. spelling
+PASS refused: cp() through an absolute spelling
+PASS refused: cp() onto a symlink outside the project that points at it
+PASS refused: rm() of another page's output
+PASS refused: file().remove of another page's output
+PASS refused: mv() of another page's output away
+PASS refused: file().move of another page's output away
+PASS refused: mv() onto another page's output
+PASS refused: file().open(w) + save() of another page's output
+PASS refused: ofstream onto another page's output
+PASS refused: touch() of another page's output
+PASS refused: cmd().stdout() redirect onto another page's output
+PASS refused moves left the source in place
+PASS allowed: unowned file inside public/
+PASS allowed: path outside the project
+PASS allowed: the page's own output (rewritten by the build afterwards)
+PASS allowed: an unowned file next to the outputs, removed
+PASS other page's output intact after all cases
+PASS status consistent afterwards
+PASS refused metadata write: cp("payload.txt", ".nift/tracked.json")
+PASS refused metadata write: cp("payload.txt", "linked-meta/tracked.json")
+PASS refused metadata write: rm(".nift/config.json")
+PASS standalone scripts are not restricted
+PASS cross-device move: failed copy leaves the original intact
+PASS cross-device move: undeletable source is reported as a partial result
+NIFT_BIN="/home/claude/review/cand-b5/nift" python3 tests/runtime2/read_limit.py
+baseline VmPeak 14 MiB, VmHWM 7 MiB; RLIMIT_AS 118 MiB; RSS bound 79 MiB; limit 64 MiB
+PASS open: file of exactly the limit is read whole
+PASS open: empty file
+FAIL open one byte over: fatal open limit error (exit 0) AFTER
+
+PASS open one byte over: peak RSS 11 MiB within 79 MiB
+FAIL open_bytes: file of exactly the limit is read whole error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:7: not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL open_bytes: empty file error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:7: not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL open_bytes one byte over: fatal open_bytes limit error (exit 1)  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes one byte over: peak RSS 11 MiB within 79 MiB
+PASS file().open: exact limit
+FAIL file().open one byte over: fatal open limit error (exit 1) AFTER
+error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:1: managed file left open: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/over.bin
+
+PASS file().open one byte over: peak RSS 11 MiB within 79 MiB
+PASS ifstream read_all: exact limit
+PASS ifstream read_all one byte over: fatal read_all limit error (exit 1)
+PASS ifstream read_all one byte over: peak RSS 11 MiB within 79 MiB
+FAIL read_line: line of exactly the limit error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:2:7: not compiled for the VM (type:length): an operation whose operand types the VM cannot prove (length) is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read_line one byte over: fatal read_line limit error (exit 1)
+PASS read_line one byte over: peak RSS 11 MiB within 79 MiB
+PASS open(/dev/zero): fatal open limit error (exit 1)
+PASS open(/dev/zero): peak RSS 71 MiB within 79 MiB
+FAIL open_bytes(/dev/zero): fatal open_bytes limit error (exit 1)  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes(/dev/zero): peak RSS 11 MiB within 79 MiB
+PASS cat(/dev/zero): fatal cat limit error (exit 1)
+PASS cat(/dev/zero): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/zero).open(r): fatal open limit error (exit 1)
+PASS file(/dev/zero).open(r): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/zero).open(w): fatal open limit error (exit 1)
+PASS file(/dev/zero).open(w): peak RSS 71 MiB within 79 MiB
+PASS open(/dev/full): fatal open limit error (exit 1)
+PASS open(/dev/full): peak RSS 71 MiB within 79 MiB
+FAIL open_bytes(/dev/full): fatal open_bytes limit error (exit 1)  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes(/dev/full): peak RSS 11 MiB within 79 MiB
+PASS cat(/dev/full): fatal cat limit error (exit 1)
+PASS cat(/dev/full): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/full).open(r): fatal open limit error (exit 1)
+PASS file(/dev/full).open(r): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/full).open(w): fatal open limit error (exit 1)
+PASS file(/dev/full).open(w): peak RSS 71 MiB within 79 MiB
+PASS ifstream(/dev/zero).read_all: fatal read_all limit error (exit 1)
+PASS ifstream(/dev/zero).read_all: peak RSS 71 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_all_bytes: fatal read_all_bytes limit error (exit 1) 022/case.f:3:6: not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_all_bytes: peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_line: fatal read_line limit error (exit 70) error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f: NIFT_VM internal failure: out of memory (std::bad_alloc) (the script was not run on the legacy engine)
+
+PASS ifstream(/dev/zero).read_line: peak RSS 67 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_bytes(huge): fatal read_bytes limit error (exit 1) 022/case.f:3:6: not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_bytes(huge): peak RSS 11 MiB within 79 MiB
+PASS ifstream(/dev/zero).read(huge): fatal read limit error (exit 1)
+PASS ifstream(/dev/zero).read(huge): peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero) >> token: fatal extraction limit error (exit 1) :1: not compiled for the VM (statement:Command): a shell command line inside a script is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero) >> token: peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_val: fatal read_val limit error (exit 1) 022/case.f:3:6: not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_val: peak RSS 11 MiB within 79 MiB
+FAIL read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read_line loop over a file 3 x the limit
+PASS sha256_file of a file 3 x the limit
+FAIL open() of a regular file 3 x the limit: fatal open limit error (exit 70) error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f: NIFT_VM internal failure: out of memory (std::bad_alloc) (the script was not run on the legacy engine)
+
+PASS open() of a regular file 3 x the limit: peak RSS 11 MiB within 79 MiB
+PASS FIFO: exactly the limit
+FAIL FIFO: one byte over: fatal open limit error (exit 0) AFTER
+
+PASS FIFO: one byte over: peak RSS 11 MiB within 79 MiB
+FAIL FIFO whose writer never stops (open_bytes): fatal open_bytes limit error (exit 1)  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS FIFO whose writer never stops (open_bytes): peak RSS 11 MiB within 79 MiB
+PASS FIFO whose writer never stops (ifstream read_all): fatal read_all limit error (exit 1)
+PASS FIFO whose writer never stops (ifstream read_all): peak RSS 71 MiB within 79 MiB
+PASS FIFO writers finished (reader released the pipe)
+PASS growing file: whole value within the limit or a limit error (exit 1)
+FAIL run(): capture of exactly the limit error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:6: not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL run(): capture one byte over: fatal run limit error (exit 1) d-limit-djd2p022/case.f:2:6: not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(): capture one byte over: peak RSS 11 MiB within 79 MiB
+FAIL cmd().run(): capture of 128 MiB: fatal run limit error (exit 1) d-limit-djd2p022/case.f:2:6: not compiled for the VM (callable:cmd): the call `cmd()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS cmd().run(): capture of 128 MiB: peak RSS 11 MiB within 79 MiB
+PASS read_line on a directory: catchable read error
+PASS read_line on a EIO (/proc/self/mem): catchable read error
+FAIL read(): stdin line of exactly the limit error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:6: not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL read(): stdin line one byte over is a limit error error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:6: not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL read(): endless stdin (/dev/zero) stops at the limit ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read(): endless stdin peak RSS 11 MiB within 79 MiB
+FAIL run(yes) never ends: fatal run limit error (exit 1, 0.01s) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(yes) never ends: no producer left running
+PASS run(yes) never ends: marker never created (child stopped before finishing)
+PASS run(yes) never ends: peak RSS 11 MiB within 79 MiB
+FAIL run(head -c 150000000 /dev/zero): fatal run limit error (exit 1, 0.01s) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(head -c 150000000 /dev/zero): no producer left running
+PASS run(head -c 150000000 /dev/zero): marker never created (child stopped before finishing)
+PASS run(head -c 150000000 /dev/zero): peak RSS 11 MiB within 79 MiB
+FAIL cmd(yes).pipe(cat).run(): fatal run limit error (exit 1, 0.01s) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS cmd(yes).pipe(cat).run(): no producer left running
+PASS cmd(yes).pipe(cat).run(): marker never created (child stopped before finishing)
+PASS cmd(yes).pipe(cat).run(): peak RSS 11 MiB within 79 MiB
+FAIL run(sh -c 'yes; touch marker') kills the descendant: fatal run limit error (exit 1, 0.01s) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(sh -c 'yes; touch marker') kills the descendant: no producer left running
+PASS run(sh -c 'yes; touch marker') kills the descendant: marker never created (child stopped before finishing)
+PASS run(sh -c 'yes; touch marker') kills the descendant: peak RSS 11 MiB within 79 MiB
+FAIL stderr capture of an endless producer: fatal run limit error (exit 1, 0.01s) ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS stderr capture of an endless producer: no producer left running
+PASS stderr capture of an endless producer: marker never created (child stopped before finishing)
+PASS stderr capture of an endless producer: peak RSS 11 MiB within 79 MiB
+PASS no zombie processes left by the capture cases
+FAIL NIFT_READ_LIMIT=1K means 1024 bytes AFTER
+
+PASS NIFT_READ_LIMIT=2MiB means 2097152 bytes
+FAIL NIFT_READ_LIMIT=1g means 1073741824 bytes error: /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f:1:6: open: file exceeds the memory budget
+
+FAIL NIFT_READ_LIMIT=4096 means 4096 bytes AFTER
+
+PASS NIFT_READ_LIMIT=3m means 3145728 bytes
+PASS NIFT_READ_LIMIT=0 is rejected loudly
+PASS NIFT_READ_LIMIT=-1 is rejected loudly
+PASS NIFT_READ_LIMIT=abc is rejected loudly
+PASS NIFT_READ_LIMIT=12Q is rejected loudly
+PASS NIFT_READ_LIMIT=99999999999999999999 is rejected loudly
+PASS NIFT_READ_LIMIT=18014398509481984T is rejected loudly
+FAIL default limit: open_bytes(/dev/zero) stops at 1073741824 bytes ed by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/nift-certify-16274/test-runtime2-host-deps/read-limit-djd2p022/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS page build: initial build
+PASS page build: limit is a build failure naming the operation and limit
+PASS page build: last-good output preserved
+PASS page build: no interrupted-state marker
+PASS page build: next build after the fix succeeds without --repair
+FAIL page build: up to date afterwards Nift status
+1 of 1 tracked file needs rebuilding
+
+/
+  ↳ dependency changed: data.txt
+
+run nift build to rebuild this file
+
+33 failure(s)
+make: *** [Makefile:2624: test-runtime2-host-deps] Error 1

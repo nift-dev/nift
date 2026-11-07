@@ -102,7 +102,8 @@ def diagnose(block, roots=()):
 
 class Spec:
     def __init__(self, cases, count=None, lines=r"^\s*(?:FAIL|not ok)\b", summary=(), category=None, abort=False,
-                 block_detail=False, step=None, step_scope=False, outside_unique=False):
+                 block_detail=False, step=None, step_scope=False, outside_unique=False,
+                 errtrace=False, keep_rtdiff=False, rc_category=False, table=None, table_step=None):
         self.cases = [re.compile(c) for c in cases]  # each has (?P<id>) and may have (?P<detail>)
         # F5: the gate's own failure count, independent of the case parser: (?P<n>) a stated number,
         # (?P<list>) a comma-separated list of names; None where the gate prints no count (the
@@ -116,6 +117,14 @@ class Spec:
         self.step = re.compile(step) if step else _STEP  # which echoed commands start a step
         self.step_scope = step_scope                 # diagnose a case from its whole step (interleaved output)
         self.outside_unique = outside_unique         # outside diagnostics as a set (repeats depend on -j)
+        # owner 2026-11-08 03:27, runner-level diagnostics (certify.runner_env), the same on every tree
+        self.errtrace = errtrace                     # BASH_ENV=certify_errtrace.bash: CERTIFY-ERR lines
+        self.keep_rtdiff = keep_rtdiff               # PYTHONPATH=certify_site: CERTIFY-RTDIFF lines
+        self.rc_category = rc_category               # a case's category from its (?P<rc>) exit status
+        # the approved case-ID table for one step's `FAIL <name> <detail>` lines: [(key, regex)];
+        # a FAIL line of that step matching none, or more than one, is UNMAPPED and blocks
+        self.table = [(k, re.compile(r)) for k, r in (table or [])]
+        self.table_step = table_step
 
 
 _FAILLINE = r"^FAIL (?P<id>.+?)(?:: (?P<detail>.*))?$"
@@ -150,28 +159,69 @@ SPECS = {
                                          summary=[r"^FAIL scanner parity\b", r"^scanner parity: \d+ sites"], block_detail=True),
 }
 
-STOPPED = {
-    "test-v44-language-foundation": (
-        "tests/v44_ast_expression_smoke.sh fails with no output at all (set -euo pipefail; the failing "
-        "command prints nothing): no failing case is named",
-        "adapter: certify re-runs that recipe line under `bash -x` on both trees and takes the last "
-        "traced command as the case (or a reviewed test-only change printing the failing step)"),
-    "test-rt-vm": (
-        "vm_parity's --rt-diff part runs rt-diff --quiet and deletes its report: the log says only "
-        "`FAIL vm parity: 1 failure(s)`, never which entries differ (vm_modules alone is extractable)",
-        "adapter: certify runs vm_parity with a kept rt-diff report (an existing --report path in a "
-        "certify directory) on both trees and fingerprints its unapproved differing entries (id, channel)"),
-    "test-runtime2-host-deps": (
-        "read_limit.py prints `FAIL <name> <detail>`: names contain colons and the exit code, the detail "
-        "is raw stderr cut to a fixed tail whose start moves with the length of TMPDIR (it holds a pid), "
-        "so neither the case id nor the detail can be split out reliably",
-        "adapter: match read_limit.py's case names from its check() calls (a reviewed name table) and "
-        "take only the refusal code / exit status of each, not the cut stderr"),
-}
+# Owner 2026-11-08 03:27: no gate is stopped; the three that were (C19) have runner-level
+# diagnostics or the approved case-ID table below.
+STOPPED = {}
+
+# test-runtime2-host-deps, read_limit.py: the APPROVED shared case-ID table (owner 03:27), one
+# entry per check() call. read_limit.py prints `FAIL <name> <detail>`: names contain colons, exit
+# codes, durations and RSS figures, and the detail is stderr cut to a fixed tail whose start moves
+# with TMPDIR's length. A case is the entry and its name arguments; the exit code in the name is
+# its status; durations, RSS figures and the cut detail are not compared. A FAIL line that maps
+# to no entry, or to more than one, is UNMAPPED and blocks.
+READ_LIMIT_TABLE = [
+    ("fatal-limit", r"(?P<name>.+?): fatal (?P<op>\w+) limit error \(exit (?P<exit>-?\d+)\)"),
+    ("peak-rss", r"(?P<name>.+?): peak RSS \d+ MiB within \d+ MiB"),
+    ("exact-limit-read-whole", r"(?P<op>[\w()./]+): file of exactly the limit is read whole"),
+    ("empty-file", r"(?P<op>[\w()./]+): empty file"),
+    ("file-open-exact", r"file\(\)\.open: exact limit"),
+    ("ifstream-read-all-exact", r"ifstream read_all: exact limit"),
+    ("read-line-exact", r"read_line: line of exactly the limit"),
+    ("read-bytes-streamed", r"read_bytes\(limit/2\) x 16 from /dev/zero \(8 x limit streamed\)"),
+    ("read-line-loop", r"read_line loop over a file 3 x the limit"),
+    ("sha256-file-3x", r"sha256_file of a file 3 x the limit"),
+    ("growing-file", r"growing file: whole value within the limit or a limit error \(exit (?P<exit>-?\d+)\)"),
+    ("run-exact", r"run\(\): capture of exactly the limit"),
+    ("env-limit-means", r"NIFT_READ_LIMIT=(?P<raw>\S+) means (?P<bytes>\d+) bytes"),
+    ("env-limit-rejected", r"NIFT_READ_LIMIT=(?P<raw>\S+) is rejected loudly"),
+    ("fifo-exact", r"FIFO: exactly the limit"),
+    ("fifo-writers", r"FIFO writers finished \(reader released the pipe\)"),
+    ("default-limit", r"default limit: open_bytes\(/dev/zero\) stops at 1073741824 bytes"),
+    ("page-build", r"page build: (?P<what>initial build|limit is a build failure naming the operation and limit"
+                   r"|last-good output preserved|no interrupted-state marker"
+                   r"|next build after the fix succeeds without --repair|up to date afterwards)"),
+    ("read-line-catchable", r"read_line on a (?P<name>.+?): catchable read error"),
+    ("stdin-exact", r"read\(\): stdin line of exactly the limit"),
+    ("stdin-over", r"read\(\): stdin line one byte over is a limit error"),
+    ("stdin-endless", r"read\(\): endless stdin \(/dev/zero\) stops at the limit"),
+    ("stdin-endless-rss", r"read\(\): endless stdin peak RSS \d+ MiB within \d+ MiB"),
+    ("run-fatal", r"(?P<name>.+?): fatal run limit error \(exit (?P<exit>-?\d+), [\d.]+s\)"),
+    ("run-no-producer", r"(?P<name>.+?): no producer left running"),
+    ("run-marker", r"(?P<name>.+?): marker never created \(child stopped before finishing\)"),
+    ("no-zombies", r"no zombie processes left by the capture cases"),
+]
+SPECS.update({
+    # owner 03:27: v44_ast_expression_smoke.sh dies silently under set -e; the runner's
+    # certify_errtrace.bash (BASH_ENV, every tree alike) names the script, line, status and command
+    "test-v44-language-foundation": Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$",
+                                          r"^FAIL: (?P<id>[^:]+): (?P<detail>.*)$", _FAILLINE],
+                                         lines=r"^(?:FAIL|CERTIFY-ERR) ", errtrace=True, rc_category=True),
+    # owner 03:27: the runner keeps rt-diff's report (certify_site/sitecustomize.py, every tree
+    # alike) and prints each unapproved difference; vm_modules and the other harnesses print FAIL lines
+    "test-rt-vm": Spec([r"^CERTIFY-RTDIFF (?P<id>\S+ \w+) (?P<detail>.*)$", r"^(?P<id>CERTIFY-RTDIFF-ERROR) (?P<detail>.*)$",
+                        _FAILLINE],
+                       summary=[r"^FAIL vm parity: \d+ failure", r"^FAIL vm modules: ", r"^CERTIFY-RTDIFF-SUMMARY ",
+                                r"^random: \d+ module programs", r"^(vm corpus|generated|mutants): \d+ "],
+                       count=r"^CERTIFY-RTDIFF-SUMMARY differing=(?P<n>\d+) ", lines=r"^(?:FAIL|CERTIFY-RTDIFF) ",
+                       keep_rtdiff=True),
+    "test-runtime2-host-deps": Spec([_FAILLINE], table=READ_LIMIT_TABLE, table_step="read_limit.py",
+                                    count=r"^(?P<n>\d+) failure\(s\)$"),
+})
 
 # The gates expected to fail identically on a baseline (record section 17). The guard fails if any
 # of them has no extractor or no table test, or is also STOPPED.
 EXPECTED_BASELINE = [
+    "test-v44-language-foundation", "test-rt-vm", "test-runtime2-host-deps",
     "cp25r-inventory", "test-cp19-s1-dispatch", "test-rt-host-mutants", "test-rt-parser",
     "test-runtime2-cp01-simplify", "test-runtime2-cp03-simplify", "test-runtime2-rt-diff-selftest",
     "test-runtime2-scanner-parity", "test-sha256", "test-test-integrity", "test-v44-packages",
@@ -202,6 +252,23 @@ def _cases(spec, lines, roots):
         if any(s.match(line) for s in spec.summary):
             i += 1
             continue
+        if spec.table and step == spec.table_step and line.startswith("FAIL "):
+            rest = line[5:]
+            hits = [(k, mm) for k, rx in spec.table for mm in [rx.match(rest)]
+                    if mm and (mm.end() == len(rest) or rest[mm.end()] == " ")]
+            i += 1
+            while i < len(lines) and lines[i].strip() and not re.match(r"^\s*(?:PASS|FAIL|SKIP|ok|note)\b", lines[i]) \
+                    and not spec.step.match(lines[i]) and not lines[i].startswith("make"):
+                i += 1  # the rest of the cut stderr detail: not compared (its start moves with TMPDIR)
+            stepped[step] = True
+            if len(hits) != 1:
+                out.append((step, "UNMAPPED", "unmapped", "", narrow(rest, roots) + f" ({len(hits)} table entries match)"))
+                continue
+            k, mm = hits[0]
+            args = {n: v for n, v in mm.groupdict().items() if n != "exit"}
+            out.append((step, k + "".join(f" {n}={v}" for n, v in sorted(args.items())), "table-case",
+                        mm.groupdict().get("exit") or "", ""))
+            continue
         m = next((m for c in spec.cases for m in [c.match(line)] if m), None)
         if not m:
             abort_blocks[step].append(line)
@@ -222,6 +289,11 @@ def _cases(spec, lines, roots):
         elif spec.category:  # the line's own detail, and any diagnostic printed under it (F1)
             cat, detail = spec.category + (f":{g['cat']}" if g.get("cat") else ""), " / ".join(
                 filter(None, [narrow(g.get("detail") or "", roots), detail]))
+        elif spec.rc_category and g.get("rc") is not None:  # CERTIFY-ERR: the failing command, its status
+            rc = int(g["rc"])
+            cat = "timeout" if rc == 124 else f"signal:{rc - 128}" if rc > 128 else "exit"
+            status = str(rc)
+            detail = " / ".join(narrow(x, roots) for x in [g.get("detail") or ""] + block[1:])
         elif cat is None:  # the harness's own detail: the rest of the line and the lines under it
             cat, detail = "assertion", " / ".join(narrow(x, roots) for x in [g.get("detail") or ""] + block[1:])
         elif g.get("detail"):  # the diagnostic and the case line's own detail (`exit 1 != 77`, expected)
@@ -268,7 +340,7 @@ def differences(a, b):
     """Why two fingerprints differ ([] when equal; a missing fingerprint always differs)."""
     if a is None or b is None:
         return ["no extractable failure fingerprint on the " + ("candidate" if a is None else "baseline")]
-    out = []
+    out = [f"unmapped failure (blocks): {c[4]}" for c in sorted(set(a["cases"]) | set(b["cases"])) if c[1] == "UNMAPPED"]
     if a["count"] != b["count"]:
         out.append(f"stated failure count {a['count']} != {b['count']}")
     if a["lines"] != b["lines"]:

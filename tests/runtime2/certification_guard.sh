@@ -615,6 +615,11 @@ toy3 be 1 FAILED-NEW "weekend/r2: applicable, cannot run there"
 toy "$TOY/bf/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/v4" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/r1" test-sha256 "$SHA_BLOCKED"
 toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"; sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile"
 toy3 bf 1 FAILED-NEW "17f7964c: applicable, cannot run there"
+# owner 03:27: a read_limit.py failure outside the approved case-ID table blocks, even when the
+# baseline prints the identical line
+UNMAPPED='echo "NIFT_BIN=x python3 tests/runtime2/read_limit.py"; echo "FAIL a check nobody listed: it failed"; echo "1 failure(s)"; exit 1'
+toy "$TOY/um/cand" test-runtime2-host-deps "$UNMAPPED"; toy "$TOY/um/base" test-runtime2-host-deps "$UNMAPPED"
+toyrun um test-runtime2-host-deps reg 1 FAILED-NEW
 toyrun n1 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n2 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n3 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
