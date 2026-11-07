@@ -40,8 +40,12 @@ compare_site() { # name source-dir
   fi
 }
 
+# NIFT_PARITY_SCRIPTS=FILE: only the scripts listed in FILE, no sites (the
+# regression test scanner_parity_selftest.sh; never a certification run).
+RESTRICTED="${NIFT_PARITY_SCRIPTS:-}"
+
 # 1. Project sites in the repository.
-while IFS= read -r config; do
+[ -n "$RESTRICTED" ] || while IFS= read -r config; do
   dir="$(dirname "$(dirname "$config")")"
   compare_site "repo-$(echo "${dir#./}" | tr '/' '_')" "$REPO/$dir"
 done < <(cd "$REPO" && git ls-files '*/.nift/config.json')
@@ -102,34 +106,60 @@ for case in range(60):
         text = text.replace("\n", "\r\n")   # CRLF sources
     open(os.path.join(d, "content/index.html"), "w", newline="").write(text)
 PY
-for d in "$W"/gen/case*; do compare_site "gen-$(basename "$d")" "$d"; done
+[ -n "$RESTRICTED" ] || for d in "$W"/gen/case*; do compare_site "gen-$(basename "$d")" "$d"; done
 
 # 3. Optional extra site (e.g. the 300-page benchmark site).
 [ -n "${NIFT_SITE:-}" ] && [ -d "${NIFT_SITE}" ] && compare_site "extra-site" "$NIFT_SITE"
 
 # 4. Script probe corpus.
+# Flakiness fix (2026-11-08), three causes found in two runs on one tree:
+# - The cp22 VM-only fixtures (tests/runtime2/cp22/vm-only/*.f: thread and task
+#   ordering, preemption) have a deterministic VM contract that
+#   test-runtime2-cp22 --mode vm-only asserts against their recorded .vm.*
+#   expectations; on the legacy reference their order and results vary by
+#   design (real threads), so a parity comparison with it has no stable answer.
+#   They are counted and named here, not compared.
+# - When the reference is killed (timeout), bash reports the job ("line N: PID
+#   Killed ...") asynchronously, at a later script's FAIL output, with a pid:
+#   the runs' own shell messages now go to $W/shell.msgs; the exit status
+#   (124/137) is still compared.
+# - Values that legitimately differ per run (scanner_parity_masks.tsv: the
+#   socket probe binds port 0 and prints the port the kernel allocated) are
+#   compared and reported with digits masked; a reference that differs between
+#   two runs is masked as before, and the reported diff is now the masked one.
+MASKS="$REPO/tests/runtime2/scanner_parity_masks.tsv"
+# NIFT_PARITY_UNFIXED=1 restores the three old behaviours (the regression test
+# shows they make two runs differ); only with NIFT_PARITY_SCRIPTS.
+UNFIXED=0; [ -n "$RESTRICTED" ] && [ "${NIFT_PARITY_UNFIXED:-}" = 1 ] && UNFIXED=1
+MSGS="$W/shell.msgs"; [ "$UNFIXED" -eq 1 ] && MSGS=/dev/stderr
+vmonly=0
 while IFS= read -r script; do
+  [ "$UNFIXED" -eq 1 ] || case "$script" in tests/runtime2/cp22/vm-only/*.f) vmonly=$((vmonly+1)); continue ;; esac
   mkdir -p "$W/sa" "$W/sb"
-  (cd "$W/sa" && timeout 30 "$NIFT" "$REPO/$script" >"$W/s.a.out" 2>"$W/s.a.err" </dev/null; echo $? >"$W/s.a.rc")
-  (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.b.out" 2>"$W/s.b.err" </dev/null; echo $? >"$W/s.b.rc")
+  (cd "$W/sa" && timeout 30 "$NIFT" "$REPO/$script" >"$W/s.a.out" 2>"$W/s.a.err" </dev/null; echo $? >"$W/s.a.rc") 2>>"$MSGS"
+  (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.b.out" 2>"$W/s.b.err" </dev/null; echo $? >"$W/s.b.rc") 2>>"$MSGS"
   scripts=$((scripts+1))
+  listed=0; [ "$UNFIXED" -eq 0 ] && grep -q "^$script	" "$MASKS" 2>/dev/null && listed=1
   if ! cmp -s "$W/s.a.rc" "$W/s.b.rc" || ! cmp -s "$W/s.a.out" "$W/s.b.out" || ! cmp -s "$W/s.a.err" "$W/s.b.err"; then
     # Only a script whose reference output is itself nondeterministic (timing
     # probes) is compared with digits masked; stdout, stderr and exit code are
     # always all compared.
-    (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.c.out" 2>"$W/s.c.err" </dev/null)
+    (cd "$W/sb" && timeout 30 "$REF" "$REPO/$script" >"$W/s.c.out" 2>"$W/s.c.err" </dev/null) 2>>"$MSGS"
     mask=cat
-    if ! cmp -s "$W/s.b.out" "$W/s.c.out" || ! cmp -s "$W/s.b.err" "$W/s.c.err"; then mask="tr -d 0-9"; fi
+    if [ "$listed" -eq 1 ] || ! cmp -s "$W/s.b.out" "$W/s.c.out" || ! cmp -s "$W/s.b.err" "$W/s.c.err"; then mask="tr -d 0-9"; fi
     if ! cmp -s "$W/s.a.rc" "$W/s.b.rc" ||
        ! diff -q <($mask <"$W/s.a.out") <($mask <"$W/s.b.out") >/dev/null ||
        ! diff -q <($mask <"$W/s.a.err") <($mask <"$W/s.b.err") >/dev/null; then
-      echo "FAIL script $script"; diff "$W/s.a.out" "$W/s.b.out" | head -5; diff "$W/s.a.err" "$W/s.b.err" | head -5; fail=1
+      rmask=$mask; [ "$UNFIXED" -eq 1 ] && rmask=cat
+      echo "FAIL script $script"; diff <($rmask <"$W/s.a.out") <($rmask <"$W/s.b.out") | head -5
+      diff <($rmask <"$W/s.a.err") <($rmask <"$W/s.b.err") | head -5; fail=1
     fi
   fi
-done < <(cd "$REPO" && git ls-files 'docs/evidence/cp410-competitiveness/probes/*.f' 'tests/*.f')
+done < <(if [ -n "$RESTRICTED" ]; then cat "$RESTRICTED"; else cd "$REPO" && git ls-files 'docs/evidence/cp410-competitiveness/probes/*.f' 'tests/*.f'; fi)
 
-echo "scanner parity: $sites sites, $scripts scripts compared"
+echo "scanner parity: $sites sites, $scripts scripts compared; $vmonly cp22 VM-only fixtures left to test-runtime2-cp22 --mode vm-only"
 # Guard against a silently empty corpus (e.g. run outside a git checkout).
-if [ "$sites" -lt 70 ] || [ "$scripts" -lt 100 ]; then echo "FAIL scanner parity: corpus too small"; fail=1; fi
+if [ -n "$RESTRICTED" ]; then echo "FAIL scanner parity: restricted corpus (a self-test, never a certification run)"; fail=1
+elif [ "$sites" -lt 70 ] || [ "$scripts" -lt 100 ]; then echo "FAIL scanner parity: corpus too small"; fail=1; fi
 [ $fail -eq 0 ] && echo "PASS scanner parity" || echo "FAIL scanner parity"
 exit $fail

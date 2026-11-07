@@ -1,0 +1,1 @@
+tests/runtime2/prevalidate/projects/nift-packages_http/tests/socket_proof.f	digits	binds port 0 and prints the port the kernel allocated (getsockname): a different number every run

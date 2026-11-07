@@ -1025,3 +1025,42 @@ the page "needs rebuilding" every time; a sequenced edit is up to date and built
 CPU-bound processes, 2 run concurrently with a second copy: no `[mode]` line fails in any run,
 and the failure fingerprints of all 28 make runs are equal (the 21 remaining FAIL lines are the
 deterministic VM refusals: bytes(), open_bytes, builtin arity, fn-name-reserved).
+
+## 22. test-runtime2-scanner-parity flakiness: three causes, test-only fixes (C25)
+
+Before: two runs on one tree differed (§17.1): v_preempt, v_thread_order, v_sleep_ties
+(tests/runtime2/cp22/vm-only), socket_proof.f, and for-s2/t27. Investigated separately:
+
+- **Thread/task ordering (cp22 VM-only fixtures).** These fixtures define the VM's
+  deterministic scheduling (thread order, FIFO wake-up, no preemption, timer ties), and
+  test-runtime2-cp22 runs them with `--mode vm-only` against their recorded `.vm.*`
+  expectations: ordering IS part of the VM contract and stays asserted there,
+  deterministically. Against the legacy reference (real threads) their order and even their
+  results (`v_preempt`: true or false) vary by design, so a legacy-parity comparison has no
+  stable answer. The scanner now counts and names them (`7 cp22 VM-only fixtures left to
+  test-runtime2-cp22 --mode vm-only`) instead of comparing them. This is scoped by the fixture
+  directory's documented contract, not by a gate name.
+- **The socket probe** already binds port 0 and connects to the port `getsockname` returns
+  (it never picks a port itself), so nothing assumes a port stays free; it prints that
+  allocated port, so the reference's output differs every run. It is listed in
+  `tests/runtime2/scanner_parity_masks.tsv` (with the reason) and compared and reported with
+  digits masked. The candidate still fails it (a VM refusal), with a deterministic report.
+- **for-s2/t27 and others: job messages.** When a reference run is killed by `timeout`, bash
+  prints `line N: PID Killed ...` asynchronously, inside a later script's FAIL output, with a
+  pid. The runs' own shell messages now go to a file; the exit status (124/137) is still
+  compared. Reported diffs are the masked ones when the reference is nondeterministic.
+
+No timeout was lengthened and nothing is retried. **Regression test**
+(`tests/runtime2/scanner_parity_selftest.sh`, run first by the gate): fake candidate and
+reference binaries reproduce the three causes (random thread order, a random port, a reference
+that kills itself); with the old behaviours (`NIFT_PARITY_UNFIXED=1`, only in the restricted
+self-test mode `NIFT_PARITY_SCRIPTS`, which always fails as a certification run) runs differ;
+fixed, 6 runs are byte-identical, no job message leaks, both real differences are reported and
+the VM-only fixture is counted.
+
+**Determinism:** three full gate runs on the candidate against the v4.12.0 reference (two plain,
+one under `taskset -c 0` with a CPU-bound process): equal failure fingerprints (1517 failing
+scripts and sites each; before the fix, two plain runs differed).
+
+Also in C25: test-sha256's forced-race block compares `status` output without a pipeline
+(test-integrity reported the pipe; findings are back to 57).

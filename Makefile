@@ -2547,6 +2547,7 @@ test-incremental-modified-immediate: $(TARGET)
 # Runtime 2.0 CP06: template scanner output parity against a reference
 # binary (set NIFT_REF=/path/to/reference/nift; skipped when unset).
 test-runtime2-scanner-parity: $(TARGET)
+	bash tests/runtime2/scanner_parity_selftest.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" NIFT_REF="$(NIFT_REF)" bash tests/runtime2/scanner_parity.sh
 
 # Runtime 2.0 CP02 (review defect D2) and CP03 (decision D-002).

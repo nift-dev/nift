@@ -328,7 +328,8 @@ for mode in modified hybrid; do
   "$PY" "$TICKS" --age "$P" .nift/config.json >/dev/null
   printf 'r2' > data/x.bin; "$NIFT" build >/dev/null 2>&1
   stamp_infos "$("$PY" -c 'import os; print(os.stat("data/x.bin").st_mtime_ns)')"
-  if "$NIFT" status | grep -q "up to date"; then bad "[$mode] forced race, unsequenced edit: the same-tick page-info was not caught"
+  st="$("$NIFT" status 2>&1)"
+  if [[ "$st" == *"up to date"* ]]; then bad "[$mode] forced race, unsequenced edit: the same-tick page-info was not caught"
   else pass "[$mode] forced race, unsequenced edit: same-tick page-info needs rebuilding (the old flake)"; fi
   "$NIFT" build >/dev/null 2>&1
   printf 'r3' > data/x.bin; t=$("$PY" "$TICKS" --age "$P" data/x.bin); "$NIFT" build >/dev/null 2>&1
