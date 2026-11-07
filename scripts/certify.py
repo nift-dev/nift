@@ -64,6 +64,8 @@ certified); 0 when every required gate is PASSED or FAILED-BASELINE (--strict: o
 import argparse, concurrent.futures as cf, json, os, pwd, re, shutil, signal, subprocess, sys, time
 from pathlib import Path
 
+import certify_fingerprints as FP  # owner 2026-11-08 01:06: per-gate failure fingerprints
+
 ROOT = Path(__file__).resolve().parent.parent
 AGGREGATE = "certify-targets"
 
@@ -499,7 +501,7 @@ def recipe_lines(cwd, target, old=()):
 
 def run_lines(cwd, target, old, logdir, timeout, extra_env=None, tag=""):
     """C2: a failing recipe stops at its first failing line, hiding the rest: run every line on its
-    own (the target's prerequisites are built) and return [(command, rc, failure identity)]."""
+    own (the target's prerequisites are built) and return [(command, rc, failure fingerprint)]."""
     results = []
     env = clean_env()
     env.update(extra_env or {})
@@ -513,17 +515,19 @@ def run_lines(cwd, target, old, logdir, timeout, extra_env=None, tag=""):
                                     timeout=timeout).returncode
             except subprocess.TimeoutExpired:
                 rc = 124
-        results.append((cmd, rc, failure_identity(log.read_text(errors="replace"), [cwd], rc) if rc else None))
+        # owner 01:06: each failing line's own fingerprint (same extractor on both trees)
+        results.append((cmd, rc, FP.fingerprint(target, log.read_text(errors="replace"), [cwd], rc) if rc else None))
     return results
 
 
 def lines_match(cand, base, croot, broot):
     """H2a: every recipe line that fails on its own on the candidate fails identically on the
-    baseline (same command, same failure identity). Returns the candidate lines that do not."""
+    baseline (same command, equal failure fingerprints; owner 01:06). Returns the candidate lines
+    that do not (a line without an extractable fingerprint never matches)."""
     norm = lambda c, r: c.replace(str(r), "<ROOT>")
-    have = {norm(c, broot): ident for c, rc, ident in base if rc}
-    return [i for i, (c, rc, ident) in enumerate(cand, 1)
-            if rc and not same_failure(ident, have.get(norm(c, croot)))]
+    have = {norm(c, broot): fp for c, rc, fp in base if rc}
+    return [i for i, (c, rc, fp) in enumerate(cand, 1)
+            if rc and not FP.same(fp, have.get(norm(c, croot)))]
 
 
 def blocked_reason(text):
@@ -1087,13 +1091,12 @@ def decide(f):
         return "SKIPPED-ENVIRONMENTAL", f"fails only as root; passes as unprivileged user '{f['user']}'"
     if f.get("base_rc") not in (None, 0) and f.get("base_has_target"):
         cs, bs = f.get("cand_step"), f.get("base_step")
-        if cs is not None and cs == bs and f.get("base_identical") is True:
-            return "BASELINE-FAILURE", f"identical failure on the v4.12.0 baseline (same step, statuses and FAIL lines), same user: {cs}"
-        if cs is not None and cs == bs:
-            return "FAIL", (f"the v4.12.0 baseline fails at the same step but not identically (statuses or FAIL lines "
-                            f"differ, or a recipe line fails only on the candidate); see {f.get('cand_log')}")
-        return "FAIL", (f"baseline also fails, but at a different or unidentified step "
-                        f"(candidate: {cs}; baseline: {bs}); see {f.get('cand_log')}")
+        # owner 2026-11-08 01:06: FAILED-BASELINE means equal failure fingerprints (the same
+        # extractor on both raw logs), nothing else; no fingerprint is never a match
+        if f.get("base_identical") is True:
+            return "BASELINE-FAILURE", f"equal failure fingerprint on the v4.12.0 baseline, same user (steps {cs} / {bs})"
+        return "FAIL", (f"the v4.12.0 baseline also fails, but its failure fingerprint differs or none could be "
+                        f"extracted ({'; '.join(f.get('base_fp_diff') or ['no comparison'])[:300]}); see {f.get('cand_log')}")
     return "FAIL", f"see .build/certify/{t}.log"
 
 
@@ -1345,8 +1348,13 @@ def main():
                     f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
                     f["base_step"] = failure_signature(btext)
                     f["cand_log"] = str(cand_log.relative_to(ROOT))
-                    f["base_identical"] = same_failure(failure_identity(cand_log.read_text(errors="replace"), [ROOT, user_copy] if user_copy else [ROOT]),
-                                                       failure_identity(btext, [base_dir]))
+                    croots = [ROOT, user_copy] if user_copy else [ROOT]
+                    ctext0 = cand_log.read_text(errors="replace")
+                    diff = FP.differences(FP.fingerprint(t, ctext0, croots), FP.fingerprint(t, btext, [base_dir]))
+                    f["base_identical"], f["base_fp_diff"] = not diff, diff
+                    # the stricter whole-log identity: reported, does not decide
+                    r.setdefault("whole_log_identical", {})["v4.12.0"] = same_failure(
+                        failure_identity(ctext0, croots), failure_identity(btext, [base_dir]))
                     base_tree_used = base_dir
             # C2: the regression baselines, each compared on its own (same step AND same FAIL lines).
             if not f["unverified"] and f.get("unpriv_rc") != 0 and regressions:
@@ -1356,9 +1364,12 @@ def main():
                     rlog = logdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
                     rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
                     rtext = rlog.read_text(errors="replace")
-                    same = (rrc != 0 and "No rule to make target" not in rtext and failure_signature(ctext) is not None
-                            and same_failure(failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree])))
-                    r["regression"][name] = same
+                    diff = (FP.differences(FP.fingerprint(t, ctext, [ROOT]), FP.fingerprint(t, rtext, [tree]))
+                            if rrc != 0 and "No rule to make target" not in rtext else ["the baseline does not fail"])
+                    r["regression"][name] = not diff
+                    r.setdefault("fingerprint_diff", {})[name] = diff[:20]
+                    r.setdefault("whole_log_identical", {})[name] = rrc != 0 and same_failure(
+                        failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree]))
         line_note = ""
         if r["rc"] != 0 and recipe.get(t, "").count("\n") > 1:
             # C2: the lines after the failing one would never run: each line on its own. H2a: a
@@ -1421,8 +1432,12 @@ def main():
         if r["class"] == "BLOCKED":
             r["reason"] = r["blocked"] or r["reason"]
         elif r["class"] == "FAILED-BASELINE" and r["status"] == "FAIL":
-            r["reason"] = "identical failure on regression baseline(s): " + ", ".join(
-                n for n, same in r["regression"].items() if same) + "; " + r["reason"]
+            r["reason"] = "equal failure fingerprint on regression baseline(s): " + ", ".join(
+                n for n, same in r["regression"].items() if same) + "; whole log identical: " + ", ".join(
+                f"{n}={v}" for n, v in r.get("whole_log_identical", {}).items()) + "; " + r["reason"]
+        elif r["class"] == "FAILED-NEW" and r.get("fingerprint_diff"):
+            r["reason"] += "; fingerprint differs: " + " / ".join(
+                f"{n}: {'; '.join(d[:3])}" for n, d in r["fingerprint_diff"].items() if d)[:600]
         if line_note:
             r["reason"] += "; " + line_note  # H2a: never overwritten
     for t in planned:

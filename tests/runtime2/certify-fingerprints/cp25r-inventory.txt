@@ -1,0 +1,12 @@
+$ make -k cp25r-inventory  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/cp25r-inventory)
+/usr/bin/python3 tests/runtime2/cp25/inventory.py collect --nift "/home/claude/review/cand-b5/nift" --out ".build/cp25r-inventory"
+classify-all: 789 units (589 excluding generated); execute: 608 entries
+/usr/bin/python3 tests/runtime2/cp25/inventory.py report ".build/cp25r-inventory" \
+  --markdown ".build/cp25r-inventory/INVENTORY.md" --check
+INVENTORY: unclassified reason: coro-blocking-host:file
+INVENTORY: unclassified reason: coro-blocking-host:rm
+INVENTORY: unclassified reason: method:close
+INVENTORY: unclassified reason: method:open
+INVENTORY: unclassified reason: method:save
+INVENTORY: unclassified reason: method:write
+make: *** [Makefile:5384: cp25r-inventory] Error 1

@@ -405,6 +405,10 @@ print(f'PASS certify harness self-test ({len(checks)} cases: inventory, report c
 PYC
 harness_status=$?
 [ "$harness_status" -eq 0 ] || exit "$harness_status"
+# owner 2026-11-08 01:06: per-gate failure fingerprints. Every expected-baseline gate has an
+# extractor and a table test on its real log (positive, new failure, changed diagnostic,
+# substitution with the same count, wording-only change); a gate without one fails here.
+python3 -B tests/runtime2/certify_fingerprints_selftest.py || exit 1
 
 # R3-1: the skip-phrase inventory. Every tracked line that prints skip / not-run / unverified
 # wording is listed in tests/runtime2/skip_phrases.tsv as detected (certify.py's markers catch it)
@@ -470,18 +474,19 @@ trap 'rm -rf "$TOY"' EXIT
 toy() {  # toy DIR TARGET RECIPE-LINES...  (CERTIFY_PY: the runner copied in, default the tree's)
     local dir=$1 target=$2; shift 2
     mkdir -p "$dir/scripts"; cp "${CERTIFY_PY:-scripts/certify.py}" "$dir/scripts/certify.py"
+    cp scripts/certify_fingerprints.py "$dir/scripts/"
     { printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n'
       printf 'certify-targets: %s\n.PHONY: %s\n%s: nift\n' "$target" "$target" "$target"
       for l in "$@"; do printf '\t@%s\n' "$l"; done; } >> "$dir/Makefile"
 }
-toy "$TOY/a/cand" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 1'
-toy "$TOY/a/base" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 0'
+toy "$TOY/a/cand" test-runtime2-rt-diff-selftest 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 1'
+toy "$TOY/a/base" test-runtime2-rt-diff-selftest 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 0'
 toy "$TOY/b/cand" test-rt-crash 'echo "running tests/crashy.sh"; echo "Segmentation fault"; exit 139'
 toy "$TOY/b/base" test-rt-crash 'echo "running tests/crashy.sh"; echo "assertion failed: x"; exit 2'
-toy "$TOY/c/cand" test-rt-cases 'echo "running tests/cases.sh"; echo "FAIL case-new-1"; echo "FAIL case-new-2"; exit 1'
-toy "$TOY/c/base" test-rt-cases 'echo "running tests/cases.sh"; echo "FAIL case-old-9"; exit 1'
-toy "$TOY/p/cand" test-rt-same 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
-toy "$TOY/p/base" test-rt-same 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
+toy "$TOY/c/cand" test-runtime2-rt-diff-selftest 'echo "running tests/cases.sh"; echo "FAIL case-new-1"; echo "FAIL case-new-2"; exit 1'
+toy "$TOY/c/base" test-runtime2-rt-diff-selftest 'echo "running tests/cases.sh"; echo "FAIL case-old-9"; exit 1'
+toy "$TOY/p/cand" test-runtime2-rt-diff-selftest 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
+toy "$TOY/p/base" test-runtime2-rt-diff-selftest 'echo "running tests/same.sh"; echo "FAIL same: 3"; exit 1'
 toyrun() {  # toyrun CASE TARGET BASELINE-FLAG WANT-RC WANT-CLASS
     local out rc
     out=$(cd "$TOY/$1/cand" && python3 scripts/certify.py --jobs 1 --targets "$2" --unprivileged-user '' \
@@ -494,32 +499,44 @@ toyrun() {  # toyrun CASE TARGET BASELINE-FLAG WANT-RC WANT-CLASS
 }
 # F1 (confirmation of c73a7692): detail lines under the same FAIL line count; a vm_parity-style
 # summary count change counts; varying values (pid, temporary path, duration, timestamp) do not.
-toy "$TOY/d/cand" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-NEW"; exit 1'
-toy "$TOY/d/base" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-old"; exit 1'
+toy "$TOY/d/cand" test-runtime2-rt-diff-selftest 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-NEW"; exit 1'
+toy "$TOY/d/base" test-runtime2-rt-diff-selftest 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-old"; exit 1'
 toy "$TOY/e/cand" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 31 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
 toy "$TOY/e/base" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 30 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
 # R3-2: a changed detail above many identical lines; R3-3: real hex data
-toy "$TOY/t/cand" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
-toy "$TOY/t/base" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7,4]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
-toy "$TOY/x/cand" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeee"; exit 1'
-toy "$TOY/x/base" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeef"; exit 1'
+toy "$TOY/t/cand" test-runtime2-rt-diff-selftest 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/t/base" test-runtime2-rt-diff-selftest 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7,4]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/x/cand" test-runtime2-rt-diff-selftest 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeee"; exit 1'
+toy "$TOY/x/base" test-runtime2-rt-diff-selftest 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeef"; exit 1'
 # R4-2: a FAIL line naming a test path does not cut the identity short
-toy "$TOY/tp/cand" test-rt-paths 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
-toy "$TOY/tp/base" test-rt-paths 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7,4]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
-toy "$TOY/v/cand" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-$$$$/a pid $$$$ took 123ms at 2026-11-07T21:04:30"; echo "FAIL vary: 2 of 9 (took 45ms)"; exit 1'
-toy "$TOY/v/base" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-7/a pid 7 took 9ms at 2026-11-08T01:00:00"; echo "FAIL vary: 2 of 9 (took 3ms)"; exit 1'
-toyrun a test-rt-multi reg 1 FAILED-NEW
+toy "$TOY/tp/cand" test-runtime2-rt-diff-selftest 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/tp/base" test-runtime2-rt-diff-selftest 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7,4]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/v/cand" test-runtime2-rt-diff-selftest 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-$$$$/a pid $$$$ took 123ms at 2026-11-07T21:04:30"; echo "FAIL vary: 2 of 9 in /tmp/nift-x-$$$$/a"; exit 1'
+toy "$TOY/v/base" test-runtime2-rt-diff-selftest 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-7/a pid 7 took 9ms at 2026-11-08T01:00:00"; echo "FAIL vary: 2 of 9 in /tmp/nift-x-7/a"; exit 1'
+# owner 2026-11-08 01:06, the three mandatory negative controls (FAILED-NEW, never FAILED-BASELINE):
+# n1 an existing failure changes its diagnostic; n2 a passing case fails alongside the existing
+# failure; n3 one failing case is replaced by another, same count
+toy "$TOY/n1/cand" test-runtime2-rt-diff-selftest 'echo "FAIL case-a: error: a.f:1:1: not compiled for the VM (fn-flags): x"; exit 1'
+toy "$TOY/n1/base" test-runtime2-rt-diff-selftest 'echo "FAIL case-a: error: a.f:1:1: not compiled for the VM (import-nested): x"; exit 1'
+toy "$TOY/n2/cand" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAIL case-b"; exit 1'
+toy "$TOY/n2/base" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "PASS case-b"; exit 1'
+toy "$TOY/n3/cand" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAIL case-c"; echo "PASS case-b"; exit 1'
+toy "$TOY/n3/base" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAIL case-b"; echo "PASS case-c"; exit 1'
+toyrun n1 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun n2 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun n3 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun a test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun b test-rt-crash reg 1 FAILED-NEW
-toyrun c test-rt-cases v4 1 FAILED-NEW
-toyrun d test-rt-detail reg 1 FAILED-NEW
-toyrun d test-rt-detail v4 1 FAILED-NEW
+toyrun c test-runtime2-rt-diff-selftest v4 1 FAILED-NEW
+toyrun d test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun d test-runtime2-rt-diff-selftest v4 1 FAILED-NEW
 toyrun e test-rt-parity reg 1 FAILED-NEW
-toyrun t test-rt-tail reg 1 FAILED-NEW
-toyrun t test-rt-tail v4 1 FAILED-NEW
-toyrun x test-rt-hex reg 1 FAILED-NEW
-toyrun tp test-rt-paths reg 1 FAILED-NEW
-toyrun p test-rt-same reg 0 FAILED-BASELINE
-toyrun v test-rt-vary reg 0 FAILED-BASELINE
+toyrun t test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun t test-runtime2-rt-diff-selftest v4 1 FAILED-NEW
+toyrun x test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun tp test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
+toyrun p test-runtime2-rt-diff-selftest reg 0 FAILED-BASELINE
+toyrun v test-runtime2-rt-diff-selftest reg 0 FAILED-BASELINE
 # D3 toy controls: a gate that passes with a required assertion skipped is PARTIAL (reported
 # BLOCKED) and a gate whose only result is a skip is SKIP (NOT-RUN); in certification mode
 # (--certify) either fails the campaign (exit 1); an other-platform skip stays PASSED.
@@ -544,7 +561,7 @@ skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows 
 toy "$TOY/s4/cand" test-rt-silent 'true'
 skiprun s4 test-rt-silent 1 "NOT-RUN          test-rt-silent: SKIP"
 # R4-5: a silent recipe whose command make echoes over two lines (a continuation) is SKIP too
-mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py "$TOY/s5/cand/scripts/"
+mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py scripts/certify_fingerprints.py "$TOY/s5/cand/scripts/"
 printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\ncertify-targets: test-rt-cont\n.PHONY: test-rt-cont\ntest-rt-cont: nift\n\ttrue \\\n\t  \&\& true\n' > "$TOY/s5/cand/Makefile"
 skiprun s5 test-rt-cont 1 "NOT-RUN          test-rt-cont: SKIP"
 # owner 23:10: each result states its environment

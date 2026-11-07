@@ -1,0 +1,26 @@
+$ make -k test-runtime2-cp01-simplify  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-runtime2-cp01-simplify)
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/runtime2/cp01_simplify.sh
+=== ours (/home/claude/review/cand-b5/nift)
+FAILS (3):
+  FAIL S3b content consumed by two pages: rebuilt ['?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?'] expected ['index', 'p1']
+  FAIL S4a create unreferenced file: rebuilt ['p1'] expected []
+  FAIL S8e no-op after mode switches rebuilt [1, 0, 0, 0, 0]
+  note S5 rebuilds per no-op build: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; files rewritten: 0
+  note S3a partial used by p0..p9: status not clean after correct build (extra rebuild pending): ['', 'run nift build to rebuild these files']
+  note S3b content consumed by two pages: status not clean after correct build (extra rebuild pending): ['', 'run nift build to rebuild this file']
+  note S4b add dependency: status not clean after correct build (extra rebuild pending): ['', 'run nift build to rebuild these files']
+  note S8a switch modified->hash rebuilt 31
+  note S8c switch hash->modified rebuilt 0
+  note S8d edit after switching back: status not clean after correct build (extra rebuild pending): ['', 'run nift build to rebuild this file']
+  note K kill@0.01s killed: recovery build rc=0 rebuilt 1491, then [0, 0, 0]; oracle_ok=True
+  note K kill@0.03s killed: recovery build rc=0 rebuilt 1501, then [0, 0, 0]; oracle_ok=True
+  note K kill@0.06s killed: recovery build rc=0 rebuilt 1501, then [0, 0, 0]; oracle_ok=True
+  note C page-rendered:p12: crash rc=-9, recovery rebuilt 31, then [0, 0, 0], oracle_ok=True
+  note C page-output:p12: crash rc=-9, recovery rebuilt 31, then [0, 0, 0], oracle_ok=True
+  note C page-info:p12: crash rc=-9, recovery rebuilt 31, then [0, 0, 0], oracle_ok=True
+  note C page-post:p12: crash rc=-9, recovery rebuilt 31, then [0, 0, 0], oracle_ok=True
+  note C page-done:p12: crash rc=-9, recovery rebuilt 31, then [0, 0, 0], oracle_ok=True
+label=ours cycles=1000 misses=0 repaired_next=0 persistent=0 build_fail=0
+label=ours atomic-save cycles=1000 misses=0 persistent=0 build_fail=0 example: 
+FAIL settle: ours fs=ext2/ext3 after-init:[ 0 0 0 0 0 0 0 0 0 0 0 0 ] after-edit-all:[ 20 1 0 0 0 0 0 0 0 0 0 0 ] outputs-with-edit=20/20
+make: *** [Makefile:2751: test-runtime2-cp01-simplify] Error 1

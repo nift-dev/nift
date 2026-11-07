@@ -1,0 +1,19 @@
+$ make -k test-v44-packages  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-v44-packages)
+NIFT="/home/claude/review/cand-b5/nift" tests/package_refs_smoke.sh ; st=$?; if [ $st -eq 77 ]; then echo "  (skipped)"; else exit $st; fi
+added demo
+added demo
+PASS package refs/local lock
+NIFT="/home/claude/review/cand-b5/nift" tests/package_metadata_smoke.sh
+PASS package metadata and lock schema
+/usr/bin/python3 tests/package_transaction_smoke.py "/home/claude/review/cand-b5/nift" ; st=$?; if [ $st -eq 77 ]; then echo "  (skipped)"; else exit $st; fi
+Traceback (most recent call last):
+  File "/home/claude/review/cand-b5/tests/package_transaction_smoke.py", line 330, in <module>
+    same = run(unchanged, "same.f")
+  File "/home/claude/review/cand-b5/tests/package_transaction_smoke.py", line 23, in run
+    raise AssertionError(f"{' '.join(args)} failed: {result.stderr}")
+AssertionError: same.f failed: error: /tmp/nift-certify-16274/test-v44-packages/tmpls3ktabp/unchanged-provenance/.nift/packages/demo/src/main.f:1:25: not compiled for the VM (import-nested): this form of import is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift same.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+make: *** [Makefile:3388: test-v44-packages] Error 1

@@ -763,3 +763,85 @@ for test-rt-vm's own recipe it cannot (vm_parity prints the HEAD-only `'approved
 category; recipe and 9 harness files differ from 17f7964c). For the gates absent from v4.12.0, and
 for VM refusals, v4.12.0 is not a usable baseline. No new identity mechanism was built; the options
 are with the owner.
+
+## 17. Per-gate failure fingerprints (owner 2026-11-08 01:06, Option A) (C19)
+
+C19 is a harness change only: `scripts/certify_fingerprints.py` (new), `scripts/certify.py`, the
+guard, `tests/runtime2/certify_fingerprints_selftest.py` and its real-log fixtures
+(`tests/runtime2/certify-fingerprints/*.txt`). No production or runtime change; the binary is
+`91a49efa…`.
+
+**Rule.** A failing gate is FAILED-BASELINE only when its failure fingerprint on the candidate
+equals its fingerprint on the baseline (v4.12.0 or a regression baseline). Both are computed during
+the campaign from the two raw logs by the same extractor; nothing stored is compared. Anything else,
+including a log with no extractable failing case or a gate without an extractor, is FAILED-NEW;
+there is no fallback to "same step". The old whole-log identity is still computed and reported
+(`whole log identical: NAME=True/False`) as a stricter extra signal; it does not decide. Recipe
+lines run on their own (H2a) are compared the same way, line by line.
+
+**Fingerprint** (`certify_fingerprints.py`, declarative per-gate SPECS):
+- each failing case: (step, case id, category, status, detail). The step is the harness make ran;
+  the case id is the name the harness prints; the category is the first of build-refused, refusal,
+  crash, signal, timeout, exception that matches the case's lines, else assertion (or the gate's
+  fixed category: test-integrity `finding:<kind>`, cp25r `unclassified`, scanner `diff`); the
+  status is the exit status the case states; the detail is the refusal code and source position,
+  the crash text, the exception, or the harness's own detail line and the lines under it, plus the
+  case line's own detail;
+- the failure count, from a separate per-gate pattern (a stated count where the harness prints one,
+  otherwise the failure lines), compared independently of the case set;
+- the gate's own exit (make's `Error N` on the top-level target, or the line's rc).
+- Normalisation is narrow: the checkout roots, and absolute paths under /tmp reduced to their base
+  name (with line and column). Durations, counts and other values are kept.
+- One justified reduction: test-rt-host-mutants records the refused switch, not the refused object
+  set, because host_mutants.sh runs `make -j4` without `-k` and which objects are refused before
+  make stops depends on scheduling.
+
+**Expected-baseline gates with an extractor (13):** cp25r-inventory, test-cp19-s1-dispatch,
+test-rt-host-mutants, test-rt-parser, test-runtime2-cp01-simplify, test-runtime2-cp03-simplify,
+test-runtime2-rt-diff-selftest, test-runtime2-scanner-parity, test-sha256, test-test-integrity,
+test-v44-packages, test-v44-shell-restricted, test-v46-relative-imports.
+
+**Stopped (no extractor; FAILED-NEW until an adapter is approved), with proposals:**
+
+| Gate | Why its failing cases cannot be identified | Proposed adapter |
+| --- | --- | --- |
+| test-v44-language-foundation | `tests/v44_ast_expression_smoke.sh` fails with no output (`set -euo pipefail`; the failing command prints nothing) | certify re-runs that recipe line under `bash -x` on both trees and takes the last traced command as the case; or a reviewed test-only change printing the failing step |
+| test-rt-vm (own recipe) | vm_parity's `--rt-diff` part runs rt-diff `--quiet` and deletes its report; the log says only `FAIL vm parity: 1 failure(s)` (vm_modules alone is extractable) | certify runs vm_parity with the rt-diff report kept in a certify directory on both trees and fingerprints the unapproved differing entries (id, channel) |
+| test-runtime2-host-deps | read_limit.py prints `FAIL <name> <detail>`: names contain colons and exit codes, and the detail is raw stderr cut to a fixed tail whose start moves with the length of TMPDIR (it contains a pid) | match read_limit.py's case names from its `check()` calls (a reviewed name table) and keep only each case's refusal code / exit status |
+
+**Guard.** `certify_fingerprints_selftest.py` (run by test-runtime2-certification-guard; 81 checks)
+fails if an expected-baseline gate has no extractor, no table row, or is also stopped. For each
+gate, on its real log: positive (equal to itself, and to a copy with another checkout root and other
+temporary paths), a new failure alongside the existing ones, a changed diagnostic or category, a
+substitution with the same count (each must differ), and a wording-only change outside the
+extracted fields (summaries, notes, totals, headers; must stay equal); test-integrity also has a
+count-only change. End to end, toy controls n1 (diagnostic changes), n2 (a passing case fails
+alongside) and n3 (substitution, same count) are FAILED-NEW under certify; p and v (equal failure,
+varying temporary path, pid, time) are FAILED-BASELINE; the earlier controls a, c, d, t, x, tp run
+under an expected-baseline gate name and stay FAILED-NEW, e (vm_parity style, no extractor) stays
+FAILED-NEW.
+
+### 17.1 Equality shown locally (HEAD binary 91a49efa, fc987ec1 binary ac283072)
+
+Fingerprints computed by the C19 extractor from raw logs: head1 = the round-4 certify logs
+(`cls/`), head2 = a second run on this tree, fc = this tree's harness with the fc987ec1 binary
+(`make T TARGET=<fc987ec1 binary>`). Only the binary differs between head and fc, which is the
+main source of cross-tree change. Whole-log identity often differs where fingerprints are equal:
+the echoed command lines name the binary's path, and prerequisite output differs between runs.
+The 17f7964c and weekend/r2 comparisons are for Linode.
+
+| Gate | head1 ~ head2 | head ~ fc987ec1 |
+| --- | --- | --- |
+| test-v46-relative-imports, test-runtime2-cp03-simplify, test-v44-packages, test-v44-shell-restricted, test-cp19-s1-dispatch, cp25r-inventory, test-rt-parser, test-runtime2-rt-diff-selftest | equal | equal |
+| test-test-integrity | head2 equals fc987ec1's tree (57 findings each); the round-4 log (58: certify.py's finding, fixed in C17) differs, as it should | equal |
+| test-rt-host-mutants | one log only (it builds mutant trees; same tree, not binary-dependent) | n/a |
+| test-sha256 | **flaky**: `[hybrid] up to date after rebuild` fails in 1 of 6 HEAD runs and 2 of 5 fc987ec1 runs (`[modified]` fails in all) | differs when the flake hits |
+| test-runtime2-cp01-simplify | **flaky** (known, R5-1b): 4 failing cases in one run, 1 in the next | differs |
+| test-runtime2-scanner-parity | **not stable on one tree**: cp22 vm-only thread-order scripts (v_preempt, v_thread_order, v_sleep_ties), socket_proof.f (the reference prints a random port) and for-s2/t27 differ between two runs; 1519/1520 failing scripts against the v4.12.0 reference | differs: fc987ec1 also fails 25 b5/evalorder fixtures (the H-A fix) |
+
+So the extractor identifies the cases in all 13, but three of those gates are nondeterministic
+themselves (test-sha256, cp01-simplify, scanner-parity): with zero-flakiness they will be
+FAILED-NEW on Linode until their nondeterminism is fixed or the owner decides otherwise.
+Scanner-parity would need its thread-order and port-printing probes made deterministic or
+excluded with a reviewed list; sha256's hybrid/modified freshness check looks like mtime
+granularity (not investigated; same class as CP01).

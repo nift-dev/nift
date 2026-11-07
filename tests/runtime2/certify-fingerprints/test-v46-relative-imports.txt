@@ -1,0 +1,7 @@
+$ make -k test-v46-relative-imports  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-v46-relative-imports)
+NIFT="/home/claude/review/cand-b5/nift" bash tests/v44_relative_import_ownership_smoke.sh
+error: /tmp/nift-certify-16274/test-v46-relative-imports/tmp.uCAYK9WIso/direct/modules/helper.f:1:1: not compiled for the VM (fn-flags): this function declaration form is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift modules/main.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+make: *** [Makefile:3564: test-v46-relative-imports] Error 1

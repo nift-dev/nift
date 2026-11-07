@@ -1,0 +1,24 @@
+$ make -k test-rt-host-mutants -o test-runtime2-f6-mutants -o test-runtime2-cp17-routing-mutants -o test-runtime2-cp17-n2-rebuild-mutant -o test-runtime2-cp17-handle-mutants -o test-runtime2-cp17-unwind-mutants  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-rt-host-mutants)
+bash tests/runtime2/host_mutants.sh "/home/claude/review/cand-b5/nift"
+FAIL host mutant 1: build failed (harness failure)
+error: production object src/ParserHelpers.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+error: production object src/ParserHostHelpers.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+error: production object src/ParserHost.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+make[1]: *** [Makefile:211: src/ParserHelpers.o] Error 1
+make[1]: *** [Makefile:211: src/ParserHostHelpers.o] Error 1
+bash scripts/build/compile-object.sh --production src/ParserObservation.o -- g++ -include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=1 -c src/ParserObservation.cpp
+bash scripts/build/compile-object.sh --production src/ParserReadObservation.o -- g++ -include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=1 -c src/ParserReadObservation.cpp
+make[1]: *** [Makefile:211: src/ParserHost.o] Error 1
+bash scripts/build/compile-object.sh --production src/ParserScript.o -- g++ -include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=1 -c src/ParserScript.cpp
+error: production object src/ParserReadObservation.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+error: production object src/ParserObservation.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+error: production object src/ParserScript.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+make[1]: *** [Makefile:211: src/ParserReadObservation.o] Error 1
+bash scripts/build/compile-object.sh --production src/ParserTemplate.o -- g++ -include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=1 -c src/ParserTemplate.cpp
+make[1]: *** [Makefile:211: src/ParserObservation.o] Error 1
+make[1]: *** [Makefile:211: src/ParserScript.o] Error 1
+error: production object src/ParserTemplate.o: the command line sets the test-only switch NIFT_HOST_MUTANT (tooling.md 3)
+make[1]: *** [Makefile:211: src/ParserTemplate.o] Error 1
+make[1]: Target 'nift' not remade because of errors.
+make[1]: Leaving directory '/tmp/nift-certify-16274/test-rt-host-mutants/tmp.n9Bn6F7bEL/m1'
+make: *** [Makefile:1435: test-rt-host-mutants] Error 1

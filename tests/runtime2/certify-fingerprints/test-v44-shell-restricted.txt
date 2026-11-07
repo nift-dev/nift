@@ -1,0 +1,27 @@
+$ make -k test-v44-shell-restricted  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-v44-shell-restricted)
+NIFT="/home/claude/review/cand-b5/nift" tests/v44_shell_glob.sh ; st=$?; if [ $st -eq 77 ]; then echo "  (skipped)"; else exit $st; fi
+PASS v4.4 shell glob
+NIFT="/home/claude/review/cand-b5/nift" tests/v44_cp21_history_smoke.sh
+NIFT="/home/claude/review/cand-b5/nift" tests/v44_cp22_completion_smoke.sh
+PASS tab-completes-command
+PASS completed-command-runs
+PASS history-up-arrow
+PASS tab-completes-builtin
+PASS tab-completes-path
+PASS ctrl-c-keeps-shell
+PASS ctrl-c-then-command
+FAIL tab-completes-user-function
+FAIL user-function-runs
+PASS ctrl-d-exits
+FAILED: tab-completes-user-function, user-function-runs
+MARK run1
+PASS foreground-stdin-tty
+PASS foreground-stdout-tty
+PASS foreground-stderr-tty
+MARK run2
+PASS redirection-routes-stdout
+MARK run3
+FAIL run-captures-not-tty
+FAILED: run-captures-not-tty
+bash tests/v44_cp27_restricted_smoke.sh /home/claude/review/cand-b5/nift
+make: *** [Makefile:3239: test-v44-shell-restricted] Error 1

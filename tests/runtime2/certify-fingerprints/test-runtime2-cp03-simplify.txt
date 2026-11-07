@@ -1,0 +1,17 @@
+$ make -k test-runtime2-cp03-simplify  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-runtime2-cp03-simplify)
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/runtime2/cp01/missing_tracer_caller.sh
+PASS missing-tracer caller: explicitly unmeasured (77)
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/runtime2/cp03_missing_tracer.sh
+FAIL CP03 missing-tracer caller: exit 1 != 77
+Traceback (most recent call last):
+  File "/home/claude/review/cand-b5/tests/runtime2/../v46_resource_paths.py", line 51, in <module>
+    result = run(["main.f"], local)
+  File "/home/claude/review/cand-b5/tests/runtime2/../v46_resource_paths.py", line 21, in run
+    raise AssertionError(f"command failed: {args}\n{result.stderr}")
+AssertionError: command failed: ['main.f']
+error: /tmp/nift-certify-16274/test-runtime2-cp03-simplify/tmpuzrjqo3g/local/main.f:2:7: not compiled for the VM (callable:module_path): the call `module_path()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift main.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+make: *** [Makefile:2563: test-runtime2-cp03-simplify] Error 1

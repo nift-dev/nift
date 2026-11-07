@@ -1,0 +1,57 @@
+NIFT_BIN="/home/claude/review/cand-b5/nift" NIFT_REF="/home/claude/review/nift-baseline-ce8cd36" bash tests/runtime2/scanner_parity.sh
+FAIL site repo-bindings_csharp_apps_NiftAspDogfood_site
+FAIL site repo-bindings_node_app_site
+FAIL site repo-bindings_python_app_site
+FAIL site repo-tests_conformance_cases_path-escape_project
+FAIL site repo-tests_conformance_cases_path-outside-default_project
+FAIL site repo-tests_runtime2_cp16_probes_sites_site_contain_site
+FAIL site repo-tests_runtime2_cp16_probes_sites_site_deps_site
+Only in /tmp/tmp.WBGGzghDiW/a/repo-tests_runtime2_cp16_probes_sites_site_deps_site: public
+FAIL site repo-tests_runtime2_rt-diff-corpus_workspaces_external-output_project
+diff -r -x .nift /tmp/tmp.WBGGzghDiW/a/repo-tests_runtime2_rt-diff-corpus_workspaces_external-output_project/site/index.info.json /tmp/tmp.WBGGzghDiW/b/repo-tests_runtime2_rt-diff-corpus_workspaces_external-output_project/site/index.info.json
+25d24
+<   "site-unknown-values": 0,
+diff -r -x .nift /tmp/tmp.WBGGzghDiW/a/repo-tests_runtime2_rt-diff-corpus_workspaces_external-output_project/site/two.info.json /tmp/tmp.WBGGzghDiW/b/repo-tests_runtime2_rt-diff-corpus_workspaces_external-output_project/site/two.info.json
+25d24
+<   "site-unknown-values": 0,
+FAIL script docs/evidence/cp410-competitiveness/probes/call-locals-2000.f
+0a1
+> 4002000
+1,4d0
+< error: /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-2000.f:1:12: not compiled for the VM (prepared-decl-type): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet
+< note: the program was not executed: no part of it ran
+< note: to run it on the legacy interpreter: NIFT_VM=0 nift /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-2000.f
+< note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+FAIL script docs/evidence/cp410-competitiveness/probes/call-locals-4000.f
+0a1
+> 16004000
+1,4d0
+< error: /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-4000.f:1:12: not compiled for the VM (prepared-decl-type): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet
+< note: the program was not executed: no part of it ran
+< note: to run it on the legacy interpreter: NIFT_VM=0 nift /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-4000.f
+< note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+FAIL script docs/evidence/cp410-competitiveness/probes/call-locals-8000.f
+0a1
+> 64008000
+1,4d0
+< error: /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-8000.f:1:12: not compiled for the VM (prepared-decl-type): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet
+< note: the program was not executed: no part of it ran
+< note: to run it on the legacy interpreter: NIFT_VM=0 nift /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/call-locals-8000.f
+< note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+FAIL script docs/evidence/cp410-competitiveness/probes/filter-aggregate-2000.f
+1,4c1
+< error: /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/filter-aggregate-2000.f:1:6: not compiled for the VM (callable:inject): the call `inject()` is not supported by the Runtime 2.0 VM yet
+< note: the program was not executed: no part of it ran
+< note: to run it on the legacy interpreter: NIFT_VM=0 nift /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/filter-aggregate-2000.f
+< note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+FAIL script docs/evidence/cp410-competitiveness/probes/frequency-2000.f
+0a1
+> 37
+1,4d0
+< error: /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/frequency-2000.f:4:24: not compiled for the VM (postfix-spelling): this postfix operator spelling is not supported by the Runtime 2.0 VM yet
+< note: the program was not executed: no part of it ran
+< note: to run it on the legacy interpreter: NIFT_VM=0 nift /home/claude/review/cand-b5/docs/evidence/cp410-competitiveness/probes/frequency-2000.f
+< note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+scanner parity: 88 sites, 2604 scripts compared
+FAIL scanner parity
+make: *** [Makefile:2550: test-runtime2-scanner-parity] Error 1

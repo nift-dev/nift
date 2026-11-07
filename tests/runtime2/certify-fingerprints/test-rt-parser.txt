@@ -1,0 +1,14 @@
+$ make -k test-rt-parser  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/nift-certify-16274/test-rt-parser)
+.build/rt-parser-unit
+FAIL dump of [print(await(f()))] lacks 'Opaque [legacy-runtime-error]':
+Program @0..17
+  ExprStmt @0..17
+    Call @0..17
+      Ident @0..5 `print`
+      Call @6..16
+        Ident @6..11 `await`
+        Call @12..15
+          Ident @12..13 `f`
+
+1 rt parser unit failure(s)
+make: *** [Makefile:3645: test-rt-parser] Error 1
