@@ -296,25 +296,43 @@ _SIGNAL = re.compile(r"Segmentation fault|Aborted|Killed|Bus error|core dumped|F
 _TIMING = re.compile(r"^\s*(real|user|sys)\s")
 
 
+_VARYING = [  # F1 (confirmation of c73a7692): values that vary between two runs of the same failure
+    (re.compile(r"/tmp/\S+"), "<TMP>"),
+    (re.compile(r"\b\d{4}-\d\d-\d\d[T ]\d\d:\d\d(:\d\d(\.\d+)?)?\S*"), "<TIMESTAMP>"),
+    (re.compile(r"\b\d\d:\d\d:\d\d(\.\d+)?\b"), "<CLOCK>"),
+    (re.compile(r"\b\d+(\.\d+)?\s?(ns|us|\u00b5s|ms|s|sec|secs|seconds|min)\b"), "<DURATION>"),
+    (re.compile(r'("[A-Za-z_]*_(us|ms|ns|seconds)"\s*:\s*)[\d.]+'), r"\1<DURATION>"),
+    (re.compile(r"\bpid\s*[=: ]\s*\d+", re.I), "pid <PID>"),
+    (re.compile(r"\b0x[0-9a-fA-F]{4,}\b"), "<ADDR>"),
+]
+
+
+def normalise(line, roots=()):
+    """F1: one normalisation for FAIL, detail and summary lines: checkout roots, temporary paths,
+    timestamps, durations, process ids and addresses. Counts are kept (`30 differing` vs `31`)."""
+    for r in roots:
+        if str(r):
+            line = line.replace(str(r), "<ROOT>")
+    for pat, rep in _VARYING:
+        line = pat.sub(rep, line)
+    return line.strip()
+
+
 def failure_identity(text, roots=(), rc=None):
-    """H2 (review of 0d853db4): what makes two failures the same failure. The failing step (or
-    None), the exit statuses and signals (make's `Error N`, a signal text, or the command's own rc),
-    and the normalised FAIL lines; when a log has no FAIL line, its normalised last lines instead.
-    None when there is nothing to compare (no FAIL line and no output): never identical."""
+    """H2 (review of 0d853db4), F1 (confirmation of c73a7692): what makes two failures the same
+    failure: the failing step (or None), the exit statuses and signals (make's `Error N`, a signal
+    text, or the command's own rc), the normalised FAIL lines, AND the normalised last lines of the
+    log (the detail and summary lines under a FAIL line: `bad case: ...`, `30 differing`), which
+    always count. None when there is nothing to compare: never identical."""
     lines = text.splitlines()
     codes = tuple(m.group(1).strip() for m in map(_MAKE_ERR.match, lines) if m)
     sigs = tuple(sorted(set(_SIGNAL.findall(text))))
-    fails = frozenset(fail_lines(text, roots))
-    tail = ()
-    if not fails:
-        def norm(l):
-            for r in roots:
-                l = l.replace(str(r), "<ROOT>")
-            return re.sub(r"/tmp/\S+", "<TMP>", l.strip())
-        body = [norm(l) for l in lines if l.strip() and not l.startswith(("make", "$ ")) and not _TIMING.match(l)]
-        tail = tuple(body[-15:])
-        if not tail:
-            return None
+    fails = frozenset(normalise(l, roots) for l in lines if _FAIL_LINE.match(l))
+    body = [normalise(l, roots) for l in lines
+            if l.strip() and not l.startswith(("make", "$ ")) and not _TIMING.match(l)]
+    tail = tuple(body[-15:])
+    if not fails and not tail:
+        return None
     return (failure_signature(text), codes or (rc,), sigs, fails, tail)
 
 

@@ -296,9 +296,9 @@ harness_status=$?
 # Positive control: an identical failure is FAILED-BASELINE (exit 0).
 TOY=$(mktemp -d)
 trap 'rm -rf "$TOY"' EXIT
-toy() {  # toy DIR TARGET RECIPE-LINES...
+toy() {  # toy DIR TARGET RECIPE-LINES...  (CERTIFY_PY: the runner copied in, default the tree's)
     local dir=$1 target=$2; shift 2
-    mkdir -p "$dir/scripts"; cp scripts/certify.py "$dir/scripts/"
+    mkdir -p "$dir/scripts"; cp "${CERTIFY_PY:-scripts/certify.py}" "$dir/scripts/certify.py"
     { printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n'
       printf 'certify-targets: %s\n.PHONY: %s\n%s: nift\n' "$target" "$target" "$target"
       for l in "$@"; do printf '\t@%s\n' "$l"; done; } >> "$dir/Makefile"
@@ -321,10 +321,33 @@ toyrun() {  # toyrun CASE TARGET BASELINE-FLAG WANT-RC WANT-CLASS
     fi
     echo "PASS certification guard toy control $1: $2 is $5 (exit $rc)"
 }
+# F1 (confirmation of c73a7692): detail lines under the same FAIL line count; a vm_parity-style
+# summary count change counts; varying values (pid, temporary path, duration, timestamp) do not.
+toy "$TOY/d/cand" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-NEW"; exit 1'
+toy "$TOY/d/base" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-old"; exit 1'
+toy "$TOY/e/cand" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 31 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
+toy "$TOY/e/base" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 30 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
+toy "$TOY/v/cand" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-$$$$/a pid $$$$ took 123ms at 2026-11-07T21:04:30"; echo "FAIL vary: 2 of 9 (took 45ms)"; exit 1'
+toy "$TOY/v/base" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-7/a pid 7 took 9ms at 2026-11-08T01:00:00"; echo "FAIL vary: 2 of 9 (took 3ms)"; exit 1'
 toyrun a test-rt-multi reg 1 FAILED-NEW
 toyrun b test-rt-crash reg 1 FAILED-NEW
 toyrun c test-rt-cases v4 1 FAILED-NEW
+toyrun d test-rt-detail reg 1 FAILED-NEW
+toyrun d test-rt-detail v4 1 FAILED-NEW
+toyrun e test-rt-parity reg 1 FAILED-NEW
 toyrun p test-rt-same reg 0 FAILED-BASELINE
+toyrun v test-rt-vary reg 0 FAILED-BASELINE
+# F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;
+# the tree's runner (above) does not. Needs that commit in this repository.
+if git cat-file -e 0d853db4:scripts/certify.py 2>/dev/null; then
+    git show 0d853db4:scripts/certify.py > "$TOY/old-certify.py"
+    CERTIFY_PY="$TOY/old-certify.py" toy "$TOY/o/cand" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 1'
+    CERTIFY_PY="$TOY/old-certify.py" toy "$TOY/o/base" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 0'
+    toyrun o test-rt-multi reg 0 FAILED-BASELINE
+    echo "PASS certification guard historical control: the 0d853db4 runner launders control (a); this tree's runner reports it FAILED-NEW"
+else
+    echo "NOT RUN certification guard historical control: commit 0d853db4 is not in this repository (manual evidence: combined-b3-b5.md 10)"
+fi
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an
