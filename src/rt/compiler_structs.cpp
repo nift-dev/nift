@@ -120,14 +120,23 @@ bool UnitCompiler::field_update(const Node& node, NodeId receiver, const StructF
         const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
         const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
         if (!numbers && !strings && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");
-        if (!expr_any(node.b, value)) return false;
+#if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 6
+        if (!expr_any(node.b, value)) return false;  // D2-6: the field is read after the rhs
+#endif
     }
+    // D2 family C: the receiver and the field are read before the rhs is evaluated.
     if (!temp(slot) || !receiver_value(receiver, slot) || !temp(current)) return false;
     if (!fb_->constant(Value::integer(field.type), type)) return builder_ok();
     const Atom key = atom(field.name);
     if (key.id > 0xffff) return fail(node, "limit:atoms");
     fb_->set_offset(node.begin);
     fb_->note(fb_->emit(OpCode::FieldGet, current, slot, static_cast<std::uint16_t>(key.id)), std::string(field.name));
+#if !(defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 6)
+    if (node.kind != NodeKind::IncDec) {
+        if (!expr_any(node.b, value)) return false;
+        fb_->set_offset(node.begin);
+    }
+#endif
     if (node.kind == NodeKind::IncDec) {
         const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
         fb_->emit(OpCode::AddI, current, current, jump_operand(up ? 1 : -1));

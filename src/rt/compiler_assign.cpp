@@ -221,6 +221,9 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
     const Node* rhs = node.kind == NodeKind::IncDec ? nullptr : &ast_.at(node.b);
     const bool immediate = rhs != nullptr && node.op == Op::AddAssign && rhs->kind == NodeKind::Number &&
                            decode_number_literal(text(*rhs), small) && small.is(Kind::Int) && small.as_int() <= 32767;
+#if !(defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 3)  // D2-3: the target is read after the rhs again
+    if (rhs != nullptr && !immediate && may_rebind(node.b)) return compound_snapshot(node, b);  // D2 family B
+#endif
     if (rhs != nullptr && !immediate && !expr_any(node.b, value)) return false;
     if (indirect) {
         if (!read_binding(b, reg)) return false;

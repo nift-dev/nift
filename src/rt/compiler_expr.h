@@ -143,6 +143,7 @@ private:
     bool return_statement(const Node& node);
     bool assign_value(const Node& node, const Binding& b);
     bool compound_op(const Node& node, const Binding& b);
+    bool compound_snapshot(const Node& node, const Binding& b);
     bool atomic_update(const Node& node, const Binding& b, std::uint16_t dst, bool expression);
     bool atomic_store(const Node& node, const Binding& b);
     bool atomic_read(NodeId id, std::uint16_t source, std::uint16_t& dst);

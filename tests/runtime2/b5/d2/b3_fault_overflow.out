@@ -1,0 +1,2 @@
+-- exit 1
+error: b3_fault_overflow.f:4:7: signed 64-bit integer overflow

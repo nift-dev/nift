@@ -1,0 +1,8 @@
+20
+5
+Z
+24
+-- exit 0
+error: modulo by zero
+error: signed 64-bit integer overflow
+error: boom

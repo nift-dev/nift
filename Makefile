@@ -1010,9 +1010,10 @@ $(B4B_GUARDOFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)
 .PHONY: test-runtime2-b5 test-runtime2-b5-mutants
 test-runtime2-b5: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver evalorder precision
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver evalorder precision
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver evalorder precision d2
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver evalorder precision d2
 	$(PYTHON) tests/runtime2/b5/sort_refusals.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/b5/d2_append.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
 	bash tests/runtime2/b5/mutants.sh
@@ -1028,12 +1029,17 @@ test-runtime2-b5-generators: $(TARGET)
 # argument behaviour (rebind, alias mutation, dropped references, throw) x callee x context
 # (top level, loop, function, lambda, session) against the contract model, on the production
 # build, inputs from the tree (tests/runtime2/b5/gen/evalorder.tsv); then its negative controls
-# (a missing tree and a truncated operation table must exit 2 and write nothing).
+# (a missing tree and a truncated operation table must exit 2 and write nothing). D2 (section 27):
+# then the operator family (gen_operators.py, tests/runtime2/b5/gen/operators.tsv: binary operators,
+# fused comparisons, compound assignment on variables and struct fields, by callee and context) and
+# its negative controls.
 .PHONY: test-runtime2-b5-evalorder
 test-runtime2-b5-evalorder: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-evalorder: $(TARGET)
 	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
 	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
+	$(PYTHON) -I tests/runtime2/b5/gen/gen_operators.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
+	$(PYTHON) -I tests/runtime2/b5/gen/gen_operators.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
 test-rt-vm: test-runtime2-b5-evalorder
 # H-A lifetime fixtures (tests/runtime2/b5/evalorder life_*, atomic_*, and the generator's `drop`
 # family: the retained receiver is the only reference left) on the ASan/UBSan build. A sanitizer
@@ -1043,9 +1049,11 @@ test-rt-vm: test-runtime2-b5-evalorder
 test-runtime2-b5-evalorder-sanitize: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-evalorder-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
-		$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(SAN_TARGET)" --dirs evalorder
+		$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(SAN_TARGET)" --dirs evalorder d2
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(SAN_TARGET)" --tree "$(CURDIR)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) -I tests/runtime2/b5/gen/gen_operators.py --nift "$(CURDIR)/$(SAN_TARGET)" --tree "$(CURDIR)"
 test-rt-vm-sanitize: test-runtime2-b5-evalorder-sanitize
 # Combined-candidate harness (C3, owner 2026-11-07 18:00): gen_alias, every program, on the
 # PRODUCTION build (test-runtime2-guardoff runs only a 1,500-program sample on the probe build).

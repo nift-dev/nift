@@ -99,7 +99,10 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
     switch (left.kind()) {
         case Kind::Null: same = true; break;
         case Kind::Bool: same = left.as_bool() == right.as_bool(); break;
-        case Kind::String: same = string_view_of(left) == string_view_of(right); break;
+        case Kind::String:  // D2: the same string object is equal without reading it (compound_snapshot)
+            same = (left.is_heap() && right.is_heap() && left.heap() == right.heap()) ||
+                   string_view_of(left) == string_view_of(right);
+            break;
         case Kind::Bytes: same = bytes_of(left) == bytes_of(right); break;
         case Kind::Array:
             if (identity && left.heap() == right.heap()) return Shallow::Equal;

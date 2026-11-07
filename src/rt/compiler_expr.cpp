@@ -174,7 +174,14 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const std::uint16_t mark = fb_->top();
     const auto numeric_flags = fb_->flags();
     std::uint16_t left = 0, right = 0;
+    // D2 family A: operands are evaluated once, left to right; a left operand in its
+    // binding's own register is retained when the right operand can rebind it.
+#if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 1
     if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
+#else
+    if (!expr_any(node.a, left) || !retain_receiver(left, left < mark, node.b) || !expr_any(node.b, right))
+        return false;
+#endif
     fb_->set_offset(site(node));
 #if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 9
     if (numeric_guard) {
@@ -366,7 +373,12 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
             !unknown_defers(kinds(node.a) | kinds(node.b)))
             return fail(node, std::string("type:") + op_name(node.op));
         std::uint16_t left = 0, right = 0;
+#if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 2
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
+#else
+        if (!expr_any(node.a, left) || !retain_receiver(left, left < mark, node.b) || !expr_any(node.b, right))
+            return false;  // D2 family A (fused comparison)
+#endif
         fb_->set_offset(node.begin);
         jumps.push_back(fb_->emit(fused, left, right));
     } else {

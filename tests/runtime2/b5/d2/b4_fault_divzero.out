@@ -1,0 +1,2 @@
+-- exit 1
+error: b4_fault_divzero.f:4:7: division by zero

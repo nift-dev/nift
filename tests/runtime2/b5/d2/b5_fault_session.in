@@ -1,0 +1,17 @@
+x := 6
+z := 0
+g := () => { x = 20; return 1 % z }
+x += g()
+print(x)
+y := 9223372036854775807
+h := () => { y = 5; return 1 }
+y += h()
+print(y)
+s := "a"
+k := () => { s = "Z"; if (z == 0) { throw error("boom") }; return "a" }
+s += k()
+print(s)
+v := 6
+fn(n()) { v = 30; return 4 }
+v *= n()
+print(v)

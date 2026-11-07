@@ -1,0 +1,4 @@
+x := 6
+g := () => { x = 20; return 4 }
+x += g()
+print(x)

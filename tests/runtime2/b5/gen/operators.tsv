@@ -1,0 +1,44 @@
+# D2 operand evaluation order (docs/runtime-2/checkpoints/combined-b3-b5.md section 27): one row per
+# operation. Columns (tab-separated): op, family, statement template. In the template V is the
+# binding and G the right operand that rebinds it (g(), or an inline assignment). gen_operators.py
+# checks this table against its model in both directions: a missing or extra row exits 2.
+add	num	print(V + G)
+sub	num	print(V - G)
+mul	num	print(V * G)
+div	num	print(V / G)
+mod	num	print(V % G)
+eq	num	print(V == G + 2)
+ne	num	print(V != G + 2)
+lt	num	print(V < G + 4)
+le	num	print(V <= G + 2)
+gt	num	print(V > G + 4)
+ge	num	print(V >= G + 4)
+neg_right	num	print(V + -G)
+nested_right	num	print(V + (0 + G))
+nested_left	num	print((V + 0) + G)
+neg_left	num	print(-V + G)
+tern_right	num	print(V + (true ? G : 0))
+and_sc	num	print(V == 7 && G == 4)
+or_eval	num	print(V == 7 || G == 4)
+if_eq	num	if (V == G + 2) { print("T") } else { print("F") }
+if_lt	num	if (V < G + 4) { print("T") } else { print("F") }
+list	num	print([V, G].stringify())
+objlit	num	print({"a": V, "b": G}.stringify())
+call_fn	num	print(f2(V, G))
+call_lam	num	print(l2(V, G))
+strcat	str	print(V + G)
+str_eq	str	print(V == G)
+str_ge	str	print(V >= G)
+add_dbl	dbl	print(V + G)
+c_add	num	V += G
+c_sub	num	V -= G
+c_mul	num	V *= G
+c_div	num	V /= G
+c_div_dbl	dbl	V /= G
+c_mod	num	V %= G
+c_expr	num	print(V += G)
+c_str	str	V += G
+c_index	arr	V[0] += G
+c_okey	obj	V["k"] += G
+f_add	fld	V.v += G
+f_mul	fld	V.v *= G

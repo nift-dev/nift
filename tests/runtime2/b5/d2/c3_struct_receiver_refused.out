@@ -1,0 +1,2 @@
+-- exit 1
+error: c3_struct_receiver_refused.f:9:14: not compiled for the VM (struct-assign): this struct feature is not supported by the Runtime 2.0 VM yet
