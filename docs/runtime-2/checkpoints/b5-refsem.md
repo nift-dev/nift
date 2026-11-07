@@ -1,6 +1,9 @@
 # Checkpoint B5: guard removal, the reference-semantics switch (D-NEXT-refsem-b)
 
-Status: **SECOND FIX-UP FROZEN (B5 21, section 12) on the first fix-up `09651e11`, after the
+Status: **FINAL FIX-UP FROZEN (B5 24, section 13) on `3c9c66f4`, after the targeted re-review's
+ACCEPT-WITH-CONDITIONS (owner 2026-11-07 15:25: the four conditions R2-1, R2-2, R2-3 and
+vm_builtins closed in section 13; awaiting the narrow independent confirmation).** Earlier status, as
+written: **SECOND FIX-UP FROZEN (B5 21, section 12) on the first fix-up `09651e11`, after the
 independent REJECT of the B5 13 freeze `1d9053f6` (tree `e3f1767d`); awaiting the targeted
 independent re-review (owner 2026-11-07 14:00: m12/m13, the 54+ conversions, receiver identity,
 D4 classifications).** (First fix-up: section 11.) The REJECT and
@@ -1087,6 +1090,13 @@ statement is then refused), 7 refuse at another position or for another reason. 
 m13 CLI (harness object) gives the same results as the run-time switch
 (`m13/output-diffs.txt`).
 
+**[CORRECTED in 13.1 (B5 23, owner 2026-11-07 15:25): the m12 classification in this paragraph is
+WRONG. The call site IS reachable (session closures capturing a function parameter that holds a
+mutex, channel or atomic; `host-handle-flow` refuses only host handles such as `ofstream`), and the
+"0 arrivals" corpus never built such a session. m12 is OBSERVATIONALLY EQUIVALENT to production on
+the tested reachable paths, not unreachable and not proven universally equivalent. The original text
+is kept below as written.]**
+
 **m12** (`session_callable.cpp`, `may_call` always true). **UNREACHABLE on B5; retired with a
 bounded proof, kept as a tripwire.** `may_call` has one call site (line 74, plus its own
 recursion): a function upvalue that is a cell for which `cell_plain_capture` returns null. That
@@ -1267,3 +1277,177 @@ guard-era refusal expectations of the same kind as 12.3 but were outside this ro
   read-only) and rv-b5 untouched.
 - For the targeted re-review (owner 14:00): 12.1 (m12/m13), 12.2-12.3 (the 48 + 27 conversions
   and their rules), 12.4 (receiver identity), D4 classifications unchanged (11.1).
+
+## 13. Final fix-up from 3c9c66f4 (owner 2026-11-07 15:25; B5 22 to B5 24)
+
+The targeted re-review of `3c9c66f4` (tree `b1b1e389`; `scratchpad/review-b5/REVIEW-R2.md`) is
+ACCEPT-WITH-CONDITIONS; the owner's 15:25 decision (binding) set four conditions. This round, by
+an agent that is neither the reviewer nor an earlier implementer, closes them with **tests,
+harnesses, one Makefile dependency fix and documentation only: no `src/`, `include/` or
+`scripts/` change** (`git diff 3c9c66f4 HEAD -- src include scripts` is empty). Evidence:
+`scratchpad/b5-fixup3/` (`clean/` clean-checkout builds, `m12/`, `compat/`, `vb/`, `gates/`).
+Commits: B5 22 `22624c05` (Makefile), B5 23 `f6e1aac7` (probe, fixtures, harness, compatibility,
+evidence), B5 24 (this record and the 12.1 correction marker).
+
+### 13.1 m12: corrected classification (R2-1; owner 15:25 ACCEPTED)
+
+**The original classification (12.1, B5 21) was wrong, and stays visible there, marked.** It
+said m12 (`session_callable.cpp`: `may_call` always true) was UNREACHABLE on B5, because the
+only remaining cell with binding type -1 would hold a host handle, which `host-handle-flow`
+refuses, and the instrumented corpus had 0 arrivals in 3,462 sessions. Correction: `binding_tag`
+returns -1 for any `Kind::Handle`, and `HandleKind` includes Mutex, Channel and Atomic;
+`host-handle-flow` refuses only host handles such as `ofstream`. A session closure capturing a
+**function parameter that holds a mutex, channel or atomic** reaches the call site
+(`is_cell(capture) && !may_call(bound)`); the B5 21 corpus never built such a session.
+
+**Classification: m12 is OBSERVATIONALLY EQUIVALENT to production on the tested reachable paths.
+It is not unreachable and has not been proven universally equivalent.** At every arrival observed,
+production's `may_call(bound)` is already true (the bound type carries the handle kind bit,
+outside the allowed set), so forcing it true changes nothing on those paths. m12 stays an
+**informational negative control**: the `selector` tripwire rows in `admission_mutants.py`
+(comment corrected), plus a new permanent probe. **If m12 ever becomes observable (the probe
+fails, or the tripwire trips), this classification must be revisited.**
+
+Permanent reachable-path regression probe: `tests/runtime2/cp19/m12_reachable.py`, run by
+`make test-cp19-m12-reachable`, which is part of `test-cp19-mutants`. Its sessions,
+`tests/runtime2/cp19/m12_reachable/p1-p10.in`, are the reviewer's probes, verbatim. From the
+production build plan (`make -n nift`) the probe builds, in a temporary directory that is deleted
+afterwards:
+- an instrumented production CLI: a copy of `session_callable.cpp` that logs production's
+  `may_call` at each arrival at the call site;
+- the real m12 CLI: `-DNIFT_SESSION_ADMISSION_MUTANT=12`.
+
+It then runs each session with `nift -i` and `NIFT_VM=require`, and requires:
+- **p4-p10 reach the call site, 23 arrivals in all, with production's `may_call` = 1 at each.**
+  These are mutex (p4, p5, p7, p8), channel (p6, p9) and atomic (p10) parameters captured by
+  closures.
+- The p1-p3 controls (`ofstream` captures) are refused with `host-handle-flow` and never arrive.
+- Production, the instrumented CLI (log lines removed) and **m12 give identical stdout, stderr and
+  exit status**, equal to the pinned results (`1`, `ok`, `1`, `1`, `2`, `2`, `2`; the controls exit
+  1).
+- An arrival where production's `may_call` is false fails the probe ("m12 may now be observable").
+  So does an m12 difference.
+- If the call-site anchor moves, or there is no build plan, the probe exits 2 (a harness failure).
+
+Run on the tree (`m12/run2.log`) and in the clean worktree (`gates/test-cp19-m12-reachable.log`):
+PASS. This is the demonstration the owner asked for: **m12 built temporarily, same result as
+production, build deleted.** Nothing is left under `/tmp` or in the tree.
+
+Limit, found while checking whether the probe can discriminate (scratch only,
+`m12/inverse_control.log`): a scratch variant that makes `may_call` return **false** at the same
+site also gives output identical to production on p1-p10. So these sessions' printed results do
+not depend on the branch's value. The equivalence on the tested paths therefore rests on the
+logged fact that production's `may_call` is already true at every arrival (m12 computes the same
+value there), not on output sensitivity. The probe checks that fact directly.
+
+### 13.2 Clean-build dependencies (R2-2)
+
+Cause: `test-runtime2-b5` and `test-runtime2-b5-mutants` named `$(B4B_GUARDOFF_NIFT)` as a
+prerequisite before the Makefile defined it. Make expands prerequisites when it reads a rule, so
+the prerequisite was empty. Fix (B5 22): the definition and its rule move, unchanged, above the two
+targets. Evidence (`clean/dryrun.txt`): in a clean worktree, the `make -n` plan contains **0**
+probe-binary links at `3c9c66f4` for both targets, and **1** at `22624c05`.
+
+Clean-checkout runs, in a temporary worktree (`git worktree add --detach … f6e1aac7`). Each run
+starts from `git checkout --detach f6e1aac7; git clean -ffdxq`. Before each run
+`git status --porcelain --ignored` is empty and there is no `.build`: no cached objects, no
+prebuilt probe, no libffi. Script: `clean/run.sh`; logs and results: `clean/<name>.{log,result}`.
+
+| run | command (from clean) | result |
+| --- | --- | --- |
+| b5-seq | `make -j1 test-runtime2-b5` | exit 0: builds libffi, `nift` (sha256 `ac283072…`) and `.build/b4b-guardoff/nift-guardoff`; PASS 73 production, PASS 78 probe, sort-refusals 564 |
+| b5mut-seq | `make -j1 test-runtime2-b5-mutants` | exit 0: builds `nift` and the probe binary; PASS b5 mutants: 1, 3, 4, 6, 7, 8, 11, 12 all caught |
+| b5-j4a / b5-j4b | `make -j4 test-runtime2-b5` (twice, each from clean) | exit 0 both; same PASS lines; `nift` sha256 `ac283072…` |
+| b5mut-j4a / b5mut-j4b | `make -j4 test-runtime2-b5-mutants` (twice, each from clean) | exit 0 both; all 8 caught |
+
+No dependency race: none of the six logs has a make error, a missing-file error or a "No rule"
+line. An earlier `make -j1 test-runtime2-b5` from clean at `22624c05` also passed
+(`clean/b5-seq-22624c05.result`; 71/76, before the two new fixtures). Fixture counts are now 73
+production and 78 probe, previously 71/76: `q3` gained r14 and r15 (13.3).
+
+### 13.3 Compatibility rows (R2-3; both APPROVED by the owner 2026-11-07 15:25)
+
+Added to the compatibility.md table "Arrays and objects are shared references". The earlier
+rows and the approval history (14:00 receiver row and others) are unchanged. Also added to
+`expected-changes.tsv` (class i), each row citing the approval.
+
+1. **Extracted array elements stay valid after the source binding is reassigned.** Measured
+   (`compat/`), comparing B5 (`require` and `NIFT_VM=1`), legacy (`NIFT_VM=0`) and 17f7964c:
+
+   | program | B5 | legacy | 17f7964c |
+   | --- | --- | --- | --- |
+   | `a := [1]; x := a[0]; a = []; print(x)` (the owner's example) | `1` | **`1`** | `1` |
+   | `a := [[1]]; x := a[0]; a = []; print(x[0])` (reviewer's `side.f`) | `1` | error `reference target no longer exists: x[0]` at 4:7, exit 1 | refused `aliasing` (2:1) |
+   | `… print(y.stringify())` | `[1]` | error `reference target no longer exists: y` (exit 1) | refused `aliasing` |
+   | `o := [{"k": 1}]; z := o[0]; o = []; print(z.k)` | `1` | error `reference target no longer exists: z.k` | refused `aliasing` |
+   | `c := [[1]]; w := c[0]; c = [[5]]; print(w[0])` | `1` | `5` (reads the location through the new `c`) | refused `aliasing` |
+
+   **Correction to the brief:** legacy prints `1` for the owner's literal scalar example, so it
+   is legacy-equal; legacy copies a scalar element. The legacy difference exists for an
+   aggregate element, which legacy binds as a location in the source: after `a = []` legacy fails
+   "reference target no longer exists: <expr>", and after a rebinding it reads the new source.
+   The row records both. B5's behaviour is the one approved: `1` for the example, and the element
+   itself in every case. Fixture: `tests/runtime2/b5/q3/r14_extracted_element_survives_rebind.f`
+   (golden hand-derived, `1 [1] 1 1`). On it, legacy fails at 13:7 with `reference target no
+   longer exists: y` and 17f7964c refuses `aliasing` at 11:1.
+2. **`first()` returns the element itself.** `a := [[1, 2], [3]]; head := a.first(); head.push(9);
+   print(a.stringify()); e := a[0]; print(same(head, e))`: B5 `[[1,2,9],[3]]` and `true`; legacy
+   `[[1,2],[3]]` and `false`; 17f7964c refuses `aliasing` at 8:1 (the version without `same`:
+   `reference-guard:inflow` at 2:9). Fixture: `tests/runtime2/b5/q3/r15_first_returns_element.f`.
+   Both fixtures pass on the production and probe builds and are part of `test-runtime2-b5`.
+
+### 13.4 vm_builtins: the 4 cases, each converted on its own rule
+
+Each case was run on legacy, B5 (classify, `require`, `NIFT_VM=1`) and 17f7964c (classify,
+`require`, `1`). Original expectations, every result, the conversion and the rule are in
+`docs/runtime-2/evidence/b5/vm-builtins-originals.json`. The original harness is
+`git show 3c9c66f4:tests/runtime2/vm_builtins.py`.
+
+| case | original expectation | legacy | 17f7964c | B5 | conversion | rule |
+| --- | --- | --- | --- | --- | --- | --- |
+| `shapes@loop` | refused `reference-guard:inflow` | 16 lines incl. `[[1,2],[3]]` x2, exit 0 | refused `reference-guard:inflow` | compiled, `vm`: legacy's output with `[[1,2],[3]]` -> `[[1,2,9],[3]]` (2 lines), nothing else differs | `B5_PINNED_IN_CONTEXT` (exact: legacy with the pinned line replaced; fails if legacy starts to print the B5 line) | `first()` returns the element (13.3 row 2, APPROVED 15:25), after guard removal (owner 2026-11-02) |
+| `shapes@fn-loop` | refused `reference-guard:inflow` | as above, plus `0` lines | refused `reference-guard:inflow` | as above (2 lines differ) | as above | as above |
+| `w3-mixed` | refused `builtin-receiver:empty` (CP14 W3) | `false false` | **compiled, `false false`** (the expectation already failed there) | compiled, `false false` | `SUPPORTED_TOP` (legacy-equal) | **not a B5 rule**: B4a Dynamic admission (owner B4 ruling 2026-11-06 01:09; b4-dispatch.md section 1, a closed string/array union with each family's `empty`). B3 `4c7d0b40` still refused it |
+| `f4-sort` | refused `reference-guard:shared` | `2` | refused `reference-guard:shared` | compiled, `2` | `SUPPORTED_TOP` (legacy-equal) | guard removal (owner 2026-11-02); `sort()` returns the receiver (APPROVED 14:00) |
+
+The reviewer's claim checks out with one correction. w3-mixed and f4-sort are legacy-equal, and
+the two `shapes` cases differ from legacy only through `first()` returning the element. But
+w3-mixed was **not** refused at 17f7964c: it was a stale expectation from B4a (the 12.5 / 12.7
+note "failing on 17f7964c too" is right only for this case). Negative control: on the 17f7964c
+binary the converted harness fails exactly `shapes@loop`, `shapes@fn-loop` and `f4-sort` (not
+compiled). On B5: **PASS** (67 supported, 2 pinned, 26 error programs, 28 refusals, 2 budget stops).
+
+### 13.5 Gates on a clean tree (`scratchpad/b5-fixup3/gates/`, clean worktree at `f6e1aac7`)
+
+| gate | result |
+| --- | --- |
+| test-runtime2-b5 | **PASS** (73 production, 78 probe, sort-refusals 564); sequential and `-j4` x2 from clean (13.2) |
+| test-runtime2-b5-mutants | **PASS** (all 8 caught); sequential and `-j4` x2 from clean |
+| test-rt-vm, vm_builtins line (`python3 tests/runtime2/vm_builtins.py --nift $PWD/nift`) | **PASS** (0 failures; was 4) |
+| test-cp19-m12-reachable (new) | **PASS** (7 reachable, 23 arrivals with production `may_call` already true; 3 controls; production = m12) |
+| test-cp19-admission-mutants / -switch | FAIL by design, exactly as in 12.5: 13 of 15 cases PASS (the selector/shared tripwires hold, shared-scalar catches m13); `loop` (D4, m3) and `native` (m10) fail |
+
+After the runs: the production `nift` sha256 is `ac283072f622c473b117d76d4d2e4397606743a8804bee5c0fa1565145ac05b7`
+(unchanged, built from clean); `git status --porcelain` in the clean worktree is empty;
+`--ignored` lists build products only (`.build/`, `nift`, `*.o`/`*.d`/`*.cfg`, `libnift_c.*`).
+
+### 13.6 Open items (unchanged by this round)
+
+These remain release blockers, as recorded in 12.7: the D4 four (with the group audit; m3's
+coverage obligation), D2 comparator-sort portability, F4 lambda line positions, m10, the
+pre-existing failures, and cp01-simplify FLAKY (zero-flakiness policy). m12 is informational
+(13.1), not a release blocker, and must be revisited if it becomes observable. No PENDING-OWNER
+item is new.
+
+### 13.7 Freeze record (B5 24)
+
+- Commits: B5 22 `22624c05`, B5 23 `f6e1aac7`, B5 24 (this record). Production binary
+  unchanged (sha256 `ac283072…`). No `src/`, `include/` or `scripts/` change since `3c9c66f4`.
+- `git status --porcelain` is empty after the commit; `--ignored` shows build products only. The
+  temporary clean worktree was removed (`git worktree remove --force`). The scratch m12 and
+  instrumented CLIs were deleted by the probe. No generated corpus is in the tree.
+- Not pushed, not tagged. runtime-2, weekend/r2, cand/b4-dispatch, cand-b4 (its `./nift` was
+  only run) and rv-b5 are untouched.
+- For the narrow independent confirmation: 13.1 (the m12 correction and probe), 13.2 (the clean
+  and parallel builds), 13.3 (the two rows, including the scalar-example correction), 13.4 (the
+  four conversions).
