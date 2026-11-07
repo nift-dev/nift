@@ -1109,29 +1109,72 @@ aged as a whole, edits stamped just before the clock); hash mode keeps the raw s
 unsequenced edit and passes with a sequenced one.
 
 **Cross-binary equality** (this tree's harness, candidate vs fc987ec1 binary): language-foundation
-(1 case) and host-deps (33 cases) equal; rt-diff's 30 unapproved differences identical on
-fc987ec1, 17f7964c and weekend/r2 (below).
+(1 case) and host-deps (33 cases) equal. (The rt-diff cross-binary claim first written here was
+wrong; see §23.1, corrected in §25.)
 
-### 23.1 rt-diff's unapproved differences: 30, not 14
+### 23.1 rt-diff's unapproved differences: 30, not 14 (CORRECTED in C28, see §25)
 
-Correction: §15/§R5-1a's "14" came from reading `30 differing, 16 approved` as 30 - 16. rt-diff
-counts them separately: 30 entries differ and are not approved; 16 others are approved.
+Count: rt-diff's own summary says `differing: 30, approved: 16` (817 entries): 30 entries differ
+without an approval; 16 others are approved. The earlier "14" was 30 - 16, a misreading.
 
-Evidence: each binary run through this tree's vm_parity (same corpus, generator seed, policies)
-with the report kept; the difference lists are compared entry by entry, channel by channel, first
-difference included. All 30 are identical on fc987ec1 (the B5 base), 17f7964c (accepted B4b) and
-weekend/r2 (before B3), so none is introduced by B3-B5 or by the H-A fix: **all 30 are historical
-incompatibilities; none is an approved B5 change; none is a candidate defect.**
+The classification first written here ("identical on fc987ec1, 17f7964c and weekend/r2 … none is
+introduced by B3-B5 … historical incompatibilities") was WRONG and is withdrawn: rt-diff runs each
+entry with a minimal environment, so `NIFT_VM_BIN` never reached `tools/rt-vm/nift-vm`, whose
+B side therefore always ran this checkout's `./nift`; every "per-binary" run compared that
+binary's legacy side with the candidate's VM. Found by the review of 4ec1aa80 (F1). The
+corrected evidence and classification:
 
-| Group | Entries | Legacy (a) / VM (b) | What it is |
-| --- | --- | --- | --- |
-| Reference semantics (shared arrays) | 24 generated (`gen/g00002` … `gen/g00190`, 3 ending in a VM error) | `[1,2]` / `[1,2,99]` | a callee's push to an argument is visible to the caller on the VM; legacy copies (weekend-refsem-a §11: Phase B makes `f(a)`'s mutation visible) |
-| Same, corpus | `semantics/copy_at_call.f`, `semantics/copy_at_return.f`, `vm-corpus/cp11/arrays.f` | `[1]`/`[1,9]`, `[1]`/`[1,5]`, `4`/`5` | the same reference-semantics change (`arrays.f`: "5/4 becomes 5/5 in Phase B") |
-| Legacy reference-target errors | `smoke/location_method_receiver/002-missing`, `smoke/v44_element_assignment_smoke/003-const`, `smoke/v44_root_path_reference_smoke/001-missing` | exit 1 with `reference target no longer exists` / exit 0 or another error | legacy's reference objects end when their target goes; the VM's shared values do not |
+All 30 entries, each binary through this tree's (fixed) vm_parity, legacy side `NIFT_VM=0` and VM
+side `NIFT_VM=1` of the same binary: the candidate and fc987ec1 show the same 30 differences
+(identical first differences, every channel); 17f7964c and weekend/r2 refuse all 30 on the VM
+(reference-guard / aliasing / declare-const) and fall back to legacy, so they are legacy-equal. The
+differences were introduced by B5 (fc987ec1) and are unchanged by the H-A fix. **All 30 are
+approved B5 changes; none is a historical incompatibility and none is a candidate defect.**
 
-None has an rt-diff approval policy, which is why vm_parity fails on every tree. Approving them
-(or not) is an owner decision about the reference-semantics difference; it is not waived here.
-The full table: `scratchpad/combined-fix/item2/rtdiff-table.md`.
+| # | Entry | First difference: legacy / VM | fc987ec1 VM | 17f7964c VM | weekend/r2 VM | Cause | Class |
+|---|---|---|---|---|---|---|---|
+| 1 | `gen/g00002/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 4}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 2 | `gen/g00008/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 16}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 3 | `gen/g00024/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 4 | `gen/g00028/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 4}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 5 | `gen/g00030/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 21}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 6 | `gen/g00034/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 4}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 7 | `gen/g00045/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 10}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 8 | `gen/g00060/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 10}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 9 | `gen/g00071/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 31}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 10 | `gen/g00073/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 15}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 11 | `gen/g00101/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 8}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 12 | `gen/g00112/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 3}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 13 | `gen/g00114/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 14 | `gen/g00118/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 15 | `gen/g00125/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 16 | `gen/g00131/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 16}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 17 | `gen/g00133/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 22}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 18 | `gen/g00139/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 8}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 19 | `gen/g00159/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 3}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 20 | `gen/g00169/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 8}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 21 | `gen/g00170/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 3}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 22 | `gen/g00181/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 23 | `gen/g00189/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 12}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 24 | `gen/g00190/main.f` | `{"a": "[1,2]", "b": "[1,2,99]", "line": 32}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 25 | `semantics/copy_at_call.f` | `{"a": "[1]", "b": "[1,9]", "line": 2}` | same difference | legacy-equal (refused: fallback:reference-guard:argument) | legacy-equal (refused: fallback:reference-guard:argument) | B5 shared references: a callee's push to an argument is visible to the caller (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 26 | `semantics/copy_at_return.f` | `{"a": "[1]", "b": "[1,5]", "line": 1}` | same difference | legacy-equal (refused: fallback:aliasing) | legacy-equal (refused: fallback:aliasing) | B5 shared references: a returned array stays shared with the caller's value (D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+| 27 | `smoke/location_method_receiver/002-missing/missing.f` | `{"a": [1], "b": [0]}` | same difference | legacy-equal (refused: fallback:aliasing) | legacy-equal (refused: fallback:aliasing) | B5 shared references: an extracted element stays valid after its source is cleared (compatibility.md; expected-changes.tsv class i), so `b.push(2)` runs | approved B5 change |
+| 28 | `smoke/v44_element_assignment_smoke/003-const/const.f` | `{"a": [1], "b": [0]}` | same difference | legacy-equal (refused: fallback:declare-const) | legacy-equal (refused: fallback:declare-const) | `const` is binding-only (owner ruling Q2 option B, b5-refsem.md section 1): `const a := [1, 2]; a[0] = 9` runs | approved B5 change |
+| 29 | `smoke/v44_root_path_reference_smoke/001-missing/missing.f` | `{"a": "error: $ROOT/missing.f:4:7: reference target no longer exists: b", "b": "error: $RO` | same difference | legacy-equal (refused: fallback:aliasing) | legacy-equal (refused: fallback:aliasing) | B5 shared references: the extracted element survives `a.pop()` (`print(b.stringify())` gives `[2]`); `print(b)` of an array then gives legacy's own print error, which legacy also gives for any array (`x := [2]; print(x)`) | approved B5 change |
+| 30 | `vm-corpus/cp11/arrays.f` | `{"a": "4", "b": "5", "line": 7}` | same difference | legacy-equal (refused: fallback:reference-guard:shared) | legacy-equal (refused: fallback:reference-guard:shared) | B5 shared references: `grow(a)` pushes to the caller's array, `5/4 becomes 5/5` (weekend-refsem-a section 11, D-NEXT-refsem-b, b5-refsem.md section 1) | approved B5 change |
+
+#29 in detail: `a := [[1], [2]]; b := a[1]; a.pop(); print(b)`. Legacy: `reference target no
+longer exists: b`. Under B5's shared references `b` keeps `[2]` (`print(b.stringify())` prints `[2]`
+on the candidate and fc987ec1); `print(b)` of an array then fails with `print: value is not
+directly renderable`, which is legacy's own error for printing any array (`x := [2]; print(x)`
+gives it on legacy and VM alike). So the approved B5 behaviour (the element survives) followed by
+an unchanged, legacy-equal print rule: not a defect.
+
+None has an rt-diff approval policy, which is why vm_parity fails on the candidate and fc987ec1
+(17f7964c and weekend/r2 refuse them instead). Encoding them as rt-diff approvals is an owner
+decision; until then test-rt-vm is FAILED-NEW against 17f7964c and weekend/r2. Data:
+`scratchpad/combined-fix/rtvm2/` (kept reports, per binary).
 
 ## 24. Review of C21-C25 (a977376e): ACCEPT-WITH-CONDITIONS; follow-ups (C27)
 
@@ -1158,3 +1201,58 @@ Root cause, mutants and regression tests confirmed, and the cp22 VM-only exclusi
 unfixed mode restores the three old behaviours together and does not show each cause on its own;
 three rare diagnostics are not in the shared list: a bare `KeyboardInterrupt`, `SystemExit: N`
 and `terminate called without an active exception`.
+
+## 25. Review of C26-C27 (4ec1aa80): REJECT; fixes (C28)
+
+Harness and tests only; `src/` and the binary (`91a49efa…`) unchanged.
+
+**F1 (fixed): rt-diff's VM side and the evidence.** `vm_parity.py` now writes its own B-side
+wrapper (`NIFT_VM=1`, then the `--nift` binary) as it already did for the legacy side, and
+`cp25/inventory.py` does the same for both its sides: rt-diff's minimal environment had dropped
+`NIFT_VM_BIN`, so `tools/rt-vm/nift-vm` always ran the checkout's `./nift`. No gate's evidence was
+affected (every gate passes the checkout's own binary; test-rt-vm-sanitize runs vm_parity without
+`--rt-diff`); only my cross-binary evidence of §23.1 was, now redone and corrected there (30
+approved B5 changes, introduced by fc987ec1; 17f7964c and weekend/r2 refuse them; #28 is Q2's
+const-is-binding-only; #29 is the surviving element plus legacy's own print rule).
+
+**F2 (fixed): host-deps table cases diagnose what is printed under them.** For a read_limit.py
+case the line's own detail and every line under it are compared, narrowly normalised, with every
+shared-list diagnostic in them. Nine `check()` calls print a fixed-size tail of the output whose
+start moves with the length of the temporary paths in it, so `certify.run_target` now gives every
+run of every tree (candidate, reruns, baselines, unprivileged copy) a TMPDIR of the same length
+(`nift-certify-<7-digit pid>/<16 hex>`): the tails are cut at the same offset everywhere. Shown:
+three runs with different equal-length TMPDIRs and one with the fc987ec1 binary give equal
+fingerprints (32 cases). Selftest: an internal failure, a Segmentation fault, a VM refusal and a
+Traceback under `FAIL open one byte over…`, and a replaced detail, each change the fingerprint.
+Also found: `read_limit.py`'s `page build: up to date afterwards` had the CP01 same-tick flake
+(failed in 2 of 4 runs); its three edits are now sequenced with `ticks.py` (passed 3 of 3 after).
+The forced-race mechanism is the one host_deps.py's forced_race check covers (same helper, same
+modified rule).
+
+**F3 (done): checks hidden by an abort are reported (D3, required, "aborted by earlier failure").**
+`certify_fingerprints.not_executed` lists them from the failing logs (the gate's and each failing
+recipe line's), on the candidate and every baseline alike; certify adds them to the gate's
+not-executed assertions. Named checks come from `ABORT_CASES` (line, name), hidden when after the
+line the script stopped at (CERTIFY-ERR, or a Python traceback's module-level frame); a script
+without named checks reports "every check after line N". test-v46-relative-imports now also gets
+the errtrace hook so its stop line is known. The abort-hidden checks on the candidate:
+
+| Gate | Script (stops at) | Checks never run |
+| --- | --- | --- |
+| test-v44-language-foundation | v44_ast_expression_smoke.sh (line 52) | big-int equality (its check), large-value compound, live binding, precedence |
+| | v44_element_assignment_smoke.sh (line 25, recipe line run alone) | array element assignment, object member assignment, nested grid assignment, compound element assignment, element read-after-write, out-of-range element assignment, const array element assignment |
+| | v44_root_path_corruption_reproducers.sh (line 20) | 1 destructuring then parent growth (its check), 2 nested extraction then growth, 3 array of struct handles, 4 map of struct handles, 5 @for over a mutated map, 6 @for over a mutated array, CP34 escaped reference, CP34 loop-scope reference, CP34 heavy reallocation |
+| | v44_cp2_variadic_functions, v44_struct_variadic_methods, v44_cp3_variadic_lambdas, v44_cp4_spread, v44_cp5_generalized_native, v44_cp6_cp7_glob_filesystem, v44_cp9_map_markup smokes (`#!/bin/sh`, `set -eu`: stop at a VM refusal; sh has no BASH_ENV hook, so no stop line) | every check after the failing command |
+| | v44_ast_differential_corpus.sh | none hidden (it runs every case and fails at its end; `ABORT_CASES` marks it complete) |
+| test-v46-relative-imports | v44_relative_import_ownership_smoke.sh (line 69) | every check after line 69 (the script names none) |
+| | v46_import_worker_ownership_smoke.sh (recipe line run alone; no stop line printed) | every check after its failing command |
+| test-v44-packages | package_transaction_smoke.py (line 330) | every check after line 330 (unnamed asserts: child-update provenance and the rest) |
+| test-runtime2-cp03-simplify | cp03_missing_tracer.sh (explicit exit at line 9) | every check after its failing command (the same case's remaining checks) |
+
+None of them was run another way; accepting fail-fast scripts is the owner's decision. Shown end
+to end: certify on test-v44-language-foundation and test-v46-relative-imports lists these 29 as
+REQUIRED not-executed assertions (`scratchpad/combined-fix/item2/certify2.log`).
+
+**Release-audit items fixed.** The BASH_ENV hook no longer sets errtrace (a script's own ERR
+trap no longer fires inside its functions; the selftest checks three trap/errexit shapes keep their
+exit status and output under the hook). The sitecustomize hook catches every `Exception`.

@@ -1087,7 +1087,12 @@ def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
     cannot collide with concurrent targets, other checkouts or other users),
     in its own process group (killed on timeout)."""
     log.parent.mkdir(parents=True, exist_ok=True)
-    tmp = Path(os.environ.get("TMPDIR", "/tmp")) / f"nift-certify-{os.getpid()}" / re.sub(r"[^\w.-]", "_", log.stem)
+    # Review of 4ec1aa80 (F2): the same path LENGTH for every run of every tree (candidate, rerun,
+    # baselines, unprivileged copy): harnesses that print a fixed-size tail of their output
+    # (read_limit.py) then cut it at the same offset everywhere, so the tail can be compared.
+    import hashlib
+    tmp = (Path(os.environ.get("TMPDIR", "/tmp")) / f"nift-certify-{os.getpid():07d}"
+           / hashlib.sha256(str(log).encode()).hexdigest()[:16])
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     env = clean_env()
@@ -1607,6 +1612,15 @@ def main():
         silent = False
         echo = recipe_echo(ROOT, t, olds[t])
         r["skipped"] = skipped_assertions(logtext, echo)
+        if r["rc"] not in (None, 0) and t in FP.ABORT_CASES:
+            # F3 (review of 4ec1aa80), D3: checks a failing script never reached, on every tree
+            texts = [logtext] + [(logdir / f"{t}.line{i}.log").read_text(errors="replace")
+                                 for i, (_, lrc) in enumerate(r.get("lines") or [], 1)
+                                 if lrc and (logdir / f"{t}.line{i}.log").exists()]
+            hidden = []
+            for text in texts:
+                hidden += [x for x in FP.not_executed(t, text, [ROOT]) if x not in hidden]
+            r["skipped"] = r["skipped"] + hidden
         if r["rc"] == 0 and t not in SILENT_BY_DESIGN:  # R4-5: no line cap
             silent = not own_output(logtext, echo)
         # R4-1: a check skipped only because the run is root is run as the unprivileged user

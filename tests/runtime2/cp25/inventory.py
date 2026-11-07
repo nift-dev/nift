@@ -72,7 +72,13 @@ def collect_execute_rt_diff(nift, out, seed):
     import cp12b_inventory
     with tempfile.TemporaryDirectory(prefix="cp25-exec-") as work:
         report = os.path.join(work, "report.json")
-        cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", "tools/rt-vm/nift-vm", "--b", "tools/rt-vm/nift-vm",
+        # rt-diff's minimal environment drops NIFT_VM_BIN, so tools/rt-vm/nift-vm always ran the
+        # checkout's ./nift (review of 4ec1aa80, F1): a wrapper names the binary itself.
+        vm = os.path.join(work, "nift-vm")
+        with open(vm, "w") as f:
+            f.write("#!/bin/sh\nNIFT_VM=1\nexport NIFT_VM\nexec '%s' \"$@\"\n" % nift.replace("'", "'\\''"))
+        os.chmod(vm, 0o755)
+        cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", vm, "--b", vm,
                "--no-trace", "--no-interleave", "--jobs", "1", "--extract-smoke", "tests", "--gen", "0",
                "--seed", str(seed), "--quiet", "--b-vm-stats", "--report", report, "--timeout", "60"]
         for c in cp12b_inventory.SHARED:

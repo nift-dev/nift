@@ -131,7 +131,9 @@ _FAILLINE = r"^FAIL (?P<id>.+?)(?:: (?P<detail>.*))?$"
 SPECS = {
     "test-v44-shell-restricted": Spec([r"^FAIL (?P<id>[\w-]+)$"], summary=[r"^FAILED: "],
                                       count=r"^FAILED: (?P<list>.+)$"),
-    "test-v46-relative-imports": Spec([], lines=r"^(?:error: |\w+Error: )", abort=True),
+    "test-v46-relative-imports": Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$"],
+                                      lines=r"^(?:error: |\w+Error: |CERTIFY-ERR )", abort=True, errtrace=True,
+                                      rc_category=True),
     "test-runtime2-cp03-simplify": Spec([_FAILLINE], abort=True),
     # bad "$1 (expected '$2', got '$3')": $3 may span lines, so the id ends at " (expected '"
     "test-sha256": Spec([r"^FAIL (?P<id>.+?) \((?P<detail>expected '.*)$", _FAILLINE],
@@ -167,7 +169,8 @@ STOPPED = {}
 # entry per check() call. read_limit.py prints `FAIL <name> <detail>`: names contain colons, exit
 # codes, durations and RSS figures, and the detail is stderr cut to a fixed tail whose start moves
 # with TMPDIR's length. A case is the entry and its name arguments; the exit code in the name is
-# its status; durations, RSS figures and the cut detail are not compared. A FAIL line that maps
+# its status; durations and RSS figures are not compared; the detail and the lines under the FAIL
+# line are (see below). A FAIL line that maps
 # to no entry, or to more than one, is UNMAPPED and blocks.
 READ_LIMIT_TABLE = [
     ("fatal-limit", r"(?P<name>.+?): fatal (?P<op>\w+) limit error \(exit (?P<exit>-?\d+)\)"),
@@ -200,6 +203,10 @@ READ_LIMIT_TABLE = [
     ("run-marker", r"(?P<name>.+?): marker never created \(child stopped before finishing\)"),
     ("no-zombies", r"no zombie processes left by the capture cases"),
 ]
+# Nine check() calls print a tail of the output ((stdout + stderr)[-N:], read_limit.py lines 138,
+# 196, 207, 234, 260, 329, 371, 389, 429), whose start moves with the length of the temporary paths
+# in it: certify.run_target gives every run of every tree a TMPDIR of the same length, so the tails
+# are cut at the same offset and compared in full.
 SPECS.update({
     # owner 03:27: v44_ast_expression_smoke.sh dies silently under set -e; the runner's
     # certify_errtrace.bash (BASH_ENV, every tree alike) names the script, line, status and command
@@ -220,6 +227,67 @@ SPECS.update({
 
 # The gates expected to fail identically on a baseline (record section 17). The guard fails if any
 # of them has no extractor or no table test, or is also STOPPED.
+# Review of 4ec1aa80 (F3), D3: scripts that stop at their first failure hide every later check, on
+# the candidate and on every baseline alike, so an equal fingerprint says nothing about them. For
+# each gate whose scripts abort, the checks each script would still have run: (line, name) from
+# the unchanged script, a check being hidden when its line is after the line the script stopped
+# at (CERTIFY-ERR, or the module-level frame of a Python traceback). A script of such a gate
+# without named checks reports the rest of the script as one not-executed entry.
+ABORT_CASES = {
+    "test-v44-language-foundation": {
+        # runs every case and fails at its end (each case is a FAIL line): nothing hidden
+        "v44_ast_differential_corpus.sh": "complete",
+        "v44_ast_expression_smoke.sh": [(43, "hot-loop sum"), (53, "big-int equality"), (63, "large-value compound"),
+                                        (73, "live binding"), (82, "precedence")],
+        "v44_element_assignment_smoke.sh": [(26, "array element assignment"), (27, "object member assignment"),
+                                            (28, "nested grid assignment"), (29, "compound element assignment"),
+                                            (30, "element read-after-write"), (36, "out-of-range element assignment"),
+                                            (44, "const array element assignment")],
+        "v44_root_path_corruption_reproducers.sh": [
+            (21, "1 destructuring then parent growth"), (36, "2 nested extraction then growth"),
+            (51, "3 array of struct handles with growth"), (68, "4 map of struct handles with growth"),
+            (89, "5 @for over a map whose body mutates it"), (107, "6 @for over an array whose body mutates it"),
+            (126, "CP34 escaped reference through an object member"), (140, "CP34 reference escaping a loop scope"),
+            (158, "CP34 heavy reallocation with composed locations")],
+    },
+    "test-v46-relative-imports": {},
+    "test-v44-packages": {},
+    "test-runtime2-cp03-simplify": {},
+}
+_ABORT_AT = re.compile(r'^CERTIFY-ERR (?P<s>[^\s:]+):(?P<l>\d+) |^\s*File "(?:[^"]*/)?(?P<ps>[^"/]+\.py)", line (?P<pl>\d+), in <module>$')
+
+
+def not_executed(gate, text, roots=()):
+    """F3: [(label, reason, required)] for the checks hidden by a script's abort in this log."""
+    scripts = ABORT_CASES.get(gate)
+    if scripts is None:
+        return []
+    spec = SPECS.get(gate)
+    steps = [narrow(m.group("step"), roots).split("/")[-1] for m in map(spec.step.match, text.splitlines())
+             if m and not m.string.startswith(("FAIL", "PASS"))]
+    stopped = {}
+    for m in map(_ABORT_AT.match, text.splitlines()):
+        if m:
+            s, l = (m.group("s"), m.group("l")) if m.group("s") else (m.group("ps"), m.group("pl"))
+            stopped.setdefault(s, int(l))
+    out = []
+    for script, line in sorted(stopped.items()):
+        named = scripts.get(script)
+        if named == "complete":
+            continue
+        if named:
+            out += [(f"NOT EXECUTED {script}: {name}", f"aborted by earlier failure (line {line})", True)
+                    for at, name in named if at > line]
+        else:
+            out.append((f"NOT EXECUTED {script}: every check after line {line} (the script names none)",
+                        f"aborted by earlier failure (line {line})", True))
+    last = steps[-1] if steps else None
+    if last and last not in stopped and scripts.get(last) != "complete":  # failing logs only: the last step failed
+        out.append((f"NOT EXECUTED {last}: every check after its failing command (its line is not printed)",
+                    "aborted by earlier failure", True))
+    return out
+
+
 EXPECTED_BASELINE = [
     "test-v44-language-foundation", "test-rt-vm", "test-runtime2-host-deps",
     "cp25r-inventory", "test-cp19-s1-dispatch", "test-rt-host-mutants", "test-rt-parser",
@@ -257,17 +325,25 @@ def _cases(spec, lines, roots):
             hits = [(k, mm) for k, rx in spec.table for mm in [rx.match(rest)]
                     if mm and (mm.end() == len(rest) or rest[mm.end()] == " ")]
             i += 1
+            under = []
             while i < len(lines) and lines[i].strip() and not re.match(r"^\s*(?:PASS|FAIL|SKIP|ok|note)\b", lines[i]) \
                     and not spec.step.match(lines[i]) and not lines[i].startswith("make"):
-                i += 1  # the rest of the cut stderr detail: not compared (its start moves with TMPDIR)
+                under.append(lines[i])
+                i += 1
             stepped[step] = True
             if len(hits) != 1:
                 out.append((step, "UNMAPPED", "unmapped", "", narrow(rest, roots) + f" ({len(hits)} table entries match)"))
                 continue
             k, mm = hits[0]
             args = {n: v for n, v in mm.groupdict().items() if n != "exit"}
+            # review of 4ec1aa80, F2: the lines under the FAIL line are diagnosed and compared too:
+            # the line's own detail and every line under it, narrowly normalised, and every
+            # diagnostic in them
+            own = rest[mm.end():].strip()
+            found = matches("\n".join([own] + under), roots)
+            detail = " | ".join([f"{c}:{d}" for c, d in found] + [narrow(x, roots) for x in [own] + under if x.strip()])
             out.append((step, k + "".join(f" {n}={v}" for n, v in sorted(args.items())), "table-case",
-                        mm.groupdict().get("exit") or "", ""))
+                        mm.groupdict().get("exit") or "", detail))
             continue
         m = next((m for c in spec.cases for m in [c.match(line)] if m), None)
         if not m:

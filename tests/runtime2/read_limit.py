@@ -329,17 +329,31 @@ def default_limit(work):
           limit_error(proc, "open_bytes", gib), (proc.stdout + proc.stderr)[-300:])
 
 
+def sequenced(site, path):
+    """Flakiness fix (2026-11-08, record section 25): an edit followed at once by a build can share
+    the page-info's timestamp tick, so the modified rule rebuilds once more and `status` is not up
+    to date. Age the site as a whole (order kept), then stamp the edit just before the clock
+    (tests/runtime2/cp01/ticks.py): strictly newer than the last build, older than the next."""
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "cp01"))
+    import ticks
+    ticks.age(str(site))
+    ticks.sequence([str(path)])
+
+
 def page_build(work):
     site = work / "site"
     site.mkdir()
     subprocess.run([NIFT, "init"], cwd=site, capture_output=True, check=True)
     (site / "content" / "index.html").write_text('<p>GOOD:@script { return open("data.txt") }</p>\n')
     (site / "data.txt").write_text("v1\n")
+    sequenced(site, site / "data.txt")
     env = dict(os.environ, NIFT_READ_LIMIT="1024")
     first = subprocess.run([NIFT, "build", "--all"], cwd=site, capture_output=True, text=True, env=env)
     good = (site / "public" / "index.html").read_bytes()
     check("page build: initial build", first.returncode == 0 and b"GOOD:v1" in good, first.stdout + first.stderr)
     (site / "data.txt").write_text("x" * 1025)
+    sequenced(site, site / "data.txt")
     failed = subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
     text = failed.stdout + failed.stderr
     check("page build: limit is a build failure naming the operation and limit",
@@ -347,6 +361,7 @@ def page_build(work):
     check("page build: last-good output preserved", (site / "public" / "index.html").read_bytes() == good)
     check("page build: no interrupted-state marker", not (site / ".nift" / ".unfinished").exists())
     (site / "data.txt").write_text("v2\n")
+    sequenced(site, site / "data.txt")
     fixed = subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
     check("page build: next build after the fix succeeds without --repair",
           fixed.returncode == 0 and b"GOOD:v2" in (site / "public" / "index.html").read_bytes(), fixed.stdout + fixed.stderr)

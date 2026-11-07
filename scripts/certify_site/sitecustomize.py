@@ -37,7 +37,7 @@ if _KEEP:
                     data.get("summary", {}).get("differing"), data.get("summary", {}).get("approved"),
                     data.get("summary", {}).get("entries")))
                 sys.stderr.flush()
-        except (OSError, ValueError) as e:  # never hide: the line names the failure
+        except Exception as e:  # never hide or crash the harness: the line names the failure (review of 4ec1aa80)
             sys.stderr.write("CERTIFY-RTDIFF-ERROR %s\n" % e)
         return _real_rmtree(path, *args, **kwargs)
 

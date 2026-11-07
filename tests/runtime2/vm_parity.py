@@ -289,7 +289,13 @@ def rt_diff(args, work):
     with open(legacy, "w") as f:
         f.write("#!/bin/sh\nNIFT_VM=0\nexport NIFT_VM\nexec '%s' \"$@\"\n" % args.nift.replace("'", "'\\''"))
     os.chmod(legacy, 0o755)
-    cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", legacy, "--b", os.path.join(REPO, "tools/rt-vm/nift-vm"),
+    # The B side the same way (review of 4ec1aa80, F1): rt-diff's minimal environment drops
+    # NIFT_VM_BIN, so tools/rt-vm/nift-vm always ran the checkout's ./nift, whatever --nift named.
+    vm = os.path.join(work, "nift-vm")
+    with open(vm, "w") as f:
+        f.write("#!/bin/sh\nNIFT_VM=${NIFT_VM_WRAPPER_MODE:-1}\nexport NIFT_VM\nexec '%s' \"$@\"\n" % args.nift.replace("'", "'\\''"))
+    os.chmod(vm, 0o755)
+    cmd = [sys.executable, "tools/rt-diff/rt-diff", "--a", legacy, "--b", vm,
            "--ignore", "tools/rt-diff/ignore.txt", "--policy", "tools/rt-diff/policies/cp11-vm.json",
            "--policy", "tools/rt-diff/policies/cp12-vm.json",
            # d040-vm.json is retired by D-NEXT-refsem #9 (its witnesses are refused before execution

@@ -288,6 +288,45 @@ check("host-deps every real failure maps", not any(c[1] == "UNMAPPED" for c in
       F.fingerprint("test-runtime2-host-deps", text, [ROOT])["cases"]))
 n += 2
 
+# review of 4ec1aa80, F2: what is printed under a table-mapped read_limit.py FAIL line counts
+under = "FAIL open one byte over: fatal open limit error (exit 0) AFTER\n"
+for kind, ins in [("internal failure", "error: case.f: NIFT_VM internal failure: unexpected operands"),
+                  ("Segmentation fault", "Segmentation fault (core dumped)"),
+                  ("VM refusal", "error: /tmp/x/tmp.AB/case.f:1:1: not compiled for the VM (new-refusal): x"),
+                  ("Traceback", "Traceback (most recent call last):\nRuntimeError: boom")]:
+    got = F.fingerprint("test-runtime2-host-deps", text.replace(under, under + ins + "\n", 1), [ROOT])
+    check(f"host-deps {kind} under a mapped FAIL line", not F.same(F.fingerprint("test-runtime2-host-deps", text, [ROOT]), got))
+    n += 1
+got = F.fingerprint("test-runtime2-host-deps", text.replace(under, under.replace("AFTER", "error: something else"), 1), [ROOT])
+check("host-deps replaced detail of a mapped FAIL line", not F.same(F.fingerprint("test-runtime2-host-deps", text, [ROOT]), got))
+n += 1
+
+# review of 4ec1aa80, F3: the checks a failing script never reached are reported (D3, required)
+lf = open(os.path.join(LOGS, "test-v44-language-foundation.txt"), errors="replace").read()
+hidden = [x[0] for x in F.not_executed("test-v44-language-foundation", lf, [ROOT])]
+check("language-foundation hidden checks", hidden == [f"NOT EXECUTED v44_ast_expression_smoke.sh: {c}" for c in
+      ("big-int equality", "large-value compound", "live binding", "precedence")], str(hidden))
+check("abort gates listed", set(F.ABORT_CASES) >= {"test-v44-language-foundation", "test-v46-relative-imports",
+      "test-v44-packages", "test-runtime2-cp03-simplify"})
+n += 2
+
+# review of 4ec1aa80: the errtrace hook leaves a script's exit status alone (no errtrace option)
+import subprocess, tempfile
+hook = os.path.join(HERE, "..", "..", "scripts", "certify_errtrace.bash")
+check("errtrace hook sets no errtrace", "set -o errtrace" not in open(hook).read() and "set -E" not in open(hook).read())
+for body in ("trap 'echo own; exit 7' ERR\nf() { false; echo after; }\nf\necho done\n",
+             "set -e\nf() { false; }\nf || echo handled\necho done\n",
+             "trap 'exit 9' ERR\nset -e\ng() { return 3; }\nif g; then :; fi\necho done\n"):
+    with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
+        fh.write(body)
+    plain = subprocess.run(["bash", fh.name], capture_output=True, text=True, env={"PATH": os.environ["PATH"]})
+    hooked = subprocess.run(["bash", fh.name], capture_output=True, text=True,
+                            env={"PATH": os.environ["PATH"], "BASH_ENV": hook})
+    os.unlink(fh.name)
+    check("errtrace hook keeps exit status and stdout", (plain.returncode, plain.stdout) == (hooked.returncode, hooked.stdout),
+          f"{body!r}: {plain.returncode}/{hooked.returncode}")
+    n += 1
+
 # no failing case found: no fingerprint, never equal (never "same step")
 check("no case: no fingerprint", F.fingerprint("test-v44-shell-restricted", "PASS a\nmake: *** [x] Error 1\n") is None)
 check("no fingerprint never matches", not F.same(None, None))
