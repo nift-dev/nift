@@ -530,9 +530,9 @@ guard). No production change: binary `91a49efa…`.
 | Requirement | Minimum | Checked | For |
 | --- | --- | --- | --- |
 | RAM | 8 GB plan (MemTotal >= 7600 MiB) | yes | read_limit.py's default-limit check needs MemAvailable >= 4096 MiB |
-| Disk | 50 GB free | yes | 1.7 GB worktree; about 1.5 GB per sanitizer object set (ASan/UBSan, TSan) and their variants (guard-off, cp18, cp19, cp23); three baseline trees; a GCC snapshot build (5-7 GB build tree, about 1.2 GB installed) |
+| Disk | 40 GB free (section 14: no toolchain build) | yes | 1.7 GB worktree; about 1.5 GB per sanitizer object set (ASan/UBSan, TSan) and their variants (guard-off, cp18, cp19, cp23); three baseline trees |
 | Cores | 2 (4 recommended) | no | duration only |
-| GCC 15.2 with `__GLIBCXX__` 20260321 | the GCC 15 branch snapshot of 2026-03-21 (`15.2.1 20260321`; FreeBSD ships it as `gcc15-devel 15.2.1.s20260321`) | yes | comparator sort |
+| GCC 15.2 | the D4 profile: Ubuntu `g++-15 15.2.0-16ubuntu1` with its libstdc++ (section 14) | yes (version, `__GLIBCXX__`, three sha256s) | comparator sort |
 | Python | 3.12+, with headers (Ubuntu `python3-dev`) | yes | harnesses, test-python-binding |
 | Go | 1.26+ (bindings/go/go.mod) with pkg-config | yes | test-go-binding (`go test -race`) |
 | Node | 22 (>= 20) and npm | yes | test-node-binding |
@@ -543,24 +543,50 @@ guard). No production change: binary `91a49efa…`.
 | Kernel | `vm.mmap_rnd_bits` <= 28 (`sysctl -w vm.mmap_rnd_bits=28`) | yes | the TSan gates |
 | User | an unprivileged `tester` | (runner) | root-only classification |
 
-Ubuntu 24.04 packages: `build-essential pkg-config git strace time util-linux python3 python3-dev
-python3-venv golang-go` (only 1.22 in 24.04: install Go 1.26 from go.dev/dl instead), Node 22 from
-NodeSource or nodejs.org, `dotnet-sdk-10.0` from Microsoft's package feed.
+(The toolchain plan of this section is superseded by section 14.)
 
-**GCC 15.2 with `__GLIBCXX__` 20260321.** That value is the DATESTAMP of the GCC 15 branch
-snapshot `15-20260321`; no LTS image (Ubuntu 24.04, Debian 12/13) ships it, and rolling
-distributions have since moved past it. The tree's evidence (cp14b-d4-validation.md) names the
-profile but not the image; the exact compiler identity is in the owner workspace
-(`.claude-linode-runs/codex/cp14b/implementation/d4/profile.json`). Plan: build from the
-snapshot on the instance:
+## 14. The comparator toolchain is Ubuntu's packaged GCC 15.2.0-16ubuntu1 (C14)
 
-    curl -O https://gcc.gnu.org/pub/gcc/snapshots/15-20260321/gcc-15-20260321.tar.xz
-    tar xf gcc-15-20260321.tar.xz && cat gcc-15-20260321/gcc/DATESTAMP   # must print 20260321
-    (cd gcc-15-20260321 && ./contrib/download_prerequisites)
-    mkdir gcc-build && cd gcc-build && ../gcc-15-20260321/configure --prefix=/opt/gcc-15-20260321 \
-        --enable-languages=c,c++ --disable-multilib --disable-bootstrap && make -j"$(nproc)" && make install
-    export PATH=/opt/gcc-15-20260321/bin:$PATH LD_LIBRARY_PATH=/opt/gcc-15-20260321/lib64
+The owner's D4 profile (owner workspace `.claude-linode-runs/codex/cp14b/implementation/d4/profile.json`,
+read by the coordinator) records the comparator certification toolchain as `g++ (Ubuntu
+15.2.0-16ubuntu1) 15.2.0`, `__GLIBCXX__` 20260321, `_GLIBCXX_RELEASE` 15, flags `-std=c++17 -O2
+-Wall -Wextra -pedantic -pthread`, scope "Linux/GCC15 libstdc++ full-buffer profile only", and the
+sha256 of `/usr/lib/gcc/x86_64-linux-gnu/15/libstdc++.so` and of `bits/stl_algo.h` and
+`bits/stl_tempbuf.h`. Those values are now in the tree, `tests/runtime2/cp14b/toolchain-profile.json`
+(with that provenance).
 
-Estimate: 30-60 min on 4 cores without bootstrap (2 cores: about twice), 5-7 GB build tree
-(deleted after install), about 1.2 GB installed. Then `echo __GLIBCXX__ | g++ -E -include
-cstddef -` must print 20260321 (the preflight checks it). Not tried here (disk).
+- **Preflight.** Besides `__GLIBCXX__` 20260321, the compiler's version string must contain
+  `15.2.0-16ubuntu1`, and the libstdc++.so (found with `$CXX -print-file-name=libstdc++.so`, symlink
+  resolved) and the two headers (found through the compiler's include trace for `<algorithm>`)
+  must have the profile's sha256s. Guard: a mismatch on each field fails (5 table cases).
+- **Image.** packages.ubuntu.com lists `gcc-15` **15.2.0-16ubuntu1** for **resolute (Ubuntu 26.04
+  LTS)**; stonking (26.10) and tenacious have 15.3.0-4ubuntu1 (checked 2026-11-07). Install on a
+  26.04 instance, pinned and held:
+
+      apt-get install gcc-15=15.2.0-16ubuntu1 g++-15=15.2.0-16ubuntu1 cpp-15=15.2.0-16ubuntu1 \
+          libstdc++-15-dev=15.2.0-16ubuntu1 libgcc-15-dev=15.2.0-16ubuntu1
+      apt-mark hold gcc-15 g++-15 cpp-15 libstdc++-15-dev libgcc-15-dev
+      export CXX=g++-15 CC=gcc-15
+
+  If the resolute archive has moved on by then (an SRU of gcc-15), pin the archive to a date with
+  snapshot.ubuntu.com (`deb [snapshot=20261107T000000Z] http://archive.ubuntu.com/ubuntu resolute main
+  universe`, apt >= 2.7) so exactly 15.2.0-16ubuntu1 resolves. The runtime `libstdc++6` the
+  `libstdc++.so` symlink resolves to comes from that archive state too: the preflight's sha256
+  check decides, whatever the package names.
+- **Linode image: not verified here.** Ubuntu 26.04 was released in April 2026 and other providers
+  list it; whether Linode offers `linode/ubuntu26.04` must be checked with the API
+  (`linode-cli images list | grep -i 26.04`) before provisioning. Fallback: a 24.04 instance with a
+  resolute chroot (`debootstrap resolute /srv/resolute http://archive.ubuntu.com/ubuntu`, or the
+  snapshot.ubuntu.com mirror at a pinned date), the campaign run inside it with the pinned packages.
+- **Rejected:** building the GCC 15 snapshot 15-20260321 from source (C13's plan): it shares the
+  date stamp but is not the profiled Ubuntu libstdc++ build (different files and sha256s).
+- **Disk.** No toolchain build: the minimum is back to 40 GB free (preflight `MIN_DISK_GIB`).
+- **Go, Node, .NET on 26.04.** Not verified (the packages.ubuntu.com page for resolute's
+  `golang-go` could not be fetched from here). Use the upstream installers as on 24.04 unless the
+  resolute packages meet the minimums (Go 1.26+, Node 22, .NET SDK 10): go.dev tarball, Node 22 from
+  nodejs.org/NodeSource, `dotnet-sdk-10.0` from Microsoft's feed for 26.04 (or the official install
+  script). The preflight checks presence; versions are recorded in its facts.
+- **No conflict with the cp14b gate.** `tests/runtime2/cp14b/comparator_profile.py` and the
+  production gate (`compiler_collection_sort.cpp`) check only `__GLIBCXX__ == 20260321`; the
+  preflight is stricter (a different build with the same date stamp passes the gate's check but
+  fails the campaign preflight), which is the intended direction. Neither is changed.

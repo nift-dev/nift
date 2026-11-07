@@ -499,6 +499,16 @@ def preflight_problems(f):
         out.append(f"GCC 15.2 required for comparator-sort certification (found: {f.get('cxx') or 'no compiler'})")
     if f.get("glibcxx") != 20260321:
         out.append(f"__GLIBCXX__ must be 20260321, the value the comparator-sort gate compiles for (found: {f.get('glibcxx')})")
+    # C14: the D4 profile's identity (tests/runtime2/cp14b/toolchain-profile.json), not only the macro
+    prof = f.get("profile") or {}
+    want = prof.get("compiler_version_contains")
+    if want and want not in (f.get("cxx") or ""):
+        out.append(f"the compiler is not the D4 profile's ({want}; found: {f.get('cxx')})")
+    for name, spec in (prof.get("files") or {}).items():
+        got = (f.get("profile_files") or {}).get(name)
+        if got != spec.get("sha256"):
+            out.append(f"{name} is not the D4 profile's (sha256 {spec.get('sha256', '')[:12]}..., found: "
+                       f"{(got or 'missing')[:12]})")
     if f.get("comparator") != "ok":
         out.append(f"comparator sort is not compiled into the production binary ({f.get('comparator')})")
     if f.get("require_env") != "1":
@@ -569,7 +579,7 @@ HOST_TOOLS = [
     ("make", "make --version | head -1", "GNU make"),
 ]
 MIN_MEM_MIB = 7600     # 8 GB plan: read_limit.py needs MemAvailable >= 4096 MiB while it runs
-MIN_DISK_GIB = 50      # section 12.1 of the record (incl. a GCC 15.2 snapshot build)
+MIN_DISK_GIB = 40      # combined-b3-b5.md 14 (the packaged GCC 15.2.0-16ubuntu1; no toolchain build)
 COMPARATOR_PROGRAM = "xs := [3, 1, 2]\nxs.sort((p, q) => p < q)\nprint(xs.stringify())\n"
 
 
@@ -599,6 +609,24 @@ def preflight_facts(root, oracle, campaign_start=None):
         facts["glibcxx"] = int(out[-1]) if out and out[-1].isdigit() else None
     except (OSError, ValueError):
         facts["glibcxx"] = None
+    # C14: the D4 toolchain profile's files, located through the compiler itself
+    try:
+        prof = json.loads((Path(root) / "tests/runtime2/cp14b/toolchain-profile.json").read_text())
+    except (OSError, ValueError):
+        prof = {"compiler_version_contains": "(toolchain-profile.json missing)", "files": {}}
+    facts["profile"] = prof
+    files = {}
+    try:
+        lib = subprocess.run([cxx, "-print-file-name=libstdc++.so"], capture_output=True, text=True).stdout.strip()
+        files["libstdc++.so"] = sha256_of(os.path.realpath(lib)) if lib and os.path.isabs(lib) else None
+        trace = subprocess.run([cxx, "-x", "c++", "-std=c++17", "-E", "-H", "-o", os.devnull, "-"],
+                               input="#include <algorithm>\n", capture_output=True, text=True).stderr
+        for name in ("bits/stl_algo.h", "bits/stl_tempbuf.h"):
+            hit = [l.lstrip(". ").strip() for l in trace.splitlines() if l.strip().endswith("/" + name)]
+            files[name] = sha256_of(hit[0]) if hit else None
+    except OSError:
+        pass
+    facts["profile_files"] = files
     tools = {}
     for name, probe, _ in HOST_TOOLS:
         try:

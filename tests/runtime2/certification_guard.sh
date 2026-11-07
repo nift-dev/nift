@@ -234,6 +234,10 @@ GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', 
             oracle='/o/nift', oracle_version='v4.12.0', oracle_commit=certify.V4120_COMMIT, oracle_clean=True,
             oracle_current=True, campaign_start=1000, oracle_mtime=2000, oracle_sha256='aa', candidate_sha256='bb',
             oracle_realpath='/o/nift', candidate_realpath='/c/nift')
+import json
+PROFILE = json.load(open('tests/runtime2/cp14b/toolchain-profile.json'))
+PROF_FILES = {k: v['sha256'] for k, v in PROFILE['files'].items()}
+PROF_OK = {**GOOD, 'cxx': PROFILE['compiler'], 'profile': PROFILE, 'profile_files': PROF_FILES}
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -324,6 +328,13 @@ checks = [
     ('preflight TSan mmap bits', len(pp({**GOOD, 'mmap_rnd_bits': 32})), 1),
     ('preflight loopback', len(pp({**GOOD, 'loopback': False})), 1),
     ('preflight pty', len(pp({**GOOD, 'pty': False})), 1),
+    # C14: the D4 toolchain profile (tests/runtime2/cp14b/toolchain-profile.json)
+    *[(n, len(pp({**PROF_OK, **kw})), want) for n, kw, want in [
+        ('profile matches', {}, 0),
+        ('profile: compiler build differs', {'cxx': 'g++ (Ubuntu 15.2.0-4ubuntu4) 15.2.0'}, 1),
+        ('profile: libstdc++.so differs', {'profile_files': {**PROF_FILES, 'libstdc++.so': '00'}}, 1),
+        ('profile: stl_algo.h differs', {'profile_files': {**PROF_FILES, 'bits/stl_algo.h': '00'}}, 1),
+        ('profile: stl_tempbuf.h differs', {'profile_files': {**PROF_FILES, 'bits/stl_tempbuf.h': None}}, 1)]],
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]

@@ -1,0 +1,16 @@
+{
+  "provenance": "the owner's D4 profile (CP14B D4 validation; owner workspace .claude-linode-runs/codex/cp14b/implementation/d4/profile.json, read by the coordinator 2026-11-07); docs/runtime-2/checkpoints/cp14b-d4-validation.md; combined-b3-b5.md 14",
+  "scope": "Linux/GCC15 libstdc++ full-buffer profile only",
+  "compiler_version_contains": "15.2.0-16ubuntu1",
+  "compiler": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "macros": {"__GLIBCXX__": "20260321", "_GLIBCXX_RELEASE": "15"},
+  "flags": "-std=c++17 -O2 -Wall -Wextra -pedantic -pthread",
+  "files": {
+    "libstdc++.so": {"path": "/usr/lib/gcc/x86_64-linux-gnu/15/libstdc++.so",
+                     "sha256": "946ce23525e79c2916eacb0aeaabd6538df4b1ea9b84ebdd17451f0c89350777"},
+    "bits/stl_algo.h": {"path": "/usr/include/c++/15/bits/stl_algo.h",
+                        "sha256": "e65d697268d714022119deeb6e01678aa1e93e9c5ffc203416a45b94ef55298a"},
+    "bits/stl_tempbuf.h": {"path": "/usr/include/c++/15/bits/stl_tempbuf.h",
+                           "sha256": "fd894aaf6d65981d84289ea85d48755fe6c6e491bc353111096c7769e3924758"}
+  }
+}

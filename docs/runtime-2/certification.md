@@ -66,7 +66,7 @@ Owner 2026-11-07 18:00 (D2/D3); details in `checkpoints/combined-b3-b5.md` secti
   policy). Approved behavioural differences are the B5 expected-output table, checked by the
   gates. Exit status 1 on FAILED-NEW or a comparator SKIP, 3 on BLOCKED/NOT-RUN, 2 when the
   preflight fails.
-- **Preflight** (before any gate, after `make nift`): GCC 15.2 with `__GLIBCXX__` 20260321, a
+- **Preflight** (before any gate, after `make nift`): the D4 toolchain profile (`tests/runtime2/cp14b/toolchain-profile.json`: Ubuntu g++ 15.2.0-16ubuntu1, the libstdc++.so and two header sha256s; checkpoints/combined-b3-b5.md 14), GCC 15.2 with `__GLIBCXX__` 20260321, a
   comparator sort runs on the production VM, `NIFT_CP14B_REQUIRE_COMPARATOR=1`, and the v4.12.0
   legacy oracle for `test-cp19-proof-cli` (`--legacy-oracle`, built from tag `v4.12.0` =
   `ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb`; instructions in the checkpoint record, section 7).
