@@ -165,6 +165,8 @@ HARNESS_BLOCKED = [
     (re.compile(r"CP19_LEGACY_ORACLE is unset|CP19_LEGACY_ORACLE=\S* is not an executable"),
      "no CP19 legacy oracle (v4.12.0 binary): pass --legacy-oracle"),
     (re.compile(re.escape(COMPARATOR_SKIP)), "comparator coverage skipped: not GCC 15.2 with __GLIBCXX__ 20260321"),
+    (re.compile(r"NIFT_REF must name a reference nift binary"),
+     "no scanner-parity reference binary (NIFT_REF; the campaign passes the v4.12.0 oracle)"),
 ]
 
 
@@ -747,7 +749,8 @@ def main():
     if not (ROOT / "nift").exists():
         print("certify: could not build nift, see .build/certify/_prebuild.log", file=sys.stderr)
         return 1
-    extra = {"CP19_LEGACY_ORACLE": oracle} if oracle else {}
+    # The v4.12.0 oracle is also test-runtime2-scanner-parity's reference binary (NIFT_REF).
+    extra = {"CP19_LEGACY_ORACLE": oracle, "NIFT_REF": os.environ.get("NIFT_REF") or oracle} if oracle else {}
 
     results = {}
     started = time.time()

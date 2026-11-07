@@ -254,6 +254,7 @@ checks = [
     ('blocked: no oracle', br('FAIL test-cp19-proof-cli: CP19_LEGACY_ORACLE is unset. This gate') is not None, True),
     ('blocked: comparator skip', br('SKIP UNVERIFIED COMPARATOR COVERAGE: x: 3 comparator case(s)') is not None, True),
     ('not blocked', br('FAIL b5 fixtures: 1 of 9'), None),
+    ('blocked: no scanner reference', br('ERROR scanner parity: NIFT_REF must name a reference nift binary') is not None, True),
     ('fail lines normalised', fl('FAIL /a/t/x.f: bad\nok\nFAIL /tmp/q1/y\n', ['/a']) == fl('FAIL /b/t/x.f: bad\nFAIL /tmp/z9/y\n', ['/b']), True),
     ('fail lines differ', fl('FAIL x: 1\n') == fl('FAIL x: 2\n'), False),
     ('preflight ok', pp(GOOD), []),
