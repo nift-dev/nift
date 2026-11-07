@@ -232,7 +232,8 @@ INV = ['test-runtime2-a', 'test-runtime2-b', 'test-runtime2-prep']
 DEF = set(INV) | {'test-x'}
 GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', require_env='1',
             oracle='/o/nift', oracle_version='v4.12.0', oracle_commit=certify.V4120_COMMIT, oracle_clean=True,
-            oracle_current=True)
+            oracle_current=True, campaign_start=1000, oracle_mtime=2000, oracle_sha256='aa', candidate_sha256='bb',
+            oracle_realpath='/o/nift', candidate_realpath='/c/nift')
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -280,6 +281,24 @@ checks = [
         len(pp({**GOOD, 'oracle_commit': '7a89b77a'})), 1),
     ('preflight oracle checkout modified', len(pp({**GOOD, 'oracle_clean': False})), 1),
     ('preflight oracle not built from its checkout', len(pp({**GOOD, 'oracle_current': False})), 1),
+    # D4 (owner 2026-11-07 22:13): built during the campaign; distinct from the candidate
+    ('preflight no campaign start', len(pp({**GOOD, 'campaign_start': None})), 1),
+    ('preflight oracle built before the campaign', len(pp({**GOOD, 'oracle_mtime': 999})), 1),
+    ('preflight oracle is the candidate (sha256)', len(pp({**GOOD, 'oracle_sha256': 'bb'})), 1),
+    ('preflight oracle is the candidate (path)', len(pp({**GOOD, 'oracle_realpath': '/c/nift'})), 1),
+    # D3: assertion classes
+    ('assertions pass', certify.assertion_class(0, 'PASS a: 3 checks\n'), 'PASS'),
+    ('assertions partial (known RAM condition)', certify.assertion_class(0,
+        'PASS read limits\nSKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)\n'), 'PARTIAL'),
+    ('assertions skip (all skipped)', certify.assertion_class(0, 'SKIP package refs/local lock (git unavailable)\n'), 'SKIP'),
+    ('assertions unknown skip is required', certify.assertion_class(0, 'PASS x\nskipping the y check\n'), 'PARTIAL'),
+    ('assertions other-platform skip is not required', certify.assertion_class(0,
+        'PASS x\nSKIP CP20 Windows pipeline (POSIX host)\n'), 'PASS'),
+    ('assertions zero skipped is not a skip', certify.assertion_class(0, 'PASS N1: 16 checks, 0 failure(s), 0 skipped\n'), 'PASS'),
+    ('assertions fail', certify.assertion_class(1, 'FAIL x\n'), 'FAIL'),
+    ('assertions blocked', certify.assertion_class(1, 'x', 'no oracle'), 'BLOCKED'),
+    ('class partial', rc('PASS', None, None, 'PARTIAL'), 'BLOCKED'),
+    ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
@@ -337,6 +356,25 @@ toyrun d test-rt-detail v4 1 FAILED-NEW
 toyrun e test-rt-parity reg 1 FAILED-NEW
 toyrun p test-rt-same reg 0 FAILED-BASELINE
 toyrun v test-rt-vary reg 0 FAILED-BASELINE
+# D3 toy controls: a gate that passes with a required assertion skipped is PARTIAL (reported
+# BLOCKED) and a gate whose only result is a skip is SKIP (NOT-RUN); in certification mode
+# (--certify) either fails the campaign (exit 1); an other-platform skip stays PASSED.
+toy "$TOY/s1/cand" test-rt-partial 'echo "running tests/runtime2/read_limit.py"; echo "PASS limits"; echo "SKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)"; exit 0'
+toy "$TOY/s2/cand" test-rt-skipall 'echo "running tests/refs.sh"; echo "SKIP package refs/local lock (git unavailable)"; exit 0'
+toy "$TOY/s3/cand" test-rt-platform 'echo "running tests/w.py"; echo "PASS w"; echo "SKIP CP20 Windows pipeline (POSIX host)"; exit 0'
+skiprun() {  # skiprun CASE TARGET WANT-RC WANT-TEXT
+    local out rc
+    out=$(cd "$TOY/$1/cand" && python3 scripts/certify.py --jobs 1 --certify --targets "$2" --unprivileged-user '' --baseline '' 2>/dev/null); rc=$?
+    if [ "$rc" -ne "$3" ] || ! grep -q -- "$4" <<<"$out"; then
+        echo "FAIL certification guard D3 control $1 ($2): exit $rc, wanted $3 and '$4'"; echo "$out" | tail -5; exit 1
+    fi
+    echo "PASS certification guard D3 control $1: $2 (exit $rc): $4"
+}
+skiprun s1 test-rt-partial 1 "BLOCKED          test-rt-partial: PARTIAL"
+skiprun s1 test-rt-partial 1 "CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: test-rt-partial"
+skiprun s1 test-rt-partial 1 "needs: MemAvailable >= 4096 MiB"
+skiprun s2 test-rt-skipall 1 "NOT-RUN          test-rt-skipall: SKIP"
+skiprun s3 test-rt-platform 0 "PASSED 1"
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;
 # the tree's runner (above) does not. Needs that commit in this repository.
 if git cat-file -e 0d853db4:scripts/certify.py 2>/dev/null; then

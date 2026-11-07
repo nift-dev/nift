@@ -259,12 +259,69 @@ def inventory_problems(covered, inv, non_gate, mandatory, defined):
     return out
 
 
-def report_class(status, regression=None, blocked=None):
+# D3 (owner 2026-11-07 22:13): each gate's assertions are PASS, PARTIAL (some required assertion
+# skipped), SKIP (every assertion skipped), FAIL or BLOCKED. Skips are found mechanically in the
+# log; KNOWN_CONDITIONAL names the conditional checks the tree prints, with each one's requirement
+# and whether it is required on a Linux certification host (platform checks of other systems are
+# not; they belong to their CI lanes). An unknown skip is required (conservative).
+SKIP_MARKERS = [re.compile(r"^\s*SKIP(PED)?\b"), re.compile(r"\bskipping\b", re.I),
+                re.compile(r"\b[1-9]\d*\s+(?:[\w-]+\s+)?skipped\b", re.I)]
+KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign host)
+    (r"default 1 GiB limit \(MemAvailable", "MemAvailable >= 4096 MiB while tests/runtime2/read_limit.py runs", True),
+    (r"UNVERIFIED COMPARATOR COVERAGE", "GCC 15.2 with __GLIBCXX__ 20260321 (comparator sort compiled in)", True),
+    (r"comparator refusal: admitted libstdc\+\+ profile", "a toolchain that refuses comparator sort (checked on the other-toolchain lane; n/a on GCC 15.2)", False),
+    (r"root without setpriv|needs Linux setpriv", "setpriv (util-linux) when running as root", True),
+    (r"tracer unavailable|strace unavailable|syscalls: tracer", "strace", True),
+    (r"/usr/bin/time (is )?unavailable|requires /usr/bin/time", "GNU time at /usr/bin/time", True),
+    (r"git unavailable", "git", True),
+    (r"python3 (not available|unavailable)", "python3", True),
+    (r"/dev/shm missing or on the same filesystem", "/dev/shm on a separate (tmpfs) filesystem", True),
+    (r"cannot create symlinks|symlinks unavailable", "a filesystem that supports symlinks", True),
+    (r"/proc/self/mem|read-failure (fixture|cases) (is |are )?unavailable|needs /proc", "/proc with /proc/self/mem", True),
+    (r"cc unavailable|peak tracker: build failed", "a C compiler (cc)", True),
+    (r"no head\)|needs /proc, yes, head, sh", "coreutils (head, yes, sh)", True),
+    (r"edit during streaming is outside the v4.12 modified", "none: a documented design boundary (modified mode), not an assertion", False),
+    (r"Windows|MSYS|macOS|POSIX host|POSIX PTY test", "another platform (its CI lane)", False),
+]
+
+
+def skipped_assertions(text):
+    """D3: [(line, requirement, required)] for every skip marker in a log."""
+    out = []
+    for line in text.splitlines():
+        if not any(m.search(line) for m in SKIP_MARKERS):
+            continue
+        req, required = "unknown condition (not in KNOWN_CONDITIONAL)", True
+        for pat, why, needed in KNOWN_CONDITIONAL:
+            if re.search(pat, line):
+                req, required = why, needed
+                break
+        out.append((line.strip()[:200], req, required))
+    return out
+
+
+def assertion_class(rc, text, blocked=None):
+    """D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
+    PARTIAL: it passed, but a required assertion was skipped; SKIP: every result line is a skip."""
+    if blocked:
+        return "BLOCKED"
+    if rc != 0:
+        return "FAIL"
+    req = [x for x in skipped_assertions(text) if x[2]]
+    if not req:
+        return "PASS"
+    ran = any(re.search(r"^\s*(PASS|ok)\b|\bpassed\b", l) for l in text.splitlines())
+    return "PARTIAL" if ran else "SKIP"
+
+
+def report_class(status, regression=None, blocked=None, assertion=None):
     """C2, pure (table-tested): the owner's report class of one required gate. `status` is
     decide()'s verdict (or None: not run); `regression` maps each regression baseline to whether it
     shows the identical failure; `blocked` is a harness/dependency reason from the log."""
-    if status is None:
-        return "NOT-RUN"
+    if status is None or assertion == "SKIP":
+        return "NOT-RUN"  # D3: SKIP maps to NOT-RUN
+    if status == "PASS" and assertion == "PARTIAL":
+        return "BLOCKED"  # D3: PARTIAL maps to BLOCKED (a required assertion did not execute)
     if status == "PASS" and not blocked:
         return "PASSED"
     if blocked or status in ("UNVERIFIED", "SKIPPED-ENVIRONMENTAL"):
@@ -416,6 +473,18 @@ def preflight_problems(f):
         if f.get("oracle_clean") is not True or f.get("oracle_current") is not True:
             out.append("the CP19 legacy oracle's checkout has tracked changes or its nift is not built from it "
                        f"(clean: {f.get('oracle_clean')}, make -q nift: {f.get('oracle_current')})")
+        # D4 (owner 2026-11-07 22:13): built during this campaign, and a different binary from the
+        # candidate. Deliberate substitution is an accepted threat-model limitation (record 12).
+        if f.get("campaign_start") is None:
+            out.append("no campaign start time (--campaign-start EPOCH or NIFT_CAMPAIGN_START): the oracle "
+                       "cannot be shown to be built during the campaign")
+        elif (f.get("oracle_mtime") or 0) < f["campaign_start"]:
+            out.append(f"the CP19 legacy oracle was not built during this campaign (mtime {f.get('oracle_mtime')} "
+                       f"< campaign start {f['campaign_start']})")
+        if f.get("oracle_sha256") and f.get("oracle_sha256") == f.get("candidate_sha256"):
+            out.append("the CP19 legacy oracle and the candidate are the same binary (sha256)")
+        if f.get("oracle_realpath") and f.get("oracle_realpath") == f.get("candidate_realpath"):
+            out.append("the CP19 legacy oracle and the candidate are the same file (real path)")
     return out
 
 
@@ -423,7 +492,20 @@ V4120_COMMIT = "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"  # tag v4.12.0
 COMPARATOR_PROGRAM = "xs := [3, 1, 2]\nxs.sort((p, q) => p < q)\nprint(xs.stringify())\n"
 
 
-def preflight_facts(root, oracle):
+def sha256_of(path):
+    import hashlib
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+ORACLE_BUILD = ("git worktree add --detach <tree> " + "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"
+                + " && make -C <tree> -j\"$(nproc)\" nift")
+
+
+def preflight_facts(root, oracle, campaign_start=None):
     cxx = os.environ.get("CXX", "g++")
     facts = {"require_env": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"), "oracle": oracle}
     try:
@@ -463,6 +545,16 @@ def preflight_facts(root, oracle):
         facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
         facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and subprocess.run(
             ["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env()).returncode == 0)
+        facts["campaign_start"] = campaign_start
+        try:
+            facts["oracle_mtime"] = int(os.stat(oracle).st_mtime)
+        except OSError:
+            facts["oracle_mtime"] = None
+        facts["oracle_sha256"] = sha256_of(oracle)
+        facts["oracle_realpath"] = os.path.realpath(oracle)
+        facts["oracle_build_command"] = ORACLE_BUILD.replace("<tree>", str(tree))
+    facts["candidate_sha256"] = sha256_of(nift)
+    facts["candidate_realpath"] = os.path.realpath(nift)
     return facts
 
 
@@ -713,6 +805,11 @@ def main():
     ap.add_argument("--legacy-oracle", default=os.environ.get("CP19_LEGACY_ORACLE", ""),
                     help="the v4.12.0 legacy binary test-cp19-proof-cli compares with (CP19_LEGACY_ORACLE)")
     ap.add_argument("--strict", action="store_true", help="exit 1 unless every required gate is PASSED")
+    ap.add_argument("--campaign-start", type=int, default=int(os.environ["NIFT_CAMPAIGN_START"])
+                    if os.environ.get("NIFT_CAMPAIGN_START", "").isdigit() else None,
+                    help="the campaign's start (epoch seconds); the CP19 oracle must be built after it")
+    ap.add_argument("--certify", action="store_true",
+                    help="certification mode (implied by a full campaign): a mandatory gate that is PARTIAL or SKIP fails the campaign")
     ap.add_argument("--list", action="store_true", help="dry run: print the plan, the inventory check and the preflight, then exit")
     ap.add_argument("--check-plan", action="store_true", help="exit 1 when the plan misses an inventory or mandatory gate")
     ap.add_argument("--drop", action="append", default=[], metavar="TARGET",
@@ -763,7 +860,7 @@ def main():
             print(f"parallel   {t}")
         for t, why in exclusive.items():
             print(f"exclusive  {t}  ({why})" + (f"  [make -k {t} " + " ".join("-o " + o for o in olds[t]) + "]" if olds[t] else ""))
-        pf = preflight_problems(preflight_facts(ROOT, oracle))
+        pf = preflight_problems(preflight_facts(ROOT, oracle, a.campaign_start))
         print(f"plan: {len(planned)} required gates ({len(parallel)} parallel, {len(exclusive)} serial), "
               f"{len(inv)} inventory targets, {len(NON_GATE)} non-gates: " + ", ".join(sorted(NON_GATE)))
         for pr in pf:
@@ -792,7 +889,7 @@ def main():
     # preflight problem.
     built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, text=True, env=clean_env())
     (logdir / "_build-nift.log").write_text(built.stdout + built.stderr)
-    facts = preflight_facts(ROOT, oracle)
+    facts = preflight_facts(ROOT, oracle, a.campaign_start)
     pf = preflight_problems(facts)
     (logdir / "_preflight.json").write_text(json.dumps({"facts": facts, "problems": pf}, indent=2) + "\n")
     for pr in pf:
@@ -927,7 +1024,12 @@ def main():
         r["blocked"] = blocked_reason(logtext)
         if COMPARATOR_SKIP in logtext:
             comparator_skipped.append(t)
-        r["class"] = report_class(r["status"], r.get("regression"), r["blocked"])
+        r["skipped"] = skipped_assertions(logtext)
+        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"])
+        r["class"] = report_class(r["status"], r.get("regression"), r["blocked"], r["assertion"])
+        if r["assertion"] in ("PARTIAL", "SKIP"):
+            r["reason"] = (f"{r['assertion']}: required assertions skipped: "
+                           + "; ".join(f"{l} [{why}]" for l, why, req in r["skipped"] if req))
         if r["class"] == "BLOCKED":
             r["reason"] = r["blocked"] or r["reason"]
         elif r["class"] == "FAILED-BASELINE" and r["status"] == "FAIL":
@@ -960,12 +1062,28 @@ def main():
             lines.append(f"  {k:<16} {t}: {results[t]['reason']}")
     if comparator_skipped:
         lines.append("CAMPAIGN FAILED: comparator coverage skipped in " + ", ".join(comparator_skipped))
+    # D3: every required assertion that did not execute, and in certification mode the campaign fails
+    # when a mandatory gate is PARTIAL or SKIP.
+    unexecuted = [(t, l, why) for t in sorted(results) for l, why, req in results[t].get("skipped", []) if req]
+    summary["unexecuted_assertions"] = [{"gate": t, "line": l, "requirement": why} for t, l, why in unexecuted]
+    if unexecuted:
+        lines.append(f"REQUIRED ASSERTIONS NOT EXECUTED: {len(unexecuted)}")
+        lines += [f"  {t}: {l}  [needs: {why}]" for t, l, why in unexecuted]
+    # every planned gate is a required gate of the certification plan (MANDATORY is the subset the
+    # plan check insists on); in certification mode any of them PARTIAL or SKIP fails the campaign
+    partial_mandatory = sorted(t for t, r in results.items() if r.get("assertion") in ("PARTIAL", "SKIP"))
+    summary["assertion_counts"] = {k: sum(1 for r in results.values() if r.get("assertion") == k)
+                                   for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
+    certify_mode = a.certify or full
+    if certify_mode and partial_mandatory:
+        lines.append("CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: " + ", ".join(partial_mandatory))
+    (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     not_passed = sum(counts[k] for k in classes[:-1])
     if not_passed:
         lines.append(f"NOT CERTIFIED HERE: {not_passed} required gate(s) are not PASSED (only PASSED counts as a pass)")
     (logdir / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    if counts["FAILED-NEW"] or comparator_skipped:
+    if counts["FAILED-NEW"] or comparator_skipped or (certify_mode and partial_mandatory):
         return 1
     if counts["BLOCKED"] or counts["NOT-RUN"]:
         return 3
