@@ -264,8 +264,13 @@ def inventory_problems(covered, inv, non_gate, mandatory, defined):
 # log; KNOWN_CONDITIONAL names the conditional checks the tree prints, with each one's requirement
 # and whether it is required on a Linux certification host (platform checks of other systems are
 # not; they belong to their CI lanes). An unknown skip is required (conservative).
-SKIP_MARKERS = [re.compile(r"^\s*SKIP(PED)?\b"), re.compile(r"\bskipping\b", re.I),
-                re.compile(r"\b[1-9]\d*\s+(?:[\w-]+\s+)?skipped\b", re.I)]
+# R3-1 (confirmation round 3): case-insensitive skip / not-run / unverified wording, TAP `# SKIP`
+# and pytest progress; explicit zero counts are not skips. tests/runtime2/skip_phrases.tsv lists
+# every such message the tree prints; the guard fails on an unlisted one.
+SKIP_MARKERS = [re.compile(r"\bskip(?:ped|ping|s)?\b(?![-_\w])", re.I), re.compile(r"\bNOT[ -]RUN\b"),
+                re.compile(r"\bunverified\b", re.I), re.compile(r"\bnot verified\b", re.I),
+                re.compile(r"^\s*[.sxFE]*s[.sxFE]*\s*(\[\s*\d+%\])?\s*$")]
+ZERO_SKIPS = re.compile(r"\b0\s+(?:[\w-]+\s+)?skip(?:ped|s)?\b|\bskip(?:ped|s)?\s*[:=]\s*0\b", re.I)
 KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign host)
     (r"default 1 GiB limit \(MemAvailable", "MemAvailable >= 4096 MiB while tests/runtime2/read_limit.py runs", True),
     (r"UNVERIFIED COMPARATOR COVERAGE", "GCC 15.2 with __GLIBCXX__ 20260321 (comparator sort compiled in)", True),
@@ -281,7 +286,16 @@ KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign h
     (r"cc unavailable|peak tracker: build failed", "a C compiler (cc)", True),
     (r"no head\)|needs /proc, yes, head, sh", "coreutils (head, yes, sh)", True),
     (r"edit during streaming is outside the v4.12 modified", "none: a documented design boundary (modified mode), not an assertion", False),
-    (r"Windows|MSYS|macOS|POSIX host|POSIX PTY test", "another platform (its CI lane)", False),
+    # R3-5: the other-platform messages, anchored to the exact texts the tree prints
+    (r"^SKIP CP20 Windows pipeline \(POSIX host\)$", "Windows (its CI lane)", False),
+    (r"^SKIP v4\.4 interactive completion PTY \(Windows uses line-based in", "Windows (its CI lane)", False),
+    (r"^SKIP v4\.4 shell foreground TTY \(POSIX PTY test; macOS foreground", "macOS/Windows (their CI lanes)", False),
+    (r"^SKIP v4\.4 shell glob \(Windows passthrough pending glob backend\)", "Windows (its CI lane)", False),
+    (r"^SKIP CP19 completion \(POSIX PTY test\)", "Windows (its CI lane)", False),
+    (r"^SKIP shell dispatch \(POSIX pty/coreutils regression\)", "Windows (its CI lane)", False),
+    (r"^SKIP unreadable file \(POSIX permission bits do not apply on Windows\)", "Windows (its CI lane)", False),
+    (r"^SKIP \[\w+\] trace descriptor inheritance under MSYS", "MSYS (its CI lane)", False),
+    (r"^SKIP: serve_smoke\.sh runs on Linux \(full\) and macOS", "Windows (its CI lane)", False),
 ]
 
 
@@ -291,22 +305,41 @@ def skipped_assertions(text):
     for line in text.splitlines():
         if not any(m.search(line) for m in SKIP_MARKERS):
             continue
+        if ZERO_SKIPS.search(line) and not any(m.search(ZERO_SKIPS.sub("", line)) for m in SKIP_MARKERS):
+            continue  # "0 skipped", "skipped: 0"
         req, required = "unknown condition (not in KNOWN_CONDITIONAL)", True
         for pat, why, needed in KNOWN_CONDITIONAL:
-            if re.search(pat, line):
+            if re.search(pat, line.strip()):
                 req, required = why, needed
                 break
         out.append((line.strip()[:200], req, required))
     return out
 
 
-def assertion_class(rc, text, blocked=None):
+# R3-4: gates that are silent by design (they print nothing of their own when they pass), each with
+# its reason. Any other gate that exits 0 without output of its own is SKIP (no assertion shown).
+SILENT_BY_DESIGN = {
+}
+_MAKE_NOISE = re.compile(r"^(\$ make |make(\[\d+\])?: (Entering|Leaving|Nothing to be done|'.*' is up to date))")
+
+
+def own_output(text, commands=()):
+    """R3-4: the lines a gate printed itself: not the runner's header, make's own messages, or the
+    recipe commands make echoes."""
+    echoed = {c.strip() for c in commands}
+    return [l for l in text.splitlines() if l.strip() and not _MAKE_NOISE.match(l) and l.strip() not in echoed]
+
+
+def assertion_class(rc, text, blocked=None, silent=False):
     """D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
-    PARTIAL: it passed, but a required assertion was skipped; SKIP: every result line is a skip."""
+    PARTIAL: it passed, but a required assertion was skipped; SKIP: every result line is a skip, or
+    (R3-4) it printed nothing of its own (`silent`) and is not silent by design."""
     if blocked:
         return "BLOCKED"
     if rc != 0:
         return "FAIL"
+    if silent:
+        return "SKIP"
     req = [x for x in skipped_assertions(text) if x[2]]
     if not req:
         return "PASS"
@@ -357,10 +390,13 @@ _VARYING = [  # F1 (confirmation of c73a7692): values that vary between two runs
     (re.compile(r"/tmp/\S+"), "<TMP>"),
     (re.compile(r"\b\d{4}-\d\d-\d\d[T ]\d\d:\d\d(:\d\d(\.\d+)?)?\S*"), "<TIMESTAMP>"),
     (re.compile(r"\b\d\d:\d\d:\d\d(\.\d+)?\b"), "<CLOCK>"),
-    (re.compile(r"\b\d+(\.\d+)?\s?(ns|us|\u00b5s|ms|s|sec|secs|seconds|min)\b"), "<DURATION>"),
+    (re.compile(r"\b\d+(\.\d+)?\s?(ns|us|\u00b5s|ms|sec|secs|seconds)\b|\b\d+\.\d+\s?s\b"), "<DURATION>"),
     (re.compile(r'("[A-Za-z_]*_(us|ms|ns|seconds)"\s*:\s*)[\d.]+'), r"\1<DURATION>"),
     (re.compile(r"\bpid\s*[=: ]\s*\d+", re.I), "pid <PID>"),
-    (re.compile(r"\b0x[0-9a-fA-F]{4,}\b"), "<ADDR>"),
+    # R3-3: addresses only in pointer contexts (sanitizer frames, "at"/"address"/"ptr=", or a
+    # pointer-width 12+ digit value); data such as `expected 0xdeadbeef` is kept
+    (re.compile(r"(?i)(\bat |\baddress |\bptr=|^\s*#\d+\s+)0x[0-9a-f]{8,}\b"), r"\1<ADDR>"),
+    (re.compile(r"\b0x[0-9a-fA-F]{12,}\b"), "<ADDR>"),
 ]
 
 
@@ -385,9 +421,17 @@ def failure_identity(text, roots=(), rc=None):
     codes = tuple(m.group(1).strip() for m in map(_MAKE_ERR.match, lines) if m)
     sigs = tuple(sorted(set(_SIGNAL.findall(text))))
     fails = frozenset(normalise(l, roots) for l in lines if _FAIL_LINE.match(l))
-    body = [normalise(l, roots) for l in lines
+    # R3-2: the whole normalised output of the failing step (from the line that starts it, the last
+    # mention of the step before make's error, to the end), not a fixed tail; without an
+    # identified step, the whole log.
+    step = failure_signature(text)
+    start = 0
+    if step is not None:
+        end = max((i for i, l in enumerate(lines) if l.startswith("make: ***")), default=len(lines))
+        start = max((i for i in range(end) if step in lines[i]), default=0)
+    body = [normalise(l, roots) for l in lines[start:]
             if l.strip() and not l.startswith(("make", "$ ")) and not _TIMING.match(l)]
-    tail = tuple(body[-15:])
+    tail = tuple(body)
     if not fails and not tail:
         return None
     return (failure_signature(text), codes or (rc,), sigs, fails, tail)
@@ -459,6 +503,21 @@ def preflight_problems(f):
         out.append(f"comparator sort is not compiled into the production binary ({f.get('comparator')})")
     if f.get("require_env") != "1":
         out.append("NIFT_CP14B_REQUIRE_COMPARATOR=1 is not set (comparator tests would SKIP instead of failing)")
+    for name, have in (f.get("tools") or {}).items():
+        if not have:
+            out.append(f"host tool missing: {name} ({dict((n, w) for n, _, w in HOST_TOOLS).get(name, '')})")
+    if f.get("mem_mib") is not None and f["mem_mib"] < MIN_MEM_MIB:
+        out.append(f"MemTotal {f['mem_mib']} MiB < {MIN_MEM_MIB} MiB (an 8 GB plan; read_limit.py needs 4 GiB available)")
+    if f.get("disk_gib") is not None and f["disk_gib"] < MIN_DISK_GIB:
+        out.append(f"free disk {f['disk_gib']} GiB < {MIN_DISK_GIB} GiB")
+    if f.get("mmap_rnd_bits") is not None and f["mmap_rnd_bits"] > 28:
+        out.append(f"vm.mmap_rnd_bits={f['mmap_rnd_bits']} > 28: TSan aborts (sysctl -w vm.mmap_rnd_bits=28)")
+    if f.get("loopback") is False:
+        out.append("cannot bind a loopback TCP port (test-serve)")
+    if f.get("pty") is False:
+        out.append("no PTY available (/dev/ptmx; test-progress-pty, the v4.4 PTY smokes)")
+    if f.get("shm_separate") is False:
+        out.append("/dev/shm is not a separate filesystem (cross-device move cases)")
     if not f.get("oracle"):
         out.append("no CP19 legacy oracle: pass --legacy-oracle (a v4.12.0 binary built from tag v4.12.0)")
     else:
@@ -489,6 +548,28 @@ def preflight_problems(f):
 
 
 V4120_COMMIT = "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"  # tag v4.12.0
+# R3-6: the host requirements of the planned gates, checked before any gate runs (a missing one
+# would make its gates BLOCKED mid-campaign). (name, shell probe that prints a version or
+# "ok", minimum / why)
+HOST_TOOLS = [
+    ("python3", "python3 --version", "3.12+ (bindings, harnesses)"),
+    ("python3-dev", "python3 -c 'import sysconfig,os;p=sysconfig.get_paths()[\"include\"];print(\"ok\" if os.path.exists(os.path.join(p,\"Python.h\")) else \"\")'",
+     "Python.h for test-python-binding (Ubuntu: python3-dev)"),
+    ("go", "go version", "1.26+ (bindings/go/go.mod; test-go-binding, go test -race)"),
+    ("node", "node --version", "22 (>= 20: bindings/node/package.json; test-node-binding)"),
+    ("npm", "npm --version", "with node (bindings/node/build.sh)"),
+    ("dotnet", "dotnet --version", ".NET SDK 10 (net10.0; test-csharp-binding)"),
+    ("pkg-config", "pkg-config --version", "test-go-binding (dist/embed-prefix .pc)"),
+    ("git", "git --version", "package, regression and baseline gates"),
+    ("strace", "strace -V", "cp01/cp03 syscall measurements"),
+    ("time", "test -x /usr/bin/time && /usr/bin/time --version 2>&1 | head -1", "GNU time at /usr/bin/time (memory gates)"),
+    ("setpriv", "setpriv --version", "util-linux setpriv (privilege-drop cases as root)"),
+    ("script", "script --version", "util-linux script (test-progress-pty)"),
+    ("cc", "cc --version | head -1", "a C compiler"),
+    ("make", "make --version | head -1", "GNU make"),
+]
+MIN_MEM_MIB = 7600     # 8 GB plan: read_limit.py needs MemAvailable >= 4096 MiB while it runs
+MIN_DISK_GIB = 50      # section 12.1 of the record (incl. a GCC 15.2 snapshot build)
 COMPARATOR_PROGRAM = "xs := [3, 1, 2]\nxs.sort((p, q) => p < q)\nprint(xs.stringify())\n"
 
 
@@ -518,6 +599,34 @@ def preflight_facts(root, oracle, campaign_start=None):
         facts["glibcxx"] = int(out[-1]) if out and out[-1].isdigit() else None
     except (OSError, ValueError):
         facts["glibcxx"] = None
+    tools = {}
+    for name, probe, _ in HOST_TOOLS:
+        try:
+            out = subprocess.run(["bash", "-c", probe], capture_output=True, text=True, timeout=60)
+            tools[name] = (out.stdout or out.stderr).strip().splitlines()[0][:80] if out.returncode == 0 and (out.stdout or out.stderr).strip() else ""
+        except (OSError, subprocess.TimeoutExpired, IndexError):
+            tools[name] = ""
+    facts["tools"] = tools
+    try:
+        facts["mem_mib"] = int([l for l in open("/proc/meminfo") if l.startswith("MemTotal:")][0].split()[1]) // 1024
+    except (OSError, IndexError, ValueError):
+        facts["mem_mib"] = None
+    st = os.statvfs(str(root))
+    facts["disk_gib"] = st.f_bavail * st.f_frsize // (1 << 30)
+    try:
+        facts["mmap_rnd_bits"] = int(open("/proc/sys/vm/mmap_rnd_bits").read())
+    except (OSError, ValueError):
+        facts["mmap_rnd_bits"] = None
+    import socket
+    try:
+        sk = socket.socket(); sk.bind(("127.0.0.1", 0)); sk.close(); facts["loopback"] = True
+    except OSError:
+        facts["loopback"] = False
+    facts["pty"] = os.path.exists("/dev/ptmx")
+    try:
+        facts["shm_separate"] = os.stat("/dev/shm").st_dev != os.stat(str(root)).st_dev
+    except OSError:
+        facts["shm_separate"] = False
     nift = Path(root) / "nift"
     if not nift.exists():
         facts["comparator"] = "nift not built"
@@ -543,7 +652,7 @@ def preflight_facts(root, oracle, campaign_start=None):
         facts["oracle_commit"] = head.stdout.strip() if head.returncode == 0 else "not a git checkout"
         st = git("status", "--porcelain", "--untracked-files=no")
         facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
-        facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and subprocess.run(
+        facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file() and subprocess.run(
             ["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env()).returncode == 0)
         facts["campaign_start"] = campaign_start
         try:
@@ -1025,7 +1134,13 @@ def main():
         if COMPARATOR_SKIP in logtext:
             comparator_skipped.append(t)
         r["skipped"] = skipped_assertions(logtext)
-        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"])
+        silent = False
+        if r["rc"] == 0 and t not in SILENT_BY_DESIGN and len(logtext.splitlines()) < 400:
+            silent = not own_output(logtext, recipe_lines(ROOT, t, olds[t]))
+        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent)
+        if silent:
+            r["skipped"] = r["skipped"] + [("(no output of its own)", "a gate that prints its results "
+                                            "(or an entry in SILENT_BY_DESIGN with a reason)", True)]
         r["class"] = report_class(r["status"], r.get("regression"), r["blocked"], r["assertion"])
         if r["assertion"] in ("PARTIAL", "SKIP"):
             r["reason"] = (f"{r['assertion']}: required assertions skipped: "
@@ -1064,11 +1179,13 @@ def main():
         lines.append("CAMPAIGN FAILED: comparator coverage skipped in " + ", ".join(comparator_skipped))
     # D3: every required assertion that did not execute, and in certification mode the campaign fails
     # when a mandatory gate is PARTIAL or SKIP.
-    unexecuted = [(t, l, why) for t in sorted(results) for l, why, req in results[t].get("skipped", []) if req]
-    summary["unexecuted_assertions"] = [{"gate": t, "line": l, "requirement": why} for t, l, why in unexecuted]
+    unexecuted = [(t, l, why, req) for t in sorted(results) for l, why, req in results[t].get("skipped", [])]
+    summary["unexecuted_assertions"] = [{"gate": t, "line": l, "requirement": why, "required": req}
+                                        for t, l, why, req in unexecuted]
     if unexecuted:
-        lines.append(f"REQUIRED ASSERTIONS NOT EXECUTED: {len(unexecuted)}")
-        lines += [f"  {t}: {l}  [needs: {why}]" for t, l, why in unexecuted]
+        lines.append(f"ASSERTIONS NOT EXECUTED: {len(unexecuted)} "
+                     f"({sum(1 for x in unexecuted if x[3])} required, {sum(1 for x in unexecuted if not x[3])} not required here)")
+        lines += [f"  {'REQUIRED' if req else 'not-required'} {t}: {l}  [needs: {why}]" for t, l, why, req in unexecuted]
     # every planned gate is a required gate of the certification plan (MANDATORY is the subset the
     # plan check insists on); in certification mode any of them PARTIAL or SKIP fails the campaign
     partial_mandatory = sorted(t for t, r in results.items() if r.get("assertion") in ("PARTIAL", "SKIP"))

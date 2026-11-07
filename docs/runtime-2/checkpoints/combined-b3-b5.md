@@ -484,9 +484,83 @@ conservative direction) rather than as a pass. Normalisation of varying values i
 
 ### 12.1 Linode instance minimums (every mandatory assertion executes)
 
-| Resource | Minimum | Why |
-| --- | --- | --- |
-| RAM | 8 GB plan (MemAvailable >= 4096 MiB while read_limit.py runs, with the campaign's other jobs) | `tests/runtime2/read_limit.py` skips its default 1 GiB limit check below 4 GiB available; this host (7.7 GB) runs it |
-| Disk | 40 GB free | measured: the worktree with the production, guard-off and test builds is 1.7 GB; one sanitizer object set is about 1.5 GB (112 of 303 ASan objects took 541 MB), and the campaign builds ASan/UBSan and TSan sets plus sanitized variants (guard-off, cp18, cp19, cp23); three baseline trees (v4.12.0, 17f7964c, weekend/r2) each rebuild nift and their test artefacts; logs |
-| Cores | 2 (4 recommended) | no gate depends on the core count for its assertions (cp22 print_order uses max(2, hardware concurrency)); cores only change the duration (test-rt-vm alone took 33 min on 2-4 cores here) |
-| Toolchain and tools | GCC 15.2 with `__GLIBCXX__` 20260321; python3; git; strace; GNU time at `/usr/bin/time`; setpriv (util-linux); cc; coreutils; `/proc` with `/proc/self/mem`; `/dev/shm` as a separate tmpfs; a symlink-capable filesystem; an unprivileged user (`tester`) | each is the requirement of a `KNOWN_CONDITIONAL` check |
+Superseded by section 13.2 (confirmation round 3 completed the list).
+
+## 13. Confirmation round 3 on 35a5fda4: CONFIRMED-WITH-CONDITIONS; harness completion (C13)
+
+Review: `scratchpad/review-ha/CONFIRM-HA-R3.md` (toys `review-ha/toy4/`, `toy5/`, copied into the
+guard). No production change: binary `91a49efa…`.
+
+- **R3-1 (skip detection).** `SKIP_MARKERS` are now case-insensitive `skip`/`skipped`/`skipping`
+  (not a hyphenated identifier such as `skipped-float`, not `--skip-million`), upper-case
+  `NOT RUN`, `unverified`, `not verified`, TAP `# SKIP` and pytest progress lines with an `s`;
+  explicit zero counts (`0 skipped`, `skipped: 0`) are not skips. Upper-case `NOT RUN` only: the
+  tree's PASS lines say a refused statement "did not run" / "was not run on the legacy engine".
+  Inventory: `tests/runtime2/skip_phrases.tsv` lists every tracked line (Makefile, `*.mk`,
+  tests, scripts, tools) that prints skip / not-run / unverified wording: 159 lines, 143
+  detected by the markers, 16 justified (FAIL lines of failing gates, identifiers, comments,
+  counters), each with its reason. The guard rescans the tree and fails on an unlisted line, a
+  stale entry, or a detected line the markers no longer catch (with a negative control). The
+  F2 historical control prints `SKIP …` when 0d853db4 is absent, so the guard gate is PARTIAL
+  (BLOCKED), never PASSED, there. Limitation: the scan is per line; a message whose wording sits
+  on a continuation line without a print keyword is not seen (none known).
+- **R3-2 (identity scope).** The identity now uses the whole normalised output of the failing
+  step (from the last line that names the step before make's error to the end), or the whole
+  log without an identified step; each per-line run is a whole log. The reviewer's
+  `test-rt-tail` toy is a guard control (FAILED-NEW on both baseline paths). Stability, recomputed
+  on the `stab/` double runs: vm_parity, vm_modules, cp14b (137 lines of step output) and
+  rt-diff-selftest (90 lines) are each identical between their two runs.
+- **R3-3 (addresses).** Only pointer contexts normalise: `at `/`address `/`ptr=` or a sanitizer
+  frame (`#N 0x…`) with 8+ hex digits, or a pointer-width value of 12+ digits;
+  `expected 0xdeadbeef got 0xdeadbeee` is FAILED-NEW (guard toy). Durations no longer include a
+  bare `s` after an integer or `min`.
+- **R3-4 (silent gates).** A gate that exits 0 without output of its own (not the runner header,
+  make's own messages, or the recipe commands make echoes) is SKIP (NOT-RUN), unless it is in
+  `SILENT_BY_DESIGN` with a reason (empty today: no planned gate is known to be silent; an entry
+  needs a reason). Guard toy: `@true` is NOT-RUN and fails the campaign under `--certify`.
+- **R3-5.** The other-platform entries of `KNOWN_CONDITIONAL` are anchored to the nine exact
+  messages the tree prints; anything else mentioning Windows/macOS is required (guard case).
+- **R3-6.** The preflight now checks the host before any gate (section 13.2).
+- **R3-7.** "Built from its checkout" requires the checkout's Makefile, and `make -q nift` runs there.
+- **D3 reporting.** The summary lists every assertion that did not execute, each marked
+  REQUIRED or not-required with its requirement (guard control).
+
+### 13.2 Linode instance minimums and toolchain plan (checked by the preflight)
+
+| Requirement | Minimum | Checked | For |
+| --- | --- | --- | --- |
+| RAM | 8 GB plan (MemTotal >= 7600 MiB) | yes | read_limit.py's default-limit check needs MemAvailable >= 4096 MiB |
+| Disk | 50 GB free | yes | 1.7 GB worktree; about 1.5 GB per sanitizer object set (ASan/UBSan, TSan) and their variants (guard-off, cp18, cp19, cp23); three baseline trees; a GCC snapshot build (5-7 GB build tree, about 1.2 GB installed) |
+| Cores | 2 (4 recommended) | no | duration only |
+| GCC 15.2 with `__GLIBCXX__` 20260321 | the GCC 15 branch snapshot of 2026-03-21 (`15.2.1 20260321`; FreeBSD ships it as `gcc15-devel 15.2.1.s20260321`) | yes | comparator sort |
+| Python | 3.12+, with headers (Ubuntu `python3-dev`) | yes | harnesses, test-python-binding |
+| Go | 1.26+ (bindings/go/go.mod) with pkg-config | yes | test-go-binding (`go test -race`) |
+| Node | 22 (>= 20) and npm | yes | test-node-binding |
+| .NET SDK | 10 (`net10.0`) | yes | test-csharp-binding |
+| git, strace, GNU time (`/usr/bin/time`), util-linux (`setpriv`, `script`), cc, make, coreutils | any current | yes | conditional checks in KNOWN_CONDITIONAL; test-progress-pty |
+| PTY (`/dev/ptmx`), loopback TCP | available | yes | test-progress-pty, v4.4 PTY smokes; test-serve |
+| `/dev/shm` | a separate tmpfs | yes | cross-device move cases |
+| Kernel | `vm.mmap_rnd_bits` <= 28 (`sysctl -w vm.mmap_rnd_bits=28`) | yes | the TSan gates |
+| User | an unprivileged `tester` | (runner) | root-only classification |
+
+Ubuntu 24.04 packages: `build-essential pkg-config git strace time util-linux python3 python3-dev
+python3-venv golang-go` (only 1.22 in 24.04: install Go 1.26 from go.dev/dl instead), Node 22 from
+NodeSource or nodejs.org, `dotnet-sdk-10.0` from Microsoft's package feed.
+
+**GCC 15.2 with `__GLIBCXX__` 20260321.** That value is the DATESTAMP of the GCC 15 branch
+snapshot `15-20260321`; no LTS image (Ubuntu 24.04, Debian 12/13) ships it, and rolling
+distributions have since moved past it. The tree's evidence (cp14b-d4-validation.md) names the
+profile but not the image; the exact compiler identity is in the owner workspace
+(`.claude-linode-runs/codex/cp14b/implementation/d4/profile.json`). Plan: build from the
+snapshot on the instance:
+
+    curl -O https://gcc.gnu.org/pub/gcc/snapshots/15-20260321/gcc-15-20260321.tar.xz
+    tar xf gcc-15-20260321.tar.xz && cat gcc-15-20260321/gcc/DATESTAMP   # must print 20260321
+    (cd gcc-15-20260321 && ./contrib/download_prerequisites)
+    mkdir gcc-build && cd gcc-build && ../gcc-15-20260321/configure --prefix=/opt/gcc-15-20260321 \
+        --enable-languages=c,c++ --disable-multilib --disable-bootstrap && make -j"$(nproc)" && make install
+    export PATH=/opt/gcc-15-20260321/bin:$PATH LD_LIBRARY_PATH=/opt/gcc-15-20260321/lib64
+
+Estimate: 30-60 min on 4 cores without bootstrap (2 cores: about twice), 5-7 GB build tree
+(deleted after install), about 1.2 GB installed. Then `echo __GLIBCXX__ | g++ -E -include
+cstddef -` must print 20260321 (the preflight checks it). Not tried here (disk).

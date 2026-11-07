@@ -298,6 +298,32 @@ checks = [
     ('assertions fail', certify.assertion_class(1, 'FAIL x\n'), 'FAIL'),
     ('assertions blocked', certify.assertion_class(1, 'x', 'no oracle'), 'BLOCKED'),
     ('class partial', rc('PASS', None, None, 'PARTIAL'), 'BLOCKED'),
+    # R3-1: the in-tree skip wordings (case-insensitive; zero counts are not skips)
+    *[('marker: ' + t, bool(certify.skipped_assertions(t)), want) for t, want in [
+        ('test-serve: SKIPPED (unsupported platform or python3 unavailable; nothing was tested)', True),
+        ('test-progress-pty: skipped (PTY tooling unavailable)', True), ('  (skipped: python3 unavailable)', True),
+        ('  (fuzz skipped: no compiler)', True), ('escapees_subreaper: SKIPPED (no PR_SET_CHILD_SUBREAPER)', True),
+        ('skip: x', True), ('[SKIP] y', True), ('NOT RUN z', True), ('UNVERIFIED: q', True), ('ok 2 # SKIP', True),
+        ('skipped: 3', True), ('..s..', True), ('progress PTY smoke SKIPPED: NOT verified', True),
+        ('PASS N1: 16 checks, 0 failure(s), 0 skipped', False), ('skipped: 0', False),
+        ('ok   consumer control skipped-float: rejected', False), ('python3 x.py --skip-million', False),
+        ('PASS tty REPL: statement not run and left no definition', False)]],
+    # R3-5: other-platform entries are anchored
+    ('anchored platform skip', certify.assertion_class(0, 'PASS x\nSKIP TSan lane (Windows-style runners differ)\n'), 'PARTIAL'),
+    # R3-4: no output of its own
+    ('silent gate', certify.assertion_class(0, '', None, True), 'SKIP'),
+    ('own output excludes echoed commands', certify.own_output('$ make -k t\npython3 x.py\nmake[1]: Leaving directory\n', ['python3 x.py']), []),
+    # R3-3: addresses only in pointer contexts
+    ('hex data kept', certify.normalise('FAIL bytes: expected 0xdeadbeef got 0xdeadbeee'), 'FAIL bytes: expected 0xdeadbeef got 0xdeadbeee'),
+    ('sanitizer frame address', certify.normalise('    #3 0x55d0a1b2c3d4 in f'), '#3 <ADDR> in f'),
+    ('address context', certify.normalise('READ of size 8 at 0x6020000000f0 thread T0'), 'READ of size 8 at <ADDR> thread T0'),
+    # R3-6: host requirements
+    ('preflight tool missing', len(pp({**GOOD, 'tools': {'go': '', 'git': 'git version 2.43'}})), 1),
+    ('preflight memory', len(pp({**GOOD, 'mem_mib': 3900})), 1),
+    ('preflight disk', len(pp({**GOOD, 'disk_gib': 10})), 1),
+    ('preflight TSan mmap bits', len(pp({**GOOD, 'mmap_rnd_bits': 32})), 1),
+    ('preflight loopback', len(pp({**GOOD, 'loopback': False})), 1),
+    ('preflight pty', len(pp({**GOOD, 'pty': False})), 1),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]
@@ -307,6 +333,53 @@ print(f'PASS certify harness self-test ({len(checks)} cases: inventory, report c
 PYC
 harness_status=$?
 [ "$harness_status" -eq 0 ] || exit "$harness_status"
+
+# R3-1: the skip-phrase inventory. Every tracked line that prints skip / not-run / unverified
+# wording is listed in tests/runtime2/skip_phrases.tsv as detected (certify.py's markers catch it)
+# or justified; a new unlisted line, a stale entry, or a detected line the markers miss fails.
+python3 -B - <<'PYSKIP' || exit 1
+import re, subprocess, sys
+sys.path.insert(0, 'scripts')
+import certify
+PRINT = re.compile(r"\b(print|echo|printf|fprintf|cout|cerr|puts|write|fail|log|say|note|report)\b|<<", re.I)
+PHRASE = re.compile(r"skip|not[ -]run|not verified|unverified", re.I)
+INV = 'tests/runtime2/skip_phrases.tsv'
+files = subprocess.run(["git", "ls-files", "Makefile", "*.mk", "tests/*.py", "tests/*.sh", "tests/*.cpp", "tests/*.c",
+                        "scripts/*.py", "scripts/*.sh", "tools/*.py"], capture_output=True, text=True).stdout.split()
+found = set()
+for f in files:
+    try:
+        lines = open(f, errors="replace").read().splitlines()
+    except OSError:
+        continue
+    for l in lines:
+        if PHRASE.search(l) and PRINT.search(l):
+            found.add((f, l.strip()))
+listed, bad = {}, []
+for row in open(INV):
+    if row.startswith('#') or not row.strip():
+        continue
+    p, cls, why, line = row.rstrip('\n').split('\t', 3)
+    listed[(p, line)] = cls
+    if cls == 'detected' and not certify.skipped_assertions(line):
+        bad.append(f'{p}: listed as detected but the markers miss it: {line[:100]}')
+    if cls not in ('detected', 'justified') or (cls == 'justified' and why in ('', '-')):
+        bad.append(f'{p}: bad class or missing reason: {line[:100]}')
+bad += [f'{p}: unlisted skip/not-run/unverified message (add it to {INV}): {l[:100]}' for p, l in sorted(found - set(listed))]
+bad += [f'{p}: stale inventory entry: {l[:100]}' for p, l in sorted(set(listed) - found)]
+# negative control: a new skip message the inventory does not list is reported
+fake = ('tests/runtime2/new_gate.sh', 'echo "SKIP new check (tool missing)"')
+if fake in listed or not certify.skipped_assertions(fake[1]):
+    bad.append('negative control: the synthetic unlisted skip message was not reported')
+else:
+    print('PASS certification guard phrase inventory negative control: an unlisted message is reported')
+for b in bad:
+    print('FAIL certification guard phrase inventory: ' + b)
+if bad:
+    sys.exit(1)
+print(f'PASS certification guard phrase inventory: {len(found)} lines, '
+      f'{sum(1 for v in listed.values() if v == "detected")} detected, {sum(1 for v in listed.values() if v == "justified")} justified')
+PYSKIP
 
 # H2 toy-Makefile negative controls (review of 0d853db4): scripts/certify.py itself, on a candidate
 # and a baseline toy tree. (a) a later recipe line failing only on the candidate, behind a first line
@@ -346,6 +419,11 @@ toy "$TOY/d/cand" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suit
 toy "$TOY/d/base" test-rt-detail 'echo "running tests/suite.py"; echo "FAIL suite"; echo "  bad case: case-old"; exit 1'
 toy "$TOY/e/cand" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 31 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
 toy "$TOY/e/base" test-rt-parity 'echo "running tests/runtime2/vm_parity.py"; echo "rt-diff: 817 entries, 30 differing, 16 approved"; echo "FAIL vm parity: 1 failure(s)"; exit 1'
+# R3-2: a changed detail above many identical lines; R3-3: real hex data
+toy "$TOY/t/cand" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/t/base" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7,4]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/x/cand" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeee"; exit 1'
+toy "$TOY/x/base" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeef"; exit 1'
 toy "$TOY/v/cand" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-$$$$/a pid $$$$ took 123ms at 2026-11-07T21:04:30"; echo "FAIL vary: 2 of 9 (took 45ms)"; exit 1'
 toy "$TOY/v/base" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-7/a pid 7 took 9ms at 2026-11-08T01:00:00"; echo "FAIL vary: 2 of 9 (took 3ms)"; exit 1'
 toyrun a test-rt-multi reg 1 FAILED-NEW
@@ -354,6 +432,9 @@ toyrun c test-rt-cases v4 1 FAILED-NEW
 toyrun d test-rt-detail reg 1 FAILED-NEW
 toyrun d test-rt-detail v4 1 FAILED-NEW
 toyrun e test-rt-parity reg 1 FAILED-NEW
+toyrun t test-rt-tail reg 1 FAILED-NEW
+toyrun t test-rt-tail v4 1 FAILED-NEW
+toyrun x test-rt-hex reg 1 FAILED-NEW
 toyrun p test-rt-same reg 0 FAILED-BASELINE
 toyrun v test-rt-vary reg 0 FAILED-BASELINE
 # D3 toy controls: a gate that passes with a required assertion skipped is PARTIAL (reported
@@ -368,13 +449,19 @@ skiprun() {  # skiprun CASE TARGET WANT-RC WANT-TEXT
     if [ "$rc" -ne "$3" ] || ! grep -q -- "$4" <<<"$out"; then
         echo "FAIL certification guard D3 control $1 ($2): exit $rc, wanted $3 and '$4'"; echo "$out" | tail -5; exit 1
     fi
-    echo "PASS certification guard D3 control $1: $2 (exit $rc): $4"
+    echo "PASS certification guard D3 control $1: $2 (exit $rc) as expected"
 }
 skiprun s1 test-rt-partial 1 "BLOCKED          test-rt-partial: PARTIAL"
 skiprun s1 test-rt-partial 1 "CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: test-rt-partial"
 skiprun s1 test-rt-partial 1 "needs: MemAvailable >= 4096 MiB"
 skiprun s2 test-rt-skipall 1 "NOT-RUN          test-rt-skipall: SKIP"
 skiprun s3 test-rt-platform 0 "PASSED 1"
+skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows pipeline"
+# R3-4: a gate with no output of its own is SKIP (NOT-RUN) and fails the campaign under --certify
+toy "$TOY/s4/cand" test-rt-silent 'true'
+skiprun s4 test-rt-silent 1 "NOT-RUN          test-rt-silent: SKIP"
+# R3-1 inventory check of the D3 phrases the guard itself prints: the historical control's
+# missing-commit branch prints a SKIP line, so that gate cannot be PASSED (see above).
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;
 # the tree's runner (above) does not. Needs that commit in this repository.
 if git cat-file -e 0d853db4:scripts/certify.py 2>/dev/null; then
@@ -384,7 +471,8 @@ if git cat-file -e 0d853db4:scripts/certify.py 2>/dev/null; then
     toyrun o test-rt-multi reg 0 FAILED-BASELINE
     echo "PASS certification guard historical control: the 0d853db4 runner launders control (a); this tree's runner reports it FAILED-NEW"
 else
-    echo "NOT RUN certification guard historical control: commit 0d853db4 is not in this repository (manual evidence: combined-b3-b5.md 10)"
+    # R3-1: never a pass when it cannot run: the SKIP line makes this gate PARTIAL (BLOCKED) under certify.py
+    echo "SKIP certification guard historical control: commit 0d853db4 is not in this repository (manual evidence: combined-b3-b5.md 10)"
 fi
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure

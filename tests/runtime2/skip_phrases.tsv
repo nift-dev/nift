@@ -1,0 +1,163 @@
+# R3-1 (confirmation round 3 of the H-A repair): every line of the tree that prints skip / not-run /
+# unverified wording. class detected: scripts/certify.py's SKIP_MARKERS catch it; justified: why it is not a
+# skip of a required assertion. certification_guard.sh rescans the tree and fails on an unlisted line, a
+# stale line, or a detected line the markers no longer catch. Columns: path, class, reason, the line (stripped).
+Makefile	detected	-	F6_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP F6 cleanup controls: Linux-only"; exit 0; fi;
+Makefile	detected	-	@if command -v clang++ >/dev/null 2>&1; then echo "== clang++ first-party warnings pass =="; $(MAKE) warnings-check CXX=clang++; else echo "clang++ not available; Clang warnings pass skipped locally"; fi
+Makefile	detected	-	if [ $$status -eq 77 ]; then echo "test-progress-pty: skipped (PTY tooling unavailable)"; \
+Makefile	detected	-	@echo "test-v45-integration-dogfood: skipped (POSIX shared-library, shebang, and job-control coverage)"
+Makefile	detected	-	@echo "test-v45-adversarial-runtime: skipped (POSIX timeout and job-control coverage)"
+Makefile	detected	-	if [ $$st -eq 77 ]; then echo "test-serve: SKIPPED (unsupported platform or python3 unavailable; nothing was tested)"; \
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
+Makefile	detected	-	V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
+Makefile	detected	-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/cp19_completion.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: completion PTY needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m1; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_QUOTING)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m2; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_EAGER)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m3; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT_SYNTAX)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m4; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@echo "test-v45-job-control: skipped (POSIX job control unavailable)"
+Makefile	detected	-	# a build whose inventory alone skips the check must fail the inventory-link
+Makefile	detected	-	CP14B_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP CP14B $@: Linux/libstdc++ only (D4)"; exit 0; fi;
+scripts/certify.py	detected	-	harness-blocked log: no CP19 legacy oracle, comparator coverage skipped)
+scripts/certify.py	detected	-	# skipped), SKIP (every assertion skipped), FAIL or BLOCKED. Skips are found mechanically in the
+scripts/certify.py	detected	-	"""D3: [(line, requirement, required)] for every skip marker in a log."""
+scripts/certify.py	detected	-	"""D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
+scripts/certify.py	detected	-	order = ["FAIL", "BASELINE-FAILURE", "UNVERIFIED", "SKIPPED-ENVIRONMENTAL", "FLAKY", "PASS"]
+scripts/certify.py	detected	-	for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
+scripts/guard_outcome.py	detected	-	report a skipped or unsupported run as success.
+scripts/memory_safety.py	detected	-	print("SKIP: rss mode requires /usr/bin/time but it is unavailable; "
+scripts/release_certify.py	detected	-	print(f"release certification: passed={summary['passed']} failed={summary['failed']} skipped={summary['skipped']}")
+scripts/test_integrity_check.py	justified	a comment in a checker, not printed	# SKIP-print followed by an exit-0 call, either later on the same line
+scripts/test_integrity_check.py	detected	-	r"print\(\s*[\"'][^\"']*SKIP[^\"']*[\"']\s*\)"
+scripts/test_integrity_check.py	detected	-	# body so a `if False: print("SKIP"); sys.exit(0)` is not a false green.
+scripts/test_integrity_check.py	detected	-	r"(?:echo|printf)\s+[^\n;]*?SKIP[^\n;]*?"
+tests/build_boundary.sh	justified	a FAIL line: the gate fails	./nift --version >/dev/null 2>&1 || { echo "FAIL: reduced CLI does not run"; exit 1; }
+tests/conformance/gen_golden.py	detected	-	print(f"SKIP {name}: CLI build failed; no golden written")
+tests/conformance/gen_golden.py	detected	-	print(f"SKIP {name}: page '{page}' has no CLI info.json")
+tests/cp19_completion.py	detected	-	print("SKIP CP19 completion (POSIX PTY test)")
+tests/cp20_windows_pipeline.py	detected	-	print("SKIP CP20 Windows pipeline (POSIX host)")
+tests/filesystem_type_smoke.sh	detected	-	echo "SKIP symlink assertions (cannot create symlinks here)"
+tests/handover_live_check.sh	detected	-	[ "${NIFT_LIVE_TESTS:-0}" = "1" ] || { echo "handover live check skipped (NIFT_LIVE_TESTS != 1)"; exit 0; }
+tests/memory_10k_benchmark.py	detected	-	Outcome contract (BH2): this guard emits exactly one of PASS / FAIL / SKIP /
+tests/migration_live_check.sh	detected	-	[ "${NIFT_LIVE_TESTS:-0}" = "1" ] || { echo "migration live check skipped (NIFT_LIVE_TESTS != 1)"; exit 0; }
+tests/ownership_unit.cpp	detected	-	std::printf("  [SKIP] process-death path (POSIX fork/kill) not run on Windows\n");
+tests/package_combined_dogfood.sh	detected	-	echo "SKIP combined dogfood (python3 unavailable)"
+tests/package_combined_dogfood.sh	detected	-	echo "SKIP combined dogfood (dirty sqlite self-dependency rejected)"
+tests/package_refs_smoke.sh	detected	-	echo "SKIP package refs/local lock (git unavailable)"
+tests/package_sqlite_dogfood.sh	detected	-	echo "SKIP package_sqlite_dogfood (dirty sqlite self-dependency rejected)"
+tests/package_transaction_smoke.py	detected	-	print("SKIP package transactions (git unavailable)")
+tests/pagination_ordering_smoke.sh	detected	-	echo "Pagination ordering smoke test SKIPPED (strace unavailable): the ordering guarantee is NOT verified" >&2
+tests/path_alias_smoke.sh	detected	-	printf 'unused\n' >"$P/public/assets/skipped.txt"
+tests/progress_pty_smoke.sh	detected	-	echo "progress PTY smoke test SKIPPED ('script' unavailable): the PTY ordering guarantee is NOT verified" >&2
+tests/progress_pty_smoke.sh	detected	-	echo "progress PTY smoke test SKIPPED ('python3' unavailable): the PTY ordering guarantee is NOT verified" >&2
+tests/requirements_smoke.sh	detected	-	printf 'y\n' >"$P/public/assets/skipped.txt"
+tests/rt/case_conversion_unit.cpp	detected	-	if (!checked) std::fprintf(stderr, "note: no UTF-8 locale installed; locale-independence check skipped\n");
+tests/rt/host_observer_native.cpp	detected	-	std::printf("N1 native post-open read-failure code mapping: SKIP (Linux /proc/self/mem unavailable)\n");
+tests/rt/host_observer_native.cpp	detected	-	std::printf("N1 native post-open read-failure code mapping: SKIP (Linux-only fixture)\n");
+tests/rt/host_process_unit.cpp	detected	-	if (!runtime::enable_subreaper()) { std::printf("escapees_subreaper: SKIPPED (no PR_SET_CHILD_SUBREAPER)\n"); return; }
+tests/rt/host_process_unit.cpp	detected	-	if (!runtime::enable_subreaper()) { std::printf("subreaper_reaps_orphans: SKIPPED\n"); return; }
+tests/rt/host_process_unit.cpp	detected	-	if (!runtime::enable_subreaper()) { std::printf("orphan_zombie_at_destroy: SKIPPED\n"); return; }
+tests/rt/host_process_unit.cpp	detected	-	if (!runtime::enable_subreaper()) { std::printf("orphan_after_group_destroy: SKIPPED\n"); return; }
+tests/rt/refrep_production.sh	detected	-	else echo "SKIP comparator refusal: admitted libstdc++ profile $profile (the production VM runs it)"; fi
+tests/rt/value_d040.cpp	detected	-	else std::printf("large_accounting skipped (no-large)\n");
+tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP partial cross-device move (root without setpriv)"; fi
+tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP cross-device move cases (/dev/shm missing or on the same filesystem)"; fi
+tests/runtime2/certification_guard.sh	justified	the guard's own heredoc opener for this scan, not a message	python3 -B - <<'PYSKIP' || exit 1
+tests/runtime2/certification_guard.sh	detected	-	fake = ('tests/runtime2/new_gate.sh', 'echo "SKIP new check (tool missing)"')
+tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s1/cand" test-rt-partial 'echo "running tests/runtime2/read_limit.py"; echo "PASS limits"; echo "SKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)"; exit 0'
+tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s2/cand" test-rt-skipall 'echo "running tests/refs.sh"; echo "SKIP package refs/local lock (git unavailable)"; exit 0'
+tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s3/cand" test-rt-platform 'echo "running tests/w.py"; echo "PASS w"; echo "SKIP CP20 Windows pipeline (POSIX host)"; exit 0'
+tests/runtime2/certification_guard.sh	detected	-	echo "SKIP certification guard historical control: commit 0d853db4 is not in this repository (manual evidence: combined-b3-b5.md 10)"
+tests/runtime2/cp01/syscall_harness_negative.sh	detected	-	if ! command -v strace >/dev/null 2>&1; then echo "SKIP syscall harness: strace unavailable"; exit 77; fi
+tests/runtime2/cp01/syscall_harness_negative.sh	detected	-	elif [ "$want" = 77 ]; then [ $rc -eq 77 ] && { echo "PASS syscall harness: $desc (skip)"; ok=$((ok+1)); } || { echo "FAIL syscall harness: $desc rc=$rc expected 77"; fail=1; }
+tests/runtime2/cp01/syscalls.sh	detected	-	echo "SKIP syscalls: tracer '$TRACE' is unavailable"
+tests/runtime2/cp01_simplify.sh	detected	-	run_optional77() { "$@" >/dev/null 2>&1; local rc=$?; if [ "$rc" -eq 77 ]; then echo "SKIP $*"; elif [ "$rc" -ne 0 ]; then "$@"; fail=1; fi; }
+tests/runtime2/cp01_simplify.sh	detected	-	echo "SKIP CP01 syscall measurements: tracer unavailable; performance unmeasured"
+tests/runtime2/cp03_simplify.sh	detected	-	echo "SKIP CP03 syscall measurements: tracer unavailable; performance unmeasured"
+tests/runtime2/cp13b/mutant_build.py	justified	a FAIL line: the gate fails	print(f"FAIL: cannot run make: {error}")
+tests/runtime2/cp14b/allocation_failure.cpp	detected	-	if(unverified)std::printf("SKIP UNVERIFIED COMPARATOR COVERAGE: allocation: %d comparator workload(s) refused with method:sort on an unverified libstdc++ profile\n",unverified);
+tests/runtime2/cp14b/comparator_contexts.py	detected	-	rows.append(dict(kind=name,context=context,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name,context);continue
+tests/runtime2/cp14b/comparator_contexts.py	detected	-	print(cprof.banner(prof,unverified,'comparator contexts'))
+tests/runtime2/cp14b/comparator_profile.py	detected	-	that fallback. Scripts then report UNVERIFIED COMPARATOR COVERAGE: refusal-only
+tests/runtime2/cp14b/comparator_profile_selftest.py	detected	-	method:sort refusal; everything else must fail rather than skip: a crash, an
+tests/runtime2/cp14b/design_mutations.py	detected	-	print('UNVERIFIED' if all(oks) else 'FAIL',number,name,flush=True);continue
+tests/runtime2/cp14b/design_mutations.py	detected	-	print(cprof.banner(prof,unverified,'design mutants'))
+tests/runtime2/cp14b/drain_allocation.cpp	detected	-	std::printf("SKIP UNVERIFIED COMPARATOR COVERAGE: drain: %zu comparator programs refused with method:sort on an unverified libstdc++ profile; no drain witnessed\n",sizeof(cases)/sizeof(cases[0]));
+tests/runtime2/cp14b/effects.py	detected	-	results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
+tests/runtime2/cp14b/effects.py	detected	-	print(cprof.banner(prof,unverified,'effects'))
+tests/runtime2/cp14b/functional.py	detected	-	results.append(dict(name=name,source=source,pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',name);continue
+tests/runtime2/cp14b/functional.py	detected	-	print(cprof.banner(prof,unverified,'functional'))
+tests/runtime2/cp14b/inventory.py	detected	-	results.append(dict(id=c['id'],source=source,classification='unverified comparator',pass_=bool(ok),detail=detail));print('UNVERIFIED' if ok else 'FAIL',c['id']);continue
+tests/runtime2/cp14b/inventory.py	detected	-	print(cprof.banner(prof,unverified,'inventory'))
+tests/runtime2/cp14b/inventory.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),counts=dict(collections.Counter(r['classification'] for r in results)),results=results)
+tests/runtime2/cp14b/mutations.py	detected	-	print('UNVERIFIED' if ok else 'FAIL',number,name,flush=True);continue
+tests/runtime2/cp14b/mutations.py	detected	-	print(cprof.banner(prof,unverified,'named mutants'))
+tests/runtime2/cp14b/origins.py	detected	-	rows.append(dict(name=case['name'],pass_=bool(ok),coverage='unverified-comparator',detail=detail));print('UNVERIFIED' if ok else 'FAIL',case['name']);continue
+tests/runtime2/cp14b/origins.py	detected	-	print(cprof.banner(prof,unverified,'origins'))
+tests/runtime2/cp14b/origins.py	detected	-	result=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
+tests/runtime2/cp14b/reporting_regression.py	detected	-	print(cprof.banner(prof,unverified,'reporting'))
+tests/runtime2/cp14b/reporting_regression.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
+tests/runtime2/cp14b/sort_replay.py	detected	-	if prof.refused:print(cprof.banner(prof,unverified,'sort replay'))
+tests/runtime2/cp14b/sort_replay.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),oracle_sha256=hashlib.sha256(Path(a.oracle).read_bytes()).hexdigest(),results=results)
+tests/runtime2/cp14b/sort_replay.py	detected	-	Path(a.output).write_text(json.dumps(report,indent=2)+'\n');print((report['status']+' '+str(len(results))+' production VM traces') if not prof.refused else (('UNVERIFIED' if report['status']=='PASS' else 'FAIL')+' '+str(len(results))+' D4 cases refused with method:sort (no VM trace replayed)'));return 0 if report['status']=='PASS' else 1
+tests/runtime2/cp16/capture.py	detected	-	print("SKIPPED %s (needs Linux setpriv for priv=nodac)" % probe.id)
+tests/runtime2/cp16_n1.py	detected	-	print(f"SKIP {skipped} post-open read-failure cases: /proc/self/mem is unavailable "
+tests/runtime2/cp16_n1.py	detected	-	print("SKIP mutant predicate: Linux read-failure cases are unavailable")
+tests/runtime2/cp16_n1_controls.py	detected	-	print("SKIP control simulated-mutant: Linux read-failure fixture unavailable")
+tests/runtime2/cp16_n1_result.py	justified	a failure message (the gate fails when skipped_read_cases is not 0)	return fail(f"skipped_read_cases {data['skipped_read_cases']!r}, want integer 0")
+tests/runtime2/cp19/proof.mk	detected	-	@test -n "$(CP19_LEGACY_ORACLE)" || { echo 'FAIL test-cp19-proof-cli: CP19_LEGACY_ORACLE is unset. This gate is NOT run without a legacy oracle (it never skips): make test-cp19-proof-cli CP19_LEGACY_ORACLE=/path/to/nift (run as NIFT_VM=0; certification uses the frozen legacy binary). See tests/runtime2/cp19/session_proof_cli.py.'; exit 2; }
+tests/runtime2/cp19/session.cpp	detected	-	const auto result = session.execute("print(\"MUST-NOT-RUN\")", "budget-unit", output);
+tests/runtime2/cp19/session_classify_cli.py	detected	-	root=Path(td);stats=root/'stats';(root/'.niftrc').write_text('print("RC-MUST-NOT-RUN")')
+tests/runtime2/cp19/session_classify_cli.py	detected	-	source='print("SCRIPT-MUST-NOT-RUN")\ncommand /usr/bin/touch marker\ncommand /usr/bin/printf "%s" "$[print(\"INTERPOLATION-MUST-NOT-RUN\")]"\nexit\n'
+tests/runtime2/cp19/session_classify_cli.py	detected	-	r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN");bytes([65]);unknown(1)\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
+tests/runtime2/cp19/session_classify_cli.py	detected	-	r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN")\nprint("AFTER-INTERNAL")\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
+tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shell short-circuit cases), not a message	('skip_or',['-i'],'x:=0\ncommand /usr/bin/true || command /usr/bin/printf "%s\\n" "$[(x+=1)]"\nx\nexit\n','',2),
+tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shell short-circuit cases), not a message	('skip_and',['-i'],'x:=0\ncommand /usr/bin/false && command /usr/bin/printf "%s\\n" "$[(x+=1)]"\nx\nexit\n','',2),
+tests/runtime2/cp19/session_cli.py	detected	-	if unverified:print(f'SKIP UNVERIFIED COMPARATOR COVERAGE: session_cli.py: {unverified} VM-session comparator '
+tests/runtime2/cp22/adversarial.py	justified	a FAIL line: the gate fails	print(f"FAIL {tag} adv{k}: not run on the VM: {st.get('outcome')} {st.get('reason')}")
+tests/runtime2/file_copy_move_freedom.sh	detected	-	else echo "SKIP cross-device move (/dev/shm missing or on the same filesystem)"; fi
+tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print("FAIL: base.f did not run on the VM")
+tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print(f"FAIL: {label}: a loop did not run on the VM")
+tests/runtime2/host_deps.py	detected	-	print("SKIP [%s] permission steps (root without setpriv)" % mode)
+tests/runtime2/host_deps.py	detected	-	print("SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract")
+tests/runtime2/host_m3_order.py	detected	-	print(f"SKIP root {base}: {error}")
+tests/runtime2/literals/run.py	detected	-	print(f"PASS {name} [{context}] side effects preserved, later call skipped")
+tests/runtime2/packages/packages.py	detected	-	print("SKIP E2 writer (git unavailable)")
+tests/runtime2/read_limit.py	detected	-	print("SKIP process capture (no head)")
+tests/runtime2/read_limit.py	detected	-	print("SKIP default 1 GiB limit (MemAvailable %d MiB < 4096)" % (available // MiB))
+tests/runtime2/read_limit.py	detected	-	print("SKIP read_line EIO (no /proc/self/mem)")
+tests/runtime2/read_limit.py	detected	-	print("SKIP capture-while-running cases (needs /proc, yes, head, sh)")
+tests/runtime2/refsem/stale_vm.cpp	justified	a harness diagnostic on a failing path (the unit fails)	std::fprintf(stderr, "harness: %s not run (%s %s)\n", name, r.refusal.c_str(), r.execution.message.c_str());
+tests/runtime2/rt_parser_corpus.py	detected	-	print("paren oracle: skipped %d nondeterministic entries (tools/rt-diff/ignore.txt)" % len(skipped))
+tests/runtime2/safety/mutants.sh	detected	-	link=$(printf '%s\n' $objects | grep -vxE "$skip" | grep -v '\.a$' | tr '\n' ' ')
+tests/runtime2/vm_host.py	detected	-	print("SKIP symlink fixtures: symlinks unavailable")
+tests/runtime2/vm_host_memory.py	detected	-	print("SKIP vm_host_memory: /usr/bin/time unavailable")
+tests/runtime2/vm_host_memory.py	detected	-	print("SKIP peak tracker: build failed")
+tests/runtime2/vm_host_memory.py	detected	-	print("SKIP peak tracker: cc unavailable")
+tests/serve_smoke.sh	detected	-	*) echo "SKIP: serve_smoke.sh runs on Linux (full) and macOS (lifecycle core); Windows uses tests/serve_windows_lifecycle.ps1"; exit 77 ;;
+tests/serve_smoke.sh	detected	-	PY=$(command -v python3) || { echo "SKIP: python3 not available; nift serve requires it, nothing was tested"; exit 77; }
+tests/serve_smoke.sh	justified	a counter initialisation, not a message	fail=0; passes=0; skips=0
+tests/serve_smoke.sh	detected	-	skip() { skips=$((skips+1)); echo "SKIPPED - $1"; }
+tests/serve_smoke.sh	detected	-	echo "serve_smoke (macOS lifecycle core): $passes passed, $skips skipped, $([ $fail = 0 ] && echo 0 || echo some) failed"
+tests/serve_smoke.sh	detected	-	echo "serve_smoke: $passes passed, $skips skipped, $([ $fail = 0 ] && echo 0 || echo some) failed"
+tests/sha256_builtins.sh	detected	-	echo "SKIP unreadable file (POSIX permission bits do not apply on Windows)"
+tests/sha256_builtins.sh	detected	-	echo "SKIP unreadable file (running as root without setpriv)"
+tests/sha256_builtins.sh	detected	-	echo "SKIP symlinks (cannot create symlinks here)"
+tests/sha256_builtins.sh	detected	-	if [ "$IS_WINDOWS" -eq 1 ]; then echo "SKIP [$mode] trace descriptor inheritance under MSYS"
+tests/sha256_unit.cpp	detected	-	std::printf("note: running as root; unreadable-file check skipped (root bypasses permissions)\n");
+tests/shell_dispatch.py	detected	-	print("SKIP shell dispatch (POSIX pty/coreutils regression)")
+tests/shell_dispatch.py	justified	a variable name (skip_script), not a message	result = run_shell(skip_script % "false && echo $[bump()]")
+tests/shell_dispatch.py	justified	a variable name (skip_script), not a message	result = run_shell(skip_script % "true || echo $[bump()]")
+tests/shell_dispatch.py	justified	a variable name (skip_script), not a message	result = run_shell(skip_script % "false || echo $[bump()]")
+tests/shell_dispatch.py	justified	a variable name (skip_script), not a message	result = run_shell(skip_script % "true && echo $[bump()] | cat")
+tests/site_dx_smoke.sh	detected	-	grep -q 'needs verification' <<<"$out" && ! grep -q 'all .* up to date' <<<"$out" && pass "B1 $mode: status --strict lists unverified pages" || fail "B1 $mode: status --strict: $out"
+tests/v44_interactive_completion_pty.py	detected	-	print("SKIP v4.4 interactive completion PTY (Windows uses line-based input)")
+tests/v44_relative_import_ownership_smoke.sh	detected	-	echo '  (symlink cycle skipped: native symlinks unavailable)'
+tests/v44_relative_import_ownership_smoke.sh	detected	-	echo '  (package symlink escape skipped: native symlinks unavailable)'
+tests/v44_shell_foreground_tty_smoke.py	detected	-	print("SKIP v4.4 shell foreground TTY (POSIX PTY test; macOS foreground execution hangs)")
+tests/v44_shell_glob.sh	detected	-	echo 'SKIP v4.4 shell glob (Windows passthrough pending glob backend)'
+tests/v46_b4_cp8_embedding_abi.sh	detected	-	echo 'nm unavailable; skipping symbol-surface check' >&2
+tests/v46_resource_paths.py	detected	-	print("  (package symlink escape skipped: native symlinks unavailable)")
