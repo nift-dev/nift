@@ -174,11 +174,13 @@ bool UnitCompiler::keyed_read_call(const Node& node, std::uint16_t dst, int id) 
     return builder_ok();
 }
 
-// D-NEXT-refsem #1: the arguments are evaluated first, then the receiver
-// binding is read (a reference to the shared collection; nothing is taken
-// out of the binding, so a catchable error such as a refused reference cycle
-// leaves every binding as it was), and KeyedMutate changes the collection in
-// place, visibly through every alias.
+// D-NEXT-refsem #1, H-A (combined-b3-b5.md): the receiver binding is read first
+// (a reference to the shared collection, retained in state+Source while the
+// arguments run, so an argument that rebinds the name does not redirect the
+// mutation; legacy's canonical order), then the arguments are evaluated.
+// Nothing is taken out of the binding, so a catchable error such as a refused
+// reference cycle leaves every binding as it was, and KeyedMutate changes the
+// collection in place, visibly through every alias.
 bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
     using namespace collection_slot;
     const std::string name(keyed_names[id]);
@@ -202,9 +204,14 @@ bool UnitCompiler::keyed_mutation(const Node& node, std::uint16_t dst, int id) {
         if (!temp(reg)) return false;
         fb_->emit(OpCode::LoadNull, reg);
     }
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
+    if (!expr_to(ast_.at(node.a).a, state + Source)) return false;
+#endif
     if (node.count > 0 && !expr_to(args[0], state + Item)) return false;
     if (node.count > 1 && !expr_to(args[1], state + Returned)) return false;
-    if (!expr_to(ast_.at(node.a).a, state + Source)) return false;
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13
+    if (!expr_to(ast_.at(node.a).a, state + Source)) return false;  // M13: read after the arguments (H-A)
+#endif
     fb_->set_offset(collection_offset(node));
     fb_->emit(OpCode::KeyedMutate, state, static_cast<std::uint16_t>(id), 0);
     fb_->emit(OpCode::Move, dst, state + Result);

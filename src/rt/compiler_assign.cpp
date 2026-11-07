@@ -158,7 +158,21 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         if (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
             !kinds_within(target.b, kKindNumber, target, "type:element-assignment"))
             return false;
-        if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
+        // H-A (combined-b3-b5.md): the receiver first, its value retained in a register (a
+        // binding's own register is copied when the value can rebind it); then the value,
+        // then the index (legacy's order for every context: `b[i] = g()` where g changes i
+        // stores at the new i). B2: never taken out of its holder.
+        if (global) {
+            fb_->set_offset(target.begin);
+            if (!global_check_defined(held.reg, text(object))) return false;
+            if (!(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(object)))) return false;
+        }
+        if (!retain_receiver(reg, !global && !indirect, node.b) || !expr_any(node.b, value) ||
+            !expr_any(target.b, key))
+            return false;
+#else
+        if (!expr_any(target.b, key) || !expr_any(node.b, value)) return false;  // M13 (H-A): the old order
         if (global) {
             fb_->set_offset(target.begin);
             if (!global_check_defined(held.reg, text(object))) return false;
@@ -167,6 +181,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
             fb_->emit(OpCode::CellLoad, reg, held.reg);
         if (global && !(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(object))))
             return false;
+#endif
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));

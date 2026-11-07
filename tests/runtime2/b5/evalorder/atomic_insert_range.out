@@ -1,0 +1,4 @@
+[7,8,9,10,11,12]
+[1,2]
+-- exit 0
+error: insert: index out of range

@@ -13,6 +13,11 @@
 #   7 compiler_array_mutation.cpp+session_invocation.cpp
 #                        R-B7: `args` immutability is a binding-only check again (aliases mutate it)
 #   8 collection_sort.cpp Q7: the comparator sort sorts the receiver in place (no copy-sort-commit)
+#  13 compiler_array_mutation.cpp+compiler_keyed.cpp+compiler_stmt_expr.cpp+compiler_assign.cpp
+#                        H-A: the receiver is read after its arguments again (and an element store's
+#                        index before its value), the order before the combined-candidate repair
+#  14 compiler_literal_expr.cpp  H-A: a receiver in its binding's own register is never copied
+#                        before an operand that can rebind it (top-level forms read it late)
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
@@ -25,7 +30,9 @@ fi
 fail=0
 for spec in 1:src/rt/infer_sites.cpp 3:src/rt/infer_session.cpp 4:src/rt/infer_session.cpp \
             6:src/rt/vm_ops.cpp 7:src/rt/compiler_array_mutation.cpp+src/rt/session_invocation.cpp \
-            8:src/rt/collection_sort.cpp 11:src/rt/op_admission.cpp 12:src/rt/compiler_dispatch.cpp; do
+            8:src/rt/collection_sort.cpp 11:src/rt/op_admission.cpp 12:src/rt/compiler_dispatch.cpp \
+            13:src/rt/compiler_array_mutation.cpp+src/rt/compiler_keyed.cpp+src/rt/compiler_stmt_expr.cpp+src/rt/compiler_assign.cpp \
+            14:src/rt/compiler_literal_expr.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

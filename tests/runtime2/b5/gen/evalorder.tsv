@@ -1,0 +1,18 @@
+# H-A evaluation-order family (docs/runtime-2/checkpoints/combined-b3-b5.md): one row per operation.
+# Columns (tab-separated): op, family, statement template, value the argument call returns.
+# In the template, G is the argument call (g()) and R names the result binding (r). gen_evalorder.py
+# checks this table against its model in both directions: a missing or extra row exits 2.
+push_stmt	array	b.push(G)	4
+push_expr	array	R := b.push(G)	4
+insert_v	array	b.insert(0, G)	4
+insert_i	array	b.insert(G, 9)	0
+remove	array	R := b.remove(G)	0
+splice_s	array	b.splice(G, 1)	0
+store_v	array	b[0] = G	4
+read_k	array	R := b[G]	1
+mset_v	map	b.set("k", G)	4
+mset_k	map	b.set(G, 1)	"k"
+mremove	map	b.remove(G)	"a"
+sadd	set	b.add(G)	4
+sremove	set	b.remove(G)	1
+spush	stack	b.push(G)	4

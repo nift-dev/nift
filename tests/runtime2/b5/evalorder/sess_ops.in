@@ -1,0 +1,19 @@
+b := [1, 2]
+keep := b
+g := () => { b = [7, 8]; return 4 }
+b[0] = g()
+print(b.stringify())
+print(keep.stringify())
+c := [1, 2]
+kc := c
+h := () => { c = [7, 8]; return 0 }
+print(c[h()])
+x := c.insert(h(), 5)
+print(c.stringify())
+print(kc.stringify())
+m := map()
+km := m
+w := () => { m = map(); return 4 }
+y := m.set("k", w())
+print(m.size())
+print(km.size())

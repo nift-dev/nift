@@ -38,14 +38,22 @@ bool UnitCompiler::expression_statement(const Node& node) {
             if (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
                 !kinds_within(callee.a, kKindArray, receiver, "type:push"))
                 return false;
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
+            // H-A (combined-b3-b5.md): the receiver is read before the operand and retained
+            // in a register (a counted reference); a receiver in its binding's own register is
+            // copied first when the operand can rebind it. The array stays in its holder, Push
+            // writes it in place and checks the cycle itself (stage 2.4): no write-back.
+            if (global && !(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(receiver))))
+                return false;
+            if (!retain_receiver(reg, !global && !indirect, arg) || !expr_any(arg, value)) return false;
+#else
             if (!expr_any(arg, value)) return false;
-            // B2 (b2-refrep.md): re-read after the operand (as the take did);
-            // the array stays in its holder, Push writes it in place and
-            // checks the cycle itself (stage 2.4): no write-back.
+            // M13 (H-A): re-read after the operand, as before the H-A repair
             if (indirect && !global && held.selector_root_only && !held.loop_binding)
                 fb_->emit(OpCode::CellLoad, reg, held.reg);
             if (global && !(held.cell ? read_binding(held, reg) : global_read_value(held.reg, reg, text(receiver))))
                 return false;
+#endif
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));

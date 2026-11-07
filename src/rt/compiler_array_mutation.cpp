@@ -64,6 +64,13 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     // binding-only; `args` is immutable as an object (kImmutable, checked by the protocol
     // through every alias).
     const NodeId* args=ast_.list(node);
+    // H-A (combined-b3-b5.md): the receiver is evaluated first and its value retained in
+    // state+Source (a counted reference) while the arguments run, as legacy's canonical
+    // evaluator does: an argument that rebinds the receiver's name, or drops every other
+    // reference to the array, does not change which array is mutated.
+#if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
+    if(!read())return false;
+#endif
     if(argc>0&&!expr_to(args[0],state+Item))return false;
     if(argc>1&&!expr_to(args[1],state+Returned))return false;
     // D-NEXT-refsem #4, review round 4 (coordinator ruling): every splice
@@ -81,7 +88,9 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     const bool late=false&&cell;
 #endif
     if(splice3&&!late&&!expr_to(args[2],state+Keys))return false;
-    if(!read())return false;
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13
+    if(!read())return false;  // M13: the receiver is read after its arguments again (H-A)
+#endif
     // The call text: the VM's wrong-receiver message (B0, vm_array_mutation.cpp).
     fb_->set_offset(collection_offset(node));
     fb_->note(fb_->emit(OpCode::ArrayMutate,state,id,splice3&&!late?2:0),std::string(text(node)));

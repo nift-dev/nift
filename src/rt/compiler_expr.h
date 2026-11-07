@@ -214,6 +214,8 @@ private:
     NodeId node_id(const Node& node) const { return static_cast<NodeId>(&node - &ast_.at(0)); }
     bool false_jump(NodeId cond, std::vector<std::size_t>& jumps);
     bool has_call(NodeId id) const;
+    bool may_rebind(NodeId id) const;
+    bool retain_receiver(std::uint16_t& reg, bool own_register, NodeId operand);
     bool plain_postfix(const Node& node);
     bool ends_with_not(NodeId id) const;
     bool infix_left_ok(const Node& node);

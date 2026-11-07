@@ -383,7 +383,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (note_set) global_note_ = saved_note;
     global_offset_set_ = offset_set;
     chain_next_ = nullptr;
-    if (!receiver_ok) return false;
+    if (!receiver_ok || !retain_receiver(object_reg, object_reg < mark, node.b)) return false;  // H-A: b[g()]
     ++index_depth_;
     const std::uint8_t saved_flags = fb_->flags();
     fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrIndexKey));

@@ -1010,8 +1010,8 @@ $(B4B_GUARDOFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)
 .PHONY: test-runtime2-b5 test-runtime2-b5-mutants
 test-runtime2-b5: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver evalorder
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver evalorder
 	$(PYTHON) tests/runtime2/b5/sort_refusals.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
@@ -1024,6 +1024,17 @@ test-runtime2-b5-generators: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-generators: $(TARGET)
 	$(PYTHON) -I tests/runtime2/b5/gen/gate.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
 	$(PYTHON) -I tests/runtime2/b5/gen/gate.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
+# H-A (docs/runtime-2/checkpoints/combined-b3-b5.md): the evaluation-order family. Every operation x
+# argument behaviour (rebind, alias mutation, dropped references, throw) x callee x context
+# (top level, loop, function, lambda, session) against the contract model, on the production
+# build, inputs from the tree (tests/runtime2/b5/gen/evalorder.tsv); then its negative controls
+# (a missing tree and a truncated operation table must exit 2 and write nothing).
+.PHONY: test-runtime2-b5-evalorder
+test-runtime2-b5-evalorder: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b5-evalorder: $(TARGET)
+	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
+	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
+test-rt-vm: test-runtime2-b5-evalorder
 .PHONY: test-runtime2-guardoff
 # Review F2: every step runs its programs in temporary copies; the gate fails if it left the
 # repository changed (tracked, untracked or ignored files; tests/runtime2/repo_state.py).

@@ -1,0 +1,5 @@
+i := 0
+b := [0, 0]
+g := () => { i = 1; return 5 }
+b[i] = g()
+print(b.stringify())
