@@ -123,6 +123,10 @@ def supported():
                                        "  r := await f()\n  print(n)\n  return r\n}\nprint(m())\n"))
     out.append(("async-capture-before-await", "fn(m()) {\n  n := 1\n  f := async () => n\n  n = 7\n"
                                               "  return await f()\n}\nprint(m())\n"))
+    # B5 fix-up 2: formerly UNSUPPORTED ("aliasing"); legacy-equal on B5 (`2`: the element pushed
+    # through `inner` is the captured array's element in both engines).
+    out.append(("async-capture-aliased", "fn(m()) {\n  n := [[1], [2]]\n  f := async () => n[0].size()\n"
+                                         "  inner := n[0]\n  inner.push(9)\n  return await f()\n}\nprint(m())\n"))
     # CP25-R: a reserved parameter name that is only read is an ordinary parameter.
     out.append(("reserved-param-read", "fn(f(name)) { return name }\nprint(f(1))\n"))
     out.append(("for-top", "for (x : [1, 2]) { print(x) }\n"))
@@ -146,10 +150,10 @@ UNSUPPORTED = [
     # CP22 refused an async lambda capturing a local (coro-capture; legacy
     # clones captures per task). CP23 admits it (cp23-concurrency.md,
     # CP22-CLASSIFICATION.tsv r_capture.f: vm, legacy-golden); the programs are
-    # now SUPPORTED (supported(): async-capture*). Still refused next to them:
-    # a capture of an aggregate whose element is aliased in the frame.
-    ("async-capture-aliased", "fn(m()) {\n  n := [[1], [2]]\n  f := async () => n[0].size()\n  inner := n[0]\n"
-     "  inner.push(9)\n  return await f()\n}\nprint(m())\n", "aliasing"),
+    # now SUPPORTED (supported(): async-capture*). B5 fix-up 2 (b5-refsem.md 12.3): the
+    # aliased-element capture that stayed refused here (`aliasing`) is admitted since B5 deleted the
+    # reference guard (owner 2026-11-02: shared references, no replacement static guard) and is
+    # legacy-equal (`2`): moved to supported() as async-capture-aliased.
     ("deferred-fn", "@fn(f()) { return 1 }\nprint(1)\n", "fn-flags"),
     ("bare-expression", "x := 1\nx\n", "expression-statement"),
     ("jump-not-last", "i := 0\nwhile (i < 3) { i += 1; break; print(i) }\n", "jump-not-last"),

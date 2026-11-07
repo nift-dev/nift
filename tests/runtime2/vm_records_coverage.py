@@ -291,19 +291,9 @@ ORACLE = {
 }
 
 REFUSED = [
-    # D-NEXT-refsem #1: add() mutates its parameter, so in Phase B the caller's
-    # `a` would receive the pushes (the D-040 copy at the call loses them): the
-    # Phase A guard refuses it before any effect (it was a supported shape).
-    ('push_arrlit_fnloop', 'fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n',
-     'reference-guard:argument'),
-    # Integration review (stage4d): these were listed as supported, but each
-    # contains a construct that is refused for a reason that still holds: a
-    # pushed member of a binding and a declaration from an array element are
-    # places (aliasing, L7: legacy binds locations); `p < 2 == true` is a
-    # comparison chain (CP12 F2: legacy splits chains differently). Kept here
-    # with that reason; the supported list has the corrected programs.
-    ("push-member-after-call", 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\nb := mk(2)\na.push(b.t)\nprint(a.stringify())\n', "aliasing"),
-    ("decl-from-pushed-element", 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\nx := a[0]\nprint(a.stringify())\n', "aliasing"),
+    # Integration review (stage4d): `p < 2 == true` is a comparison chain (CP12 F2: legacy splits
+    # chains differently), refused. (B5 fix-up 2: the pushed-member and declaration-from-element
+    # programs listed here as `aliasing` are admitted since B5 and legacy-equal: SUPPORTED below.)
     ("chain-if-condition", 'fn(f(p)) { if (p < 2 == true) { print("lt") }\nreturn p }\ni := 0\nwhile (i < 3) { print(f(i)); i += 1 }\n', "comparison-chain"),
     # The parameter copy where legacy's prepared typing differs from the
     # declared type: a binding of the same name outside the function
@@ -320,8 +310,6 @@ REFUSED = [
      'while (i < 1) { print(f(g(1))); i += 1 }\n', "prepared-fn-unprepared"),
     ("expression-argument", 'fn(f(p)) { return (p ?? 0) }\ni := 0\nwhile (i < 1) { print(f(i + 1)); i += 1 }\n',
      "prepared-fn-unprepared"),
-    ("push-binding", 'o := {"k": 1}\na := []\na.push(o)\nprint(a.stringify())\n', "aliasing"),
-    ("push-member", 'o := {"k": [1]}\na := []\na.push(o.k)\nprint(a.stringify())\n', "aliasing"),
     # Path arguments that stay refused (coordinator ruling): an aggregate is
     # shared with the caller in legacy (the callee pushes, a returned copy is
     # pushed, a local copy is pushed; a written scalar parameter is refused as
@@ -364,8 +352,28 @@ REFUSED = [
      'path-in-call-argument'),
     ('path-write-scalar', 'fn(f(s)) {\n  s = 9\n  return s\n}\no := {"k": 1}\nprint(f(o.k))\nprint(o.k)\n',
      'alias-argument'),
-    ("push-index-loop", 'a := [[1]]\nb := []\ni := 0\nwhile (i < 1) { b.push(a[0]); i += 1 }\nprint(b.stringify())\n',
-     "aliasing"),
+]
+
+
+# B5 fix-up 2 (docs/runtime-2/checkpoints/b5-refsem.md 12.3): formerly REFUSED with `aliasing` (the
+# Phase A reference guard, deleted by B5; owner 2026-11-02: shared references, no replacement static
+# guard). Each was run on legacy, 17f7964c and B5: refused at 17f7964c, legacy-equal on B5, so they are
+# ordinary supported shapes now (originals: docs/runtime-2/evidence/b5/rt-vm-originals.json).
+SUPPORTED += [
+    ("push-member-after-call", 'fn(mk(i)) { return {"id": i, "t": [i]} }\na := []\na.push(mk(1))\nb := mk(2)\na.push(b.t)\nprint(a.stringify())\n'),
+    ("decl-from-pushed-element", 'fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\nx := a[0]\nprint(a.stringify())\n'),
+    ("push-binding", 'o := {"k": 1}\na := []\na.push(o)\nprint(a.stringify())\n'),
+    ("push-member", 'o := {"k": [1]}\na := []\na.push(o.k)\nprint(a.stringify())\n'),
+    ("push-index-loop", 'a := [[1]]\nb := []\ni := 0\nwhile (i < 1) { b.push(a[0]); i += 1 }\nprint(b.stringify())\n'),
+]
+# B5 fix-up 2: approved differences from legacy, each pinned with its rule. Formerly REFUSED
+# `reference-guard:argument` (Phase A). push_arrlit_fnloop: add() pushes into its parameter, which is
+# the caller's array (owner 2026-11-01: assignment, arguments and returns share identity;
+# compatibility.md "Arrays and objects are shared references": `fn(f(x)){x.push(4)}; f(a)`); legacy
+# copies the argument and prints `[]`.
+B5_APPROVED = [
+    ('push_arrlit_fnloop', 'fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n',
+     b"[[0,1],[1,2]]\n", "shared-reference arguments (owner 2026-11-01)"),
 ]
 
 
@@ -439,6 +447,18 @@ def main():
                         elif name in LEGACY_RESULT and legacy != LEGACY_RESULT[name]:
                             failures.append(f"{name}: legacy result {legacy} != {LEGACY_RESULT[name]}")
                 shutil.rmtree(d, ignore_errors=True)
+        for name, source, stdout, rule in B5_APPROVED:
+            d = tempfile.mkdtemp(dir=work)
+            with open(os.path.join(d, "p.f"), "w") as f:
+                f.write(source)
+            legacy, _ = run(nift, d, None, a.timeout)
+            for mode in ("require", "1"):
+                vm, st = run(nift, d, mode, a.timeout)
+                if not st or st["outcome"] != "vm" or vm != (stdout, b"", 0):
+                    failures.append(f"{name}: NIFT_VM={mode} is not the pinned B5 result ({rule}): {vm} {st and st['outcome']}")
+            if legacy == (stdout, b"", 0):
+                failures.append(f"{name}: pinned as a B5 difference ({rule}) but legacy now agrees: stale pin")
+            shutil.rmtree(d, ignore_errors=True)
         for name, source, want in outer_cases():
             d = tempfile.mkdtemp(dir=work)
             with open(os.path.join(d, "p.f"), "w") as f:

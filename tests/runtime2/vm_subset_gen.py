@@ -197,7 +197,11 @@ TRIGGERS = [
     ("tq := [1]\nprint(tq[5])", ("vm-error",)),
     ('tq := {"k": 1}\nprint(tq.length())', ("vm-error", "vm")),  # textual: legacy error; prepared: 1
     ("tq := 9007199254740991\nprint(tq + 1)", ("vm",)),
-    ("tq := [1]\ntr := tq\nprint(tr)", ("fallback:aliasing",)),
+    # B5 fix-up 2 (b5-refsem.md 12.3): was ("fallback:aliasing",) (Phase A guard). B5 deleted the
+    # guard (owner 2026-11-02); `tr := tq` shares (legacy-equal) and print(tr) is legacy's own error
+    # "print: value is not directly renderable", which the VM reports itself (check_supported still
+    # requires stdout, stderr and exit identical to legacy).
+    ("tq := [1]\ntr := tq\nprint(tr)", ("vm-error",)),
     ("tq := 4000000000\ntq = tq * tq\nprint(tq)", ("vm-error",)),  # textual overflow; prepared re-evaluation
     ("tq := 1\ntq = tq / 2", ("vm-error",)),  # binding type error (wording per evaluator)
 ]

@@ -1,0 +1,971 @@
+{
+ "description": "B5 fix-up 2 (b5-refsem.md 12.3): the test-rt-vm recipe lines that passed on 17f7964c and failed on B5 (6 lines, 27 cases incl. 5 generated programs sharing one trigger). Original expectation, legacy (NIFT_VM=0, B5 binary), 17f7964c NIFT_VM=require, B5 NIFT_VM=require and NIFT_VM=1, the conversion made and the approving rule.",
+ "cases": [
+  {
+   "recipe_line": "vm_subset.py",
+   "case": "async-capture-aliased",
+   "source": "fn(m()) {\n  n := [[1], [2]]\n  f := async () => n[0].size()\n  inner := n[0]\n  inner.push(9)\n  return await f()\n}\nprint(m())\n",
+   "sha256": "298965c280a26624ebad015fa5744a019db3dde66585d315bf5472e0285f9b7f",
+   "original_expectation": "UNSUPPORTED: refused before execution, reason aliasing",
+   "legacy": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:4:3: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to supported(): NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_subset_gen.py --suite both",
+   "case": "TRIGGERS aliasing (former-replay seed 1 indexes 6, 15, 24, 33, 42)",
+   "source": "tq := [1]\ntr := tq\nprint(tr)\n",
+   "sha256": "fac4f5d850e5d338a5fbc516c8a0111501c3658ebc36259ae34000c5dc6813d3",
+   "original_expectation": "acceptable outcome fallback:aliasing",
+   "legacy": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:1: print: value is not directly renderable\n",
+    "exit": 1,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:2:1: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:1: print: value is not directly renderable\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "print: value is not directly renderable"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:1: print: value is not directly renderable\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "print: value is not directly renderable"
+    ]
+   },
+   "conversion": "acceptable outcome vm-error; check_supported still requires stdout, stderr and exit identical to legacy (the error is legacy's own \"print: value is not directly renderable\")",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "push-member-after-call",
+   "source": "fn(mk(i)) { return {\"id\": i, \"t\": [i]} }\na := []\na.push(mk(1))\nb := mk(2)\na.push(b.t)\nprint(a.stringify())\n",
+   "sha256": "1d35b753d0c2500b48bdf9ba4bad80a00fd56b7e43ac2616b239a9552a4e597b",
+   "original_expectation": "REFUSED: fallback aliasing before execution, legacy output",
+   "legacy": {
+    "stdout": "[{\"id\":1,\"t\":[1]},[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:5:8: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[{\"id\":1,\"t\":[1]},[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[{\"id\":1,\"t\":[1]},[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to SUPPORTED: NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "decl-from-pushed-element",
+   "source": "fn(mk(i)) { return [i] }\na := []\nv := mk(5)\na.push(mk(1))\ni := 0\nwhile (i < 1) { a.push(mk(2)); i += 1 }\nx := a[0]\nprint(a.stringify())\n",
+   "sha256": "d33e5c1970e1d517c8be5cd299fbbfa1ca22706b5c355b3736af0effc773506c",
+   "original_expectation": "REFUSED: fallback aliasing before execution, legacy output",
+   "legacy": {
+    "stdout": "[[1],[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:7:1: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[[1],[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[[1],[2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to SUPPORTED: NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "push-binding",
+   "source": "o := {\"k\": 1}\na := []\na.push(o)\nprint(a.stringify())\n",
+   "sha256": "9ac3435e4459b9e1e42e826f17d62102ca1a311634c496e8c2cad92743000ffa",
+   "original_expectation": "REFUSED: fallback aliasing before execution, legacy output",
+   "legacy": {
+    "stdout": "[{\"k\":1}]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:8: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[{\"k\":1}]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[{\"k\":1}]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to SUPPORTED: NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "push-member",
+   "source": "o := {\"k\": [1]}\na := []\na.push(o.k)\nprint(a.stringify())\n",
+   "sha256": "6f7fd9ffeab3d7a92bbdedd1d35ce304e7b9a2f3d8d62874e2f09b9909bba5da",
+   "original_expectation": "REFUSED: fallback aliasing before execution, legacy output",
+   "legacy": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:8: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to SUPPORTED: NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "push-index-loop",
+   "source": "a := [[1]]\nb := []\ni := 0\nwhile (i < 1) { b.push(a[0]); i += 1 }\nprint(b.stringify())\n",
+   "sha256": "5a10ed4d195193b16c5dd28c5776a7a9afced5a06b2afbd1ec0a207d4aeed83c",
+   "original_expectation": "REFUSED: fallback aliasing before execution, legacy output",
+   "legacy": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:4:24: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[[1]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "moved to SUPPORTED: NIFT_VM=require identical to legacy",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_records_coverage.py",
+   "case": "push_arrlit_fnloop",
+   "source": "fn(add(a, i)) { a.push([i, i + 1]) \nreturn a.length() }\na := []\ni := 0\nwhile (i < 2) { add(a, i); i += 1 }\nprint(a.stringify())\n",
+   "sha256": "7eb4093aa870216893ec8159b5afe15740d8e889cf409fdb84b22c71a360152d",
+   "original_expectation": "REFUSED: fallback reference-guard:argument before execution",
+   "legacy": {
+    "stdout": "[]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:5:21: not compiled for the VM (reference-guard:argument): an array or object use whose output would change once arrays and objects are references (argument) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "reference-guard:argument"
+    ]
+   },
+   "b5_require": {
+    "stdout": "[[0,1],[1,2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "[[0,1],[1,2]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "B5_APPROVED: pinned [[0,1],[1,2]] exit 0 under require and NIFT_VM=1; must differ from legacy ([])",
+   "rule": "shared-reference arguments: owner 2026-11-01 (assignment, arguments and returns share identity); compatibility.md row `fn(f(x)){x.push(4)}; f(a)`; D-NEXT-refsem #1"
+  },
+  {
+   "recipe_line": "vm_engine_selection.py",
+   "case": "vm-d040-copy",
+   "source": "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n",
+   "sha256": "5e6ccb4f838e22503c182bedaf8e33d6ebd53ed6dad13b0d5a69f2e60e8b57f2",
+   "original_expectation": "outcome fallback (Phase A guard; before D-NEXT-refsem #9: vm)",
+   "legacy": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:2:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "reference-guard:inflow"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "outcome vm, identical to legacy (2)",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_review_cp12.py",
+   "case": "chain199-alias",
+   "source": "fn(g0(a)) { return a }\nfn(g1(a)) {\n  x := a\n  return g0(x)\n}\nfn(g2(a)) {\n  x := a\n  return g1(x)\n}\nfn(g3(a)) {\n  x := a\n  return g2(x)\n}\nfn(g4(a)) {\n  x := a\n  return g3(x)\n}\nfn(g5(a)) {\n  x := a\n  return g4(x)\n}\nfn(g6(a)) {\n  x := a\n  return g5(x)\n}\nfn(g7(a)) {\n  x := a\n  return g6(x)\n}\nfn(g8(a)) {\n  x := a\n  return g7(x)\n}\nfn(g9(a)) {\n  x := a\n  return g8(x)\n}\nfn(g10(a)) {\n  x := a\n  return g9(x)\n}\nfn(g11(a)) {\n  x := a\n  return g10(x)\n}\nfn(g12(a)) {\n  x := a\n  return g11(x)\n}\nfn(g13(a)) {\n  x := a\n  return g12(x)\n}\nfn(g14(a)) {\n  x := a\n  return g13(x)\n}\nfn(g15(a)) {\n  x := a\n  return g14(x)\n}\nfn(g16(a)) {\n  x := a\n  return g15(x)\n}\nfn(g17(a)) {\n  x := a\n  return g16(x)\n}\nfn(g18(a)) {\n  x := a\n  return g17(x)\n}\nfn(g19(a)) {\n  x := a\n  return g18(x)\n}\nfn(g20(a)) {\n  x := a\n  return g19(x)\n}\nfn(g21(a)) {\n  x := a\n  return g20(x)\n}\nfn(g22(a)) {\n  x := a\n  return g21(x)\n}\nfn(g23(a)) {\n  x := a\n  return g22(x)\n}\nfn(g24(a)) {\n  x := a\n  return g23(x)\n}\nfn(g25(a)) {\n  x := a\n  return g24(x)\n}\nfn(g26(a)) {\n  x := a\n  return g25(x)\n}\nfn(g27(a)) {\n  x := a\n  return g26(x)\n}\nfn(g28(a)) {\n  x := a\n  return g27(x)\n}\nfn(g29(a)) {\n  x := a\n  return g28(x)\n}\nfn(g30(a)) {\n  x := a\n  return g29(x)\n}\nfn(g31(a)) {\n  x := a\n  return g30(x)\n}\nfn(g32(a)) {\n  x := a\n  return g31(x)\n}\nfn(g33(a)) {\n  x := a\n  return g32(x)\n}\nfn(g34(a)) {\n  x := a\n  return g33(x)\n}\nfn(g35(a)) {\n  x := a\n  return g34(x)\n}\nfn(g36(a)) {\n  x := a\n  return g35(x)\n}\nfn(g37(a)) {\n  x := a\n  return g36(x)\n}\nfn(g38(a)) {\n  x := a\n  return g37(x)\n}\nfn(g39(a)) {\n  x := a\n  return g38(x)\n}\nfn(g40(a)) {\n  x := a\n  return g39(x)\n}\nfn(g41(a)) {\n  x := a\n  return g40(x)\n}\nfn(g42(a)) {\n  x := a\n  return g41(x)\n}\nfn(g43(a)) {\n  x := a\n  return g42(x)\n}\nfn(g44(a)) {\n  x := a\n  return g43(x)\n}\nfn(g45(a)) {\n  x := a\n  return g44(x)\n}\nfn(g46(a)) {\n  x := a\n  return g45(x)\n}\nfn(g47(a)) {\n  x := a\n  return g46(x)\n}\nfn(g48(a)) {\n  x := a\n  return g47(x)\n}\nfn(g49(a)) {\n  x := a\n  return g48(x)\n}\nfn(g50(a)) {\n  x := a\n  return g49(x)\n}\nfn(g51(a)) {\n  x := a\n  return g50(x)\n}\nfn(g52(a)) {\n  x := a\n  return g51(x)\n}\nfn(g53(a)) {\n  x := a\n  return g52(x)\n}\nfn(g54(a)) {\n  x := a\n  return g53(x)\n}\nfn(g55(a)) {\n  x := a\n  return g54(x)\n}\nfn(g56(a)) {\n  x := a\n  return g55(x)\n}\nfn(g57(a)) {\n  x := a\n  return g56(x)\n}\nfn(g58(a)) {\n  x := a\n  return g57(x)\n}\nfn(g59(a)) {\n  x := a\n  return g58(x)\n}\nfn(g60(a)) {\n  x := a\n  return g59(x)\n}\nfn(g61(a)) {\n  x := a\n  return g60(x)\n}\nfn(g62(a)) {\n  x := a\n  return g61(x)\n}\nfn(g63(a)) {\n  x := a\n  return g62(x)\n}\nfn(g64(a)) {\n  x := a\n  return g63(x)\n}\nfn(g65(a)) {\n  x := a\n  return g64(x)\n}\nfn(g66(a)) {\n  x := a\n  return g65(x)\n}\nfn(g67(a)) {\n  x := a\n  return g66(x)\n}\nfn(g68(a)) {\n  x := a\n  return g67(x)\n}\nfn(g69(a)) {\n  x := a\n  return g68(x)\n}\nfn(g70(a)) {\n  x := a\n  return g69(x)\n}\nfn(g71(a)) {\n  x := a\n  return g70(x)\n}\nfn(g72(a)) {\n  x := a\n  return g71(x)\n}\nfn(g73(a)) {\n  x := a\n  return g72(x)\n}\nfn(g74(a)) {\n  x := a\n  return g73(x)\n}\nfn(g75(a)) {\n  x := a\n  return g74(x)\n}\nfn(g76(a)) {\n  x := a\n  return g75(x)\n}\nfn(g77(a)) {\n  x := a\n  return g76(x)\n}\nfn(g78(a)) {\n  x := a\n  return g77(x)\n}\nfn(g79(a)) {\n  x := a\n  return g78(x)\n}\nfn(g80(a)) {\n  x := a\n  return g79(x)\n}\nfn(g81(a)) {\n  x := a\n  return g80(x)\n}\nfn(g82(a)) {\n  x := a\n  return g81(x)\n}\nfn(g83(a)) {\n  x := a\n  return g82(x)\n}\nfn(g84(a)) {\n  x := a\n  return g83(x)\n}\nfn(g85(a)) {\n  x := a\n  return g84(x)\n}\nfn(g86(a)) {\n  x := a\n  return g85(x)\n}\nfn(g87(a)) {\n  x := a\n  return g86(x)\n}\nfn(g88(a)) {\n  x := a\n  return g87(x)\n}\nfn(g89(a)) {\n  x := a\n  return g88(x)\n}\nfn(g90(a)) {\n  x := a\n  return g89(x)\n}\nfn(g91(a)) {\n  x := a\n  return g90(x)\n}\nfn(g92(a)) {\n  x := a\n  return g91(x)\n}\nfn(g93(a)) {\n  x := a\n  return g92(x)\n}\nfn(g94(a)) {\n  x := a\n  return g93(x)\n}\nfn(g95(a)) {\n  x := a\n  return g94(x)\n}\nfn(g96(a)) {\n  x := a\n  return g95(x)\n}\nfn(g97(a)) {\n  x := a\n  return g96(x)\n}\nfn(g98(a)) {\n  x := a\n  return g97(x)\n}\nfn(g99(a)) {\n  x := a\n  return g98(x)\n}\nfn(g100(a)) {\n  x := a\n  return g99(x)\n}\nfn(g101(a)) {\n  x := a\n  return g100(x)\n}\nfn(g102(a)) {\n  x := a\n  return g101(x)\n}\nfn(g103(a)) {\n  x := a\n  return g102(x)\n}\nfn(g104(a)) {\n  x := a\n  return g103(x)\n}\nfn(g105(a)) {\n  x := a\n  return g104(x)\n}\nfn(g106(a)) {\n  x := a\n  return g105(x)\n}\nfn(g107(a)) {\n  x := a\n  return g106(x)\n}\nfn(g108(a)) {\n  x := a\n  return g107(x)\n}\nfn(g109(a)) {\n  x := a\n  return g108(x)\n}\nfn(g110(a)) {\n  x := a\n  return g109(x)\n}\nfn(g111(a)) {\n  x := a\n  return g110(x)\n}\nfn(g112(a)) {\n  x := a\n  return g111(x)\n}\nfn(g113(a)) {\n  x := a\n  return g112(x)\n}\nfn(g114(a)) {\n  x := a\n  return g113(x)\n}\nfn(g115(a)) {\n  x := a\n  return g114(x)\n}\nfn(g116(a)) {\n  x := a\n  return g115(x)\n}\nfn(g117(a)) {\n  x := a\n  return g116(x)\n}\nfn(g118(a)) {\n  x := a\n  return g117(x)\n}\nfn(g119(a)) {\n  x := a\n  return g118(x)\n}\nfn(g120(a)) {\n  x := a\n  return g119(x)\n}\nfn(g121(a)) {\n  x := a\n  return g120(x)\n}\nfn(g122(a)) {\n  x := a\n  return g121(x)\n}\nfn(g123(a)) {\n  x := a\n  return g122(x)\n}\nfn(g124(a)) {\n  x := a\n  return g123(x)\n}\nfn(g125(a)) {\n  x := a\n  return g124(x)\n}\nfn(g126(a)) {\n  x := a\n  return g125(x)\n}\nfn(g127(a)) {\n  x := a\n  return g126(x)\n}\nfn(g128(a)) {\n  x := a\n  return g127(x)\n}\nfn(g129(a)) {\n  x := a\n  return g128(x)\n}\nfn(g130(a)) {\n  x := a\n  return g129(x)\n}\nfn(g131(a)) {\n  x := a\n  return g130(x)\n}\nfn(g132(a)) {\n  x := a\n  return g131(x)\n}\nfn(g133(a)) {\n  x := a\n  return g132(x)\n}\nfn(g134(a)) {\n  x := a\n  return g133(x)\n}\nfn(g135(a)) {\n  x := a\n  return g134(x)\n}\nfn(g136(a)) {\n  x := a\n  return g135(x)\n}\nfn(g137(a)) {\n  x := a\n  return g136(x)\n}\nfn(g138(a)) {\n  x := a\n  return g137(x)\n}\nfn(g139(a)) {\n  x := a\n  return g138(x)\n}\nfn(g140(a)) {\n  x := a\n  return g139(x)\n}\nfn(g141(a)) {\n  x := a\n  return g140(x)\n}\nfn(g142(a)) {\n  x := a\n  return g141(x)\n}\nfn(g143(a)) {\n  x := a\n  return g142(x)\n}\nfn(g144(a)) {\n  x := a\n  return g143(x)\n}\nfn(g145(a)) {\n  x := a\n  return g144(x)\n}\nfn(g146(a)) {\n  x := a\n  return g145(x)\n}\nfn(g147(a)) {\n  x := a\n  return g146(x)\n}\nfn(g148(a)) {\n  x := a\n  return g147(x)\n}\nfn(g149(a)) {\n  x := a\n  return g148(x)\n}\nfn(g150(a)) {\n  x := a\n  return g149(x)\n}\nfn(g151(a)) {\n  x := a\n  return g150(x)\n}\nfn(g152(a)) {\n  x := a\n  return g151(x)\n}\nfn(g153(a)) {\n  x := a\n  return g152(x)\n}\nfn(g154(a)) {\n  x := a\n  return g153(x)\n}\nfn(g155(a)) {\n  x := a\n  return g154(x)\n}\nfn(g156(a)) {\n  x := a\n  return g155(x)\n}\nfn(g157(a)) {\n  x := a\n  return g156(x)\n}\nfn(g158(a)) {\n  x := a\n  return g157(x)\n}\nfn(g159(a)) {\n  x := a\n  return g158(x)\n}\nfn(g160(a)) {\n  x := a\n  return g159(x)\n}\nfn(g161(a)) {\n  x := a\n  return g160(x)\n}\nfn(g162(a)) {\n  x := a\n  return g161(x)\n}\nfn(g163(a)) {\n  x := a\n  return g162(x)\n}\nfn(g164(a)) {\n  x := a\n  return g163(x)\n}\nfn(g165(a)) {\n  x := a\n  return g164(x)\n}\nfn(g166(a)) {\n  x := a\n  return g165(x)\n}\nfn(g167(a)) {\n  x := a\n  return g166(x)\n}\nfn(g168(a)) {\n  x := a\n  return g167(x)\n}\nfn(g169(a)) {\n  x := a\n  return g168(x)\n}\nfn(g170(a)) {\n  x := a\n  return g169(x)\n}\nfn(g171(a)) {\n  x := a\n  return g170(x)\n}\nfn(g172(a)) {\n  x := a\n  return g171(x)\n}\nfn(g173(a)) {\n  x := a\n  return g172(x)\n}\nfn(g174(a)) {\n  x := a\n  return g173(x)\n}\nfn(g175(a)) {\n  x := a\n  return g174(x)\n}\nfn(g176(a)) {\n  x := a\n  return g175(x)\n}\nfn(g177(a)) {\n  x := a\n  return g176(x)\n}\nfn(g178(a)) {\n  x := a\n  return g177(x)\n}\nfn(g179(a)) {\n  x := a\n  return g178(x)\n}\nfn(g180(a)) {\n  x := a\n  return g179(x)\n}\nfn(g181(a)) {\n  x := a\n  return g180(x)\n}\nfn(g182(a)) {\n  x := a\n  return g181(x)\n}\nfn(g183(a)) {\n  x := a\n  return g182(x)\n}\nfn(g184(a)) {\n  x := a\n  return g183(x)\n}\nfn(g185(a)) {\n  x := a\n  return g184(x)\n}\nfn(g186(a)) {\n  x := a\n  return g185(x)\n}\nfn(g187(a)) {\n  x := a\n  return g186(x)\n}\nfn(g188(a)) {\n  x := a\n  return g187(x)\n}\nfn(g189(a)) {\n  x := a\n  return g188(x)\n}\nfn(g190(a)) {\n  x := a\n  return g189(x)\n}\nfn(g191(a)) {\n  x := a\n  return g190(x)\n}\nfn(g192(a)) {\n  x := a\n  return g191(x)\n}\nfn(g193(a)) {\n  x := a\n  return g192(x)\n}\nfn(g194(a)) {\n  x := a\n  return g193(x)\n}\nfn(g195(a)) {\n  x := a\n  return g194(x)\n}\nfn(g196(a)) {\n  x := a\n  return g195(x)\n}\nfn(g197(a)) {\n  x := a\n  return g196(x)\n}\nfn(g198(a)) {\n  x := a\n  return g197(x)\n}\nif (0 > 1) { print(g198(1)) }\na := [1]\nb := a\nb.push(2)\nprint(a.length())\n",
+   "sha256": "a3b749fe3a8a99ffaba4642c54354297a4a25124bec1e9af6969c0c5a811b1f8",
+   "original_expectation": "refusal reference-guard:inflow",
+   "legacy": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:796:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "reference-guard:inflow"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "expectation None: any accepted verdict (legacy-equal: 2)",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_review_cp12.py",
+   "case": "chain199-aliasret",
+   "source": "fn(f(a)) { return a }\nfn(g0(a)) { return a }\nfn(g1(a)) {\n  x := a\n  return g0(x)\n}\nfn(g2(a)) {\n  x := a\n  return g1(x)\n}\nfn(g3(a)) {\n  x := a\n  return g2(x)\n}\nfn(g4(a)) {\n  x := a\n  return g3(x)\n}\nfn(g5(a)) {\n  x := a\n  return g4(x)\n}\nfn(g6(a)) {\n  x := a\n  return g5(x)\n}\nfn(g7(a)) {\n  x := a\n  return g6(x)\n}\nfn(g8(a)) {\n  x := a\n  return g7(x)\n}\nfn(g9(a)) {\n  x := a\n  return g8(x)\n}\nfn(g10(a)) {\n  x := a\n  return g9(x)\n}\nfn(g11(a)) {\n  x := a\n  return g10(x)\n}\nfn(g12(a)) {\n  x := a\n  return g11(x)\n}\nfn(g13(a)) {\n  x := a\n  return g12(x)\n}\nfn(g14(a)) {\n  x := a\n  return g13(x)\n}\nfn(g15(a)) {\n  x := a\n  return g14(x)\n}\nfn(g16(a)) {\n  x := a\n  return g15(x)\n}\nfn(g17(a)) {\n  x := a\n  return g16(x)\n}\nfn(g18(a)) {\n  x := a\n  return g17(x)\n}\nfn(g19(a)) {\n  x := a\n  return g18(x)\n}\nfn(g20(a)) {\n  x := a\n  return g19(x)\n}\nfn(g21(a)) {\n  x := a\n  return g20(x)\n}\nfn(g22(a)) {\n  x := a\n  return g21(x)\n}\nfn(g23(a)) {\n  x := a\n  return g22(x)\n}\nfn(g24(a)) {\n  x := a\n  return g23(x)\n}\nfn(g25(a)) {\n  x := a\n  return g24(x)\n}\nfn(g26(a)) {\n  x := a\n  return g25(x)\n}\nfn(g27(a)) {\n  x := a\n  return g26(x)\n}\nfn(g28(a)) {\n  x := a\n  return g27(x)\n}\nfn(g29(a)) {\n  x := a\n  return g28(x)\n}\nfn(g30(a)) {\n  x := a\n  return g29(x)\n}\nfn(g31(a)) {\n  x := a\n  return g30(x)\n}\nfn(g32(a)) {\n  x := a\n  return g31(x)\n}\nfn(g33(a)) {\n  x := a\n  return g32(x)\n}\nfn(g34(a)) {\n  x := a\n  return g33(x)\n}\nfn(g35(a)) {\n  x := a\n  return g34(x)\n}\nfn(g36(a)) {\n  x := a\n  return g35(x)\n}\nfn(g37(a)) {\n  x := a\n  return g36(x)\n}\nfn(g38(a)) {\n  x := a\n  return g37(x)\n}\nfn(g39(a)) {\n  x := a\n  return g38(x)\n}\nfn(g40(a)) {\n  x := a\n  return g39(x)\n}\nfn(g41(a)) {\n  x := a\n  return g40(x)\n}\nfn(g42(a)) {\n  x := a\n  return g41(x)\n}\nfn(g43(a)) {\n  x := a\n  return g42(x)\n}\nfn(g44(a)) {\n  x := a\n  return g43(x)\n}\nfn(g45(a)) {\n  x := a\n  return g44(x)\n}\nfn(g46(a)) {\n  x := a\n  return g45(x)\n}\nfn(g47(a)) {\n  x := a\n  return g46(x)\n}\nfn(g48(a)) {\n  x := a\n  return g47(x)\n}\nfn(g49(a)) {\n  x := a\n  return g48(x)\n}\nfn(g50(a)) {\n  x := a\n  return g49(x)\n}\nfn(g51(a)) {\n  x := a\n  return g50(x)\n}\nfn(g52(a)) {\n  x := a\n  return g51(x)\n}\nfn(g53(a)) {\n  x := a\n  return g52(x)\n}\nfn(g54(a)) {\n  x := a\n  return g53(x)\n}\nfn(g55(a)) {\n  x := a\n  return g54(x)\n}\nfn(g56(a)) {\n  x := a\n  return g55(x)\n}\nfn(g57(a)) {\n  x := a\n  return g56(x)\n}\nfn(g58(a)) {\n  x := a\n  return g57(x)\n}\nfn(g59(a)) {\n  x := a\n  return g58(x)\n}\nfn(g60(a)) {\n  x := a\n  return g59(x)\n}\nfn(g61(a)) {\n  x := a\n  return g60(x)\n}\nfn(g62(a)) {\n  x := a\n  return g61(x)\n}\nfn(g63(a)) {\n  x := a\n  return g62(x)\n}\nfn(g64(a)) {\n  x := a\n  return g63(x)\n}\nfn(g65(a)) {\n  x := a\n  return g64(x)\n}\nfn(g66(a)) {\n  x := a\n  return g65(x)\n}\nfn(g67(a)) {\n  x := a\n  return g66(x)\n}\nfn(g68(a)) {\n  x := a\n  return g67(x)\n}\nfn(g69(a)) {\n  x := a\n  return g68(x)\n}\nfn(g70(a)) {\n  x := a\n  return g69(x)\n}\nfn(g71(a)) {\n  x := a\n  return g70(x)\n}\nfn(g72(a)) {\n  x := a\n  return g71(x)\n}\nfn(g73(a)) {\n  x := a\n  return g72(x)\n}\nfn(g74(a)) {\n  x := a\n  return g73(x)\n}\nfn(g75(a)) {\n  x := a\n  return g74(x)\n}\nfn(g76(a)) {\n  x := a\n  return g75(x)\n}\nfn(g77(a)) {\n  x := a\n  return g76(x)\n}\nfn(g78(a)) {\n  x := a\n  return g77(x)\n}\nfn(g79(a)) {\n  x := a\n  return g78(x)\n}\nfn(g80(a)) {\n  x := a\n  return g79(x)\n}\nfn(g81(a)) {\n  x := a\n  return g80(x)\n}\nfn(g82(a)) {\n  x := a\n  return g81(x)\n}\nfn(g83(a)) {\n  x := a\n  return g82(x)\n}\nfn(g84(a)) {\n  x := a\n  return g83(x)\n}\nfn(g85(a)) {\n  x := a\n  return g84(x)\n}\nfn(g86(a)) {\n  x := a\n  return g85(x)\n}\nfn(g87(a)) {\n  x := a\n  return g86(x)\n}\nfn(g88(a)) {\n  x := a\n  return g87(x)\n}\nfn(g89(a)) {\n  x := a\n  return g88(x)\n}\nfn(g90(a)) {\n  x := a\n  return g89(x)\n}\nfn(g91(a)) {\n  x := a\n  return g90(x)\n}\nfn(g92(a)) {\n  x := a\n  return g91(x)\n}\nfn(g93(a)) {\n  x := a\n  return g92(x)\n}\nfn(g94(a)) {\n  x := a\n  return g93(x)\n}\nfn(g95(a)) {\n  x := a\n  return g94(x)\n}\nfn(g96(a)) {\n  x := a\n  return g95(x)\n}\nfn(g97(a)) {\n  x := a\n  return g96(x)\n}\nfn(g98(a)) {\n  x := a\n  return g97(x)\n}\nfn(g99(a)) {\n  x := a\n  return g98(x)\n}\nfn(g100(a)) {\n  x := a\n  return g99(x)\n}\nfn(g101(a)) {\n  x := a\n  return g100(x)\n}\nfn(g102(a)) {\n  x := a\n  return g101(x)\n}\nfn(g103(a)) {\n  x := a\n  return g102(x)\n}\nfn(g104(a)) {\n  x := a\n  return g103(x)\n}\nfn(g105(a)) {\n  x := a\n  return g104(x)\n}\nfn(g106(a)) {\n  x := a\n  return g105(x)\n}\nfn(g107(a)) {\n  x := a\n  return g106(x)\n}\nfn(g108(a)) {\n  x := a\n  return g107(x)\n}\nfn(g109(a)) {\n  x := a\n  return g108(x)\n}\nfn(g110(a)) {\n  x := a\n  return g109(x)\n}\nfn(g111(a)) {\n  x := a\n  return g110(x)\n}\nfn(g112(a)) {\n  x := a\n  return g111(x)\n}\nfn(g113(a)) {\n  x := a\n  return g112(x)\n}\nfn(g114(a)) {\n  x := a\n  return g113(x)\n}\nfn(g115(a)) {\n  x := a\n  return g114(x)\n}\nfn(g116(a)) {\n  x := a\n  return g115(x)\n}\nfn(g117(a)) {\n  x := a\n  return g116(x)\n}\nfn(g118(a)) {\n  x := a\n  return g117(x)\n}\nfn(g119(a)) {\n  x := a\n  return g118(x)\n}\nfn(g120(a)) {\n  x := a\n  return g119(x)\n}\nfn(g121(a)) {\n  x := a\n  return g120(x)\n}\nfn(g122(a)) {\n  x := a\n  return g121(x)\n}\nfn(g123(a)) {\n  x := a\n  return g122(x)\n}\nfn(g124(a)) {\n  x := a\n  return g123(x)\n}\nfn(g125(a)) {\n  x := a\n  return g124(x)\n}\nfn(g126(a)) {\n  x := a\n  return g125(x)\n}\nfn(g127(a)) {\n  x := a\n  return g126(x)\n}\nfn(g128(a)) {\n  x := a\n  return g127(x)\n}\nfn(g129(a)) {\n  x := a\n  return g128(x)\n}\nfn(g130(a)) {\n  x := a\n  return g129(x)\n}\nfn(g131(a)) {\n  x := a\n  return g130(x)\n}\nfn(g132(a)) {\n  x := a\n  return g131(x)\n}\nfn(g133(a)) {\n  x := a\n  return g132(x)\n}\nfn(g134(a)) {\n  x := a\n  return g133(x)\n}\nfn(g135(a)) {\n  x := a\n  return g134(x)\n}\nfn(g136(a)) {\n  x := a\n  return g135(x)\n}\nfn(g137(a)) {\n  x := a\n  return g136(x)\n}\nfn(g138(a)) {\n  x := a\n  return g137(x)\n}\nfn(g139(a)) {\n  x := a\n  return g138(x)\n}\nfn(g140(a)) {\n  x := a\n  return g139(x)\n}\nfn(g141(a)) {\n  x := a\n  return g140(x)\n}\nfn(g142(a)) {\n  x := a\n  return g141(x)\n}\nfn(g143(a)) {\n  x := a\n  return g142(x)\n}\nfn(g144(a)) {\n  x := a\n  return g143(x)\n}\nfn(g145(a)) {\n  x := a\n  return g144(x)\n}\nfn(g146(a)) {\n  x := a\n  return g145(x)\n}\nfn(g147(a)) {\n  x := a\n  return g146(x)\n}\nfn(g148(a)) {\n  x := a\n  return g147(x)\n}\nfn(g149(a)) {\n  x := a\n  return g148(x)\n}\nfn(g150(a)) {\n  x := a\n  return g149(x)\n}\nfn(g151(a)) {\n  x := a\n  return g150(x)\n}\nfn(g152(a)) {\n  x := a\n  return g151(x)\n}\nfn(g153(a)) {\n  x := a\n  return g152(x)\n}\nfn(g154(a)) {\n  x := a\n  return g153(x)\n}\nfn(g155(a)) {\n  x := a\n  return g154(x)\n}\nfn(g156(a)) {\n  x := a\n  return g155(x)\n}\nfn(g157(a)) {\n  x := a\n  return g156(x)\n}\nfn(g158(a)) {\n  x := a\n  return g157(x)\n}\nfn(g159(a)) {\n  x := a\n  return g158(x)\n}\nfn(g160(a)) {\n  x := a\n  return g159(x)\n}\nfn(g161(a)) {\n  x := a\n  return g160(x)\n}\nfn(g162(a)) {\n  x := a\n  return g161(x)\n}\nfn(g163(a)) {\n  x := a\n  return g162(x)\n}\nfn(g164(a)) {\n  x := a\n  return g163(x)\n}\nfn(g165(a)) {\n  x := a\n  return g164(x)\n}\nfn(g166(a)) {\n  x := a\n  return g165(x)\n}\nfn(g167(a)) {\n  x := a\n  return g166(x)\n}\nfn(g168(a)) {\n  x := a\n  return g167(x)\n}\nfn(g169(a)) {\n  x := a\n  return g168(x)\n}\nfn(g170(a)) {\n  x := a\n  return g169(x)\n}\nfn(g171(a)) {\n  x := a\n  return g170(x)\n}\nfn(g172(a)) {\n  x := a\n  return g171(x)\n}\nfn(g173(a)) {\n  x := a\n  return g172(x)\n}\nfn(g174(a)) {\n  x := a\n  return g173(x)\n}\nfn(g175(a)) {\n  x := a\n  return g174(x)\n}\nfn(g176(a)) {\n  x := a\n  return g175(x)\n}\nfn(g177(a)) {\n  x := a\n  return g176(x)\n}\nfn(g178(a)) {\n  x := a\n  return g177(x)\n}\nfn(g179(a)) {\n  x := a\n  return g178(x)\n}\nfn(g180(a)) {\n  x := a\n  return g179(x)\n}\nfn(g181(a)) {\n  x := a\n  return g180(x)\n}\nfn(g182(a)) {\n  x := a\n  return g181(x)\n}\nfn(g183(a)) {\n  x := a\n  return g182(x)\n}\nfn(g184(a)) {\n  x := a\n  return g183(x)\n}\nfn(g185(a)) {\n  x := a\n  return g184(x)\n}\nfn(g186(a)) {\n  x := a\n  return g185(x)\n}\nfn(g187(a)) {\n  x := a\n  return g186(x)\n}\nfn(g188(a)) {\n  x := a\n  return g187(x)\n}\nfn(g189(a)) {\n  x := a\n  return g188(x)\n}\nfn(g190(a)) {\n  x := a\n  return g189(x)\n}\nfn(g191(a)) {\n  x := a\n  return g190(x)\n}\nfn(g192(a)) {\n  x := a\n  return g191(x)\n}\nfn(g193(a)) {\n  x := a\n  return g192(x)\n}\nfn(g194(a)) {\n  x := a\n  return g193(x)\n}\nfn(g195(a)) {\n  x := a\n  return g194(x)\n}\nfn(g196(a)) {\n  x := a\n  return g195(x)\n}\nfn(g197(a)) {\n  x := a\n  return g196(x)\n}\nfn(g198(a)) {\n  x := a\n  return g197(x)\n}\nif (0 > 1) { print(g198(1)) }\nq := [1]\nr := f(q)\nr.push(5)\nprint(q.length())\n",
+   "sha256": "f2e2c64d5c08082d963b6b0628f37aa4f9a9ecb2024b5af9e1791a124e8f1c53",
+   "original_expectation": "refusal aliasing",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:1:12: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "B5_PINNED: 2 exit 0, outcome vm; must differ from legacy (1)",
+   "rule": "shared-reference returns: owner 2026-11-01 (assignment, arguments and returns share identity); compatibility.md row `fn(r()){return a}; x := r(); x.push(4)`"
+  },
+  {
+   "recipe_line": "vm_review_cp12.py",
+   "case": "chain201-alias",
+   "source": "fn(g0(a)) { return a }\nfn(g1(a)) {\n  x := a\n  return g0(x)\n}\nfn(g2(a)) {\n  x := a\n  return g1(x)\n}\nfn(g3(a)) {\n  x := a\n  return g2(x)\n}\nfn(g4(a)) {\n  x := a\n  return g3(x)\n}\nfn(g5(a)) {\n  x := a\n  return g4(x)\n}\nfn(g6(a)) {\n  x := a\n  return g5(x)\n}\nfn(g7(a)) {\n  x := a\n  return g6(x)\n}\nfn(g8(a)) {\n  x := a\n  return g7(x)\n}\nfn(g9(a)) {\n  x := a\n  return g8(x)\n}\nfn(g10(a)) {\n  x := a\n  return g9(x)\n}\nfn(g11(a)) {\n  x := a\n  return g10(x)\n}\nfn(g12(a)) {\n  x := a\n  return g11(x)\n}\nfn(g13(a)) {\n  x := a\n  return g12(x)\n}\nfn(g14(a)) {\n  x := a\n  return g13(x)\n}\nfn(g15(a)) {\n  x := a\n  return g14(x)\n}\nfn(g16(a)) {\n  x := a\n  return g15(x)\n}\nfn(g17(a)) {\n  x := a\n  return g16(x)\n}\nfn(g18(a)) {\n  x := a\n  return g17(x)\n}\nfn(g19(a)) {\n  x := a\n  return g18(x)\n}\nfn(g20(a)) {\n  x := a\n  return g19(x)\n}\nfn(g21(a)) {\n  x := a\n  return g20(x)\n}\nfn(g22(a)) {\n  x := a\n  return g21(x)\n}\nfn(g23(a)) {\n  x := a\n  return g22(x)\n}\nfn(g24(a)) {\n  x := a\n  return g23(x)\n}\nfn(g25(a)) {\n  x := a\n  return g24(x)\n}\nfn(g26(a)) {\n  x := a\n  return g25(x)\n}\nfn(g27(a)) {\n  x := a\n  return g26(x)\n}\nfn(g28(a)) {\n  x := a\n  return g27(x)\n}\nfn(g29(a)) {\n  x := a\n  return g28(x)\n}\nfn(g30(a)) {\n  x := a\n  return g29(x)\n}\nfn(g31(a)) {\n  x := a\n  return g30(x)\n}\nfn(g32(a)) {\n  x := a\n  return g31(x)\n}\nfn(g33(a)) {\n  x := a\n  return g32(x)\n}\nfn(g34(a)) {\n  x := a\n  return g33(x)\n}\nfn(g35(a)) {\n  x := a\n  return g34(x)\n}\nfn(g36(a)) {\n  x := a\n  return g35(x)\n}\nfn(g37(a)) {\n  x := a\n  return g36(x)\n}\nfn(g38(a)) {\n  x := a\n  return g37(x)\n}\nfn(g39(a)) {\n  x := a\n  return g38(x)\n}\nfn(g40(a)) {\n  x := a\n  return g39(x)\n}\nfn(g41(a)) {\n  x := a\n  return g40(x)\n}\nfn(g42(a)) {\n  x := a\n  return g41(x)\n}\nfn(g43(a)) {\n  x := a\n  return g42(x)\n}\nfn(g44(a)) {\n  x := a\n  return g43(x)\n}\nfn(g45(a)) {\n  x := a\n  return g44(x)\n}\nfn(g46(a)) {\n  x := a\n  return g45(x)\n}\nfn(g47(a)) {\n  x := a\n  return g46(x)\n}\nfn(g48(a)) {\n  x := a\n  return g47(x)\n}\nfn(g49(a)) {\n  x := a\n  return g48(x)\n}\nfn(g50(a)) {\n  x := a\n  return g49(x)\n}\nfn(g51(a)) {\n  x := a\n  return g50(x)\n}\nfn(g52(a)) {\n  x := a\n  return g51(x)\n}\nfn(g53(a)) {\n  x := a\n  return g52(x)\n}\nfn(g54(a)) {\n  x := a\n  return g53(x)\n}\nfn(g55(a)) {\n  x := a\n  return g54(x)\n}\nfn(g56(a)) {\n  x := a\n  return g55(x)\n}\nfn(g57(a)) {\n  x := a\n  return g56(x)\n}\nfn(g58(a)) {\n  x := a\n  return g57(x)\n}\nfn(g59(a)) {\n  x := a\n  return g58(x)\n}\nfn(g60(a)) {\n  x := a\n  return g59(x)\n}\nfn(g61(a)) {\n  x := a\n  return g60(x)\n}\nfn(g62(a)) {\n  x := a\n  return g61(x)\n}\nfn(g63(a)) {\n  x := a\n  return g62(x)\n}\nfn(g64(a)) {\n  x := a\n  return g63(x)\n}\nfn(g65(a)) {\n  x := a\n  return g64(x)\n}\nfn(g66(a)) {\n  x := a\n  return g65(x)\n}\nfn(g67(a)) {\n  x := a\n  return g66(x)\n}\nfn(g68(a)) {\n  x := a\n  return g67(x)\n}\nfn(g69(a)) {\n  x := a\n  return g68(x)\n}\nfn(g70(a)) {\n  x := a\n  return g69(x)\n}\nfn(g71(a)) {\n  x := a\n  return g70(x)\n}\nfn(g72(a)) {\n  x := a\n  return g71(x)\n}\nfn(g73(a)) {\n  x := a\n  return g72(x)\n}\nfn(g74(a)) {\n  x := a\n  return g73(x)\n}\nfn(g75(a)) {\n  x := a\n  return g74(x)\n}\nfn(g76(a)) {\n  x := a\n  return g75(x)\n}\nfn(g77(a)) {\n  x := a\n  return g76(x)\n}\nfn(g78(a)) {\n  x := a\n  return g77(x)\n}\nfn(g79(a)) {\n  x := a\n  return g78(x)\n}\nfn(g80(a)) {\n  x := a\n  return g79(x)\n}\nfn(g81(a)) {\n  x := a\n  return g80(x)\n}\nfn(g82(a)) {\n  x := a\n  return g81(x)\n}\nfn(g83(a)) {\n  x := a\n  return g82(x)\n}\nfn(g84(a)) {\n  x := a\n  return g83(x)\n}\nfn(g85(a)) {\n  x := a\n  return g84(x)\n}\nfn(g86(a)) {\n  x := a\n  return g85(x)\n}\nfn(g87(a)) {\n  x := a\n  return g86(x)\n}\nfn(g88(a)) {\n  x := a\n  return g87(x)\n}\nfn(g89(a)) {\n  x := a\n  return g88(x)\n}\nfn(g90(a)) {\n  x := a\n  return g89(x)\n}\nfn(g91(a)) {\n  x := a\n  return g90(x)\n}\nfn(g92(a)) {\n  x := a\n  return g91(x)\n}\nfn(g93(a)) {\n  x := a\n  return g92(x)\n}\nfn(g94(a)) {\n  x := a\n  return g93(x)\n}\nfn(g95(a)) {\n  x := a\n  return g94(x)\n}\nfn(g96(a)) {\n  x := a\n  return g95(x)\n}\nfn(g97(a)) {\n  x := a\n  return g96(x)\n}\nfn(g98(a)) {\n  x := a\n  return g97(x)\n}\nfn(g99(a)) {\n  x := a\n  return g98(x)\n}\nfn(g100(a)) {\n  x := a\n  return g99(x)\n}\nfn(g101(a)) {\n  x := a\n  return g100(x)\n}\nfn(g102(a)) {\n  x := a\n  return g101(x)\n}\nfn(g103(a)) {\n  x := a\n  return g102(x)\n}\nfn(g104(a)) {\n  x := a\n  return g103(x)\n}\nfn(g105(a)) {\n  x := a\n  return g104(x)\n}\nfn(g106(a)) {\n  x := a\n  return g105(x)\n}\nfn(g107(a)) {\n  x := a\n  return g106(x)\n}\nfn(g108(a)) {\n  x := a\n  return g107(x)\n}\nfn(g109(a)) {\n  x := a\n  return g108(x)\n}\nfn(g110(a)) {\n  x := a\n  return g109(x)\n}\nfn(g111(a)) {\n  x := a\n  return g110(x)\n}\nfn(g112(a)) {\n  x := a\n  return g111(x)\n}\nfn(g113(a)) {\n  x := a\n  return g112(x)\n}\nfn(g114(a)) {\n  x := a\n  return g113(x)\n}\nfn(g115(a)) {\n  x := a\n  return g114(x)\n}\nfn(g116(a)) {\n  x := a\n  return g115(x)\n}\nfn(g117(a)) {\n  x := a\n  return g116(x)\n}\nfn(g118(a)) {\n  x := a\n  return g117(x)\n}\nfn(g119(a)) {\n  x := a\n  return g118(x)\n}\nfn(g120(a)) {\n  x := a\n  return g119(x)\n}\nfn(g121(a)) {\n  x := a\n  return g120(x)\n}\nfn(g122(a)) {\n  x := a\n  return g121(x)\n}\nfn(g123(a)) {\n  x := a\n  return g122(x)\n}\nfn(g124(a)) {\n  x := a\n  return g123(x)\n}\nfn(g125(a)) {\n  x := a\n  return g124(x)\n}\nfn(g126(a)) {\n  x := a\n  return g125(x)\n}\nfn(g127(a)) {\n  x := a\n  return g126(x)\n}\nfn(g128(a)) {\n  x := a\n  return g127(x)\n}\nfn(g129(a)) {\n  x := a\n  return g128(x)\n}\nfn(g130(a)) {\n  x := a\n  return g129(x)\n}\nfn(g131(a)) {\n  x := a\n  return g130(x)\n}\nfn(g132(a)) {\n  x := a\n  return g131(x)\n}\nfn(g133(a)) {\n  x := a\n  return g132(x)\n}\nfn(g134(a)) {\n  x := a\n  return g133(x)\n}\nfn(g135(a)) {\n  x := a\n  return g134(x)\n}\nfn(g136(a)) {\n  x := a\n  return g135(x)\n}\nfn(g137(a)) {\n  x := a\n  return g136(x)\n}\nfn(g138(a)) {\n  x := a\n  return g137(x)\n}\nfn(g139(a)) {\n  x := a\n  return g138(x)\n}\nfn(g140(a)) {\n  x := a\n  return g139(x)\n}\nfn(g141(a)) {\n  x := a\n  return g140(x)\n}\nfn(g142(a)) {\n  x := a\n  return g141(x)\n}\nfn(g143(a)) {\n  x := a\n  return g142(x)\n}\nfn(g144(a)) {\n  x := a\n  return g143(x)\n}\nfn(g145(a)) {\n  x := a\n  return g144(x)\n}\nfn(g146(a)) {\n  x := a\n  return g145(x)\n}\nfn(g147(a)) {\n  x := a\n  return g146(x)\n}\nfn(g148(a)) {\n  x := a\n  return g147(x)\n}\nfn(g149(a)) {\n  x := a\n  return g148(x)\n}\nfn(g150(a)) {\n  x := a\n  return g149(x)\n}\nfn(g151(a)) {\n  x := a\n  return g150(x)\n}\nfn(g152(a)) {\n  x := a\n  return g151(x)\n}\nfn(g153(a)) {\n  x := a\n  return g152(x)\n}\nfn(g154(a)) {\n  x := a\n  return g153(x)\n}\nfn(g155(a)) {\n  x := a\n  return g154(x)\n}\nfn(g156(a)) {\n  x := a\n  return g155(x)\n}\nfn(g157(a)) {\n  x := a\n  return g156(x)\n}\nfn(g158(a)) {\n  x := a\n  return g157(x)\n}\nfn(g159(a)) {\n  x := a\n  return g158(x)\n}\nfn(g160(a)) {\n  x := a\n  return g159(x)\n}\nfn(g161(a)) {\n  x := a\n  return g160(x)\n}\nfn(g162(a)) {\n  x := a\n  return g161(x)\n}\nfn(g163(a)) {\n  x := a\n  return g162(x)\n}\nfn(g164(a)) {\n  x := a\n  return g163(x)\n}\nfn(g165(a)) {\n  x := a\n  return g164(x)\n}\nfn(g166(a)) {\n  x := a\n  return g165(x)\n}\nfn(g167(a)) {\n  x := a\n  return g166(x)\n}\nfn(g168(a)) {\n  x := a\n  return g167(x)\n}\nfn(g169(a)) {\n  x := a\n  return g168(x)\n}\nfn(g170(a)) {\n  x := a\n  return g169(x)\n}\nfn(g171(a)) {\n  x := a\n  return g170(x)\n}\nfn(g172(a)) {\n  x := a\n  return g171(x)\n}\nfn(g173(a)) {\n  x := a\n  return g172(x)\n}\nfn(g174(a)) {\n  x := a\n  return g173(x)\n}\nfn(g175(a)) {\n  x := a\n  return g174(x)\n}\nfn(g176(a)) {\n  x := a\n  return g175(x)\n}\nfn(g177(a)) {\n  x := a\n  return g176(x)\n}\nfn(g178(a)) {\n  x := a\n  return g177(x)\n}\nfn(g179(a)) {\n  x := a\n  return g178(x)\n}\nfn(g180(a)) {\n  x := a\n  return g179(x)\n}\nfn(g181(a)) {\n  x := a\n  return g180(x)\n}\nfn(g182(a)) {\n  x := a\n  return g181(x)\n}\nfn(g183(a)) {\n  x := a\n  return g182(x)\n}\nfn(g184(a)) {\n  x := a\n  return g183(x)\n}\nfn(g185(a)) {\n  x := a\n  return g184(x)\n}\nfn(g186(a)) {\n  x := a\n  return g185(x)\n}\nfn(g187(a)) {\n  x := a\n  return g186(x)\n}\nfn(g188(a)) {\n  x := a\n  return g187(x)\n}\nfn(g189(a)) {\n  x := a\n  return g188(x)\n}\nfn(g190(a)) {\n  x := a\n  return g189(x)\n}\nfn(g191(a)) {\n  x := a\n  return g190(x)\n}\nfn(g192(a)) {\n  x := a\n  return g191(x)\n}\nfn(g193(a)) {\n  x := a\n  return g192(x)\n}\nfn(g194(a)) {\n  x := a\n  return g193(x)\n}\nfn(g195(a)) {\n  x := a\n  return g194(x)\n}\nfn(g196(a)) {\n  x := a\n  return g195(x)\n}\nfn(g197(a)) {\n  x := a\n  return g196(x)\n}\nfn(g198(a)) {\n  x := a\n  return g197(x)\n}\nfn(g199(a)) {\n  x := a\n  return g198(x)\n}\nfn(g200(a)) {\n  x := a\n  return g199(x)\n}\nif (0 > 1) { print(g200(1)) }\na := [1]\nb := a\nb.push(2)\nprint(a.length())\n",
+   "sha256": "72eaff58bcc0813ef0c473e41a7e3b27769624f8d164a08ffb17b4d8487259a6",
+   "original_expectation": "refusal reference-guard:inflow",
+   "legacy": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:804:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "reference-guard:inflow"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "expectation None: any accepted verdict (legacy-equal: 2)",
+   "rule": "guard removal: B5 deleted the Phase A reference guard (owner 2026-11-02: arrays/objects are shared references implemented by the runtime, no replacement static guard); the program is legacy-equal"
+  },
+  {
+   "recipe_line": "vm_review_cp12.py",
+   "case": "chain201-aliasret",
+   "source": "fn(f(a)) { return a }\nfn(g0(a)) { return a }\nfn(g1(a)) {\n  x := a\n  return g0(x)\n}\nfn(g2(a)) {\n  x := a\n  return g1(x)\n}\nfn(g3(a)) {\n  x := a\n  return g2(x)\n}\nfn(g4(a)) {\n  x := a\n  return g3(x)\n}\nfn(g5(a)) {\n  x := a\n  return g4(x)\n}\nfn(g6(a)) {\n  x := a\n  return g5(x)\n}\nfn(g7(a)) {\n  x := a\n  return g6(x)\n}\nfn(g8(a)) {\n  x := a\n  return g7(x)\n}\nfn(g9(a)) {\n  x := a\n  return g8(x)\n}\nfn(g10(a)) {\n  x := a\n  return g9(x)\n}\nfn(g11(a)) {\n  x := a\n  return g10(x)\n}\nfn(g12(a)) {\n  x := a\n  return g11(x)\n}\nfn(g13(a)) {\n  x := a\n  return g12(x)\n}\nfn(g14(a)) {\n  x := a\n  return g13(x)\n}\nfn(g15(a)) {\n  x := a\n  return g14(x)\n}\nfn(g16(a)) {\n  x := a\n  return g15(x)\n}\nfn(g17(a)) {\n  x := a\n  return g16(x)\n}\nfn(g18(a)) {\n  x := a\n  return g17(x)\n}\nfn(g19(a)) {\n  x := a\n  return g18(x)\n}\nfn(g20(a)) {\n  x := a\n  return g19(x)\n}\nfn(g21(a)) {\n  x := a\n  return g20(x)\n}\nfn(g22(a)) {\n  x := a\n  return g21(x)\n}\nfn(g23(a)) {\n  x := a\n  return g22(x)\n}\nfn(g24(a)) {\n  x := a\n  return g23(x)\n}\nfn(g25(a)) {\n  x := a\n  return g24(x)\n}\nfn(g26(a)) {\n  x := a\n  return g25(x)\n}\nfn(g27(a)) {\n  x := a\n  return g26(x)\n}\nfn(g28(a)) {\n  x := a\n  return g27(x)\n}\nfn(g29(a)) {\n  x := a\n  return g28(x)\n}\nfn(g30(a)) {\n  x := a\n  return g29(x)\n}\nfn(g31(a)) {\n  x := a\n  return g30(x)\n}\nfn(g32(a)) {\n  x := a\n  return g31(x)\n}\nfn(g33(a)) {\n  x := a\n  return g32(x)\n}\nfn(g34(a)) {\n  x := a\n  return g33(x)\n}\nfn(g35(a)) {\n  x := a\n  return g34(x)\n}\nfn(g36(a)) {\n  x := a\n  return g35(x)\n}\nfn(g37(a)) {\n  x := a\n  return g36(x)\n}\nfn(g38(a)) {\n  x := a\n  return g37(x)\n}\nfn(g39(a)) {\n  x := a\n  return g38(x)\n}\nfn(g40(a)) {\n  x := a\n  return g39(x)\n}\nfn(g41(a)) {\n  x := a\n  return g40(x)\n}\nfn(g42(a)) {\n  x := a\n  return g41(x)\n}\nfn(g43(a)) {\n  x := a\n  return g42(x)\n}\nfn(g44(a)) {\n  x := a\n  return g43(x)\n}\nfn(g45(a)) {\n  x := a\n  return g44(x)\n}\nfn(g46(a)) {\n  x := a\n  return g45(x)\n}\nfn(g47(a)) {\n  x := a\n  return g46(x)\n}\nfn(g48(a)) {\n  x := a\n  return g47(x)\n}\nfn(g49(a)) {\n  x := a\n  return g48(x)\n}\nfn(g50(a)) {\n  x := a\n  return g49(x)\n}\nfn(g51(a)) {\n  x := a\n  return g50(x)\n}\nfn(g52(a)) {\n  x := a\n  return g51(x)\n}\nfn(g53(a)) {\n  x := a\n  return g52(x)\n}\nfn(g54(a)) {\n  x := a\n  return g53(x)\n}\nfn(g55(a)) {\n  x := a\n  return g54(x)\n}\nfn(g56(a)) {\n  x := a\n  return g55(x)\n}\nfn(g57(a)) {\n  x := a\n  return g56(x)\n}\nfn(g58(a)) {\n  x := a\n  return g57(x)\n}\nfn(g59(a)) {\n  x := a\n  return g58(x)\n}\nfn(g60(a)) {\n  x := a\n  return g59(x)\n}\nfn(g61(a)) {\n  x := a\n  return g60(x)\n}\nfn(g62(a)) {\n  x := a\n  return g61(x)\n}\nfn(g63(a)) {\n  x := a\n  return g62(x)\n}\nfn(g64(a)) {\n  x := a\n  return g63(x)\n}\nfn(g65(a)) {\n  x := a\n  return g64(x)\n}\nfn(g66(a)) {\n  x := a\n  return g65(x)\n}\nfn(g67(a)) {\n  x := a\n  return g66(x)\n}\nfn(g68(a)) {\n  x := a\n  return g67(x)\n}\nfn(g69(a)) {\n  x := a\n  return g68(x)\n}\nfn(g70(a)) {\n  x := a\n  return g69(x)\n}\nfn(g71(a)) {\n  x := a\n  return g70(x)\n}\nfn(g72(a)) {\n  x := a\n  return g71(x)\n}\nfn(g73(a)) {\n  x := a\n  return g72(x)\n}\nfn(g74(a)) {\n  x := a\n  return g73(x)\n}\nfn(g75(a)) {\n  x := a\n  return g74(x)\n}\nfn(g76(a)) {\n  x := a\n  return g75(x)\n}\nfn(g77(a)) {\n  x := a\n  return g76(x)\n}\nfn(g78(a)) {\n  x := a\n  return g77(x)\n}\nfn(g79(a)) {\n  x := a\n  return g78(x)\n}\nfn(g80(a)) {\n  x := a\n  return g79(x)\n}\nfn(g81(a)) {\n  x := a\n  return g80(x)\n}\nfn(g82(a)) {\n  x := a\n  return g81(x)\n}\nfn(g83(a)) {\n  x := a\n  return g82(x)\n}\nfn(g84(a)) {\n  x := a\n  return g83(x)\n}\nfn(g85(a)) {\n  x := a\n  return g84(x)\n}\nfn(g86(a)) {\n  x := a\n  return g85(x)\n}\nfn(g87(a)) {\n  x := a\n  return g86(x)\n}\nfn(g88(a)) {\n  x := a\n  return g87(x)\n}\nfn(g89(a)) {\n  x := a\n  return g88(x)\n}\nfn(g90(a)) {\n  x := a\n  return g89(x)\n}\nfn(g91(a)) {\n  x := a\n  return g90(x)\n}\nfn(g92(a)) {\n  x := a\n  return g91(x)\n}\nfn(g93(a)) {\n  x := a\n  return g92(x)\n}\nfn(g94(a)) {\n  x := a\n  return g93(x)\n}\nfn(g95(a)) {\n  x := a\n  return g94(x)\n}\nfn(g96(a)) {\n  x := a\n  return g95(x)\n}\nfn(g97(a)) {\n  x := a\n  return g96(x)\n}\nfn(g98(a)) {\n  x := a\n  return g97(x)\n}\nfn(g99(a)) {\n  x := a\n  return g98(x)\n}\nfn(g100(a)) {\n  x := a\n  return g99(x)\n}\nfn(g101(a)) {\n  x := a\n  return g100(x)\n}\nfn(g102(a)) {\n  x := a\n  return g101(x)\n}\nfn(g103(a)) {\n  x := a\n  return g102(x)\n}\nfn(g104(a)) {\n  x := a\n  return g103(x)\n}\nfn(g105(a)) {\n  x := a\n  return g104(x)\n}\nfn(g106(a)) {\n  x := a\n  return g105(x)\n}\nfn(g107(a)) {\n  x := a\n  return g106(x)\n}\nfn(g108(a)) {\n  x := a\n  return g107(x)\n}\nfn(g109(a)) {\n  x := a\n  return g108(x)\n}\nfn(g110(a)) {\n  x := a\n  return g109(x)\n}\nfn(g111(a)) {\n  x := a\n  return g110(x)\n}\nfn(g112(a)) {\n  x := a\n  return g111(x)\n}\nfn(g113(a)) {\n  x := a\n  return g112(x)\n}\nfn(g114(a)) {\n  x := a\n  return g113(x)\n}\nfn(g115(a)) {\n  x := a\n  return g114(x)\n}\nfn(g116(a)) {\n  x := a\n  return g115(x)\n}\nfn(g117(a)) {\n  x := a\n  return g116(x)\n}\nfn(g118(a)) {\n  x := a\n  return g117(x)\n}\nfn(g119(a)) {\n  x := a\n  return g118(x)\n}\nfn(g120(a)) {\n  x := a\n  return g119(x)\n}\nfn(g121(a)) {\n  x := a\n  return g120(x)\n}\nfn(g122(a)) {\n  x := a\n  return g121(x)\n}\nfn(g123(a)) {\n  x := a\n  return g122(x)\n}\nfn(g124(a)) {\n  x := a\n  return g123(x)\n}\nfn(g125(a)) {\n  x := a\n  return g124(x)\n}\nfn(g126(a)) {\n  x := a\n  return g125(x)\n}\nfn(g127(a)) {\n  x := a\n  return g126(x)\n}\nfn(g128(a)) {\n  x := a\n  return g127(x)\n}\nfn(g129(a)) {\n  x := a\n  return g128(x)\n}\nfn(g130(a)) {\n  x := a\n  return g129(x)\n}\nfn(g131(a)) {\n  x := a\n  return g130(x)\n}\nfn(g132(a)) {\n  x := a\n  return g131(x)\n}\nfn(g133(a)) {\n  x := a\n  return g132(x)\n}\nfn(g134(a)) {\n  x := a\n  return g133(x)\n}\nfn(g135(a)) {\n  x := a\n  return g134(x)\n}\nfn(g136(a)) {\n  x := a\n  return g135(x)\n}\nfn(g137(a)) {\n  x := a\n  return g136(x)\n}\nfn(g138(a)) {\n  x := a\n  return g137(x)\n}\nfn(g139(a)) {\n  x := a\n  return g138(x)\n}\nfn(g140(a)) {\n  x := a\n  return g139(x)\n}\nfn(g141(a)) {\n  x := a\n  return g140(x)\n}\nfn(g142(a)) {\n  x := a\n  return g141(x)\n}\nfn(g143(a)) {\n  x := a\n  return g142(x)\n}\nfn(g144(a)) {\n  x := a\n  return g143(x)\n}\nfn(g145(a)) {\n  x := a\n  return g144(x)\n}\nfn(g146(a)) {\n  x := a\n  return g145(x)\n}\nfn(g147(a)) {\n  x := a\n  return g146(x)\n}\nfn(g148(a)) {\n  x := a\n  return g147(x)\n}\nfn(g149(a)) {\n  x := a\n  return g148(x)\n}\nfn(g150(a)) {\n  x := a\n  return g149(x)\n}\nfn(g151(a)) {\n  x := a\n  return g150(x)\n}\nfn(g152(a)) {\n  x := a\n  return g151(x)\n}\nfn(g153(a)) {\n  x := a\n  return g152(x)\n}\nfn(g154(a)) {\n  x := a\n  return g153(x)\n}\nfn(g155(a)) {\n  x := a\n  return g154(x)\n}\nfn(g156(a)) {\n  x := a\n  return g155(x)\n}\nfn(g157(a)) {\n  x := a\n  return g156(x)\n}\nfn(g158(a)) {\n  x := a\n  return g157(x)\n}\nfn(g159(a)) {\n  x := a\n  return g158(x)\n}\nfn(g160(a)) {\n  x := a\n  return g159(x)\n}\nfn(g161(a)) {\n  x := a\n  return g160(x)\n}\nfn(g162(a)) {\n  x := a\n  return g161(x)\n}\nfn(g163(a)) {\n  x := a\n  return g162(x)\n}\nfn(g164(a)) {\n  x := a\n  return g163(x)\n}\nfn(g165(a)) {\n  x := a\n  return g164(x)\n}\nfn(g166(a)) {\n  x := a\n  return g165(x)\n}\nfn(g167(a)) {\n  x := a\n  return g166(x)\n}\nfn(g168(a)) {\n  x := a\n  return g167(x)\n}\nfn(g169(a)) {\n  x := a\n  return g168(x)\n}\nfn(g170(a)) {\n  x := a\n  return g169(x)\n}\nfn(g171(a)) {\n  x := a\n  return g170(x)\n}\nfn(g172(a)) {\n  x := a\n  return g171(x)\n}\nfn(g173(a)) {\n  x := a\n  return g172(x)\n}\nfn(g174(a)) {\n  x := a\n  return g173(x)\n}\nfn(g175(a)) {\n  x := a\n  return g174(x)\n}\nfn(g176(a)) {\n  x := a\n  return g175(x)\n}\nfn(g177(a)) {\n  x := a\n  return g176(x)\n}\nfn(g178(a)) {\n  x := a\n  return g177(x)\n}\nfn(g179(a)) {\n  x := a\n  return g178(x)\n}\nfn(g180(a)) {\n  x := a\n  return g179(x)\n}\nfn(g181(a)) {\n  x := a\n  return g180(x)\n}\nfn(g182(a)) {\n  x := a\n  return g181(x)\n}\nfn(g183(a)) {\n  x := a\n  return g182(x)\n}\nfn(g184(a)) {\n  x := a\n  return g183(x)\n}\nfn(g185(a)) {\n  x := a\n  return g184(x)\n}\nfn(g186(a)) {\n  x := a\n  return g185(x)\n}\nfn(g187(a)) {\n  x := a\n  return g186(x)\n}\nfn(g188(a)) {\n  x := a\n  return g187(x)\n}\nfn(g189(a)) {\n  x := a\n  return g188(x)\n}\nfn(g190(a)) {\n  x := a\n  return g189(x)\n}\nfn(g191(a)) {\n  x := a\n  return g190(x)\n}\nfn(g192(a)) {\n  x := a\n  return g191(x)\n}\nfn(g193(a)) {\n  x := a\n  return g192(x)\n}\nfn(g194(a)) {\n  x := a\n  return g193(x)\n}\nfn(g195(a)) {\n  x := a\n  return g194(x)\n}\nfn(g196(a)) {\n  x := a\n  return g195(x)\n}\nfn(g197(a)) {\n  x := a\n  return g196(x)\n}\nfn(g198(a)) {\n  x := a\n  return g197(x)\n}\nfn(g199(a)) {\n  x := a\n  return g198(x)\n}\nfn(g200(a)) {\n  x := a\n  return g199(x)\n}\nif (0 > 1) { print(g200(1)) }\nq := [1]\nr := f(q)\nr.push(5)\nprint(q.length())\n",
+   "sha256": "2cc6a7df2792c64b93715c768812e6f15bf2d3aaafa5ee127a889bfea9ff9f3e",
+   "original_expectation": "refusal aliasing",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:1:12: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": [
+     "vm",
+     ""
+    ]
+   },
+   "conversion": "B5_PINNED: 2 exit 0, outcome vm; must differ from legacy (1)",
+   "rule": "shared-reference returns: owner 2026-11-01 (assignment, arguments and returns share identity); compatibility.md row `fn(r()){return a}; x := r(); x.push(4)`"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fnboth",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nprint(\"before\")\nprint(w0())\ni0 := 0\nwhile (i0 < 1) { i0 += 1\nprint(w0()) }\n",
+   "sha256": "4e75484895acfb0a83c206768a5f66d05968d8648185433d9750d6f3d6b1d589",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fnloop",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nprint(\"before\")\ni0 := 0\nwhile (i0 < 1) { i0 += 1\nprint(w0()) }\nprint(\"after\")\n",
+   "sha256": "041d0451220ae03fe91613b50aa442242ca4aff53e6447342b99f151baf94aa0",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\nafter\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fnnest",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nfn(w1()) {\nreturn w0()\n}\nprint(\"before\")\nprint(w1())\n",
+   "sha256": "727587285945bac16e2f28e857f602db76d2b19f1838c507b910f993e5f00591",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: return: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "return: reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: return: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "return: reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fnnestloop",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nfn(w1()) {\nreturn w0()\n}\nprint(\"before\")\ni0 := 0\nwhile (i0 < 1) { i0 += 1\nprint(w1()) }\n",
+   "sha256": "8554efa4f715382e6e50ea52e9bdf6314914446b4b59406f7dfffcfbfa504f72",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: return: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "return: reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: return: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "return: reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fnown",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\nj0 := 0\nwhile (j0 < 1) {\nj0 += 1\narr.push(arr)\n}\nreturn 7\n}\nprint(\"before\")\nprint(w0())\n",
+   "sha256": "a6548e5fab3178f51813316e329fb92cce370d2207863186f2609919db35c7bb",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:37:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:37:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:37:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fntop",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nprint(\"before\")\nprint(w0())\nprint(\"after\")\n",
+   "sha256": "8bee8a413a39fe075321ccfa5b0912c24260ac055731b8f814f3db2b4a0da1d6",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\nafter\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-fntopdecl",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nfn(w0()) {\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\narr.push(arr)\nreturn 7\n}\nprint(\"before\")\nr := w0()\nprint(r)\n",
+   "sha256": "02707483906a40383cbdfd83c67d402238f69d3008cde9de46321ca6eb7423de",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-loop",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\nprint(\"before\")\ni0 := 0\nwhile (i0 < 1) {\ni0 += 1\narr.push(arr)\n}\nprint(\"after\")\n",
+   "sha256": "1670c5437a8220736ffbbe995b7fe4cc2b2975f4a3d01a0109448e6e9b9e6057",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\nafter\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:37:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:37:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:37:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-top",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\nprint(\"before\")\narr.push(arr)\nprint(\"after\")\n",
+   "sha256": "0dee3f8f2bb05a06a432baed307158c7a13665442d9ed971bd40a8199cc77724",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\nafter\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:34:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:34:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  },
+  {
+   "recipe_line": "vm_former_replay.py --seed 1 --sample 600",
+   "case": "aggregates-10-topif",
+   "source": "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\nfn(loud(x)) { print(\"loud\")\nreturn x }\nfn(mk()) { return [1, 2, 3] }\nfn(c1(x)) { if (x == 0) { return 1 / x }\nreturn c1(x - 1) + 1 }\nfn(c2(x)) { return id(10 / x) }\nfn(c3(a, i)) { return a[i] }\nfn(c4(x)) { y := x\ny = y + 0.5\nreturn y }\nfn(c5(x)) { k := 0\nwhile (k < x) { k += 1 }\nreturn 10 / k }\nfn(c6(d)) { if (d == 0) { return 0 }\nreturn c6(d - 1) + 1 }\nfn(c7(v)) { return v.length() }\nz := 0\nh := 5.5\narr := [1, 2]\no := {\"k\": 1, \"s\": \"t\"}\nbig := 2000000000 * 2000000000\nk5 := 5\nneg := -1\nfr := 0.5\ntwo := 2.0\nn := 7\ng := 2.5\nw := 9007199254740991\nv2 := 0\nks := \"zz\"\nprint(\"before\")\nif (true) {\narr.push(arr)\n}\nprint(\"after\")\n",
+   "sha256": "c51adedc78ec943019464b5302eb8f24049dc9821a6651b79d8680ce3477d6de",
+   "original_expectation": "VM result identical to legacy (or an approved vm_policies policy)",
+   "legacy": {
+    "stdout": "before\nafter\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:35:10: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": [
+     "require-error",
+     "aliasing"
+    ]
+   },
+   "b5_require": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:35:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "b5_vm1": {
+    "stdout": "before\n",
+    "stderr": "error: $R/p.f:35:1: reference cycle: the stored value would contain itself\n",
+    "exit": 1,
+    "outcome": [
+     "vm-error",
+     "reference cycle: the stored value would contain itself"
+    ]
+   },
+   "conversion": "b5_pinned(): stdout \"before\", one error at the push statement (line, column 1; \"return: \" prefix in the fnnest contexts), exit 1, outcome vm-error; must differ from legacy",
+   "rule": "reference cycle refused before mutation: owner 2026-11-01; D-NEXT-refsem #4 (catchable runtime.reference_cycle); compatibility.md row `a.push(a)`; receiver-unchanged test tests/runtime2/b5/cycle/push_self_unchanged.f"
+  }
+ ]
+}

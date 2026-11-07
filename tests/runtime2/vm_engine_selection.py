@@ -64,9 +64,11 @@ CASES = [
      "vm", {}),
     ("vm-file-write-then-error", FILE_WRITE + 'print("wrote")\nprint(1 / 0)\n', "vm-error", {}),
     ("fallback-type-error", 'print("a")\nprint("x" < 1)\n', "fallback", {}),
-    # D-NEXT-refsem #9: the former D-040 copy witness is refused before execution by the
-    # Phase A forward-compatibility guard (its meaning would change in Phase B); was "vm".
-    ("vm-d040-copy", 'a := [1]\nb := a\nb.push(2)\nprint(a.length())\n', "fallback", {}),
+    # D-NEXT-refsem #9: the former D-040 copy witness was refused before execution by the
+    # Phase A forward-compatibility guard ("fallback"; before that "vm"). B5 fix-up 2
+    # (b5-refsem.md 12.3): B5 deleted the guard; `b := a` shares (plan section 3; owner
+    # 2026-11-01/02) and the program is legacy-equal (`2`): outcome "vm" again.
+    ("vm-d040-copy", 'a := [1]\nb := a\nb.push(2)\nprint(a.length())\n', "vm", {}),
     ("internal-failure", 'print("start")\ns := "abcdefghijklmnopq"\nk := 0\nwhile (k < 22) { s += s\nk += 1 }\n'
                          'print(s.length())\n', "internal-error", {"NIFT_VM_HEAP_BUDGET": str(4 << 20)}),
 ]

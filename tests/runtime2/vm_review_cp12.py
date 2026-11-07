@@ -50,13 +50,19 @@ def programs():
         guard = f"if (0 > 1) {{ print(g{n - 1}(1)) }}\n"
         for name, tail, reason in (
                 # CP14B admitted b.push through the alias as the exact D-040 witness;
-                # D-NEXT-refsem #9 refuses it before execution (Phase A guard).
-                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", "reference-guard:inflow"),
+                # D-NEXT-refsem #9 refused it before execution (Phase A guard,
+                # "reference-guard:inflow"). B5 fix-up 2 (b5-refsem.md 12.3): the guard is
+                # deleted; `b := a` shares and the program is legacy-equal (`2`).
+                ("alias", "a := [1]\nb := a\nb.push(2)\nprint(a.length())\n", None),
                 ("negzero", "x := 0\ni := 0\nwhile (i < 1) { i += 1\nprint(-x) }\n", "context:negative-zero"),
                 ("order", 'fn_v := 1\nprint("x" < 1)\n', "type:<"),
                 ("assign", "x := 1\ni := 0\nwhile (i < 2) { x = x + 0.5; i++ }\nprint(x)\n", "context:assignment-type"),
                 ("objlen", None, "context:object-length"),
-                ("aliasret", None, "aliasing"),
+                # Was refused "aliasing" (Phase A). B5 fix-up 2: `r := f(q)` returns q itself
+                # (owner 2026-11-01: arguments and returns share identity; compatibility.md
+                # `fn(r()){return a}; x := r(); x.push(4)`): r.push(5) grows q, `2`; legacy
+                # copies, `1`. Pinned in B5_PINNED.
+                ("aliasret", None, "B5"),
                 ("strtype", 'x := 1\nprint(x + "s")\n', None)):
             if name == "objlen":
                 src = 'fn(nn(o)) { return o.length() }\n' + chain(n) + guard + \
@@ -116,6 +122,10 @@ EXACT = {
 }
 
 
+# B5 fix-up 2: approved differences from legacy, pinned (stdout, stderr, exit), derived from the rule.
+B5_PINNED = {f"chain{n}-aliasret": (b"2\n", b"", 0) for n in (199, 201)}
+
+
 def exact_result(name, source, path):
     out, error = EXACT[name]
     if error is None:
@@ -149,7 +159,13 @@ def main():
                 verdict, policy = ("pinned", "exact") if vm == pinned else ("diff", None)
             key = f"{group} {outcome}" + (f" {policy}" if policy else "")
             tally[key] = tally.get(key, 0) + 1
-            if reason == "D-040":
+            if reason == "B5":
+                if outcome != "vm" or vm != B5_PINNED[name]:
+                    failures.append(f"{group} {name}: not the pinned B5 result (shared-reference returns): "
+                                    f"{outcome} {vm!r}")
+                elif legacy == B5_PINNED[name]:
+                    failures.append(f"{group} {name}: pinned as a B5 difference but legacy now agrees: stale pin")
+            elif reason == "D-040":
                 if (verdict, policy) != ("approved", "D-040 independent copy"):
                     failures.append(f"{group} {name}: expected the exact D-040 witness, got {verdict} {policy} "
                                     f"({outcome} {st and st.get('reason')}): legacy {legacy!r} vm {vm!r}")

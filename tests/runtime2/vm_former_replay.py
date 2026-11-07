@@ -186,6 +186,27 @@ def programs(seed):
             yield "output", f"output-{n}-{label}", rec + loop.format(line="x" * 20, n=n) + tail
 
 
+# B5 fix-up 2 (docs/runtime-2/checkpoints/b5-refsem.md 12.3): `arr.push(arr)` (aggregates-10-*, every
+# context) is the approved reference-cycle error: owner 2026-11-01 "refuse cycle creation before
+# mutation"; D-NEXT-refsem #4 (catchable runtime.reference_cycle, uncaught here); compatibility.md
+# "`a.push(a)` | pushes a copy | catchable runtime.reference_cycle". Legacy pushes a copy and runs on.
+# Pinned result, derived from the source (never from the VM): the output before the push, then one
+# error at the push statement (its line, column 1), with legacy's `return: ` prefix where the error
+# leaves w0 through w1's `return w0()` (the fnnest contexts; D-009#5), exit 1. The receiver staying
+# unchanged after the refused push is tests/runtime2/b5/cycle/push_self_unchanged.f.
+B5_CYCLE = "arr.push(arr)"
+
+
+def b5_pinned(name, source, path):
+    if not name.startswith("aggregates-%d-" % AGGREGATES.index(B5_CYCLE)):
+        return None
+    lines = source.split("\n")
+    line = lines.index(B5_CYCLE) + 1
+    prefix = "return: " if name.endswith(("-fnnest", "-fnnestloop")) else ""
+    err = "error: %s:%d:1: %sreference cycle: the stored value would contain itself\n" % (path, line, prefix)
+    return b"before\n", err.encode(), 1
+
+
 def check(nift, item, work, timeout):
     family, name, source = item
     d = tempfile.mkdtemp(dir=work)
@@ -208,6 +229,14 @@ def check(nift, item, work, timeout):
             problem = "fallback after VM execution started"
         elif st["outcome"] not in ("vm", "vm-error", "fallback"):
             problem = f"unexpected outcome {st['outcome']}"
+        elif b5_pinned(name, source, path) is not None:
+            pinned = b5_pinned(name, source, path)
+            if vm != pinned or st["outcome"] != "vm-error":
+                problem = "not the pinned B5 reference-cycle error"
+            elif legacy == pinned:
+                problem = "pinned as a B5 difference but legacy now agrees: stale pin"
+            else:
+                verdict = "approved:B5 reference cycle"
         elif verdict not in ("same", "endless") and not verdict.startswith("approved:"):
             problem = "output differs from legacy"
         return family, name, key, verdict, problem, source, legacy, vm
