@@ -133,6 +133,30 @@ generator: `tests/runtime2/b5/gen/gen_evalorder.py`.
 | a captured loop binding rebound by the argument: `for (b : [[1], [2]]) { g := () => { b = [7]; return 4 }; b.push(g()); print(b.stringify()) }` | `[7,4]` twice (its prepared loop evaluator reads late); insert/remove and the element store: the contract's result | `[7]` twice: the element gets the push, the rebinding stays (the first H-A repair printed `[1,4] [2,4]`). **Previously admitted with the legacy-equal `[7,4]` twice on 17f7964c**: a changed output, APPROVED 2026-11-07 22:13 (owner D1.2) |
 | `b := [1, 2]; fn(g()) { b = [7, 8]; return 0 }; b.remove(g())` (no other reference to the original) | `remove: index out of range` | removes from the original (retained); `b` is `[7,8]` |
 
+## Operand order of operators and compound assignment (combined B3-B5 candidate, D2)
+
+Operands are evaluated once, left to right (owner rulings 2026-11-08 03:27/03:29): a binary
+operator (`+ - * / %`, comparisons, string `+`/`==`, and `if (x == g())`) reads its left operand
+before the right one; a compound assignment on a variable (`x op= g()`, `s += k()`) reads its
+target, then evaluates the right-hand side, then writes back; a compound on a struct field
+(`p.v += g()`, an implicit field in a method) reads the receiver and the field first. When the
+operation or the binding-type check fails after the right-hand side rebound the target, nothing is
+written back: the binding keeps what the right-hand side left (in a session the next statement
+sees it). The VM read the left operand or target late until this repair (`combined-b3-b5.md`
+section 27). Fixtures: `tests/runtime2/b5/d2/`; generator: `tests/runtime2/b5/gen/gen_operators.py`.
+Compound assignment on an index or a field-key target (`b[i] += v`, `o["k"] += v`) stays refused.
+
+| Program | Legacy | Runtime 2.0 |
+| --- | --- | --- |
+| `x := 6; fn(g()) { x = 20; return 4 }; print(x + g())` (and `-`, `*`, `/`, `%`, comparisons, string `+`/`==`, `if (x == g() + 2)`) at top level, in loops and in function locals | `10` | the same (91a49efa and earlier: `24`) |
+| `x := 6; g := () => { x = 20; return 4 }; x += g()` in every context, sessions included (`s := "a"; k := () => { s = "Z"; return "a" }; s += k()`) | `10` (`aa`) | the same (91a49efa and earlier: `24`, `Za`) |
+| `x := 9223372036854775807; g := () => { x = 5; return 1 }; x += g()` | fatal overflow at the statement; a session then shows `x` as `5` | the same (91a49efa: no error, `6`); **a previously admitted output changes** (approved) |
+| `x := 6; g := () => { x = 20; return 4 }; x /= g()` (an int binding) | `cannot assign double to int binding 'x'` at the statement | the same (91a49efa: no error, `5`); **a previously admitted output changes** (approved) |
+| (**APPROVED 2026-11-08 03:27/03:29**, owner; a difference, not legacy parity) in a `while`/`for` body, `x += g()` with a `fn` callee (`*=`, `-=`, `%=`, `/=` on doubles, string `+=`) | `24` (`Za`): legacy's prepared loop evaluator reads the target late | `10` (`aa`); previously admitted and legacy-equal by accident (`24`, `Za`). Fixture `d2/b7_loop_compound_approved.f` |
+| (**APPROVED 2026-11-08 03:27/03:29**, owner; a difference, not legacy parity) in a `while`/`for` body, `s += k()` with a lambda callee that rebinds `s` | `Z`: the append is lost | `aa`; previously admitted with `Za` (already different from legacy). Fixture `d2/b7_loop_compound_approved.f` |
+| (recorded, no change: r05) in a `while`/`for` body, `l2(x, g())` where `l2` is a lambda and `g` rebinds `x` | `20`: legacy's loop evaluator reads a lambda's call argument late (a `fn` callee and top-level code: `6`) | `6`: arguments once, left to right (unchanged; fixture `d2/b8_lambda_args_loop.f`) |
+| `struct(P) { v := 6 }; p := P(); g := () => { p.v = 20; return 4 }; p.v += g()` | `struct has no method: v += g` (not runnable) | `10` (91a49efa: `24`); a method's implicit `v += h()`: legacy `10`, the same (91a49efa: `24`) |
+
 ## Documented compatibility differences (approved by the owner, not release blockers)
 
 | Difference | Legacy | VM | Status |

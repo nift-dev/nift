@@ -89,7 +89,7 @@ Also observed, not changed by the repair (the VM already differed and is correct
 5. legacy fails (`remove: index out of range`) when the argument drops the receiver's last other
    reference; the VM keeps the retained receiver alive.
 
-### 2.2 Same root cause outside H-A (STOP: not fixed; RELEASE BLOCKER, owner 2026-11-07 22:13 D2, bounded investigation to be briefed separately)
+### 2.2 Same root cause outside H-A (STOP: not fixed; RELEASE BLOCKER, owner 2026-11-07 22:13 D2, bounded investigation to be briefed separately; fixed by C30, section 27)
 
 The same main-frame-register pattern affects operators, which are not receiver operations:
 `x := 1; fn(g()) { x = 10; return 1 }; print(x + g())` prints 11 (legacy 2; semantics.md requires
@@ -1277,3 +1277,157 @@ seen so far are top-level ones and are reported. The sitecustomize hook catches 
   FAILED-BASELINE, also fails a campaign until its labelling is fixed or accepted.
 - **C3.** The two record claims are corrected (§25): errexit inside a function exits silently
   (conservative fallback); read_limit.py has a direct forced-race check now.
+
+## 27. D2: operand evaluation order outside receivers (C30)
+
+Owner rulings 2026-11-08 03:27/03:29 on the bounded investigation (`scratchpad/d2/D2-REPORT.md`):
+operands are evaluated once, left to right; binary operators and compound assignment stay
+separate. Production change; new binary `f2fed67d211eebd8b511c41fc63f01342e70a501f3475306b4ebba38a442419a`
+(GCC 13.3 here; the previous candidate binary was `91a49efa…`).
+
+**Family A (compiler_expr.cpp).** `binary()` and the fused `false_jump` comparison call
+`retain_receiver(left, left < mark, node.b)` between the operands: a left operand held in its
+binding's own register is copied to a temporary when the right operand can rebind it
+(`may_rebind`, unchanged and not narrowed for built-ins). Constants (`kConstantBit`) and
+temporaries are never copied.
+
+**Family B (new compiler_compound.cpp, `compound_snapshot`).** Taken by `compound_op` only when
+the rhs exists, is not the `AddI` immediate and `may_rebind(rhs)`; otherwise the old code runs
+byte for byte (the in-place `s += t`). Steps:
+1. snapshot `t`: own register `Move t, x`; global `CheckGlobal` (loop code) then
+   `GetGlobalChecked`; cell, upvalue or session binding `read_binding`;
+2. the rhs (it may rebind `x`; `t` is unaffected);
+3. the operation on `t` at the statement's position (`AddAssign`/`Sub`/`Mul`/`Div`/`Mod`), the
+   same `context:assignment-error` refusal;
+4. the unchanged binding-type check, then the write-back: `CheckType t` + `Move x, t`, a plain
+   `SetGlobal` (no take flag: nothing was taken), or `store_binding` (cells check in the store);
+5. `LoadNull t`.
+The captured operand (`t`), the binding as the rhs left it, and the write-back stay separate: a
+fatal failure in 3 or 4 writes nothing, so the binding keeps what the rhs left (no rollback, no
+partial commit). An rhs that fails before returning leaves its own rebinding (fixtures b5, b9).
+
+*String fast path (2b).* With only the steps above, a string `s += f(i)` copies `s` on every
+append (the snapshot shares it): 20,000 appends cost 390.4 M Ir against 17.0 M before
+(quadratic). So for `+=` with string kinds on an own register or a non-cell global, after the rhs
+`JmpNotEq t, x` checks whether the binding still equals the snapshot; if so `t` is dropped and the
+old in-place path runs on the binding (`AddAssign x, v`, or `global_take`/`global_put`), which
+gives the same result because the operands are equal; otherwise the snapshot path runs.
+`compare.cpp`: identical string objects compare equal without reading them (keeps the check O(1)
+on the common path). Cells and sessions keep the snapshot path: they were never in place (a
+400,000-step session or cell `s += …` loop is quadratic before and after D2, 3.9 s / 9.4 s on
+both 91a49efa and f2fed67d; pre-existing, not changed here).
+
+**Family C (compiler_structs.cpp).** `field_update` reads the receiver and the field
+(`FieldGet`) before the rhs, then computes, `CheckField`, `FieldSet`. A receiver-rebinding rhs
+stays refused (`struct-assign`, fixture c3).
+
+**Not changed (out of scope, per the rulings):** compound on index or field-key targets (refused;
+the generator checks that), `may_rebind` for built-ins, `[x, g()]` (already left to right,
+fixture e1), `const_write` (rhs first, then the const read: a const cannot be rebound), and no
+other expression lowering (none was needed).
+
+**Pre-existing, reported, not changed:** on the common in-place path a string-append memory fault
+is detected after the append (`memory_ok` after `add_assign_slow`), so the binding would hold the
+appended text. Not observable: a memory-budget stop is exit 70 and ends the script and the
+session (checked: `NIFT_VM_HEAP_BUDGET` with a rebinding `s += k()`, script and session).
+
+### 27.1 Legacy differences introduced (approved) and changed admitted outputs
+
+| Fixture | Legacy | 91a49efa | Now | Status |
+| --- | --- | --- | --- | --- |
+| d2/b7 loop compound, `fn` callee (`x += g()`, `t += kf()`) | `24`, `Za` | `24`, `Za` | `10`, `aa` | APPROVED difference (owner 03:27/03:29) |
+| d2/b7 loop string `+=`, lambda callee | `Z` (append lost) | `Za` | `aa` | APPROVED difference |
+| d2/b3 overflow after a rebinding rhs | fatal overflow 4:7 | `6 6 5` exit 0 | legacy's error | changed admitted output, legacy-equal (approved) |
+| d2/b6 `/=` on an int binding | binding-type error 5:1 | `before 5` | legacy's error | changed admitted output, legacy-equal (approved) |
+| d2/b5 session faults | `20`, overflow, `5`, `Z`, `24` | `20`, `6`, `Z`, `120` | legacy-equal | changed admitted output |
+| d2/b8 r05 (lambda call argument in loops) | `6 20 6` | `6 6 6` | `6 6 6` | recorded only (compatibility.md), no change |
+
+Recorded in `compatibility.md` (D2 section) and `evidence/b5/expected-changes.tsv` (7 rows).
+Error texts and positions: every error row of the D2 matrix (22) gives legacy's error line exactly.
+
+### 27.2 Tests
+
+- `tests/runtime2/b5/d2/` (17 fixtures; in test-runtime2-b5 on the production and guard-off
+  builds and in the evalorder sanitizer lane): a1-a4 family A, b1-b9 family B (contexts, session,
+  faults, `/=`, approved loop differences, r05, an rhs that rebinds then throws), c1-c3 family C,
+  e1 `[x, g()]`.
+- `tests/runtime2/b5/gen/gen_operators.py` + `operators.tsv` (in test-runtime2-b5-evalorder):
+  40 operations x callee (lambda, `fn`, inline assignment) x context (top, loop, fn global,
+  lambda global, fn cell, captured, loop binding, session, fn local): 880 programs, 85 refused,
+  795 admitted (the floor), 0 bad; a model (left to right; compound = read, rhs, write back; int
+  `/=` = legacy's error); legacy cross-check with error lines compared; known legacy classes
+  loop-compound 8, loop-args 3, no-field-op 20; index compounds must stay refused. Negative
+  controls: a missing tree and a truncated table exit 2 and write nothing. The pre-D2 binary
+  fails it (381 bad).
+- `tests/runtime2/b5/d2_append.py` (in test-runtime2-b5): 1,200,000 `s += piece(i)` at top level,
+  in a `fn` and in a lambda on a global: about 0.1-0.2 s; the copying variant (mutant d8) times out
+  at 60 s.
+- Mutants (`mutants.sh`, `-DNIFT_D2_MUTANT=n`), all caught: d1 binary without the retain, d2 the
+  fused jump without it, d3 compound target read after the rhs, d4 an own register's snapshot is
+  the register (local targets read late), d5 number compound through the restore form (caught by
+  d2/b5: the overflow would roll back), d6 field_update's old order, d7 the in-place append
+  without the unchanged-binding check, d8 no unchanged-binding path (caught by d2_append). M14
+  (`may_rebind` false) now also fails the d2 fixtures. Two candidate mutants were found
+  equivalent and not used: dropping `LoadNull t` (one extra copy at most: the next snapshot
+  overwrites `t`) and writing back before the binding-type check (a failed check is fatal and the
+  session forms that could show it are refused, `session:binding-shape-contract`).
+
+### 27.3 Cost (callgrind Ir, deterministic; 91a49efa -> f2fed67d)
+
+| Program (loop of N) | N | before | after | change |
+| --- | --- | --- | --- | --- |
+| `s += "x"` (no call: old path) | 20,000 | 10,218,635 | 10,218,842 | 0 |
+| `s += piece(i)` (`fn`, unchanged binding: fast path) | 2,000 / 20,000 | 4,401,014 / 16,983,388 | 4,943,475 / 22,385,836 | +270 Ir per append (linear) |
+| `s += piece(i)` without the fast path (mutant d8) | 20,000 | 16,983,388 | 389,924,846 | quadratic |
+| `x += f(i)` (numbers) | 20,000 | 12,935,552 | 14,995,941 | +103 Ir per step |
+| `y = x + f(i)` (family A retain) | 20,000 | 16,794,506 | 17,574,765 | +39 Ir per step |
+
+Programs: `scratchpad/combined-fix/d2run/cost/`.
+
+### 27.4 Gate results (binary f2fed67d, GCC 13.3; local, not certification)
+
+Separate `make -k` runs, logs `scratchpad/combined-fix/d2gates/` (results.txt). The runs after C31
+and C32 are on the same binary (those commits change no `src/`).
+
+| Class | Gates |
+| --- | --- |
+| PASSED | test-runtime2-b5 (140 production / 145 guard-off fixtures incl. d2; sort-refusals 564; d2-append 3); test-runtime2-b5-evalorder (evalorder 840/830 admitted, 0 bad; operators 880/795 admitted, 0 bad; both negative controls); test-runtime2-b5-generators (gen1 20,274, gen_struct 1,911, 0 bad); test-runtime2-b5-mutants (1, 3, 4, 6, 7, 8, 11-15 and d1-d8, all caught); test-rt-lint; test-runtime2-certification-guard (after C32); test-runtime2-b4b-gen-alias (12,600, 5,532 on the VM, 0 bad); test-runtime2-b4b; test-runtime2-guardoff; test-runtime2-cp12c-probes; test-runtime2-cp16-engine-parity; test-runtime2-rt-diff; every test-rt-vm prerequisite except cp14b (b3, b3-mutants, b4, b4-mutants, refsem(-mutants), collections(-mutants), cp22, coro-module, cp17, d040, capture-origins, for-s2, closures-s1, safety(-mutants), vm-default, args-cmd, packages, b5-evalorder, b5-snapshot-memory, ...); test-rt-vm's own recipe up to vm_modules, with **vm_parity --rt-diff now PASS on its own merits** (817 entries, 0 differing, 46 approved: C31), vm_adversarial 39,612 programs 0 non-approved; the 7 recipe lines after vm_modules run one by one: all PASS |
+| FAILED-BASELINE (as before) | test-runtime2-cp14b (`script_return_kernel_error`, known pre-existing); vm_modules in test-rt-vm's recipe (2 cases `import-scope:collision`); test-test-integrity (57 findings, unchanged); test-runtime2-rt-diff-selftest (its FAIL set is unchanged; the new D-NEXT cases pass) |
+| FAILED-NEW | none |
+| Not run here | ASan/UBSan (test-runtime2-b5-evalorder-sanitize now includes d2 and gen_operators), TSan, the GCC 15.2 comparator lane, scanner-parity (needs NIFT_REF): the Linode lane |
+
+## 28. Owner decisions 2026-11-08 06:46: rt-diff approvals (C31), campaign verdicts (C32)
+
+**1. The 30 rt-diff B5 differences are APPROVED (C31).** `tools/rt-diff/policies/b5-refsem-vm.json`
+holds 62 exact rules in the existing format (entry id, source sha256, channel, exact old -> new,
+count), one per differing channel of the 30 entries of section 23.1 (27 stdout+combined, two
+exit+stderr+combined, one stderr+combined). Each rule's justification states "APPROVED owner
+2026-11-08 06:46: an approved B5 semantic difference, not legacy parity", the cause (shared
+references 26; extracted-element lifetime 1; const binding-only 1; the #29 rendering case 1;
+a returned array stays shared 1), the legacy and VM text and its row in section 23.1; `test`
+names the corpus file, the generator (`tools/rt-diff/gen.py`, seed 1) or the smoke script the
+entry is extracted from. `decision` is `D-NEXT-refsem-b`: rt-diff's rule check accepted only
+numbered rows (`D-009#6`), so it now also accepts an unnumbered decision record
+(`D-NEXT-<name>`; rt-diff.md; selftest cases accept `D-NEXT-refsem-b`, refuse `D-NEXT-` and
+`D-NEXT-refsem-b#x`). vm_parity passes the file and confirms every B5 approval by the entry's own
+VM statistics (one VM execution, no legacy execution). On the D2 binary: rt-diff 817 entries,
+0 differing, 46 approved, 0 unused policies; b5-refsem approvals 30, all confirmed. The rules were
+generated from rt-diff's own run_one/compare (`scratchpad/combined-fix/rtdiff-approve/build_policy.py`),
+each checked with `policy_matches` before it was written.
+
+**2. Checks hidden by an early abort: PARTIAL certification (C32; replaces C29's C2 default).**
+`certify.py` gives a campaign verdict with its own exit status: CERTIFIED 0, FAILED 1, PARTIAL 4
+(exit 3 is gone; what it covered is FAILED). PARTIAL only when nothing failed (no FAILED-NEW, no
+comparator skip, no NOT-RUN/SKIP gate, no gate blocked by anything other than unexecuted required
+checks, no FAILED-BASELINE under --strict) and the only gaps are listed REQUIRED checks that did
+not execute. The summary lists each with its category; any Category A gap prints
+`NOT RELEASE-QUALIFYING`; PARTIAL prints "PARTIAL is not a pass". The categories are the reviewed
+table `scripts/certify_hidden_checks.tsv` (51 rows: every named abort-hidden check, and a `*` row
+for every script of the four ABORT_CASES gates); a check without a row reads as A. Category A:
+the expression-smoke checks, the element-assignment checks, the root-path reproducers and the
+constant-fold smoke; B: the v4.4 variadic/spread/native/glob/wildcard/markup/filesystem-authority
+smokes, the perf-scaling smoke, the module-import "ownership" smokes (import-path ownership, not
+reference ownership: for the reviewer to confirm), the package smokes and the CP03 tracer cases.
+Guard: toys ab (B hidden, FAILED-BASELINE: PARTIAL, exit 4, no NOT RELEASE-QUALIFYING), ac (A
+hidden listed, NOT RELEASE-QUALIFYING), ad (hidden + FAILED-NEW: FAILED, exit 1), s1 (PARTIAL,
+exit 4), an 11-case verdict table, and every named ABORT_CASES check must have a row.
