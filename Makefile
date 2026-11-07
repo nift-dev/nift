@@ -5283,6 +5283,7 @@ test-cp19-mutants: test-cp19-session-mutants
 test-cp19-mutants: test-cp19-session-mutants-switch
 test-cp19-mutants: test-cp19-admission-mutants
 test-cp19-mutants: test-cp19-admission-mutants-switch
+test-cp19-mutants: test-cp19-m12-reachable
 test-cp19-mutants: test-cp19-resource-alloc
 test-cp19-mutants: test-cp19-proof-alloc
 test-cp19-sanitize: test-cp19-session-sanitize

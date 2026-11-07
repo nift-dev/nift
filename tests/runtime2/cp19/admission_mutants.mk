@@ -27,6 +27,15 @@ $(eval $(call CP19_ADMISSION_MUTANT,13,infer_session_location))
 test-cp19-admission-mutants: $(TEST_DIR)/cp19/admission-control $(addprefix $(TEST_DIR)/cp19/admission-m,1 2 3 4 5 6 7 8 9 10 11 12 13)
 	$(PYTHON) tests/runtime2/cp19/admission_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --out "$(TEST_DIR)/cp19/admission-mutants.json"
 
+# B5 23 (b5-refsem.md 13.1, owner 2026-11-07 15:25): m12's permanent reachable-path probe. It
+# builds an instrumented production CLI and the m12 CLI in a temporary directory (deleted), shows
+# the may_call call site is reached (session closures capturing a mutex/channel/atomic parameter)
+# with production's may_call already true, and that production and m12 give identical results.
+.PHONY: test-cp19-m12-reachable
+test-cp19-m12-reachable: export PYTHONDONTWRITEBYTECODE := 1
+test-cp19-m12-reachable: $(TARGET)
+	$(PYTHON) -I tests/runtime2/cp19/m12_reachable.py --nift "$(CURDIR)/$(TARGET)"
+
 $(TEST_DIR)/cp19/admission-sanitize: tests/runtime2/cp19/admission_mutants.cpp $(CP19_EXPR_SAN_OBJECTS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@

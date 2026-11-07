@@ -1,0 +1,4 @@
+fn(id(v)){return v};fn(mk()){f:=id(ofstream("o.txt"));return ()=>f};c:=mk()
+y:=c
+print("ok")
+exit

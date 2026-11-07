@@ -1,0 +1,4 @@
+fn(mk(h)){g:=()=>h;return {"g":g,"n":()=>1}};o:=mk(channel());w:=o.n()
+v:=o.n()
+print(v)
+exit

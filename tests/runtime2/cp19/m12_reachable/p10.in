@@ -1,0 +1,4 @@
+fn(ap(g)){return g(1)};fn(mk2(h)){return v=>{q:=h;return v+1}};c:=mk2(atomic<int>(1));w:=ap(c)
+z:=ap(c)
+print(z)
+exit

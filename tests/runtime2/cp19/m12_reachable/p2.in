@@ -1,0 +1,4 @@
+fs:=[];for(h:[ofstream("o.txt")]){fs.push(()=>h)};x:=1
+y:=fs
+print("ok")
+exit

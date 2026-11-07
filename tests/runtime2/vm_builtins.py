@@ -188,6 +188,15 @@ SUPPORTED = {
 # (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
 SUPPORTED_TOP = [
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n"),
+    # B5 23 (b5-refsem.md 13.4; originals docs/runtime-2/evidence/b5/vm-builtins-originals.json):
+    # w3-mixed was UNSUPPORTED "builtin-receiver:empty" (CP14 W3). B4a's Dynamic admission
+    # (owner B4 ruling 2026-11-06 01:09, b4-dispatch.md section 1: a closed string|array union,
+    # each family's own `empty`) compiles it since 17f7964c; legacy-equal (`false`, `false`).
+    ("w3-mixed", 'fn(f(x)) { return x.empty() }\nprint(f("a"))\nprint(f([1]))\n'),
+    # f4-sort was UNSUPPORTED "reference-guard:shared" (Phase A guard, D-NEXT-refsem #1). B5:
+    # the guard is deleted (owner 2026-11-02) and `b := a.sort()` is the receiver itself
+    # (APPROVED 2026-11-07 14:00); `b.size()` is 2 either way: legacy-equal.
+    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n"),
     # The one place the two readings meet: JSON except for one fallback
     # spelling (`.5`). As JSON `-0` stays -0; read as Nift it is 0.
     ("w9-meet", 'jn := {"a": 0.10, "b": -0, "c": 0.5}\nfb := {"a": 0.10, "b": -0, "c": .5}\n'
@@ -270,7 +279,7 @@ UNSUPPORTED = [
     ("w4-get-default", 'fn(f()) { print("f")\nreturn 1 }\no := {"a": 1}\nprint(o.get("a", f()))\n',
      "builtin-default:get"),
     # W3 receiver kinds.
-    ("w3-mixed", 'fn(f(x)) { return x.empty() }\nprint(f("a"))\nprint(f([1]))\n', "builtin-receiver:empty"),
+    # (w3-mixed, formerly "builtin-receiver:empty": supported since B4a, see SUPPORTED_TOP.)
     ("w3-family", 's := "a"\nprint(s.keys())\n', "builtin-receiver:keys"),
     ("q8-index-of-array", "a := [1]\nprint(a.index_of(1))\n", "builtin-receiver:index_of"),
     ("q4-number-to-double", "x := 2\nprint(x.to_double())\n", "builtin-receiver:to_double"),
@@ -313,10 +322,8 @@ UNSUPPORTED = [
     ("n-q2-abs-arity", "x := -2\nprint(x.abs(1))\n", "builtin-arity:abs"),
     ("cp16-replace-once", 's := "aa"\nprint(s.replace_once("a", "b"))\n', "method:replace_once"),
     # D-063 (base candidate): stack() compiles since the weekend collections;
-    # the cp17-collection refusal entry is retired. D-NEXT-refsem #1: sort()
-    # returns its receiver, so `b := a.sort()` would alias `a` in Phase B: the
-    # guard refuses it (it was a supported F4 program).
-    ("f4-sort", "a := [2, 1]\nb := a.sort()\nprint(b.size())\n", "reference-guard:shared"),
+    # the cp17-collection refusal entry is retired. (f4-sort, refused
+    # "reference-guard:shared" by the Phase A guard: supported again in B5, see SUPPORTED_TOP.)
 ]
 
 
@@ -350,6 +357,19 @@ def check(nift, work, kind, name, source, reason, timeout):
             f.write(source)
         legacy, _ = run(nift, d, None, timeout)
         _, cst = run(nift, d, "classify", timeout)
+        if kind == "pinned":  # B5 approved difference: legacy's output with the pinned line changed
+            old, new, n = reason
+            if not cst or cst["outcome"] != "compiled":
+                return f"{name}: not compiled ({cst and cst['reason']})"
+            vm, st = run(nift, d, "require", timeout)
+            if not st or st["outcome"] != "vm":
+                return f"{name}: expected outcome vm, got {st and (st['outcome'], st['reason'])}"
+            lo = legacy[0].decode()
+            if legacy[2] != 0 or lo.count(old) != n:
+                return f"{name}: legacy no longer prints {old!r} {n} times (stale pin): {legacy}"
+            if vm != (lo.replace(old, new).encode(), legacy[1], legacy[2]) or vm[0].decode().count(new) != n:
+                return f"{name}: not the pinned B5 result (first() returns the element)\n  legacy {legacy}\n  vm     {vm}"
+            return None
         if kind in ("supported", "error"):
             if not cst or cst["outcome"] != "compiled":
                 return f"{name}: not compiled ({cst and cst['reason']})"
@@ -428,11 +448,17 @@ def budget_checks(nift, work, timeout):
 # checked method argument and reports the method's type message, in loop code
 # the fault itself; a checked argument that can fault (`q.split(h.sep)`: a
 # member read) is refused there. The same bodies stay supported in loop code.
-# D-NEXT-refsem #1: in loop contexts `shapes` reaches the Phase A guard (its
-# `head := h.l.first(); head.push(9)` would change h in Phase B).
-REFUSED_IN_CONTEXT = {("shapes", "loop"): "reference-guard:inflow", ("shapes", "fn-loop"): "reference-guard:inflow",
-                      ("shapes", "top"): "builtin-arg-fault-context", ("shapes", "if"): "builtin-arg-fault-context",
+# D-NEXT-refsem #1: in loop contexts `shapes` reached the Phase A guard (its
+# `head := h.l.first(); head.push(9)` changes h in Phase B), refused "reference-guard:inflow"
+# until 17f7964c. B5 23 (b5-refsem.md 13.4): the guard is deleted (owner 2026-11-02) and
+# `first()` returns the element itself (Extraction, compatibility row APPROVED by the owner
+# 2026-11-07 15:25), so `h.l` becomes [[1,2,9],[3]]: an approved difference from legacy
+# ([[1,2],[3]]), pinned in B5_PINNED_IN_CONTEXT; every other line must stay legacy-equal.
+REFUSED_IN_CONTEXT = {("shapes", "top"): "builtin-arg-fault-context", ("shapes", "if"): "builtin-arg-fault-context",
                       ("shapes", "fn-top"): "builtin-arg-fault-context"}
+# (body, context) -> (legacy line, B5 line, occurrences): the approved first()-element difference.
+B5_PINNED_IN_CONTEXT = {("shapes", "loop"): ("[[1,2],[3]]\n", "[[1,2,9],[3]]\n", 2),
+                        ("shapes", "fn-loop"): ("[[1,2],[3]]\n", "[[1,2,9],[3]]\n", 2)}
 
 
 def items():
@@ -441,8 +467,9 @@ def items():
         for ctx, template in CONTEXTS.items():
             indented = "".join("  " + line + "\n" for line in body.splitlines()) if ctx != "top" else body
             reason = REFUSED_IN_CONTEXT.get((body_name, ctx))
-            out.append(("unsupported" if reason else "supported", f"{body_name}@{ctx}", template.format(body=indented),
-                        reason))
+            pinned = B5_PINNED_IN_CONTEXT.get((body_name, ctx))
+            kind = "unsupported" if reason else "pinned" if pinned else "supported"
+            out.append((kind, f"{body_name}@{ctx}", template.format(body=indented), reason or pinned))
     out += [("supported", n, s, None) for n, s in SUPPORTED_TOP]
     out += [("error", n, s, None) for n, s in ERRORS]
     out += [("unsupported", n, s, r) for n, s, r in UNSUPPORTED]
@@ -467,10 +494,11 @@ def main():
         shutil.rmtree(work, ignore_errors=True)
     for f in failures:
         print("FAIL " + f)
-    count = {k: sum(1 for i in todo if i[0] == k) for k in ("supported", "error", "unsupported")}
+    count = {k: sum(1 for i in todo if i[0] == k) for k in ("supported", "pinned", "error", "unsupported")}
     print(("PASS" if not failures else "FAIL") + f" vm built-ins: {count['supported']} supported programs "
-          f"({len(SUPPORTED)} bodies x {len(CONTEXTS)} contexts less {len(REFUSED_IN_CONTEXT)} refused there, "
-          f"on the VM, identical to legacy), "
+          f"({len(SUPPORTED)} bodies x {len(CONTEXTS)} contexts less {len(REFUSED_IN_CONTEXT)} refused there "
+          f"and {len(B5_PINNED_IN_CONTEXT)} pinned, plus {len(SUPPORTED_TOP)} top-level, "
+          f"on the VM, identical to legacy), {count['pinned']} pinned B5 differences (first() element), "
           f"{count['error']} error programs, {count['unsupported']} refusals, {len(BUDGET)} budget stops; "
           f"{len(failures)} failure(s)")
     return 1 if failures else 0

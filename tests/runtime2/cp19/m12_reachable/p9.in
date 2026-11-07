@@ -1,0 +1,4 @@
+fn(mk2(h)){return {"f":v=>{q:=h;return v}}};o:=mk2(channel());w:=o.f(1)
+z:=o.f(2)
+print(z)
+exit

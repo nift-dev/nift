@@ -1,0 +1,4 @@
+fn(mk(h)){return ()=>1+0*0};fn(mk2(h)){return v=>{q:=h;return v}};c:=mk2(mutex());w:=c(1)
+z:=c(2)
+print(z)
+exit

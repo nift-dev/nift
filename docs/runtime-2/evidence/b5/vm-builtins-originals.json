@@ -1,0 +1,193 @@
+{
+ "description": "B5 final fix-up (b5-refsem.md 13.4): the 4 vm_builtins cases that failed on B5 at 3c9c66f4 (3 of them, plus w3-mixed, on 17f7964c: w3-mixed failed there too). Original expectation, legacy (NIFT_VM=0, B5 binary), 17f7964c (NIFT_VM=classify, require, 1), B5 (classify, require, 1), the conversion made and the rule. The original harness is tests/runtime2/vm_builtins.py at 3c9c66f4 (git show 3c9c66f4:tests/runtime2/vm_builtins.py).",
+ "cases": [
+  {
+   "recipe_line": "vm_builtins.py",
+   "case": "shapes@loop",
+   "source": "i0 := 0\nwhile (i0 < 2) {\n  i0 += 1\n  h := {\"s\": \" a,b \", \"l\": [[1, 2], [3]], \"sep\": \",\"}\n  print(h.s.trim())\n  print(h.l[0].sum())\n  q := h.s\n  sep := h.sep\n  sp := q.split(sep)\n  print(sp.stringify())\n  sp2 := q.split(h.sep)\n  print(sp2.stringify())\n  print(h.l[1].contains(3))\n  w := \" x \"\n  print(w.trim() + \"|\" + w.to_upper())\n  print(html_escape(h.s.trim()))\n  head := h.l.first()\n  head.push(9)\n  print(h.l.stringify())\n}\n",
+   "sha256": "063ace917215bbbfe9f4b8a7d136c72ef08e8a36632dd19f34dd0e27fe74ea8d",
+   "original_expectation": "UNSUPPORTED in context: refused before execution, reason reference-guard:inflow (REFUSED_IN_CONTEXT)",
+   "legacy": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c_classify": [
+    "fallback",
+    "reference-guard:inflow"
+   ],
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:17:11: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": "require-error"
+   },
+   "b4b_17f7964c_vm1": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "fallback"
+   },
+   "b5_classify": [
+    "compiled",
+    ""
+   ],
+   "b5_require": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b5_vm1": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "conversion": "moved to B5_PINNED_IN_CONTEXT: compiled, NIFT_VM=require outcome vm, output = legacy's with each of the 2 lines [[1,2],[3]] replaced by [[1,2,9],[3]]; fails if legacy starts to print the B5 line (stale pin)",
+   "rule": "first() returns the element itself (Extraction; compatibility.md row APPROVED by the owner 2026-11-07 15:25), after guard removal (owner 2026-11-02): head.push(9) mutates h.l[0]. The only difference from legacy; every other line legacy-equal"
+  },
+  {
+   "recipe_line": "vm_builtins.py",
+   "case": "shapes@fn-loop",
+   "source": "fn(w0()) {\n  h := {\"s\": \" a,b \", \"l\": [[1, 2], [3]], \"sep\": \",\"}\n  print(h.s.trim())\n  print(h.l[0].sum())\n  q := h.s\n  sep := h.sep\n  sp := q.split(sep)\n  print(sp.stringify())\n  sp2 := q.split(h.sep)\n  print(sp2.stringify())\n  print(h.l[1].contains(3))\n  w := \" x \"\n  print(w.trim() + \"|\" + w.to_upper())\n  print(html_escape(h.s.trim()))\n  head := h.l.first()\n  head.push(9)\n  print(h.l.stringify())\n  return 0\n}\ni0 := 0\nwhile (i0 < 2) { print(w0()); i0 += 1 }\n",
+   "sha256": "5059eee668c3f04f1f7e08ae87b8edc70bb7f690f52483d29fa5494298056dcb",
+   "original_expectation": "UNSUPPORTED in context: refused before execution, reason reference-guard:inflow (REFUSED_IN_CONTEXT)",
+   "legacy": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n0\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c_classify": [
+    "fallback",
+    "reference-guard:inflow"
+   ],
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:15:11: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": "require-error"
+   },
+   "b4b_17f7964c_vm1": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n0\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2],[3]]\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "fallback"
+   },
+   "b5_classify": [
+    "compiled",
+    ""
+   ],
+   "b5_require": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n0\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b5_vm1": {
+    "stdout": "a,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n0\na,b\n3\n[\" a\",\"b \"]\n[\" a\",\"b \"]\ntrue\nx| X \na,b\n[[1,2,9],[3]]\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "conversion": "moved to B5_PINNED_IN_CONTEXT: compiled, NIFT_VM=require outcome vm, output = legacy's with each of the 2 lines [[1,2],[3]] replaced by [[1,2,9],[3]]; fails if legacy starts to print the B5 line (stale pin)",
+   "rule": "first() returns the element itself (Extraction; compatibility.md row APPROVED by the owner 2026-11-07 15:25), after guard removal (owner 2026-11-02): head.push(9) mutates h.l[0]. The only difference from legacy; every other line legacy-equal"
+  },
+  {
+   "recipe_line": "vm_builtins.py",
+   "case": "w3-mixed",
+   "source": "fn(f(x)) { return x.empty() }\nprint(f(\"a\"))\nprint(f([1]))\n",
+   "sha256": "a0c42b0219ec5c6a635a4d4e88813df6f420fb2ae9722dcf129e8de9e606394a",
+   "original_expectation": "UNSUPPORTED: refused before execution, reason builtin-receiver:empty (CP14 W3)",
+   "legacy": {
+    "stdout": "false\nfalse\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c_classify": [
+    "compiled",
+    ""
+   ],
+   "b4b_17f7964c": {
+    "stdout": "false\nfalse\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b4b_17f7964c_vm1": {
+    "stdout": "false\nfalse\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b5_classify": [
+    "compiled",
+    ""
+   ],
+   "b5_require": {
+    "stdout": "false\nfalse\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b5_vm1": {
+    "stdout": "false\nfalse\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "conversion": "moved to SUPPORTED_TOP: compiled, NIFT_VM=require identical to legacy",
+   "rule": "B4a Dynamic admission (owner B4 ruling 2026-11-06 01:09; b4-dispatch.md section 1): a closed string|array receiver union, each family's own empty(); admitted already at 17f7964c (the expectation was stale before B5, failing there too). Not a B5 rule; legacy-equal"
+  },
+  {
+   "recipe_line": "vm_builtins.py",
+   "case": "f4-sort",
+   "source": "a := [2, 1]\nb := a.sort()\nprint(b.size())\n",
+   "sha256": "a2b9dd460750cdf806ebf0181ea9e2976742f8f9ddf942eca9c790f846655c79",
+   "original_expectation": "UNSUPPORTED: refused before execution, reason reference-guard:shared (Phase A guard, D-NEXT-refsem #1)",
+   "legacy": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": null
+   },
+   "b4b_17f7964c_classify": [
+    "fallback",
+    "reference-guard:shared"
+   ],
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:2:6: not compiled for the VM (reference-guard:shared): an array or object use whose output would change once arrays and objects are references (shared) is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+    "exit": 1,
+    "outcome": "require-error"
+   },
+   "b4b_17f7964c_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "fallback"
+   },
+   "b5_classify": [
+    "compiled",
+    ""
+   ],
+   "b5_require": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "b5_vm1": {
+    "stdout": "2\n",
+    "stderr": "",
+    "exit": 0,
+    "outcome": "vm"
+   },
+   "conversion": "moved to SUPPORTED_TOP: compiled, NIFT_VM=require identical to legacy",
+   "rule": "guard removal (owner 2026-11-02: arrays/objects are shared references, no replacement static guard); b := a.sort() returns the receiver itself (APPROVED 2026-11-07 14:00), b.size() is 2 either way; legacy-equal"
+  }
+ ]
+}

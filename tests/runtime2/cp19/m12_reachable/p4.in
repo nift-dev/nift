@@ -1,0 +1,4 @@
+fn(mk(h)){n:=1;return {"a":()=>h,"b":()=>n}};o:=mk(mutex());x:=o.b()
+y:=o.b()
+print(y)
+exit

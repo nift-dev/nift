@@ -1,0 +1,4 @@
+fn(mk(h)){return ()=>h};c:=mk(mutex());x:=1
+fn(use(f)){return 1};y:=use(c)
+print(y)
+exit

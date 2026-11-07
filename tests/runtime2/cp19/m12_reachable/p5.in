@@ -1,0 +1,4 @@
+m:=mutex();fn(mk(h)){return ()=>h};c:=mk(m)
+z:=c
+print("ok")
+exit

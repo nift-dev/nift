@@ -1,0 +1,4 @@
+fn(mk(h)){return ()=>h};c:=mk(ofstream("o.txt"));x:=1
+y:=c
+print("ok")
+exit
