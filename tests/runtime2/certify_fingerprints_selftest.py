@@ -51,7 +51,7 @@ TABLE = {
         "wording": [("note: please report unsupported programs at", "note: report unsupported programs to")],
     },
     "test-sha256": {
-        "count_source": 'none: `fail=1` is a flag, not a count',
+        "count_source": 'own: the unit steps\' `sha256 unit: N checks, M failures` lines (the builtins step prints `fail=1`, a flag)',
         "new": [("PASS number rejected", "FAIL number rejected (expected 'error', got '')")],
         "diag": [("FAIL line endings not normalised (expected 'false', got '')",
                   "FAIL line endings not normalised (expected 'false', got 'true')")],
@@ -195,6 +195,14 @@ INSERTIONS = {
     "C++ assertion": "nift: src/rt/vm.cpp:10: void f(): Assertion `x' failed.",
     "sanitizer": "==123==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000010",
     "timeout": "subprocess.TimeoutExpired: Command '['nift']' timed out after 30 seconds",
+    # C2 (confirmation of C20)
+    "uncaught C++ exception": "terminate called after throwing an instance of 'std::bad_alloc'\n  what():  std::bad_alloc",
+    "ThreadSanitizer": "WARNING: ThreadSanitizer: data race (pid=4242)",
+    "ASan warning": "==7==WARNING: AddressSanitizer: failed to allocate 0x1000 bytes",
+    "UBSan": "src/rt/vm.cpp:12:5: runtime error: signed integer overflow: 2147483647 + 1",
+    "MemoryError": "MemoryError",
+    "dotted exception": "subprocess.CalledProcessError: Command '['nift', 'x.f']' returned non-zero exit status 3.",
+    "dotted decoder exception": "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
 }
 
 

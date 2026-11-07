@@ -243,6 +243,10 @@ BUILD_OK = {'build_rc': 0, 'cxx_resolved': '/usr/bin/x86_64-linux-gnu-g++-15', '
             'build_sig': {'resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'version-sha256': 'aa' * 32,
                           'args': ['-include', 'src/build/production_tu.h'] + PROFILE['flags'].split()}}
 EXP = BUILD_OK['build_sig']['args']
+CC_OK = {'cxx_identity': {'path': '/usr/bin/x86_64-linux-gnu-g++-15', 'elf': True, 'sha256': 'aa' * 32,
+                          'package': 'g++-15-x86-64-linux-gnu', 'version': PROFILE['compiler_version_contains']},
+         'cc_identity': {'path': '/usr/bin/x86_64-linux-gnu-gcc-15', 'elf': True, 'sha256': 'bb' * 32,
+                         'package': 'gcc-15-x86-64-linux-gnu', 'version': PROFILE['compiler_version_contains']}}
 C_ARGS = ['-Imarkuppp/vendor/cmark', '-std=c99', '-O2', '-Wall', '-Wextra', '-pedantic']
 C_OK = {'build_sig_c': {'resolved': '/usr/bin/gcc-15', 'args': C_ARGS}, 'expected_args_c': C_ARGS,
         'cc_resolved': '/usr/bin/gcc-15'}
@@ -386,6 +390,15 @@ checks = [
         ('build: C block missing', {**BUILD_OK, **C_OK, 'build_sig_c': None}, 1),
         ('build: untracked header under include/', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': ['include/bits/stl_algo.h']}}, 1),
         ('build: git ls-files failed', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': None}}, 1),
+        # C21 (confirmation of C20, release audit): the compilers themselves, branch variables, link line
+        ('build: compilers pinned', {**BUILD_OK, **CC_OK}, 0),
+        ('build: $CXX is a wrapper script', {**BUILD_OK, **CC_OK, 'cxx_identity': {**CC_OK['cxx_identity'], 'elf': False}}, 1),
+        ('build: $CC from another package', {**BUILD_OK, **CC_OK, 'cc_identity': {**CC_OK['cc_identity'],
+            'package': 'gcc-15-x86-64-linux-gnu', 'version': '15.2.0-4ubuntu4'}}, 1),
+        ('build: OS=Windows_NT from the environment', {**BUILD_OK, 'makefile_env': {'OS': 'Windows_NT'}}, 1),
+        ('build: link line differs', {**BUILD_OK, 'link': {'as_built': 'g++ ;; -static', 'own': 'g++ ;; '}}, 1),
+        ('build: link line not derivable', {**BUILD_OK, 'link': {'as_built': None, 'own': None}}, 1),
+        ('build: link line equal', {**BUILD_OK, 'link': {'as_built': 'g++ ;; x', 'own': 'g++ ;; x'}}, 0),
         # R4-6: minimum versions
         ('tools: go below 1.26', {'tools': {'go': 'go version go1.24.7 linux/amd64'}}, 1),
         ('tools: go 1.26', {'tools': {'go': 'go version go1.26.0 linux/amd64'}}, 0),
@@ -572,6 +585,18 @@ toy3 bb 0 FAILED-BASELINE "every applicable regression baseline"
 mkdir -p "$TOY/bc/r1"; printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n' > "$TOY/bc/r1/Makefile"
 toy "$TOY/bc/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bc/v4" test-sha256 "$SHA_FAIL"
 toy3 bc 0 FAILED-BASELINE "LEGACY-ONLY"
+# C1 (confirmation of C20, toy11): a missing prerequisite is not a missing target, and a harness-
+# blocked baseline is no evidence: both are applicable and differing, never "not applicable"
+toy "$TOY/bd/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r2" test-sha256 "$SHA_FAIL"
+sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bd/r2/Makefile"
+toy3 bd 1 FAILED-NEW "weekend/r2: applicable"
+SHA_BLOCKED='echo "bash tests/sha256_builtins.sh"; echo "SKIP UNVERIFIED COMPARATOR COVERAGE: x"; exit 1'
+toy "$TOY/be/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r2" test-sha256 "$SHA_BLOCKED"
+toy3 be 1 FAILED-NEW "weekend/r2: applicable, cannot run there"
+# every regression baseline blocked or unbuildable, v4.12.0 equal: never LEGACY-ONLY
+toy "$TOY/bf/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/v4" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/r1" test-sha256 "$SHA_BLOCKED"
+toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"; sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile"
+toy3 bf 1 FAILED-NEW "17f7964c: applicable, cannot run there"
 toyrun n1 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n2 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n3 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW

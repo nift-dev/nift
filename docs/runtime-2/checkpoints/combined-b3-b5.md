@@ -910,3 +910,39 @@ each can run there is decided by the campaign):
 | test-v44-shell-restricted, test-v46-relative-imports, test-v44-packages, test-test-integrity | target present | target present | target present (not used: regression baselines apply) |
 | cp25r-inventory, test-cp19-s1-dispatch, test-rt-host-mutants, test-rt-parser, test-runtime2-cp01-simplify, test-runtime2-cp03-simplify, test-runtime2-rt-diff-selftest, test-runtime2-scanner-parity, test-sha256 | target present | target present | no target |
 | test-v44-language-foundation, test-rt-vm, test-runtime2-host-deps (stopped) | target present | target present | language-foundation present; the others absent |
+
+## 19. Confirmation of C20 (965d2a2a): CONFIRMED-WITH-CONDITIONS; fixes (C21)
+
+Harness only; `src/` and the binary (`91a49efa…`) unchanged.
+
+**C1 (fixed): applicability.** A regression baseline is not applicable only when make says its own
+Makefile has no rule for the gate itself (`No rule to make target '<gate>'.`, with `  Stop.`
+without `-k`, nothing after the name). A missing prerequisite (`…, needed by '<gate>'`) and a
+harness-blocked baseline log (comparator SKIP, missing oracle, missing tool) are applicable and
+differing: they give no evidence and never support FAILED-BASELINE. So LEGACY-ONLY happens only
+when every regression baseline genuinely lacks the target. The v4.12.0 baseline uses the same
+target test. Guard toy controls: bd (the review's toy11: equal on 17f7964c, weekend/r2 with a
+missing prerequisite → FAILED-NEW), be (toy11 r3: weekend/r2 harness-blocked → FAILED-NEW), bf
+(every regression baseline blocked or unbuildable, v4.12.0 equal → FAILED-NEW, not LEGACY-ONLY).
+
+**C2 (fixed): diagnostic list.** Added: an uncaught C++ exception (`terminate called after
+throwing an instance of '…'` and its `what():` line), sanitizer WARNING reports (ThreadSanitizer,
+AddressSanitizer), and exception names that are dotted or bare (`^\w+(\.\w+)*(Error|Exception)\b`,
+with or without a message or a Traceback: `subprocess.CalledProcessError: …`,
+`json.decoder.JSONDecodeError: …`, `MemoryError`); UBSan `runtime error:` was already matched.
+The selftest now inserts 14 diagnostics at both positions on all 13 gates (26 positions each);
+454 checks. Cross-run equality rechecked: unchanged.
+
+**Release-audit items fixed.**
+- The compilers are pinned themselves: the real path of `$CXX` and `$CC` must be an ELF binary (a
+  wrapper script is refused) owned by a `g++-15` / `gcc-15` package at the profile's version
+  (15.2.0-16ubuntu1), from `dpkg -S` and `dpkg-query`. Their sha256 is recorded in every result's
+  environment (`compiler_sha256`, `cc_sha256`).
+- Every variable a Makefile conditional tests (OS, LIBNIFT_C_EXPORTS, NIFT_DRY, …) is refused
+  from the environment like the `?=` variables; `OS=Windows_NT` would switch to static libstdc++,
+  `.exe` and other link flags. The link line's variables (`$(CXX) $(CXXFLAGS) $(LDFLAGS)
+  $(LDLIBS) $(TARGET)`) as the campaign's make sees them must equal make's own derivation.
+- test-sha256's own count is its unit steps' `sha256 unit: N checks, M failures` lines (the
+  builtins step prints `fail=1`, a flag).
+Guard cases: wrapper script, other compiler package, OS=Windows_NT, link line differs or cannot be
+derived.

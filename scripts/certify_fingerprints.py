@@ -52,14 +52,20 @@ DIAGNOSTICS = [
     ("refusal", re.compile(_LOC + r"not compiled for the VM \((?P<d>[^)]+)\)")),
     ("refusal", re.compile(_LOC + r"NIFT_VM session refused: (?P<d>[\w-]+:[^:\s]+):")),
     ("internal-failure", re.compile(_LOC + r"NIFT_VM internal failure: (?P<d>[^(\n]+?)(?: \(|$)", re.M)),
-    ("sanitizer", re.compile(r"ERROR: (?P<d>\w+Sanitizer: [\w-]+)")),
+    # C2 (confirmation of C20): ThreadSanitizer reports are WARNINGs; ASan can warn too
+    ("sanitizer", re.compile(r"(?:ERROR|WARNING): (?P<d>\w+Sanitizer: [\w-]+)")),
     ("sanitizer", re.compile(r"(?P<file>[\w.-]+):(?P<line>\d+):(?P<col>\d+): runtime error: (?P<d>[^\n]+)")),
     ("assertion", re.compile(r"(?P<d>Assertion [`'][^\n]*?['] failed)")),
+    # C2: an uncaught C++ exception (std::bad_alloc, ...): no "Aborted" when run as a subprocess
+    ("uncaught-exception", re.compile(r"terminate called after throwing an instance of '(?P<d>[^'\n]+)'")),
+    ("uncaught-exception", re.compile(r"^\s*what\(\):\s*(?P<d>[^\n]*)$", re.M)),
     ("crash", re.compile(r"\b(?P<d>Segmentation fault|Aborted|Bus error|Floating point exception|Illegal instruction"
                          r"|Killed|Terminated)\b")),
     ("timeout", re.compile(r"(?P<d>timed out|TimeoutExpired)")),
     ("traceback", re.compile(r"^(?P<d>Traceback) \(most recent call last\):", re.M)),
-    ("exception", re.compile(r"^(?P<e>\w+(?:Error|Exception)): (?P<d>.*)$", re.M)),
+    # C2: dotted names (subprocess.CalledProcessError, json.decoder.JSONDecodeError) and bare ones
+    # (MemoryError), with or without a Traceback before them
+    ("exception", re.compile(r"^(?P<e>\w+(?:\.\w+)*(?:Error|Exception))\b(?::[ \t]*(?P<d>[^\n]*))?$", re.M)),
 ]
 _STATUS = re.compile(r"\(exit (-?\d+)\)|\(rc=(-?\d+)\)|\bexit (-?\d+) != (-?\d+)|\brc=(-?\d+)")
 _MAKE_TOP = re.compile(r"^make: \*\*\* \[(?:[^\]:]*:\d+: )?([^\]]+)\] (.+)$")
@@ -76,7 +82,7 @@ def matches(text, roots=()):
             g = m.groupdict()
             where = f"@{g['file']}:{g['line']}:{g['col']}" if g.get("file") and g.get("line") else (
                 f"@{g['file']}" if g.get("file") else "")
-            found.append((m.start(), cat, (f"{g['e']}: " if g.get("e") else "") + narrow(g["d"], roots) + where))
+            found.append((m.start(), cat, (f"{g['e']}: " if g.get("e") else "") + narrow(g.get("d") or "", roots) + where))
     return [(c, d) for _, c, d in sorted(found)]
 
 
@@ -120,7 +126,7 @@ SPECS = {
     "test-runtime2-cp03-simplify": Spec([_FAILLINE], abort=True),
     # bad "$1 (expected '$2', got '$3')": $3 may span lines, so the id ends at " (expected '"
     "test-sha256": Spec([r"^FAIL (?P<id>.+?) \((?P<detail>expected '.*)$", _FAILLINE],
-                        lines=r"^FAIL "),
+                        lines=r"^FAIL ", count=r"^sha256 unit: \d+ checks, (?P<n>\d+) failures\b"),
     "test-runtime2-cp01-simplify": Spec([r"^\s*FAIL (?P<id>S\w+|settle|shared \w+ repair|syscalls \S+|\.nift file count)"
                                          r"(?::? (?P<detail>.*))?$"], summary=[r"^FAILS \(\d+\):$"],
                                         count=r"^FAILS \((?P<n>\d+)\):$"),

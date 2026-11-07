@@ -74,6 +74,7 @@ tests/runtime2/certification_guard.sh	detected	-	'note: running as root; unreada
 tests/runtime2/certification_guard.sh	detected	-	'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
 tests/runtime2/certification_guard.sh	justified	the guard's own heredoc opener for this scan, not a message	python3 -B - <<'PYSKIP' || exit 1
 tests/runtime2/certification_guard.sh	detected	-	fake = ('tests/runtime2/new_gate.sh', 'echo "SKIP new check (tool missing)"')
+tests/runtime2/certification_guard.sh	detected	-	SHA_BLOCKED='echo "bash tests/sha256_builtins.sh"; echo "SKIP UNVERIFIED COMPARATOR COVERAGE: x"; exit 1'
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s1/cand" test-rt-partial 'echo "running tests/runtime2/read_limit.py"; echo "PASS limits"; echo "SKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)"; exit 0'
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s2/cand" test-rt-skipall 'echo "running tests/refs.sh"; echo "SKIP package refs/local lock (git unavailable)"; exit 0'
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s3/cand" test-rt-platform 'echo "running tests/w.py"; echo "PASS w"; echo "SKIP CP20 Windows pipeline (POSIX host)"; exit 0'

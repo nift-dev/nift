@@ -485,6 +485,13 @@ def failure_identity(text, roots=(), rc=None):
     return (failure_signature(text), codes or (rc,), sigs, fails, tail)
 
 
+def lacks_target(text, target):
+    """C1 (confirmation of C20): make's own message that the Makefile has no rule for the gate itself
+    (`No rule to make target 'T'.`, with `  Stop.` without -k), not for a prerequisite
+    (`No rule to make target 'P', needed by 'T'.`)."""
+    return re.search(r"^make: \*\*\* No rule to make target '" + re.escape(target) + r"'\.(?:  Stop\.)?$", text, re.M) is not None
+
+
 def same_failure(a, b):
     return a is not None and b is not None and a == b
 
@@ -590,6 +597,24 @@ def preflight_problems(f):
                 out.append(f"the C objects' arguments {c.get('args')} differ from the Makefile's {f['expected_args_c']}")
             if f.get("cc_resolved") and c.get("resolved") != f["cc_resolved"]:
                 out.append(f"the C objects were built by {c.get('resolved')}, not $CC ({f['cc_resolved']})")
+    # C21: the link line is the Makefile's own (no environment or branch variable changes it)
+    if "link" in f:
+        lk = f["link"]
+        if lk.get("as_built") is None or lk.get("own") is None:
+            out.append("cannot derive the link line from the Makefile (make --eval failed)")
+        elif lk["as_built"] != lk["own"]:
+            out.append(f"the link line differs from the Makefile's own ({lk['as_built']!r} vs {lk['own']!r})")
+    # C21: the compilers themselves: ELF binaries owned by the profile's g++-15/gcc-15 packages
+    want_ver = (f.get("profile") or {}).get("compiler_version_contains")
+    for key, pkg in (("cxx_identity", "g++-15"), ("cc_identity", "gcc-15")):
+        ident = f.get(key)
+        if ident is None:
+            continue
+        if ident.get("elf") is not True:
+            out.append(f"{ident.get('path')} is not an ELF compiler (a wrapper script?): the compiler must be pinned itself")
+        if not (ident.get("package") or "").startswith(pkg) or (want_ver and ident.get("version") != want_ver):
+            out.append(f"{ident.get('path')} is owned by {ident.get('package')} {ident.get('version')}, "
+                       f"not {pkg} {want_ver}")
     if f.get("make_env"):
         out.append(f"make flag variables are set in the environment ({sorted(f['make_env'])}): they can override "
                    f"the build's variables (GNUMAKEFLAGS='CXXFLAGS=-O0' would reach both the build and the derivation)")
@@ -779,11 +804,39 @@ ENV_ALLOWED = ("CXX", "CC", "CXXFLAGS")
 
 
 def makefile_env_vars(root):
+    """`?=` variables, and (C21) every variable a Makefile conditional tests (OS=Windows_NT selects
+    the Windows branch: static libstdc++, .exe, other LDFLAGS)."""
     try:
         text = (Path(root) / "Makefile").read_text()
     except OSError:
         return []
-    return sorted(set(re.findall(r"^\s*([A-Za-z_]\w*)\s*\?=", text, re.M)))
+    names = set(re.findall(r"^\s*([A-Za-z_]\w*)\s*\?=", text, re.M))
+    for line in re.findall(r"^\s*(?:ifn?eq|ifn?def)\b.*$", text, re.M):
+        names |= set(re.findall(r"\$\(([A-Za-z_]\w*)\)", line))
+        m = re.match(r"\s*ifn?def\s+([A-Za-z_]\w*)", line)
+        if m:
+            names.add(m.group(1))
+    return sorted(names)
+
+
+def compiler_identity(cmd):
+    """C21 (release audit): the compiler itself, not a wrapper: real path, ELF or not, sha256, and
+    the Debian package and version that own it."""
+    real = os.path.realpath(shutil.which(cmd) or cmd)
+    out = {"path": real, "elf": None, "sha256": None, "package": None, "version": None}
+    try:
+        with open(real, "rb") as fh:
+            out["elf"] = fh.read(4) == b"\x7fELF"
+        out["sha256"] = sha256_of(real)
+    except OSError:
+        return out
+    owner = subprocess.run(["dpkg", "-S", real], capture_output=True, text=True)
+    if owner.returncode == 0 and ":" in owner.stdout:
+        pkg = owner.stdout.split(":")[0].strip()
+        out["package"] = pkg
+        ver = subprocess.run(["dpkg-query", "-W", "-f", "${Version}", pkg], capture_output=True, text=True)
+        out["version"] = ver.stdout.strip() if ver.returncode == 0 else None
+    return out
 
 
 def environment_record(root):
@@ -852,6 +905,18 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     facts["expected_args_c"] = fix(sig.stdout.split("---")[1].split()[1:]) if ok else None
     facts["derivation_error"] = None if ok else (f"make --eval exited {sig.returncode}: "
                                                  f"{(sig.stderr or sig.stdout).strip()[:200]}")
+    # C21: the link line's variables as the campaign's make sees them, against make's own (every
+    # environment-settable or branch-selecting variable removed, CXX kept)
+    link_eval = ["make", "-s", "--no-print-directory", "--eval",
+                 "certify-print-link: ; @echo '$(CXX) ;; $(CXXFLAGS) ;; $(LDFLAGS) ;; $(LDLIBS) ;; $(TARGET)'", "certify-print-link"]
+    scrub = set(makefile_env_vars(root)) - {"CXX", "CC"}
+    as_built = subprocess.run(link_eval, cwd=root, capture_output=True, text=True, env=clean_env())
+    own = subprocess.run(link_eval, cwd=root, capture_output=True, text=True,
+                         env={k: v for k, v in clean_env().items() if k not in scrub})
+    facts["link"] = {"as_built": as_built.stdout.strip() if as_built.returncode == 0 else None,
+                     "own": own.stdout.strip() if own.returncode == 0 else None}
+    facts["cxx_identity"] = compiler_identity(cxx)
+    facts["cc_identity"] = compiler_identity(cc)
     facts["build_invocation"] = "make nift (CXX=%s, CXXFLAGS=%s)" % (cxx, os.environ.get("CXXFLAGS", "<Makefile default>"))
     current = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True, env=clean_env())
     facts["build_current"] = current.returncode == 0
@@ -1388,6 +1453,8 @@ def main():
                   "compiler_resolved": facts.get("cxx_resolved"),
                   "stdlib_sha256": (facts.get("profile_files") or {}).get("libstdc++.so"),
                   "binary_sha256": facts.get("candidate_sha256")}
+    env_record["compiler_sha256"] = (facts.get("cxx_identity") or {}).get("sha256")  # C21
+    env_record["cc_sha256"] = (facts.get("cc_identity") or {}).get("sha256")
     for t, r in sorted(results.items()):
         # Gather facts; the verdict comes only from decide(), which is pure and
         # table-tested (tests/runtime2/certification_guard.sh).
@@ -1430,7 +1497,7 @@ def main():
                     blog = logdir / f"{t}.baseline.log"
                     f["base_rc"], _ = run_target(base_dir, t, blog, a.timeout, base_user, olds[t], extra)
                     btext = blog.read_text(errors="replace")
-                    f["base_has_target"] = "No rule to make target" not in btext
+                    f["base_has_target"] = not lacks_target(btext, t)
                     f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
                     f["base_step"] = failure_signature(btext)
                     f["cand_log"] = str(cand_log.relative_to(ROOT))
@@ -1453,12 +1520,16 @@ def main():
                     rlog = logdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
                     rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
                     rtext = rlog.read_text(errors="replace")
-                    # F2 (decision 2026-11-08): applicable = the gate exists there and can run there
-                    if "No rule to make target" in rtext:
+                    # F2 (decision 2026-11-08), C1 (confirmation of C20): not applicable only when the
+                    # baseline's own Makefile has no such target; a missing prerequisite, or a log that
+                    # is harness-blocked there, is applicable and differing (no evidence either way)
+                    if rrc != 0 and lacks_target(rtext, t):
                         r["regression"][name], r["baselines"][name] = None, "not applicable: no such target there"
                         continue
                     if rrc != 0 and blocked_reason(rtext):
-                        r["regression"][name], r["baselines"][name] = None, f"not applicable: cannot run there ({blocked_reason(rtext)})"
+                        r["regression"][name] = False
+                        r["baselines"][name] = f"applicable, cannot run there ({blocked_reason(rtext)}): counts as differing"
+                        r.setdefault("fingerprint_diff", {})[name] = ["the baseline log is harness-blocked"]
                         continue
                     diff = (FP.differences(FP.fingerprint(t, ctext, [ROOT]), FP.fingerprint(t, rtext, [tree]))
                             if rrc != 0 else ["the gate passes on this baseline"])
