@@ -1716,13 +1716,20 @@ def main():
     certify_mode = a.certify or full
     if certify_mode and partial_mandatory:
         lines.append("CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: " + ", ".join(partial_mandatory))
+    # confirmation of c8817214, C2 (D3): a REQUIRED assertion that never executed fails a campaign
+    # whatever its gate's class (FAILED-BASELINE included): the checks a script's abort hid, and
+    # any other required skip of a failing gate. The owner may later accept named hidden checks.
+    unexecuted = sorted(t for t, r in results.items() if r.get("assertion") not in ("PARTIAL", "SKIP")
+                        and any(req for _, _, req in r.get("skipped") or []))
+    if certify_mode and unexecuted:
+        lines.append("CAMPAIGN FAILED: required assertions not executed in: " + ", ".join(unexecuted))
     (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     not_passed = sum(counts[k] for k in classes[:-1])
     if not_passed:
         lines.append(f"NOT CERTIFIED HERE: {not_passed} required gate(s) are not PASSED (only PASSED counts as a pass)")
     (logdir / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    if counts["FAILED-NEW"] or comparator_skipped or (certify_mode and partial_mandatory):
+    if counts["FAILED-NEW"] or comparator_skipped or (certify_mode and (partial_mandatory or unexecuted)):
         return 1
     if counts["BLOCKED"] or counts["NOT-RUN"]:
         return 3

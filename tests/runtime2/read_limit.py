@@ -338,7 +338,7 @@ def sequenced(site, path):
     sys.path.insert(0, str(Path(__file__).resolve().parent / "cp01"))
     import ticks
     ticks.age(str(site))
-    ticks.sequence([str(path)])
+    return ticks.sequence([str(path)])
 
 
 def page_build(work):
@@ -367,6 +367,28 @@ def page_build(work):
           fixed.returncode == 0 and b"GOOD:v2" in (site / "public" / "index.html").read_bytes(), fixed.stdout + fixed.stderr)
     status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
     check("page build: up to date afterwards", "up to date" in status, status)
+    # Direct regression check of the sequencing (confirmation of c8817214, C3): force the fastest
+    # build by stamping the page-info with the earliest time it legally could carry. An
+    # unsequenced edit (the old test) then needs a rebuild; a sequenced one is up to date.
+    def stamp(ns):
+        for info in (site / ".nift").rglob("*.info.json"):
+            os.utime(info, ns=(ns, ns))
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "cp01"))
+    import ticks
+    ticks.age(str(site))
+    (site / "data.txt").write_text("v3\n")
+    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    stamp(os.stat(site / "data.txt").st_mtime_ns)
+    status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
+    check("page build: forced race, an unsequenced edit needs a rebuild", "up to date" not in status, status)
+    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    (site / "data.txt").write_text("v4\n")
+    floor = sequenced(site, site / "data.txt")
+    subprocess.run([NIFT, "build"], cwd=site, capture_output=True, text=True, env=env)
+    stamp(floor)
+    status = subprocess.run([NIFT, "status"], cwd=site, capture_output=True, text=True, env=env).stdout
+    check("page build: forced race, a sequenced edit is up to date", "up to date" in status, status)
 
 
 

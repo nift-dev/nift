@@ -1,0 +1,208 @@
+NIFT_BIN=x python3 tests/runtime2/read_limit.py
+baseline VmPeak 14 MiB, VmHWM 7 MiB; RLIMIT_AS 118 MiB; RSS bound 79 MiB; limit 64 MiB
+PASS open: file of exactly the limit is read whole
+PASS open: empty file
+FAIL open one byte over: fatal open limit error (exit 0) AFTER
+
+PASS open one byte over: peak RSS 11 MiB within 79 MiB
+FAIL open_bytes: file of exactly the limit is read whole error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:7: not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL open_bytes: empty file error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:7: not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL open_bytes one byte over: fatal open_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes one byte over: peak RSS 11 MiB within 79 MiB
+PASS file().open: exact limit
+FAIL file().open one byte over: fatal open limit error (exit 1) AFTER
+error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:1: managed file left open: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/over.bin
+
+PASS file().open one byte over: peak RSS 11 MiB within 79 MiB
+PASS ifstream read_all: exact limit
+PASS ifstream read_all one byte over: fatal read_all limit error (exit 1)
+PASS ifstream read_all one byte over: peak RSS 11 MiB within 79 MiB
+FAIL read_line: line of exactly the limit error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:2:7: not compiled for the VM (type:length): an operation whose operand types the VM cannot prove (length) is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read_line one byte over: fatal read_line limit error (exit 1)
+PASS read_line one byte over: peak RSS 11 MiB within 79 MiB
+PASS open(/dev/zero): fatal open limit error (exit 1)
+PASS open(/dev/zero): peak RSS 71 MiB within 79 MiB
+FAIL open_bytes(/dev/zero): fatal open_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes(/dev/zero): peak RSS 11 MiB within 79 MiB
+PASS cat(/dev/zero): fatal cat limit error (exit 1)
+PASS cat(/dev/zero): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/zero).open(r): fatal open limit error (exit 1)
+PASS file(/dev/zero).open(r): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/zero).open(w): fatal open limit error (exit 1)
+PASS file(/dev/zero).open(w): peak RSS 71 MiB within 79 MiB
+PASS open(/dev/full): fatal open limit error (exit 1)
+PASS open(/dev/full): peak RSS 71 MiB within 79 MiB
+FAIL open_bytes(/dev/full): fatal open_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS open_bytes(/dev/full): peak RSS 11 MiB within 79 MiB
+PASS cat(/dev/full): fatal cat limit error (exit 1)
+PASS cat(/dev/full): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/full).open(r): fatal open limit error (exit 1)
+PASS file(/dev/full).open(r): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/full).open(w): fatal open limit error (exit 1)
+PASS file(/dev/full).open(w): peak RSS 71 MiB within 79 MiB
+PASS ifstream(/dev/zero).read_all: fatal read_all limit error (exit 1)
+PASS ifstream(/dev/zero).read_all: peak RSS 71 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_all_bytes: fatal read_all_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_all_bytes: peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_line: fatal read_line limit error (exit 70) error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f: NIFT_VM internal failure: out of memory (std::bad_alloc) (the script was not run on the legacy engine)
+
+PASS ifstream(/dev/zero).read_line: peak RSS 67 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_bytes(huge): fatal read_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_bytes(huge): peak RSS 11 MiB within 79 MiB
+PASS ifstream(/dev/zero).read(huge): fatal read limit error (exit 1)
+PASS ifstream(/dev/zero).read(huge): peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero) >> token: fatal extraction limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero) >> token: peak RSS 11 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_val: fatal read_val limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_val: peak RSS 11 MiB within 79 MiB
+FAIL read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read_line loop over a file 3 x the limit
+PASS sha256_file of a file 3 x the limit
+FAIL open() of a regular file 3 x the limit: fatal open limit error (exit 70) error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f: NIFT_VM internal failure: out of memory (std::bad_alloc) (the script was not run on the legacy engine)
+
+PASS open() of a regular file 3 x the limit: peak RSS 11 MiB within 79 MiB
+PASS FIFO: exactly the limit
+FAIL FIFO: one byte over: fatal open limit error (exit 0) AFTER
+
+PASS FIFO: one byte over: peak RSS 11 MiB within 79 MiB
+FAIL FIFO whose writer never stops (open_bytes): fatal open_bytes limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS FIFO whose writer never stops (open_bytes): peak RSS 11 MiB within 79 MiB
+PASS FIFO whose writer never stops (ifstream read_all): fatal read_all limit error (exit 1)
+PASS FIFO whose writer never stops (ifstream read_all): peak RSS 71 MiB within 79 MiB
+PASS FIFO writers finished (reader released the pipe)
+PASS growing file: whole value within the limit or a limit error (exit 1)
+FAIL run(): capture of exactly the limit error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:6: not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL run(): capture one byte over: fatal run limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(): capture one byte over: peak RSS 11 MiB within 79 MiB
+FAIL cmd().run(): capture of 128 MiB: fatal run limit error (exit 1)  is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS cmd().run(): capture of 128 MiB: peak RSS 11 MiB within 79 MiB
+PASS read_line on a directory: catchable read error
+PASS read_line on a EIO (/proc/self/mem): catchable read error
+FAIL read(): stdin line of exactly the limit error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:6: not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL read(): stdin line one byte over is a limit error error: /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:6: not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+FAIL read(): endless stdin (/dev/zero) stops at the limit te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read(): endless stdin peak RSS 11 MiB within 79 MiB
+FAIL run(yes) never ends: fatal run limit error (exit 1, 0.01s) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(yes) never ends: no producer left running
+PASS run(yes) never ends: marker never created (child stopped before finishing)
+PASS run(yes) never ends: peak RSS 11 MiB within 79 MiB
+FAIL run(head -c 150000000 /dev/zero): fatal run limit error (exit 1, 0.01s) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(head -c 150000000 /dev/zero): no producer left running
+PASS run(head -c 150000000 /dev/zero): marker never created (child stopped before finishing)
+PASS run(head -c 150000000 /dev/zero): peak RSS 11 MiB within 79 MiB
+FAIL cmd(yes).pipe(cat).run(): fatal run limit error (exit 1, 0.01s) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS cmd(yes).pipe(cat).run(): no producer left running
+PASS cmd(yes).pipe(cat).run(): marker never created (child stopped before finishing)
+PASS cmd(yes).pipe(cat).run(): peak RSS 11 MiB within 79 MiB
+FAIL run(sh -c 'yes; touch marker') kills the descendant: fatal run limit error (exit 1, 0.01s) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS run(sh -c 'yes; touch marker') kills the descendant: no producer left running
+PASS run(sh -c 'yes; touch marker') kills the descendant: marker never created (child stopped before finishing)
+PASS run(sh -c 'yes; touch marker') kills the descendant: peak RSS 11 MiB within 79 MiB
+FAIL stderr capture of an endless producer: fatal run limit error (exit 1, 0.01s) te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS stderr capture of an endless producer: no producer left running
+PASS stderr capture of an endless producer: marker never created (child stopped before finishing)
+PASS stderr capture of an endless producer: peak RSS 11 MiB within 79 MiB
+PASS no zombie processes left by the capture cases
+FAIL NIFT_READ_LIMIT=1K means 1024 bytes AFTER
+
+PASS NIFT_READ_LIMIT=2MiB means 2097152 bytes
+FAIL NIFT_READ_LIMIT=1g means 1073741824 bytes mp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f:1:6: open: file exceeds the memory budget
+
+FAIL NIFT_READ_LIMIT=4096 means 4096 bytes AFTER
+
+PASS NIFT_READ_LIMIT=3m means 3145728 bytes
+PASS NIFT_READ_LIMIT=0 is rejected loudly
+PASS NIFT_READ_LIMIT=-1 is rejected loudly
+PASS NIFT_READ_LIMIT=abc is rejected loudly
+PASS NIFT_READ_LIMIT=12Q is rejected loudly
+PASS NIFT_READ_LIMIT=99999999999999999999 is rejected loudly
+PASS NIFT_READ_LIMIT=18014398509481984T is rejected loudly
+FAIL default limit: open_bytes(/dev/zero) stops at 1073741824 bytes te: to run it on the legacy interpreter: NIFT_VM=0 nift /tmp/claude-0/-home-claude/5262fcab-c28a-58db-987c-2c4b624387c1/scratchpad/review-ha/c28/tmpA1/nift-certify-0000001/0123456789abcde1/read-limit-21lgdtpo/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS page build: initial build
+PASS page build: limit is a build failure naming the operation and limit
+PASS page build: last-good output preserved
+PASS page build: no interrupted-state marker
+PASS page build: next build after the fix succeeds without --repair
+PASS page build: up to date afterwards
+32 failure(s)
+rc=1

@@ -652,6 +652,18 @@ skiprun() {  # skiprun CASE TARGET WANT-RC WANT-TEXT
     fi
     echo "PASS certification guard D3 control $1: $2 (exit $rc) as expected"
 }
+# confirmation of c8817214, C2 (D3): a FAILED-BASELINE gate whose script aborted (hiding later
+# checks) still fails a --certify campaign
+ABORTED='echo "python3 tests/package_transaction_smoke.py"; echo "Traceback (most recent call last):"; echo "  File \"/x/tests/package_transaction_smoke.py\", line 330, in <module>"; echo "AssertionError: same.f failed"; exit 1'
+toy "$TOY/ab/cand" test-v44-packages "$ABORTED"; toy "$TOY/ab/r1" test-v44-packages "$ABORTED"
+out=$(cd "$TOY/ab/cand" && python3 scripts/certify.py --jobs 1 --certify --targets test-v44-packages --unprivileged-user '' \
+      --baseline '' --regression-baseline "17f7964c=$TOY/ab/r1" 2>/dev/null); rc=$?
+if [ "$rc" -ne 1 ] || ! grep -q "FAILED-BASELINE  test-v44-packages" <<<"$out" \
+   || ! grep -q "CAMPAIGN FAILED: required assertions not executed in: test-v44-packages" <<<"$out" \
+   || ! grep -q "NOT EXECUTED package_transaction_smoke.py: every check after line 330" <<<"$out"; then
+    echo "FAIL certification guard D3 control ab: exit $rc"; echo "$out" | tail -6; exit 1
+fi
+echo "PASS certification guard D3 control ab: FAILED-BASELINE with abort-hidden checks fails --certify (exit $rc)"
 skiprun s1 test-rt-partial 1 "BLOCKED          test-rt-partial: PARTIAL"
 skiprun s1 test-rt-partial 1 "CAMPAIGN FAILED: mandatory gate(s) PARTIAL or SKIP: test-rt-partial"
 skiprun s1 test-rt-partial 1 "needs: MemAvailable >= 4096 MiB"

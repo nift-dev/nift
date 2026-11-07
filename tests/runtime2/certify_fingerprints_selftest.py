@@ -301,6 +301,14 @@ got = F.fingerprint("test-runtime2-host-deps", text.replace(under, under.replace
 check("host-deps replaced detail of a mapped FAIL line", not F.same(F.fingerprint("test-runtime2-host-deps", text, [ROOT]), got))
 n += 1
 
+# confirmation of c8817214, C1: read_limit.py run twice with equal-length TMPDIRs differing in one
+# character (the review's r9/rl1.log, rl2.log): a cut inside a path must not change the fingerprint
+r1 = open(os.path.join(LOGS, "host-deps-read-limit-tmp1.txt"), errors="replace").read()
+r2 = open(os.path.join(LOGS, "host-deps-read-limit-tmp2.txt"), errors="replace").read()
+f1, f2 = F.fingerprint("test-runtime2-host-deps", r1, [ROOT]), F.fingerprint("test-runtime2-host-deps", r2, [ROOT])
+check("host-deps cut inside a path", f1 is not None and F.same(f1, f2), "; ".join(F.differences(f1, f2))[:300])
+n += 1
+
 # review of 4ec1aa80, F3: the checks a failing script never reached are reported (D3, required)
 lf = open(os.path.join(LOGS, "test-v44-language-foundation.txt"), errors="replace").read()
 hidden = [x[0] for x in F.not_executed("test-v44-language-foundation", lf, [ROOT])]

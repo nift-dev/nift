@@ -192,7 +192,8 @@ READ_LIMIT_TABLE = [
     ("default-limit", r"default limit: open_bytes\(/dev/zero\) stops at 1073741824 bytes"),
     ("page-build", r"page build: (?P<what>initial build|limit is a build failure naming the operation and limit"
                    r"|last-good output preserved|no interrupted-state marker"
-                   r"|next build after the fix succeeds without --repair|up to date afterwards)"),
+                   r"|next build after the fix succeeds without --repair|up to date afterwards"
+                   r"|forced race, an unsequenced edit needs a rebuild|forced race, a sequenced edit is up to date)"),
     ("read-line-catchable", r"read_line on a (?P<name>.+?): catchable read error"),
     ("stdin-exact", r"read\(\): stdin line of exactly the limit"),
     ("stdin-over", r"read\(\): stdin line one byte over is a limit error"),
@@ -340,6 +341,10 @@ def _cases(spec, lines, roots):
             # the line's own detail and every line under it, narrowly normalised, and every
             # diagnostic in them
             own = rest[mm.end():].strip()
+            # confirmation of c8817214, C1: a tail cut can fall inside a path, leaving a fragment
+            # that holds the mkdtemp suffix or the per-log TMPDIR hash but no leading /tmp/. The
+            # first token of the own detail is the one the cut can split: it is dropped.
+            own = own.split(None, 1)[1] if len(own.split(None, 1)) == 2 else ""
             found = matches("\n".join([own] + under), roots)
             detail = " | ".join([f"{c}:{d}" for c, d in found] + [narrow(x, roots) for x in [own] + under if x.strip()])
             out.append((step, k + "".join(f" {n}={v}" for n, v in sorted(args.items())), "table-case",

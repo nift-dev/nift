@@ -5,5 +5,7 @@
 # status and the command, so a smoke script that dies silently still names its failing case.
 # Nothing is printed for failures the script handles itself (conditions, ||, no errexit).
 # No errtrace option (review of 4ec1aa80): it would make a script's own ERR trap fire inside its
-# functions; a failing call is still reported at its top-level call site.
+# functions. Without it, errexit inside a function exits silently (no CERTIFY-ERR); the
+# fallback is conservative: no fingerprint (FAILED-NEW) and "every check after its failing
+# command" not executed.
 trap '__certify_rc=$?; case $- in *e*) printf "CERTIFY-ERR %s:%s rc=%s cmd=%s\n" "${BASH_SOURCE[0]##*/}" "$LINENO" "$__certify_rc" "$BASH_COMMAND" >&2;; esac' ERR

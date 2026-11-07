@@ -1226,8 +1226,9 @@ fingerprints (32 cases). Selftest: an internal failure, a Segmentation fault, a 
 Traceback under `FAIL open one byte over…`, and a replaced detail, each change the fingerprint.
 Also found: `read_limit.py`'s `page build: up to date afterwards` had the CP01 same-tick flake
 (failed in 2 of 4 runs); its three edits are now sequenced with `ticks.py` (passed 3 of 3 after).
-The forced-race mechanism is the one host_deps.py's forced_race check covers (same helper, same
-modified rule).
+Corrected in C29: its regression coverage was only indirect (host_deps.py's forced race uses the
+same helper and rule); read_limit.py now has its own direct forced-race check (an unsequenced edit
+needs a rebuild, a sequenced one is up to date, after the fastest build).
 
 **F3 (done): checks hidden by an abort are reported (D3, required, "aborted by earlier failure").**
 `certify_fingerprints.not_executed` lists them from the failing logs (the gate's and each failing
@@ -1255,4 +1256,24 @@ REQUIRED not-executed assertions (`scratchpad/combined-fix/item2/certify2.log`).
 
 **Release-audit items fixed.** The BASH_ENV hook no longer sets errtrace (a script's own ERR
 trap no longer fires inside its functions; the selftest checks three trap/errexit shapes keep their
-exit status and output under the hook). The sitecustomize hook catches every `Exception`.
+exit status and output under the hook). Corrected in C29: without errtrace, errexit inside a
+function exits silently (no CERTIFY-ERR line); that case falls back conservatively (no fingerprint,
+so FAILED-NEW, and "every check after its failing command" not executed). The failing commands
+seen so far are top-level ones and are reported. The sitecustomize hook catches every `Exception`.
+
+
+## 26. Confirmation of C28 (c8817214): CONFIRMED-WITH-CONDITIONS; conditions (C29)
+
+- **C1, host-deps cut tails.** An equal-length TMPDIR aligns the cut offset but not the characters
+  there: a cut inside a path leaves a fragment with the mkdtemp suffix or the per-log hash and no
+  leading `/tmp/`. The first token of each table case's own detail (the one a cut can split) is
+  now dropped. Selftest: the review's two read_limit.py runs (equal-length TMPDIRs differing in one
+  character) give equal fingerprints.
+- **C2, D3 strict default.** A REQUIRED not-executed assertion now fails a `--certify` campaign
+  whatever its gate's class, FAILED-BASELINE included (`CAMPAIGN FAILED: required assertions not
+  executed in: …`). Guard control `ab`: a FAILED-BASELINE gate whose script aborted. The owner may
+  later accept named hidden checks. Consequence to note: test-test-integrity's
+  `[pipefail-missing] … "$skip"` finding is read as a required skip (R5-6 noise), so that gate, if
+  FAILED-BASELINE, also fails a campaign until its labelling is fixed or accepted.
+- **C3.** The two record claims are corrected (§25): errexit inside a function exits silently
+  (conservative fallback); read_limit.py has a direct forced-race check now.
