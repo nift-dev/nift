@@ -18,6 +18,8 @@
 #                        index before its value), the order before the combined-candidate repair
 #  14 compiler_literal_expr.cpp  H-A: a receiver in its binding's own register is never copied
 #                        before an operand that can rebind it (top-level forms read it late)
+#  15 compiler_array_mutation.cpp  H-A (review of 0d853db4, the reviewer's mE): a captured loop
+#                        binding's receiver is read after its arguments again
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
@@ -32,7 +34,7 @@ for spec in 1:src/rt/infer_sites.cpp 3:src/rt/infer_session.cpp 4:src/rt/infer_s
             6:src/rt/vm_ops.cpp 7:src/rt/compiler_array_mutation.cpp+src/rt/session_invocation.cpp \
             8:src/rt/collection_sort.cpp 11:src/rt/op_admission.cpp 12:src/rt/compiler_dispatch.cpp \
             13:src/rt/compiler_array_mutation.cpp+src/rt/compiler_keyed.cpp+src/rt/compiler_stmt_expr.cpp+src/rt/compiler_assign.cpp \
-            14:src/rt/compiler_literal_expr.cpp; do
+            14:src/rt/compiler_literal_expr.cpp 15:src/rt/compiler_array_mutation.cpp; do
     n=${spec%%:*}; src=${spec#*:}
     IFS=+ read -r -a srcs <<<"$src"
     link=""; compiles=()

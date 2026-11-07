@@ -1,0 +1,1 @@
+for (b : [[1], [2]]) { keep := b; g := () => { b = [7]; return 4 }; b.push(g()); print(b.stringify()); print(keep.stringify()) }

@@ -185,7 +185,8 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         fb_->set_offset(node.begin);
         const std::size_t at = fb_->emit(OpCode::SetIndex, reg, key, value);
         fb_->note(at, std::string(text(ast_.at(target.b))));
-        if (indirect && !global && (held.loop_binding || held.location_source)) {
+        // H-A: no write-back when the value can rebind the binding (it would undo the rebinding).
+        if (indirect && !global && (held.loop_binding || held.location_source) && !may_rebind(node.b)) {
             std::uint16_t untyped = 0;
             if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
             if (!store_indexed_binding(held, reg)) return false;

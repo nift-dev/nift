@@ -13,14 +13,15 @@ Generates every combination of
               name, then throws: nothing is mutated, the rebinding remains),
   callee     a lambda or a `fn` (a `fn` writes top-level bindings as globals),
   context    top level, a while-loop body, a function's captured local, a top-level binding used
-              in a function, the same in a lambda, and a session (`nift -i`),
+              in a function, the same in a lambda, a session (`nift -i`), and a captured loop
+              binding as the receiver (`for (b : [...]) { g := () => { b = ... } ... }`),
 and runs each on the VM (NIFT_VM=require). Every admitted program must print exactly what the
 contract model below computes: the receiver is evaluated first and that value is retained while
 the arguments run; then, for an element store, the value before the index. A refusal must be
 before any effect (no output). Each admitted program also runs on legacy (NIFT_VM=0); legacy must
 agree with the model except in the classes listed in LEGACY_DIFFERENT (legacy's prepared loop
-evaluator, legacy's `fn`-callee element store, and legacy's lost receiver when nothing else holds
-it), which are reported, not failed. A model/legacy disagreement anywhere else fails the gate:
+evaluator, legacy's `fn`-callee element store, legacy's double evaluations, and legacy's lost
+receiver when nothing else holds it; see legacy_class()), which are reported, not failed. A model/legacy disagreement anywhere else fails the gate:
 that is the check that the model is legacy's canonical order.
 
 Fails (exit 1) on any mismatch, VM exit 70, timeout, leaked internal tag, a refused program that
@@ -49,10 +50,10 @@ INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1
                       r"AddressSanitizer|LeakSanitizer|runtime error:")
 ARGS = ["none", "rebind", "alias", "drop", "throw"]
 CALLEES = ["lambda", "fn"]
-CONTEXTS = ["top", "loop", "fncell", "fnglob", "lam", "session"]
-# Admitted programs on the H-A repair (760 of the 770 generated programs were admitted when the gate
+CONTEXTS = ["top", "loop", "fncell", "fnglob", "lam", "session", "loopbind"]
+# Admitted programs on the H-A repair (830 of the 840 generated programs were admitted when the gate
 # was written; the 10 refused are `throw` inside a lambda body); fewer means newly refused programs.
-ADMITTED_FLOOR = 760
+ADMITTED_FLOOR = 830
 
 FAMILY = {
     "array": {"init": ["b := [1, 2, 3]"], "new": "[7, 8]", "other": ["keep = [5]"],
@@ -201,6 +202,10 @@ def program(row, arg, callee, context):
         lines = ["fn(t()) {"] + ["  " + l for l in setup + op_lines + shows] + ["  return 0", "}", "t()"]
     elif context == "fnglob":
         lines = setup + ["fn(t()) {"] + ["  " + l for l in op_lines] + ["  return 0", "}", "t()"] + shows
+    elif context == "loopbind":  # the receiver is a captured loop binding (review of 0d853db4, H1)
+        source = fam["init"][0].split(":=", 1)[1].strip()
+        inner = fam["init"][1:] + ["keep := b", callee_def(callee, body)] + op_lines + shows
+        lines = ["for (b : [%s]) {" % source] + ["  " + l for l in inner] + ["}"]
     else:  # lam
         lines = setup + ["t := () => {"] + ["  " + l for l in op_lines] + ["  return 0", "}", "t()"] + shows
     return "\n".join(lines) + "\n"
@@ -208,16 +213,30 @@ def program(row, arg, callee, context):
 
 # Classes where legacy is known to differ from the model (reported, never failed):
 #   loop       legacy's prepared loop evaluator reads the receiver late (push, set, add, element
-#              store) or loses the mutation (insert, remove, splice, stack push);
+#              store) or loses the mutation (insert, remove, splice, stack push), when the argument
+#              rebinds, drops or throws (loops and captured loop bindings; other loop programs are
+#              cross-checked);
 #   fn-store   legacy's element store reads the receiver after a value that calls a `fn`;
 #   lost       legacy reads a receiver whose last reference the argument dropped (no alias kept);
+#   loop-expr  in loop code legacy evaluates a declaration's mutating initialiser wrongly
+#              (`r := b.push(g())`, `r := b.remove(g())`: "cannot mutate const array") or its index
+#              key twice (`r := b[g()]`: M1 of the review of 0d853db4, legacy 8 vs 2);
+#   loop-twice in loop code legacy evaluates an argument twice (insert, splice, stack push: an alias
+#              mutation in the argument runs twice);
 #   decl-twice legacy evaluates an index key twice in a declaration's initialiser (`r := b[g()]`),
 #              observable when the key mutates (here: through the alias); the VM evaluates it once;
 #   sharing    approved Phase B differences (arguments/aliases share: none generated here).
 def legacy_class(row, arg, callee, context):
     op = row[0]
-    if context == "loop":
-        return "loop"
+    if context in ("loop", "loopbind"):
+        # legacy's prepared evaluator: a loop's declaration evaluates an index key twice (M1 of
+        # the review of 0d853db4); otherwise it differs only when the argument rebinds or drops
+        # the receiver, so programs with no argument effect or an alias mutation are cross-checked
+        if row[2].startswith("R "):
+            return "loop-expr"  # a loop declaration: legacy evaluates the key twice / errors
+        if arg == "none":
+            return None  # no argument effect: legacy must agree
+        return "loop-twice" if arg == "alias" else "loop"
     if op == "store_v" and callee == "fn" and arg in ("rebind", "drop", "throw"):
         return "fn-store"
     if arg == "drop":
@@ -233,7 +252,7 @@ def items(rows):
         for arg in ARGS:
             for callee in CALLEES:
                 for context in CONTEXTS:
-                    if context == "fncell" and callee == "fn":
+                    if context in ("fncell", "loopbind") and callee == "fn":
                         continue  # a `fn` cannot reach a function's locals
                     out.append((row, arg, callee, context))
     return out
@@ -338,7 +357,7 @@ def negative_controls(args):
     try:
         trunc = os.path.join(scratch, "truncated")
         os.makedirs(os.path.dirname(os.path.join(trunc, TABLE)))
-        lines = open(os.path.join(TREE_DEFAULT, TABLE)).read().splitlines()
+        lines = open(os.path.join(args.tree, TABLE)).read().splitlines()  # the table of --tree
         open(os.path.join(trunc, TABLE), "w").write("\n".join(lines[:-1]) + "\n")  # one operation dropped
         cases = [("missing tree", os.path.join(scratch, "nonexistent"), "required input missing"),
                  ("truncated operation table", trunc, "lists only")]

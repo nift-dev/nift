@@ -42,9 +42,13 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
         return true;
     };
     // A captured loop binding writes the element back (its cell's own store;
-    // the array itself was changed in place).
+    // the array itself was changed in place). H-A (combined-b3-b5.md 3): not when an
+    // argument can rebind the binding: the retained receiver would undo the rebinding.
+    const NodeId* args=ast_.list(node);
+    bool rebinds=false;
+    for(std::uint32_t k=0;k<argc;++k)rebinds=rebinds||may_rebind(args[k]);
     auto put=[&]()->bool {
-        if(binding.loop_binding&&(binding.cell||binding.upvalue)){
+        if(binding.loop_binding&&(binding.cell||binding.upvalue)&&!rebinds){
             if(!store_indexed_binding(binding,state+Source))return false;}
         fb_->emit(OpCode::LoadNull,state+Source);return true;
     };
@@ -63,13 +67,17 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     // B5 (D-NEXT-refsem-b, owner Q1/Q2): no static const-array mutation check. `const` is
     // binding-only; `args` is immutable as an object (kImmutable, checked by the protocol
     // through every alias).
-    const NodeId* args=ast_.list(node);
     // H-A (combined-b3-b5.md): the receiver is evaluated first and its value retained in
     // state+Source (a counted reference) while the arguments run, as legacy's canonical
     // evaluator does: an argument that rebinds the receiver's name, or drops every other
     // reference to the array, does not change which array is mutated.
+#if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 15  // M15: a captured loop binding is read late again
+    const bool late_loop=binding.loop_binding&&(binding.cell||binding.upvalue);
+#else
+    const bool late_loop=false;
+#endif
 #if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
-    if(!read())return false;
+    if(!late_loop&&!read())return false;
 #endif
     if(argc>0&&!expr_to(args[0],state+Item))return false;
     if(argc>1&&!expr_to(args[1],state+Returned))return false;
@@ -91,6 +99,7 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
 #if defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13
     if(!read())return false;  // M13: the receiver is read after its arguments again (H-A)
 #endif
+    if(late_loop&&!read())return false;
     // The call text: the VM's wrong-receiver message (B0, vm_array_mutation.cpp).
     fb_->set_offset(collection_offset(node));
     fb_->note(fb_->emit(OpCode::ArrayMutate,state,id,splice3&&!late?2:0),std::string(text(node)));

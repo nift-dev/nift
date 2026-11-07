@@ -57,7 +57,8 @@ bool UnitCompiler::expression_statement(const Node& node) {
             fb_->set_offset(expr.begin);
             const std::size_t at = fb_->emit(OpCode::Push, reg, value);
             fb_->note(at, std::string(text(expr)));
-            if (indirect && !global && (held.loop_binding || held.location_source)) {
+            // H-A: no write-back when the operand can rebind the binding.
+            if (indirect && !global && (held.loop_binding || held.location_source) && !may_rebind(arg)) {
                 std::uint16_t untyped = 0;
                 if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
                 if (!store_indexed_binding(held, reg)) return false;
