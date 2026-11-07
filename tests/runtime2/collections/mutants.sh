@@ -23,7 +23,10 @@ declare -A FILE=(
   [12]=src/rt/compiler_native_args.cpp       # built-ins no longer check arguments/receivers holding collections
   [13]=src/rt/compiler_collection.cpp        # key/comparator callbacks may return collections
   [14]=src/rt/compiler.cpp                   # a collection is the shown eval/session result
-  [15]=src/rt/compiler_loops.cpp             # a map loop iterates the live map, not its snapshot
+  [15]=src/rt/compiler_loops.cpp             # a map loop is analysed as a live source: the vanished-element
+                                             # refusals return (B5 fix-up: the live iteration it once planted
+                                             # is unreachable, every loop iterates its held entry snapshot;
+                                             # witnesses parity/snapshot_map_body_{write,capture}.f)
   [16]=src/rt/compiler_native_args.cpp       # mutex(v) accepts a value holding a collection
 )
 list=("$@"); [ ${#list[@]} -eq 0 ] && list=(5 6 7 8 9 11 12 13 14 15 16)

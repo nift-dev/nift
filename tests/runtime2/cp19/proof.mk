@@ -63,7 +63,8 @@ $(TEST_DIR)/cp19/proof-cost: tests/runtime2/cp19/proof_cost.cpp $(CP19_EXPR_OBJE
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 .PHONY: test-cp19-proof-cli
 test-cp19-proof-cli: $(TARGET) $(CP13B_SWITCH_NIFT)
-	@test -n "$(CP19_LEGACY_ORACLE)" || { echo 'Set CP19_LEGACY_ORACLE to the frozen legacy binary'; exit 2; }
+	@test -n "$(CP19_LEGACY_ORACLE)" || { echo 'FAIL test-cp19-proof-cli: CP19_LEGACY_ORACLE is unset. This gate is NOT run without a legacy oracle (it never skips): make test-cp19-proof-cli CP19_LEGACY_ORACLE=/path/to/nift (run as NIFT_VM=0; certification uses the frozen legacy binary). See tests/runtime2/cp19/session_proof_cli.py.'; exit 2; }
+	@test -x "$(CP19_LEGACY_ORACLE)" || { echo 'FAIL test-cp19-proof-cli: CP19_LEGACY_ORACLE=$(CP19_LEGACY_ORACLE) is not an executable'; exit 2; }
 	$(PYTHON) tests/runtime2/cp19/session_proof_cli.py --nift "$(CURDIR)/$(TARGET)" --legacy "$(CP19_LEGACY_ORACLE)" --out "$(TEST_DIR)/cp19/proof-cli.json"
 	$(PYTHON) tests/runtime2/cp19/session_proof_cli.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --legacy "$(CP19_LEGACY_ORACLE)" --out "$(TEST_DIR)/cp19/proof-cli-switch.json"
 

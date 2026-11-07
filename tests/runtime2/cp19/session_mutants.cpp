@@ -19,26 +19,52 @@ int main(int argc, char** argv) {
         return status;
     }
     if (expect == "contract" || expect == "widened") {
+        // B5 fix-up (review F7). The B4b-era witness (nested:=[[1]]; for(row:nested){row.push(()=>7)};
+        // derived:=nested[0][1]; derived = ()=>9) no longer reaches the property: on B5 its third
+        // statement is refused type:index (U6's single session-heap pool: nested[0] may be a number or a
+        // callable), so neither binary got past it. It stays pinned below as a precision gap, so the
+        // pin flags when it is fixed. The property M7 removes (session_shape_contract's root check: a
+        // session binding's new root shape must lie within its recorded structure, re-checked after the
+        // coherent recompile) is exercised directly:
+        //   1. A binding recorded as a number rebound to a callable: refused before any effect, the
+        //      binding unchanged (legacy: "cannot assign string to int binding"; 17f7964c refuses the
+        //      same). The control refuses by the structural root contract (coherent re-check:
+        //      session:binding-shape-contract); M7, without that check, falls to the coarser kind check
+        //      (session:binding-contract). That reason is the discriminating observation.
+        //   2. Coherent widening still admits a callable rebound to another callable (both binaries);
+        //      the retained alias keeps the earlier callable.
+        // Differential search (b5-refsem.md 11.3): 2,091 generated sessions on B5 production and an M7
+        // CLI show no admission or output difference, only this refusal reason (32 sessions): under
+        // U6 the contents a stale recorded structure would describe are re-seeded from the session
+        // heap or the binding's private class, so the coherent recompile M7 skips is no longer needed
+        // for contents.
+        r = session.execute("held:=[1];derived:=held[0];oldderived:=derived", "number-binding", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        r = session.execute("derived = ()=>9;print(\"ONCE\")", "kind-changing-rebind", output);
+        CHECK(!r.admitted && r.vm_executions == 0 && r.legacy_executions == 0 && output.empty());
+        CHECK(r.refusal == (expect == "contract" ? "session:binding-contract" : "session:binding-shape-contract"));
+        output.clear();
+        r = session.evaluate("derived", "binding-unchanged", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 1);
+        r = session.execute("cb:=()=>7;oldcb:=cb", "callable-binding", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None);
+        const auto original = session.value("cb");
+        output.clear();
+        r = session.execute("cb = ()=>9;print(\"ONCE\")", "use-widened-bound", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
+        CHECK(output == "ONCE\n" && session.value("cb").heap() != original.heap());
+        output.clear();
+        r = session.evaluate("cb()", "future-call", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 9);
+        r = session.evaluate("oldcb()", "retained-alias", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 7);
+        // The former witness, pinned as the B5 precision gap (review F7; U6 single heap pool).
         r = session.execute("nested:=[[1]]", "nested-state", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None);
         r = session.execute("for(row:nested){row.push(()=>7)}", "nested-effect", output);
         CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
-        r = session.execute("derived:=nested[0][1];oldderived:=derived", "future-reader", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None);
-        const auto original = session.value("derived");
-        r = session.execute("derived = ()=>9;print(\"ONCE\")", "use-widened-bound", output);
-        if (expect == "contract") {
-            CHECK(!r.admitted && r.refusal == "session:binding-contract" && r.vm_executions == 0);
-            CHECK(output.empty() && session.value("derived").heap() == original.heap());
-        } else {
-            CHECK(r.admitted && r.execution.reason == StopReason::None && r.vm_executions == 1);
-            CHECK(output == "ONCE\n" && session.value("derived").heap() != original.heap());
-        }
-        output.clear();
-        r = session.evaluate("derived()", "future-call", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == (expect == "contract" ? 7 : 9));
-        r = session.evaluate("oldderived()", "retained-alias", output);
-        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.as_int() == 7);
+        r = session.execute("derived2:=nested[0][1]", "nested-reader", output);
+        CHECK(!r.admitted && r.refusal == "type:index" && r.vm_executions == 0);
         const auto status = rt_test::finish("CP19 coherent widening negative-control witness");
         if (!status) std::cout << "WITNESS " << expect << '\n';
         return status;

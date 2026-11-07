@@ -7,8 +7,12 @@ library; run for both VM dispatch builds) through the shipped Python wrapper.
 
   1. CP14B callbacks (map, filter, sort_by), mutation (push, splice) and a
      CP13B Error raised in a collection callback and caught, all on the VM;
-     output exact. Every line equals legacy except the one D-040 line: `b := a;
-     b.push(5)` leaves `a` unchanged (legacy aliases: [9,1,2,4,5]).
+     output exact and legacy-equal. `b := a; b.push(5)` grows `a` too
+     ([9,1,2,4,5]; the program returns 5): B5 shared references, plan section 3
+     "Assignment, declaration" (`b := a` shares; =L for arrays bound from a
+     name), owner Q3. Until B5 this line pinned D-040 #1 copy semantics
+     ([9,1,2,4], return 4); B5 fix-up conversion, recorded in
+     docs/runtime-2/evidence/b5/expected-changes.tsv (cp18 combined_cp14b).
   2. Reuse: the same compiled program runs again with identical output.
   3. Resource failure: a heap budget that the setup fits stops the program
      exactly at the map callback's allocation (grow.f:3:17) as the VM's fatal
@@ -59,21 +63,27 @@ try { [1, 2].map(boom) } catch(e) { t = e.message + " " + e.code }
 print(t)
 return a.length()
 '''
-# Legacy prints [9,1,2,4,5] for `a` (it aliases b); D-040 #1 keeps `a` independent.
-EXPECTED = b'[30,10,20]\n[3,2]\n[3,2,1]\n[9,1,2,4]\n[9,1,2,4,5]\nboom user.boom\n'
+# B5 (plan section 3 Assignment, Q3): `b := a` shares, so `a` shows b's push, as legacy does.
+# Was (D-040 #1, before B5): [9,1,2,4] and a return value of 4.
+EXPECTED = b'[30,10,20]\n[3,2]\n[3,2,1]\n[9,1,2,4,5]\n[9,1,2,4,5]\nboom user.boom\n'
 
-# range(4000) fits the budget (line 2 prints); the map callback's [x, x]
-# (grow.f:3:17) is the allocation that exhausts it: the CP14B callback path.
+# range(4000) and the map's result reservation fit the budget (line 2 prints);
+# the map callback's [x, x] (grow.f:3:17) is the allocation that exhausts it: the
+# CP14B callback path. B5 fix-up: the former budget (1 << 18 = 262144) stops at the
+# map call's own reservation (grow.f:3:6) on B5 AND on 17f7964c (identical through
+# the program API, libnift_c.so and the switch library; masked at 17f7964c by the
+# earlier failing check), so it no longer reached the callback. 393216 stops at
+# 3:17 on both trees (budgets 300000 to 400000 do; 500000 completes).
 GROW = 'a := range(4000)\nprint(a.length())\nr := a.map(x => [x, x])\nprint(r.length())\n'
-BUDGET = 1 << 18
+BUDGET = 393216
 
 with mod.Program(COLLECTIONS, 'collections.f', library=lib) as program:
     first = program.run()
     check('collections complete', first.ok and first.output == EXPECTED)
-    check('return value', first.returned and first.return_text == '4')
+    check('return value', first.returned and first.return_text == '5')
     second = program.run()
-    check('reuse: identical second run', second.ok and second.output == EXPECTED and second.return_text == '4')
-check('result owned after close', first.output == EXPECTED and second.return_text == '4')
+    check('reuse: identical second run', second.ok and second.output == EXPECTED and second.return_text == '5')
+check('result owned after close', first.output == EXPECTED and second.return_text == '5')
 
 with mod.Program(GROW, 'grow.f', library=lib) as program:
     limited = program.run(heap_budget=BUDGET)

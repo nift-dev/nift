@@ -1,0 +1,2615 @@
+[
+ {
+  "name": "alias-7-0-loop",
+  "source_sha256": "395c7ccbb12c2af5fb14ec81a56bbfcbf7285c56831828d969959553882c53b8",
+  "source": "fn(h(z)) { z.push(8) }\nfn(f(p)) {\np.push(9)\n}\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ni0 := 0\nwhile (i0 < 1) {\ni0 += 1\nf(b)\n}\nprint(o.k.length())\nprint(a[0].length())\nprint(n.k[0].length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:12:3: not compiled for the VM (reference-guard:argument): an array or object use whose output would change once arrays and objects are references (argument) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:argument",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:argument",
+   "rule": "Q3 plan section 3 \"Call arguments\": the callee mutates the caller's array b (legacy copies arguments)",
+   "stdout": "1\n1\n1\n2\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n1\n2\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-7-0-top",
+  "source_sha256": "32b3988b159b1adf3ff0fb577229f79a0c61d8b1ea6e83dbea401897859bff2f",
+  "source": "fn(h(z)) { z.push(8) }\nfn(f(p)) {\np.push(9)\n}\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\nf(b)\nprint(o.k.length())\nprint(a[0].length())\nprint(n.k[0].length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:9:3: not compiled for the VM (reference-guard:argument): an array or object use whose output would change once arrays and objects are references (argument) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:argument",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:argument",
+   "rule": "Q3 plan section 3 \"Call arguments\": the callee mutates the caller's array b (legacy copies arguments)",
+   "stdout": "1\n1\n1\n2\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n1\n2\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-7-3-top",
+  "source_sha256": "4bee6d458e14a3f600d01a3fbcc0d370135d299aceff96bb1c5a9decf2c4e9de",
+  "source": "fn(h(z)) { z.push(8) }\nfn(f(p)) {\nq := p\nq.push(1)\n}\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\nf(b)\nprint(o.k.length())\nprint(a[0].length())\nprint(n.k[0].length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:3:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Call arguments\": the callee mutates the caller's array b (legacy copies arguments)",
+   "stdout": "1\n1\n1\n2\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n1\n2\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-7-5-loop",
+  "source_sha256": "debebfadc7a4c08cfe77f1639bf95feab19cb3382e539b60f0c098923c4e060c",
+  "source": "fn(h(z)) { z.push(8) }\nfn(f(p)) {\nh(p)\n}\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ni0 := 0\nwhile (i0 < 1) {\ni0 += 1\nf(b)\n}\nprint(o.k.length())\nprint(a[0].length())\nprint(n.k[0].length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:3:3: not compiled for the VM (reference-guard:argument): an array or object use whose output would change once arrays and objects are references (argument) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:argument",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:argument",
+   "rule": "Q3 plan section 3 \"Call arguments\": the callee mutates the caller's array b (legacy copies arguments)",
+   "stdout": "1\n1\n1\n2\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n1\n2\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-7-5-top",
+  "source_sha256": "4dfecd96cb96a1b484ead7af662344de34dd035340b72df08defeb72e89d9fae",
+  "source": "fn(h(z)) { z.push(8) }\nfn(f(p)) {\nh(p)\n}\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\nf(b)\nprint(o.k.length())\nprint(a[0].length())\nprint(n.k[0].length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:3:3: not compiled for the VM (reference-guard:argument): an array or object use whose output would change once arrays and objects are references (argument) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:argument",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:argument",
+   "rule": "Q3 plan section 3 \"Call arguments\": the callee mutates the caller's array b (legacy copies arguments)",
+   "stdout": "1\n1\n1\n2\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n1\n2\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y.push(2)-fn-top",
+  "source_sha256": "a5a67c69c6798cdc33015835a74988b115ddb3955ef5856016cb7cf7b0246fbe",
+  "source": "fn(w0()) {\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\nreturn 0\n}\nprint(w0())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:6:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n0\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n0\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n0\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y.push(2)-loop",
+  "source_sha256": "d731dd49f001d726fa8d6cb4d619a8cd125da8a401126011637e2dbb397d05aa",
+  "source": "i0 := 0\nwhile (i0 < 1) {\ni0 += 1\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n}\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:8:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y.push(2)-top",
+  "source_sha256": "e38395973332bd320057d83cb63de28e9aae7f9234ebb4725261f16b02c3430c",
+  "source": "o := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y[0] = 3-fn-top",
+  "source_sha256": "b674ac278b729547269b92bcb848021aef1c34d76854f60d2d6e089e5b7e0bf5",
+  "source": "fn(w0()) {\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\nreturn 0\n}\nprint(w0())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:6:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n0\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n0\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n0\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y[0] = 3-loop",
+  "source_sha256": "868f470f8e83c90646d8246d11356be0cbbc59083ed1ff0d605904980f836593",
+  "source": "i0 := 0\nwhile (i0 < 1) {\ni0 += 1\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n}\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:8:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-3-y[0] = 3-top",
+  "source_sha256": "8264ba3ebe360a30ae84d0632b609aae56dbca2e0e1e55b5f768858af290e72d",
+  "source": "o := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := (true ? o.k : [0])\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y.push(2)-fn-top",
+  "source_sha256": "64515d87e8383920ed40b115a90cfad43d015ec315321e7d3dc69efbf58f0336",
+  "source": "fn(w0()) {\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\nreturn 0\n}\nprint(w0())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:6:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n0\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n0\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n0\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y.push(2)-loop",
+  "source_sha256": "f42ecd23c3b84222ab5249a2e5da4ae4cd4ee4e530f68fb9e90516e15fb6583f",
+  "source": "i0 := 0\nwhile (i0 < 1) {\ni0 += 1\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n}\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:8:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y.push(2)-top",
+  "source_sha256": "a6dea1a567091eef18840c5b19c3e1d7f45b4b4e1d45b151ea17de5e5e259ec8",
+  "source": "o := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny.push(2)\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "2\n1\n1\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "2\n1\n1\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y[0] = 3-fn-top",
+  "source_sha256": "ef15463e34e38a3d547ba0db0251505e3a8983558ca1369e9107085c3dfb75d4",
+  "source": "fn(w0()) {\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\nreturn 0\n}\nprint(w0())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:6:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n0\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n0\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n0\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y[0] = 3-loop",
+  "source_sha256": "b0b252d1ff7caec74ceabffae4416e4a0ddd8edae912025293ac6521f3ac1997",
+  "source": "i0 := 0\nwhile (i0 < 1) {\ni0 += 1\no := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n}\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:8:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "alias-decl-4-y[0] = 3-top",
+  "source_sha256": "2d83b2adf885d81de832bf36f7f95e3442e2158e66f2045d16676a8f01cd47c9",
+  "source": "o := {\"k\": [1]}\na := [[1]]\nn := {\"k\": [[1]]}\nb := [1]\ny := o.k ?? [0]\ny[0] = 3\nprint(o.k.length())\nprint(b.length())\nprint(o.k[0])\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:6: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Extraction\" + \"Assignment, declaration\": y is the element o.k itself (legacy copies the expression result)",
+   "stdout": "1\n1\n3\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "1\n1\n3\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-8-0-loop",
+  "source_sha256": "b02f1a57d39079eb5a4735f10c28c07ff9b21e7a99b40612ee6122d311def75f",
+  "source": "print(\"b\")\nfor (v : [\" a \", map()]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\na\n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\na\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\na\n",
+   "stderr_first": "error: p.f:2:34: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-8-10-loop",
+  "source_sha256": "d7c309fc6e035d273ce84b43d4af945c0ee14621780b2e675957819014dfd9f8",
+  "source": "print(\"b\")\nfor (v : [\" a \", map()]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n A \n\u001fNIFT:COLLECTION:1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n A \n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n A \n",
+   "stderr_first": "error: p.f:2:34: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-8-2-loop",
+  "source_sha256": "d82cc8f6204bcdd2e6244d2e6018158ab0537c5cf8019f92621f893cea72bc78",
+  "source": "print(\"b\")\nfor (v : [\" a \", map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n a \n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n a \n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n a \n",
+   "stderr_first": "error: p.f:2:34: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-9-0-loop",
+  "source_sha256": "6e1100f41e884b5f1c34af654f491568e24795e886b15de5d3d637c3782d05f8",
+  "source": "print(\"b\")\nfor (v : [\" a \", stack()]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\na\n",
+    "stderr_first": "error: p.f:2:30: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\na\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\na\n",
+   "stderr_first": "error: p.f:2:36: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-9-10-loop",
+  "source_sha256": "4418af1600c3f8c88524438d92e84ca8e0258d8c4529778eb6256a6e9e8f64e6",
+  "source": "print(\"b\")\nfor (v : [\" a \", stack()]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n A \n\u001fNIFT:COLLECTION:1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n A \n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n A \n",
+   "stderr_first": "error: p.f:2:36: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-0-9-2-loop",
+  "source_sha256": "96c8b1fe3f6a164f4008cbc3f15fc71ba088e8b3762aebf7553219469e5a95e1",
+  "source": "print(\"b\")\nfor (v : [\" a \", stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n a \n",
+    "stderr_first": "error: p.f:2:30: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n a \n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n a \n",
+   "stderr_first": "error: p.f:2:36: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-1-8-2-loop",
+  "source_sha256": "26ee37b5828462c2f511a0c65f3d32293ef358754cf18f36ae499993edf11865",
+  "source": "print(\"b\")\nfor (v : [5, map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:30: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n5\n",
+    "stderr_first": "error: p.f:2:24: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n5\n",
+   "stderr_first": "error: p.f:2:30: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-1-9-2-fn",
+  "source_sha256": "d184de5fda608e171edd291096229c97c12dcb51f782ffdc14f2f97668306097",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(5)\nf(stack())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n5\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n5\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-1-9-2-loop",
+  "source_sha256": "042873d77fc62a520a175b4bc0f343c535879383fff5e3179e5fd4abe8e6f860",
+  "source": "print(\"b\")\nfor (v : [5, stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:32: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n5\n",
+    "stderr_first": "error: p.f:2:26: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n5\n",
+   "stderr_first": "error: p.f:2:32: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-2-8-2-fn",
+  "source_sha256": "8be064b66744e4a0c5c9fa2df00a1f1f8166b9a087d88d057d79d8221126cd36",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(2.5)\nf(map())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n2.5\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n2.5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n2.5\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-2-8-2-loop",
+  "source_sha256": "2d8f67aeb8b21a0dfc9eb4cfa02f8fe6fef70fafbd44c7e3cdb02753381eb897",
+  "source": "print(\"b\")\nfor (v : [2.5, map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:32: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n2.5\n",
+    "stderr_first": "error: p.f:2:26: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n2.5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n2.5\n",
+   "stderr_first": "error: p.f:2:32: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-2-9-2-loop",
+  "source_sha256": "263de5557b2090785592a3af8a98b8d4b577fb4a65afd3d77c6b0c63526cc652",
+  "source": "print(\"b\")\nfor (v : [2.5, stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n2.5\n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n2.5\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n2.5\n",
+   "stderr_first": "error: p.f:2:34: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-3-8-2-loop",
+  "source_sha256": "30b7eb1b66830288ca3b3d927fc9813f3d5745f55b75afba1f39b2600df75cfd",
+  "source": "print(\"b\")\nfor (v : [true, map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\ntrue\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\ntrue\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\ntrue\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-3-9-2-loop",
+  "source_sha256": "9969a81a6930e03f5c87e81a00306d258bb0fa0db0382189dde99e1b1345f964",
+  "source": "print(\"b\")\nfor (v : [true, stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\ntrue\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\ntrue\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\ntrue\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-4-8-2-loop",
+  "source_sha256": "ba34ce58dc38ee97b950ae0f1d3d8ba43cdcef61364dc05a32dcf889dcbe5234",
+  "source": "print(\"b\")\nfor (v : [null, map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nnull\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nnull\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nnull\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-4-9-2-fn",
+  "source_sha256": "17a86cce48a19f37ad6df6eca2512f84cdf9e02623c794f2ac4335328fa31095",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(null)\nf(stack())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nnull\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nnull\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nnull\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-4-9-2-loop",
+  "source_sha256": "88bb424922d285a3d99182c79c2035c4c60d5baf6bfde7b8d4387f2e656d883f",
+  "source": "print(\"b\")\nfor (v : [null, stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nnull\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nnull\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nnull\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-8-0-loop",
+  "source_sha256": "abb64642260fa3c7c2abd1c8102e4a08824daff7ec3c782b3d1dd6e29e910c61",
+  "source": "print(\"b\")\nfor (v : [\"xa\", map()]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nxa\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\nxa\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nxa\n",
+   "stderr_first": "error: p.f:2:33: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-8-10-loop",
+  "source_sha256": "68f54156b91b2700427b88de79110bfb351d4d34e48d469670faefad2559325f",
+  "source": "print(\"b\")\nfor (v : [\"xa\", map()]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\nXA\n\u001fNIFT:COLLECTION:1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\nXA\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nXA\n",
+   "stderr_first": "error: p.f:2:33: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-8-2-loop",
+  "source_sha256": "b8d2aec38b281d55c2a2968b3ddc469cb21c2ed486e5ba083f23a4a2b065b90d",
+  "source": "print(\"b\")\nfor (v : [\"xa\", map()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nxa\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nxa\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nxa\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-9-0-loop",
+  "source_sha256": "0d180caadb10d7aa8f814194a85de4ca01dedf67ca45506b751fec5e6847a9d7",
+  "source": "print(\"b\")\nfor (v : [\"xa\", stack()]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nxa\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\nxa\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nxa\n",
+   "stderr_first": "error: p.f:2:35: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-9-10-loop",
+  "source_sha256": "6f1bc3095a03f727ed18ac06ff7dc9f8db9e56df638c17b25122bb2e32cf85cf",
+  "source": "print(\"b\")\nfor (v : [\"xa\", stack()]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\nXA\n\u001fNIFT:COLLECTION:1\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\nXA\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nXA\n",
+   "stderr_first": "error: p.f:2:35: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-9-2-fn",
+  "source_sha256": "c104ebe07620cd14d8d5f1f7d4dd71b54fed4c09db9aaa7d5cc818bb73e3483d",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(\"xa\")\nf(stack())\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nxa\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nxa\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nxa\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-7-9-2-loop",
+  "source_sha256": "f1c04a0af5566f14e2a299899965886826b52bdc2c5e80d628091f06f49a4bd0",
+  "source": "print(\"b\")\nfor (v : [\"xa\", stack()]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\nxa\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\nxa\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\nxa\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-0-0-loop",
+  "source_sha256": "fe1a9625e2f6587cc1cb6e4747bd695fe444d310287a0ecabc5c74753bbdb3c8",
+  "source": "print(\"b\")\nfor (v : [map(), \" a \"]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:34: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-0-10-loop",
+  "source_sha256": "881cd1c9bd87c3baf5b7887c8d3651908ac20527015568cf29834b5079d50f78",
+  "source": "print(\"b\")\nfor (v : [map(), \" a \"]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n\u001fNIFT:COLLECTION:1\n A \n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:34: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-0-2-loop",
+  "source_sha256": "cc36561a018c55ca608aa55b0d50f5b08b06bf6adf313b89e61a1aabfd37aa4e",
+  "source": "print(\"b\")\nfor (v : [map(), \" a \"]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:34: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-1-2-loop",
+  "source_sha256": "81e8f7fc7d053a7a397583418368f8544550b7ce0e84c12395614a539eb28813",
+  "source": "print(\"b\")\nfor (v : [map(), 5]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:30: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:24: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:30: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-2-2-fn",
+  "source_sha256": "a07d52495938d0f0fb5ef54f11ee78c50a107004bd1a51e099428991bf3178dc",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(map())\nf(2.5)\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-2-2-loop",
+  "source_sha256": "58b2f539b43d5f8c931c051f4d0b3084cd02e49968adc5f9d3171b7d3b279c56",
+  "source": "print(\"b\")\nfor (v : [map(), 2.5]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:32: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:26: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:32: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-3-2-loop",
+  "source_sha256": "618ff66576dd4421629541875ef48a16c54f442bbd91cb5620e7640b3353082e",
+  "source": "print(\"b\")\nfor (v : [map(), true]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-4-2-loop",
+  "source_sha256": "16f07c6c303af3cb1f9715f7ed1a6df54c966644a4ea42f68251d6b860bdebe1",
+  "source": "print(\"b\")\nfor (v : [map(), null]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-7-0-loop",
+  "source_sha256": "b3ac6de922f61465bbbc16a1ff6bc70d0d429f46ef6677f632e59ead30c3744a",
+  "source": "print(\"b\")\nfor (v : [map(), \"xa\"]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:33: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-7-10-loop",
+  "source_sha256": "5baf9478e7010f7279a82b79bf708059817acd1df54bac0b7d5bf33c238a12f8",
+  "source": "print(\"b\")\nfor (v : [map(), \"xa\"]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n\u001fNIFT:COLLECTION:1\nXA\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:33: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-8-7-2-loop",
+  "source_sha256": "9e8940106e0eb2940de60a5dcfcd247a2ee9d93663d155d509d3d393981b4ae9",
+  "source": "print(\"b\")\nfor (v : [map(), \"xa\"]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:33: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:27: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:33: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-0-0-loop",
+  "source_sha256": "bb13d54dac831ae9ec69d3bd9047ae90fa0a89ca024cf9f777a383de245f134c",
+  "source": "print(\"b\")\nfor (v : [stack(), \" a \"]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:30: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:36: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-0-10-loop",
+  "source_sha256": "5ff1014c8d1fbc4eb9d0623917a3bf1c9977ca7df8275069267a9f52be7b494a",
+  "source": "print(\"b\")\nfor (v : [stack(), \" a \"]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n\u001fNIFT:COLLECTION:1\n A \n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:36: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-0-2-loop",
+  "source_sha256": "cd97aa575c770a0940f156afcbba699bb36630adda8a1475c96e6c7c9b18f9a5",
+  "source": "print(\"b\")\nfor (v : [stack(), \" a \"]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:36: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:30: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:36: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-1-2-fn",
+  "source_sha256": "f20acc4e9172d5f38bf82a22c2ec18c2a6cb3ca3a743d10234a45b69dd62ef80",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(stack())\nf(5)\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-1-2-loop",
+  "source_sha256": "44ef51c8d9ad3a4d64c0f644c274ca8cc1f38450f3b5e9dc47a2a59f79127288",
+  "source": "print(\"b\")\nfor (v : [stack(), 5]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:32: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:26: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:32: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-2-2-loop",
+  "source_sha256": "b8e5b85284ebe6e2b1d61acd2ddd720c13e0f91646737bc7efd0c497b7c00703",
+  "source": "print(\"b\")\nfor (v : [stack(), 2.5]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:34: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:28: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:34: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-3-2-loop",
+  "source_sha256": "10a67f86d025753f1b2c7d3ebfae0833720795b2bb9824f31584fe0eb6da220a",
+  "source": "print(\"b\")\nfor (v : [stack(), true]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-4-2-fn",
+  "source_sha256": "1defed0281ffacc2845be467c16e20e6279538c2ab66ccc30466a39684ca89c8",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(stack())\nf(null)\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-4-2-loop",
+  "source_sha256": "97aaea68d76fb02a892d594d1fdc461c8fbf7a267ab16faf2bc17ad587289c1c",
+  "source": "print(\"b\")\nfor (v : [stack(), null]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-7-0-loop",
+  "source_sha256": "eb8a8784ab496046ab4dae3a39a57d45615417291edaacdab1558cab30ad4677",
+  "source": "print(\"b\")\nfor (v : [stack(), \"xa\"]) { print(v.trim()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:trim): `trim()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:trim",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:trim",
+   "rule": "owner 2026-11-07 04:47 (item B): ordinary program error with legacy's family text; same output and exit (legacy reports print's failure instead)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.trim()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:35: unknown value or malformed expression: v.trim()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.trim()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-7-10-loop",
+  "source_sha256": "70b9279d45a842780f9c0c2091c37f5d09fb887121461ac9504851af4ca7be53",
+  "source": "print(\"b\")\nfor (v : [stack(), \"xa\"]) { print(v.to_upper()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_upper): `to_upper()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_upper",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "b\n\u001fNIFT:COLLECTION:1\nXA\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_upper",
+   "rule": "owner 2026-11-07 04:47 (item B): a wrong-kind receiver is an ordinary program error, never a leaked tag (legacy prints the internal collection tag and exits 0)",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "unknown value or malformed expression: v.to_upper()"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:35: unknown value or malformed expression: v.to_upper()",
+   "outcome": "vm-error",
+   "reason": "unknown value or malformed expression: v.to_upper()",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-7-2-fn",
+  "source_sha256": "ae9bf377541a4193c5c63a68f7ee462d3b9295b2ba263639c2b4a7b5b71cb6c3",
+  "source": "print(\"b\")\nfn(f(v)) { print(v.to_string()) }\nf(stack())\nf(\"xa\")\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:18: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:18: unknown value or malformed expression: v.to_string()",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:18: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "mixed-9-7-2-loop",
+  "source_sha256": "1f3623b2d9a8416d8dc12c280fe09d5c121a56b2eb3e896729b22dc1caff849e",
+  "source": "print(\"b\")\nfor (v : [stack(), \"xa\"]) { print(v.to_string()) }\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:2:35: not compiled for the VM (builtin-receiver:to_string): `to_string()` on this kind of receiver is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "builtin-receiver:to_string",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr_first": "error: p.f:2:29: print: value is not directly renderable",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:builtin-receiver:to_string",
+   "rule": "B0 rendering rule (map/set/stack to_string is an ordinary error, B0 text; b5-refsem section 8 B); same output and exit; owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "b\n",
+   "exit": 1,
+   "error": "map, set and stack values cannot be rendered as text"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "b\n",
+   "stderr_first": "error: p.f:2:35: map, set and stack values cannot be rendered as text",
+   "outcome": "vm-error",
+   "reason": "map, set and stack values cannot be rendered as text",
+   "files_created": []
+  }
+ },
+ {
+  "name": "shadow-1-295",
+  "source_sha256": "321a98462bc29d81fd1d43b1a19de4f4108a9ec2fd217e8a82e2667984fa152a",
+  "source": "p := [3]\np = [1, 2]\ns := 1.25 / 3 + (true ? 2 : 3.75) < p[0] - 1e2\nt := s\nq := (p)\nc1 := 0\nwhile(c1 < 2) {\n  c1 += 1\n  q.push((true ? 0 : (true ? 1e2 : 2.5)))\n  if((\"\" == \"7\" && t)) {\n    print(null)\n  }\n  p.push(c1)\n  p = [1, 2, 3]\n  c2 := 0\n  while(c2 < 1) {\n    c2 += 1\n    q[0] = c2 / 3\n    print(q.length() - ((true && true) ? c1 : (false ? 0.5 : -1.5)))\n  }\n}\nprint(3.75 - 0 * 1e2 * 7 * 7)\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:7: not compiled for the VM (reference-guard:inflow): an array or object use whose output would change once arrays and objects are references (inflow) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "reference-guard:inflow",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 0,
+    "stdout": "2\n2\n3.75\n",
+    "stderr_first": "",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:reference-guard:inflow",
+   "rule": "Q3 plan section 3 \"Assignment, declaration\": q := (p) shares p's array, so p.push reaches q (legacy copies the parenthesized expression)",
+   "stdout": "3\n3\n3.75\n",
+   "exit": 0,
+   "error": ""
+  },
+  "b5_observed": {
+   "exit": 0,
+   "stdout": "3\n3\n3.75\n",
+   "stderr_first": "",
+   "outcome": "vm",
+   "reason": "",
+   "files_created": []
+  }
+ },
+ {
+  "name": "shadow-1-669",
+  "source_sha256": "186cc212949d11d63d936ac21340d15ae16c860cd8e11e76729bce3599642ea1",
+  "source": "fn(f0(b)) {\n  c1 := 0\n  while(c1 < 3) {\n    c1 += 1\n    b = b\n    if(false) { break }\n  }\n  s := {\"k\": 5}\n  return 2 - 3.75 % 3 != b.length() % 3\n}\nprint((false ? 7 : 40))\nprint(((true || true) ? (true ? 40 : 2.5) : 1.25 * 0) - 1.25)\nt := [1, 2, 3]\nc2 := 0\nwhile(c2 < 1) {\n  c2 += 1\n  print(t[0])\n}\ns := t\np := (t)\nc3 := 0\nwhile(c3 < 2) {\n  c3 += 1\n  q := \"2.5\" + true + true + null\n  print(null)\n}\nf0([1, 2])\nc4 := 0\nwhile(c4 < 1) {\n  c4 += 1\n  c5 := 0\n  while(c5 < 3) {\n    c5 += 1\n    f0([1, 2])\n  }\n  t = [1, 2]\n  t.push(40 - (false ? 1 : 40))\n  if(false) {\n    print(\"x\" + 1e2 + 40 + 0)\n    print((1e2 == 2.5 ? c4 : (false ? 2 : 0.5)) / 2)\n    s = [1, 2]\n  }\n}\np[0] = -1.5\nprint(\"t\" + true + \"t\" + 1e2 + true)\n",
+  "original_expectation": {
+   "gate": "vm_adversarial before B5: the VM result equals legacy (NIFT_VM=0) on stdout, exit status and error text, or the program is refused before any effect (counted as fallback)",
+   "b4b_17f7964c_require": {
+    "exit": 1,
+    "stdout": "",
+    "stderr_first": "error: p.f:5:5: not compiled for the VM (aliasing): shared references to arrays or objects (aliasing) is not supported by the Runtime 2.0 VM yet",
+    "outcome": "require-error",
+    "reason": "aliasing",
+    "files_created": []
+   },
+   "legacy": {
+    "exit": 1,
+    "stdout": "40\n38.75\n1\nnull\nnull\n",
+    "stderr_first": "error: p.f:9:3: return: modulo requires integer-valued operands",
+    "outcome": null,
+    "reason": null,
+    "files_created": []
+   }
+  },
+  "current_pin": {
+   "b4b_tip": "refused:aliasing",
+   "rule": "diagnostic text only: legacy prefixes \"return:\" (D-009#5 family); owner priorities 2026-11-01: legacy error text is not a requirement",
+   "stdout": "40\n38.75\n1\nnull\nnull\n",
+   "exit": 1,
+   "error": "modulo requires integer-valued operands"
+  },
+  "b5_observed": {
+   "exit": 1,
+   "stdout": "40\n38.75\n1\nnull\nnull\n",
+   "stderr_first": "error: p.f:9:14: modulo requires integer-valued operands",
+   "outcome": "vm-error",
+   "reason": "modulo requires integer-valued operands",
+   "files_created": []
+  }
+ }
+]

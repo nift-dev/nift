@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
-"""Full-session higher-order and reserved-binding legacy-channel witnesses."""
+"""Full-session higher-order and reserved-binding legacy-channel witnesses.
+
+Needs a legacy oracle: --legacy BINARY is run with NIFT_VM=0 (the Makefile passes
+CP19_LEGACY_ORACLE and stops with exit 2 when it is unset). Locally any nift binary built from
+this tree or from the B4b tip serves (the legacy engine is unchanged by Phase B); certification
+uses the frozen legacy binary:
+  make test-cp19-proof-cli CP19_LEGACY_ORACLE=/path/to/legacy/nift
+
+Every case runs on the oracle (lane legacy), then on --nift with NIFT_VM=1 and NIFT_VM=require.
+A passing case must equal the oracle on every channel, with every statement run by the VM.
+
+EXPECTED_REFUSALS (B5 fix-up, review F1; owner 2026-11-07 11:07) pins, separately from the
+passing cases, the four session programs B4b production (17f7964c) admitted legacy-equal and B5
+refuses before any effect: D4 admission regressions, accepted for the B5 checkpoint only and
+RELEASE BLOCKERS (not waived). Each must be refused at its pinned statement with its pinned reason,
+with exactly the oracle's output of the earlier statements and nothing of the refused statement or
+later; when one is admitted again the run FAILS, so the pin (and b5-refsem.md section 11.1) is
+updated deliberately. PROFILE_REFUSALS: `comparator` is refused method:sort before any effect off
+the frozen GCC 15.2 libstdc++ profile (D2, release blocker) and must pass as an ordinary case on it.
+"""
 import argparse,json,os,subprocess,tempfile
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--legacy',required=True)
@@ -46,22 +65,74 @@ cases=[
  ('named-alias-place','fn(g(p)){return p+1};f:=g;a:=[1]\nf(a[0])\nexit\n',0),
  ('multiple-named','fn(g(p)){return p+1};fn(h(p)){return p+2};a:=[g,h]\nf:=a[0];f(3)\nf = a[1]\nf(3)\nexit\n',0),
 ]
+# case -> (refused statement, reason, classification, reported location). Causes are not uniform
+# (review F1). The location is pinned exactly as reported (truthful: no position, the refused
+# input's start line, or the earlier unit that defined the refused code).
+EXPECTED_REFUSALS = {
+ 'shared-callable-replacement': (2, 'session:current-callable-proof',
+  'D4 cause: a fact-proved historical call opens every exposed class and infer_session.cpp:137 exposes both session-heap classes',
+  'error: <stdin> (the VM gave no exact position): '),
+ 'field': (2, 'session:callable-flow',
+  'a callable flowing through an object field (not the D4 cause: still refused without the heap exposure); a plain later a.push is refused because earlier code reads a[0]',
+  'error: <stdin>: in earlier input, at line 1, column 24 of the unit that defined it: '),
+ 'element': (2, 'session:current-callable-proof',
+  'D4 cause plus a second refusal (without the heap exposure statement 2 runs and statement 3 is still refused); a plain later a.push is refused because earlier code reads a[0]',
+  'error: <stdin>:2 (the start line of the refused input; the VM gave no exact position): '),
+ 'sibling-effects': (3, 'session:callable-flow',
+  'D4 cause (infer_session.cpp:137 exposes both session-heap classes)',
+  'error: <stdin>:3:6: '),
+}
+PROFILE_REFUSALS = {'comparator': (1, 'method:sort', 'D2: comparator sort off the GCC 15.2 libstdc++ profile',
+  'error: <stdin>:1:26: ')}
+
+
+def run_lane(binary, mode, source):
+ with tempfile.TemporaryDirectory(prefix='cp19-proof-cli-') as td:
+  stats=Path(td)/'stats';env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')}
+  env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')
+  r=subprocess.run([str(Path(binary).resolve()),'-i'],input=source,cwd=td,env=env,text=True,capture_output=True,timeout=30)
+  counters=[json.loads(x) for x in stats.read_text().splitlines()] if stats.exists() else []
+  return r,counters
+
+
+def passes(channels,oracle,counters,source,errors):
+ return (channels==oracle and len(counters)==len(source.splitlines())-1 and
+  all(x['vm_executions']==1 and x['legacy_executions']==0 and x['outcome'] in ('vm','vm-error') for x in counters) and
+  sum(x['outcome']=='vm-error' for x in counters)==errors)
+
+
+refused_seen=[]
 for name,source,errors in cases:
  oracle=None
  for lane,binary,mode in [('legacy',a.legacy,'0'),('mode1',a.nift,'1'),('require',a.nift,'require')]:
-  with tempfile.TemporaryDirectory(prefix='cp19-proof-cli-') as td:
-   stats=Path(td)/'stats';env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')}
-   env.update(HOME=td,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NO_COLOR='1')
-   r=subprocess.run([str(Path(binary).resolve()),'-i'],input=source,cwd=td,env=env,text=True,capture_output=True,timeout=30)
-   counters=[json.loads(x) for x in stats.read_text().splitlines()] if stats.exists() else []
+   r,counters=run_lane(binary,mode,source)
    row=dict(case=name,lane=lane,source=source,status=r.returncode,stdout=r.stdout,stderr=r.stderr,stats=counters)
    rows.append(row);a.out.write_text(json.dumps(rows,indent=2)+'\n')
    channels=(r.returncode,r.stdout,r.stderr)
    if oracle is None:
     oracle=channels;assert r.returncode==0 and sum(x.startswith('error: ') for x in r.stderr.splitlines())==errors,row
+   elif name in EXPECTED_REFUSALS or name in PROFILE_REFUSALS:
+    statement,reason,why,where=EXPECTED_REFUSALS.get(name) or PROFILE_REFUSALS[name]
+    if name in PROFILE_REFUSALS and passes(channels,oracle,counters,source,errors):
+     row['profile']='admitted (frozen comparator profile)';continue
+    assert not passes(channels,oracle,counters,source,errors),('EXPECTED REFUSAL NO LONGER OCCURS: %s is admitted and legacy-equal; '
+     'remove its pin here and update b5-refsem.md 11.1 (D4 release blocker)'%name,row)
+    lines=source.splitlines()
+    prefix,_=run_lane(a.legacy,'0','\n'.join(lines[:statement-1]+['exit'])+'\n')
+    assert r.returncode==1,row
+    assert r.stderr.startswith(where+'NIFT_VM session refused: %s:'%reason),(name,statement,reason,where,row)
+    assert r.stdout==prefix.stdout,('output differs from the oracle before the refused statement',prefix.stdout,row)
+    assert len(counters)==statement and counters[-1]['outcome']=='require-error' and counters[-1]['reason']==reason,row
+    assert all(x['vm_executions']==1 and x['legacy_executions']==0 for x in counters[:-1]),row
+    assert counters[-1]['vm_executions']==0 and counters[-1]['legacy_executions']==0,row
+    refused_seen.append('%s/%s: statement %d %s (%s)'%(name,lane,statement,reason,why))
    else:
     assert channels==oracle,(oracle,row)
     assert len(counters)==len(source.splitlines())-1,row
     assert all(x['vm_executions']==1 and x['legacy_executions']==0 and x['outcome'] in ('vm','vm-error') for x in counters),row
     assert sum(x['outcome']=='vm-error' for x in counters)==errors,row
-print('PASS full-session proof and remaining-admission witnesses:',len(rows),'legacy-channel observations')
+for line in refused_seen: print('EXPECTED REFUSAL',line)
+profile_refused=sorted({x.split('/')[0] for x in refused_seen} & set(PROFILE_REFUSALS))
+print('PASS full-session proof and remaining-admission witnesses:',len(rows),'legacy-channel observations;',
+      len(cases)-len(EXPECTED_REFUSALS)-len(profile_refused),'admitted cases legacy-equal,',len(EXPECTED_REFUSALS),
+      'pinned D4 refusals (release blockers),',len(profile_refused),'refused by the comparator profile gate (D2)',profile_refused)

@@ -1001,6 +1001,14 @@ test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
 	bash tests/runtime2/b5/mutants.sh
+# B5 fix-up (review F6): the gen1 and gen_struct wrong-kind generators, from the candidate tree only
+# (tests/runtime2/b5/gen, the tree's builtin table), on the production build, then their negative
+# controls (a missing tree and a truncated builtin table must exit 2 and write nothing).
+.PHONY: test-runtime2-b5-generators
+test-runtime2-b5-generators: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b5-generators: $(TARGET)
+	$(PYTHON) -I tests/runtime2/b5/gen/gate.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
+	$(PYTHON) -I tests/runtime2/b5/gen/gate.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
 # B4b review (L4): the standing guard-off gate. The CLI linked with the B2
 # reference-probe compiler objects (-DNIFT_RT_REFERENCE_PROBE: no Phase A guard,
 # no `aliasing` refusal; arrays and objects shared), a TEST configuration that
@@ -5131,6 +5139,7 @@ $(TEST_DIR)/cp19/session-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(CP
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(CP19_EXPR_SAN_OBJECTS) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 $(TEST_DIR)/cp19/session-switch-sanitize$(EXEEXT): tests/runtime2/cp19/session.cpp $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
@@ -5141,48 +5150,56 @@ test-cp19-session-sanitize: $(TEST_DIR)/cp19/session-sanitize$(EXEEXT) $(TEST_DI
 
 # Real session mutation controls, each swapping one production object.
 $(TEST_DIR)/cp19/session-control$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(CP19_EXPR_OBJECTS)
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_EXPR_OBJECTS) $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m1.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=1 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m1$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m1.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m2.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=2 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m2$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m2.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m3.o: src/rt/vm_session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=3 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m3$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m3.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m4.o: src/rt/session.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=4 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m4$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/session.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m4.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m5.o: src/rt/vm_closure.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=5 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m5$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm_closure.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m5.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m6.o: src/rt/compiler_assign_expr.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=6 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m6$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_assign_expr.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m6.o $(LDLIBS) -o $@
 $(TEST_DIR)/cp19/session-m7.o: src/rt/compiler_session_contract.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_SESSION_MUTANT=7 -MMD -MP -c $< -o $@
 $(TEST_DIR)/cp19/session-m7$(EXEEXT): tests/runtime2/cp19/session_mutants.cpp $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o
+	@mkdir -p $(dir $@)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/compiler_session_contract.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp19/session-m7.o $(LDLIBS) -o $@
 -include $(wildcard $(TEST_DIR)/cp19/session-m*.d)
