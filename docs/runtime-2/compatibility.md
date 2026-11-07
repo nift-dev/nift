@@ -112,6 +112,25 @@ replacement (`[3]`). Coordinator ruling under the owner's
 correctness-over-legacy policy, owner-approved, 2026-11-01 (D-NEXT-refsem
 round 4); the owner may reverse it.
 
+## Receiver and operand order (combined B3-B5 candidate, H-A)
+
+A method or element operation evaluates its receiver first and uses that value, retained, while
+its arguments, index and value are evaluated; an element store evaluates its value before its
+index. An argument that rebinds the receiver's name, or drops every other reference to it, does
+not redirect the operation. This is legacy's canonical order; the VM read top-level, session and
+function-global receivers late until the combined candidate's repair (owner 2026-11-07 18:00 D1;
+`docs/runtime-2/checkpoints/combined-b3-b5.md`). Fixtures: `tests/runtime2/b5/evalorder/`;
+generator: `tests/runtime2/b5/gen/gen_evalorder.py`.
+
+| Program | Legacy | Runtime 2.0 |
+| --- | --- | --- |
+| `b := [1]; c := b; g := () => { b = [7]; return 4 }; b.push(g())` (and `insert`, `remove`, `splice`, map `set`/`remove`, set `add`/`remove`, stack `push`, `b[0] = g()`, `b[g()]`, sessions) | `b` `[7]`, `c` `[1,4]` | the same (fc987ec1 and earlier: `[7,4]`, `[1]`) |
+| `i := 0; fn(g()) { i = 1; return 5 }; b[i] = g()` in a function, a closure or a session | stores at index 1 (the value before the index) | the same (fc987ec1: index 0 there) |
+| (**PENDING-OWNER**) `b := [1, 2]; fn(g()) { b = [7, 8]; return 4 }; b[0] = g()` (element store whose value calls a `fn` that rebinds the receiver) | `[4,8]`: the receiver is resolved after a `fn` call (after a lambda call it is resolved first: `[7,8]`) | `[7,8]`, one order for every callee; previously admitted and legacy-equal (17f7964c, weekend/r2: `[4,8]`) |
+| (**PENDING-OWNER**) the rebinding forms inside a `while`/`for` body (legacy's prepared loop evaluator) | `push`, `set`, `add`, element store: receiver read late (`[7,4]`, `[1]`); `insert`, `remove`, `splice`, stack `push`: the mutation is lost (both arrays unchanged) | the canonical order (`[7]`, `[1,4]`); the late-read forms were previously admitted and legacy-equal |
+| `r := b[g()]` where `g` has an effect | `g` runs twice (a declaration evaluates its index key twice) | once (unchanged) |
+| `b := [1, 2]; fn(g()) { b = [7, 8]; return 0 }; b.remove(g())` (no other reference to the original) | `remove: index out of range` | removes from the original (retained); `b` is `[7,8]` |
+
 ## Documented compatibility differences (approved by the owner, not release blockers)
 
 | Difference | Legacy | VM | Status |

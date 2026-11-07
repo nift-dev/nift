@@ -44,6 +44,33 @@ is not reached by a `certify-targets` recipe. The only CI-only script is
 Classification never relies on a target's name alone. `--strict` also fails on
 anything that is not PASS or FLAKY.
 
+## Combined-candidate harness (C1-C3, 2026-11-07)
+
+Owner 2026-11-07 18:00 (D2/D3); details in `checkpoints/combined-b3-b5.md` section 6.
+
+- **The plan is not `certify-targets` alone.** `certify.py` plans `certify-targets` plus the
+  Runtime 2.0 inventory derived from the Make database (every defined target named like a
+  Runtime 2.0 gate, `inventory()`), minus the named non-gates (`NON_GATE`, each with a reason).
+  `MANDATORY` names the owner's B3-B5 gates. `python3 scripts/certify.py --check-plan` fails on
+  any unplanned inventory or mandatory gate or a stale non-gate; the guard also drops gates from
+  the plan (`--drop`) and requires the check to fail. `--list` is the dry run: every planned
+  gate, its mode and command, the inventory check and the preflight.
+- **No masking.** Umbrella targets are expanded: their gate prerequisites are entries of their
+  own and the umbrella's own recipe runs last as `make -k T -o P ...`. Every entry runs with
+  `make -k`.
+- **Report classes.** Each required gate is PASSED, FAILED-NEW, FAILED-BASELINE (identical
+  failure on a named baseline: `--baseline` v4.12.0 for legacy compatibility,
+  `--regression-baseline NAME=TREE` for the accepted B4b `17f7964c` and weekend/r2, reported per
+  baseline), BLOCKED (missing dependency or harness, a skipped comparator test, a missing
+  oracle) or NOT-RUN. Only PASSED counts as a pass; FLAKY is FAILED-NEW (zero-flakiness
+  policy). Approved behavioural differences are the B5 expected-output table, checked by the
+  gates. Exit status 1 on FAILED-NEW or a comparator SKIP, 3 on BLOCKED/NOT-RUN, 2 when the
+  preflight fails.
+- **Preflight** (before any gate, after `make nift`): GCC 15.2 with `__GLIBCXX__` 20260321, a
+  comparator sort runs on the production VM, `NIFT_CP14B_REQUIRE_COMPARATOR=1`, and the v4.12.0
+  legacy oracle for `test-cp19-proof-cli` (`--legacy-oracle`, built from tag `v4.12.0` =
+  `ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb`; instructions in the checkpoint record, section 7).
+
 ## Exclusive targets
 
 From the isolation audit (`scripts/certify.py --audit report.json`, run in a
