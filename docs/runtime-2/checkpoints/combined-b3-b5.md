@@ -80,10 +80,13 @@ legacy-equal program whose output changes:
    `s.add`, element store, with either callee (`scratchpad/combined-fix/p9.json`). Fixture
    `evalorder/legacy_loop_order.f`.
 
+3. **A loop declaration's index read** (review of 0d853db4 M1): `r := b[g()]` in loop code with
+   `g` rebinding `b`: legacy 8 and 17f7964c 8, now 2. Fixture `evalorder/legacy_loop_decl_read.f`.
+
 Also observed, not changed by the repair (the VM already differed and is correct):
-3. legacy evaluates an index key **twice** in a declaration's initialiser (`r := b[g()]` calls `g`
+4. legacy evaluates an index key **twice** in a declaration's initialiser (`r := b[g()]` calls `g`
    twice); the VM evaluates it once (semantics.md: operands once each);
-4. legacy fails (`remove: index out of range`) when the argument drops the receiver's last other
+5. legacy fails (`remove: index out of range`) when the argument drops the receiver's last other
    reference; the VM keeps the retained receiver alive.
 
 ### 2.2 Same root cause outside H-A (STOP: not fixed, PENDING-OWNER)
@@ -114,11 +117,15 @@ variable's location and reloading it later is not used anywhere:
 - `compiler_literal_expr.cpp`: `may_rebind(operand)` (a call, assignment, compound assignment,
   increment or await anywhere in the operand) and `retain_receiver`.
 
-Diff (production sources, `git diff fc987ec1 C1 -- src`): 7 files, +88/-11, of which about 35
-executable lines; the rest are comments and the two mutant guards. No VM, protocol or runtime
-change. A captured loop binding still writes its (retained) receiver back after the mutation
-(unchanged; such programs whose argument rebinds the loop binding are refused,
-`for-capture-vanishing`).
+Diff (production sources, `git diff fc987ec1 C1 -- src`): 7 files, +88/-12 (corrected; the first
+version of this record said -11), of which about 35 executable lines; the rest are comments and
+the two mutant guards. No VM, protocol or runtime change.
+
+**Correction (review of 0d853db4, H1).** This record first said that a captured loop binding
+still writes its retained receiver back and that programs whose argument rebinds the loop binding
+are refused (`for-capture-vanishing`). That was false: the refusal concerns a loop source that
+the body may shrink, and a literal source is admitted. The write-back undid the argument's
+rebinding (section 10).
 
 Cost (deterministic, callgrind Ir, no wall clock): a top-level loop of 200k `b.push(f(i))`, 100k
 `m.set(j, f(j))` and 200k `s += b[f(k)]`: 510,963,703 -> 532,963,843 (+4.3%: one `Move` and its
@@ -247,7 +254,11 @@ Added (owner 2026-11-07 18:00 D4/D5):
   (`heap_as<...>()->items`) is enforced by lint only; (c) the remaining deliberate-source routes
   of tooling.md's layer table.
 - **H-A**: the defect being fixed before certification; **fixed here pending independent
-  verification**; kept in this history after resolution. Its two PENDING-OWNER legacy
+  verification** (the first repair was REJECTED for H1, section 10); kept in this history after
+  resolution.
+- **Operand order of top-level bindings outside receivers** (review of 0d853db4 M2; 2.2): `x + g()`,
+  `x == g()`, `s + k()`, `x += g()` (every context), `[x, g()]`. Open release blocker, pending
+  the owner's scope decision; not fixed. Its two PENDING-OWNER legacy
   differences (2.1) and the related operator/compound finding (2.2, not fixed).
 - **M-3** `for-capture-vanishing` / `for-missing-write`: deferred precision limitation (safely
   refused before any effect, not previously admitted: 17f7964c refuses them too). Fixtures in
@@ -255,7 +266,7 @@ Added (owner 2026-11-07 18:00 D4/D5):
   review's `probes3/d05`, legacy `[[1,7],[2]]`) and `m3_closure_array.f` (`probes/c02`, legacy
   `[[1,9,8],[2,9]]`); their goldens pin the refusal, so a future admission is a visible change.
 
-## 9. Gate results (binary 9e9f4466, GCC 13.3; local, not certification)
+## 9. Gate results at 0d853db4 (binary 9e9f4466, GCC 13.3; local, not certification)
 
 Run one at a time with `make -k`; `git status` unchanged by every gate.
 
@@ -276,3 +287,102 @@ Run one at a time with `make -k`; `git status` unchanged by every gate.
 
 Sanitizer, TSan, wall-clock, cross-platform and comparator (GCC 15.2) lanes: Linode, including the
 new `test-runtime2-b5-evalorder-sanitize`.
+
+## 10. Independent review of 0d853db4: REJECT; repair round (C7-C9)
+
+Review: `scratchpad/review-ha/REVIEW-HA.md` (repros in `review-ha/repro/`). Verdict REJECT with
+two High findings; the core receiver-first change was confirmed sound for every other receiver
+kind.
+
+### H1 (fixed, C7): a captured loop binding's write-back undid the argument's rebinding
+
+`for (b : [[1],[2]]) { g := () => { b = [7]; return 4 }; b.push(g()); print(b.stringify()) }`
+printed `[1,4] [2,4]` (legacy and 17f7964c `[7,4] [7,4]`; contract `[7] [7]`: the retained
+element gets the push, the rebinding stays). Cause: after reading the receiver first, `put()`
+(`compiler_array_mutation.cpp`) stored the retained receiver back into the loop binding's cell;
+the element store (`compiler_assign.cpp`) and the statement push's `location_source` path
+(`compiler_stmt_expr.cpp`) had the same write-back (the element store was wrong before H-A too:
+17f7964c `[5,2]`, legacy and contract `[7,8]`).
+
+Fix: no write-back when an operand `may_rebind` (the array was mutated in place; writing back
+the same reference was a no-op otherwise, and that unchanged path is kept). Production delta in
+C7: 3 files, +17/-6, about 6 executable lines (the rest is the M15 guard and comments). Results:
+push `[7] [7]`, insert/remove `[7,8] [7,8]` (legacy-equal), store `[7,8]` (legacy-equal), the
+expression form in a function and the session form as the contract; keyed operations were
+already correct (no write-back).
+
+Tests: fixtures `evalorder/loopbind_{push,insert_remove,store,fn_expr}.f`, `loopbind_session.in`;
+generator context `loopbind` (70 more programs, 840 in all, 830 admitted, 0 bad); mutant **15**
+(the reviewer's mE: a captured loop binding read late again) in `b5/mutants.sh`, caught (section
+10.4). Binary: **`91a49efa43715613ff96c6aae31b0844ff4b192e323addd3e64b1b6e677fefcf`**.
+
+Section 2's contract table, row push/insert/remove/store, applies to captured loop bindings too;
+legacy's prepared loop evaluator differs there as recorded in 2.1 item 2.
+
+### H2 (fixed, C8): the runner could launder a new failure into FAILED-BASELINE
+
+- (a) The per-line results of a failing multi-line recipe now decide the class: a baseline
+  matches only if every recipe line that fails on its own on the candidate fails identically
+  (same command, same failure identity) when the same lines run on that baseline; otherwise the
+  gate is FAILED-NEW. The reason text is appended to, never overwritten.
+- (b) Failure identity (`failure_identity`): the failing step, the exit statuses and signals
+  (make's `Error N`, signal texts), and the normalised FAIL lines; when neither log has a FAIL
+  line, their normalised last lines. Two logs with nothing to compare never match.
+- (c) The v4.12.0 baseline decision (`decide()`) also requires that identity
+  (`base_identical`); the same step alone is FAIL.
+- Guard: toy-Makefile negative controls run `scripts/certify.py` on candidate and baseline toy
+  trees: (a) a later line failing only on the candidate, (b) a crash against an assertion with no
+  FAIL lines, (c) different FAIL lines at the same v4.12.0 step: each FAILED-NEW (exit 1); a
+  positive control (identical failure) is FAILED-BASELINE (exit 0). The 0d853db4 `certify.py`
+  fails control (a) (FAILED-BASELINE, exit 0). Table cases: 37 harness, 31 classification.
+
+### M1 (recorded, PENDING-OWNER; fixture and compatibility row)
+
+`r := b[g()]` in loop code (`g` rebinds `b`): legacy 8 and 17f7964c 8 (legacy evaluates the key
+twice; 17f7964c read late), now 2 (operands once, receiver first). A previously admitted program
+whose output changes: added to 2.1 as item 3 (`evalorder/legacy_loop_decl_read.f`;
+compatibility.md). The generator now cross-checks loop programs against legacy where legacy's
+prepared evaluator is meaningful (no argument effect: must agree, and does); the other loop
+programs are reported under named classes: `loop` (rebind/drop/throw), `loop-twice` (legacy
+evaluates an alias-mutating argument twice for insert, splice, stack push), `loop-expr` (a loop
+declaration: `r := b.push(g())` gives legacy "cannot mutate const array", `r := b[g()]` evaluates
+the key twice).
+
+### M2 (recorded as an open release blocker, not fixed; owner scope decision)
+
+Operand order of top-level (main-frame) bindings outside receivers: `x + g()` (11, legacy 2),
+`x == g()` (false, legacy true), `s + k()` (`Zb`, legacy `ab`), compound `x += g()` in every
+context including function cells and loops (11, legacy 2), and `[x, g()]` (`[10,1]` on the VM
+and on legacy, against semantics.md's left-to-right rule). Silent wrong output in admitted
+programs under the VM default; identical on 17f7964c (not a regression). Added to section 8 as a
+release blocker pending the owner's scope decision (2.2).
+
+### L1-L4
+
+- L1 (recorded): the oracle provenance check (commit, clean checkout, `make -q nift`) catches
+  accidental misuse but not a deliberate copy of a newer binary over a clean `ce8cd36a` checkout
+  (`make -q` compares timestamps; the binary is untracked). Recording and checking the oracle's
+  sha256 would close it.
+- L2 (recorded, known harness limitation pending a decision): a gate that exits 0 after printing
+  a SKIP other than the known patterns counts as PASSED (e.g. `tests/runtime2/read_limit.py`
+  prints `SKIP default 1 GiB limit` on hosts with less than 4 GiB available, which includes small
+  Linodes). Partially skipped gates are therefore not distinguished from passed ones.
+- L3 (recorded): `run_lines` runs `make -n` output through bash without the target-specific
+  exported variables (e.g. `PYTHONDONTWRITEBYTECODE`), and its line numbers include prerequisite
+  build commands; it affects the line diagnostics and, since C8, the line comparison (both trees
+  are run the same way).
+- L4 (fixed, C7): the diff count (+88/-12); the generator's truncated-table negative control now
+  reads the table from `--tree`.
+
+### 10.4 Gates rerun (binary 91a49efa)
+
+Separate `make -k` runs (`scratchpad/combined-fix/gates/results2.txt`); the tree changed during
+the run only by this record's edits.
+
+| Class | Gates |
+| --- | --- |
+| PASSED | test-rt-lint; test-runtime2-b5-evalorder (840 programs, 830 admitted, 0 bad; negative controls); test-runtime2-b5 (123 production / 128 guard-off fixtures; sort-refusals 564); test-runtime2-b5-mutants (1, 3, 4, 6, 7, 8, 11, 12, 13, 14, 15 all caught: M13 38 failing checks, M14 22, M15 5); test-runtime2-b5-generators; test-runtime2-certification-guard (plan check, drop controls, 37 + 31 table cases, four toy controls); test-runtime2-b4b-gen-alias; test-runtime2-b4b; test-runtime2-refsem; test-runtime2-cp22; test-runtime2-capture-origins; test-runtime2-cp12c-probes; test-runtime2-b5-snapshot-memory |
+| FAILED-NEW | none |
+| FAILED-BASELINE, BLOCKED, NOT-RUN | none among the rerun gates (section 9's results for the others stand: the C7 change touches only the loop-binding and `location_source` write-backs) |
+
+M15 on the generator: 12 bad (caught). The 0d853db4 `certify.py` fails toy control (a).
