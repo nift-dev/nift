@@ -63,6 +63,15 @@ int main(int argc, char** argv) {
         seed = "fn(makeo()){a:=[1];return {\"putv\":v=>{a[0]=v;return a.stringify()},"
                "\"readv\":()=>a[0]*2}};o:=makeo();warm:=o.putv(0)";
         probe = "o.putv(\"bad\")"; check = "o.readv()";
+    } else if (test == "shared-scalar") {
+        // B5 fix-up 2 (b5-refsem.md 12.1): the m13 witness under U6. Sibling closures share one
+        // captured string binding; a later statement stores a callable through one (same binding
+        // tag, so no binding-type error) and reads it through the other as a string receiver.
+        // Production unifies the two capture slots (capture-location inference) and refuses the
+        // probe before any effect; m13 skips the unification, compiles the reader against the
+        // stale string type and stops in an internal failure (unchecked to_upper dispatch).
+        seed = "fn(mk()){a:=\"s\";return {\"wr\":v=>{a=v;return 0},\"rd\":()=>a.to_upper()}};o:=mk();w:=1";
+        probe = "o.wr(()=>4);x:=o.rd()"; check = "w"; expected = "1"; reason = "builtin-receiver:to_upper";
     } else if (test == "selector") {
         seed = "fn(g()){return 1};fn(makec()){rows:=[[1]];for(row:rows){return ()=>row[0]}};c:=makec();a:=[1]";
         probe = "fn(g()){return 3};a.push(\"bad\")"; check = "c()";
@@ -79,6 +88,19 @@ int main(int argc, char** argv) {
     CHECK(output.empty() && !session.contains("leaked") && session.binding_count() == count);
     CHECK(!original_f.is(Kind::Function) || session.value("f").heap() == original_f.heap());
     r = session.execute(probe + ";print(\"ONCE\");throw error(\"stop\")", "probe", output);
+    if (test == "shared-scalar") {
+        if (internal) {
+            CHECK(r.admitted && r.vm_executions == 1 && r.execution.reason == StopReason::Internal);
+            CHECK(r.execution.message == "unexpected operands (compiler defect): built-in to_upper");
+        } else {
+            CHECK(!r.admitted && r.refusal == reason && r.vm_executions == 0 && r.legacy_executions == 0);
+            CHECK(!session.contains("x") && session.binding_count() == count);
+        }
+        CHECK(output.empty());
+        const auto status = rt_test::finish("CP19 admission witness");
+        if (!status) std::cout << "WITNESS " << test << ' ' << (internal ? "internal" : "admitted") << '\n';
+        return status;
+    }
     if (refused) {
         CHECK(!r.admitted && r.refusal == reason && r.vm_executions == 0);
         CHECK(output.empty());

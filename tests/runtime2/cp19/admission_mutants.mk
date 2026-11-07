@@ -35,7 +35,7 @@ $(TEST_DIR)/cp19/admission-switch-sanitize: tests/runtime2/cp19/admission_mutant
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 .PHONY: test-cp19-admission-sanitize
 test-cp19-admission-sanitize: $(TEST_DIR)/cp19/admission-sanitize $(TEST_DIR)/cp19/admission-switch-sanitize
-	@for binary in $^; do for case in wrapper field loop alias schema order direct nested capture numeric native native-once selector shared; do ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $$binary $$case admitted || exit $$?; done; done
+	@for binary in $^; do for case in wrapper field loop alias schema order direct nested capture numeric native native-once selector shared shared-scalar; do ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $$binary $$case admitted || exit $$?; done; done
 
 $(TEST_DIR)/cp19/admission-control-switch: tests/runtime2/cp19/admission_mutants.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
 	@mkdir -p $(dir $@)
