@@ -289,6 +289,41 @@ def fail_lines(text, roots=()):
     return out
 
 
+def recipe_lines(cwd, target, old=()):
+    """C2: the commands `make -k target -o old...` would run, one per recipe line (continuations
+    joined), from `make -n`."""
+    out = subprocess.run(["make", "-n", target] + [x for p in old for x in ("-o", p)], cwd=cwd,
+                         capture_output=True, text=True, env=clean_env()).stdout
+    lines, cur = [], ""
+    for line in out.splitlines():
+        cur += line[:-1] + " " if line.endswith("\\") else line
+        if not line.endswith("\\"):
+            if cur.strip():
+                lines.append(cur)
+            cur = ""
+    return lines
+
+
+def run_lines(cwd, target, old, logdir, timeout, extra_env=None):
+    """C2: a failing recipe stops at its first failing line, hiding the rest: run every line on its
+    own (the target's prerequisites are built) and return [(command, rc)]."""
+    results = []
+    env = clean_env()
+    env.update(extra_env or {})
+    for i, cmd in enumerate(recipe_lines(cwd, target, old), 1):
+        log = logdir / f"{target}.line{i}.log"
+        with open(log, "w") as f:
+            f.write(f"$ {cmd}\n")
+            f.flush()
+            try:
+                rc = subprocess.run(["bash", "-c", cmd], cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=env,
+                                    timeout=timeout).returncode
+            except subprocess.TimeoutExpired:
+                rc = 124
+        results.append((cmd[:200], rc))
+    return results
+
+
 def blocked_reason(text):
     for pat, why in HARNESS_BLOCKED:
         if pat.search(text):
@@ -801,6 +836,11 @@ def main():
                             and fail_lines(ctext, [ROOT]) == fail_lines(rtext, [tree]))
                     r["regression"][name] = same
         r["status"], r["reason"] = decide(f)
+        if r["rc"] != 0 and recipe.get(t, "").count("\n") > 1:
+            # C2: the lines after the failing one would never run: each line on its own.
+            r["lines"] = run_lines(ROOT, t, olds[t], logdir, a.timeout, extra)
+            r["reason"] += "; recipe lines failing on their own: " + (", ".join(
+                f"{i}" for i, (_, lrc) in enumerate(r["lines"], 1) if lrc != 0) or "none")
         logtext = (logdir / f"{t}.log").read_text(errors="replace") if (logdir / f"{t}.log").exists() else ""
         r["blocked"] = blocked_reason(logtext)
         if COMPARATOR_SKIP in logtext:
