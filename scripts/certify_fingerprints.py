@@ -15,7 +15,11 @@ A fingerprint is:
   - status: the exit status or signal the case's lines state (`exit N`, `rc=N`, `N != M`);
   - detail: what tells two failures of one case apart (refusal code and source position,
     expected/got, the exception message, the refused objects, the harness's own detail text).
-- `count`: the number of failure lines, counted by a separate per-gate pattern, not from `cases`.
+- `count`: the gate's own stated failure count (a summary number or list), independent of the case
+  parser; None for a gate that prints none (listed in the selftest table);
+- `lines`: the number of failure lines, counted by a separate per-gate pattern;
+- diagnostics outside every case (a traceback, refusal, internal failure, crash, assertion,
+  sanitizer report or timeout before a FAIL line or after the last case): entries of their own.
 - `exit`: the gate's own status (make's `Error N` or the signal on the top-level target).
 
 Normalisation is narrow: the checkout roots and absolute paths under a temporary directory (the
@@ -38,16 +42,23 @@ def narrow(text, roots=()):
     return _TMP_PATH.sub(r"<TMP>/\1", text).strip()
 
 
-# --- diagnostics: (category, pattern, detail) in priority order -------------------------------
+# --- diagnostics: one shared list for every gate (category, pattern); F1 (review of 3161f52d) --
+# Every match counts, wherever it is printed: inside a case's lines it is part of that case, and
+# outside every case it is its own entry (step, "<outside>", category, detail).
 _LOC = r"(?:(?:\S*/)?(?P<file>[\w.<>-]+)(?::(?P<line>\d+):(?P<col>\d+))?: )?"
 DIAGNOSTICS = [
     # the switch only: which objects get refused before make stops depends on -j scheduling
     ("build-refused", re.compile(r"production object \S+: the command line sets the test-only switch (?P<d>\w+)")),
     ("refusal", re.compile(_LOC + r"not compiled for the VM \((?P<d>[^)]+)\)")),
     ("refusal", re.compile(_LOC + r"NIFT_VM session refused: (?P<d>[\w-]+:[^:\s]+):")),
-    ("crash", re.compile(_LOC + r"NIFT_VM internal failure: (?P<d>[^(\n]+?)(?: \(|$)")),
-    ("signal", re.compile(r"(?P<d>Segmentation fault|Aborted|Bus error|Floating point exception|core dumped)")),
+    ("internal-failure", re.compile(_LOC + r"NIFT_VM internal failure: (?P<d>[^(\n]+?)(?: \(|$)", re.M)),
+    ("sanitizer", re.compile(r"ERROR: (?P<d>\w+Sanitizer: [\w-]+)")),
+    ("sanitizer", re.compile(r"(?P<file>[\w.-]+):(?P<line>\d+):(?P<col>\d+): runtime error: (?P<d>[^\n]+)")),
+    ("assertion", re.compile(r"(?P<d>Assertion [`'][^\n]*?['] failed)")),
+    ("crash", re.compile(r"\b(?P<d>Segmentation fault|Aborted|Bus error|Floating point exception|Illegal instruction"
+                         r"|Killed|Terminated)\b")),
     ("timeout", re.compile(r"(?P<d>timed out|TimeoutExpired)")),
+    ("traceback", re.compile(r"^(?P<d>Traceback) \(most recent call last\):", re.M)),
     ("exception", re.compile(r"^(?P<e>\w+(?:Error|Exception)): (?P<d>.*)$", re.M)),
 ]
 _STATUS = re.compile(r"\(exit (-?\d+)\)|\(rc=(-?\d+)\)|\bexit (-?\d+) != (-?\d+)|\brc=(-?\d+)")
@@ -57,62 +68,78 @@ _STEP = re.compile(r"""^(?:\$ )?(?:\w+="[^"]*" |\w+=\S* )*(?:(?:bash|sh|\S*pytho
                    r"""(?P<step>(?:\S*/)?(?:tests|scripts|tools)/[\w./-]+\.(?:sh|py)|\.build/[\w./-]+)"?(?:\s|$)""")
 
 
+def matches(text, roots=()):
+    """Every diagnostic in the text: [(category, detail)], in order, duplicates kept."""
+    found = []
+    for cat, pat in DIAGNOSTICS:
+        for m in pat.finditer(text):
+            g = m.groupdict()
+            where = f"@{g['file']}:{g['line']}:{g['col']}" if g.get("file") and g.get("line") else (
+                f"@{g['file']}" if g.get("file") else "")
+            found.append((m.start(), cat, (f"{g['e']}: " if g.get("e") else "") + narrow(g["d"], roots) + where))
+    return [(c, d) for _, c, d in sorted(found)]
+
+
 def diagnose(block, roots=()):
-    """(category, status, detail) of one case's lines."""
+    """(category, status, detail) of one case's lines: the category of the first diagnostic in
+    DIAGNOSTICS order, and every diagnostic of every category in the detail."""
     text = "\n".join(block)
     status = tuple(sorted({next(g for g in m.groups() if g is not None) if not m.group(3)
                            else f"{m.group(3)}!={m.group(4)}" for m in _STATUS.finditer(text)}))
-    for cat, pat in DIAGNOSTICS:
-        found = list(pat.finditer(text))
-        if found:
-            parts = set()
-            for m in found:
-                g = m.groupdict()
-                where = f"@{g['file']}:{g['line']}:{g['col']}" if g.get("file") and g.get("line") else (
-                    f"@{g['file']}" if g.get("file") else "")
-                parts.add((f"{g['e']}: " if g.get("e") else "") + narrow(g["d"], roots) + where)
-            return cat, ",".join(status), " | ".join(sorted(parts))
-    return None, ",".join(status), None
+    found = matches(text, roots)
+    if not found:
+        return None, ",".join(status), None
+    order = [c for c, _ in DIAGNOSTICS]
+    cat = min((c for c, _ in found), key=order.index)
+    return cat, ",".join(status), " | ".join(sorted({f"{c}:{d}" for c, d in found}))
 
 
 class Spec:
-    def __init__(self, cases, count=r"^\s*(?:FAIL|not ok)\b", summary=(), category=None, abort=False,
-                 block_detail=False, step=None, step_scope=False):
+    def __init__(self, cases, count=None, lines=r"^\s*(?:FAIL|not ok)\b", summary=(), category=None, abort=False,
+                 block_detail=False, step=None, step_scope=False, outside_unique=False):
         self.cases = [re.compile(c) for c in cases]  # each has (?P<id>) and may have (?P<detail>)
-        self.count = re.compile(count)               # failure lines, or (?P<n>) for a stated count
+        # F5: the gate's own failure count, independent of the case parser: (?P<n>) a stated number,
+        # (?P<list>) a comma-separated list of names; None where the gate prints no count (the
+        # selftest table says so for each such gate)
+        self.count = re.compile(count) if count else None
+        self.lines = re.compile(lines)               # failure lines, counted by their own pattern
         self.summary = [re.compile(s) for s in summary]  # failure summary lines: never a case
         self.category = category                     # the category of every case (finding lists)
         self.abort = abort                           # a step that dies with no case line is a case
         self.block_detail = block_detail             # the case's following lines are its detail (a diff)
         self.step = re.compile(step) if step else _STEP  # which echoed commands start a step
         self.step_scope = step_scope                 # diagnose a case from its whole step (interleaved output)
+        self.outside_unique = outside_unique         # outside diagnostics as a set (repeats depend on -j)
 
 
 _FAILLINE = r"^FAIL (?P<id>.+?)(?:: (?P<detail>.*))?$"
 SPECS = {
-    "test-v44-shell-restricted": Spec([r"^FAIL (?P<id>[\w-]+)$"], summary=[r"^FAILED: "]),
-    "test-v46-relative-imports": Spec([], count=r"^(?:error: |\w+Error: )", abort=True),
+    "test-v44-shell-restricted": Spec([r"^FAIL (?P<id>[\w-]+)$"], summary=[r"^FAILED: "],
+                                      count=r"^FAILED: (?P<list>.+)$"),
+    "test-v46-relative-imports": Spec([], lines=r"^(?:error: |\w+Error: )", abort=True),
     "test-runtime2-cp03-simplify": Spec([_FAILLINE], abort=True),
     # bad "$1 (expected '$2', got '$3')": $3 may span lines, so the id ends at " (expected '"
     "test-sha256": Spec([r"^FAIL (?P<id>.+?) \((?P<detail>expected '.*)$", _FAILLINE],
-                        count=r"^FAIL "),
+                        lines=r"^FAIL "),
     "test-runtime2-cp01-simplify": Spec([r"^\s*FAIL (?P<id>S\w+|settle|shared \w+ repair|syscalls \S+|\.nift file count)"
-                                         r"(?::? (?P<detail>.*))?$"], summary=[r"^FAILS \(\d+\):$"]),
-    "test-cp19-s1-dispatch": Spec([_FAILLINE], summary=[r"^FAILED: "]),
+                                         r"(?::? (?P<detail>.*))?$"], summary=[r"^FAILS \(\d+\):$"],
+                                        count=r"^FAILS \((?P<n>\d+)\):$"),
+    "test-cp19-s1-dispatch": Spec([_FAILLINE], summary=[r"^FAILED: "], count=r"^FAILED: (?P<list>.+)$"),
     "test-rt-parser": Spec([r"^FAIL (?P<id>dump of \[.*?\]) lacks (?P<detail>.*)$", r"^FAIL (?P<id>.+)$"],
                            count=r"^(?P<n>\d+) rt parser unit failure\(s\)$"),
     "test-test-integrity": Spec([r"^\s+\[(?P<cat>[\w-]+)\] (?P<id>\S+): (?P<detail>.*)$"],
                                 count=r"^test-integrity findings: (?P<n>\d+)$", category="finding"),
-    "test-v44-packages": Spec([_FAILLINE], count=r"^(?:FAIL |error: |\w+Error: )", abort=True),
+    "test-v44-packages": Spec([_FAILLINE], lines=r"^(?:FAIL |error: |\w+Error: )", abort=True),
     # host_mutants.sh runs make -j4 without -k: compile-object.sh lines interleave with its own
     # output, so only tests/ scripts start a step and a case is diagnosed from its whole step
     "test-rt-host-mutants": Spec([r"^FAIL (?P<id>host mutant \d+): (?P<detail>.*)$"],
-                                 step=r"^(?:\$ )?(?:\w+=\S* )*(?:bash )?(?P<step>tests/[\w./-]+\.sh)\b", step_scope=True),
-    "cp25r-inventory": Spec([r"^INVENTORY: unclassified reason: (?P<id>\S+)$"], count=r"^INVENTORY: ",
+                                 step=r"^(?:\$ )?(?:\w+=\S* )*(?:bash )?(?P<step>tests/[\w./-]+\.sh)\b", step_scope=True,
+                                 outside_unique=True),
+    "cp25r-inventory": Spec([r"^INVENTORY: unclassified reason: (?P<id>\S+)$"], lines=r"^INVENTORY: ",
                             category="unclassified"),
     "test-runtime2-rt-diff-selftest": Spec([r"^FAIL (?P<id>.+?)(?: \(rc=-?\d+\))?$",
                                             r"^DIFF (?P<id>\S+ \w+) (?P<detail>.*)$"],
-                                           summary=[r"^FAIL rt-diff self-tests\b"], count=r"^(?:FAIL|DIFF) "),
+                                           summary=[r"^FAIL rt-diff self-tests\b"], lines=r"^(?:FAIL|DIFF) "),
     "test-runtime2-scanner-parity": Spec([r"^FAIL (?P<id>(?:site|script) \S+)$"],
                                          summary=[r"^FAIL scanner parity\b", r"^scanner parity: \d+ sites"], block_detail=True),
 }
@@ -186,9 +213,9 @@ def _cases(spec, lines, roots):
         cat, status, detail = diagnose(step_lines[step] if spec.step_scope else block, roots)
         if spec.block_detail:
             cat, detail = cat or "diff", " / ".join(narrow(x, roots) for x in block[1:])
-        elif spec.category:
-            cat = spec.category + (f":{g['cat']}" if g.get("cat") else "")
-            detail = narrow(g.get("detail") or "", roots)
+        elif spec.category:  # the line's own detail, and any diagnostic printed under it (F1)
+            cat, detail = spec.category + (f":{g['cat']}" if g.get("cat") else ""), " / ".join(
+                filter(None, [narrow(g.get("detail") or "", roots), detail]))
         elif cat is None:  # the harness's own detail: the rest of the line and the lines under it
             cat, detail = "assertion", " / ".join(narrow(x, roots) for x in [g.get("detail") or ""] + block[1:])
         elif g.get("detail"):  # the diagnostic and the case line's own detail (`exit 1 != 77`, expected)
@@ -200,6 +227,12 @@ def _cases(spec, lines, roots):
                 cat, status, detail = diagnose(block, roots)
                 if cat:
                     out.append((step, step, cat, status, detail))
+    # F1: every diagnostic outside the case blocks (before a FAIL line, between blocks, after the
+    # last one) is an entry of its own, with its step
+    for step, block in abort_blocks.items():
+        found = matches("\n".join(block), roots)
+        for cat, detail in (sorted(set(found)) if spec.outside_unique else found):
+            out.append((step, "<outside>", cat, "", detail))
     return out
 
 
@@ -212,13 +245,17 @@ def fingerprint(gate, text, roots=(), rc=None):
     cases = _cases(spec, lines, roots)
     if not cases:
         return None
-    count = 0
-    for line in lines:
-        m = spec.count.match(line)
-        if m:
-            count += int(m.group("n")) if "n" in m.groupdict() else 1
+    count = None
+    if spec.count is not None:  # F5: the gate's own count
+        for line in lines:
+            m = spec.count.match(line)
+            if m:
+                g = m.groupdict()
+                n = int(g["n"]) if g.get("n") is not None else len([x for x in g["list"].split(",") if x.strip()])
+                count = (count or 0) + n
+    failure_lines = sum(1 for line in lines if spec.lines.match(line))
     top = tuple(f"{m.group(1)}: {m.group(2)}" for m in map(_MAKE_TOP.match, lines) if m)
-    return {"cases": collections.Counter(cases), "count": count, "exit": top or (rc,)}
+    return {"cases": collections.Counter(cases), "count": count, "lines": failure_lines, "exit": top or (rc,)}
 
 
 def differences(a, b):
@@ -227,7 +264,9 @@ def differences(a, b):
         return ["no extractable failure fingerprint on the " + ("candidate" if a is None else "baseline")]
     out = []
     if a["count"] != b["count"]:
-        out.append(f"failure count {a['count']} != {b['count']}")
+        out.append(f"stated failure count {a['count']} != {b['count']}")
+    if a["lines"] != b["lines"]:
+        out.append(f"failure lines {a['lines']} != {b['lines']}")
     if a["exit"] != b["exit"]:
         out.append(f"exit {a['exit']} != {b['exit']}")
     only_a, only_b = a["cases"] - b["cases"], b["cases"] - a["cases"]

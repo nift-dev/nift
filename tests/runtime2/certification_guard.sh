@@ -243,6 +243,12 @@ BUILD_OK = {'build_rc': 0, 'cxx_resolved': '/usr/bin/x86_64-linux-gnu-g++-15', '
             'build_sig': {'resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'version-sha256': 'aa' * 32,
                           'args': ['-include', 'src/build/production_tu.h'] + PROFILE['flags'].split()}}
 EXP = BUILD_OK['build_sig']['args']
+C_ARGS = ['-Imarkuppp/vendor/cmark', '-std=c99', '-O2', '-Wall', '-Wextra', '-pedantic']
+C_OK = {'build_sig_c': {'resolved': '/usr/bin/gcc-15', 'args': C_ARGS}, 'expected_args_c': C_ARGS,
+        'cc_resolved': '/usr/bin/gcc-15'}
+os.environ['GNUMAKEFLAGS'] = 'CXXFLAGS=-O0'
+assert 'GNUMAKEFLAGS' not in certify.clean_env(), 'clean_env keeps GNUMAKEFLAGS'
+del os.environ['GNUMAKEFLAGS']
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -255,7 +261,14 @@ checks = [
     ('class fail', rc('FAIL'), 'FAILED-NEW'),
     ('class flaky is a failure', rc('FLAKY'), 'FAILED-NEW'),
     ('class v4.12.0 baseline', rc('BASELINE-FAILURE'), 'FAILED-BASELINE'),
-    ('class regression baseline identical', rc('FAIL', {'17f7964c': True, 'weekend/r2': False}), 'FAILED-BASELINE'),
+    # F2 (decision 2026-11-08): equal on EVERY applicable regression baseline (None: not applicable)
+    ('class regression: equal on one, differs on the other (any vs all)', rc('FAIL', {'17f7964c': True, 'weekend/r2': False}), 'FAILED-NEW'),
+    ('class regression: equal on every baseline', rc('FAIL', {'17f7964c': True, 'weekend/r2': True}), 'FAILED-BASELINE'),
+    ('class regression: equal where applicable', rc('FAIL', {'17f7964c': True, 'weekend/r2': None}), 'FAILED-BASELINE'),
+    ('class regression: none applicable, no v4.12.0 match', rc('FAIL', {'17f7964c': None, 'weekend/r2': None}), 'FAILED-NEW'),
+    ('class v4.12.0 match but a regression baseline passes or differs', rc('BASELINE-FAILURE', {'17f7964c': False}), 'FAILED-NEW'),
+    ('class v4.12.0 match, regression equal', rc('BASELINE-FAILURE', {'17f7964c': True}), 'FAILED-BASELINE'),
+    ('class v4.12.0 match, no regression applicable (legacy-only)', rc('BASELINE-FAILURE', {'17f7964c': None}), 'FAILED-BASELINE'),
     ('class regression baseline differs', rc('FAIL', {'17f7964c': False}), 'FAILED-NEW'),
     ('class unverified', rc('UNVERIFIED'), 'BLOCKED'),
     ('class root-only', rc('SKIPPED-ENVIRONMENTAL'), 'BLOCKED'),
@@ -345,21 +358,34 @@ checks = [
         ('build: other compiler, same __GLIBCXX__ (e.g. the 15-20260321 snapshot)',
             {**BUILD_OK, 'build_sig': {**BUILD_OK['build_sig'], 'resolved': '/opt/gcc-15-20260321/bin/g++',
                                        'version-sha256': 'ee' * 32}}, 1),
-        ('build: profile flag missing', {**BUILD_OK, 'build_sig': {**BUILD_OK['build_sig'], 'args': ['-std=c++17', '-O3']}}, 1),
+        ('build: profile flag missing', {**BUILD_OK, 'build_sig': {**BUILD_OK['build_sig'], 'args': ['-std=c++17', '-O3']}}, 2),  # also the direct profile-flag check (F3)
         ('build: make nift failed', {**BUILD_OK, 'build_rc': 2}, 1),
         ('build: CXXFLAGS overridden', {**BUILD_OK, 'cxxflags_env': '-O3 -march=native'}, 1),
         ('build: CXXFLAGS equal to the profile', {**BUILD_OK, 'cxxflags_env': PROFILE['flags']}, 0),
         # R5-2: exact arguments, CPPFLAGS/LDFLAGS, the source tree, the signature itself
         ('build: exact arguments', {**BUILD_OK, 'expected_args': EXP}, 0),
-        ('build: extra -O0', {**BUILD_OK, 'expected_args': EXP, 'build_sig': {**BUILD_OK['build_sig'], 'args': EXP + ['-O0']}}, 1),
+        ('build: extra -O0', {**BUILD_OK, 'expected_args': EXP, 'build_sig': {**BUILD_OK['build_sig'], 'args': EXP + ['-O0']}}, 2),  # also the direct profile-flag check (F3)
         ('build: extra -D_GLIBCXX_DEBUG', {**BUILD_OK, 'expected_args': EXP,
-            'build_sig': {**BUILD_OK['build_sig'], 'args': ['-D_GLIBCXX_DEBUG'] + EXP}}, 1),
+            'build_sig': {**BUILD_OK['build_sig'], 'args': ['-D_GLIBCXX_DEBUG'] + EXP}}, 2),  # also the direct profile-flag check (F3)
         ('build: CPPFLAGS set', {**BUILD_OK, 'flags_env': {'CPPFLAGS': '-D_GLIBCXX_DEBUG'}}, 1),
         ('build: LDFLAGS set', {**BUILD_OK, 'flags_env': {'LDFLAGS': '-static'}}, 1),
         ('build: dirty tracked tree', {**BUILD_OK, 'source': {'clean': False, 'untracked_src': []}}, 1),
         ('build: untracked source under src/', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': ['src/rt/extra.cpp']}}, 1),
         ('build: clean tree', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': []}}, 0),
         ('build: missing signature', {**BUILD_OK, 'build_sig': None}, 1),
+        # F3/F4 (review of 3161f52d)
+        ('build: GNUMAKEFLAGS set', {**BUILD_OK, 'make_env': {'GNUMAKEFLAGS': 'CXXFLAGS=-O0'}}, 1),
+        ('build: MAKEFLAGS set', {**BUILD_OK, 'make_env': {'MAKEFLAGS': 'CXXFLAGS=-O0'}}, 1),
+        ('build: a ?= make variable from the environment', {**BUILD_OK, 'makefile_env': {'LIBFFI_CFLAGS': '-O0'}}, 1),
+        ('build: spoofed derivation agrees with a spoofed build', {**BUILD_OK, 'expected_args': EXP + ['-O0'],
+            'build_sig': {**BUILD_OK['build_sig'], 'args': EXP + ['-O0']}}, 1),
+        ('build: derivation failed', {**BUILD_OK, 'derivation_error': 'make --eval exited 2'}, 1),
+        ('build: C half equal', {**BUILD_OK, **C_OK}, 0),
+        ('build: C half extra flag', {**BUILD_OK, **C_OK, 'build_sig_c': {**C_OK['build_sig_c'], 'args': C_ARGS + ['-O0']}}, 1),
+        ('build: C half other compiler', {**BUILD_OK, **C_OK, 'cc_resolved': '/usr/bin/clang'}, 1),
+        ('build: C block missing', {**BUILD_OK, **C_OK, 'build_sig_c': None}, 1),
+        ('build: untracked header under include/', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': ['include/bits/stl_algo.h']}}, 1),
+        ('build: git ls-files failed', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': None}}, 1),
         # R4-6: minimum versions
         ('tools: go below 1.26', {'tools': {'go': 'go version go1.24.7 linux/amd64'}}, 1),
         ('tools: go 1.26', {'tools': {'go': 'go version go1.26.0 linux/amd64'}}, 0),
@@ -522,6 +548,30 @@ toy "$TOY/n2/cand" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAI
 toy "$TOY/n2/base" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "PASS case-b"; exit 1'
 toy "$TOY/n3/cand" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAIL case-c"; echo "PASS case-b"; exit 1'
 toy "$TOY/n3/base" test-runtime2-rt-diff-selftest 'echo "FAIL case-a"; echo "FAIL case-b"; echo "PASS case-c"; exit 1'
+# F2 (review of 3161f52d, toy9): a v4.12.0 match never outweighs a regression baseline that passes;
+# any-vs-all: equal on 17f7964c but different on weekend/r2 is new; legacy-only is labelled
+toy3() {  # toy3 CASE WANT-RC WANT-CLASS WANT-TEXT V4-RECIPE REG1-RECIPE [REG2-RECIPE]
+    local c=$1 rc out; shift
+    out=$(cd "$TOY/$c/cand" && python3 scripts/certify.py --jobs 1 --targets test-sha256 --unprivileged-user '' \
+          --baseline "$([ -d "$TOY/$c/v4" ] && echo "$TOY/$c/v4")" --regression-baseline "17f7964c=$TOY/$c/r1" \
+          $([ -d "$TOY/$c/r2" ] && echo --regression-baseline "weekend/r2=$TOY/$c/r2") 2>/dev/null); rc=$?
+    if [ "$rc" -ne "$1" ] || ! grep -q "^  $2 *test-sha256: .*$3" <<<"$out"; then
+        echo "FAIL certification guard baseline control $c: exit $rc, wanted $1, $2 with '$3'"; echo "$out" | tail -4; exit 1
+    fi
+    echo "PASS certification guard baseline control $c: $2 (exit $rc)"
+}
+SHA_FAIL='echo "bash tests/sha256_builtins.sh"; echo "FAIL NIST one million a (expected '"'"'x'"'"', got '"'"''"'"')"; exit 1'
+SHA_PASS='echo "bash tests/sha256_builtins.sh"; echo "PASS NIST one million a"'
+SHA_OTHER='echo "bash tests/sha256_builtins.sh"; echo "FAIL NIST abc (expected '"'"'x'"'"', got '"'"''"'"')"; exit 1'
+toy "$TOY/b9/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/b9/v4" test-sha256 "$SHA_FAIL"; toy "$TOY/b9/r1" test-sha256 "$SHA_PASS"
+toy3 b9 1 FAILED-NEW "passes there"
+toy "$TOY/ba/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/ba/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/ba/r2" test-sha256 "$SHA_OTHER"
+toy3 ba 1 FAILED-NEW "weekend/r2: applicable, fingerprint differs"
+toy "$TOY/bb/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bb/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/bb/r2" test-sha256 "$SHA_FAIL"
+toy3 bb 0 FAILED-BASELINE "every applicable regression baseline"
+mkdir -p "$TOY/bc/r1"; printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n' > "$TOY/bc/r1/Makefile"
+toy "$TOY/bc/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bc/v4" test-sha256 "$SHA_FAIL"
+toy3 bc 0 FAILED-BASELINE "LEGACY-ONLY"
 toyrun n1 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n2 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW
 toyrun n3 test-runtime2-rt-diff-selftest reg 1 FAILED-NEW

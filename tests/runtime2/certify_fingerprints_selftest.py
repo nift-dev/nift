@@ -27,14 +27,15 @@ ROOT = "/home/claude/review/cand-b5"
 # occurrence replaced). `diag: None` states why the gate has no diagnostic beyond its case id.
 TABLE = {
     "test-v44-shell-restricted": {
+        "count_source": "own: the harnesses' `FAILED: a, b` lines (names counted)",
         "new": [("PASS ctrl-d-exits", "FAIL ctrl-d-exits")],
         "diag": [("FAIL run-captures-not-tty\n", "FAIL run-captures-not-tty\nSegmentation fault\n")],
         "subst": [("FAIL user-function-runs", "FAIL completed-command-runs"),
                   ("PASS completed-command-runs", "PASS user-function-runs")],
-        "wording": [("FAILED: tab-completes-user-function, user-function-runs",
-                     "FAILED (2): tab-completes-user-function and user-function-runs"), ("MARK run1", "MARK first")],
+        "wording": [("MARK run1", "MARK first"), ("PASS history-up-arrow", "PASS history up-arrow")],
     },
     "test-v46-relative-imports": {
+        "count_source": 'none: the smoke script stops at its first error and prints no count',
         "new": [("make: ***", 'NIFT="x" bash tests/v46_import_worker_ownership_smoke.sh\nerror: /tmp/a/tmp.QQ/w.f:2:1: '
                  'not compiled for the VM (import-nested): this form\nmake: ***')],
         "diag": [("(fn-flags)", "(fn-name-reserved)")],
@@ -43,12 +44,14 @@ TABLE = {
                     ("is not supported by the Runtime 2.0 VM yet", "is not supported yet")],
     },
     "test-runtime2-cp03-simplify": {
+        "count_source": 'none: the scripts print FAIL lines only',
         "new": [("PASS missing-tracer caller: explicitly unmeasured (77)", "FAIL missing-tracer caller: exit 0 != 77")],
         "diag": [("(callable:module_path)", "(callable:inject)")],
         "subst": [("FAIL CP03 missing-tracer caller", "FAIL CP03 present-tracer caller")],
         "wording": [("note: please report unsupported programs at", "note: report unsupported programs to")],
     },
     "test-sha256": {
+        "count_source": 'none: `fail=1` is a flag, not a count',
         "new": [("PASS number rejected", "FAIL number rejected (expected 'error', got '')")],
         "diag": [("FAIL line endings not normalised (expected 'false', got '')",
                   "FAIL line endings not normalised (expected 'false', got 'true')")],
@@ -57,24 +60,29 @@ TABLE = {
                     ("PASS null rejected", "PASS null is rejected")],
     },
     "test-runtime2-cp01-simplify": {
+        "count_source": 'own: `FAILS (N):` (the S scenarios; settle/shared/syscalls lines are counted as failure lines)',
         "new": [("FAILS (3):\n", "FAILS (3):\n  FAIL S5 rebuilds per no-op build: [1, 0]\n")],
         "diag": [("rebuilt ['p1'] expected []", "rebuilt ['p2'] expected []")],
         "subst": [("FAIL S4a create unreferenced file", "FAIL S4b create unreferenced file")],
-        "wording": [("FAILS (3):", "FAILS (three):"), ("note S8a switch modified->hash rebuilt 31", "note S8a rebuilt 32")],
+        "wording": [("note S8a switch modified->hash rebuilt 31", "note S8a rebuilt 32"),
+                    ("label=ours cycles=1000", "label=ours cycles: 1000")],
     },
     "test-cp19-s1-dispatch": {
+        "count_source": 'own: the `FAILED: a, b` line (names counted)',
         "new": [("PASS rm missing fails", "FAIL rm missing fails")],
         "diag": [("builtin-lazy-args:setenv", "builtin-lazy-args:getenv")],
         "subst": [("FAIL failed user function status non-zero", "FAIL failed user function status zero")],
-        "wording": [("FAILED: user function side effect once", "FAILED (9): user function side effect once")],
+        "wording": [("PASS rm missing fails", "PASS rm of a missing file fails")],
     },
     "test-rt-parser": {
+        "count_source": 'own: `N rt parser unit failure(s)`',
         "new": [("1 rt parser unit failure(s)", "FAIL dump of [x()] lacks 'Call':\n2 rt parser unit failure(s)")],
         "diag": [("'Opaque [legacy-runtime-error]'", "'Opaque [legacy-parse]'")],
         "subst": [("dump of [print(await(f()))]", "dump of [print(await(g()))]")],
         "wording": [("(cwd=", "(directory=")],
     },
     "test-test-integrity": {
+        "count_source": 'own: `test-integrity findings: N`',
         "new": [("test-integrity findings: 58", "test-integrity findings: 59\n  [pipefail-missing] tests/new.sh: pipeline "
                  "runs without pipefail provably active")],
         "diag": [("[swallowed-returncode] scripts/certify.py", "[pipefail-missing] scripts/certify.py")],
@@ -83,12 +91,14 @@ TABLE = {
         "count": [("test-integrity findings: 58", "test-integrity findings: 59")],
     },
     "test-v44-packages": {
+        "count_source": 'none: the smoke scripts stop at their first error',
         "new": [("PASS package metadata and lock schema", "FAIL package metadata and lock schema: lock missing")],
         "diag": [("(import-nested)", "(import-dynamic)")],
         "subst": [("/usr/bin/python3 tests/package_transaction_smoke.py", "/usr/bin/python3 tests/package_tools_dogfood.py")],
         "wording": [("added demo", "added package demo")],
     },
     "test-rt-host-mutants": {
+        "count_source": 'none: host_mutants.sh stops at the first failing mutant',
         "new": [("make[1]: Target 'nift' not remade", "FAIL host mutant 4: observer test passed (mutant not caught)\n"
                  "make[1]: Target 'nift' not remade")],
         "diag": [("FAIL host mutant 1: build failed (harness failure)",
@@ -100,6 +110,7 @@ TABLE = {
                      "NIFT_HOST_MUTANT (tooling.md 3)\n", "")],
     },
     "cp25r-inventory": {
+        "count_source": 'none: inventory.py prints one line per unclassified reason, no total',
         "new": [("INVENTORY: unclassified reason: method:write", "INVENTORY: unclassified reason: method:write\n"
                  "INVENTORY: unclassified reason: method:read")],
         "diag": None,  # the unclassified reason is the case id and its whole diagnostic
@@ -107,6 +118,7 @@ TABLE = {
         "wording": [("classify-all: 789 units", "classify-all: 790 units")],
     },
     "test-runtime2-rt-diff-selftest": {
+        "count_source": 'none: the closing `FAIL rt-diff self-tests` has no count',
         "new": [("PASS caught: file-mode (files)", "FAIL caught: file-mode (files)")],
         "diag": [("FAIL D-009 policies (rc=1)", "FAIL D-009 policies (rc=2)")],
         "subst": [("trace op not exercised: touch", "trace op not exercised: chmod")],
@@ -114,6 +126,7 @@ TABLE = {
                     ("FAIL rt-diff self-tests", "FAIL rt-diff self-tests (see above)")],
     },
     "test-runtime2-scanner-parity": {
+        "count_source": 'none: the closing line counts compared sites and scripts, not failures',
         "new": [("scanner parity: 88 sites", "FAIL script tests/x.f\n0a1\n> 1\nscanner parity: 88 sites")],
         "diag": [("(prepared-decl-type)", "(callable:inject)")],
         "subst": [("probes/frequency-2000.f\n", "probes/frequency-4000.f\n")],
@@ -170,6 +183,61 @@ for gate, row in sorted(TABLE.items()):
     got = F.fingerprint(gate, mutate(text, row["wording"], gate, "wording"), [ROOT])
     check(f"{gate} wording", F.same(base, got), "; ".join(F.differences(base, got))[:300])
     n += 1
+
+# F1 (review of 3161f52d): a diagnostic printed outside every case block is part of the
+# fingerprint: each insertion, before the first case line and after the last block (before make's
+# error), must change it on every gate
+INSERTIONS = {
+    "traceback": "Traceback (most recent call last):\n  File \"x.py\", line 1, in <module>\nRuntimeError: boom",
+    "new refusal": "error: /tmp/x/tmp.AB/z.f:1:1: not compiled for the VM (new-refusal): this form is not supported",
+    "internal failure": "error: z.f: NIFT_VM internal failure: unexpected operands",
+    "crash": "Segmentation fault (core dumped)",
+    "C++ assertion": "nift: src/rt/vm.cpp:10: void f(): Assertion `x' failed.",
+    "sanitizer": "==123==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000010",
+    "timeout": "subprocess.TimeoutExpired: Command '['nift']' timed out after 30 seconds",
+}
+
+
+def positions(gate, text):
+    lines = text.splitlines(keepends=True)
+    spec = F.SPECS[gate]
+    first = next((i for i, l in enumerate(lines) if any(c.match(l.rstrip("\n")) for c in spec.cases)), None)
+    if first is None:  # a gate whose failure is a step abort: before its first diagnostic
+        first = next(i for i, l in enumerate(lines) if F.matches(l))
+    last = max((i for i, l in enumerate(lines) if l.startswith("make: ***")), default=len(lines))
+    return {"before the first case": first, "after the last block": last}
+
+
+for gate in sorted(TABLE):
+    text = open(os.path.join(LOGS, gate + ".txt"), errors="replace").read()
+    base = F.fingerprint(gate, text, [ROOT])
+    lines = text.splitlines(keepends=True)
+    for where, at in positions(gate, text).items():
+        for kind, ins in INSERTIONS.items():
+            got = F.fingerprint(gate, "".join(lines[:at] + [ins + "\n"] + lines[at:]), [ROOT])
+            check(f"{gate} {kind} {where}", not F.same(base, got), "a diagnostic outside the cases is invisible")
+            n += 1
+
+# category moves the review named: a crash before an existing FAIL line, a traceback before another
+for gate, old, new in [
+        ("test-v44-shell-restricted", "FAIL run-captures-not-tty", "Segmentation fault\nFAIL run-captures-not-tty"),
+        ("test-v44-shell-restricted", "FAIL run-captures-not-tty", "error: x: NIFT_VM internal failure: y\nFAIL run-captures-not-tty"),
+        ("test-cp19-s1-dispatch", "FAIL failed user function status non-zero",
+         "Traceback (most recent call last):\nRuntimeError: x\nFAIL failed user function status non-zero")]:
+    text = open(os.path.join(LOGS, gate + ".txt"), errors="replace").read()
+    check(f"{gate} category move", not F.same(F.fingerprint(gate, text, [ROOT]),
+                                             F.fingerprint(gate, mutate(text, [(old, new)], gate, "move"), [ROOT])))
+    n += 1
+
+# F5: the failure count is the gate's own where it prints one; the table states which gates do not
+for gate, row in sorted(TABLE.items()):
+    has = F.SPECS[gate].count is not None
+    check(f"{gate} count source stated", isinstance(row.get("count_source"), str) and row["count_source"].startswith(
+        "own: " if has else "none: "), "count_source must say `own: <line>` or `none: <why>` and match the spec")
+    if has:
+        text = open(os.path.join(LOGS, gate + ".txt"), errors="replace").read()
+        check(f"{gate} own count found", F.fingerprint(gate, text, [ROOT])["count"] is not None)
+        n += 1
 
 # no failing case found: no fingerprint, never equal (never "same step")
 check("no case: no fingerprint", F.fingerprint("test-v44-shell-restricted", "PASS a\nmake: *** [x] Error 1\n") is None)

@@ -845,3 +845,68 @@ FAILED-NEW on Linode until their nondeterminism is fixed or the owner decides ot
 Scanner-parity would need its thread-order and port-printing probes made deterministic or
 excluded with a reviewed list; sha256's hybrid/modified freshness check looks like mtime
 granularity (not investigated; same class as CP01).
+
+## 18. Review of C18-C19 (3161f52d): ACCEPT-WITH-CONDITIONS; fixes (C20)
+
+Harness only; `src/` and the binary (`91a49efa…`) unchanged.
+
+**F1 (fixed): diagnostics outside a case block.** One shared DIAGNOSTICS list for every gate:
+build-refused, refusal (VM refusal code, session refusal), internal-failure (`NIFT_VM internal
+failure`), sanitizer (`ERROR: …Sanitizer: kind`, UBSan `runtime error:`), assertion (C/C++
+`Assertion … failed`), crash (Segmentation fault, Aborted, Bus error, Floating point exception,
+Illegal instruction, Killed, Terminated), timeout, traceback, exception. Every match outside the
+case blocks is an entry of its own (step, `<outside>`, category, detail); inside a block every
+match of every category is in the case's detail (so a crash inside a refusal case changes it).
+Normalisation is unchanged (roots, /tmp paths). test-rt-host-mutants keeps its outside entries as a
+set (how many objects are refused depends on -j4). Selftest: on every gate, a traceback, a new
+refusal id, an internal failure, a crash, a C++ assertion, a sanitizer report and a timeout,
+each inserted before the first case line and after the last block, must change the fingerprint
+(182 checks), plus the review's category moves (a crash or internal failure before
+`FAIL run-captures-not-tty`, a traceback before `FAIL failed user function status non-zero`).
+Cross-run equality (§17.1) rechecked with the C20 extractor: unchanged (equal for the same eight
+gates and test-integrity's tree pair; sha256, cp01 and scanner-parity differ as before).
+
+**F2 (fixed; decision 2026-11-08): the regression baselines decide.** A failure is FAILED-BASELINE
+only if its fingerprint is equal on EVERY applicable regression baseline (17f7964c, weekend/r2):
+`all()`, not `any()`. A baseline is applicable when the gate exists there (no "No rule to make
+target") and can run there (its log is not harness-blocked); a named baseline tree that cannot be
+built counts as applicable and differing. A gate that passes, or fails differently, on an
+applicable baseline is FAILED-NEW, whatever v4.12.0 shows. Only when no regression baseline is
+applicable may an equal v4.12.0 fingerprint give FAILED-BASELINE, labelled `LEGACY-ONLY` in the
+reason. Each failing gate's reason lists every baseline: `baselines: 17f7964c: applicable,
+fingerprint equal; weekend/r2: not applicable: no such target there`. Guard: seven report-class
+cases (any vs all, not applicable, v4.12.0 vs a passing regression, legacy-only) and four toy
+controls: b9 (the review's toy9: v4.12.0 equal, 17f7964c passes → FAILED-NEW), ba (equal on
+17f7964c, different on weekend/r2 → FAILED-NEW), bb (equal on both → FAILED-BASELINE), bc (no
+target on the regression tree, v4.12.0 equal → FAILED-BASELINE, LEGACY-ONLY).
+
+**F3 (fixed): make flag variables.** `clean_env()` drops GNUMAKEFLAGS too; the preflight refuses
+MAKEFLAGS, MFLAGS, GNUMAKEFLAGS or MAKEOVERRIDES set in the environment, and every `?=` variable of
+the Makefile set from the environment (CXX and CC are the campaign's compilers and bound to the
+signature; CXXFLAGS only as the profile flags). The C++ flag portion of the signature (all but
+`-include FILE` and `-I…`) must equal the profile's flags exactly, checked directly, so a spoofed
+derivation that agrees with a spoofed build is still refused. Guard cases for each.
+
+**F4 (fixed).** Untracked or ignored files under `src/` and every `-I` directory of the signature
+(include, minifypp, markuppp; the build's own .o/.d/.cfg aside) are refused; a failing
+`git ls-files` is refused. The C half of the signature (the cmark objects) must equal the
+Makefile's derivation (CFLAGS from the environment is a `?=` variable, refused) and be built by
+$CC. A failing `make --eval` derivation is a preflight failure, not a fallback. Guard cases.
+
+**F5 (fixed).** `count` is the gate's own stated count where it prints one (test-v44-shell-
+restricted and test-cp19-s1-dispatch: the `FAILED: a, b` names; cp01: `FAILS (N):`; rt-parser:
+`N rt parser unit failure(s)`; test-integrity: `findings: N`); the other eight print none, and the
+selftest table states why for each (`count_source`). The failure-line count is kept separately
+(`lines`). Both are compared.
+
+**Stopped gates** stay stopped, as named FAILED-NEW, pending the owner (an adapter must parse the
+unchanged baseline logs, so a test-only change in the candidate cannot help).
+
+**Applicable baselines per gate** (from the Makefiles of 17f7964c, 0b5079fc and ce8cd36a; whether
+each can run there is decided by the campaign):
+
+| Gate | 17f7964c | weekend/r2 | v4.12.0 |
+| --- | --- | --- | --- |
+| test-v44-shell-restricted, test-v46-relative-imports, test-v44-packages, test-test-integrity | target present | target present | target present (not used: regression baselines apply) |
+| cp25r-inventory, test-cp19-s1-dispatch, test-rt-host-mutants, test-rt-parser, test-runtime2-cp01-simplify, test-runtime2-cp03-simplify, test-runtime2-rt-diff-selftest, test-runtime2-scanner-parity, test-sha256 | target present | target present | no target |
+| test-v44-language-foundation, test-rt-vm, test-runtime2-host-deps (stopped) | target present | target present | language-foundation present; the others absent |

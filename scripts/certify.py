@@ -404,10 +404,15 @@ def report_class(status, regression=None, blocked=None, assertion=None):
         return "PASSED"
     if blocked or status in ("UNVERIFIED", "SKIPPED-ENVIRONMENTAL"):
         return "BLOCKED"
-    if status == "BASELINE-FAILURE":
-        return "FAILED-BASELINE"
-    if status == "FAIL" and regression and any(regression.values()):
-        return "FAILED-BASELINE"
+    if status in ("FAIL", "BASELINE-FAILURE"):
+        # F2 (decision 2026-11-08): pre-existing for B3-B5 means equal on EVERY applicable regression
+        # baseline (None = not applicable there); a passing or differing one makes it new. Only when
+        # no regression baseline applies does an equal v4.12.0 fingerprint count (legacy-only).
+        applicable = {n: v for n, v in (regression or {}).items() if v is not None}
+        if applicable:
+            return "FAILED-BASELINE" if all(applicable.values()) else "FAILED-NEW"
+        if status == "BASELINE-FAILURE":
+            return "FAILED-BASELINE"
     return "FAILED-NEW"  # FAIL, and FLAKY under the zero-flakiness policy
 
 
@@ -557,6 +562,13 @@ def preflight_problems(f):
         missing = [x for x in want_flags if x not in b.get("args", [])]
         if missing:
             out.append(f"./nift's build lacks the profile flags {missing}")
+        # F3 (review of 3161f52d): the C++ flag portion (all but -include FILE and -I...) is the
+        # profile's flags exactly, checked directly, not only through make's own derivation
+        a = b.get("args", [])
+        flagpart = [x for i, x in enumerate(a) if x != "-include" and not (i and a[i - 1] == "-include")
+                    and not x.startswith("-I")]
+        if want_flags and flagpart != want_flags:
+            out.append(f"./nift's C++ flags {flagpart} are not exactly the profile's {want_flags}")
         # R5-2 (round 5): exactly the Makefile's own arguments with the profile flags, nothing more
         exp = f.get("expected_args")
         if exp is not None and b.get("args") != exp:
@@ -565,6 +577,25 @@ def preflight_problems(f):
                        f"missing {[x for x in exp if x not in b.get('args', [])][:6]})")
     elif f.get("build_rc") is not None or f.get("expected_args") is not None:
         out.append("no build signature (.build/obj-config/default.flags): the binary's build cannot be bound")
+    # F4: make's derivation must work (no silent fallback to the subset check), and the C half of
+    # the signature (the cmark objects, CFLAGS) is the Makefile's own too, built by $CC
+    if f.get("derivation_error"):
+        out.append(f"cannot derive the Makefile's own build arguments ({f['derivation_error']}): the build cannot be bound")
+    if "build_sig_c" in f:
+        c = f.get("build_sig_c")
+        if c is None:
+            out.append("the build signature has no C block (cmark objects): the C half cannot be bound")
+        else:
+            if f.get("expected_args_c") is not None and c.get("args") != f["expected_args_c"]:
+                out.append(f"the C objects' arguments {c.get('args')} differ from the Makefile's {f['expected_args_c']}")
+            if f.get("cc_resolved") and c.get("resolved") != f["cc_resolved"]:
+                out.append(f"the C objects were built by {c.get('resolved')}, not $CC ({f['cc_resolved']})")
+    if f.get("make_env"):
+        out.append(f"make flag variables are set in the environment ({sorted(f['make_env'])}): they can override "
+                   f"the build's variables (GNUMAKEFLAGS='CXXFLAGS=-O0' would reach both the build and the derivation)")
+    if f.get("makefile_env"):
+        out.append(f"Makefile variables are set from the environment ({sorted(f['makefile_env'])}): the profiled "
+                   f"build uses the Makefile's own values")
     for var in ("CPPFLAGS", "LDFLAGS"):
         if (f.get("flags_env") or {}).get(var):
             out.append(f"{var} is set in the environment ({f['flags_env'][var]!r}): the profiled build uses the Makefile's")
@@ -572,8 +603,10 @@ def preflight_problems(f):
     if src.get("clean") is False:
         out.append("the source tree has tracked changes: the binary would not be the commit's")
     if src.get("untracked_src"):
-        out.append(f"untracked sources under src/ would be built in (the Makefile globs src/rt/*.cpp): "
-                   f"{src['untracked_src'][:5]}")
+        out.append(f"untracked or ignored files under src/ or an -I directory would be built in or included "
+                   f"(the Makefile globs src/rt/*.cpp; -Iinclude precedes the system headers): {src['untracked_src'][:5]}")
+    elif "untracked_src" in src and src["untracked_src"] is None:
+        out.append("cannot list untracked files in the source tree (git ls-files failed)")
     # owner 23:14: a stale executable never passes: it must be current for the tree (make -q nift)
     # and, with a campaign start, built after it
     if f.get("build_current") is False:
@@ -718,6 +751,41 @@ def build_signature(root):
     return blocks[0] if blocks else None
 
 
+def build_signature_c(root):
+    """F4 (review of 3161f52d): the C block of the build signature (the cmark objects), or None."""
+    try:
+        text = (Path(root) / ".build/obj-config/default.flags").read_text()
+    except OSError:
+        return None
+    blocks, cur = [], None
+    for line in text.splitlines():
+        if line.startswith("nift-object-config"):
+            cur = {"args": []}
+            blocks.append(cur)
+        elif cur is not None:
+            k, _, v = line.partition(" ")
+            if k == "arg":
+                cur["args"].append(v)
+            else:
+                cur[k] = v
+    return next((b for b in blocks if "-std=c99" in b["args"]), None)
+
+
+# F3/F4 (review of 3161f52d): make variables the environment can set (`?=` in the Makefile) and
+# make's own flag variables. CXX and CC are the campaign's compilers (bound to the signature's
+# resolved compiler); CXXFLAGS may only equal the profile flags.
+MAKE_FLAG_VARS = ("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS", "MAKEOVERRIDES")
+ENV_ALLOWED = ("CXX", "CC", "CXXFLAGS")
+
+
+def makefile_env_vars(root):
+    try:
+        text = (Path(root) / "Makefile").read_text()
+    except OSError:
+        return []
+    return sorted(set(re.findall(r"^\s*([A-Za-z_]\w*)\s*\?=", text, re.M)))
+
+
 def environment_record(root):
     """Owner 2026-11-07 23:10: where a result was produced."""
     import platform
@@ -753,21 +821,37 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     def git(*a):
         res = subprocess.run(["git", "-C", str(root)] + list(a), capture_output=True, text=True)
         return res.stdout.strip() if res.returncode == 0 else None
-    others = git("ls-files", "--others", "--", "src") or ""
+    # F4: untracked or ignored files under src/ and every -I directory of the signature (a stray
+    # include/bits/stl_algo.h would shadow libstdc++); the build's own outputs (.o .d .cfg) aside
+    sig_b, sig_c = build_signature(root), build_signature_c(root)
+    idirs = sorted({"src"} | {a[2:] for b in (sig_b, sig_c) if b for a in b.get("args", [])
+                              if a.startswith("-I") and not a.startswith("-I$TEST_DIR")})
+    others = git("ls-files", "--others", "--", *idirs)
     facts["source"] = {"head": git("rev-parse", "HEAD"), "tree": git("rev-parse", "HEAD^{tree}"),
                        "clean": git("status", "--porcelain", "--untracked-files=no") == "",
-                       "untracked_src": [x for x in others.splitlines()
-                                         if re.search(r"\.(c|cc|cpp|h|hpp|inc|ipp)$", x)]}
+                       "include_dirs": idirs,
+                       "untracked_src": None if others is None else [
+                           x for x in others.splitlines() if not re.search(r"\.(o|d|cfg)$", x)]}
+    facts["build_sig_c"] = sig_c
     facts["flags_env"] = {v: os.environ.get(v) for v in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS") if os.environ.get(v)}
-    # R5-2: the arguments the Makefile itself gives the C++ objects (no environment overrides),
-    # written the way the build signature writes them ($TEST_DIR for the build output root)
+    # F3: make's flag variables (GNUMAKEFLAGS too) and every `?=` make variable set in the environment
+    facts["make_env"] = {v: os.environ[v] for v in MAKE_FLAG_VARS if os.environ.get(v)}
+    facts["makefile_env"] = {v: os.environ[v] for v in makefile_env_vars(root)
+                             if v not in ENV_ALLOWED and os.environ.get(v) is not None}
+    cc = os.environ.get("CC", "cc")
+    facts["cc_resolved"] = os.path.realpath(shutil.which(cc) or cc)
+    # R5-2: the arguments the Makefile itself gives the objects (no environment overrides, no
+    # make flag variables), written the way the build signature writes them ($TEST_DIR)
     sig = subprocess.run(["make", "-s", "--no-print-directory", "--eval",
                           "certify-print-sig: ; @echo $(OBJ_SIGNATURE_ARGS)", "certify-print-sig"], cwd=root,
                          capture_output=True, text=True, env={k: v for k, v in clean_env().items()
-                                                              if k not in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS")})
-    toks = sig.stdout.split("---")[0].split()[1:] if sig.returncode == 0 and "---" in sig.stdout else None
-    facts["expected_args"] = None if toks is None else [
-        t.replace("-I.build/", "-I$TEST_DIR/") if t.startswith("-I.build/") else t for t in toks]
+                                                              if k not in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS", "CFLAGS")})
+    ok = sig.returncode == 0 and sig.stdout.count("---") == 1
+    fix = lambda toks: [t.replace("-I.build/", "-I$TEST_DIR/") if t.startswith("-I.build/") else t for t in toks]
+    facts["expected_args"] = fix(sig.stdout.split("---")[0].split()[1:]) if ok else None
+    facts["expected_args_c"] = fix(sig.stdout.split("---")[1].split()[1:]) if ok else None
+    facts["derivation_error"] = None if ok else (f"make --eval exited {sig.returncode}: "
+                                                 f"{(sig.stderr or sig.stdout).strip()[:200]}")
     facts["build_invocation"] = "make nift (CXX=%s, CXXFLAGS=%s)" % (cxx, os.environ.get("CXXFLAGS", "<Makefile default>"))
     current = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True, env=clean_env())
     facts["build_current"] = current.returncode == 0
@@ -889,7 +973,7 @@ def clean_env():
     env = dict(os.environ)
     # NIFT_DEFER_LOAD_SENSITIVE (CI only) would skip the load-sensitive
     # guards; certification always runs them (exclusively).
-    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES", "NIFT_DEFER_LOAD_SENSITIVE"):
+    for k in ("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS", "MAKELEVEL", "MAKEOVERRIDES", "NIFT_DEFER_LOAD_SENSITIVE"):
         env.pop(k, None)
     return env
 
@@ -1295,7 +1379,9 @@ def main():
         if name and tree and ensure_baseline(Path(tree), a.jobs):
             regressions[name] = Path(tree)
         else:
-            print(f"certify: regression baseline {spec!r} unavailable; its comparison is not made", file=sys.stderr)
+            # F2: a named baseline that cannot be built is never "not applicable": it differs
+            regressions[name or spec] = None
+            print(f"certify: regression baseline {spec!r} unavailable; it counts as differing", file=sys.stderr)
     comparator_skipped = []
     # owner 2026-11-07 23:10: every result states the environment it ran in
     env_record = {**facts.get("environment", {}), "compiler": facts.get("cxx"),
@@ -1359,14 +1445,26 @@ def main():
             # C2: the regression baselines, each compared on its own (same step AND same FAIL lines).
             if not f["unverified"] and f.get("unpriv_rc") != 0 and regressions:
                 ctext = cand_log.read_text(errors="replace")
-                r["regression"] = {}
+                r["regression"], r["baselines"] = {}, {}
                 for name, tree in regressions.items():
+                    if tree is None:
+                        r["regression"][name], r["baselines"][name] = False, "applicable, unavailable (counts as differing)"
+                        continue
                     rlog = logdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
                     rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
                     rtext = rlog.read_text(errors="replace")
+                    # F2 (decision 2026-11-08): applicable = the gate exists there and can run there
+                    if "No rule to make target" in rtext:
+                        r["regression"][name], r["baselines"][name] = None, "not applicable: no such target there"
+                        continue
+                    if rrc != 0 and blocked_reason(rtext):
+                        r["regression"][name], r["baselines"][name] = None, f"not applicable: cannot run there ({blocked_reason(rtext)})"
+                        continue
                     diff = (FP.differences(FP.fingerprint(t, ctext, [ROOT]), FP.fingerprint(t, rtext, [tree]))
-                            if rrc != 0 and "No rule to make target" not in rtext else ["the baseline does not fail"])
+                            if rrc != 0 else ["the gate passes on this baseline"])
                     r["regression"][name] = not diff
+                    r["baselines"][name] = "applicable, " + ("fingerprint equal" if not diff else
+                                                             "passes there" if rrc == 0 else "fingerprint differs")
                     r.setdefault("fingerprint_diff", {})[name] = diff[:20]
                     r.setdefault("whole_log_identical", {})[name] = rrc != 0 and same_failure(
                         failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree]))
@@ -1431,13 +1529,18 @@ def main():
                            + "; ".join(f"{l} [{why}]" for l, why, req in r["skipped"] if req))
         if r["class"] == "BLOCKED":
             r["reason"] = r["blocked"] or r["reason"]
-        elif r["class"] == "FAILED-BASELINE" and r["status"] == "FAIL":
-            r["reason"] = "equal failure fingerprint on regression baseline(s): " + ", ".join(
+        elif r["class"] == "FAILED-BASELINE" and not any(v is not None for v in (r.get("regression") or {}).values()):
+            r["legacy_only"] = True  # F2: visibly distinct
+            r["reason"] = "LEGACY-ONLY (no regression baseline applicable; v4.12.0 fingerprint equal): " + r["reason"]
+        elif r["class"] == "FAILED-BASELINE":
+            r["reason"] = "equal failure fingerprint on every applicable regression baseline: " + ", ".join(
                 n for n, same in r["regression"].items() if same) + "; whole log identical: " + ", ".join(
                 f"{n}={v}" for n, v in r.get("whole_log_identical", {}).items()) + "; " + r["reason"]
-        elif r["class"] == "FAILED-NEW" and r.get("fingerprint_diff"):
+        if r["class"] == "FAILED-NEW" and r.get("fingerprint_diff"):
             r["reason"] += "; fingerprint differs: " + " / ".join(
                 f"{n}: {'; '.join(d[:3])}" for n, d in r["fingerprint_diff"].items() if d)[:600]
+        if r["class"].startswith("FAILED") and r.get("baselines"):
+            r["reason"] += "; baselines: " + "; ".join(f"{n}: {w}" for n, w in r["baselines"].items())
         if line_note:
             r["reason"] += "; " + line_note  # H2a: never overwritten
     for t in planned:
