@@ -234,6 +234,17 @@ GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', 
             oracle='/o/nift', oracle_version='v4.12.0', oracle_commit=certify.V4120_COMMIT, oracle_clean=True,
             oracle_current=True, campaign_start=1000, oracle_mtime=2000, oracle_sha256='aa', candidate_sha256='bb',
             oracle_realpath='/o/nift', candidate_realpath='/c/nift')
+RB_OK = dict(name='17f7964c', tree='/b/17f', expected_commit=certify.REGRESSION_COMMITS['17f7964c'],
+             commit=certify.REGRESSION_COMMITS['17f7964c'], clean=True, current=True, executable=True, mtime=2000, sha256='cc')
+# a stale baseline tree: a git checkout whose nift is older than its source (make -q nift fails)
+import os, shutil, subprocess, tempfile
+STALE = tempfile.mkdtemp(prefix='cert-guard-stale-')
+open(STALE + '/Makefile', 'w').write('nift: src.c\n\tcp src.c nift && chmod +x nift\n')
+open(STALE + '/nift', 'w').write('#!/bin/sh\n'); os.chmod(STALE + '/nift', 0o755)
+open(STALE + '/src.c', 'w').write('x\n'); os.utime(STALE + '/nift', (1000, 1000))
+_g = dict(os.environ, GIT_AUTHOR_NAME='g', GIT_AUTHOR_EMAIL='g@x', GIT_COMMITTER_NAME='g', GIT_COMMITTER_EMAIL='g@x')
+subprocess.run('git init -q && git add Makefile src.c && git commit -qm t', shell=True, cwd=STALE, env=_g, check=True)
+STALE_NAME = subprocess.run(['git', '-C', STALE, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()[:12]
 import json
 PROFILE = json.load(open('tests/runtime2/cp14b/toolchain-profile.json'))
 PROF_FILES = {k: v['sha256'] for k, v in PROFILE['files'].items()}
@@ -312,6 +323,20 @@ checks = [
     ('preflight oracle built before the campaign', len(pp({**GOOD, 'oracle_mtime': 999})), 1),
     ('preflight oracle is the candidate (sha256)', len(pp({**GOOD, 'oracle_sha256': 'bb'})), 1),
     ('preflight oracle is the candidate (path)', len(pp({**GOOD, 'oracle_realpath': '/c/nift'})), 1),
+    ('preflight oracle not executable', len(pp({**GOOD, 'oracle_executable': False})), 1),
+    # C37 (pre-launch review B2): the regression baselines are checked before any gate runs
+    ('preflight baselines ok', pp({**GOOD, 'regression_baselines': [RB_OK, {**RB_OK, 'name': 'weekend/r2',
+        'expected_commit': certify.REGRESSION_COMMITS['weekend/r2'], 'commit': certify.REGRESSION_COMMITS['weekend/r2']}]}), []),
+    ('preflight baseline at another commit', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'commit': '0b5079fc' + '0' * 32}]})), 1),
+    ('preflight baseline unknown name', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'name': 'b4b', 'expected_commit': None}]})), 1),
+    ('preflight baseline modified', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'clean': False}]})), 1),
+    ('preflight baseline binary stale (make -q)', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'current': False}]})), 1),
+    ('preflight baseline built before the campaign', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'mtime': 999}]})), 1),
+    ('preflight baseline no binary', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'executable': False, 'mtime': None, 'sha256': None}]})), 1),
+    ('preflight bogus baseline path (real facts)', len(pp({**GOOD, 'regression_baselines': [certify.regression_facts('17f7964c', '/nonexistent/tree')]})), 3),
+    ('preflight stale baseline tree (real facts)', [p.split(':')[1].strip()[:20] for p in pp({**GOOD, 'campaign_start': 10**10,
+        'oracle_mtime': 10**10, 'regression_baselines': [certify.regression_facts(STALE_NAME, STALE)]})],
+        ['tracked changes or n', 'nift was not built d']),
     # D3: assertion classes
     ('assertions pass', certify.assertion_class(0, 'PASS a: 3 checks\n'), 'PASS'),
     ('assertions partial (known RAM condition)', certify.assertion_class(0,
@@ -440,6 +465,7 @@ checks = [
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
+shutil.rmtree(STALE, ignore_errors=True)
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
     print('FAIL certify harness self-test:', bad); sys.exit(1)
@@ -673,6 +699,12 @@ toy "$TOY/ab/cand" test-v44-packages "$ABORTED"; toy "$TOY/ab/r1" test-v44-packa
 hiddenrun ab test-v44-packages 4 "FAILED-BASELINE  test-v44-packages" "CAMPAIGN VERDICT: PARTIAL (exit 4)" \
     "[A] test-v44-packages: NOT EXECUTED package_transaction_smoke.py: every check after line 330" \
     "PARTIAL is not a pass" "NOT RELEASE-QUALIFYING"
+# C37: the pre-registered known-failure list is for triage only: no certify script reads it
+if grep -rqs "prelaunch-known-failures" scripts/certify.py scripts/certify_fingerprints.py scripts/certify_site/ \
+   || [ ! -s docs/runtime-2/evidence/combined-b3-b5/prelaunch-known-failures.tsv ]; then
+    echo "FAIL certification guard: the known-failure list is missing or read by the runner (it must not classify)"; exit 1
+fi
+echo "PASS certification guard: the pre-registered known-failure list exists and no certify script reads it"
 # Category A hidden checks (the root-path reproducers stop at line 20) are listed as A and make the
 # report NOT RELEASE-QUALIFYING. (A toy language-foundation is load-sensitive: a failure there is
 # FAILED-NEW under exclusive execution, so this toy's verdict is FAILED; the PARTIAL-with-A verdict

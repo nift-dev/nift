@@ -259,6 +259,9 @@ Added (owner 2026-11-07 18:00 D4/D5):
 - **Operand order of top-level bindings outside receivers** (review of 0d853db4 M2; 2.2): `x + g()`,
   `x == g()`, `s + k()`, `x += g()` (every context), `[x, g()]`. RELEASE BLOCKER (owner 2026-11-07
   22:13 D2); not started in this round; a bounded investigation will be briefed separately.
+- **test-rt-memory-c1 out-of-memory abort** (C37, section 30): under `ulimit -v` nift aborts
+  (SIGABRT, glibc TLS destructor registration) instead of failing cleanly; nondeterministic;
+  pre-existing (weekend/r2, B3, B4).
 - **B4b `script_return_kernel_error`** (C36, section 30): `a := []; return a.pop()` refused
   `type:script-return` since B4b (B3 and weekend/r2 run it legacy-equal); cp14b is FAILED-NEW
   against weekend/r2 until fixed or decided.
@@ -1499,16 +1502,20 @@ numbers, not measurements of this plan; their evidence is stated in 29.3.
 | Class | Gates |
 | --- | --- |
 | Must pass (PASSED) | the other 326 gates (the plan minus the two rows below), including every B3-B5 and D2 gate: test-runtime2-b3/-b4/-b5(+mutants, generators, evalorder with gen_operators), b4b(+gen-alias, work, fixpoint, mutants), refsem(+mutants), collections, cp22, coro-module, guardoff, certification-guard, test-build-boundary(-nondestructive), test-build-reuse, test-serve (IPv6 checked by the preflight) |
-| Expected FAILED-BASELINE (fingerprinted, `EXPECTED_BASELINE`; each must match every applicable regression baseline, else FAILED-NEW) | `test-v44-shell-restricted`, `test-v46-relative-imports`, `test-runtime2-cp03-simplify`, `test-sha256`, `test-runtime2-host-deps`, `test-runtime2-cp01-simplify`, `test-cp19-s1-dispatch`, `test-rt-parser`, `test-runtime2-rt-diff-selftest`, `test-test-integrity`, `test-v44-packages`, `test-v44-language-foundation`, `cp25r-inventory`, `test-runtime2-scanner-parity`, `test-rt-vm`, `test-rt-host-mutants`. Notes: test-rt-vm's vm_parity now passes on its own (C31), so its fingerprint is vm_modules (`import-scope:collision`, 2 cases) plus whatever its prerequisite cp14b contributes; test-runtime2-cp01-simplify was made deterministic in C23 and may now PASS (better than baseline is not a failure) |
+| Expected FAILED-BASELINE (fingerprinted, `EXPECTED_BASELINE`, 17 gates since C36; each must match every applicable regression baseline, else FAILED-NEW) | `test-runtime2-cp14b` (C36; expected FAILED-NEW against weekend/r2 unless the fresh 0b5079fc build refuses `script_return_kernel_error` too, section 30), `test-v44-shell-restricted`, `test-v46-relative-imports`, `test-runtime2-cp03-simplify`, `test-sha256`, `test-runtime2-host-deps`, `test-runtime2-cp01-simplify`, `test-cp19-s1-dispatch`, `test-rt-parser`, `test-runtime2-rt-diff-selftest`, `test-test-integrity`, `test-v44-packages`, `test-v44-language-foundation`, `cp25r-inventory`, `test-runtime2-scanner-parity`, `test-rt-vm`, `test-rt-host-mutants`. Notes: test-rt-vm's vm_parity now passes on its own (C31), so its fingerprint is vm_modules (`import-scope:collision`, 2 cases) plus whatever its prerequisite cp14b contributes; test-runtime2-cp01-simplify was made deterministic in C23 and may now PASS (better than baseline is not a failure) |
 | Linode-only lanes (never run in this container; must pass there unless named above) | `test-engine-bindings`, `test-binding-warnings`, `test-rt-builtins-sanitize`, `test-rt-value-sanitize`, `test-cp19-session-cli`, `test-cp19-session-sanitize`, `test-cp19-proof-sanitize`, `test-cp19-admission-sanitize`, `test-cp19-host-sanitize`, `test-runtime2-cp23-sanitize`, `test-runtime2-cp23-tsan`, `test-v48-map-set-scaling`, `test-runtime2-cp14b`, `test-runtime2-cp14b-sort`, `test-runtime2-cp18-sanitize`, `go-binding`, `csharp-binding`, `node-binding`, `python-binding`, `test-load-sensitive`, `test-runtime2-f6-sanitize`, `test-rt-handles-sanitize`, `test-rt-handles-tsan`, `test-runtime2-cp17-sanitize`, `test-rt-source-map-sanitize`, `test-rt-source-map-tsan`, `test-rt-error-oom-sanitize`, `test-runtime2-b5-evalorder-sanitize`, `test-runtime2-guardoff-sanitize`, `test-cp19-expression-sanitize`, `test-runtime2-cp14b-sanitize`, `test-runtime2-cp22-sanitize`, `test-runtime2-cp22-tsan`, `test-runtime2-coro-module-sanitize`, `test-runtime2-coro-module-tsan`, `test-runtime2-collections-sanitize`, `test-runtime2-collections-tsan`, `test-runtime2-refsem-sanitize`, `test-runtime2-refsem-tsan`, `test-runtime2-b3-sanitize`, `test-runtime2-b4-tsan`, `test-runtime2-cp14b-mutants`, `test-cp18-bytes-sanitize`, `test-cp18-bytes-tsan`, `test-cp19-proof-cli`, `test-cp20-launch-bench`, `test-cp20-r1-flake`, `test-cp21-prompt-latency`, `test-cp23-shared-unit-sanitize`, `test-rt-host-tsan`, `test-rt-parser-asan`, `test-runtime2-cp14b-design-mutants`, `test-runtime2-for-s2-bench`, `test-runtime2-for-s2-sanitize`, `test-runtime2-literals-scaling`, `test-go-binding`, `test-csharp-binding`, `test-node-binding`, `test-python-binding`, `test-rt-host-sanitize`, `test-cp19-r1-sanitize`, `test-rt-vm-sanitize` (sanitizer, TSan, the four bindings and their wrappers, the GCC 15.2 comparator gates, the CP19 oracle gate, the performance lane) |
 | Expected PARTIAL items (unexecuted REQUIRED checks; all Category A since C34, so the verdict is at best PARTIAL, NOT RELEASE-QUALIFYING) | test-v44-language-foundation: v44_ast_expression_smoke.sh (big-int equality, large-value compound, live binding, precedence), v44_element_assignment_smoke.sh (7 named checks), v44_root_path_corruption_reproducers.sh (9 named checks), and every check after the failing command of the v44 cp2-cp9 smokes; test-v46-relative-imports: both ownership smokes after their failing command; test-v44-packages: package_transaction_smoke.py after line 330; test-runtime2-cp03-simplify: cp03_missing_tracer.sh after its failing command. **Pending the owner (item 3, 28):** of the 21 extracted Category A checks, 10 pass on the VM, 10 are refused on the VM before any effect and one (`const` element store) runs under B5 where the original asserts an error; the extraction is not committed, so until the owner decides they stay unexecuted A checks |
 
+(C37) The 28 other locally failing planned gates of section 30 are pre-registered, for triage
+only, in `docs/runtime-2/evidence/combined-b3-b5/prelaunch-known-failures.tsv`; the runner does
+not read it. As planned the campaign ends FAILED (pre-launch review B1): launching needs, for
+each, an extractor, a fix, a `--drop` with an owner decision, or the owner's acceptance that this
+run is diagnostic.
+
 Other PARTIAL/BLOCKED risks, each checked or provided by the plan: the certification guard's
 historical control needs commit `0d853db4` in the clone (transfer the whole branch history, not a
-shallow bundle); test-sha256's root-only check needs the `tester` re-run; test-runtime2-cp14b is
-not in EXPECTED_BASELINE: its known `script_return_kernel_error` failure (GCC 13.3 here) would be
-FAILED-NEW unless it passes on the GCC 15.2 profile (risk; decide before launch whether to give it
-an extractor).
+shallow bundle); test-sha256's root-only check needs the `tester` re-run; test-runtime2-cp14b: on
+EXPECTED_BASELINE since C36 (section 30).
 
 ### 29.2 Run order on one instance
 
@@ -1517,7 +1524,7 @@ an extractor).
 | 0 | Provision (Ubuntu 26.04 if offered, else 24.04 + resolute chroot), SSH key pin, clone/bundle transfer | 10 min | 10 min |
 | 1 | Environment preflight: pinned GCC 15.2.0-16ubuntu1 (14.1), Python 3.12 + dev, Go 1.26 tarball, Node 22, .NET 10, strace/time/util-linux, `tester` user, sysctl; `make nift`; `certify.py --list` with the oracle; **delete the instance if any PREFLIGHT problem** | 35 min | 45 min |
 | 2 | v4.12.0 oracle at `ce8cd36a` (`make -j4 nift`; also the v4.12.0 baseline tree) | 8 min | 12 min |
-| 3 | Regression baselines 17f7964c and weekend/r2 `0b5079fc` (`make -j4 nift` each; their gate objects are built by certify when a gate is compared) | 15 min | 20 min |
+| 3 | Regression baselines 17f7964c and weekend/r2 `0b5079fc` (`make -j4 nift` each, under `set -e`; their gate objects are built by certify when a gate is compared); then `certify.py --list` with every flag: it checks the oracle and both baselines (commit, clean, `make -q nift`, executable, built after the campaign start, sha256) and exits 2 on any PREFLIGHT line (C37); and the stage-3 check: `script_return_kernel_error` on the fresh 0b5079fc build, recorded | 15 min | 20 min |
 | 4 | Candidate build: `make -j4 nift` plus the prebuild of test objects | 20 min | 25 min |
 | 5a | Campaign, parallel phase (212 gates, `--jobs 4`) | 1.0 h | 1.4 h |
 | 5b | Campaign, serial phase (192 gates): test-rt-vm subtree ~0.5 h; sanitizer lanes 22+7 and TSan 9+1 incl. their object sets ~4.5 h; test-build-reuse ~1.1 h; build-boundary pair ~0.5 h; cp17 handle allocation 0.5 h (budget 1.5 h); bindings ~0.3 h; perf lane ~0.6 h; other serial gates and mutants ~1.6 h | 9.6 h | 12.5 h |
@@ -1566,37 +1573,50 @@ an extractor).
 ### 29.5 Commands (as root on the instance)
 
     # stage 0-1
+    set -euo pipefail
     useradd -m -s /bin/bash tester
     sysctl -w vm.mmap_rnd_bits=28
     export CXX=g++-15 CC=gcc-15 NIFT_CP14B_REQUIRE_COMPARATOR=1    # after the 14.1 install and holds
     export NIFT_CAMPAIGN_START=$(date +%s)                          # before the oracle build
     git clone <bundle> /work/nift && cd /work/nift && git checkout --detach <frozen tip>
     git rev-parse HEAD HEAD^{tree}                                  # must equal the frozen tip and tree
+    # stage 2-3 (set -e: any failed build stops here)
     git worktree add --detach ../nift-v4.12.0 ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb
-    make -C ../nift-v4.12.0 -j4 nift && ../nift-v4.12.0/nift --version   # Nift v4.12.0
-    git worktree add --detach ../nift-17f7964c 17f7964c
-    git worktree add --detach ../nift-0b5079fc 0b5079fc
-    make -C ../nift-17f7964c -j4 nift && make -C ../nift-0b5079fc -j4 nift
+    git worktree add --detach ../nift-17f7964c 17f7964cb4f5890740658bd90af2d411b2f7d8ce
+    git worktree add --detach ../nift-0b5079fc 0b5079fc6874f998bfe82bf3a7e86e2485724477
+    for t in ../nift-v4.12.0 ../nift-17f7964c ../nift-0b5079fc; do
+        make -C "$t" -j4 nift; make -q -C "$t" nift; test -x "$t/nift"; sha256sum "$t/nift"
+    done | tee /work/stage3-builds.txt
+    ../nift-v4.12.0/nift --version                                  # Nift v4.12.0
     make -j4 nift
-    python3 scripts/certify.py --list --legacy-oracle "$PWD/../nift-v4.12.0/nift" \
-        --campaign-start "$NIFT_CAMPAIGN_START" --baseline ../nift-v4.12.0 \
-        --regression-baseline 17f7964c=../nift-17f7964c --regression-baseline weekend/r2=../nift-0b5079fc \
-        | tee /work/stage1-preflight.txt      # any "PREFLIGHT BLOCKED" line: stop and delete the instance
-    # stage 2
-    python3 scripts/certify.py --certify --jobs 4 --unprivileged-user tester \
-        --legacy-oracle "$PWD/../nift-v4.12.0/nift" --campaign-start "$NIFT_CAMPAIGN_START" \
-        --baseline ../nift-v4.12.0 \
-        --regression-baseline 17f7964c=../nift-17f7964c --regression-baseline weekend/r2=../nift-0b5079fc \
+    FLAGS=(--legacy-oracle "$PWD/../nift-v4.12.0/nift" --campaign-start "$NIFT_CAMPAIGN_START"
+           --baseline ../nift-v4.12.0
+           --regression-baseline 17f7964c=../nift-17f7964c --regression-baseline weekend/r2=../nift-0b5079fc)
+    python3 scripts/certify.py --list "${FLAGS[@]}" > /work/stage1-preflight.txt 2>&1 \
+        || { echo "PREFLIGHT failed: delete the instance"; exit 2; }        # exit 2 on any PREFLIGHT line
+    if grep -q '^PREFLIGHT' /work/stage1-preflight.txt; then echo 'PREFLIGHT line: delete the instance'; exit 2; fi
+    # the stage-3 check (record it; on a fresh 0b5079fc build)
+    printf 'a:=[]; return a.pop()\n' > /tmp/srk.f
+    for t in ../nift-17f7964c ../nift-0b5079fc; do
+        echo "== $t"; NIFT_VM=require NIFT_PREVALIDATE=off "$t/nift" /tmp/srk.f || true
+    done 2>&1 | tee /work/stage3-script-return.txt
+    # stage 4-5 (not under set -e: the verdict is the exit status)
+    set +e
+    python3 scripts/certify.py --certify --jobs 4 --unprivileged-user tester "${FLAGS[@]}" \
         > /work/campaign.out 2>&1; echo "exit $?" >> /work/campaign.out   # 0 CERTIFIED, 4 PARTIAL, 1 FAILED, 2 preflight
 
 ### 29.6 Artefacts to bring back
 
-`.build/certify/summary.json` and `summary.txt` (verdict, classes, `not_executed_required` with
-categories, `certified_binary`, environment); every per-gate log `.build/certify/<gate>.log` with
-its `.line<N>.log`, `.regression-<name>.log`, baseline and `.unprivileged.log` companions;
-`.build/certify/_preflight.json`; the kept rt-diff reports (`<log>.kept`); the fingerprints as
-summary.json records them (`fingerprint_diff`, `regression`, `whole_log_identical`);
-`/work/stage1-preflight.txt`, `/work/campaign.out`; `sha256sum` of `nift`, the oracle and both
+The whole `.build/certify/` directory (C37), which holds summary.json and summary.txt (verdict,
+classes, `not_executed_required` with categories, `certified_binary`, environment), every per-gate
+log with its `.line<N>.log`, `.regression-<name>.log`, baseline and `.unprivileged.log`
+companions, `_preflight.json` (with the oracle's and both baselines' facts and sha256s),
+`_build-nift.log`, `_prebuild.log` and the kept rt-diff reports (`<log>.kept`); the
+fingerprints as summary.json records them (`fingerprint_diff`, `regression`,
+`whole_log_identical`); the failing gates' harness JSON outputs (every `--output`/`--report` file
+of a failing gate, e.g. `.build/cp14b/evidence/*.json`: `find .build -name '*.json' -newer
+/work/stage1-preflight.txt` collected whole); `/work/stage1-preflight.txt`,
+`/work/stage3-builds.txt`, `/work/stage3-script-return.txt`, `/work/campaign.out`; `sha256sum` of `nift`, the oracle and both
 baseline binaries; `dpkg -l` of the toolchain packages, `uname -a`, `/etc/os-release`,
 `nproc`, `free -m`, `df -h`; and `git rev-parse` of the four trees. One tarball with a sha256
 manifest, verified locally before the instance is deleted.
@@ -1659,7 +1679,7 @@ extractor each is FAILED-NEW on Linode (no fingerprint never matches).
 | test-runtime2-prevalidate-gate | FAIL | FAIL | not checked | legacy channel expectations ("silent"/"ok") |
 | test-rt-builtins, test-rt-case-conversion, test-rt-host-random-budget, test-rt-host-sources-list | FAIL | FAIL | not checked | unit link / source-list defects (ld errors) |
 | test-rt-builtins-probe | FAIL | FAIL | not checked | context probe expectations (`context:object-length`) |
-| test-rt-memory-c1 | FAIL | FAIL | not checked | environment: glibc TLS registration under `ulimit -v` |
+| test-rt-memory-c1 | FAIL (nondeterministic: 15 of 24 cells here) | FAIL | FAIL (pre-launch review: reproduced on the weekend/r2, B3 and B4 binaries at 400 and 800 MB) | **corrected in C37: a pre-existing product abort on out-of-memory**, not the environment: under `ulimit -v` nift aborts (SIGABRT, exit 134, glibc "failed to register TLS destructor: out of memory") instead of failing cleanly; nondeterministic (glibc 2.39+), so Linode hits it too and no fingerprint can match reliably. **Release blocker** (runtime safety), pre-existing, not a candidate regression |
 | test-runtime2-cp13b-mutants, test-runtime2-literals-mutants, -literals-f1-negative, -literals-decimal-negative, -module-host-order-mutant | FAIL | not run there (B5 fix-up: harness failure) | not checked | mutant builds rejected by the production build guard (tooling.md 3) |
 | test-runtime2-cp17-handles, test-runtime2-cp17-routing-mutants | FAIL | FAIL (routing build) | not checked | stale routing mutant (ParserScript.cpp no longer compiles with it) |
 | test-cp19-r1, test-cp19-shared-eval, test-cp19-expression-development | FAIL | FAIL | not checked | stale eval harness expectations (refusal note wording, function tag) |
@@ -1668,3 +1688,30 @@ extractor each is FAILED-NEW on Linode (no fingerprint never matches).
 28 gates (plus cp14b) would reach Linode as FAILED-NEW. Each needs an extractor on
 EXPECTED_BASELINE (and must then match both regression baselines), a fix, or an owner decision
 before launch; cp19-admission-mutants and cp14b are B3-B5-era and cannot become FAILED-BASELINE.
+
+## 31. Pre-launch review of 0f327a20: CONFIRMED-WITH-CONDITIONS (C37)
+
+Review: `scratchpad/review-ha/PRELAUNCH.md`. Harness and docs only (no `src/`; binary f2fed67d).
+- **B2 (fixed).** `--list` and the campaign preflight check, before any gate runs, the
+  `--legacy-oracle` (as before, plus executable) and every `--regression-baseline NAME=TREE`:
+  the checkout is at the named commit (`REGRESSION_COMMITS`: 17f7964c, weekend/r2 = 0b5079fc; or
+  a NAME that is a commit-hash prefix) and clean, `make -q nift` is 0, `nift` is executable and was
+  built after the campaign start, and its sha256 is recorded (`_preflight.json`
+  `regression_baselines`). A problem is a PREFLIGHT line; a full campaign exits 2, and `--list`
+  of a full plan now exits 2 too. Guard: 11 new preflight cases (each field, a bogus baseline
+  path through the real fact collector, a stale baseline tree: a git checkout whose `nift` is
+  older than its source and than the campaign start). Seen here: a nonexistent 17f7964c path and
+  the local weekend/r2 tree (`make -q nift` 1: its binary predates 8 tooling commits) are both
+  reported. 29.5: stage 3 builds the oracle and both baselines under `set -e`, checks each with
+  `make -q` and `test -x`, records sha256s, then runs `--list` with every flag and stops on any
+  PREFLIGHT line, then records `script_return_kernel_error` on the fresh 0b5079fc build.
+- **B1 (owner).** As planned the campaign ends FAILED (29.1, 30); recorded in 29.1, not decided here.
+- **Artefacts (29.6):** the whole `.build/certify/` (incl. `_build-nift.log`, `_prebuild.log`) and
+  the failing gates' harness JSON. Pre-registered known failures for triage only:
+  `docs/runtime-2/evidence/combined-b3-b5/prelaunch-known-failures.tsv` (cp14b and the 28 gates of
+  30, each with its suspected cause, baseline evidence and owner); the runner never reads it (guard
+  check), so it changes no classification or verdict.
+- **Docs:** 29.1 (cp14b on EXPECTED_BASELINE); the L4 consequence in the b7 fixture header;
+  test-rt-memory-c1 reclassified in 30 as a pre-existing product abort on out-of-memory and added
+  to the release blockers (8). The review's vm-corpus note (3 of the 124 blocks are B5-approved
+  differences) is in the known-failure list.

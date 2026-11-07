@@ -1,0 +1,35 @@
+# Pre-registered known failures for the combined B3-B5 Linode campaign (C37, pre-launch review of
+# 0f327a20; record section 30). FOR POST-RUN TRIAGE ONLY: scripts/certify.py does not read this file
+# and it changes no classification or verdict (the guard checks that no certify script names it).
+# A gate here that ends FAILED-NEW is expected; one that ends otherwise, or a FAILED-NEW gate not
+# here, is new information. Columns (tab-separated): gate, suspected cause, baseline evidence
+# (local), owner / release-blocker item.
+test-runtime2-cp14b	B4b admission regression: `a := []; return a.pop()` refused `type:script-return` (cp14b script_return_kernel_error)	17f7964c identical; weekend/r2 and B3 binaries run it legacy-equal (local binaries not make -q current: re-checked on the fresh 0b5079fc build in stage 3)	release blocker: B4b script_return_kernel_error (record 8, 30)
+test-cp19-admission-mutants	B5: case `loop` control refused (E-U6-1, admission precision); m10 survives (pre-existing)	17f7964c fails other cases	PENDING-OWNER (b5-refsem.md 11.4)
+test-cp19-admission-mutants-switch	as test-cp19-admission-mutants (switch build)	17f7964c fails other cases	PENDING-OWNER (b5-refsem.md 11.4)
+test-cp15-numeric-repair	VM-default: a number literal refused (`number-literal`)	17f7964c and weekend/r2: same refusal	pre-existing VM-default gaps (release audit)
+test-cp17-bytes	VM-default: `bytes()` refused (`builtin-bytes:bytes`)	17f7964c fails	pre-existing VM-default gaps
+test-cp18-bytes	VM-default: `opaque:legacy-runtime-error` refused	17f7964c fails	pre-existing VM-default gaps
+test-cp19-bytes	VM-default: `open_bytes()` refused	17f7964c and weekend/r2: same refusal	pre-existing VM-default gaps
+test-cp20-bytes	VM-default: `ffi_open()` refused	17f7964c fails	pre-existing VM-default gaps
+test-runtime2-process-capture	VM-default: `cmd()` refused	17f7964c and weekend/r2: same line	pre-existing VM-default gaps
+test-runtime2-cp16-legacy	legacy-routing expectations under VM-default	17f7964c and weekend/r2: same line	pre-existing (release audit)
+test-runtime2-diagnostics	default-engine diagnostics goldens (31 FAIL blocks)	17f7964c and weekend/r2: the same 31	pre-existing goldens (release audit)
+test-runtime2-vm-corpus	default-environment goldens plus 3 B5-approved differences (copy_at_call, copy_at_return, cp11/arrays): 124 FAIL lines	17f7964c and weekend/r2: 155 (the candidate's are a subset)	pre-existing goldens; B5 rt-diff approvals 25, 26, 30
+test-runtime2-prevalidate-gate	legacy-channel expectations ("silent"/"ok")	17f7964c fails	pre-existing (release audit)
+test-rt-builtins	unit link defect (ld)	17f7964c fails	pre-existing unit source lists
+test-rt-case-conversion	unit link defect (ld)	17f7964c fails	pre-existing unit source lists
+test-rt-host-random-budget	unit link defect (ld)	17f7964c fails	pre-existing unit source lists
+test-rt-host-sources-list	host source list check	17f7964c fails	pre-existing unit source lists
+test-rt-builtins-probe	context probe expectations (`context:object-length`)	17f7964c fails	pre-existing (release audit)
+test-rt-memory-c1	product abort on out-of-memory: SIGABRT (134), glibc "failed to register TLS destructor" under `ulimit -v`; nondeterministic (glibc 2.39+)	reproduced on the weekend/r2, B3 and B4 binaries	RELEASE BLOCKER: pre-existing runtime-safety defect (record 30)
+test-runtime2-cp13b-mutants	mutant builds rejected by the production build guard (NIFT_EXC_MUTANT)	not run on 17f7964c	pre-existing harness vs build guard (tooling.md 3)
+test-runtime2-literals-mutants	mutant builds rejected by the production build guard (NIFT_INTERP_MUTANT)	not run on 17f7964c	pre-existing harness vs build guard
+test-runtime2-literals-f1-negative	defective build rejected by the production build guard	not run on 17f7964c	pre-existing harness vs build guard
+test-runtime2-literals-decimal-negative	defective build rejected by the production build guard	not run on 17f7964c	pre-existing harness vs build guard
+test-runtime2-module-host-order-mutant	mutant build rejected by the production build guard (NIFT_R1_MUTANT)	not run on 17f7964c	pre-existing harness vs build guard
+test-runtime2-cp17-handles	stale routing mutant no longer compiles (ParserScript.cpp)	17f7964c fails	pre-existing stale mutant
+test-runtime2-cp17-routing-mutants	stale routing mutant no longer compiles (ParserScript.cpp)	17f7964c fails	pre-existing stale mutant
+test-cp19-r1	stale eval harness expectation (refusal wording)	17f7964c fails	pre-existing stale harness
+test-cp19-shared-eval	stale eval harness expectation (`NIFT_VM=require` note)	17f7964c fails	pre-existing stale harness
+test-cp19-expression-development	stale eval expectation (function tag vs "opaque runtime value is not serializable")	17f7964c fails	pre-existing stale harness

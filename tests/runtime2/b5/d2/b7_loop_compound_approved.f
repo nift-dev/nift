@@ -1,4 +1,4 @@
-// D2 (docs/runtime-2/checkpoints/combined-b3-b5.md section 27): APPROVED 2026-11-08 03:27/03:29 (owner), a difference, not legacy parity: legacy's prepared loop evaluator reads a compound target late when the callee is a `fn` (24, and `Za` for a string) and loses a lambda callee's string append (`Z`); the VM uses the canonical order in loops too (10, aa, aa).
+// D2 (docs/runtime-2/checkpoints/combined-b3-b5.md section 27): APPROVED 2026-11-08 03:27/03:29 (owner), a difference, not legacy parity: legacy's prepared loop evaluator reads a compound target late when the callee is a `fn` (24, and `Za` for a string) and loses a lambda callee's string append (`Z`); the VM uses the canonical order in loops too (10, aa, aa). Consequence (review of 3b513751, L4): an operation that fails on the target read first now fails on the VM where legacy, reading the rebinding late, succeeds: `x := 9223372036854775807; fn(g()) { x = 5; return 1 }` then `x += g()` in a loop is a VM overflow error (exit 1); legacy prints 6.
 x := 6
 fn(g()) { x = 20; return 4 }
 s := "a"
