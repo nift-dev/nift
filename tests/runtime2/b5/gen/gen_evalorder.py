@@ -45,7 +45,8 @@ sys.path.insert(0, HERE)
 import genrun  # noqa: E402
 
 TABLE = os.path.join("tests", "runtime2", "b5", "gen", "evalorder.tsv")
-INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|\\u001fnift:|cell reached")
+INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|\\u001fnift:|cell reached|"
+                      r"AddressSanitizer|LeakSanitizer|runtime error:")
 ARGS = ["none", "rebind", "alias", "drop", "throw"]
 CALLEES = ["lambda", "fn"]
 CONTEXTS = ["top", "loop", "fncell", "fnglob", "lam", "session"]

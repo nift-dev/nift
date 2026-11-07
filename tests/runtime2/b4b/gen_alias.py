@@ -4,11 +4,16 @@ two paths is replaced through one path (in some context: top level, functions, c
 callbacks, thread, async, a function given a receiver-returning method's result) and observed through the other with a string-only method. B4b 32: holders whose second path is a receiver-returning method's result
 (reverse(), sort(), a comparator sort), and contexts passing such a result to a function.
 
-  gen_alias.py --nift NIFT [--sample N] [--seed S] [--out OUT.jsonl] [--legacy]
+  gen_alias.py --nift NIFT [--sample N] [--seed S] [--out OUT.jsonl] [--legacy] [--min-vm N]
+  gen_alias.py --nift NIFT --negative-controls
 
 Fails on any exit 70, internal text, internal tag or dispatch defect (on the guard-off build too:
 there the VM shares references, so a stale element type reaches an unflagged native and shows as
-`compiler defect`). --legacy also counts the differences from legacy (informational)."""
+`compiler defect`). --legacy also counts the differences from legacy (informational). --min-vm N
+also fails when fewer than N programs run on the VM (the production gate, test-runtime2-b4b-gen-alias:
+a binary that refuses everything must not pass). Every program comes from this file's templates.
+--negative-controls runs the generator on two stub binaries (one exits 70, one refuses every
+program) and requires both runs to fail."""
 import argparse, json, os, random, re, shutil, subprocess, sys, tempfile
 from multiprocessing import Pool
 
@@ -149,8 +154,12 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out")
     ap.add_argument("--legacy", action="store_true")
+    ap.add_argument("--min-vm", type=int, default=0)
+    ap.add_argument("--negative-controls", action="store_true")
     ARGS = ap.parse_args()
     ARGS.nift = os.path.abspath(ARGS.nift)
+    if ARGS.negative_controls:
+        return negative_controls()
     its = items()
     if ARGS.sample and ARGS.sample < len(its):
         random.Random(ARGS.seed).shuffle(its)
@@ -168,7 +177,34 @@ def main():
             if out: out.write(json.dumps(res) + "\n")
     print("gen_alias: %d programs, %d run by the VM, %d bad%s" % (len(its), ran, bad,
                                                                   ", %d differ from legacy" % diff if ARGS.legacy else ""))
+    if ran < ARGS.min_vm:
+        print("FAIL gen_alias: only %d programs ran on the VM (at least %d required)" % (ran, ARGS.min_vm))
+        return 1
     return 1 if bad else 0
+
+
+def negative_controls():
+    """Two stub binaries: an internal failure (exit 70) and a refusal of every program; each run
+    of this generator on a stub (a 200-program sample, --min-vm 1) must fail."""
+    ok = True
+    scratch = tempfile.mkdtemp(prefix="gen-alias-neg-")
+    try:
+        stubs = {"exit 70": "echo 'error: NIFT_VM internal failure' >&2; exit 70",
+                 "refuses everything": "echo 'error: t.f:1:1: not compiled for the VM (stub)' >&2; exit 1"}
+        for label, body in stubs.items():
+            stub = os.path.join(scratch, label.replace(" ", "-"))
+            open(stub, "w").write("#!/bin/sh\n" + body + "\n")
+            os.chmod(stub, 0o755)
+            p = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--nift", stub, "--sample", "200",
+                                "--min-vm", "1"], capture_output=True, text=True,
+                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+            good = p.returncode == 1
+            ok = ok and good
+            print("%s negative control gen_alias (%s): exit %d, %s" % ("PASS" if good else "FAIL", label, p.returncode,
+                                                                       p.stdout.strip().splitlines()[-1:]))
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

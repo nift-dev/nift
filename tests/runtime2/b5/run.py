@@ -25,7 +25,10 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|\\u001fnift:|cell reached")
+INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|\\u001fnift:|cell reached|"
+                      r"AddressSanitizer|LeakSanitizer|runtime error:")
+# A sanitizer build's options (the evalorder sanitizer lane, Makefile) reach the programs.
+SAN_ENV = {k: v for k, v in os.environ.items() if k in ("ASAN_OPTIONS", "UBSAN_OPTIONS", "LSAN_OPTIONS")}
 
 
 def run(nift, path):
@@ -36,7 +39,7 @@ def run(nift, path):
         shutil.copytree(src, tree)
         stats = os.path.join(work, "s.jsonl")
         env = {"PATH": "/usr/bin:/bin", "HOME": work, "TMPDIR": work, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
-               "NO_COLOR": "1", "NIFT_VM": "require", "NIFT_VM_STATS": stats}
+               "NO_COLOR": "1", "NIFT_VM": "require", "NIFT_VM_STATS": stats, **SAN_ENV}
         name = os.path.basename(path)
         if name.endswith(".in"):
             cmd, stdin = ["timeout", "60", nift, "-i"], open(path, "rb").read()

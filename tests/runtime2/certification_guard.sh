@@ -163,8 +163,9 @@ if sys.platform.startswith('linux'):
               ('test-cp23-certify', 'test-cp23-cp19-combined'), ('test-cp23-certify', 'test-cp23-mutants'),
               ('test-cp23-certify', 'test-cp23-allocation'), ('test-cp23-certify', 'test-runtime2-cp23-sanitize'),
               ('test-cp23-certify', 'test-runtime2-cp23-tsan')]
-# Classified, not certified: needs an owner-designated frozen legacy oracle (CP19_LEGACY_ORACLE).
-print('PENDING test-cp19-proof-cli: CP19_LEGACY_ORACLE (frozen legacy binary) not designated; owner decision; not in certify-targets')
+# test-cp19-proof-cli is planned by scripts/certify.py's inventory (C1) and runs against the
+# explicit v4.12.0 legacy binary (--legacy-oracle; owner 2026-11-07 18:00 D3); without one the
+# campaign preflight fails and the gate is BLOCKED, never passed.
 
 def reachable(graph):
     seen, stack = set(), ['certify-targets']
@@ -208,6 +209,68 @@ print('PASS certification guard alternate-edge control: direct certify-targets e
 PYCONTROL
 removal_status=$?
 [ "$removal_status" -eq 0 ] || exit "$removal_status"
+
+# Combined-candidate harness (C1-C3, docs/runtime-2/checkpoints/combined-b3-b5.md). C1: the plan
+# (certify-targets plus the Runtime 2.0 inventory derived from the Make database) covers every
+# inventory and mandatory gate; negative controls: dropping one mandatory gate, or one inventory
+# gate, from the plan makes certification preparation fail.
+python3 scripts/certify.py --check-plan || exit 1
+for dropped in test-runtime2-b5 test-runtime2-b4b-fixpoint test-cp19-proof-cli test-runtime2-diagnostics; do
+    out=$(python3 scripts/certify.py --check-plan --drop "$dropped" 2>&1); rc=$?
+    if [ "$rc" -ne 1 ] || ! grep -q "$dropped is not in the certification plan" <<<"$out"; then
+        echo "FAIL certification guard negative control: dropping $dropped from the plan was not detected (exit $rc)"; exit 1
+    fi
+    echo "PASS certification guard negative control: dropping $dropped from the plan fails preparation"
+done
+python3 - <<'PYC'
+import sys
+sys.path.insert(0, 'scripts')
+import certify
+ip, rc, pp, fl, br = (certify.inventory_problems, certify.report_class, certify.preflight_problems,
+                      certify.fail_lines, certify.blocked_reason)
+INV = ['test-runtime2-a', 'test-runtime2-b', 'test-runtime2-prep']
+DEF = set(INV) | {'test-x'}
+GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', require_env='1',
+            oracle='/o/nift', oracle_version='v4.12.0')
+checks = [
+    ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
+    ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
+    ('mandatory gate missing', len(ip({'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r', 'test-runtime2-a': 'r'},
+                                     ['test-runtime2-a'], DEF)), 1),
+    ('stale non-gate', len(ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r', 'gone': 'r'}, [], DEF)), 1),
+    ('mandatory undefined', len(ip(set(INV), INV, {}, ['test-gone'], DEF)), 1),
+    ('class pass', rc('PASS'), 'PASSED'),
+    ('class not run', rc(None), 'NOT-RUN'),
+    ('class fail', rc('FAIL'), 'FAILED-NEW'),
+    ('class flaky is a failure', rc('FLAKY'), 'FAILED-NEW'),
+    ('class v4.12.0 baseline', rc('BASELINE-FAILURE'), 'FAILED-BASELINE'),
+    ('class regression baseline identical', rc('FAIL', {'17f7964c': True, 'weekend/r2': False}), 'FAILED-BASELINE'),
+    ('class regression baseline differs', rc('FAIL', {'17f7964c': False}), 'FAILED-NEW'),
+    ('class unverified', rc('UNVERIFIED'), 'BLOCKED'),
+    ('class root-only', rc('SKIPPED-ENVIRONMENTAL'), 'BLOCKED'),
+    ('class harness-blocked fail', rc('FAIL', None, 'no oracle'), 'BLOCKED'),
+    ('class pass with a comparator skip is not a pass', rc('PASS', None, 'skipped'), 'BLOCKED'),
+    ('blocked: no oracle', br('FAIL test-cp19-proof-cli: CP19_LEGACY_ORACLE is unset. This gate') is not None, True),
+    ('blocked: comparator skip', br('SKIP UNVERIFIED COMPARATOR COVERAGE: x: 3 comparator case(s)') is not None, True),
+    ('not blocked', br('FAIL b5 fixtures: 1 of 9'), None),
+    ('fail lines normalised', fl('FAIL /a/t/x.f: bad\nok\nFAIL /tmp/q1/y\n', ['/a']) == fl('FAIL /b/t/x.f: bad\nFAIL /tmp/z9/y\n', ['/b']), True),
+    ('fail lines differ', fl('FAIL x: 1\n') == fl('FAIL x: 2\n'), False),
+    ('preflight ok', pp(GOOD), []),
+    ('preflight GCC 13', len(pp({**GOOD, 'cxx': 'g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0'})), 1),
+    ('preflight clang', len(pp({**GOOD, 'cxx': 'clang version 15.2.0'})), 1),
+    ('preflight libstdc++ datestamp', len(pp({**GOOD, 'glibcxx': 20250808})), 1),
+    ('preflight comparator refused', len(pp({**GOOD, 'comparator': 'a comparator sort exits 1'})), 1),
+    ('preflight switch unset', len(pp({**GOOD, 'require_env': None})), 1),
+    ('preflight no oracle', len(pp({**GOOD, 'oracle': None})), 1),
+    ('preflight wrong oracle', len(pp({**GOOD, 'oracle_version': 'v4.11.0'})), 1),
+]
+bad = [(n, got, want) for n, got, want in checks if got != want]
+if bad:
+    print('FAIL certify harness self-test:', bad); sys.exit(1)
+print(f'PASS certify harness self-test ({len(checks)} cases: inventory, report classes, blocked logs, failure identity, preflight)')
+PYC
+harness_status=$?
+[ "$harness_status" -eq 0 ] || exit "$harness_status"
 
 # Self-test of the classification policy (scripts/certify.py decide()). A failure
 # is accepted only when positively shown to be acceptable; in particular an

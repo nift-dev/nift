@@ -1010,8 +1010,8 @@ $(B4B_GUARDOFF_NIFT): $(CLI_OBJECTS) $(RT_REFREP_PROBE_OBJECTS) $(LIBFFI_A)
 .PHONY: test-runtime2-b5 test-runtime2-b5-mutants
 test-runtime2-b5: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver evalorder
-	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver evalorder
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(TARGET)" --dirs u6 q3 dispatch loopclosure cycle receiver evalorder precision
+	$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(B4B_GUARDOFF_NIFT)" --dirs u6 q3 sort dispatch loopclosure cycle receiver evalorder precision
 	$(PYTHON) tests/runtime2/b5/sort_refusals.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
@@ -1035,6 +1035,28 @@ test-runtime2-b5-evalorder: $(TARGET)
 	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --tree "$(CURDIR)"
 	$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
 test-rt-vm: test-runtime2-b5-evalorder
+# H-A lifetime fixtures (tests/runtime2/b5/evalorder life_*, atomic_*, and the generator's `drop`
+# family: the retained receiver is the only reference left) on the ASan/UBSan build. A sanitizer
+# lane of the combined certification (not built locally: the sanitized objects need more disk
+# than the development workspace has).
+.PHONY: test-runtime2-b5-evalorder-sanitize
+test-runtime2-b5-evalorder-sanitize: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b5-evalorder-sanitize: $(SAN_TARGET)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) tests/runtime2/b5/run.py --nift "$(CURDIR)/$(SAN_TARGET)" --dirs evalorder
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		$(PYTHON) -I tests/runtime2/b5/gen/gen_evalorder.py --nift "$(CURDIR)/$(SAN_TARGET)" --tree "$(CURDIR)"
+test-rt-vm-sanitize: test-runtime2-b5-evalorder-sanitize
+# Combined-candidate harness (C3, owner 2026-11-07 18:00): gen_alias, every program, on the
+# PRODUCTION build (test-runtime2-guardoff runs only a 1,500-program sample on the probe build).
+# The programs are the generator's own templates; at least 5,532 must run on the VM (the count
+# on fc987ec1 and on the H-A repair). Then its negative controls: on a stub that exits 70 and on
+# a stub that refuses everything, the generator must fail.
+.PHONY: test-runtime2-b4b-gen-alias
+test-runtime2-b4b-gen-alias: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b4b-gen-alias: $(TARGET)
+	$(PYTHON) -I tests/runtime2/b4b/gen_alias.py --nift "$(CURDIR)/$(TARGET)" --min-vm 5532
+	$(PYTHON) -I tests/runtime2/b4b/gen_alias.py --nift "$(CURDIR)/$(TARGET)" --negative-controls
 .PHONY: test-runtime2-guardoff
 # Review F2: every step runs its programs in temporary copies; the gate fails if it left the
 # repository changed (tracked, untracked or ignored files; tests/runtime2/repo_state.py).

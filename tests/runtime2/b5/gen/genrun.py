@@ -22,6 +22,8 @@ def set_work(path):
 def env_for(d, mode, stats):
     e = {"PATH": "/usr/bin:/bin", "HOME": d, "TMPDIR": d, "LANG": "C", "LC_ALL": "C", "TZ": "UTC", "NO_COLOR": "1",
          "NIFT_VM": mode}
+    # a sanitizer build's options (the evalorder sanitizer lane) reach the programs
+    e.update({k: v for k, v in os.environ.items() if k in ("ASAN_OPTIONS", "UBSAN_OPTIONS", "LSAN_OPTIONS")})
     if stats:
         e["NIFT_VM_STATS"] = stats
     return e

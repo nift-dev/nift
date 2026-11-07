@@ -1,0 +1,2 @@
+-- exit 1
+error: m3_nested_loop_shared.f:6:1: not compiled for the VM (for-capture-vanishing): this for-loop form is not supported by the Runtime 2.0 VM yet
