@@ -120,7 +120,9 @@ def expected(op, family, context):
 # Classes where legacy is known to differ from the model (reported, never failed):
 #   loop-compound  APPROVED (owner 2026-11-08 03:27/03:29): legacy's prepared loop evaluator reads a
 #                  compound target late with a `fn` callee (24) and loses a lambda callee's string
-#                  append (`Z`); the VM uses the canonical order (fixture d2/b7);
+#                  append (`Z`); the VM uses the canonical order (fixture d2/b7). Consequence: an
+#                  operation that fails on the target read first (an overflow) now fails on the VM
+#                  where legacy, reading the rebinding late, succeeds;
 #   loop-args      r05, recorded (compatibility.md): legacy's loop evaluator reads a lambda's call
 #                  argument late (fixture d2/b8);
 #   no-field-op    legacy cannot run a compound assignment on a struct field (`struct has no method`):

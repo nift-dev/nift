@@ -669,9 +669,10 @@ hiddenrun() {  # hiddenrun CASE TARGET WANT-RC TEXT... (each TEXT must appear; a
 }
 ABORTED='echo "python3 tests/package_transaction_smoke.py"; echo "Traceback (most recent call last):"; echo "  File \"/x/tests/package_transaction_smoke.py\", line 330, in <module>"; echo "AssertionError: same.f failed"; exit 1'
 toy "$TOY/ab/cand" test-v44-packages "$ABORTED"; toy "$TOY/ab/r1" test-v44-packages "$ABORTED"
+# (C34: package imports are a release requirement, so these checks are Category A)
 hiddenrun ab test-v44-packages 4 "FAILED-BASELINE  test-v44-packages" "CAMPAIGN VERDICT: PARTIAL (exit 4)" \
-    "[B] test-v44-packages: NOT EXECUTED package_transaction_smoke.py: every check after line 330" \
-    "PARTIAL is not a pass" "!NOT RELEASE-QUALIFYING"
+    "[A] test-v44-packages: NOT EXECUTED package_transaction_smoke.py: every check after line 330" \
+    "PARTIAL is not a pass" "NOT RELEASE-QUALIFYING"
 # Category A hidden checks (the root-path reproducers stop at line 20) are listed as A and make the
 # report NOT RELEASE-QUALIFYING. (A toy language-foundation is load-sensitive: a failure there is
 # FAILED-NEW under exclusive execution, so this toy's verdict is FAILED; the PARTIAL-with-A verdict
@@ -688,6 +689,9 @@ import sys
 sys.path.insert(0, "scripts")
 import certify, certify_fingerprints as FP
 table = FP.hidden_categories(open("scripts/certify_hidden_checks.tsv").read())
+real = dict(table)
+# the table has no B row since C34; a synthetic B row keeps the B branch tested
+table[("test-v44-packages", "package_transaction_smoke.py", "*")] = ("B", "synthetic B row (guard only)")
 G = "test-v44-language-foundation"
 A = ("NOT EXECUTED v44_root_path_corruption_reproducers.sh: 2 nested extraction then growth", "aborted", True)
 B = ("NOT EXECUTED package_transaction_smoke.py: every check after line 330", "aborted", True)
@@ -720,16 +724,16 @@ for case in cases:
     print("%s certification guard verdict table: %s -> %s %s" % ("PASS" if ok else "FAIL", name, verdict, [g[2] for g in gaps]))
 assert certify.VERDICT_EXIT == {"CERTIFIED": 0, "FAILED": 1, "PARTIAL": 4}, certify.VERDICT_EXIT
 missing = [(g, s, n) for g, scripts in FP.ABORT_CASES.items() for s, named in scripts.items() if named != "complete"
-           for _, n in named if (g, s, n) not in table]
+           for _, n in named if (g, s, n) not in real]
 print("%s certification guard category table: %d rows, every named abort-hidden check classified%s"
-      % ("FAIL" if missing else "PASS", len(table), (": missing %s" % missing) if missing else ""))
+      % ("FAIL" if missing else "PASS", len(real), (": missing %s" % missing) if missing else ""))
 sys.exit(1 if bad or missing else 0)
 VERDICT
 # hidden checks plus a FAILED-NEW (the same abort, a different failure on the baseline): FAILED
 toy "$TOY/ad/cand" test-v44-packages "$ABORTED"
 toy "$TOY/ad/r1" test-v44-packages 'echo "python3 tests/package_transaction_smoke.py"; echo "FAIL other"; exit 1'
 hiddenrun ad test-v44-packages 1 "FAILED-NEW       test-v44-packages" "CAMPAIGN VERDICT: FAILED (exit 1)" \
-    "[B] test-v44-packages: NOT EXECUTED package_transaction_smoke.py" "!CAMPAIGN VERDICT: PARTIAL"
+    "[A] test-v44-packages: NOT EXECUTED package_transaction_smoke.py" "!CAMPAIGN VERDICT: PARTIAL"
 skiprun s1 test-rt-partial 4 "BLOCKED          test-rt-partial: PARTIAL"
 skiprun s1 test-rt-partial 4 "CAMPAIGN VERDICT: PARTIAL (exit 4)"
 skiprun s1 test-rt-partial 4 "needs: MemAvailable >= 4096 MiB"

@@ -30,6 +30,12 @@ PROGRAMS = {
            'print(s.length())\n' % N,
 }
 
+GROW = 's := "a"\nw := "0123456789"\ni := 0\nwhile (i < 17) { w += w; i += 1 }\n'
+BUDGET_SESSIONS = {
+    "plain": GROW + 's += w\ns += w\nprint("after")\nprint(s.length())\n',
+    "rebinding": GROW + 'k := () => { s = "Z"; return w }\ns += w\ns += k()\nprint("after")\nprint(s.length())\n',
+}
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -54,7 +60,24 @@ def main():
             failures += not ok
             print("%s d2-append %s: exit %d, %r, %.2f s%s" % ("PASS" if ok else "FAIL", name, code, out.strip(),
                                                              elapsed, "" if ok else " " + err.strip()[:200]))
-    print("%s d2-append: %d programs, %d failure(s)" % ("PASS" if not failures else "FAIL", len(PROGRAMS), failures))
+        # Release audit L1 (review of 3b513751): a memory-budget stop during a session's string append
+        # (a plain `s += w` and a rebinding `s += k()`) ends the session: exit 70, no later statement
+        # runs, so the binding's state after the fault is never read. Pinned for these triggers only,
+        # not proven for every path (combined-b3-b5.md section 27.5).
+        for name, src in sorted(BUDGET_SESSIONS.items()):
+            env_b = dict(env, NIFT_VM_HEAP_BUDGET="3000000")
+            try:
+                p = subprocess.run([nift, "-i"], input=src, text=True, cwd=work, env=env_b, capture_output=True,
+                                   timeout=60)
+                out, err, code = p.stdout, p.stderr, p.returncode
+            except subprocess.TimeoutExpired:
+                out, err, code = "", "timeout", 124
+            ok = code == 70 and "memory budget exceeded" in err and "after" not in out
+            failures += not ok
+            print("%s d2-append budget %s: exit %d, later statements ran: %s" % (
+                "PASS" if ok else "FAIL", name, code, "after" in out))
+    total = len(PROGRAMS) + len(BUDGET_SESSIONS)
+    print("%s d2-append: %d programs, %d failure(s)" % ("PASS" if not failures else "FAIL", total, failures))
     return 1 if failures else 0
 
 

@@ -1326,16 +1326,23 @@ the generator checks that), `may_rebind` for built-ins, `[x, g()]` (already left
 fixture e1), `const_write` (rhs first, then the const read: a const cannot be rebound), and no
 other expression lowering (none was needed).
 
-**Pre-existing, reported, not changed:** on the common in-place path a string-append memory fault
-is detected after the append (`memory_ok` after `add_assign_slow`), so the binding would hold the
-appended text. Not observable: a memory-budget stop is exit 70 and ends the script and the
-session (checked: `NIFT_VM_HEAP_BUDGET` with a rebinding `s += k()`, script and session).
+**Pre-existing, reported, not changed (reworded in C34, review of 3b513751 L1):** on the in-place
+path (and on the unchanged-binding path 2b, which runs it) a string-append memory fault is
+detected after the append (`memory_ok` after `add_assign_slow`, vm.cpp), so the binding already
+holds the appended text when the fault is raised; on the snapshot path the fault comes before
+the write-back, so the binding holds what the rhs left. The two paths would therefore leave
+different binding states if anything ran after the fault. That nothing can is **unproven**: in
+every trigger found (scripts; sessions with a plain `s += w` and a rebinding `s += k()`,
+`NIFT_VM_HEAP_BUDGET` 2-5 MB) the budget stop exits 70 and ends the run, so no later statement
+reads the binding. (Sessions never take the in-place path: a session binding is a cell.) The two
+session triggers are pinned in `d2_append.py` (exit 70, no later statement runs); release audit
+item 27.5 (L1).
 
 ### 27.1 Legacy differences introduced (approved) and changed admitted outputs
 
 | Fixture | Legacy | 91a49efa | Now | Status |
 | --- | --- | --- | --- | --- |
-| d2/b7 loop compound, `fn` callee (`x += g()`, `t += kf()`) | `24`, `Za` | `24`, `Za` | `10`, `aa` | APPROVED difference (owner 03:27/03:29) |
+| d2/b7 loop compound, `fn` callee (`x += g()`, `t += kf()`) | `24`, `Za` | `24`, `Za` | `10`, `aa` | APPROVED difference (owner 03:27/03:29). Consequence (L4): an overflow on the target read first is now a VM error where legacy succeeds (`x := 9223372036854775807`, `fn(g()) { x = 5; return 1 }`, `x += g()` in a loop: VM overflow at the statement, exit 1; legacy `6`) |
 | d2/b7 loop string `+=`, lambda callee | `Z` (append lost) | `Za` | `aa` | APPROVED difference |
 | d2/b3 overflow after a rebinding rhs | fatal overflow 4:7 | `6 6 5` exit 0 | legacy's error | changed admitted output, legacy-equal (approved) |
 | d2/b6 `/=` on an int binding | binding-type error 5:1 | `before 5` | legacy's error | changed admitted output, legacy-equal (approved) |
@@ -1396,6 +1403,39 @@ and C32 are on the same binary (those commits change no `src/`).
 | FAILED-NEW | none |
 | Not run here | ASan/UBSan (test-runtime2-b5-evalorder-sanitize now includes d2 and gen_operators), TSan, the GCC 15.2 comparator lane, scanner-parity (needs NIFT_REF): the Linode lane |
 
+### 27.5 Review of 3b513751: ACCEPT-WITH-CONDITIONS; C34 and the release audit
+
+Review: `scratchpad/review-ha/REVIEW-D2.md`. C34 changes no `src/` (binary still f2fed67d).
+- **C1 (fixed): every hidden-check row is Category A.** `certify_hidden_checks.tsv` used B for
+  v46_import_worker_ownership_smoke.sh (its header asserts worker isolation: concurrency safety),
+  the package and module-import smokes, cp03 (incremental builds), cp10 (fs authority) and the
+  perf-scaling smoke; with the owner's release requirements in the A definition (package imports
+  on the VM, incremental builds, fs-root enforcement, superlinear hard stops, the website-build
+  rule) and "when unsure, A", the remaining B rows were rechecked too: variadic functions and
+  lambdas (rest arrays, captures), struct variadic methods (dispatch), spread (array sharing),
+  generalized natives (dispatch), glob/filesystem (fs-root), structured wildcards (object
+  pick/omit: B5 copies), map markup (captures; website-build rule). **No B row remains.** The
+  B branch of the verdict stays guard-tested with a synthetic row; toy ab is now A (NOT
+  RELEASE-QUALIFYING).
+- **L4 (fixed):** the loop-compound approval text (compatibility.md, expected-changes.tsv, 27.1,
+  gen_operators.py) states the consequence: an overflow on the target read first, with a `fn`
+  callee in a loop, is now a VM error where legacy succeeds.
+- **L1 (reworded, 27):** "unobservable" is now "unproven", with the differing states of the two
+  paths; the two cheap session triggers are pinned in d2_append.py.
+
+**Release audit (recorded, not fixed):**
+- L1: in-place append memory fault: the binding holds the appended text when the fault is raised
+  (fast path) vs the rhs's value (snapshot path); proven unobservable only for the pinned triggers.
+- L2: mutant d4 is caught only through an exit-70 internal failure (its `LoadNull t` nulls the
+  binding), not by a value assertion.
+- L3: rt-diff's `D-NEXT-<name>` decision check is format only; it does not check that the
+  decision record exists in decisions.md.
+- L5: removing read_limit.py's `sequenced()` call sites is caught only flakily (the race).
+- L6: a session `z /= k()` is refused (`session:binding-shape-contract`), as on 91a49efa
+  (pre-existing).
+- L7: C29 drops the first token of a host-deps table case's own detail (minor loss of
+  information, accepted).
+
 ## 28. Owner decisions 2026-11-08 06:46: rt-diff approvals (C31), campaign verdicts (C32)
 
 **1. The 30 rt-diff B5 differences are APPROVED (C31).** `tools/rt-diff/policies/b5-refsem-vm.json`
@@ -1425,9 +1465,9 @@ not execute. The summary lists each with its category; any Category A gap prints
 table `scripts/certify_hidden_checks.tsv` (51 rows: every named abort-hidden check, and a `*` row
 for every script of the four ABORT_CASES gates); a check without a row reads as A. Category A:
 the expression-smoke checks, the element-assignment checks, the root-path reproducers and the
-constant-fold smoke; B: the v4.4 variadic/spread/native/glob/wildcard/markup/filesystem-authority
-smokes, the perf-scaling smoke, the module-import "ownership" smokes (import-path ownership, not
-reference ownership: for the reviewer to confirm), the package smokes and the CP03 tracer cases.
+constant-fold smoke; B (as first written): the v4.4 variadic/spread/native/glob/wildcard/markup/
+filesystem-authority smokes, the perf-scaling smoke, the module-import smokes, the package smokes
+and the CP03 tracer cases. **Superseded by C34 (27.5): every row is A.**
 Guard: toys ab (B hidden, FAILED-BASELINE: PARTIAL, exit 4, no NOT RELEASE-QUALIFYING), ac (A
 hidden listed, NOT RELEASE-QUALIFYING), ad (hidden + FAILED-NEW: FAILED, exit 1), s1 (PARTIAL,
 exit 4), an 11-case verdict table, and every named ABORT_CASES check must have a row.

@@ -3,7 +3,10 @@
 # section 28). A = release-critical (B3-B5 semantics, mutation, ownership, reference lifetimes,
 # assignment, privacy, dispatch, snapshot iteration, runtime safety); B = an unrelated historical
 # feature. A PARTIAL campaign with any unexecuted A check (or an unclassified one, read as A) is
-# "not release-qualifying". Reviewed table: a change here is a reviewed change.
+# "not release-qualifying". Reviewed table: a change here is a reviewed change. C34 (review of
+# 3b513751, C1): the A definition includes the owner's release requirements (package imports on
+# the VM, incremental builds, fs-root enforcement, superlinear workloads as hard stops, the
+# website-build rule); when unsure, A. Every row is A now; no row is B.
 # Columns (tab-separated): gate, script, check (the name ABORT_CASES gives, or * for the script's
 # unnamed checks: "every check after line N" / "after its failing command"), category, reason.
 test-v44-language-foundation	v44_ast_expression_smoke.sh	hot-loop sum	A	runtime safety: integer arithmetic in a hot loop (precision, overflow)
@@ -31,29 +34,29 @@ test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	CP34 refere
 test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	CP34 heavy reallocation with composed locations	A	reference lifetimes and runtime safety: reallocation under composed locations
 test-v44-language-foundation	v44_root_path_corruption_reproducers.sh	*	A	reference lifetimes (the script's other checks)
 test-v44-language-foundation	v44_ast_constant_fold_smoke.sh	*	A	expression semantics: constant folding must not change results
-test-v44-language-foundation	v44_perf_scaling_smoke.sh	*	B	performance scaling of the v4.4 AST evaluator (no semantics asserted)
-test-v44-language-foundation	v44_cp2_variadic_functions_smoke.sh	*	B	v4.4 variadic function syntax
-test-v44-language-foundation	v44_struct_variadic_methods_smoke.sh	*	B	v4.4 variadic struct methods (syntax; method dispatch itself is covered by the B4 gates)
-test-v44-language-foundation	v44_cp3_variadic_lambdas_smoke.sh	*	B	v4.4 variadic lambda syntax
-test-v44-language-foundation	v44_cp4_spread_smoke.sh	*	B	v4.4 spread syntax
-test-v44-language-foundation	v44_cp5_generalized_native_smoke.sh	*	B	v4.4 generalized native calls
-test-v44-language-foundation	v44_cp6_cp7_glob_filesystem_smoke.sh	*	B	v4.4 glob and filesystem built-ins
-test-v44-language-foundation	v44_cp8_structured_wildcards_smoke.sh	*	B	v4.4 structured wildcards
-test-v44-language-foundation	v44_cp9_map_markup_smoke.sh	*	B	v4.4 map markup rendering
-test-v44-language-foundation	v44_cp10_filesystem_authority_smoke.sh	*	B	v4.4 filesystem authority (host permissions, not the language)
-test-v46-relative-imports	v44_relative_import_ownership_smoke.sh	*	B	module import paths: which module owns a relative import (v4.4/v4.6 modules; not reference ownership)
-test-v46-relative-imports	v46_import_worker_ownership_smoke.sh	*	B	module imports in workers: import-path ownership (v4.6 modules; not reference ownership)
-test-v44-packages	package_transaction_smoke.py	*	B	package transactions (install/update provenance)
-test-runtime2-cp03-simplify	cp03_missing_tracer.sh	*	B	the CP03 host-op tracer's missing-tracer case
-test-v44-packages	package_callable_closure_smoke.sh	*	B	packages: an exported callable closure through a package
-test-v44-packages	package_combined_dogfood.sh	*	B	packages: combined dogfood install
-test-v44-packages	package_hardening_smoke.sh	*	B	packages: manifest and path hardening
-test-v44-packages	package_metadata_smoke.sh	*	B	packages: metadata
-test-v44-packages	package_module_export_smoke.sh	*	B	packages: module exports
-test-v44-packages	package_refs_smoke.sh	*	B	packages: git refs and locks
-test-v44-packages	package_sqlite_dogfood.sh	*	B	packages: the sqlite package
-test-v44-packages	package_tools_dogfood.sh	*	B	packages: package tools
-test-v44-packages	v44_relative_import_ownership_smoke.sh	*	B	module import paths (as in test-v46-relative-imports)
-test-v44-packages	v46_resource_paths.py	*	B	package resource paths
-test-runtime2-cp03-simplify	missing_tracer_caller.sh	*	B	the CP01/CP03 host-op tracer's caller case
-test-runtime2-cp03-simplify	cp03_simplify.sh	*	B	CP03 incremental-build simplification
+test-v44-language-foundation	v44_perf_scaling_smoke.sh	*	A	superlinear workloads are release hard stops (owner): the AST evaluator's scaling (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp2_variadic_functions_smoke.sh	*	A	argument binding: a rest parameter is an array (B5 shared-reference semantics) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_struct_variadic_methods_smoke.sh	*	A	struct method dispatch with variadic arguments (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp3_variadic_lambdas_smoke.sh	*	A	lambda captures and rest arrays (reference lifetimes, B5 arrays) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp4_spread_smoke.sh	*	A	spread copies or shares array elements into calls (B5 shared references) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp5_generalized_native_smoke.sh	*	A	built-in (native) dispatch (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp6_cp7_glob_filesystem_smoke.sh	*	A	filesystem built-ins under the fs-root rules (fs-root enforcement) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp8_structured_wildcards_smoke.sh	*	A	object pick/omit build new objects (B5 copy/share semantics) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp9_map_markup_smoke.sh	*	A	markup lambdas in map(): captures and the website-build rule (C34: reclassified from B, review of 3b513751 C1)
+test-v44-language-foundation	v44_cp10_filesystem_authority_smoke.sh	*	A	fs-root enforcement (owner release requirement) (C34: reclassified from B, review of 3b513751 C1)
+test-v46-relative-imports	v44_relative_import_ownership_smoke.sh	*	A	package/module imports on the VM (owner release requirement) (C34: reclassified from B, review of 3b513751 C1)
+test-v46-relative-imports	v46_import_worker_ownership_smoke.sh	*	A	worker isolation: imports and mutable module state must not race or leak between workers (concurrency safety) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_transaction_smoke.py	*	A	package imports on the VM (owner release requirement): install/update provenance (C34: reclassified from B, review of 3b513751 C1)
+test-runtime2-cp03-simplify	cp03_missing_tracer.sh	*	A	incremental builds (owner release requirement): the dependency tracer's missing-tracer case (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_callable_closure_smoke.sh	*	A	package imports on the VM: an exported callable closure (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_combined_dogfood.sh	*	A	package imports on the VM: combined dogfood install (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_hardening_smoke.sh	*	A	package imports on the VM: manifest and path hardening (runtime safety) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_metadata_smoke.sh	*	A	package imports on the VM: metadata (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_module_export_smoke.sh	*	A	package imports on the VM: module exports (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_refs_smoke.sh	*	A	package imports on the VM: git refs and locks (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_sqlite_dogfood.sh	*	A	package imports on the VM: the sqlite package (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	package_tools_dogfood.sh	*	A	package imports on the VM: package tools (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	v44_relative_import_ownership_smoke.sh	*	A	package/module imports on the VM (owner release requirement) (C34: reclassified from B, review of 3b513751 C1)
+test-v44-packages	v46_resource_paths.py	*	A	package imports on the VM: resource paths (fs-root rules) (C34: reclassified from B, review of 3b513751 C1)
+test-runtime2-cp03-simplify	missing_tracer_caller.sh	*	A	incremental builds (owner release requirement): the dependency tracer's caller case (C34: reclassified from B, review of 3b513751 C1)
+test-runtime2-cp03-simplify	cp03_simplify.sh	*	A	incremental builds (owner release requirement): CP03 simplification (C34: reclassified from B, review of 3b513751 C1)
