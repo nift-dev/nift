@@ -1,0 +1,1253 @@
+{
+ "description": "B5 fix-up 2 (b5-refsem.md 12.2): the 48 cp12c-probes/src cases whose NIFT_VM=1 result differs from legacy on B5. Original expectation of the target: legacy-equal under NIFT_VM=1 (tests/runtime2/cp12c_probes.py). Each entry keeps the source (sha256), the legacy result (NIFT_VM=0, B5 binary; the expectation the harness used to enforce), the 17f7964c (B4b production) NIFT_VM=1 result and outcome, the B5 result (NIFT_VM=1 and NIFT_VM=require identical), and the approved rule it is converted under: snapshot = snapshot iteration (owner 2026-11-01 \"loops iterate a snapshot taken at entry\", 2026-11-02 \"snapshot iteration kept\"; plan section 3 Iteration, D5; Q3 rows 5-6); D1 = per-iteration loop-variable binding (owner 2026-11-07 06:55 decision 1). Kept distinct.",
+ "cases": [
+  {
+   "probe": "capture_live_at_creation",
+   "source": "f:=()=>0\na:=[1]\nfor(x:a){a[0]=9;f = ()=>x}\nprint(f())\n",
+   "sha256": "4674974fa37f41909594d37c44d99ff57397abf7dfdcf890bd1cc73f92ed7a6d",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=576 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "capture_mixed_live",
+   "source": "f:=()=>0\na:=[1,[2]]\nfor(x:a){a[0]=9;f = ()=>x;break}\nprint(f()==9)\n",
+   "sha256": "2133ba39f766319577120eec06aee4bf31176d43d033aed3147512d818246585",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "true\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "true\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "false\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=448"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "capture_named_aggregate",
+   "source": "f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>x[0];x[0]=9}\nprint(f())\n",
+   "sha256": "c31c9f45624c2befb73d4fb7f8407e75e492c30b19debbf625c794f8e5011446",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:shared-part peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=448"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 element mutation: the binding holds the snapshot element itself (a shared reference); a mutation through it mutates that element"
+  },
+  {
+   "probe": "capture_named_repeated",
+   "source": "f:=()=>0\ng:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>x[0];x[0]=9;g = ()=>x[0]}\nprint(f());print(g())\n",
+   "sha256": "b020d37d253b533e5c2577d35c83d2860e9c1b45b709ce71a82fbbc439f892b1",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n1\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:shared-part peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "9\n9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=768 live=576"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 element mutation: the binding holds the snapshot element itself (a shared reference); a mutation through it mutates that element"
+  },
+  {
+   "probe": "capture_nested_live",
+   "source": "f:=()=>0\na:=[1]\nfor(x:a){a[0]=9;f = ()=>{return ()=>x}}\ng:=f();print(g())\n",
+   "sha256": "c516f93cf0fd2bea9dc1997944b4e860a5106236fbfe60a6fc8305a0ab9926c2",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=576 live=512"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "capture_source_after",
+   "source": "f:=()=>0\na:=[1]\nfor(x:a){a[0]=9;f = ()=>x;a[0]=10}\nprint(f())\n",
+   "sha256": "4db817e123527d64ab6b5896e765a5d46d5acadd3dcfe13552e2586fe199a095",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "10\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "10\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=576 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "capture_source_repeated",
+   "source": "f:=()=>0\ng:=()=>0\na:=[1]\nfor(x:a){a[0]=9;f = ()=>x;a[0]=10;g = ()=>x}\nprint(f());print(g())\n",
+   "sha256": "54099ebe4f1ba2b8f6837217390113c3f9f8fbda11051514e4b50695d8eacd1d",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "10\n10\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "10\n10\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=704 live=512"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "captured_compound_write",
+   "source": "a:=[1,2]\nfor(x:a){a[0]=9;f:=()=>x;x+=5;print(x)}\n",
+   "sha256": "9878bb7188d855769812f69ec08885ea9ae70fda631c9542f7513188d6583e8c",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "14\n7\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "14\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "6\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "captured_postfix_inc",
+   "source": "a:=[1,2]\nfor(x:a){a[0]=9;f:=()=>x;x++;print(x)}\n",
+   "sha256": "d209654dd9bd81294b70706a8e0c1d5a4d60090ecbfe129f6f815ae0f5c21a3f",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "10\n3\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "10\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "2\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "captured_prefix_inc",
+   "source": "a:=[1,2]\nfor(x:a){a[0]=9;f:=()=>x;++x;print(x)}\n",
+   "sha256": "92ae144a3fcc8e049d25be9903c8baa19960a4d3e2c1aabde1d48bccb8e290cc",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "10\n3\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "10\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "2\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "eager_prefix_statement",
+   "source": "a:=[8,12]\nfor(x:a){a[0]=16; ++x; print(x); --x; print(x)}\n",
+   "sha256": "f0594495e50afb180d3ddd4afaa119ff9feb5f96ef9c7ec6081f49e649e49920",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "17\n16\n13\n12\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "17\n16\n13\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "9\n8\n13\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=128 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "escape_before_assign",
+   "source": "f:=()=>0\na:=[1,2]\nfor(x:a){a[0]=9;f = ()=>x;x=7;print(x)}\nprint(f())\n",
+   "sha256": "ab56fdc355e64c22d1bef16dfb023141fc0d31e992c5ce7ed6435384f23f2cd0",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "7\n7\n2\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "7\n7\n2\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "7\n7\n7\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=384"
+   },
+   "rule": "D1",
+   "sub_rule": "D1 loop-variable closures: the closure of the last iteration sees the later assignment x=7 to its own binding"
+  },
+  {
+   "probe": "f01_global_fn_before",
+   "source": "a := [1,2,3]\nfn(shrink()) { a = [9] }\nfor (x : a) { shrink(); print(x) }\nprint(\"done\")\n",
+   "sha256": "e11bbc07812ea7229b9195f02a3169c950eaa7a08e0a40dc984c85f5a46adc0e",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:31: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:31: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f02_global_fn_after_loop",
+   "source": "a := [1,2,3]\nfn(h()) { return g() }\nfn(g()) { a = [9]\n  return 0 }\nfor (x : a) { h(); print(x) }\nprint(\"done\")\n",
+   "sha256": "cdaf31520cf0f5da458c7dd26d26cf5fc169fb8ed504948e1d8dc05d8a79eaff",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:5:26: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:5:26: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f03_late_capture_in_while",
+   "source": "a := [1,2,3]\nf := () => 0\ni := 0\nwhile (i < 2) {\n  i += 1\n  for (x : a) { f(); print(x) }\n  f = () => { a = [9]\n    return 0 }\n}\nprint(\"done\")\n",
+   "sha256": "50964ee5686adbe00d601573cd34332852c72c38a8ec7d616a5306c4243e24e0",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n2\n3\n9\n",
+    "stderr": "error: $R/p.f:6:28: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n2\n3\n9\n",
+    "stderr": "error: $R/p.f:6:28: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=384 live=192",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=512 live=320"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f04_closure_param_mut",
+   "source": "a := [1,2,3]\ns := () => { a = [9]\n  return 0 }\nfor (x : a) { s(); print(x) }\nprint(\"done\")\n",
+   "sha256": "f0988f0ba68ca059d7ef23507c900dfe1325a084aabdd639f940debc39a9e59c",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:4:26: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:4:26: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=320 live=192",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=448 live=192"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f05b_fn_local_captured",
+   "source": "fn(runit()) {\n  a := [1,2,3]\n  s := () => { a = [9]\n    return 0 }\n  for (x : a) { s(); print(x) }\n  return 0\n}\nprint(runit())\n",
+   "sha256": "6ad529dc60b4b6935309ffe145e2ef51d3d2de7eddf7636aa7ec0aafa331eb1f",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:5:28: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:5:28: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=448 live=384",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=576 live=0"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f08_alias_mutate",
+   "source": "a := [1,2,3]\nb := a\nfor (x : a) { b[1] = 77; print(x) }\nprint(a[1])\n",
+   "sha256": "7b338b85e4f7e884c6035d5cb7c64ce05659cc992be372762b0dfa3bdf6ec14a",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n77\n3\n77\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n77\n3\n77\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/aliasing peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n77\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "f11_slice_reassign",
+   "source": "a := [1,2,3]\nfor (x : a) { a = a.slice(0, 1); print(x) }\nprint(\"done\")\n",
+   "sha256": "afd3f6d6957c6ac69cf0dffad71bfff54e64d7a765d6ec4b4428acef7758148c",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:2:40: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:2:40: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f12_global_from_fn_loop",
+   "source": "a := [1,2,3]\nfn(f()) {\n  for (x : a) { a = [9]; print(x) }\n  return 0\n}\nprint(f())\n",
+   "sha256": "5e65d872a111951bd6a15bea0c64ea7006510ddca6d208f0b231f6c1c6fbf11c",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:32: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:32: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f13_global_from_fn_loop_elem",
+   "source": "a := [1,2,3]\nfn(f()) {\n  for (x : a) { a[1] = 99; print(x) }\n  return 0\n}\nprint(f())\n",
+   "sha256": "02ff8fe8533d42d721d2c416cf44bdd24d70e236a9f606640e9d1a3bf70b177d",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n99\n3\n0\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n99\n3\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n0\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "f14_nested_same",
+   "source": "a := [1,2,3]\nfor (x : a) { for (y : a) { print(y) }; a = [9]; print(x) }\nprint(\"done\")\n",
+   "sha256": "b288342fe661190f21782fc23e95723c15c24d48a5a05c5a55a4456ce745f95b",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n2\n3\n9\n9\n",
+    "stderr": "error: $R/p.f:2:56: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n2\n3\n9\n9\n",
+    "stderr": "error: $R/p.f:2:56: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n1\n9\n2\n9\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=384 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f17_obj_global_fn",
+   "source": "o := {\"a\":1,\"b\":2,\"c\":3}\nfn(drop()) { o = {\"a\":1} }\nfor ((k,v) : o) { drop(); print(k); print(v) }\nprint(\"done\")\n",
+   "sha256": "15e1ac2c237ceca6caecbe548684f5fce97336a66c45b0702636bc2eb87ade56",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "a\n1\nb\n",
+    "stderr": "error: $R/p.f:3:43: reference target no longer exists: v\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "a\n1\nb\n",
+    "stderr": "error: $R/p.f:3:43: reference target no longer exists: v\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: v peak=1152 live=960",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "a\n1\nb\n2\nc\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=1280 live=832"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f20_while_inside_shrinks",
+   "source": "a := [1,2,3]\nfor (x : a) { j := 0\n  while (j < 1) { a = [9]; j += 1 }\n  print(x) }\nprint(\"done\")\n",
+   "sha256": "530840ed2c366f436ff1b2a524ed5c3e6da7037c5c8233bf10e20b3915beb947",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:4:9: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:4:9: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f22_toplevel_lambda_obj",
+   "source": "o := {\"a\":1,\"b\":2,\"c\":3}\ns := () => { o = {\"a\":1}\n  return 0 }\nfor ((k,v) : o) { s(); print(k); print(v) }\nprint(\"done\")\n",
+   "sha256": "31391d2807994f4fb7b0f227f87a3a75d9027d6cfd349379233f656543caaa6b",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "a\n1\nb\n",
+    "stderr": "error: $R/p.f:4:40: reference target no longer exists: v\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "a\n1\nb\n",
+    "stderr": "error: $R/p.f:4:40: reference target no longer exists: v\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: v peak=1280 live=1088",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "a\n1\nb\n2\nc\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=1408 live=960"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "f24_global_elem_write_via_fn",
+   "source": "a := [1,2,3]\nfn(setit()) { a[1] = 50 }\nfor (x : a) { setit(); print(x) }\nprint(\"done\")\n",
+   "sha256": "f82550868651bf089e00177a83e26087379217ed7c859e31d24be65f0e803efb",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n50\n3\ndone\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n50\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "g02_obj_global_fn_same_keys",
+   "source": "o := {\"a\":1,\"b\":2}\nfn(reset()) { o = {\"a\":5,\"b\":6} }\nfor ((k,v) : o) { reset(); print(v) }\nprint(\"done\")\n",
+   "sha256": "3f81cd82620e017d605048600a34f528bc8864f22bc3f3396ae37174c999f9c9",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "5\n6\ndone\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "5\n6\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=864 live=672",
+    "outcome": "vm"
+   },
+   "b5": {
+    "stdout": "1\n2\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=992 live=672"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "g03_arr_global_fn_same_len",
+   "source": "a := [1,2]\nfn(reset()) { a = [5,6] }\nfor (x : a) { reset(); print(x) }\nprint(\"done\")\n",
+   "sha256": "639d185984bcd3c1a096392dc412f5abba68683cdc1a0d512f0572751c7167dd",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "5\n6\ndone\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "5\n6\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=128 live=64",
+    "outcome": "vm"
+   },
+   "b5": {
+    "stdout": "1\n2\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=192 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "m10_unvisited_change",
+   "source": "a := [1,2,3]\nfor (x : a) { if (x == 1) { a[2] = 33 }; print(x) }\n",
+   "sha256": "30be685c8fc68dc5337cdf7649254ceb3622b98ec2ee5ca699423fb9dee1c897",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n2\n33\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n2\n33\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "nested_selector_missing_call",
+   "source": "h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>x[0]}}\ng:=h()\na=[]\ng()\n",
+   "sha256": "626bfc7c7431ac3304245bc9195f54f14f6b0ea3bde8ff19d55424e4991811d0",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:6:1: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:6:1: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1,
+    "stats": "vm-error/lambda body error: reference target no longer exists: x[0] peak=1408 live=1408",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=576"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: the binding holds the element bound at that iteration; a closure called after the loop reads it after the source was rebound/emptied (no vanished-element error)"
+  },
+  {
+   "probe": "nested_selector_missing_print",
+   "source": "h:=()=>0\na:=[[1]]\nfor(x:a){h = ()=>{return ()=>x[0]}}\ng:=h()\na=[]\nprint(g())\n",
+   "sha256": "edad574b9d42fbdfbacfa7348108d085cf7a1466689dec03866516a15734be47",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:6:7: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:6:7: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1,
+    "stats": "vm-error/lambda body error: reference target no longer exists: x[0] peak=1408 live=1408",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=576"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: the binding holds the element bound at that iteration; a closure called after the loop reads it after the source was rebound/emptied (no vanished-element error)"
+  },
+  {
+   "probe": "prefix_dec_live_source",
+   "source": "a:=[8,12]\nfor(x:a){a[0]=16;print(--x);a[0]=20;print(x);print(--x);print(x)}\n",
+   "sha256": "ab16916ec71e6402bd89032818d7787122aa30a6d87465edc12ebaa27702ccb4",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "16\n20\n20\n20\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "16\n20\n20\n20\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "8\n8\n8\n8\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=128 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "prefix_live_source",
+   "source": "a:=[8,12]\nfor(x:a){a[0]=16;print(++x);a[0]=20;print(x);print(++x);print(x)}\n",
+   "sha256": "925fd77ff4245274ae4935e9f94d42e4430394c489c2ff94abb7b0881303a63a",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "16\n20\n20\n20\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "16\n20\n20\n20\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "8\n8\n8\n8\n12\n12\n12\n12\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=128 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "selector_missing_cached_write",
+   "source": "f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>{x[0]=9;return x[0]}}\na=[]\nprint(f())\n",
+   "sha256": "6923307ea097a0b3300eb4c8f2d6228240cbb4e55af9cd7575b0a33e0a5a6b55",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:3:38: return: reference target no longer exists: x[0]\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:3:38: return: reference target no longer exists: x[0]\n",
+    "exit": 1,
+    "stats": "fallback/reference-guard:shared-part peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=448"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 element mutation: the binding holds the snapshot element itself (a shared reference); a mutation through it mutates that element"
+  },
+  {
+   "probe": "selector_missing_index",
+   "source": "f:=()=>0\na:=[[1]]\nfor(x:a){f = ()=>x[0]}\na=[]\nprint(f())\n",
+   "sha256": "bc9883122b8e96dd19a19763d18a134dca60dea13e74750e793f93926e478012",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:18: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:18: lambda body error: reference target no longer exists: x[0]\n",
+    "exit": 1,
+    "stats": "vm-error/lambda body error: reference target no longer exists: x[0] peak=1152 live=1024",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=448"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: the binding holds the element bound at that iteration; a closure called after the loop reads it after the source was rebound/emptied (no vanished-element error)"
+  },
+  {
+   "probe": "selector_missing_member",
+   "source": "f:=()=>0\no:={\"a\":{\"x\":1}}\nfor((k,v):o){f = ()=>v.x}\no={}\nprint(f())\n",
+   "sha256": "8899b6327c2cb427796e18ff6e9dd2df6f2ffba8d3148bd626fb724498db7e77",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:22: lambda body error: reference target no longer exists: v.x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "",
+    "stderr": "error: $R/p.f:3:22: lambda body error: reference target no longer exists: v.x\n",
+    "exit": 1,
+    "stats": "vm-error/lambda body error: reference target no longer exists: v.x peak=1952 live=1696",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=1504 live=1120"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: the binding holds the element bound at that iteration; a closure called after the loop reads it after the source was rebound/emptied (no vanished-element error)"
+  },
+  {
+   "probe": "selector_missing_side_effect",
+   "source": "f:=()=>0\na:=[[1]]\nfor(x:a){print(x[0]);f = ()=>{x[0]=9;print(\"after-write\");return x[0]}}\na=[]\nprint(f())\n",
+   "sha256": "d77237c39caff3380c65900cd7c00129ca34d269e35683ce4ec6d5e114216337",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\nafter-write\n",
+    "stderr": "error: $R/p.f:3:59: return: reference target no longer exists: x[0]\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\nafter-write\n",
+    "stderr": "error: $R/p.f:3:59: return: reference target no longer exists: x[0]\n",
+    "exit": 1,
+    "stats": "fallback/reference-guard:shared-part peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\nafter-write\n9\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=448"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 element mutation: the binding holds the snapshot element itself (a shared reference); a mutation through it mutates that element"
+  },
+  {
+   "probe": "t06_fn_global",
+   "source": "a := [1,2,3]\nfn(shrink()) { a = [9] }\nfor (x : a) { print(\"s\"); shrink(); print(x) }\nprint(\"done\")\n",
+   "sha256": "8c939a61dfa742620d6360917e8c7fbf2e0cd1bf4ab5734f5609f0efa8c44a49",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "s\n9\ns\n",
+    "stderr": "error: $R/p.f:3:43: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "s\n9\ns\n",
+    "stderr": "error: $R/p.f:3:43: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "s\n1\ns\n2\ns\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "t08_closure_captured",
+   "source": "a := [1,2,3]\ns := () => { a = [9] }\nfor (x : a) { s(); print(x) }\nprint(\"done\")\n",
+   "sha256": "3ddc396c9698babd07717f3f82d2feb1d78ea03f0f519e8aa894127a7b1bb1d2",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:26: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:3:26: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=320 live=192",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=448 live=192"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "t09_pop_current",
+   "source": "a := [1,2,3]\nfor (x : a) { a.pop(); print(x) }\nprint(\"done\")\n",
+   "sha256": "5da1a19ad4dd2962aedfc16a724c322b6f80efea5db636bf2c2e947763d82a27",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:2:30: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n",
+    "stderr": "error: $R/p.f:2:30: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "t10_pop_later",
+   "source": "a := [1,2,3,4]\nfor (x : a) { print(x); a.pop() }\nprint(\"done\")\n",
+   "sha256": "af996407beb89287f81fdac94e467d2af1685e33974fc5b9c58db3c091dd687e",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n2\n",
+    "stderr": "error: $R/p.f:2:21: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n2\n",
+    "stderr": "error: $R/p.f:2:21: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n4\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "t14_obj_replace_values",
+   "source": "o := {\"a\":1,\"b\":2,\"c\":3}\nfor ((k,v) : o) { print(k); print(v); o = {\"c\":30,\"b\":20,\"a\":10} }\nprint(\"done\")\n",
+   "sha256": "9abd2d26e404b6a5e43abd5419d86824df4d94d033c628b27276190140429cc9",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "a\n1\nb\n20\nc\n30\ndone\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "a\n1\nb\n20\nc\n30\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=1280 live=960",
+    "outcome": "vm"
+   },
+   "b5": {
+    "stdout": "a\n1\nb\n2\nc\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=1408 live=960"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "t16_same_iter_modify",
+   "source": "a := [1,2,3]\nfor (x : a) { a[0] = 99; a[1] = 98; print(x) }\nprint(a[0])\n",
+   "sha256": "fa1784a91256c95569095fb14ccc8f88672c1bbb75aa7278e73d52b3fd08b3fa",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "99\n98\n3\n99\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "99\n98\n3\n99\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n99\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=256 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "t17_restored_before_read",
+   "source": "a := [1,2,3]\nn := 0\nfor (x : a) { n += 1; if (n == 2) { a = [5,6,7] }\n  print(x); if (n == 1) { a = [1] } }\nprint(\"done\")\n",
+   "sha256": "e8f767f7faac111c2d6156940d7caa53a2ab1f4a8547420530ac4ae736c23403",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "1\n6\n7\ndone\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "1\n6\n7\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=192 live=128",
+    "outcome": "vm"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=128"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  },
+  {
+   "probe": "t24_nested_same_source",
+   "source": "a := [1,2,3]\nfor (x : a) { for (y : a) { a = [9] }; print(x) }\nprint(\"done\")\n",
+   "sha256": "ec986224046c80164ddb24a00e5c1a8765e0fa1f48855f1ca51443d51515f2f2",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:2:46: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:2:46: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=448 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "t26_read_after_shrink_first_iter",
+   "source": "a := [1,2,3]\nfor (x : a) { a = [9]; print(x) }\n",
+   "sha256": "e7bf92a92c137a6404ee62cc3e395dd9db283c5533b73640d74fd89d2de1e433",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:2:30: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n",
+    "stderr": "error: $R/p.f:2:30: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "1\n2\n3\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "t29_nested_taken_read",
+   "source": "a := [1,2,3]\nfor (x : a) { a = [9]; print(\"s\"); if (true) { print(x) } }\nprint(\"done\")\n",
+   "sha256": "d9a32f0c1c4478082add04fedddf93407b0a504671dcb31b670a3cacc0ed756e",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "s\n9\ns\n",
+    "stderr": "error: $R/p.f:2:54: reference target no longer exists: x\n",
+    "exit": 1
+   },
+   "b4b_17f7964c": {
+    "stdout": "s\n9\ns\n",
+    "stderr": "error: $R/p.f:2:54: reference target no longer exists: x\n",
+    "exit": 1,
+    "stats": "vm-error/reference target no longer exists: x peak=192 live=64",
+    "outcome": "vm-error"
+   },
+   "b5": {
+    "stdout": "s\n1\ns\n2\ns\n3\ndone\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=320 live=64"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 nothing vanishes: rebinding or shrinking the source does not reach the active loop (every entry element is bound)"
+  },
+  {
+   "probe": "write_before_live_capture",
+   "source": "a:=[1,2]\nfor(x:a){a[0]=9; f:=()=>x; print(x)}\n",
+   "sha256": "3683c598fd96e8cc92b21324ca1222474512c03ee6ac71c81175b5f4e21334fc",
+   "original_expectation": "legacy-equal under NIFT_VM=1 (cp12c_probes.py), no internal failure",
+   "legacy": {
+    "stdout": "9\n2\n",
+    "stderr": "",
+    "exit": 0
+   },
+   "b4b_17f7964c": {
+    "stdout": "9\n2\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "fallback/reference-guard:lent peak=0 live=0",
+    "outcome": "refused"
+   },
+   "b5": {
+    "stdout": "1\n2\n",
+    "stderr": "",
+    "exit": 0,
+    "stats": "vm peak=640 live=384"
+   },
+   "rule": "snapshot",
+   "sub_rule": "D5 live reads: writes to or rebinding of the source during the loop are not seen by the loop binding"
+  }
+ ]
+}
