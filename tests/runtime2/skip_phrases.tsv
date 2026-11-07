@@ -1,5 +1,5 @@
 # R3-1 (confirmation round 3 of the H-A repair): every line of the tree that prints skip / not-run /
-# unverified wording. class detected: scripts/certify.py's SKIP_MARKERS catch it; justified: why it is not a
+# unverified wording (scan scope: certification_guard.sh SCAN, R4-7). class detected: scripts/certify.py's SKIP_MARKERS catch it; justified: why it is not a
 # skip of a required assertion. certification_guard.sh rescans the tree and fails on an unlisted line, a
 # stale line, or a detected line the markers no longer catch. Columns: path, class, reason, the line (stripped).
 Makefile	detected	-	F6_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP F6 cleanup controls: Linux-only"; exit 0; fi;
@@ -25,6 +25,7 @@ scripts/certify.py	detected	-	harness-blocked log: no CP19 legacy oracle, compar
 scripts/certify.py	detected	-	# skipped), SKIP (every assertion skipped), FAIL or BLOCKED. Skips are found mechanically in the
 scripts/certify.py	detected	-	"""D3: [(line, requirement, required)] for every skip marker in a log."""
 scripts/certify.py	detected	-	"""D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
+scripts/certify.py	detected	-	r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} (.build/certify/{t}.unprivileged.log)"
 scripts/certify.py	detected	-	order = ["FAIL", "BASELINE-FAILURE", "UNVERIFIED", "SKIPPED-ENVIRONMENTAL", "FLAKY", "PASS"]
 scripts/certify.py	detected	-	for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
 scripts/guard_outcome.py	detected	-	report a skipped or unsupported run as success.
@@ -65,6 +66,7 @@ tests/rt/refrep_production.sh	detected	-	else echo "SKIP comparator refusal: adm
 tests/rt/value_d040.cpp	detected	-	else std::printf("large_accounting skipped (no-large)\n");
 tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP partial cross-device move (root without setpriv)"; fi
 tests/runtime2/build_write_ownership.sh	detected	-	else echo "SKIP cross-device move cases (/dev/shm missing or on the same filesystem)"; fi
+tests/runtime2/certification_guard.sh	detected	-	'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
 tests/runtime2/certification_guard.sh	justified	the guard's own heredoc opener for this scan, not a message	python3 -B - <<'PYSKIP' || exit 1
 tests/runtime2/certification_guard.sh	detected	-	fake = ('tests/runtime2/new_gate.sh', 'echo "SKIP new check (tool missing)"')
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s1/cand" test-rt-partial 'echo "running tests/runtime2/read_limit.py"; echo "PASS limits"; echo "SKIP default 1 GiB limit (MemAvailable 900 MiB < 4096)"; exit 0'

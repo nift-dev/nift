@@ -270,9 +270,15 @@ def inventory_problems(covered, inv, non_gate, mandatory, defined):
 SKIP_MARKERS = [re.compile(r"\bskip(?:ped|ping|s)?\b(?![-_\w])", re.I), re.compile(r"\bNOT[ -]RUN\b"),
                 re.compile(r"\bunverified\b", re.I), re.compile(r"\bnot verified\b", re.I),
                 re.compile(r"^\s*[.sxFE]*s[.sxFE]*\s*(\[\s*\d+%\])?\s*$")]
-ZERO_SKIPS = re.compile(r"\b0\s+(?:[\w-]+\s+)?skip(?:ped|s)?\b|\bskip(?:ped|s)?\s*[:=]\s*0\b", re.I)
+ZERO_SKIPS = re.compile(r"\b0\s+(?:[\w-]+\s+)?skip(?:ped|s)?\b|\bskip(?:ped|s)?\s*[:=]?\s*0\b(?!\.\d)", re.I)
 KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign host)
     (r"default 1 GiB limit \(MemAvailable", "MemAvailable >= 4096 MiB while tests/runtime2/read_limit.py runs", True),
+    # R4-1 (round 4): printed on every run; the entries are the rt-diff ignore list's known
+    # nondeterministic outputs (tools/rt-diff/ignore.txt), excluded by design, not a skipped check
+    (r"paren oracle: skipped \d+ nondeterministic entries", "none: tools/rt-diff/ignore.txt lists them by design", False),
+    # R4-1: the unreadable-file check needs a non-root run: required when not root; as root the
+    # runner re-runs the gate as the unprivileged user (ROOT_ONLY_SKIPS)
+    (r"running as root; unreadable-file check skipped", "a non-root run (the runner re-runs as the unprivileged user)", "when-not-root"),
     (r"UNVERIFIED COMPARATOR COVERAGE", "GCC 15.2 with __GLIBCXX__ 20260321 (comparator sort compiled in)", True),
     (r"comparator refusal: admitted libstdc\+\+ profile", "a toolchain that refuses comparator sort (checked on the other-toolchain lane; n/a on GCC 15.2)", False),
     (r"root without setpriv|needs Linux setpriv", "setpriv (util-linux) when running as root", True),
@@ -312,6 +318,8 @@ def skipped_assertions(text):
             if re.search(pat, line.strip()):
                 req, required = why, needed
                 break
+        if required == "when-not-root":
+            required = os.geteuid() != 0
         out.append((line.strip()[:200], req, required))
     return out
 
@@ -323,9 +331,16 @@ SILENT_BY_DESIGN = {
 _MAKE_NOISE = re.compile(r"^(\$ make |make(\[\d+\])?: (Entering|Leaving|Nothing to be done|'.*' is up to date))")
 
 
+def recipe_echo(cwd, target, old=()):
+    """R4-5: the lines make echoes for a recipe, as printed (a continued command spans lines)."""
+    out = subprocess.run(["make", "-n", target] + [x for p in old for x in ("-o", p)], cwd=cwd,
+                         capture_output=True, text=True, env=clean_env()).stdout
+    return [l.strip() for l in out.splitlines() if l.strip()]
+
+
 def own_output(text, commands=()):
     """R3-4: the lines a gate printed itself: not the runner's header, make's own messages, or the
-    recipe commands make echoes."""
+    recipe commands make echoes (R4-5: each echoed line, continuations included)."""
     echoed = {c.strip() for c in commands}
     return [l for l in text.splitlines() if l.strip() and not _MAKE_NOISE.match(l) and l.strip() not in echoed]
 
@@ -424,12 +439,10 @@ def failure_identity(text, roots=(), rc=None):
     # R3-2: the whole normalised output of the failing step (from the line that starts it, the last
     # mention of the step before make's error, to the end), not a fixed tail; without an
     # identified step, the whole log.
-    step = failure_signature(text)
-    start = 0
-    if step is not None:
-        end = max((i for i, l in enumerate(lines) if l.startswith("make: ***")), default=len(lines))
-        start = max((i for i in range(end) if step in lines[i]), default=0)
-    body = [normalise(l, roots) for l in lines[start:]
+    # R4-2 (round 4): the whole log, not from a mention of the step (a FAIL line naming a test
+    # path moved that start past earlier differing lines); earlier passing steps are deterministic
+    # output too, and a varying value there shows as FAILED-NEW (the conservative side).
+    body = [normalise(l, roots) for l in lines
             if l.strip() and not l.startswith(("make", "$ ")) and not _TIMING.match(l)]
     tail = tuple(body)
     if not fails and not tail:
@@ -499,6 +512,22 @@ def preflight_problems(f):
         out.append(f"GCC 15.2 required for comparator-sort certification (found: {f.get('cxx') or 'no compiler'})")
     if f.get("glibcxx") != 20260321:
         out.append(f"__GLIBCXX__ must be 20260321, the value the comparator-sort gate compiles for (found: {f.get('glibcxx')})")
+    # R4-3 (round 4): the certified binary is the one this campaign built, with the profiled
+    # compiler and flags (.build/obj-config/default.flags is the build's own signature)
+    if f.get("build_rc") not in (None, 0):
+        out.append(f"make nift failed (exit {f['build_rc']}): the binary would not be this campaign's build")
+    b = f.get("build_sig")
+    if b is not None:
+        if b.get("resolved") != f.get("cxx_resolved") or b.get("version-sha256") != f.get("cxx_version_sha256"):
+            out.append(f"./nift was built by another compiler ({b.get('resolved')}, version {str(b.get('version-sha256'))[:12]}) "
+                       f"than $CXX ({f.get('cxx_resolved')}, version {str(f.get('cxx_version_sha256'))[:12]})")
+        want_flags = ((f.get("profile") or {}).get("flags") or "").split()
+        missing = [x for x in want_flags if x not in b.get("args", [])]
+        if missing:
+            out.append(f"./nift's build lacks the profile flags {missing}")
+    if f.get("cxxflags_env") is not None and f["cxxflags_env"].split() != \
+            ((f.get("profile") or {}).get("flags") or "").split():
+        out.append(f"CXXFLAGS is overridden in the environment ({f['cxxflags_env']!r}), not the profile flags")
     # C14: the D4 profile's identity (tests/runtime2/cp14b/toolchain-profile.json), not only the macro
     prof = f.get("profile") or {}
     want = prof.get("compiler_version_contains")
@@ -516,6 +545,13 @@ def preflight_problems(f):
     for name, have in (f.get("tools") or {}).items():
         if not have:
             out.append(f"host tool missing: {name} ({dict((n, w) for n, _, w in HOST_TOOLS).get(name, '')})")
+            continue
+        m = re.search(r"(\d+)\.(\d+)", have)
+        ver = (int(m.group(1)), int(m.group(2))) if m else None
+        if name in TOOL_MIN and (ver is None or ver < TOOL_MIN[name] or
+                                 (name in TOOL_MAX_MAJOR and ver[0] != TOOL_MAX_MAJOR[name])):
+            out.append(f"{name} {have!r} is below the minimum {'.'.join(map(str, TOOL_MIN[name]))}"
+                       + (f" (major {TOOL_MAX_MAJOR[name]})" if name in TOOL_MAX_MAJOR else ""))
     if f.get("mem_mib") is not None and f["mem_mib"] < MIN_MEM_MIB:
         out.append(f"MemTotal {f['mem_mib']} MiB < {MIN_MEM_MIB} MiB (an 8 GB plan; read_limit.py needs 4 GiB available)")
     if f.get("disk_gib") is not None and f["disk_gib"] < MIN_DISK_GIB:
@@ -561,6 +597,10 @@ V4120_COMMIT = "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"  # tag v4.12.0
 # R3-6: the host requirements of the planned gates, checked before any gate runs (a missing one
 # would make its gates BLOCKED mid-campaign). (name, shell probe that prints a version or
 # "ok", minimum / why)
+# R4-6 (round 4): minimum versions (major, minor), compared with the first version number the
+# probe prints; tools without an entry need only be present.
+TOOL_MIN = {"python3": (3, 12), "go": (1, 26), "node": (22, 0), "dotnet": (10, 0)}
+TOOL_MAX_MAJOR = {"dotnet": 10}  # the .NET SDK 10 line (net10.0)
 HOST_TOOLS = [
     ("python3", "python3 --version", "3.12+ (bindings, harnesses)"),
     ("python3-dev", "python3 -c 'import sysconfig,os;p=sysconfig.get_paths()[\"include\"];print(\"ok\" if os.path.exists(os.path.join(p,\"Python.h\")) else \"\")'",
@@ -596,9 +636,63 @@ ORACLE_BUILD = ("git worktree add --detach <tree> " + "ce8cd36a92ecfdc8b15b00df4
                 + " && make -C <tree> -j\"$(nproc)\" nift")
 
 
-def preflight_facts(root, oracle, campaign_start=None):
+def build_signature(root):
+    """R4-3: the C++ block of .build/obj-config/default.flags (compiler, resolved path, version
+    hash, args), or None."""
+    try:
+        text = (Path(root) / ".build/obj-config/default.flags").read_text()
+    except OSError:
+        return None
+    blocks, cur = [], None
+    for line in text.splitlines():
+        if line.startswith("nift-object-config"):
+            cur = {"args": []}
+            blocks.append(cur)
+        elif cur is not None:
+            k, _, v = line.partition(" ")
+            if k == "arg":
+                cur["args"].append(v)
+            else:
+                cur[k] = v
+    for b in blocks:
+        if "-std=c++17" in b["args"]:
+            return b
+    return blocks[0] if blocks else None
+
+
+def environment_record(root):
+    """Owner 2026-11-07 23:10: where a result was produced."""
+    import platform
+    env = {"hostname": platform.node(), "kernel": platform.release()}
+    try:
+        osr = dict(l.rstrip("\n").split("=", 1) for l in open("/etc/os-release") if "=" in l)
+        env["distro"] = osr.get("PRETTY_NAME", "").strip('"')
+    except OSError:
+        env["distro"] = None
+    cgroup = ""
+    try:
+        cgroup = open("/proc/1/cgroup").read()
+    except OSError:
+        pass
+    env["container"] = bool(os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+                            or re.search(r"docker|lxc|containerd|kubepods|podman", cgroup))
+    return env
+
+
+def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     cxx = os.environ.get("CXX", "g++")
-    facts = {"require_env": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"), "oracle": oracle}
+    facts = {"require_env": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"), "oracle": oracle, "build_rc": build_rc}
+    path = shutil.which(cxx) or cxx
+    facts["cxx_resolved"] = os.path.realpath(path)
+    try:
+        import hashlib
+        facts["cxx_version_sha256"] = hashlib.sha256(subprocess.run([cxx, "--version"], capture_output=True)
+                                                     .stdout).hexdigest()
+    except OSError:
+        facts["cxx_version_sha256"] = None
+    facts["build_sig"] = build_signature(root)
+    facts["cxxflags_env"] = os.environ.get("CXXFLAGS")
+    facts["environment"] = environment_record(root)
     try:
         facts["cxx"] = subprocess.run([cxx, "--version"], capture_output=True, text=True).stdout.splitlines()[0]
     except (OSError, IndexError):
@@ -926,6 +1020,29 @@ def ensure_baseline(path, jobs):
     return (path / "nift").exists()
 
 
+def merge_summaries(paths):
+    """Owner 2026-11-07 23:10: merged results list each environment and which gates ran in it."""
+    envs, gates = [], {}
+    for p in paths:
+        data = json.loads(Path(p).read_text())
+        for t, r in data.get("targets", {}).items():
+            env = r.get("environment") or data.get("environment") or {}
+            key = json.dumps(env, sort_keys=True)
+            if key not in envs:
+                envs.append(key)
+            gates.setdefault(t, []).append((envs.index(key), r.get("class")))
+    print(f"merged {len(paths)} summaries: {len(envs)} environment(s)")
+    for i, key in enumerate(envs):
+        env = json.loads(key)
+        ran = sorted(t for t, v in gates.items() if any(e == i for e, _ in v))
+        print(f"  environment {i + 1}: {env.get('hostname')} {env.get('distro')} kernel {env.get('kernel')} "
+              f"container={env.get('container')} compiler={env.get('compiler')} "
+              f"stdlib={str(env.get('stdlib_sha256'))[:12]} binary={str(env.get('binary_sha256'))[:12]}: {len(ran)} gate(s)")
+        for t in ran:
+            print(f"    {t}: " + ", ".join(c for e, c in gates[t] if e == i))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--jobs", "-j", type=int, default=max(1, (os.cpu_count() or 2)))
@@ -952,7 +1069,11 @@ def main():
     ap.add_argument("--drop", action="append", default=[], metavar="TARGET",
                     help="remove TARGET from the plan before --check-plan (negative control)")
     ap.add_argument("--audit", metavar="JSON", help="isolation audit: run targets serially and record writes (use a disposable copy)")
+    ap.add_argument("--merge", nargs="+", metavar="SUMMARY_JSON",
+                    help="merge certification summaries: list each environment and the gates that ran in it")
     a = ap.parse_args()
+    if a.merge:
+        return merge_summaries(a.merge)
 
     deps, recipe = make_db(ROOT, AGGREGATE)
     inv = inventory(deps)
@@ -1026,13 +1147,16 @@ def main():
     # preflight problem.
     built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, text=True, env=clean_env())
     (logdir / "_build-nift.log").write_text(built.stdout + built.stderr)
-    facts = preflight_facts(ROOT, oracle, a.campaign_start)
+    facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode)
     pf = preflight_problems(facts)
     (logdir / "_preflight.json").write_text(json.dumps({"facts": facts, "problems": pf}, indent=2) + "\n")
     for pr in pf:
         print("PREFLIGHT BLOCKED: " + pr, file=sys.stderr)
     if pf and full:
         print("certify: preflight failed; the campaign did not start (.build/certify/_preflight.json)", file=sys.stderr)
+        return 2
+    if built.returncode != 0:  # R4-3: never certify a stale binary
+        print("certify: make nift failed; see .build/certify/_build-nift.log", file=sys.stderr)
         return 2
     # Phase 0: build every non-test prerequisite once (binaries, objects,
     # staged prefixes, bindings), so concurrent make processes do not race to
@@ -1075,6 +1199,11 @@ def main():
         else:
             print(f"certify: regression baseline {spec!r} unavailable; its comparison is not made", file=sys.stderr)
     comparator_skipped = []
+    # owner 2026-11-07 23:10: every result states the environment it ran in
+    env_record = {**facts.get("environment", {}), "compiler": facts.get("cxx"),
+                  "compiler_resolved": facts.get("cxx_resolved"),
+                  "stdlib_sha256": (facts.get("profile_files") or {}).get("libstdc++.so"),
+                  "binary_sha256": facts.get("candidate_sha256")}
     for t, r in sorted(results.items()):
         # Gather facts; the verdict comes only from decide(), which is pure and
         # table-tested (tests/runtime2/certification_guard.sh).
@@ -1163,13 +1292,29 @@ def main():
             comparator_skipped.append(t)
         r["skipped"] = skipped_assertions(logtext)
         silent = False
-        if r["rc"] == 0 and t not in SILENT_BY_DESIGN and len(logtext.splitlines()) < 400:
-            silent = not own_output(logtext, recipe_lines(ROOT, t, olds[t]))
+        if r["rc"] == 0 and t not in SILENT_BY_DESIGN:  # R4-5: no line cap
+            silent = not own_output(logtext, recipe_echo(ROOT, t, olds[t]))
+        # R4-1: a check skipped only because the run is root is run as the unprivileged user
+        rootonly = [x for x in r["skipped"] if x[1].startswith("a non-root run")]
+        if rootonly and r["rc"] == 0 and os.geteuid() == 0 and user:
+            if user_copy is None:
+                user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                prepare_copy(ROOT, user_copy, user)
+            urc, _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
+            r["unprivileged_check"] = urc
+            if urc == 0:
+                r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
+                    (l + " [ran as " + user + ": passed]", why, False) for l, why, _ in rootonly]
         r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent)
+        if r.get("unprivileged_check") not in (None, 0):
+            r["assertion"] = "FAIL"
         if silent:
             r["skipped"] = r["skipped"] + [("(no output of its own)", "a gate that prints its results "
                                             "(or an entry in SILENT_BY_DESIGN with a reason)", True)]
         r["class"] = report_class(r["status"], r.get("regression"), r["blocked"], r["assertion"])
+        if r["assertion"] == "FAIL" and r["rc"] == 0:
+            r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} (.build/certify/{t}.unprivileged.log)"
+        r["environment"] = env_record
         if r["assertion"] in ("PARTIAL", "SKIP"):
             r["reason"] = (f"{r['assertion']}: required assertions skipped: "
                            + "; ".join(f"{l} [{why}]" for l, why, req in r["skipped"] if req))
@@ -1196,6 +1341,10 @@ def main():
                       **{f"{n} (regression)": str(p) for n, p in regressions.items()},
                       "approved differences": "docs/runtime-2/evidence/b5/expected-changes.tsv (checked by the gates)"},
         "comparator_skipped": comparator_skipped,
+        "environment": env_record,
+        "certified_binary": {"sha256": facts.get("candidate_sha256"),
+                             "profile": (facts.get("profile") or {}).get("compiler"),
+                             "build_signature": facts.get("build_sig")},
         "targets": {t: results[t] for t in sorted(results)},
     }
     (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

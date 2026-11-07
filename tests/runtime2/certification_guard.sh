@@ -238,6 +238,10 @@ import json
 PROFILE = json.load(open('tests/runtime2/cp14b/toolchain-profile.json'))
 PROF_FILES = {k: v['sha256'] for k, v in PROFILE['files'].items()}
 PROF_OK = {**GOOD, 'cxx': PROFILE['compiler'], 'profile': PROFILE, 'profile_files': PROF_FILES}
+import os
+BUILD_OK = {'build_rc': 0, 'cxx_resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'cxx_version_sha256': 'aa' * 32,
+            'build_sig': {'resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'version-sha256': 'aa' * 32,
+                          'args': ['-include', 'src/build/production_tu.h'] + PROFILE['flags'].split()}}
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -334,7 +338,29 @@ checks = [
         ('profile: compiler build differs', {'cxx': 'g++ (Ubuntu 15.2.0-4ubuntu4) 15.2.0'}, 1),
         ('profile: libstdc++.so differs', {'profile_files': {**PROF_FILES, 'libstdc++.so': '00'}}, 1),
         ('profile: stl_algo.h differs', {'profile_files': {**PROF_FILES, 'bits/stl_algo.h': '00'}}, 1),
-        ('profile: stl_tempbuf.h differs', {'profile_files': {**PROF_FILES, 'bits/stl_tempbuf.h': None}}, 1)]],
+        ('profile: stl_tempbuf.h differs', {'profile_files': {**PROF_FILES, 'bits/stl_tempbuf.h': None}}, 1),
+        # R4-3: the certified binary is bound to the profile: built by $CXX with the profile flags
+        ('build: same compiler and flags', {**BUILD_OK}, 0),
+        ('build: other compiler, same __GLIBCXX__ (e.g. the 15-20260321 snapshot)',
+            {**BUILD_OK, 'build_sig': {**BUILD_OK['build_sig'], 'resolved': '/opt/gcc-15-20260321/bin/g++',
+                                       'version-sha256': 'ee' * 32}}, 1),
+        ('build: profile flag missing', {**BUILD_OK, 'build_sig': {**BUILD_OK['build_sig'], 'args': ['-std=c++17', '-O3']}}, 1),
+        ('build: make nift failed', {**BUILD_OK, 'build_rc': 2}, 1),
+        ('build: CXXFLAGS overridden', {**BUILD_OK, 'cxxflags_env': '-O3 -march=native'}, 1),
+        ('build: CXXFLAGS equal to the profile', {**BUILD_OK, 'cxxflags_env': PROFILE['flags']}, 0),
+        # R4-6: minimum versions
+        ('tools: go below 1.26', {'tools': {'go': 'go version go1.24.7 linux/amd64'}}, 1),
+        ('tools: go 1.26', {'tools': {'go': 'go version go1.26.0 linux/amd64'}}, 0),
+        ('tools: node 20', {'tools': {'node': 'v20.11.0'}}, 1),
+        ('tools: dotnet 9', {'tools': {'dotnet': '9.0.100'}}, 1),
+        ('tools: dotnet 10', {'tools': {'dotnet': '10.0.100'}}, 0),
+        ('tools: python 3.10', {'tools': {'python3': 'Python 3.10.12'}}, 1)]],
+    # R4-1: real in-tree lines of planned gates
+    ('rt-parser paren oracle (by design)', certify.assertion_class(0,
+        'PASS corpus\nparen oracle: skipped 7 nondeterministic entries (tools/rt-diff/ignore.txt)\n'), 'PASS'),
+    ('zero count before the noun', certify.skipped_assertions('paren oracle: skipped 0 nondeterministic entries'), []),
+    ('sha256 root-only skip', certify.skipped_assertions(
+        'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
 bad = [(n, got, want) for n, got, want in checks if got != want]
@@ -355,8 +381,15 @@ import certify
 PRINT = re.compile(r"\b(print|echo|printf|fprintf|cout|cerr|puts|write|fail|log|say|note|report)\b|<<", re.I)
 PHRASE = re.compile(r"skip|not[ -]run|not verified|unverified", re.I)
 INV = 'tests/runtime2/skip_phrases.tsv'
-files = subprocess.run(["git", "ls-files", "Makefile", "*.mk", "tests/*.py", "tests/*.sh", "tests/*.cpp", "tests/*.c",
-                        "scripts/*.py", "scripts/*.sh", "tools/*.py"], capture_output=True, text=True).stdout.split()
+# R4-7 (round 4): the Makefile, every script, harness and test source of tests/, scripts/, tools/
+# and bindings/. Not scanned, with the reason: docs/ (not printed by a gate); program fixtures
+# (*.f, *.in, *.out, *.json: Nift program data compared with goldens, not runner messages); src/
+# (the product's own messages: a gate that passes on them asserts them).
+SCAN = ["Makefile", "*.mk", "tests/*.py", "tests/*.sh", "tests/*.cpp", "tests/*.cc", "tests/*.c", "tests/*.h",
+        "tests/*.js", "tests/*.go", "tests/*.ps1", "scripts/*.py", "scripts/*.sh", "scripts/*.ps1",
+        "tools/*.py", "tools/*.sh", "bindings/*.py", "bindings/*.sh", "bindings/*.js", "bindings/*.go",
+        "bindings/*.cs", "bindings/*.c", "bindings/*.cc", "bindings/*.cpp", "bindings/*.h", "bindings/*.ps1"]
+files = subprocess.run(["git", "ls-files"] + SCAN, capture_output=True, text=True).stdout.split()
 found = set()
 for f in files:
     try:
@@ -435,6 +468,9 @@ toy "$TOY/t/cand" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixtu
 toy "$TOY/t/base" test-rt-tail 'echo "running tests/b5/run.py"; echo "FAIL fixture a.f:"; echo "--- got"; echo "[7,4]"; for i in $$(seq 1 20); do echo "  diff line $$i"; done; echo "FAIL fixture b.f:"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
 toy "$TOY/x/cand" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeee"; exit 1'
 toy "$TOY/x/base" test-rt-hex 'echo "running tests/bytes.sh"; echo "FAIL bytes: expected 0xdeadbeef got 0xdeadbeef"; exit 1'
+# R4-2: a FAIL line naming a test path does not cut the identity short
+toy "$TOY/tp/cand" test-rt-paths 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
+toy "$TOY/tp/base" test-rt-paths 'echo "running tests/runtime2/b5/run.py"; echo "FAIL tests/runtime2/b5/evalorder/a.f:"; echo "--- got"; echo "[7,4]"; echo "FAIL tests/runtime2/b5/evalorder/b.f:"; echo "--- got"; echo "same"; echo "FAIL b5 fixtures: 2 of 9"; exit 1'
 toy "$TOY/v/cand" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-$$$$/a pid $$$$ took 123ms at 2026-11-07T21:04:30"; echo "FAIL vary: 2 of 9 (took 45ms)"; exit 1'
 toy "$TOY/v/base" test-rt-vary 'echo "running tests/vary.sh"; echo "work /tmp/nift-x-7/a pid 7 took 9ms at 2026-11-08T01:00:00"; echo "FAIL vary: 2 of 9 (took 3ms)"; exit 1'
 toyrun a test-rt-multi reg 1 FAILED-NEW
@@ -446,6 +482,7 @@ toyrun e test-rt-parity reg 1 FAILED-NEW
 toyrun t test-rt-tail reg 1 FAILED-NEW
 toyrun t test-rt-tail v4 1 FAILED-NEW
 toyrun x test-rt-hex reg 1 FAILED-NEW
+toyrun tp test-rt-paths reg 1 FAILED-NEW
 toyrun p test-rt-same reg 0 FAILED-BASELINE
 toyrun v test-rt-vary reg 0 FAILED-BASELINE
 # D3 toy controls: a gate that passes with a required assertion skipped is PARTIAL (reported
@@ -471,6 +508,18 @@ skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows 
 # R3-4: a gate with no output of its own is SKIP (NOT-RUN) and fails the campaign under --certify
 toy "$TOY/s4/cand" test-rt-silent 'true'
 skiprun s4 test-rt-silent 1 "NOT-RUN          test-rt-silent: SKIP"
+# R4-5: a silent recipe whose command make echoes over two lines (a continuation) is SKIP too
+mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py "$TOY/s5/cand/scripts/"
+printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\ncertify-targets: test-rt-cont\n.PHONY: test-rt-cont\ntest-rt-cont: nift\n\ttrue \\\n\t  \&\& true\n' > "$TOY/s5/cand/Makefile"
+skiprun s5 test-rt-cont 1 "NOT-RUN          test-rt-cont: SKIP"
+# owner 23:10: each result states its environment
+python3 -B -c "
+import json,sys; d=json.load(open('$TOY/s5/cand/.build/certify/summary.json'))
+env=d['targets']['test-rt-cont'].get('environment') or {}
+need=('hostname','kernel','distro','container','compiler','stdlib_sha256','binary_sha256')
+miss=[k for k in need if k not in env]
+sys.exit('FAIL certification guard environment record: missing %s' % miss if miss or 'environment' not in d else 0)" || exit 1
+echo "PASS certification guard environment record: every result states its environment"
 # R3-1 inventory check of the D3 phrases the guard itself prints: the historical control's
 # missing-commit branch prints a SKIP line, so that gate cannot be PASSED (see above).
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;
