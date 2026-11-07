@@ -590,3 +590,127 @@ sha256 of `/usr/lib/gcc/x86_64-linux-gnu/15/libstdc++.so` and of `bits/stl_algo.
   production gate (`compiler_collection_sort.cpp`) check only `__GLIBCXX__ == 20260321`; the
   preflight is stricter (a different build with the same date stamp passes the gate's check but
   fails the campaign preflight), which is the intended direction. Neither is changed.
+
+## 15. Confirmation round 4 on 5f8630e2: CONFIRMED-WITH-CONDITIONS; fixes (C15-C17)
+
+Review: `scratchpad/review-ha/CONFIRM-HA-R4.md` (toys `toy6/`, `toy7/`, copied into the guard).
+Owner additions 23:10 (environment record, two-stage flow) and 23:14 (four outcomes, source-tree
+binding). No production change: binary `91a49efa…`.
+
+- **R4-1.** `skipped 0 <noun>` is a zero count. `test-rt-parser`'s `paren oracle: skipped N
+  nondeterministic entries` is a by-design KNOWN_CONDITIONAL entry (the entries are
+  tools/rt-diff/ignore.txt's). `test-sha256`'s `running as root; unreadable-file check skipped`
+  is required when not root; **as root the runner re-runs that gate as the unprivileged `tester`
+  user** (the plan provides the user: `--unprivileged-user`, default `tester`); if no
+  unprivileged run executes it, the check counts as a required skip. Local classification of
+  real gate logs: section 15.1.
+- **R4-2.** The identity is the whole normalised log (the step's last mention could be moved by a
+  FAIL line naming a test path); the reviewer's `test-rt-paths` toy is a guard control
+  (FAILED-NEW). The `stab/` double runs stay identical under it (vm_parity 10 lines, vm_modules
+  5, cp14b 138, rt-diff-selftest 90).
+- **R4-3 and owner 23:14.** The campaign's `make nift` return code is checked (a failure aborts,
+  exit 2). `./nift` must be current (`make -q nift`), not older than the campaign start, and its
+  build signature (`.build/obj-config/default.flags`: resolved compiler path and `--version` hash,
+  args) must name `$CXX`'s resolved path and version hash and carry the profile flags
+  (`-std=c++17 -O2 -Wall -Wextra -pedantic -pthread`); a `CXXFLAGS` environment override that
+  differs from the profile fails. summary.json `certified_binary` records the binary sha256, the
+  profile, the compiler and its resolved path, the libstdc++ sha256, the build invocation, the
+  build signature and the source tree (HEAD, tree, clean flag). Guard: a binary built by another
+  compiler with the same `__GLIBCXX__` (the 15-20260321 snapshot) fails. **Limit:** the header
+  sha256s are taken from the compiler's own include trace without the build's `-I` paths, so a
+  `bits/stl_algo.h` placed under `src/` or `include/` would shadow the system header in the build
+  but not in the preflight (none exists in the tree).
+- **R4-5.** make's echo of a continued recipe is not the gate's own output (each echoed line is
+  removed); the 400-line cap is gone. Guard: `test-rt-cont` is NOT-RUN.
+- **R4-6.** Minimum versions: Python 3.12, Go 1.26, Node 22, .NET SDK major 10; the other tools
+  need only be present (no minimum stated in 13.2).
+- **R4-7.** The phrase scan covers the Makefile, `*.mk`, and the scripts, harnesses and test
+  sources (`py sh c cc cpp h js go cs ps1`) of tests/, scripts/, tools/ and bindings/ (162 lines,
+  146 detected, 16 justified). Not scanned, with reasons: docs/ (not printed by a gate), Nift
+  program fixtures (`*.f`, `*.in`, `*.out`, `*.json`: program data compared with goldens), src/
+  (the product's own messages, asserted by the gates that print them). Limit: per-line scan.
+- **Owner 23:14 outcomes.** Each gate records `zero-skipped`, `inapplicable-only`,
+  `mandatory-skipped` or `not-executed`; a KNOWN_CONDITIONAL entry excuses only its own line
+  (guard: the root line plus another skip in the same log is PARTIAL).
+- **Owner 23:10 environment.** summary.json and every gate result carry `environment`: hostname,
+  kernel, distro, container or host, compiler, libstdc++ sha256, binary sha256.
+  `certify.py --merge A.json B.json …` lists each environment and the gates that ran in it.
+
+### 14.1 Toolchain pin (R4-4)
+
+Choice: **install from the snapshot date and pin**. Add to the archive pin of section 14
+(`snapshot=20261107T000000Z`, resolute) and install and hold every package of the gcc-15 source
+the build and the loader use, at the same version:
+
+    V=15.2.0-16ubuntu1
+    apt-get install gcc-15=$V g++-15=$V cpp-15=$V libstdc++-15-dev=$V libgcc-15-dev=$V \
+        gcc-15-base=$V libstdc++6=$V libgcc-s1=$V
+    apt-mark hold gcc-15 g++-15 cpp-15 libstdc++-15-dev libgcc-15-dev gcc-15-base libstdc++6 libgcc-s1
+
+(packages.ubuntu.com, resolute: `libstdc++6-15-dbg` is built from source gcc-15
+15.2.0-16ubuntu1 and depends on `libstdc++6 (>= 15.2.0-16ubuntu1)`.) Whatever apt resolves, the
+preflight's sha256 checks decide.
+
+### 14.2 Single-instance two-stage flow (owner 23:10)
+
+1. Provision the intended instance (Ubuntu 26.04 image if Linode offers it, section 14).
+2. Stage 1, environment only: install the pinned toolchain and tools, build the v4.12.0 oracle,
+   `make nift`, then `python3 scripts/certify.py --list --legacy-oracle … --campaign-start …`
+   (the preflight, nothing else). **If the preflight reports any problem, delete the instance
+   immediately** (no gate runs on a wrong environment).
+3. Stage 2, on the same instance: `python3 scripts/certify.py --certify …` (the full campaign,
+   whose own preflight repeats stage 1's checks against the same binary).
+
+If the fallback (a resolute chroot or container on a 24.04 instance) is used, these planned
+gates depend on the host and must be judged with that in mind (the summary's `environment.container`
+says which ran where): the TSan gates (`*-tsan`: the host kernel's `vm.mmap_rnd_bits` and address
+layout); process management and job control (`test-v45-job-control`, `test-cp21-*` terminal and
+fd gates, `test-rt-host*`, `test-runtime2-process-capture`, `test-cp20-*`, `test-cp19-host`,
+`escapees_subreaper` in the host-process unit: PID namespaces and `PR_SET_CHILD_SUBREAPER`); PTY
+gates (`test-progress-pty`, the v4.4 PTY and TTY smokes, `test-cp21-terminal-lease`); networking
+(`test-serve`: loopback ports); filesystem gates (`/dev/shm` cross-device moves, symlinks,
+`test-filesystem-type`); and privilege gates (setpriv, the unprivileged `tester` re-runs).
+
+### 15.1 Local classification of real gate logs (R4-1)
+
+Estimate: the 343 planned gates that need no sanitizer, GCC 15.2, oracle or binding toolchain
+would take about 5-8 hours here (test-rt-vm's 45 prerequisites alone took 33 min), over the 3-hour
+budget. So the 44 not-yet-run gates whose recipes print skip / not-run / unverified wording ran
+first (`make -k`, non-certify, 42.7 min; logs `scratchpad/combined-fix/cls/`), and the 24 gate
+logs of this round's earlier runs were reclassified (`cls/reclass.txt`). The other ~275 feasible
+gates were not run here; they are classified on Linode.
+
+The pass found these false readings, now fixed: make's echo of a recipe containing `echo "…
+skipped …"` (excluded: `skipped_assertions` drops the echoed recipe lines); product wording
+(`status --strict lists unverified pages`), test-case names (`PASS skipped && interpolation`,
+`PASS syntax validates skipped segment`) and mutant descriptions (`PASS mutant N (… skipped …)`)
+(KNOWN_CONDITIONAL entries, not required); cp14b's `UNVERIFIED <case>` lines (the comparator
+requirement). It also found one real conditional check: test-serve's IPv6 case (`SKIPPED - IPv6
+::1 not available on this host`), now a required KNOWN_CONDITIONAL entry and a preflight check
+(`::1` must bind). And test-test-integrity flagged `scripts/certify.py` (a subprocess result it
+could not see used): rewritten, so its findings equal fc987ec1's 57.
+
+**Gates whose class would block a `--certify` campaign:**
+
+| Gate | Here | On Linode |
+| --- | --- | --- |
+| test-serve | PARTIAL (no IPv6 `::1` in this container) | PASS when the preflight's `::1` check passes |
+| test-runtime2-cp14b-sort, test-cp19-session-cli, test-runtime2-cp14b-design-mutants | BLOCKED (comparator SKIP/UNVERIFIED on GCC 13.3) | judged only on the GCC 15.2 profile host |
+| test-runtime2-cp14b, test-runtime2-cp14b-mutants | FAIL with comparator UNVERIFIED lines | judged only on the GCC 15.2 profile host |
+| test-runtime2-certification-guard | PASS | PARTIAL if the clone lacks 0d853db4 (historical control) |
+| test-sha256 | FAIL here (VM refusals, pre-existing) with the root-only skip | its unreadable-file check is re-run as `tester` |
+
+Failing here, expected FAILED-BASELINE only if identical on the named baselines (pre-existing per
+b5-refsem.md 11.10 and the combined review; not re-compared here): test-v44-language-foundation
+(load-sensitive), test-v44-shell-restricted, test-v46-relative-imports,
+test-runtime2-cp03-simplify, test-sha256, test-runtime2-host-deps, test-runtime2-cp01-simplify
+(FLAKY on both binaries: FAILED-NEW under the zero-flakiness rule), test-cp19-s1-dispatch,
+test-rt-parser, test-test-integrity (57 findings, the same as fc987ec1), test-v44-packages,
+test-rt-host-mutants (mutant builds rejected by the production build guard), cp25r-inventory,
+test-rt-vm's own recipe (vm_parity `--rt-diff`, vm_modules), test-runtime2-rt-diff-selftest;
+test-runtime2-scanner-parity is BLOCKED here (needs NIFT_REF: the campaign passes the oracle).
+
+Judged only on Linode: every sanitizer and TSan gate (including test-runtime2-b5-evalorder-sanitize),
+the four binding gates, the performance lane (PERF_LANE, LOAD_SENSITIVE), test-cp19-proof-cli
+(oracle), the GCC 15.2 comparator gates, the root-only re-runs as `tester`, and the ~275 feasible
+gates not run here.

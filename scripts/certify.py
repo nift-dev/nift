@@ -276,6 +276,13 @@ KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign h
     # R4-1 (round 4): printed on every run; the entries are the rt-diff ignore list's known
     # nondeterministic outputs (tools/rt-diff/ignore.txt), excluded by design, not a skipped check
     (r"paren oracle: skipped \d+ nondeterministic entries", "none: tools/rt-diff/ignore.txt lists them by design", False),
+    # R4-1 local classification pass (combined-b3-b5.md 15.1): lines of passing gates whose wording
+    # is not a skip, and the conditional checks they revealed
+    (r"^ok: B1 \w+: status --strict lists unverified pages$", "none: product wording (status --strict's unverified pages), an assertion that ran", False),
+    (r"^PASS (skipped (&&|\|\||pipeline) interpolation|syntax validates skipped segment)", "none: a test case named after the shell branch it skips, which ran", False),
+    (r"^PASS mutant \d+ \(", "none: a mutant's description (the mutant was caught)", False),
+    (r"^SKIPPED - IPv6 ::1 not available on this host$|^serve_smoke: \d+ passed, [1-9]\d* skipped", "IPv6 on loopback (::1) for test-serve", True),
+    (r"^UNVERIFIED (\d+ )?[\w-]+$|^UNVERIFIED \d+ D4 cases refused with method:sort", "GCC 15.2 comparator profile (cp14b cases and mutants unverified elsewhere)", True),
     # R4-1: the unreadable-file check needs a non-root run: required when not root; as root the
     # runner re-runs the gate as the unprivileged user (ROOT_ONLY_SKIPS)
     (r"running as root; unreadable-file check skipped", "a non-root run (the runner re-runs as the unprivileged user)", "when-not-root"),
@@ -305,10 +312,15 @@ KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign h
 ]
 
 
-def skipped_assertions(text):
-    """D3: [(line, requirement, required)] for every skip marker in a log."""
+def skipped_assertions(text, echoed=()):
+    """D3: [(line, requirement, required)] for every skip marker in a log. `echoed`: make's echo of
+    the recipe (R4-1 local pass: a recipe that contains `echo "... skipped ..."` is not a skip
+    until the gate prints it)."""
     out = []
+    echoed = {e.strip() for e in echoed}
     for line in text.splitlines():
+        if line.strip() in echoed:
+            continue
         if not any(m.search(line) for m in SKIP_MARKERS):
             continue
         if ZERO_SKIPS.search(line) and not any(m.search(ZERO_SKIPS.sub("", line)) for m in SKIP_MARKERS):
@@ -579,6 +591,8 @@ def preflight_problems(f):
         out.append(f"vm.mmap_rnd_bits={f['mmap_rnd_bits']} > 28: TSan aborts (sysctl -w vm.mmap_rnd_bits=28)")
     if f.get("loopback") is False:
         out.append("cannot bind a loopback TCP port (test-serve)")
+    if f.get("loopback6") is False:
+        out.append("cannot bind ::1 (IPv6 loopback; test-serve's IPv6 case)")
     if f.get("pty") is False:
         out.append("no PTY available (/dev/ptmx; test-progress-pty, the v4.4 PTY smokes)")
     if f.get("shm_separate") is False:
@@ -705,18 +719,20 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     facts["cxx_resolved"] = os.path.realpath(path)
     try:
         import hashlib
-        facts["cxx_version_sha256"] = hashlib.sha256(subprocess.run([cxx, "--version"], capture_output=True)
-                                                     .stdout).hexdigest()
+        version_out = subprocess.run([cxx, "--version"], capture_output=True).stdout
+        facts["cxx_version_sha256"] = hashlib.sha256(version_out).hexdigest()
     except OSError:
         facts["cxx_version_sha256"] = None
     facts["build_sig"] = build_signature(root)
     # owner 23:14: the source tree the binary was built from, and whether the binary is current
-    git = lambda *a: subprocess.run(["git", "-C", str(root)] + list(a), capture_output=True, text=True).stdout.strip()
+    def git(*a):
+        res = subprocess.run(["git", "-C", str(root)] + list(a), capture_output=True, text=True)
+        return res.stdout.strip() if res.returncode == 0 else None
     facts["source"] = {"head": git("rev-parse", "HEAD"), "tree": git("rev-parse", "HEAD^{tree}"),
                        "clean": git("status", "--porcelain", "--untracked-files=no") == ""}
     facts["build_invocation"] = "make nift (CXX=%s, CXXFLAGS=%s)" % (cxx, os.environ.get("CXXFLAGS", "<Makefile default>"))
-    facts["build_current"] = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True,
-                                            env=clean_env()).returncode == 0
+    current = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True, env=clean_env())
+    facts["build_current"] = current.returncode == 0
     facts["campaign_start"] = campaign_start
     try:
         facts["binary_mtime"] = int(os.stat(Path(root) / "nift").st_mtime)
@@ -775,6 +791,10 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
         sk = socket.socket(); sk.bind(("127.0.0.1", 0)); sk.close(); facts["loopback"] = True
     except OSError:
         facts["loopback"] = False
+    try:
+        sk6 = socket.socket(socket.AF_INET6); sk6.bind(("::1", 0)); sk6.close(); facts["loopback6"] = True
+    except OSError:
+        facts["loopback6"] = False
     facts["pty"] = os.path.exists("/dev/ptmx")
     try:
         facts["shm_separate"] = os.stat("/dev/shm").st_dev != os.stat(str(root)).st_dev
@@ -800,13 +820,16 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
         except OSError as e:
             facts["oracle_version"] = f"not runnable: {e}"
         tree = Path(oracle).resolve().parent
-        git = lambda *a: subprocess.run(["git", "-C", str(tree)] + list(a), capture_output=True, text=True)
+        def git(*a):
+            res = subprocess.run(["git", "-C", str(tree)] + list(a), capture_output=True, text=True)
+            return res
         head = git("rev-parse", "HEAD")
         facts["oracle_commit"] = head.stdout.strip() if head.returncode == 0 else "not a git checkout"
         st = git("status", "--porcelain", "--untracked-files=no")
         facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
-        facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file() and subprocess.run(
-            ["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env()).returncode == 0)
+        oracle_q = subprocess.run(["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env())
+        facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file()
+                                   and oracle_q.returncode == 0)
         facts["campaign_start"] = campaign_start
         try:
             facts["oracle_mtime"] = int(os.stat(oracle).st_mtime)
@@ -1321,10 +1344,11 @@ def main():
         r["blocked"] = blocked_reason(logtext)
         if COMPARATOR_SKIP in logtext:
             comparator_skipped.append(t)
-        r["skipped"] = skipped_assertions(logtext)
         silent = False
+        echo = recipe_echo(ROOT, t, olds[t])
+        r["skipped"] = skipped_assertions(logtext, echo)
         if r["rc"] == 0 and t not in SILENT_BY_DESIGN:  # R4-5: no line cap
-            silent = not own_output(logtext, recipe_echo(ROOT, t, olds[t]))
+            silent = not own_output(logtext, echo)
         # R4-1: a check skipped only because the run is root is run as the unprivileged user
         rootonly = [x for x in r["skipped"] if x[1].startswith("a non-root run")]
         if rootonly and r["rc"] == 0 and os.geteuid() == 0 and user:
