@@ -1522,7 +1522,7 @@ EXPECTED_BASELINE since C36 (section 30).
 | # | Stage | Dedicated 4 CPU / 8 GB | Shared 4 vCPU / 8 GB |
 | --- | --- | ---: | ---: |
 | 0 | Provision (Ubuntu 26.04 if offered, else 24.04 + resolute chroot), SSH key pin, clone/bundle transfer | 10 min | 10 min |
-| 1 | Environment preflight: pinned GCC 15.2.0-16ubuntu1 (14.1), Python 3.12 + dev, Go 1.26 tarball, Node 22, .NET 10, strace/time/util-linux, `tester` user, sysctl; `make nift`; `certify.py --list` with the oracle; **delete the instance if any PREFLIGHT problem** | 35 min | 45 min |
+| 1 | Environment preflight: pinned GCC 15.2.0-16ubuntu1 (14.1), Python 3.12 + dev, Go 1.26 tarball, Node 22, .NET 10, strace/time/util-linux, `tester` user, sysctl; the frozen tip and tree checked by `test`; `certify.py --toolchain-preflight` (compiler identity, profile sha256s, tool versions, host) before any build (C38); **delete the instance on any PREFLIGHT problem**; the full `--list` preflight follows the builds in stage 3 | 35 min | 45 min |
 | 2 | v4.12.0 oracle at `ce8cd36a` (`make -j4 nift`; also the v4.12.0 baseline tree) | 8 min | 12 min |
 | 3 | Regression baselines 17f7964c and weekend/r2 `0b5079fc` (`make -j4 nift` each, under `set -e`; their gate objects are built by certify when a gate is compared); then `certify.py --list` with every flag: it checks the oracle and both baselines (commit, clean, `make -q nift`, executable, built after the campaign start, sha256) and exits 2 on any PREFLIGHT line (C37); and the stage-3 check: `script_return_kernel_error` on the fresh 0b5079fc build, recorded | 15 min | 20 min |
 | 4 | Candidate build: `make -j4 nift` plus the prebuild of test objects | 20 min | 25 min |
@@ -1578,8 +1578,13 @@ EXPECTED_BASELINE since C36 (section 30).
     sysctl -w vm.mmap_rnd_bits=28
     export CXX=g++-15 CC=gcc-15 NIFT_CP14B_REQUIRE_COMPARATOR=1    # after the 14.1 install and holds
     export NIFT_CAMPAIGN_START=$(date +%s)                          # before the oracle build
-    git clone <bundle> /work/nift && cd /work/nift && git checkout --detach <frozen tip>
-    git rev-parse HEAD HEAD^{tree}                                  # must equal the frozen tip and tree
+    TIP=<frozen tip, full hash>; TREE=<frozen tree, full hash>      # from the coordinator's freeze report
+    git clone <bundle> /work/nift && cd /work/nift && git checkout --detach "$TIP"
+    test "$(git rev-parse HEAD)" = "$TIP" && test "$(git rev-parse 'HEAD^{tree}')" = "$TREE"   # automatic, not by eye
+    test -z "$(git status --porcelain)"
+    # stage 1: toolchain and host only, before any build (C38): a wrong toolchain fails in minutes
+    python3 scripts/certify.py --toolchain-preflight > /work/stage1-toolchain.txt 2>&1 \
+        || { cat /work/stage1-toolchain.txt; echo 'toolchain PREFLIGHT failed: delete the instance'; exit 2; }
     # stage 2-3 (set -e: any failed build stops here)
     git worktree add --detach ../nift-v4.12.0 ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb
     git worktree add --detach ../nift-17f7964c 17f7964cb4f5890740658bd90af2d411b2f7d8ce
@@ -1616,7 +1621,7 @@ fingerprints as summary.json records them (`fingerprint_diff`, `regression`,
 `whole_log_identical`); the failing gates' harness JSON outputs (every `--output`/`--report` file
 of a failing gate, e.g. `.build/cp14b/evidence/*.json`: `find .build -name '*.json' -newer
 /work/stage1-preflight.txt` collected whole); `/work/stage1-preflight.txt`,
-`/work/stage3-builds.txt`, `/work/stage3-script-return.txt`, `/work/campaign.out`; `sha256sum` of `nift`, the oracle and both
+`/work/stage1-toolchain.txt`, `/work/stage3-builds.txt`, `/work/stage3-script-return.txt`, `/work/campaign.out`; `sha256sum` of `nift`, the oracle and both
 baseline binaries; `dpkg -l` of the toolchain packages, `uname -a`, `/etc/os-release`,
 `nproc`, `free -m`, `df -h`; and `git rev-parse` of the four trees. One tarball with a sha256
 manifest, verified locally before the instance is deleted.
@@ -1715,3 +1720,23 @@ Review: `scratchpad/review-ha/PRELAUNCH.md`. Harness and docs only (no `src/`; b
   test-rt-memory-c1 reclassified in 30 as a pre-existing product abort on out-of-memory and added
   to the release blockers (8). The review's vm-corpus note (3 of the 124 blocks are B5-approved
   differences) is in the known-failure list.
+
+## 32. PRELAUNCH-R2 on 60eadc65: CONFIRMED-WITH-CONDITIONS (C38)
+
+Review: `scratchpad/review-ha/PRELAUNCH-R2.md`. Harness and docs only (no `src/`; binary f2fed67d).
+- **C1 (fixed): distinct binaries.** Each regression baseline's `nift` must differ from the
+  candidate, the oracle and the other baseline by sha256 and by real path, and must not be a
+  symlink out of its own tree; two baselines may not share a tree. (The oracle already had its
+  checks against the candidate.) Guard: symlinked to the candidate (sha, path and symlink lines),
+  a copy of the candidate, the oracle's binary, the same binary under both names, a symlink out of
+  the tree, two names on one tree, and a real tree whose `nift` symlinks to another binary through
+  the real fact collector.
+- **C2 (fixed): the required baselines.** A full campaign (and `--list` of a full plan) needs
+  exactly `17f7964c` and `weekend/r2`, once each, on distinct trees; none, one, a duplicate name or
+  a missing name is a PREFLIGHT problem (guard: each).
+- **Low items.** The baseline tree's untracked/ignored files under `src/`, `include/` and its
+  signature's `-I` directories are refused like the candidate's. Baseline git commands run with
+  `GIT_OPTIONAL_LOCKS=0` (read-only). `certify.py --toolchain-preflight` runs the toolchain and
+  host checks only (no build, oracle or baselines needed; `toolchain_problems`, table-tested) and
+  exits 2 on a problem; 29.5 runs it in stage 1 before the stage-3 builds, and stage 0's tip and
+  tree check is an automatic `test` against the frozen hashes. B1 stays the owner's decision.

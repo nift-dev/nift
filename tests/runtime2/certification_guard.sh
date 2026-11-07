@@ -235,7 +235,11 @@ GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', 
             oracle_current=True, campaign_start=1000, oracle_mtime=2000, oracle_sha256='aa', candidate_sha256='bb',
             oracle_realpath='/o/nift', candidate_realpath='/c/nift')
 RB_OK = dict(name='17f7964c', tree='/b/17f', expected_commit=certify.REGRESSION_COMMITS['17f7964c'],
-             commit=certify.REGRESSION_COMMITS['17f7964c'], clean=True, current=True, executable=True, mtime=2000, sha256='cc')
+             commit=certify.REGRESSION_COMMITS['17f7964c'], clean=True, current=True, executable=True, mtime=2000, sha256='cc',
+             realpath='/b/17f/nift', tree_realpath='/b/17f', symlink_outside=False, untracked_src=[])
+RB_R2 = {**RB_OK, 'name': 'weekend/r2', 'expected_commit': certify.REGRESSION_COMMITS['weekend/r2'],
+         'commit': certify.REGRESSION_COMMITS['weekend/r2'], 'tree': '/b/r2', 'sha256': 'dd', 'realpath': '/b/r2/nift',
+         'tree_realpath': '/b/r2'}
 # a stale baseline tree: a git checkout whose nift is older than its source (make -q nift fails)
 import os, shutil, subprocess, tempfile
 STALE = tempfile.mkdtemp(prefix='cert-guard-stale-')
@@ -245,6 +249,14 @@ open(STALE + '/src.c', 'w').write('x\n'); os.utime(STALE + '/nift', (1000, 1000)
 _g = dict(os.environ, GIT_AUTHOR_NAME='g', GIT_AUTHOR_EMAIL='g@x', GIT_COMMITTER_NAME='g', GIT_COMMITTER_EMAIL='g@x')
 subprocess.run('git init -q && git add Makefile src.c && git commit -qm t', shell=True, cwd=STALE, env=_g, check=True)
 STALE_NAME = subprocess.run(['git', '-C', STALE, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()[:12]
+# a baseline tree whose nift is a symlink to a binary outside it (the substituted candidate)
+LINKED = tempfile.mkdtemp(prefix='cert-guard-linked-')
+CANDIDATE = tempfile.mkdtemp(prefix='cert-guard-cand-')
+open(CANDIDATE + '/nift', 'w').write('#!/bin/sh\necho cand\n'); os.chmod(CANDIDATE + '/nift', 0o755)
+open(LINKED + '/Makefile', 'w').write('nift:\n\ttrue\n')
+os.symlink(CANDIDATE + '/nift', LINKED + '/nift')
+subprocess.run('git init -q && git add Makefile && git commit -qm t', shell=True, cwd=LINKED, env=_g, check=True)
+LINKED_NAME = subprocess.run(['git', '-C', LINKED, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()[:12]
 import json
 PROFILE = json.load(open('tests/runtime2/cp14b/toolchain-profile.json'))
 PROF_FILES = {k: v['sha256'] for k, v in PROFILE['files'].items()}
@@ -325,8 +337,40 @@ checks = [
     ('preflight oracle is the candidate (path)', len(pp({**GOOD, 'oracle_realpath': '/c/nift'})), 1),
     ('preflight oracle not executable', len(pp({**GOOD, 'oracle_executable': False})), 1),
     # C37 (pre-launch review B2): the regression baselines are checked before any gate runs
-    ('preflight baselines ok', pp({**GOOD, 'regression_baselines': [RB_OK, {**RB_OK, 'name': 'weekend/r2',
-        'expected_commit': certify.REGRESSION_COMMITS['weekend/r2'], 'commit': certify.REGRESSION_COMMITS['weekend/r2']}]}), []),
+    ('preflight baselines ok', pp({**GOOD, 'regression_baselines': [RB_OK, RB_R2]}), []),
+    ('preflight baselines ok, full campaign', pp({**GOOD, 'require_baselines': True, 'regression_baselines': [RB_OK, RB_R2]}), []),
+    # C38 (PRELAUNCH-R2 C1): each baseline a distinct binary, no symlink out of its tree
+    ('preflight baseline symlinked to the candidate', sorted(x.split(': ', 1)[1][:40] for x in pp({**GOOD, 'regression_baselines': [
+        {**RB_OK, 'realpath': '/c/nift', 'sha256': 'bb', 'symlink_outside': True}]})),
+        ['its nift is the same binary as the candi', 'its nift is the same file as the candida', 'nift is a symlink out of its tree (/c/ni']),
+    ('preflight baseline a copy of the candidate', [x.split(': ', 1)[1][:40] for x in pp({**GOOD, 'regression_baselines': [
+        {**RB_OK, 'sha256': 'bb'}]})], ['its nift is the same binary as the candi']),
+    ('preflight baseline the same as the oracle', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'sha256': 'aa'}]})), 1),
+    ('preflight the same binary under both baseline names', [x[:60] for x in pp({**GOOD, 'regression_baselines': [
+        RB_OK, {**RB_R2, 'sha256': 'cc'}]})], ['regression baselines 17f7964c and weekend/r2 are the same bi']),
+    ('preflight baseline symlink out of its tree', [x.split(': ', 1)[1][:30] for x in pp({**GOOD, 'regression_baselines': [
+        {**RB_OK, 'realpath': '/elsewhere/nift', 'symlink_outside': True}]})], ['nift is a symlink out of its t']),
+    ('preflight baseline untracked source file', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'untracked_src': ['src/rt/x.cpp']}]})), 1),
+    ('preflight baseline symlink to the candidate (real facts)', sorted(x.split(': ', 1)[1][:28] for x in pp({**GOOD,
+        'candidate_sha256': certify.sha256_of(LINKED + '/nift'), 'candidate_realpath': os.path.realpath(LINKED + '/nift'),
+        'regression_baselines': [certify.regression_facts(LINKED_NAME, LINKED)]}) if 'tracked changes' not in x),
+        ['its nift is the same binary ', 'its nift is the same file as', 'nift is a symlink out of its']),
+    # C38: the stage-1 toolchain preflight ignores what needs the build, the oracle or the baselines
+    ('toolchain preflight: build, oracle and baselines not yet there', certify.toolchain_problems({**GOOD, 'oracle': None,
+        'build_rc': 2, 'require_baselines': True, 'regression_baselines': [{**RB_OK, 'executable': False}]}), []),
+    ('toolchain preflight: GCC 13 still fails', len(certify.toolchain_problems({**GOOD, 'cxx': 'g++ (Ubuntu 13.3.0) 13.3.0'})), 1),
+    ('toolchain preflight: a missing tool still fails', len(certify.toolchain_problems({**GOOD, 'tools': {'go': None}})), 1),
+    # C38 (PRELAUNCH-R2 C2): a full campaign names exactly the two regression baselines
+    ('preflight full campaign, no baseline', len(pp({**GOOD, 'require_baselines': True, 'regression_baselines': []})), 1),
+    ('preflight full campaign, one baseline', len(pp({**GOOD, 'require_baselines': True, 'regression_baselines': [RB_OK]})), 1),
+    ('preflight full campaign, a duplicate name', len([x for x in pp({**GOOD, 'require_baselines': True,
+        'regression_baselines': [RB_OK, {**RB_OK, 'sha256': 'ee', 'realpath': '/b/x/nift', 'tree_realpath': '/b/x'}]})
+        if x.startswith('a full campaign needs')]), 1),
+    ('preflight full campaign, a missing name (another hash)', len([x for x in pp({**GOOD, 'require_baselines': True,
+        'regression_baselines': [RB_OK, {**RB_R2, 'name': 'abcdef12', 'expected_commit': 'abcdef12', 'commit': 'abcdef12' + '0' * 32}]})
+        if x.startswith('a full campaign needs')]), 1),
+    ('preflight two baselines on one tree', len([x for x in pp({**GOOD, 'regression_baselines': [RB_OK, {**RB_R2, 'tree_realpath': '/b/17f'}]})
+        if x.endswith('the same tree')]), 1),
     ('preflight baseline at another commit', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'commit': '0b5079fc' + '0' * 32}]})), 1),
     ('preflight baseline unknown name', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'name': 'b4b', 'expected_commit': None}]})), 1),
     ('preflight baseline modified', len(pp({**GOOD, 'regression_baselines': [{**RB_OK, 'clean': False}]})), 1),
@@ -465,7 +509,8 @@ checks = [
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
-shutil.rmtree(STALE, ignore_errors=True)
+for _d in (STALE, LINKED, CANDIDATE):
+    shutil.rmtree(_d, ignore_errors=True)
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
     print('FAIL certify harness self-test:', bad); sys.exit(1)

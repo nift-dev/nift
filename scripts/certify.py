@@ -68,7 +68,9 @@ Campaign verdict (owner 2026-11-08 06:46; campaign_verdict()), one exit status e
   CERTIFIED  exit 0: every gate PASSED or FAILED-BASELINE (--strict: only PASSED), nothing hidden.
 Exit 2: preflight failed (full campaign; also `--list` of a full plan), nothing planned, or the
 category table is unusable. The preflight checks the oracle and every --regression-baseline tree
-(named commit, clean, make -q nift, executable, built after --campaign-start; sha256 recorded).
+(named commit, clean, make -q nift, executable, built after --campaign-start; sha256 recorded;
+a distinct binary, no symlink out of its tree); a full campaign needs exactly 17f7964c and
+weekend/r2 (C38). --toolchain-preflight: the toolchain and host checks only, before any build.
 Logs: .build/certify/<target>.log; summary: .build/certify/summary.json and summary.txt.
 """
 import argparse, concurrent.futures as cf, json, os, pwd, re, shutil, signal, subprocess, sys, time
@@ -744,10 +746,53 @@ def preflight_problems(f):
                        f"< campaign start {f['campaign_start']})")
         if b.get("executable") is True and not b.get("sha256"):
             out.append(f"regression baseline {name}: sha256 not recorded")
+        if b.get("untracked_src"):
+            out.append(f"regression baseline {name}: untracked or ignored files under src/ or an -I directory "
+                       f"would be built in or included: {b['untracked_src'][:5]}")
+        elif "untracked_src" in b and b["untracked_src"] is None and b.get("executable"):
+            out.append(f"regression baseline {name}: cannot list untracked files in its tree (git ls-files failed)")
+        # C38 (PRELAUNCH-R2 C1): a distinct binary: not the candidate, not the oracle, not another
+        # baseline, and no symlink out of its own tree
+        if b.get("symlink_outside"):
+            out.append(f"regression baseline {name}: nift is a symlink out of its tree ({b.get('realpath')})")
+        for other, sha, real in (("the candidate", f.get("candidate_sha256"), f.get("candidate_realpath")),
+                                 ("the CP19 legacy oracle", f.get("oracle_sha256"), f.get("oracle_realpath"))):
+            if b.get("sha256") and b["sha256"] == sha:
+                out.append(f"regression baseline {name}: its nift is the same binary as {other} (sha256)")
+            if b.get("realpath") and b["realpath"] == real:
+                out.append(f"regression baseline {name}: its nift is the same file as {other} (real path)")
+    bases = f.get("regression_baselines") or []
+    for i, b in enumerate(bases):
+        for c in bases[i + 1:]:
+            if b.get("sha256") and b["sha256"] == c.get("sha256"):
+                out.append(f"regression baselines {b.get('name')} and {c.get('name')} are the same binary (sha256)")
+            if b.get("realpath") and b["realpath"] == c.get("realpath"):
+                out.append(f"regression baselines {b.get('name')} and {c.get('name')} are the same file (real path)")
+            if b.get("tree_realpath") and b["tree_realpath"] == c.get("tree_realpath"):
+                out.append(f"regression baselines {b.get('name')} and {c.get('name')} are the same tree")
+    # C38 (PRELAUNCH-R2 C2): a full --certify campaign names exactly the two regression baselines
+    if f.get("require_baselines"):
+        names = [b.get("name") for b in bases]
+        if sorted(names) != sorted(REGRESSION_COMMITS):
+            out.append(f"a full campaign needs exactly the regression baselines {', '.join(sorted(REGRESSION_COMMITS))}, "
+                       f"once each, on distinct trees (given: {names or 'none'})")
     if f.get("regression_baselines") and f.get("campaign_start") is None and not f.get("oracle"):
         out.append("no campaign start time (--campaign-start EPOCH or NIFT_CAMPAIGN_START): the regression "
                    "baselines cannot be shown to be built during the campaign")
     return out
+
+
+# C38 (PRELAUNCH-R2, low item): stage 1 checks the toolchain and host before anything is built;
+# these problems need the candidate build, the oracle or the baselines and are left to stage 3
+_NOT_TOOLCHAIN = ("make nift failed", "./nift", "no build signature", "cannot derive the Makefile",
+                  "the build signature has no C block", "the C objects", "cannot derive the link line",
+                  "the link line differs", "comparator sort is not compiled", "no CP19 legacy oracle",
+                  "the CP19 legacy oracle", "no campaign start", "regression baseline", "a full campaign needs")
+
+
+def toolchain_problems(f):
+    """C38, pure (table-tested): the preflight problems that need no build, oracle or baseline."""
+    return [p for p in preflight_problems(f) if not p.startswith(_NOT_TOOLCHAIN)]
 
 
 # C37: the named commits of the regression baselines (record 6, 29)
@@ -755,23 +800,38 @@ REGRESSION_COMMITS = {"17f7964c": "17f7964cb4f5890740658bd90af2d411b2f7d8ce",
                       "weekend/r2": "0b5079fc6874f998bfe82bf3a7e86e2485724477"}
 
 
+_RO_GIT = dict(os.environ, GIT_OPTIONAL_LOCKS="0")  # read-only git (no index refresh in a baseline tree)
+
+
 def regression_facts(name, tree):
     """C37: the preflight facts of one --regression-baseline NAME=TREE."""
     expected = REGRESSION_COMMITS.get(name) or (name if re.fullmatch(r"[0-9a-f]{7,40}", name or "") else None)
     t = Path(tree) if tree else None
     out = {"name": name, "tree": str(tree), "expected_commit": expected, "commit": None, "clean": None,
-           "current": None, "executable": False, "mtime": None, "sha256": None}
+           "current": None, "executable": False, "mtime": None, "sha256": None, "realpath": None,
+           "symlink_outside": False, "tree_realpath": os.path.realpath(tree) if tree else None}
     if t is None or not t.is_dir():
         out["commit"] = "no such directory"
         return out
-    head = subprocess.run(["git", "-C", str(t), "rev-parse", "HEAD"], capture_output=True, text=True)
+    head = subprocess.run(["git", "-C", str(t), "rev-parse", "HEAD"], capture_output=True, text=True, env=_RO_GIT)
     out["commit"] = head.stdout.strip() if head.returncode == 0 else "not a git checkout"
-    st = subprocess.run(["git", "-C", str(t), "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True)
+    st = subprocess.run(["git", "-C", str(t), "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True, env=_RO_GIT)
     out["clean"] = st.returncode == 0 and not st.stdout.strip()
     q = subprocess.run(["make", "-q", "nift"], cwd=t, capture_output=True, env=clean_env()) if (t / "Makefile").is_file() else None
     out["current"] = q is not None and q.returncode == 0
+    # the same untracked/ignored-file check as the candidate's (F4): src/ and the -I directories
+    sig_b, sig_c = build_signature(t), build_signature_c(t)
+    idirs = sorted({"src", "include"} | {a[2:] for b in (sig_b, sig_c) if b for a in b.get("args", [])
+                                        if a.startswith("-I") and not a.startswith("-I$TEST_DIR")})
+    others = subprocess.run(["git", "-C", str(t), "ls-files", "--others", "--", *idirs], capture_output=True, text=True, env=_RO_GIT)
+    out["untracked_src"] = None if others.returncode != 0 else [
+        x for x in others.stdout.splitlines() if not re.search(r"\.(o|d|cfg)$", x)]
     binary = t / "nift"
     out["executable"] = binary.is_file() and os.access(binary, os.X_OK)
+    if binary.exists() or binary.is_symlink():
+        out["realpath"] = os.path.realpath(binary)
+        inside = os.path.commonpath([out["realpath"], os.path.realpath(t)]) == os.path.realpath(t)
+        out["symlink_outside"] = binary.is_symlink() and not inside
     if out["executable"]:
         out["mtime"] = int(os.stat(binary).st_mtime)
         out["sha256"] = sha256_of(str(binary))
@@ -947,7 +1007,7 @@ def environment_record(root):
     return env
 
 
-def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regressions=()):
+def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regressions=(), require_baselines=False):
     cxx = os.environ.get("CXX", "g++")
     facts = {"require_env": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"), "oracle": oracle, "build_rc": build_rc}
     path = shutil.which(cxx) or cxx
@@ -1114,6 +1174,7 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regression
         facts["oracle_executable"] = os.path.isfile(oracle) and os.access(oracle, os.X_OK)
     facts["campaign_start"] = campaign_start
     facts["regression_baselines"] = [regression_facts(n, t) for n, t in regressions]
+    facts["require_baselines"] = require_baselines
     facts["candidate_sha256"] = sha256_of(nift)
     facts["candidate_realpath"] = os.path.realpath(nift)
     return facts
@@ -1427,6 +1488,8 @@ def main():
     ap.add_argument("--certify", action="store_true",
                     help="certification mode (implied by a full campaign); the verdict is CERTIFIED (0), PARTIAL (4) or FAILED (1)")
     ap.add_argument("--list", action="store_true", help="dry run: print the plan, the inventory check and the preflight, then exit")
+    ap.add_argument("--toolchain-preflight", action="store_true",
+                    help="stage 1 (C38): only the toolchain and host checks, before any build; exit 2 on a problem")
     ap.add_argument("--check-plan", action="store_true", help="exit 1 when the plan misses an inventory or mandatory gate")
     ap.add_argument("--drop", action="append", default=[], metavar="TARGET",
                     help="remove TARGET from the plan before --check-plan (negative control)")
@@ -1436,6 +1499,12 @@ def main():
     a = ap.parse_args()
     if a.merge:
         return merge_summaries(a.merge)
+    if a.toolchain_preflight:
+        tp = toolchain_problems(preflight_facts(ROOT, None, a.campaign_start))
+        for pr in tp:
+            print("PREFLIGHT BLOCKED: " + pr)
+        print("toolchain preflight: " + ("ok" if not tp else f"{len(tp)} problem(s)"))
+        return 2 if tp else 0
     # owner 2026-11-08 06:46: the reviewed category table of abort-hidden checks (the runner's own)
     try:
         hidden_table = FP.hidden_categories((Path(__file__).resolve().parent / "certify_hidden_checks.tsv").read_text())
@@ -1487,7 +1556,8 @@ def main():
             print(f"parallel   {t}")
         for t, why in exclusive.items():
             print(f"exclusive  {t}  ({why})" + (f"  [make -k {t} " + " ".join("-o " + o for o in olds[t]) + "]" if olds[t] else ""))
-        pf = preflight_problems(preflight_facts(ROOT, oracle, a.campaign_start, regressions=regression_specs))
+        pf = preflight_problems(preflight_facts(ROOT, oracle, a.campaign_start, regressions=regression_specs,
+                                                require_baselines=full))
         print(f"plan: {len(planned)} required gates ({len(parallel)} parallel, {len(exclusive)} serial), "
               f"{len(inv)} inventory targets, {len(NON_GATE)} non-gates: " + ", ".join(sorted(NON_GATE)))
         for pr in pf:
@@ -1518,7 +1588,7 @@ def main():
     # preflight problem.
     built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, text=True, env=clean_env())
     (logdir / "_build-nift.log").write_text(built.stdout + built.stderr)
-    facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode, regression_specs)
+    facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode, regression_specs, require_baselines=full)
     pf = preflight_problems(facts)
     (logdir / "_preflight.json").write_text(json.dumps({"facts": facts, "problems": pf}, indent=2) + "\n")
     for pr in pf:
