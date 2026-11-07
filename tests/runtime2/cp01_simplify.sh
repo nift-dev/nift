@@ -18,6 +18,9 @@ run_optional77 bash "$HERE/cp01/missing_tracer_caller.sh"
 run_optional77 bash "$HERE/cp01/syscall_depth_control.sh"
 
 ONLY=basic,interrupt,crash CYCLES=0 python3 "$HERE/cp01/ordinary.py" ours="$NIFT" || fail=1
+# CP01 flakiness fix (2026-11-08): the forced same-tick race must reproduce the
+# original extra rebuilds with unsequenced edits and none with sequenced ones
+python3 "$HERE/cp01/tick_order_selftest.py" "$NIFT" || fail=1
 bash "$HERE/cp01/classify.sh" "$NIFT" 1000 3 ours || fail=1
 bash "$HERE/cp01/atomic_classify.sh" "$NIFT" 1000 ours || fail=1
 for mode in hash hybrid; do

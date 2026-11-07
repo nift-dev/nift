@@ -957,3 +957,44 @@ every preflight derivation now reads the Makefile under `make -n` (the Makefile'
 mode, which only marks stale signatures instead of writing them) and parses the echoed command.
 Guard: with `OS=Windows_NT` the derivation returns `nift.exe` and the 8 signature files keep
 their mtimes.
+
+## 20. test-runtime2-cp01-simplify flakiness: root cause and test-only fix (C23)
+
+**Reproduced (old harness, `ONLY=basic` of ordinary.py, 5-6 runs each):** the candidate failed 6 of
+6, fc987ec1 4 of 5, 17f7964c 4 of 5, v4.12.0 3 of 5, weekend/r2 2 of 5. The signatures vary from
+run to run: `S3b ... rebuilt ['index', 'p0', 'p1'] expected ['index', 'p1']`, `S4a create
+unreferenced file: rebuilt ['p1']` (or `['index', 'p1']`), `S4e edit removed dependency (no
+rebuild): rebuilt ['p0']`, `S8e no-op after mode switches rebuilt [N, 0, 0, 0, 0]`, and settle
+`after-edit-all:[ 20 1 0 ... ]`. Every failure is an extra rebuild; no run produced stale output
+(the clean-build oracle and status checks never failed). Logs: `scratchpad/combined-fix/cp01/`.
+
+**Root cause: a test assumption, not runtime nondeterminism.** Probe (`cp01/probe.py`, 30 runs: 4
+showed it): the page-info written by the build that follows an edit carries exactly the edit's
+mtime (`info - dep = 0.000 ms`). Timestamps here come from a coarse 4 ms clock (multigrain
+timestamps: a stat'ed file gets a fine stamp and later writes in the same tick get that same
+value), and a nift build of a few pages finishes inside one tick. The v4.12 modified rule (and
+hybrid's) rebuilds when a dependency is not older than its page-info, so the next build rebuilds
+that page once more: the documented conservative same-tick behaviour. The harness's 50 ms sleep
+before each edit only separates the edit from the PREVIOUS build, never from the next one; settle
+edits all pages and builds at once by design. No src/ change is needed or made.
+
+**Fix (test-only, no sleeps, timeouts or retries added):** `tests/runtime2/cp01/ticks.py`
+sequences an edit: after writing, it reads the filesystem clock (the mtime of a probe file it
+writes, T) and stamps the edited file T - 1 ns; every later write, including the next build's
+page-info, is stamped at least T because the clock never goes backwards, so the edit is strictly
+older than the build whatever the scheduling. ordinary.py's `edit()` and settle.sh (after editing
+all 20 pages, then still checking the edits are newer than the initial page-info) use it. The
+edits stay real content changes. The pre-existing 50 ms sleep before an edit (separation from
+the previous build, checked fail-closed by the harness) is unchanged.
+
+**Regression test** (`tests/runtime2/cp01/tick_order_selftest.py`, run by cp01_simplify.sh): it
+forces the race deterministically with `CP01_WORST_CASE_TICK=1`, which stamps every page-info a
+build writes with the earliest legal time (the fastest possible build). With the old edits
+(`CP01_EDIT=unsequenced`) the original failures appear every time (S3a/S3b/S4a/S4e/S8e
+`rebuilt [10, 0, 0, 0, 0]`, settle `[20, >=1, 0, 0]`); with sequenced edits there are none and
+settle is `[20, 0, 0, 0]`.
+
+**Determinism (fixed harness, full gate on the candidate):** 20 consecutive runs, 3 under
+`taskset -c 0`, 1 under `nice -n 19` with two CPU-bound processes on both cores, 2 with one
+CPU-bound process, 2 with `make -j2`, and 2 pairs run concurrently: 32 of 32 PASS. The fixed
+`ONLY=basic` scenarios pass 5 of 5 on each of weekend/r2, v4.12.0, 17f7964c and fc987ec1.
