@@ -242,6 +242,7 @@ import os
 BUILD_OK = {'build_rc': 0, 'cxx_resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'cxx_version_sha256': 'aa' * 32,
             'build_sig': {'resolved': '/usr/bin/x86_64-linux-gnu-g++-15', 'version-sha256': 'aa' * 32,
                           'args': ['-include', 'src/build/production_tu.h'] + PROFILE['flags'].split()}}
+EXP = BUILD_OK['build_sig']['args']
 checks = [
     ('inventory complete', ip({'test-runtime2-a', 'test-runtime2-b'}, INV, {'test-runtime2-prep': 'r'}, ['test-runtime2-a'], DEF), []),
     ('inventory gate missing', len(ip({'test-runtime2-a'}, INV, {'test-runtime2-prep': 'r'}, [], DEF)), 1),
@@ -348,6 +349,17 @@ checks = [
         ('build: make nift failed', {**BUILD_OK, 'build_rc': 2}, 1),
         ('build: CXXFLAGS overridden', {**BUILD_OK, 'cxxflags_env': '-O3 -march=native'}, 1),
         ('build: CXXFLAGS equal to the profile', {**BUILD_OK, 'cxxflags_env': PROFILE['flags']}, 0),
+        # R5-2: exact arguments, CPPFLAGS/LDFLAGS, the source tree, the signature itself
+        ('build: exact arguments', {**BUILD_OK, 'expected_args': EXP}, 0),
+        ('build: extra -O0', {**BUILD_OK, 'expected_args': EXP, 'build_sig': {**BUILD_OK['build_sig'], 'args': EXP + ['-O0']}}, 1),
+        ('build: extra -D_GLIBCXX_DEBUG', {**BUILD_OK, 'expected_args': EXP,
+            'build_sig': {**BUILD_OK['build_sig'], 'args': ['-D_GLIBCXX_DEBUG'] + EXP}}, 1),
+        ('build: CPPFLAGS set', {**BUILD_OK, 'flags_env': {'CPPFLAGS': '-D_GLIBCXX_DEBUG'}}, 1),
+        ('build: LDFLAGS set', {**BUILD_OK, 'flags_env': {'LDFLAGS': '-static'}}, 1),
+        ('build: dirty tracked tree', {**BUILD_OK, 'source': {'clean': False, 'untracked_src': []}}, 1),
+        ('build: untracked source under src/', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': ['src/rt/extra.cpp']}}, 1),
+        ('build: clean tree', {**BUILD_OK, 'source': {'clean': True, 'untracked_src': []}}, 0),
+        ('build: missing signature', {**BUILD_OK, 'build_sig': None}, 1),
         # R4-6: minimum versions
         ('tools: go below 1.26', {'tools': {'go': 'go version go1.24.7 linux/amd64'}}, 1),
         ('tools: go 1.26', {'tools': {'go': 'go version go1.26.0 linux/amd64'}}, 0),
@@ -366,6 +378,16 @@ checks = [
         [(l, w, r if 'running as root' not in l else False) for l, w, r in certify.skipped_assertions(
             'note: running as root; unreadable-file check skipped (root bypasses permissions)\nskipping the symlink case')]),
         'PARTIAL'),
+    # R5-3: an excusing entry covers its own exact text, nothing appended
+    ('mutant line with a build skip is not excused', certify.assertion_class(0,
+        'PASS mutant 3 (x): build skipped (no compiler), not run\n'), 'PARTIAL'),
+    ('real mutant line is excused', certify.assertion_class(0,
+        'PASS mutant 13 (module top-level lambdas skipped and init callbacks not seen (review init-lam evasion)): '
+        '23 failing checks, witness review/init-lam-ok:\n'), 'PASS'),
+    ('interpolation line with an appended skip', certify.assertion_class(0,
+        'PASS skipped && interpolation; SKIP remaining cases (no tty)\n'), 'PARTIAL'),
+    ('paren line with an appended skip', certify.assertion_class(0,
+        'PASS corpus\nSKIP cross-device check (needs tmpfs); paren oracle: skipped 1 nondeterministic entries (tools/rt-diff/ignore.txt)\n'), 'PARTIAL'),
     ('stale binary', len(pp({**GOOD, 'build_current': False})), 1),
     ('binary predates the campaign', len(pp({**GOOD, 'binary_mtime': 500})), 1),
     # R4-1: real in-tree lines of planned gates
@@ -533,6 +555,26 @@ need=('hostname','kernel','distro','container','compiler','stdlib_sha256','binar
 miss=[k for k in need if k not in env]
 sys.exit('FAIL certification guard environment record: missing %s' % miss if miss or 'environment' not in d else 0)" || exit 1
 echo "PASS certification guard environment record: every result states its environment"
+# R5-5: --merge refuses summaries whose binaries or libstdc++ differ, and accepts equal ones
+python3 -B - "$TOY" <<'MERGE' || exit 1
+import json, subprocess, sys
+toy = sys.argv[1]
+d = json.load(open(f"{toy}/s5/cand/.build/certify/summary.json"))
+def write(name, **env):
+    e = json.loads(json.dumps(d))
+    for r in e["targets"].values():
+        r["environment"] = {**r.get("environment", {}), **env}
+    open(f"{toy}/{name}.json", "w").write(json.dumps(e))
+write("m0"); write("m1", hostname="other-host"); write("m2", binary_sha256="ff" * 32); write("m3", stdlib_sha256="ee" * 32)
+def merge(*names):
+    return subprocess.run([sys.executable, "-B", "scripts/certify.py", "--merge", *[f"{toy}/{n}.json" for n in names]],
+                          capture_output=True, text=True)
+same, b, l = merge("m0", "m1"), merge("m0", "m2"), merge("m0", "m3")
+if same.returncode != 0 or b.returncode == 0 or "binary_sha256 differs" not in b.stdout \
+        or l.returncode == 0 or "stdlib_sha256 differs" not in l.stdout:
+    sys.exit("FAIL certification guard merge: rc %s/%s/%s\n%s%s" % (same.returncode, b.returncode, l.returncode, b.stdout, l.stdout))
+MERGE
+echo "PASS certification guard merge: differing binary or libstdc++ between environments refused"
 # R3-1 inventory check of the D3 phrases the guard itself prints: the historical control's
 # missing-commit branch prints a SKIP line, so that gate cannot be PASSED (see above).
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;

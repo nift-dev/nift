@@ -275,19 +275,19 @@ KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign h
     (r"default 1 GiB limit \(MemAvailable", "MemAvailable >= 4096 MiB while tests/runtime2/read_limit.py runs", True),
     # R4-1 (round 4): printed on every run; the entries are the rt-diff ignore list's known
     # nondeterministic outputs (tools/rt-diff/ignore.txt), excluded by design, not a skipped check
-    (r"paren oracle: skipped \d+ nondeterministic entries", "none: tools/rt-diff/ignore.txt lists them by design", False),
+    (r"^paren oracle: skipped \d+ nondeterministic entries \(tools/rt-diff/ignore\.txt\)$", "none: tools/rt-diff/ignore.txt lists them by design", False),
     # R4-1 local classification pass (combined-b3-b5.md 15.1): lines of passing gates whose wording
     # is not a skip, and the conditional checks they revealed
     (r"^ok: B1 \w+: status --strict lists unverified pages$", "none: product wording (status --strict's unverified pages), an assertion that ran", False),
-    (r"^PASS (skipped (&&|\|\||pipeline) interpolation|syntax validates skipped segment)", "none: a test case named after the shell branch it skips, which ran", False),
-    (r"^PASS mutant \d+ \(", "none: a mutant's description (the mutant was caught)", False),
+    (r"^PASS (skipped (&&|\|\||pipeline) interpolation|syntax validates skipped segment)$", "none: a test case named after the shell branch it skips, which ran", False),
+    (r"^PASS mutant \d+ \((?:[^()]|\([^()]*\))*\): \d+ failing checks?, witness \S+:?$", "none: a mutant's description (the mutant was caught)", False),
     (r"^SKIPPED - IPv6 ::1 not available on this host$|^serve_smoke: \d+ passed, [1-9]\d* skipped", "IPv6 on loopback (::1) for test-serve", True),
     (r"^UNVERIFIED (\d+ )?[\w-]+$|^UNVERIFIED \d+ D4 cases refused with method:sort", "GCC 15.2 comparator profile (cp14b cases and mutants unverified elsewhere)", True),
     # R4-1: the unreadable-file check needs a non-root run: required when not root; as root the
     # runner re-runs the gate as the unprivileged user (ROOT_ONLY_SKIPS)
-    (r"running as root; unreadable-file check skipped", "a non-root run (the runner re-runs as the unprivileged user)", "when-not-root"),
+    (r"^note: running as root; unreadable-file check skipped \(root bypasses permissions\)$", "a non-root run (the runner re-runs as the unprivileged user)", "when-not-root"),
     (r"UNVERIFIED COMPARATOR COVERAGE", "GCC 15.2 with __GLIBCXX__ 20260321 (comparator sort compiled in)", True),
-    (r"comparator refusal: admitted libstdc\+\+ profile", "a toolchain that refuses comparator sort (checked on the other-toolchain lane; n/a on GCC 15.2)", False),
+    (r"^SKIP comparator refusal: admitted libstdc\+\+ profile \S+ \(the production VM runs it\)$", "a toolchain that refuses comparator sort (checked on the other-toolchain lane; n/a on GCC 15.2)", False),
     (r"root without setpriv|needs Linux setpriv", "setpriv (util-linux) when running as root", True),
     (r"tracer unavailable|strace unavailable|syscalls: tracer", "strace", True),
     (r"/usr/bin/time (is )?unavailable|requires /usr/bin/time", "GNU time at /usr/bin/time", True),
@@ -298,17 +298,17 @@ KNOWN_CONDITIONAL = [  # (pattern, requirement, required on the Linux campaign h
     (r"/proc/self/mem|read-failure (fixture|cases) (is |are )?unavailable|needs /proc", "/proc with /proc/self/mem", True),
     (r"cc unavailable|peak tracker: build failed", "a C compiler (cc)", True),
     (r"no head\)|needs /proc, yes, head, sh", "coreutils (head, yes, sh)", True),
-    (r"edit during streaming is outside the v4.12 modified", "none: a documented design boundary (modified mode), not an assertion", False),
+    (r"^SKIP \[modified\] edit during streaming is outside the v4\.12 modified-mode contract$", "none: a documented design boundary (modified mode), not an assertion", False),
     # R3-5: the other-platform messages, anchored to the exact texts the tree prints
     (r"^SKIP CP20 Windows pipeline \(POSIX host\)$", "Windows (its CI lane)", False),
-    (r"^SKIP v4\.4 interactive completion PTY \(Windows uses line-based in", "Windows (its CI lane)", False),
-    (r"^SKIP v4\.4 shell foreground TTY \(POSIX PTY test; macOS foreground", "macOS/Windows (their CI lanes)", False),
-    (r"^SKIP v4\.4 shell glob \(Windows passthrough pending glob backend\)", "Windows (its CI lane)", False),
-    (r"^SKIP CP19 completion \(POSIX PTY test\)", "Windows (its CI lane)", False),
-    (r"^SKIP shell dispatch \(POSIX pty/coreutils regression\)", "Windows (its CI lane)", False),
-    (r"^SKIP unreadable file \(POSIX permission bits do not apply on Windows\)", "Windows (its CI lane)", False),
-    (r"^SKIP \[\w+\] trace descriptor inheritance under MSYS", "MSYS (its CI lane)", False),
-    (r"^SKIP: serve_smoke\.sh runs on Linux \(full\) and macOS", "Windows (its CI lane)", False),
+    (r"^SKIP v4\.4 interactive completion PTY \(Windows uses line-based input\)$", "Windows (its CI lane)", False),
+    (r"^SKIP v4\.4 shell foreground TTY \(POSIX PTY test; macOS foreground execution hangs\)$", "macOS/Windows (their CI lanes)", False),
+    (r"^SKIP v4\.4 shell glob \(Windows passthrough pending glob backend\)$", "Windows (its CI lane)", False),
+    (r"^SKIP CP19 completion \(POSIX PTY test\)$", "Windows (its CI lane)", False),
+    (r"^SKIP shell dispatch \(POSIX pty/coreutils regression\)$", "Windows (its CI lane)", False),
+    (r"^SKIP unreadable file \(POSIX permission bits do not apply on Windows\)$", "Windows (its CI lane)", False),
+    (r"^SKIP \[\w+\] trace descriptor inheritance under MSYS$", "MSYS (its CI lane)", False),
+    (r"^SKIP: serve_smoke\.sh runs on Linux \(full\) and macOS \(lifecycle core\); Windows uses tests/serve_windows_lifecycle\.ps1$", "Windows (its CI lane)", False),
 ]
 
 
@@ -329,6 +329,10 @@ def skipped_assertions(text, echoed=()):
         for pat, why, needed in KNOWN_CONDITIONAL:
             if re.search(pat, line.strip()):
                 req, required = why, needed
+                # R5-3: an entry that excuses (not required) covers only its own exact text
+                rest = re.sub(pat, "", line.strip())
+                if needed is not True and any(m.search(rest) for m in SKIP_MARKERS):
+                    req, required = "unknown condition (text beyond a KNOWN_CONDITIONAL entry)", True
                 break
         if required == "when-not-root":
             required = os.geteuid() != 0
@@ -549,6 +553,23 @@ def preflight_problems(f):
         missing = [x for x in want_flags if x not in b.get("args", [])]
         if missing:
             out.append(f"./nift's build lacks the profile flags {missing}")
+        # R5-2 (round 5): exactly the Makefile's own arguments with the profile flags, nothing more
+        exp = f.get("expected_args")
+        if exp is not None and b.get("args") != exp:
+            extra = [x for x in b.get("args", []) if x not in exp]
+            out.append(f"./nift's build arguments differ from the profiled build's (extra {extra[:6]}, "
+                       f"missing {[x for x in exp if x not in b.get('args', [])][:6]})")
+    elif f.get("build_rc") is not None or f.get("expected_args") is not None:
+        out.append("no build signature (.build/obj-config/default.flags): the binary's build cannot be bound")
+    for var in ("CPPFLAGS", "LDFLAGS"):
+        if (f.get("flags_env") or {}).get(var):
+            out.append(f"{var} is set in the environment ({f['flags_env'][var]!r}): the profiled build uses the Makefile's")
+    src = f.get("source") or {}
+    if src.get("clean") is False:
+        out.append("the source tree has tracked changes: the binary would not be the commit's")
+    if src.get("untracked_src"):
+        out.append(f"untracked sources under src/ would be built in (the Makefile globs src/rt/*.cpp): "
+                   f"{src['untracked_src'][:5]}")
     # owner 23:14: a stale executable never passes: it must be current for the tree (make -q nift)
     # and, with a campaign start, built after it
     if f.get("build_current") is False:
@@ -728,8 +749,21 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None):
     def git(*a):
         res = subprocess.run(["git", "-C", str(root)] + list(a), capture_output=True, text=True)
         return res.stdout.strip() if res.returncode == 0 else None
+    others = git("ls-files", "--others", "--", "src") or ""
     facts["source"] = {"head": git("rev-parse", "HEAD"), "tree": git("rev-parse", "HEAD^{tree}"),
-                       "clean": git("status", "--porcelain", "--untracked-files=no") == ""}
+                       "clean": git("status", "--porcelain", "--untracked-files=no") == "",
+                       "untracked_src": [x for x in others.splitlines()
+                                         if re.search(r"\.(c|cc|cpp|h|hpp|inc|ipp)$", x)]}
+    facts["flags_env"] = {v: os.environ.get(v) for v in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS") if os.environ.get(v)}
+    # R5-2: the arguments the Makefile itself gives the C++ objects (no environment overrides),
+    # written the way the build signature writes them ($TEST_DIR for the build output root)
+    sig = subprocess.run(["make", "-s", "--no-print-directory", "--eval",
+                          "certify-print-sig: ; @echo $(OBJ_SIGNATURE_ARGS)", "certify-print-sig"], cwd=root,
+                         capture_output=True, text=True, env={k: v for k, v in clean_env().items()
+                                                              if k not in ("CXXFLAGS", "CPPFLAGS", "LDFLAGS")})
+    toks = sig.stdout.split("---")[0].split()[1:] if sig.returncode == 0 and "---" in sig.stdout else None
+    facts["expected_args"] = None if toks is None else [
+        t.replace("-I.build/", "-I$TEST_DIR/") if t.startswith("-I.build/") else t for t in toks]
     facts["build_invocation"] = "make nift (CXX=%s, CXXFLAGS=%s)" % (cxx, os.environ.get("CXXFLAGS", "<Makefile default>"))
     current = subprocess.run(["make", "-q", "nift"], cwd=root, capture_output=True, env=clean_env())
     facts["build_current"] = current.returncode == 0
@@ -1094,7 +1128,14 @@ def merge_summaries(paths):
               f"stdlib={str(env.get('stdlib_sha256'))[:12]} binary={str(env.get('binary_sha256'))[:12]}: {len(ran)} gate(s)")
         for t in ran:
             print(f"    {t}: " + ", ".join(c for e, c in gates[t] if e == i))
-    return 0
+    # R5-5: one certification is one binary built against one libstdc++; differing ones are refused
+    rc = 0
+    for field in ("binary_sha256", "stdlib_sha256"):
+        seen = sorted({str(json.loads(k).get(field)) for k in envs})
+        if len(seen) > 1:
+            print(f"MERGE REFUSED: {field} differs between environments: " + ", ".join(x[:12] for x in seen))
+            rc = 1
+    return rc
 
 
 def main():

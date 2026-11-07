@@ -23,6 +23,7 @@ Makefile	detected	-	# a build whose inventory alone skips the check must fail th
 Makefile	detected	-	CP14B_LINUX_ONLY = if [ "$$(uname -s)" != Linux ]; then echo "SKIP CP14B $@: Linux/libstdc++ only (D4)"; exit 0; fi;
 scripts/certify.py	detected	-	harness-blocked log: no CP19 legacy oracle, comparator coverage skipped)
 scripts/certify.py	detected	-	# skipped), SKIP (every assertion skipped), FAIL or BLOCKED. Skips are found mechanically in the
+scripts/certify.py	detected	-	(r"^note: running as root; unreadable-file check skipped \(root bypasses permissions\)$", "a non-root run (the runner re-runs as the unprivileged user)", "when-not-root"),
 scripts/certify.py	detected	-	"""D3: [(line, requirement, required)] for every skip marker in a log. `echoed`: make's echo of
 scripts/certify.py	detected	-	the recipe (R4-1 local pass: a recipe that contains `echo "... skipped ..."` is not a skip
 scripts/certify.py	detected	-	"""D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.

@@ -714,3 +714,52 @@ Judged only on Linode: every sanitizer and TSan gate (including test-runtime2-b5
 the four binding gates, the performance lane (PERF_LANE, LOAD_SENSITIVE), test-cp19-proof-cli
 (oracle), the GCC 15.2 comparator gates, the root-only re-runs as `tester`, and the ~275 feasible
 gates not run here.
+
+## 16. Confirmation round 5 on 0193d4ed: CONFIRMED-WITH-CONDITIONS; build binding (C18)
+
+C18 changes only `scripts/certify.py`, the guard and `skip_phrases.tsv`; `src/` and the binary
+(`91a49efa…`) are unchanged.
+
+**R5-2 (fixed): the build binding is exact.** The preflight derives the C++ arguments the Makefile
+itself gives the objects (`$(OBJ_SIGNATURE_ARGS)` with CXXFLAGS, CPPFLAGS and LDFLAGS unset; the
+build output root written as `$TEST_DIR`, as the signature writes it) and refuses:
+- a build signature whose arguments are not exactly that list (an extra `-O0` or `-D_GLIBCXX_DEBUG`,
+  in any position, is refused as well as a missing flag);
+- CPPFLAGS or LDFLAGS set in the environment (CXXFLAGS other than the profile flags was already
+  refused);
+- tracked changes in the source tree, and untracked or ignored sources under `src/` (the Makefile
+  builds `$(wildcard src/rt/*.cpp)`);
+- a missing `.build/obj-config/default.flags` (the binding was silently skipped).
+Guard cases: exact arguments (accepted), extra `-O0`, extra `-D_GLIBCXX_DEBUG`, CPPFLAGS set,
+LDFLAGS set, dirty tracked tree, untracked `src/rt/extra.cpp`, clean tree (accepted), missing
+signature.
+
+**R5-3 (fixed): an excusing entry covers its own exact text.** Every KNOWN_CONDITIONAL entry that
+excuses a skip is anchored at both ends against the real in-tree line, and a skip marker in any
+text a matched entry leaves over makes the line required. Guard controls: `PASS mutant 3 (x):
+build skipped (no compiler), not run` (PARTIAL), the real mutant-13 line (PASS), `PASS skipped &&
+interpolation; SKIP remaining cases (no tty)` (PARTIAL), the paren-oracle line behind another
+skip (PARTIAL).
+
+**R5-5 (fixed): `--merge`** prints `MERGE REFUSED: <field> differs between environments` and exits
+1 when `binary_sha256` or `stdlib_sha256` differ; equal binaries on different hosts merge (exit 0).
+Guard case on generated summaries.
+
+**Recorded for the release audit, not fixed:**
+- R5-4: on `urc == 0` the root re-run credits the line without checking that the unprivileged log
+  shows the check; a failing gate (rc ≠ 0, e.g. test-sha256) is never re-run for its root-only
+  check and is reported "no unprivileged run available" (wrong wording); with that gate
+  FAILED-BASELINE the run can exit 0. `prepare_copy` deletes an existing
+  `~tester/nift-certify-copy` without warning.
+- R5-6: labelling noise (`UNVERIFIED <anything>` labelled with the comparator requirement; any
+  `serve_smoke: N passed, M skipped` labelled IPv6; test-test-integrity's `[pipefail-missing] …
+  "$skip"` finding read as a required skip). All stay required; nothing is hidden.
+- R5-1b: test-runtime2-cp01-simplify is FLAKY on both binaries, so FAILED-NEW; a campaign exits 1
+  while it stays flaky. Needs a fix or an owner decision.
+
+**R5-1a (analysis only, see the round-5 report):** §15.1's "expected FAILED-BASELINE" list is
+unverified. Whole-log identity holds on one tree (§11.1) but is not shown to hold across trees;
+for test-rt-vm's own recipe it cannot (vm_parity prints the HEAD-only `'approved B5 Q3'`
+category; recipe and 9 harness files differ from 17f7964c). For the gates absent from v4.12.0, and
+for VM refusals, v4.12.0 is not a usable baseline. No new identity mechanism was built; the options
+are with the owner.
