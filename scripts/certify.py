@@ -1081,11 +1081,14 @@ def runner_env(target, cwd, log=None):
     env = {}
     if spec is not None and spec.errtrace:
         env["BASH_ENV"] = str(ROOT / "scripts/certify_errtrace.bash")
-    if spec is not None and spec.keep_rtdiff:
+    if spec is not None and (spec.keep_rtdiff or spec.cp14b_detail):
         env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(ROOT / "scripts/certify_site"),
                                                           os.environ.get("PYTHONPATH")]))
         env["PYTHONDONTWRITEBYTECODE"] = "1"  # no __pycache__ in the runner's directory
+    if spec is not None and spec.keep_rtdiff:
         env["CERTIFY_KEEP_DIR"] = str(Path(log).resolve()) + ".kept" if log else str(Path(cwd) / ".certify-kept")
+    if spec is not None and spec.cp14b_detail:  # C36: the cp14b harnesses' failing cases, from their JSON
+        env["CERTIFY_CP14B_DETAIL"] = "1"
     return env
 
 

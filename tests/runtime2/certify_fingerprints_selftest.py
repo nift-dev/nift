@@ -96,6 +96,20 @@ TABLE = {
         "wording": [("note S8a switch modified->hash rebuilt 31", "note S8a rebuilt 32"),
                     ("label=ours cycles=1000", "label=ours cycles: 1000")],
     },
+    # C36: functional.py's FAIL line plus the runner's CERTIFY-CP14B evidence line (sitecustomize.py)
+    "test-runtime2-cp14b": {
+        "count_source": 'own: `CERTIFY-CP14B-SUMMARY <script> failed=N`, counted from the harness JSON',
+        "new": [("PASS ordinary_lambda_collection_error\n", "FAIL ordinary_lambda_collection_error\n"
+                 "CERTIFY-CP14B functional.py:ordinary_lambda_collection_error vm exit=0 outcome=vm reason=- err=- legacy exit=1\n")],
+        "diag": [("reason=type:script-return err=error: $CASE/case.f:1:8: not compiled for the VM (type:script-return)",
+                  "reason=type:script-return err=error: $CASE/case.f:1:8: not compiled for the VM (type:unknown-return)")],
+        "subst": [("FAIL script_return_kernel_error\n", "FAIL fast_named_helper_error\n"),
+                  ("functional.py:script_return_kernel_error", "functional.py:fast_named_helper_error")],
+        "count": [("CERTIFY-CP14B-SUMMARY functional.py failed=1", "CERTIFY-CP14B-SUMMARY functional.py failed=2")],
+        "wording": [("SKIP UNVERIFIED COMPARATOR COVERAGE: functional: 13 comparator case(s)",
+                     "SKIP UNVERIFIED COMPARATOR COVERAGE: functional: 13 comparator cases"),
+                    ("PASS fast_named_helper_error", "PASS fast named helper error")],
+    },
     "test-cp19-s1-dispatch": {
         "count_source": 'own: the `FAILED: a, b` line (names counted)',
         "new": [("PASS rm missing fails", "FAIL rm missing fails")],
@@ -334,6 +348,29 @@ for body in ("trap 'echo own; exit 7' ERR\nf() { false; echo after; }\nf\necho d
     check("errtrace hook keeps exit status and stdout", (plain.returncode, plain.stdout) == (hooked.returncode, hooked.stdout),
           f"{body!r}: {plain.returncode}/{hooked.returncode}")
     n += 1
+
+# C36: the cp14b detail hook (certify_site/sitecustomize.py) prints each failing case from the
+# harness's JSON and a count from the JSON; the harness's stdout and exit status are unchanged
+site = os.path.join(HERE, "..", "..", "scripts", "certify_site")
+with tempfile.TemporaryDirectory() as d:
+    fake = os.path.join(d, "functional.py")
+    open(fake, "w").write("import json, sys\nout = sys.argv[sys.argv.index('--output') + 1]\n"
+                          "json.dump({'results': [{'name': 'b', 'pass_': False, 'vm': {'exit': 1, 'err': "
+                          "'error: x.f:1:1: not compiled for the VM (r): y\\nnote: z', 'stats': [{'outcome': "
+                          "'require-error', 'reason': 'r'}]}, 'legacy': {'exit': 0}}, {'name': 'a', 'pass_': True}]}, "
+                          "open(out, 'w'))\nprint('FAIL b')\nraise SystemExit(1)\n")
+    env = {"PATH": os.environ["PATH"], "PYTHONDONTWRITEBYTECODE": "1"}
+    plain = subprocess.run([sys.executable, fake, "--output", os.path.join(d, "o.json")], capture_output=True, text=True, env=env)
+    hooked = subprocess.run([sys.executable, fake, "--output", os.path.join(d, "o.json")], capture_output=True, text=True,
+                            env={**env, "PYTHONPATH": site, "CERTIFY_CP14B_DETAIL": "1"})
+    want = ("CERTIFY-CP14B functional.py:b vm exit=1 outcome=require-error reason=r "
+            "err=error: x.f:1:1: not compiled for the VM (r): y legacy exit=0\nCERTIFY-CP14B-SUMMARY functional.py failed=1\n")
+    check("cp14b hook keeps exit status and stdout", (plain.returncode, plain.stdout) == (hooked.returncode, hooked.stdout))
+    check("cp14b hook prints the failing case and the count", hooked.stderr == want, repr(hooked.stderr))
+    other = subprocess.run([sys.executable, fake, "--output", os.path.join(d, "o.json")], capture_output=True, text=True,
+                           env={**env, "PYTHONPATH": site})
+    check("cp14b hook only when asked", other.stderr == "", repr(other.stderr))
+    n += 3
 
 # no failing case found: no fingerprint, never equal (never "same step")
 check("no case: no fingerprint", F.fingerprint("test-v44-shell-restricted", "PASS a\nmake: *** [x] Error 1\n") is None)

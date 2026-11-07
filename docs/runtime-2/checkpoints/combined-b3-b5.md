@@ -259,6 +259,9 @@ Added (owner 2026-11-07 18:00 D4/D5):
 - **Operand order of top-level bindings outside receivers** (review of 0d853db4 M2; 2.2): `x + g()`,
   `x == g()`, `s + k()`, `x += g()` (every context), `[x, g()]`. RELEASE BLOCKER (owner 2026-11-07
   22:13 D2); not started in this round; a bounded investigation will be briefed separately.
+- **B4b `script_return_kernel_error`** (C36, section 30): `a := []; return a.pop()` refused
+  `type:script-return` since B4b (B3 and weekend/r2 run it legacy-equal); cp14b is FAILED-NEW
+  against weekend/r2 until fixed or decided.
 - **M-3** `for-capture-vanishing` / `for-missing-write`: deferred precision limitation (safely
   refused before any effect, not previously admitted: 17f7964c refuses them too). Fixtures in
   tree, run by `test-runtime2-b5`: `tests/runtime2/b5/precision/m3_nested_loop_shared.f` (the
@@ -1597,3 +1600,71 @@ summary.json records them (`fingerprint_diff`, `regression`, `whole_log_identica
 baseline binaries; `dpkg -l` of the toolchain packages, `uname -a`, `/etc/os-release`,
 `nproc`, `free -m`, `df -h`; and `git rev-parse` of the four trees. One tarball with a sha256
 manifest, verified locally before the instance is deleted.
+
+## 30. C36: test-runtime2-cp14b on EXPECTED_BASELINE; the known local failures outside it
+
+Harness only (no `src/`; binary f2fed67d).
+
+**Extractor.** cp14b's harnesses print `FAIL <name>` only (the evidence goes to their `--output`
+JSON). Like vm_parity's rt-diff report (section 23), the runner adds the detail on every tree
+alike: `certify_site/sitecustomize.py`, loaded through `PYTHONPATH` with `CERTIFY_CP14B_DETAIL=1`
+(Spec `cp14b_detail`), reads the JSON functional.py/effects.py/origins.py wrote at exit and prints
+`CERTIFY-CP14B <script>:<name> vm exit=… outcome=… reason=… err=<first error line> legacy exit=…`
+per failing case and `CERTIFY-CP14B-SUMMARY <script> failed=N` (the independent count, from the
+JSON); the harness's output and status are unchanged (selftest: a fake harness with and without
+the hook). Case = step, id, category, status and that detail. Table row (real log
+`tests/runtime2/certify-fingerprints/test-runtime2-cp14b.txt`): new (a second case fails), diag
+(another refusal reason), subst (another case, same count), count, wording; plus the outside-
+diagnostic insertions. Fingerprint selftest: 610 checks over 17 gates.
+
+**Is `script_return_kernel_error` pre-existing on the baselines? Only on 17f7964c, not on
+weekend/r2.** `a := []; return a.pop()` (legacy: `return: pop: array is empty`, exit 1), run on
+the binaries at hand with `NIFT_VM=require`, and functional.py of each tree run on its own binary
+(`scratchpad/combined-fix/cp14b/`):
+
+| Tree | Binary result | Its functional.py |
+| --- | --- | --- |
+| weekend/r2 `0b5079fc` (cand-vmdefault) | runs on the VM, legacy-equal | PASS (failed=0) |
+| integ-argscmd, integ-coromod, integ-refsem-a, cand-refsem-a | runs, legacy-equal | (not run) |
+| B3 `4c7d0b40` (cand-b3) | runs, legacy-equal (B3 10 fixed the first N1 regression) | (not run) |
+| B4b `17f7964c` (cand-b4) | refused `type:script-return` | FAIL, the same CERTIFY-CP14B line |
+| fc987ec1, 91a49efa, f2fed67d | refused `type:script-return` | FAIL (b5-refsem.md 10.6; here) |
+
+So it was introduced between B3 `4c7d0b40` and B4b `17f7964c` (64 commits of B4/B4b; most likely
+B4b's per-allocation-site element types, not bisected: no intermediate binary here, and building
+one does not fit the disk). On Linode the candidate's fingerprint will equal 17f7964c's but not
+weekend/r2's (there the gate passes, or fails only for other reasons), so under the all-baselines
+rule **cp14b will be FAILED-NEW**, correctly: it is a B3-B5-era admission regression (a program
+weekend/r2 ran legacy-equal is refused before any effect), not a pre-existing failure. **Owner:
+the release-blocker audit of b5-refsem.md 10.6 ("a precision regression of an admitted form"),
+introduced by B4b; added to section 8's list as "B4b: `a := []; return a.pop()` refused
+`type:script-return` (cp14b `script_return_kernel_error`)".** If cp14b passes on GCC 15.2 it is
+simply PASSED; with the extractor its failure is at least named exactly.
+
+**Other planned gates that fail locally and are not on EXPECTED_BASELINE** (B5 fix-up list,
+b5-refsem.md 11.10, rerun here on this tip, `scratchpad/combined-fix/known/`): without an
+extractor each is FAILED-NEW on Linode (no fingerprint never matches).
+
+| Gate | Now | 17f7964c (B5 fix-up `c17-*`, or here) | weekend/r2 (here: this tree's harness, r2 binary) | Cause |
+| --- | --- | --- | --- | --- |
+| test-runtime2-dynamic-reads | **PASS** | FAIL | - | passes on this tip (cause of the change not investigated) |
+| test-runtime2-guardoff, test-runtime2-cp12c-probes | PASS | - | - | fixed earlier (11.11, C7) |
+| test-cp15-numeric-repair | FAIL | FAIL | FAIL (same refusal) | VM-default: `number-literal` refused (pre-existing, VM-default) |
+| test-cp17-bytes, test-cp19-bytes, test-cp20-bytes | FAIL | FAIL | cp19-bytes FAIL, same refusal (others same cause) | VM-default: bytes/FFI built-ins refused |
+| test-cp18-bytes | FAIL | FAIL | not checked | `opaque:legacy-runtime-error` refused |
+| test-runtime2-process-capture | FAIL | FAIL | FAIL, same line | `cmd()` refused (VM-default) |
+| test-runtime2-cp16-legacy | FAIL | FAIL | FAIL, same line | legacy routing expectations under VM-default |
+| test-runtime2-diagnostics | FAIL (31) | FAIL (31) | FAIL (31) | default-engine diagnostics goldens |
+| test-runtime2-vm-corpus | FAIL (124 lines) | FAIL (155) | FAIL (155) | default-environment goldens; the candidate's failures are a strict subset, so an equal-fingerprint rule would still call it FAILED-NEW |
+| test-runtime2-prevalidate-gate | FAIL | FAIL | not checked | legacy channel expectations ("silent"/"ok") |
+| test-rt-builtins, test-rt-case-conversion, test-rt-host-random-budget, test-rt-host-sources-list | FAIL | FAIL | not checked | unit link / source-list defects (ld errors) |
+| test-rt-builtins-probe | FAIL | FAIL | not checked | context probe expectations (`context:object-length`) |
+| test-rt-memory-c1 | FAIL | FAIL | not checked | environment: glibc TLS registration under `ulimit -v` |
+| test-runtime2-cp13b-mutants, test-runtime2-literals-mutants, -literals-f1-negative, -literals-decimal-negative, -module-host-order-mutant | FAIL | not run there (B5 fix-up: harness failure) | not checked | mutant builds rejected by the production build guard (tooling.md 3) |
+| test-runtime2-cp17-handles, test-runtime2-cp17-routing-mutants | FAIL | FAIL (routing build) | not checked | stale routing mutant (ParserScript.cpp no longer compiles with it) |
+| test-cp19-r1, test-cp19-shared-eval, test-cp19-expression-development | FAIL | FAIL | not checked | stale eval harness expectations (refusal note wording, function tag) |
+| test-cp19-admission-mutants (+ -switch) | FAIL | FAIL (other cases) | not checked | **B5-changed** (case `loop` control: E-U6-1, PENDING-OWNER, b5-refsem.md 11.4); m10 survives |
+
+28 gates (plus cp14b) would reach Linode as FAILED-NEW. Each needs an extractor on
+EXPECTED_BASELINE (and must then match both regression baselines), a fix, or an owner decision
+before launch; cp19-admission-mutants and cp14b are B3-B5-era and cannot become FAILED-BASELINE.

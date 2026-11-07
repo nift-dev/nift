@@ -103,7 +103,8 @@ def diagnose(block, roots=()):
 class Spec:
     def __init__(self, cases, count=None, lines=r"^\s*(?:FAIL|not ok)\b", summary=(), category=None, abort=False,
                  block_detail=False, step=None, step_scope=False, outside_unique=False,
-                 errtrace=False, keep_rtdiff=False, rc_category=False, table=None, table_step=None):
+                 errtrace=False, keep_rtdiff=False, rc_category=False, table=None, table_step=None,
+                 cp14b_detail=False):
         self.cases = [re.compile(c) for c in cases]  # each has (?P<id>) and may have (?P<detail>)
         # F5: the gate's own failure count, independent of the case parser: (?P<n>) a stated number,
         # (?P<list>) a comma-separated list of names; None where the gate prints no count (the
@@ -120,6 +121,7 @@ class Spec:
         # owner 2026-11-08 03:27, runner-level diagnostics (certify.runner_env), the same on every tree
         self.errtrace = errtrace                     # BASH_ENV=certify_errtrace.bash: CERTIFY-ERR lines
         self.keep_rtdiff = keep_rtdiff               # PYTHONPATH=certify_site: CERTIFY-RTDIFF lines
+        self.cp14b_detail = cp14b_detail             # PYTHONPATH=certify_site: CERTIFY-CP14B lines (C36)
         self.rc_category = rc_category               # a case's category from its (?P<rc>) exit status
         # the approved case-ID table for one step's `FAIL <name> <detail>` lines: [(key, regex)];
         # a FAIL line of that step matching none, or more than one, is UNMAPPED and blocks
@@ -226,6 +228,14 @@ SPECS.update({
                        keep_rtdiff=True),
     "test-runtime2-host-deps": Spec([_FAILLINE], table=READ_LIMIT_TABLE, table_step="read_limit.py",
                                     count=r"^(?P<n>\d+) failure\(s\)$"),
+    # C36: the cp14b harnesses print `FAIL <name>` only; the runner (certify_site/sitecustomize.py,
+    # every tree alike) prints each failing case's evidence from the harness's JSON and a count
+    # taken from the JSON. A case is the harness step, its name and that detail.
+    "test-runtime2-cp14b": Spec([r"^CERTIFY-CP14B (?P<id>\S+) (?P<detail>.*)$", r"^(?P<id>CERTIFY-CP14B-ERROR) (?P<detail>.*)$",
+                                 r"^FAIL (?P<id>[\w.-]+)$"],
+                                summary=[r"^CERTIFY-CP14B-SUMMARY ", r"^SKIP UNVERIFIED COMPARATOR COVERAGE: "],
+                                count=r"^CERTIFY-CP14B-SUMMARY \S+ failed=(?P<n>\d+)$",
+                                lines=r"^(?:FAIL|CERTIFY-CP14B) ", cp14b_detail=True),
 })
 
 # The gates expected to fail identically on a baseline (record section 17). The guard fails if any
@@ -332,6 +342,7 @@ EXPECTED_BASELINE = [
     "test-runtime2-cp01-simplify", "test-runtime2-cp03-simplify", "test-runtime2-rt-diff-selftest",
     "test-runtime2-scanner-parity", "test-sha256", "test-test-integrity", "test-v44-packages",
     "test-v44-shell-restricted", "test-v46-relative-imports",
+    "test-runtime2-cp14b",  # C36 (script_return_kernel_error: a B4b regression, section 30)
 ]
 
 
