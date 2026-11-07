@@ -302,6 +302,9 @@ def rt_diff(args, work):
            # now; an unused policy fails rt-diff). The file stays as the historical record.
            "--policy", "tools/rt-diff/policies/d009-const-vm.json",
            "--policy", "tools/rt-diff/policies/cp23-vm.json",
+           # B5 (owner 2026-11-08 06:46): the 30 approved shared-reference differences
+           # (combined-b3-b5.md section 23.1), exact rules; approved changes, not legacy parity.
+           "--policy", "tools/rt-diff/policies/b5-refsem-vm.json",
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
            "--timeout", str(max(60, args.timeout)),
            "--b-vm-stats",
@@ -366,6 +369,18 @@ def rt_diff(args, work):
         own = r.get("vm_stats") or []
         if len(own) != 1 or own[0].get("outcome") != "vm-error" or own[0].get("legacy_executions", 0) != 0:
             print(f"FAIL rt-diff D-009 #2 approval for {r['id']} not confirmed by VM statistics")
+            bad_class += 1
+    # B5 approvals (tools/rt-diff/policies/b5-refsem-vm.json): the approved text must come from one
+    # VM execution (the program ran on the VM, possibly ending in its error), with no legacy execution.
+    b5_ids = {rule["id"] for rule in json.load(open(os.path.join(REPO, "tools/rt-diff/policies/b5-refsem-vm.json")))}
+    for r in report["results"]:
+        if not any(d["policy"] in b5_ids for d in r["approved"]):
+            continue
+        approvals["b5-refsem"] += 1
+        own = r.get("vm_stats") or []
+        if (len(own) != 1 or own[0].get("outcome") not in ("vm", "vm-error")
+                or own[0].get("legacy_executions", 0) != 0):
+            print(f"FAIL rt-diff B5 approval for {r['id']} not confirmed by VM statistics")
             bad_class += 1
     print(f"rt-diff class approvals (confirmed by VM statistics): {dict(sorted(approvals.items()))}")
     if bad_class:

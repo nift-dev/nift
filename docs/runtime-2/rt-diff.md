@@ -118,7 +118,8 @@ The difference is approved only for that entry id **and** source
 if replacing exactly `count` occurrences of `old` in A's channel yields B's
 channel byte for byte. Refused at load (exit 2): patterns, empty `old`,
 `old == new`, a channel other than stdout/stderr/combined/exit, a `count`
-below 1, a `decision` not shaped like `D-009#6`, a `test` whose first token
+below 1, a `decision` not shaped like `D-009#6` (or an unnumbered decision record such as
+`D-NEXT-refsem-b`, whose number is assigned at integration), a `test` whose first token
 is not an existing repository path. A policy that approves nothing in a run is
 reported as `UNUSED-POLICY` and fails the run.
 Approved differences are reported as `APPROVED` and do not fail the run;

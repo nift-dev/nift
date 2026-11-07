@@ -135,7 +135,7 @@ rc=$(run --b "$(mutant replace:item:ITEM)" --corpus "$SELF/other/pc" --policy "$
 [ "$rc" = 1 ] && grep -q '^UNUSED-POLICY' "$W/out" && pass "policy bound to its source: same entry id, different program not approved" || bad "policy approved another program with the same id"
 rc=$(run --b "$NIFT" --corpus "$SELF/pc" --policy "$W/policy.json")
 [ "$rc" = 1 ] && grep -q '^UNUSED-POLICY self-stdout' "$W/out" && pass "unused policies are failures" || bad "unused policy not reported (rc=$rc)"
-for bad_rule in 'old=' 'channel=trace' 'decision=D9' 'test=no/such/file' 'count=0'; do
+for bad_rule in 'old=' 'channel=trace' 'decision=D9' 'decision=D-NEXT-' 'decision=D-NEXT-refsem-b#x' 'test=no/such/file' 'count=0'; do
   key="${bad_rule%%=*}"; val="${bad_rule#*=}"
   python3 - "$W/policy.json" "$key" "$val" "$W/bad.json" <<'PY'
 import json, sys
@@ -146,6 +146,15 @@ PY
   rc=$(run --b "$NIFT" --corpus "$SELF/pc" --policy "$W/bad.json")
   [ "$rc" = 2 ] && pass "invalid policy refused: $bad_rule" || bad "invalid policy accepted: $bad_rule (rc=$rc)"
 done
+# an unnumbered decision record (B5, owner 2026-11-08 06:46: D-NEXT-refsem-b) is accepted
+python3 - "$W/policy.json" "$W/next.json" <<'PY'
+import json, sys
+rules = json.load(open(sys.argv[1]))
+for r in rules: r["decision"] = "D-NEXT-refsem-b"
+json.dump(rules, open(sys.argv[2], "w"))
+PY
+rc=$(run --b "$(mutant replace:item:ITEM)" --corpus "$SELF/pc" --policy "$W/next.json")
+[ "$rc" = 0 ] && grep -q '^APPROVED pc/one/main.f stdout self' "$W/out" && pass "unnumbered decision record accepted (D-NEXT-refsem-b)" || bad "D-NEXT decision refused (rc=$rc)"
 printf '[{"id":"wild","decision":"D-009#6","entry":"pc/*","source_sha256":"%s","channel":"stdout","old":"a","new":"b","count":1,"justification":"x","test":"tests/runtime2/rt_diff_selftest.sh"}]\n' "$PC_HASH" > "$W/wild.json"
 rc=$(run --b "$NIFT" --corpus "$SELF/pc" --policy "$W/wild.json")
 [ "$rc" = 2 ] && pass "pattern policies are refused" || bad "pattern policy accepted (rc=$rc)"

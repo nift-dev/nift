@@ -704,8 +704,9 @@ def load_policies(paths):
                         problems.append("`old` and `new` are identical")
                     if not isinstance(rule["count"], int) or rule["count"] < 1:
                         problems.append("`count` must be a positive integer")
-                    if not re.match(r"^D-\d{3}#\d+(,#\d+)*$", str(rule["decision"])):
-                        problems.append("`decision` must name decision rows like D-009#6 or D-009#3,#4")
+                    if not re.match(r"^(D-\d{3}#\d+(,#\d+)*|D-NEXT-[a-z0-9]+(-[a-z0-9]+)*)$", str(rule["decision"])):
+                        problems.append("`decision` must name decision rows like D-009#6 or D-009#3,#4, or an "
+                                        "unnumbered decision record like D-NEXT-refsem-b")
                     if not re.match(r"^[0-9a-f]{64}$", str(rule["source_sha256"])):
                         problems.append("`source_sha256` must be a sha256")
                     test_path = str(rule["test"]).split()[0] if str(rule["test"]).split() else ""
