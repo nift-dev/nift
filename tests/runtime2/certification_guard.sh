@@ -234,6 +234,13 @@ GOOD = dict(cxx='g++ (GCC) 15.2.1 20260321', glibcxx=20260321, comparator='ok', 
             oracle='/o/nift', oracle_version='v4.12.0', oracle_commit=certify.V4120_COMMIT, oracle_clean=True,
             oracle_current=True, campaign_start=1000, oracle_mtime=2000, oracle_sha256='aa', candidate_sha256='bb',
             oracle_realpath='/o/nift', candidate_realpath='/c/nift')
+# C41 (owner 2026-11-08 14:01): the v4.12.0 oracle's checksum-pinned provenance (a valid record)
+PIN = 'ab' * 32
+PROV_OK = dict(schema=certify.ORACLE_PROVENANCE_SCHEMA, commit=certify.V4120_COMMIT, tree=certify.V4120_TREE,
+               pre_build={'ok': True}, build_rc=0, command='make -j4 nift', build_start=1.0, build_end=2.0, sha256=PIN,
+               binary='/o/nift', cxx={'identity': {'sha256': 'aa' * 32}}, cc={'identity': {'sha256': 'bb' * 32}})
+PIN_OK = dict(pin=PIN, provenance=PROV_OK, provenance_error=None, current_sha256=PIN, realpath='/o/nift')
+GOOD['oracle_pin'] = PIN_OK
 RB_OK = dict(name='17f7964c', tree='/b/17f', expected_commit=certify.REGRESSION_COMMITS['17f7964c'],
              commit=certify.REGRESSION_COMMITS['17f7964c'], clean=True, current=True, executable=True, mtime=2000, sha256='cc',
              realpath='/b/17f/nift', tree_realpath='/b/17f', symlink_outside=False, untracked_src=[])
@@ -302,6 +309,65 @@ FR40_OLD_OTHER = certify.oracle_freshness(T40, START40)
 os.unlink(T40 + '/.build/libffi/old.log')
 open(T40 + '/.build/libffi/toy/.nift-toolchain-signature', 'w').write('cc|toy|compiler-0\n')
 FR40_OTHER = certify.oracle_freshness(T40, START40)
+# C41: a pristine toy checkout recorded by certify.record_legacy_oracle (built by its own make;
+# every build gives a different binary, so a rebuild after pinning changes the sha256)
+T41 = tempfile.mkdtemp(prefix='cert-guard-c41-')
+open(T41 + '/Makefile', 'w').write('nift: src.c\n\t{ cat src.c; date +%s%N; } > nift && chmod +x nift\n')
+open(T41 + '/src.c', 'w').write('#!/bin/sh\necho v4.12.0\nexit 0\n')
+open(T41 + '/.gitignore', 'w').write('nift\n.build/\n')
+subprocess.run('git init -q && git add Makefile src.c .gitignore && git commit -qm t', shell=True, cwd=T41, env=_g, check=True)
+T41_C = subprocess.run(['git', '-C', T41, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+T41_T = subprocess.run(['git', '-C', T41, 'rev-parse', 'HEAD^{tree}'], capture_output=True, text=True).stdout.strip()
+OUT41 = tempfile.mkdtemp(prefix='cert-guard-c41-out-')
+P41 = OUT41 + '/oracle-provenance.json'
+open(T41 + '/stray.txt', 'w').write('x\n')                       # untracked before the build
+REC_UNTRACKED = certify.record_legacy_oracle(T41, P41, 1, T41_C, T41_T)[0]
+os.unlink(T41 + '/stray.txt'); os.makedirs(T41 + '/.build')       # .build before the build
+REC_BUILD_DIR = certify.record_legacy_oracle(T41, P41, 1, T41_C, T41_T)[0]
+os.rmdir(T41 + '/.build')
+REC_OTHER_COMMIT = certify.record_legacy_oracle(T41, P41, 1)[0]  # the toy is not ce8cd36a
+REC_EXISTS_BEFORE = os.path.exists(P41)
+REC_RC, REC = certify.record_legacy_oracle(T41, P41, 1, T41_C, T41_T)
+REC_AGAIN = certify.record_legacy_oracle(T41, P41, 1, T41_C, T41_T)[0]   # a pin is written once
+PIN41 = certify.sha256_of(T41 + '/nift')
+def pin41(pin=PIN41, prov=P41, oracle=T41 + '/nift', **kw):
+    return certify.oracle_pin_problems(certify.oracle_pin_facts(oracle, pin, prov), commit=T41_C, tree_hash=T41_T, **kw)
+PIN41_OK = pin41()
+PIN41_OTHER_PIN = pin41(pin='cd' * 32)
+PIN41_NO_FLAG = pin41(pin=None)
+PIN41_NO_PROV = pin41(prov=OUT41 + '/missing.json')
+PIN41_NO_PROV_FLAG = pin41(prov=None)
+PIN41_NOT_V412 = certify.oracle_pin_problems(certify.oracle_pin_facts(T41 + '/nift', PIN41, P41))
+PIN41_OTHER_CXX = pin41(cxx_sha256='ee' * 32)
+CAND41 = tempfile.mkdtemp(prefix='cert-guard-c41-cand-')
+open(CAND41 + '/nift', 'w').write('#!/bin/sh\necho candidate\n'); os.chmod(CAND41 + '/nift', 0o755)
+SUB41 = OUT41 + '/substituted'
+shutil.copy2(CAND41 + '/nift', SUB41)
+PIN41_SUBST_FILE = pin41(oracle=SUB41)                            # another file in its place
+shutil.copy2(T41 + '/nift', OUT41 + '/pinned.bak')
+shutil.copy2(CAND41 + '/nift', T41 + '/nift')                      # the candidate copied over it
+PIN41_CAND_COPY = pin41()
+PP41_CAND_COPY = pp({**GOOD, 'oracle_sha256': certify.sha256_of(T41 + '/nift'), 'candidate_sha256': certify.sha256_of(CAND41 + '/nift'),
+                     'oracle_pin': certify.oracle_pin_facts(T41 + '/nift', PIN, None)})
+shutil.copy2(OUT41 + '/pinned.bak', T41 + '/nift')
+RECHECK41_OK = certify.oracle_recheck(T41 + '/nift', PIN41, P41, T41, commit=T41_C, tree_hash=T41_T)
+os.utime(T41 + '/src.c', None); time.sleep(0.01)
+subprocess.run(['make', '-s', 'nift'], cwd=T41, check=True, capture_output=True)   # rebuilt after pinning
+PIN41_REBUILT = pin41()
+RECHECK41_REBUILT = certify.oracle_recheck(T41 + '/nift', PIN41, P41, T41, commit=T41_C, tree_hash=T41_T)
+F41 = tempfile.mkdtemp(prefix='cert-guard-c41-fail-')
+open(F41 + '/Makefile', 'w').write('nift:\n\tfalse\n')
+subprocess.run('git init -q && git add Makefile && git commit -qm t', shell=True, cwd=F41, env=_g, check=True)
+F41_C = subprocess.run(['git', '-C', F41, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+F41_T = subprocess.run(['git', '-C', F41, 'rev-parse', 'HEAD^{tree}'], capture_output=True, text=True).stdout.strip()
+REC_FAIL_RC, REC_FAIL = certify.record_legacy_oracle(F41, OUT41 + '/fail.json', 1, F41_C, F41_T)
+PIN41_FAILED_BUILD = certify.oracle_pin_problems(certify.oracle_pin_facts(F41 + '/nift', PIN41, OUT41 + '/fail.json'),
+                                                 commit=F41_C, tree_hash=F41_T)
+CLI41 = subprocess.run([sys.executable, '-B', 'scripts/certify.py', '--list', '--targets', 'test-runtime2-b5',
+                        '--legacy-oracle', T41 + '/nift'], capture_output=True, text=True)
+CLI41_PINNED = subprocess.run([sys.executable, '-B', 'scripts/certify.py', '--list', '--targets', 'test-runtime2-b5',
+                               '--legacy-oracle', T41 + '/nift', '--legacy-oracle-sha256', PIN41, '--legacy-oracle-provenance', P41],
+                              capture_output=True, text=True)
 # a baseline tree whose nift is a symlink to a binary outside it (the substituted candidate)
 LINKED = tempfile.mkdtemp(prefix='cert-guard-linked-')
 CANDIDATE = tempfile.mkdtemp(prefix='cert-guard-cand-')
@@ -382,10 +448,11 @@ checks = [
     ('preflight oracle from another commit (a Runtime 2.0 build reports v4.12.0 too)',
         len(pp({**GOOD, 'oracle_commit': '7a89b77a'})), 1),
     ('preflight oracle checkout modified', len(pp({**GOOD, 'oracle_clean': False})), 1),
-    ('preflight oracle not built from its checkout', len(pp({**GOOD, 'oracle_current': False})), 1),
-    # D4 (owner 2026-11-07 22:13): built during the campaign; distinct from the candidate
-    ('preflight no campaign start', len(pp({**GOOD, 'campaign_start': None})), 1),
-    ('preflight oracle built before the campaign', len(pp({**GOOD, 'oracle_mtime': 999})), 1),
+    # C41: make -q (C39) and the in-campaign mtime (D4) are supporting facts for the oracle, not gates
+    ('preflight oracle make -q not 0: supporting only (C41)', pp({**GOOD, 'oracle_current': False}), []),
+    ('preflight no campaign start, oracle only: no longer an oracle gate (C41)', pp({**GOOD, 'campaign_start': None}), []),
+    ('preflight no campaign start with regression baselines', len(pp({**GOOD, 'campaign_start': None, 'regression_baselines': [RB_OK, RB_R2]})), 1),
+    ('preflight oracle mtime before the campaign: supporting only (C41)', pp({**GOOD, 'oracle_mtime': 999}), []),
     ('preflight oracle is the candidate (sha256)', len(pp({**GOOD, 'oracle_sha256': 'bb'})), 1),
     ('preflight oracle is the candidate (path)', len(pp({**GOOD, 'oracle_realpath': '/c/nift'})), 1),
     ('preflight oracle not executable', len(pp({**GOOD, 'oracle_executable': False})), 1),
@@ -396,21 +463,65 @@ checks = [
     ('oracle v4.12.0-style tree: plain make -q is never 0 (the finding)', FR_PLAIN_Q != 0, True),
     ('oracle v4.12.0-style tree passes', (FR_OK['make_q'], FR_OK['signature_ok'], pp({**GOOD, 'oracle_freshness': FR_OK})), (0, True, [])),
     ('oracle v4.12.0-style tree, stale binary', FR_STALE['make_q'] != 0, True),
-    ('oracle v4.12.0-style tree, signature of another toolchain', len(pp({**GOOD, 'oracle_freshness': FR_OTHER})), 1),
-    ('oracle v4.12.0-style tree, signature missing, no fresh-build proof', [x.split(' is missing')[1][:45] for x in pp({**GOOD, 'oracle_freshness': FR_MISSING})],
-        [' and the oracle was not built from scratch du']),
+    ('oracle v4.12.0-style tree, signature of another toolchain (recorded; C41: decides nothing)',
+        (FR_OTHER['signature_ok'], pp({**GOOD, 'oracle_freshness': FR_OTHER})), (False, [])),
+    ('oracle v4.12.0-style tree, signature missing, no fresh-build proof (recorded; C41: decides nothing)',
+        (FR_MISSING['signature_ok'], pp({**GOOD, 'oracle_freshness': FR_MISSING})), (False, [])),
     # C40: v4.12.0's libffi build deletes the signature; a fresh in-campaign build is the proof then
     ('oracle signature deleted by its build, fresh in-campaign build passes', (FR40_OK['signature_present'], FR40_OK['signature_ok'],
         FR40_OK.get('accepted_by'), FR40_OK['fresh_build']['objects'] >= 1, pp({**GOOD, 'oracle_freshness': FR40_OK})),
         (False, True, 'fresh in-campaign build', True, [])),
-    ('oracle signature deleted by its build, an object older than the campaign start', (FR40_OLD_OBJ['signature_ok'],
-        FR40_OLD_OBJ['fresh_build']['old'], len(pp({**GOOD, 'oracle_freshness': FR40_OLD_OBJ}))), (False, ['obj.o'], 1)),
+    ('oracle signature deleted by its build, an object older than the campaign start (recorded only)', (FR40_OLD_OBJ['signature_ok'],
+        FR40_OLD_OBJ['fresh_build']['old'], pp({**GOOD, 'oracle_freshness': FR40_OLD_OBJ})), (False, ['obj.o'], [])),
     ('oracle signature deleted by its build, nift older than the campaign start', (FR40_OLD_BIN['signature_ok'],
         FR40_OLD_BIN['fresh_build']['old']), (False, ['nift'])),
     ('oracle signature deleted by its build, a stray product older than the campaign start', FR40_OLD_OTHER['fresh_build']['old'],
         ['.build/libffi/old.log']),
-    ('oracle signature present but another toolchain\'s (still the C39 check)', (FR40_OTHER['signature_ok'],
-        len(pp({**GOOD, 'oracle_freshness': FR40_OTHER}))), (False, 1)),
+    ('oracle signature present but another toolchain\'s (recorded only)', (FR40_OTHER['signature_ok'],
+        pp({**GOOD, 'oracle_freshness': FR40_OTHER})), (False, [])),
+    # C41: the checksum-pinned provenance contract (a toy checkout recorded by record_legacy_oracle)
+    ('C41 record: untracked file before the build refused', REC_UNTRACKED, 3),
+    ('C41 record: .build before the build refused', REC_BUILD_DIR, 3),
+    ('C41 record: a checkout that is not ce8cd36a refused', REC_OTHER_COMMIT, 3),
+    ('C41 record: nothing written by a refused record', REC_EXISTS_BEFORE, False),
+    ('C41 record: pristine checkout built and recorded', (REC_RC, REC['commit'], REC['tree'], REC['build_rc'], REC['sha256'],
+        REC['pre_build']['ok'], REC['command'], REC['build_end'] >= REC['build_start'],
+        bool(REC['cxx']['identity']['sha256']), bool(REC['cc']['identity']['sha256']), REC['make_reports'] is not None),
+        (0, T41_C, T41_T, 0, PIN41, True, 'make -j1 nift', True, True, True, True)),
+    ('C41 record: an existing pin is never rewritten', REC_AGAIN, 3),
+    ('C41 record: a failing build is recorded and refused', (REC_FAIL_RC, REC_FAIL['build_rc'] != 0, REC_FAIL['sha256'],
+        any('did not exit 0' in x for x in PIN41_FAILED_BUILD)), (1, True, None, True)),
+    ('C41 pin: the correct pinned sha256 passes', PIN41_OK, []),
+    ('C41 pin: correct pin passes the preflight table', pp(GOOD), []),
+    ('C41 pin: another sha256 given refused', [x[:52] for x in PIN41_OTHER_PIN],
+        ["the CP19 legacy oracle's pin cdcdcdcdcdcdcdcd... is ", "the CP19 legacy oracle's sha256 is now " + PIN41[:13]]),
+    ('C41 pin: a substituted file refused', [x[:39] for x in PIN41_SUBST_FILE],
+        ["the CP19 legacy oracle " + os.path.realpath(SUB41)[:16], "the CP19 legacy oracle's sha256 is now "]),
+    ('C41 pin: the candidate copied over the oracle refused', [x[:39] for x in PIN41_CAND_COPY], ["the CP19 legacy oracle's sha256 is now "]),
+    ('C41 pin: the candidate copied over the oracle (preflight, no record either)', sorted(x[:44] for x in PP41_CAND_COPY),
+        ['the CP19 legacy oracle and the candidate are', "the CP19 legacy oracle has no provenance rec", "the CP19 legacy oracle's sha256 is now " + certify.sha256_of(CAND41 + '/nift')[:5]]),
+    ('C41 pin: rebuilt after pinning refused', [x[:39] for x in PIN41_REBUILT], ["the CP19 legacy oracle's sha256 is now "]),
+    ('C41 recheck: unchanged oracle and v4.12.0 baseline tree pass', RECHECK41_OK, []),
+    ('C41 recheck: rebuilt after pinning refused (oracle and baseline tree)', [x[:30] for x in RECHECK41_REBUILT],
+        ["the CP19 legacy oracle's sha25", 'the v4.12.0 baseline tree ' + T41[:4]]),
+    ('C41 pin: missing sha256 flag refused', [x[:45] for x in PIN41_NO_FLAG], ['the CP19 legacy oracle has no pinned sha256 (']),
+    ('C41 pin: missing provenance file refused', [x[:62] for x in PIN41_NO_PROV], ['the CP19 legacy oracle has no provenance record: cannot read t']),
+    ('C41 pin: no provenance flag refused', PIN41_NO_PROV_FLAG,
+        ['the CP19 legacy oracle has no provenance record: no provenance file given (--legacy-oracle-provenance)']),
+    ('C41 pin: provenance commit and tree not ce8cd36a refused', [x[:52] for x in PIN41_NOT_V412],
+        ["the CP19 legacy oracle's provenance names commit " + T41_C[:3]]),
+    ('C41 pin: provenance commit only wrong (table)', len(pp({**GOOD, 'oracle_pin': {**PIN_OK, 'provenance': {**PROV_OK, 'commit': '7a89b77a' + '0' * 32}}})), 1),
+    ('C41 pin: provenance tree only wrong (table)', len(pp({**GOOD, 'oracle_pin': {**PIN_OK, 'provenance': {**PROV_OK, 'tree': '0' * 40}}})), 1),
+    ('C41 pin: not pristine before the build (table)', len(pp({**GOOD, 'oracle_pin': {**PIN_OK, 'provenance': {**PROV_OK, 'pre_build': {'ok': False}}}})), 1),
+    ('C41 pin: built with another compiler refused', [x[:51] for x in PIN41_OTHER_CXX], ['the CP19 legacy oracle was built with another CXX (']),
+    ('C41 pin: not hex refused (table)', len(pp({**GOOD, 'oracle_pin': {**PIN_OK, 'pin': 'xyz'}})) >= 1, True),
+    ('C41 pin: v4.12.0 baseline tree nift not the pinned oracle (table)', len(pp({**GOOD, 'v412_baseline': {'tree': '/o', 'sha256': 'cd' * 32}})), 1),
+    ('C41 pin: v4.12.0 baseline tree without nift in a full campaign (table)', len(pp({**GOOD, 'require_baselines': True,
+        'regression_baselines': [RB_OK, RB_R2], 'v412_baseline': {'tree': '/o', 'sha256': None}})), 1),
+    ('C41 cli: --list with an unpinned oracle exits 2 (focused run too)', (CLI41.returncode,
+        'PREFLIGHT BLOCKED: the CP19 legacy oracle has no pinned sha256' in CLI41.stdout), (2, True)),
+    ('C41 cli: --list with the toy pinned exits 2 (not ce8cd36a)', (CLI41_PINNED.returncode,
+        "PREFLIGHT BLOCKED: the CP19 legacy oracle's provenance names commit " + T41_C in CLI41_PINNED.stdout), (2, True)),
     ('oracle without a FORCE signature: plain make -q', certify.oracle_freshness(STALE)['signature'], None),
     # C38 (PRELAUNCH-R2 C1): each baseline a distinct binary, no symlink out of its tree
     ('preflight baseline symlinked to the candidate', sorted(x.split(': ', 1)[1][:40] for x in pp({**GOOD, 'regression_baselines': [
@@ -582,7 +693,7 @@ checks = [
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
-for _d in (STALE, LINKED, CANDIDATE, V412T, T40):
+for _d in (STALE, LINKED, CANDIDATE, V412T, T40, T41, OUT41, CAND41, F41):
     shutil.rmtree(_d, ignore_errors=True)
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:

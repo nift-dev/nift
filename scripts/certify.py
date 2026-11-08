@@ -67,10 +67,14 @@ Campaign verdict (owner 2026-11-08 06:46; campaign_verdict()), one exit status e
              historical; no row reads as A), and any A makes the report "NOT RELEASE-QUALIFYING";
   CERTIFIED  exit 0: every gate PASSED or FAILED-BASELINE (--strict: only PASSED), nothing hidden.
 Exit 2: preflight failed (full campaign; also `--list` of a full plan), nothing planned, or the
-category table is unusable. The preflight checks the oracle and every --regression-baseline tree
-(named commit, clean, make -q nift, executable, built after --campaign-start; sha256 recorded;
-a distinct binary, no symlink out of its tree); a full campaign needs exactly 17f7964c and
-weekend/r2 (C38). --toolchain-preflight: the toolchain and host checks only, before any build.
+category table is unusable. The preflight checks every --regression-baseline tree (named commit,
+clean, make -q nift, executable, built after --campaign-start; sha256 recorded; a distinct binary,
+no symlink out of its tree); a full campaign needs exactly 17f7964c and weekend/r2 (C38). The
+v4.12.0 oracle is a legacy semantic oracle held to a checksum-pinned provenance contract instead
+(C41): --record-legacy-oracle TREE builds it from a pristine ce8cd36a checkout and writes
+--legacy-oracle-provenance JSON; every run given --legacy-oracle needs --legacy-oracle-sha256 and
+that record, exits 2 if the oracle's sha256 differs, and re-verifies it during classification.
+--toolchain-preflight: the toolchain and host checks only, before any build.
 Logs: .build/certify/<target>.log; summary: .build/certify/summary.json and summary.txt.
 """
 import argparse, concurrent.futures as cf, json, os, pwd, re, shutil, signal, subprocess, sys, time
@@ -707,29 +711,27 @@ def preflight_problems(f):
         if f.get("oracle_commit") != V4120_COMMIT:
             out.append(f"the CP19 legacy oracle is not built from v4.12.0 = {V4120_COMMIT[:12]} "
                        f"(its checkout is at: {f.get('oracle_commit')})")
-        if f.get("oracle_clean") is not True or f.get("oracle_current") is not True:
-            out.append("the CP19 legacy oracle's checkout has tracked changes or its nift is not built from it "
-                       f"(clean: {f.get('oracle_clean')}, make -q nift: {f.get('oracle_current')})")
-        # D4 (owner 2026-11-07 22:13): built during this campaign, and a different binary from the
-        # candidate. Deliberate substitution is an accepted threat-model limitation (record 12).
-        if f.get("campaign_start") is None:
-            out.append("no campaign start time (--campaign-start EPOCH or NIFT_CAMPAIGN_START): the oracle "
-                       "cannot be shown to be built during the campaign")
-        elif (f.get("oracle_mtime") or 0) < f["campaign_start"]:
-            out.append(f"the CP19 legacy oracle was not built during this campaign (mtime {f.get('oracle_mtime')} "
-                       f"< campaign start {f['campaign_start']})")
+        if f.get("oracle_clean") is not True:
+            out.append("the CP19 legacy oracle's checkout has tracked changes "
+                       f"(clean: {f.get('oracle_clean')})")
+        # C41 (owner 2026-11-08 14:01): v4.12.0 is a legacy semantic oracle. Its identity is the
+        # checksum-pinned provenance contract (oracle_pin_problems), not the later build system's
+        # invariants: `make -q -o <signature> nift` (C39), the signature's content (C39) and the
+        # in-campaign timestamps (D4, C40) are recorded as supporting facts and decide nothing.
+        out += oracle_pin_problems(f.get("oracle_pin"), (f.get("cxx_identity") or {}).get("sha256"),
+                                   (f.get("cc_identity") or {}).get("sha256"))
         if f.get("oracle_sha256") and f.get("oracle_sha256") == f.get("candidate_sha256"):
             out.append("the CP19 legacy oracle and the candidate are the same binary (sha256)")
         if f.get("oracle_realpath") and f.get("oracle_realpath") == f.get("candidate_realpath"):
             out.append("the CP19 legacy oracle and the candidate are the same file (real path)")
-        fr = f.get("oracle_freshness") or {}
-        if fr.get("signature") and fr.get("signature_ok") is not True:
-            out.append(f"the CP19 legacy oracle's libffi toolchain signature {fr.get('signature')} "
-                       + (f"is missing and the oracle was not built from scratch during this campaign "
-                          f"({(fr.get('fresh_build') or {}).get('reason') or 'make -q -o <signature> nift is not 0'})"
-                          if not fr.get("signature_present") else
-                          "does not match what its Makefile's recipe writes for this toolchain"
-                          if fr.get("expected") is not None else "cannot be recomputed from its Makefile's recipe"))
+        # the v4.12.0 baseline tree (--baseline) classifies BASELINE-FAILURE with its own nift: when
+        # it has one, it is the pinned oracle (the campaign uses the oracle's tree)
+        vb = f.get("v412_baseline")
+        pin = (f.get("oracle_pin") or {}).get("pin")
+        if vb and vb.get("sha256") is not None and pin and vb["sha256"] != pin:
+            out.append(f"the v4.12.0 baseline tree {vb.get('tree')}'s nift is not the pinned CP19 legacy oracle")
+        elif vb and vb.get("sha256") is None and f.get("require_baselines"):
+            out.append(f"the v4.12.0 baseline tree {vb.get('tree')} has no nift: a full campaign uses the pinned oracle's tree")
         if f.get("oracle_executable") is False:
             out.append(f"the CP19 legacy oracle {f.get('oracle')} is not an executable file")
     # C37 (pre-launch review B2): every regression baseline is checked here, before any gate runs
@@ -784,7 +786,7 @@ def preflight_problems(f):
         if sorted(names) != sorted(REGRESSION_COMMITS):
             out.append(f"a full campaign needs exactly the regression baselines {', '.join(sorted(REGRESSION_COMMITS))}, "
                        f"once each, on distinct trees (given: {names or 'none'})")
-    if f.get("regression_baselines") and f.get("campaign_start") is None and not f.get("oracle"):
+    if f.get("regression_baselines") and f.get("campaign_start") is None:
         out.append("no campaign start time (--campaign-start EPOCH or NIFT_CAMPAIGN_START): the regression "
                    "baselines cannot be shown to be built during the campaign")
     return out
@@ -795,7 +797,8 @@ def preflight_problems(f):
 _NOT_TOOLCHAIN = ("make nift failed", "./nift", "no build signature", "cannot derive the Makefile",
                   "the build signature has no C block", "the C objects", "cannot derive the link line",
                   "the link line differs", "comparator sort is not compiled", "no CP19 legacy oracle",
-                  "the CP19 legacy oracle", "no campaign start", "regression baseline", "a full campaign needs")
+                  "the CP19 legacy oracle", "no campaign start", "regression baseline", "a full campaign needs",
+                  "the v4.12.0 baseline tree")
 
 
 def toolchain_problems(f):
@@ -898,6 +901,187 @@ def fresh_build_facts(t, campaign_start):
     return out
 
 
+# ----- C41 (owner 2026-11-08 14:01): the v4.12.0 oracle's checksum-pinned provenance -----
+# v4.12.0 is a legacy semantic oracle: it is not held to the later build system's libffi-signature
+# or `make -q` invariants (C39/C40 facts stay recorded as supporting evidence, deciding nothing).
+# Its contract: a pristine checkout of exactly ce8cd36a, built from scratch with the verified
+# toolchain (exit 0), the executable's sha256 recorded immediately after the build in a provenance
+# file, and that sha256 (--legacy-oracle-sha256) verified before every use of the oracle.
+ORACLE_PROVENANCE_SCHEMA = "nift-legacy-oracle-provenance/1"
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def pristine_checkout(tree, commit=None, tree_hash=None):
+    """C41 contract 1: `tree` is a git checkout of exactly `commit` (and `tree_hash`) with nothing
+    else in it: no tracked change, no untracked or ignored file (no build output anywhere), no
+    .build directory."""
+    t = Path(tree)
+    commit = commit or V4120_COMMIT
+    tree_hash = tree_hash or V4120_TREE
+    def git(*a):
+        r = subprocess.run(["git", "-C", str(t)] + list(a), capture_output=True, text=True, env=_RO_GIT)
+        return r.stdout if r.returncode == 0 else None
+    head, th = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
+    st = git("status", "--porcelain=v1", "--untracked-files=all", "--ignored")
+    out = {"checkout": str(t.resolve()), "head": head and head.strip(), "tree": th and th.strip(),
+           "status": None if st is None else st.splitlines()[:20], "build_dir": (t / ".build").exists(),
+           "ok": False, "reason": None}
+    if out["head"] != commit or out["tree"] != tree_hash:
+        out["reason"] = f"the checkout is at {out['head']} (tree {out['tree']}), not {commit} (tree {tree_hash})"
+    elif st is None:
+        out["reason"] = "git status failed"
+    elif out["status"]:
+        out["reason"] = "tracked changes, untracked or ignored files before the build: " + ", ".join(out["status"][:5])
+    elif out["build_dir"]:
+        out["reason"] = ".build exists before the build"
+    out["ok"] = out["reason"] is None
+    return out
+
+
+def _compiler_record(cmd):
+    try:
+        line = (subprocess.run([cmd, "--version"], capture_output=True, text=True).stdout.splitlines() or [None])[0]
+    except OSError:
+        line = None
+    return {"command": cmd, "version_line": line, "identity": compiler_identity(cmd)}
+
+
+def record_legacy_oracle(tree, provenance, jobs, commit=None, tree_hash=None, log=None):
+    """C41 contract 1-4: check the checkout is pristine, build `nift` from scratch with the
+    environment's (verified) toolchain, and write the provenance file with the binary's sha256,
+    taken immediately after the build. Returns (exit, provenance): 0 recorded; 3 the checkout is
+    not pristine, or the provenance file already exists (a pin is never rewritten); 1 the build
+    failed or left no executable (the provenance file is still written, with build_rc)."""
+    t = Path(tree).resolve()
+    prov_path = Path(provenance)
+    commit = commit or V4120_COMMIT
+    tree_hash = tree_hash or V4120_TREE
+    if prov_path.exists():
+        return 3, {"error": f"{prov_path} already exists: an oracle is pinned once"}
+    pre = pristine_checkout(t, commit, tree_hash)
+    if not pre["ok"]:
+        return 3, {"error": "the oracle checkout is not pristine: " + pre["reason"], "pre_build": pre}
+    env = clean_env()
+    # what make itself will use (dry; read before the build so nothing is written by it)
+    rep = make_print(t, "$(CC) ;; $(CXX) ;; $(CFLAGS) ;; $(CXXFLAGS) ;; $(CPPFLAGS) ;; $(LDFLAGS) ;; $(LDLIBS)", env)
+    names = ("CC", "CXX", "CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "LDLIBS")
+    vals = rep.stdout.split(" ;; ") if rep.returncode == 0 else []
+    make_reports = dict(zip(names, (v.strip() for v in vals))) if len(vals) == len(names) else None
+    cc = (make_reports or {}).get("CC") or env.get("CC", "cc")
+    cxx = (make_reports or {}).get("CXX") or env.get("CXX", "g++")
+    cmd = ["make", f"-j{jobs}", "nift"]
+    log = Path(log) if log else prov_path.with_suffix(".build.log")
+    prov = {"schema": ORACLE_PROVENANCE_SCHEMA, "commit": pre["head"], "tree": pre["tree"],
+            "checkout": str(t), "binary": str(t / "nift"), "pre_build": pre,
+            "command": " ".join(cmd), "cwd": str(t), "build_log": str(log),
+            "environment": {k: env[k] for k in ("CC", "CXX", "CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "PATH")
+                            if k in env},
+            "make_reports": make_reports,
+            "cc": _compiler_record(cc.split()[0]), "cxx": _compiler_record(cxx.split()[0]),
+            "host": environment_record(t)}
+    prov["build_start"] = time.time()
+    with open(log, "w") as fh:
+        rc = subprocess.run(cmd, cwd=t, stdout=fh, stderr=subprocess.STDOUT, env=env).returncode
+    prov["build_end"] = time.time()
+    prov["build_rc"] = rc
+    nift = t / "nift"
+    prov["sha256"] = sha256_of(str(nift)) if rc == 0 else None   # immediately after the build
+    prov["executable"] = nift.is_file() and os.access(nift, os.X_OK)
+    try:
+        prov["binary_mtime"] = os.stat(nift).st_mtime
+    except OSError:
+        prov["binary_mtime"] = None
+    if rc == 0 and prov["executable"]:
+        try:
+            v = subprocess.run([str(nift), "--version"], capture_output=True, text=True, env=dict(env, NIFT_VM="0"))
+            prov["version"] = (v.stdout + v.stderr).strip()[:120]
+        except OSError as e:
+            prov["version"] = f"not runnable: {e}"
+        # supporting facts only (C39/C40); they decide nothing for this oracle
+        prov["supporting"] = {"oracle_freshness": oracle_freshness(t, int(prov["build_start"]))}
+    prov["recorded_at"] = time.time()
+    prov_path.write_text(json.dumps(prov, indent=2, sort_keys=True) + "\n")
+    os.chmod(prov_path, 0o444)
+    return (0 if rc == 0 and prov["executable"] and prov["sha256"] else 1), prov
+
+
+def oracle_pin_facts(oracle, pin, provenance):
+    """C41 contract 6, the facts: the pin given (--legacy-oracle-sha256), the provenance file
+    (--legacy-oracle-provenance) and the oracle's sha256 now."""
+    out = {"pin": pin, "provenance_path": provenance, "provenance": None, "provenance_error": None,
+           "current_sha256": sha256_of(oracle) if oracle else None,
+           "realpath": os.path.realpath(oracle) if oracle else None}
+    if not provenance:
+        out["provenance_error"] = "no provenance file given (--legacy-oracle-provenance)"
+    else:
+        try:
+            out["provenance"] = json.loads(Path(provenance).read_text())
+            if not isinstance(out["provenance"], dict):
+                out["provenance"], out["provenance_error"] = None, "the provenance file is not a JSON object"
+        except OSError as e:
+            out["provenance_error"] = f"cannot read the provenance file {provenance}: {e.strerror}"
+        except ValueError:
+            out["provenance_error"] = f"the provenance file {provenance} is not JSON"
+    return out
+
+
+def oracle_pin_problems(p, cxx_sha256=None, cc_sha256=None, commit=None, tree_hash=None):
+    """C41 contract 1-6, pure (table-tested): the oracle is the pinned, recorded binary."""
+    commit = commit or V4120_COMMIT
+    tree_hash = tree_hash or V4120_TREE
+    out = []
+    pin = (p or {}).get("pin")
+    if not pin:
+        out.append("the CP19 legacy oracle has no pinned sha256 (--legacy-oracle-sha256 HEX, recorded right after its build)")
+    elif not _HEX64.match(pin):
+        out.append(f"the CP19 legacy oracle's pin {pin!r} is not a sha256 (64 lowercase hex digits)")
+    pr = (p or {}).get("provenance")
+    if pr is None:
+        out.append("the CP19 legacy oracle has no provenance record: " + ((p or {}).get("provenance_error") or "missing"))
+    else:
+        if pr.get("schema") != ORACLE_PROVENANCE_SCHEMA:
+            out.append(f"the CP19 legacy oracle's provenance record has schema {pr.get('schema')!r}, not {ORACLE_PROVENANCE_SCHEMA}")
+        if pr.get("commit") != commit or pr.get("tree") != tree_hash:
+            out.append(f"the CP19 legacy oracle's provenance names commit {pr.get('commit')} tree {pr.get('tree')}, "
+                       f"not v4.12.0 = {commit} tree {tree_hash}")
+        if (pr.get("pre_build") or {}).get("ok") is not True:
+            out.append("the CP19 legacy oracle's provenance does not show a pristine checkout before the build")
+        if pr.get("build_rc") != 0:
+            out.append(f"the CP19 legacy oracle's recorded build did not exit 0 (build_rc {pr.get('build_rc')})")
+        if not pr.get("command") or not isinstance(pr.get("build_start"), (int, float)) \
+                or not isinstance(pr.get("build_end"), (int, float)) or pr["build_end"] < pr["build_start"]:
+            out.append("the CP19 legacy oracle's provenance lacks the build command or its timestamps")
+        if pin and pr.get("sha256") != pin:
+            out.append(f"the CP19 legacy oracle's pin {str(pin)[:16]}... is not the sha256 recorded after its build "
+                       f"({str(pr.get('sha256'))[:16]}...)")
+        if (p or {}).get("realpath") and pr.get("binary") and os.path.realpath(pr["binary"]) != p["realpath"]:
+            out.append(f"the CP19 legacy oracle {p['realpath']} is not the recorded binary {pr['binary']}")
+        for key, cur, label in (("cxx", cxx_sha256, "CXX"), ("cc", cc_sha256, "CC")):
+            rec = ((pr.get(key) or {}).get("identity") or {}).get("sha256")
+            if not rec or not _HEX64.match(str(rec)):
+                out.append(f"the CP19 legacy oracle's provenance has no {label} identity (resolved binary sha256)")
+            elif cur is not None and rec != cur:
+                out.append(f"the CP19 legacy oracle was built with another {label} ({rec[:16]}...) than this "
+                           f"campaign's verified toolchain ({cur[:16]}...)")
+    cur = (p or {}).get("current_sha256")
+    if pin and cur != pin:
+        out.append(f"the CP19 legacy oracle's sha256 is now {str(cur)[:16]}..., not the pinned {str(pin)[:16]}... "
+                   f"(substituted or rebuilt after pinning)")
+    return out
+
+
+def oracle_recheck(oracle, pin, provenance, baseline=None, cxx_sha256=None, cc_sha256=None, commit=None, tree_hash=None):
+    """C41: before the oracle's or the v4.12.0 baseline tree's logs are used (classification): the
+    oracle is still the pinned binary, and so is the v4.12.0 baseline tree's own nift."""
+    out = oracle_pin_problems(oracle_pin_facts(oracle, pin, provenance), cxx_sha256, cc_sha256, commit, tree_hash)
+    if baseline is not None and pin:
+        b = sha256_of(str(Path(baseline) / "nift"))
+        if b != pin:
+            out.append(f"the v4.12.0 baseline tree {baseline}'s nift ({str(b)[:16]}...) is not the pinned oracle "
+                       f"({pin[:16]}...)")
+    return out
+
+
 def regression_facts(name, tree):
     """C37: the preflight facts of one --regression-baseline NAME=TREE."""
     expected = REGRESSION_COMMITS.get(name) or (name if re.fullmatch(r"[0-9a-f]{7,40}", name or "") else None)
@@ -934,6 +1118,7 @@ def regression_facts(name, tree):
 
 
 V4120_COMMIT = "ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb"  # tag v4.12.0
+V4120_TREE = "c128ba47c28383fea2775e48b6985962b87dc56c"    # its tree (C41 provenance)
 # R3-6: the host requirements of the planned gates, checked before any gate runs (a missing one
 # would make its gates BLOCKED mid-campaign). (name, shell probe that prints a version or
 # "ok", minimum / why)
@@ -1102,7 +1287,8 @@ def environment_record(root):
     return env
 
 
-def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regressions=(), require_baselines=False):
+def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regressions=(), require_baselines=False,
+                    oracle_pin=None, oracle_provenance=None, baseline=None):
     cxx = os.environ.get("CXX", "g++")
     facts = {"require_env": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"), "oracle": oracle, "build_rc": build_rc}
     path = shutil.which(cxx) or cxx
@@ -1259,6 +1445,7 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regression
         # (`$(LIBFFI_SIGNATURE): FORCE`), so a plain `make -q nift` is never 0 there
         fresh = oracle_freshness(tree, campaign_start)
         facts["oracle_freshness"] = fresh
+        # supporting fact only since C41 (v4.12.0 is not held to make -q)
         facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file()
                                    and fresh["make_q"] == 0)
         facts["campaign_start"] = campaign_start
@@ -1270,6 +1457,10 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regression
         facts["oracle_realpath"] = os.path.realpath(oracle)
         facts["oracle_build_command"] = ORACLE_BUILD.replace("<tree>", str(tree))
         facts["oracle_executable"] = os.path.isfile(oracle) and os.access(oracle, os.X_OK)
+        # C41: the checksum-pinned provenance (deciding); the facts above it are supporting
+        facts["oracle_pin"] = oracle_pin_facts(oracle, oracle_pin, oracle_provenance)
+        if baseline:
+            facts["v412_baseline"] = {"tree": str(baseline), "sha256": sha256_of(str(Path(baseline) / "nift"))}
     facts["campaign_start"] = campaign_start
     facts["regression_baselines"] = [regression_facts(n, t) for n, t in regressions]
     facts["require_baselines"] = require_baselines
@@ -1579,6 +1770,13 @@ def main():
                     help="a regression baseline tree (repeatable): the accepted B4b 17f7964c, weekend/r2")
     ap.add_argument("--legacy-oracle", default=os.environ.get("CP19_LEGACY_ORACLE", ""),
                     help="the v4.12.0 legacy binary test-cp19-proof-cli compares with (CP19_LEGACY_ORACLE)")
+    ap.add_argument("--legacy-oracle-sha256", default="", metavar="HEX",
+                    help="C41: the oracle's sha256 as recorded right after its build; verified before every use")
+    ap.add_argument("--legacy-oracle-provenance", default="", metavar="JSON",
+                    help="C41: the oracle's provenance record (written by --record-legacy-oracle)")
+    ap.add_argument("--record-legacy-oracle", metavar="TREE",
+                    help="C41: check that TREE is a pristine ce8cd36a checkout, build its nift from scratch and write "
+                         "--legacy-oracle-provenance (exit 0 recorded, 3 not pristine or already pinned, 1 build failed)")
     ap.add_argument("--strict", action="store_true", help="exit 1 unless every required gate is PASSED")
     ap.add_argument("--campaign-start", type=int, default=int(os.environ["NIFT_CAMPAIGN_START"])
                     if os.environ.get("NIFT_CAMPAIGN_START", "").isdigit() else None,
@@ -1597,6 +1795,19 @@ def main():
     a = ap.parse_args()
     if a.merge:
         return merge_summaries(a.merge)
+    if a.record_legacy_oracle:
+        if not a.legacy_oracle_provenance:
+            print("certify: --record-legacy-oracle needs --legacy-oracle-provenance JSON", file=sys.stderr)
+            return 2
+        code, prov = record_legacy_oracle(a.record_legacy_oracle, a.legacy_oracle_provenance, a.jobs)
+        if code == 0:
+            print(f"{prov['sha256']}  {prov['binary']}")
+            print(f"legacy oracle recorded: commit {prov['commit']} tree {prov['tree']}, {prov['command']} exit 0, "
+                  f"{prov['build_end'] - prov['build_start']:.0f}s, provenance {a.legacy_oracle_provenance}")
+        else:
+            print("certify: legacy oracle not recorded: " + (prov.get("error") or
+                  f"the build exited {prov.get('build_rc')} (log {prov.get('build_log')})"), file=sys.stderr)
+        return code
     if a.toolchain_preflight:
         tp = toolchain_problems(preflight_facts(ROOT, None, a.campaign_start))
         for pr in tp:
@@ -1647,15 +1858,23 @@ def main():
     exclusive = dict(sorted(exclusive.items(), key=lambda kv: (olds.get(kv[0]) != (), planned.index(kv[0]))))
     parallel = [t for t in planned if t not in exclusive]
     oracle = a.legacy_oracle or None
+    pin, provenance = a.legacy_oracle_sha256 or None, a.legacy_oracle_provenance or None
+    v412_baseline = Path(a.baseline) if a.baseline and oracle else None
     full = not a.targets and not a.quick
+
+    def pinned_problems(fx):
+        """C41: the oracle-pin problems among the preflight's (fatal for every run with an oracle)."""
+        return oracle_pin_problems(fx.get("oracle_pin"), (fx.get("cxx_identity") or {}).get("sha256"),
+                                   (fx.get("cc_identity") or {}).get("sha256"))
     regression_specs = [(spec.partition("=")[0], spec.partition("=")[2]) for spec in a.regression_baseline]
     if a.list:
         for t in parallel:
             print(f"parallel   {t}")
         for t, why in exclusive.items():
             print(f"exclusive  {t}  ({why})" + (f"  [make -k {t} " + " ".join("-o " + o for o in olds[t]) + "]" if olds[t] else ""))
-        pf = preflight_problems(preflight_facts(ROOT, oracle, a.campaign_start, regressions=regression_specs,
-                                                require_baselines=full))
+        lfacts = preflight_facts(ROOT, oracle, a.campaign_start, regressions=regression_specs, require_baselines=full,
+                                 oracle_pin=pin, oracle_provenance=provenance, baseline=v412_baseline)
+        pf = preflight_problems(lfacts)
         print(f"plan: {len(planned)} required gates ({len(parallel)} parallel, {len(exclusive)} serial), "
               f"{len(inv)} inventory targets, {len(NON_GATE)} non-gates: " + ", ".join(sorted(NON_GATE)))
         for pr in pf:
@@ -1663,6 +1882,8 @@ def main():
         print("preflight: " + ("ok" if not pf else f"{len(pf)} problem(s): a full campaign would exit 2 here"))
         if pf and full:
             return 2  # C37: stage 1/3 stops here
+        if oracle and pinned_problems(lfacts):
+            return 2  # C41: an oracle that is not the pinned one stops every run
         return 1 if problems and not a.targets else 0
     if not planned:
         print("certify: no targets planned", file=sys.stderr)
@@ -1686,12 +1907,13 @@ def main():
     # preflight problem.
     built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, text=True, env=clean_env())
     (logdir / "_build-nift.log").write_text(built.stdout + built.stderr)
-    facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode, regression_specs, require_baselines=full)
+    facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode, regression_specs, require_baselines=full,
+                            oracle_pin=pin, oracle_provenance=provenance, baseline=v412_baseline)
     pf = preflight_problems(facts)
     (logdir / "_preflight.json").write_text(json.dumps({"facts": facts, "problems": pf}, indent=2) + "\n")
     for pr in pf:
         print("PREFLIGHT BLOCKED: " + pr, file=sys.stderr)
-    if pf and full:
+    if pf and (full or (oracle and pinned_problems(facts))):
         print("certify: preflight failed; the campaign did not start (.build/certify/_preflight.json)", file=sys.stderr)
         return 2
     if built.returncode != 0:  # R4-3: never certify a stale binary
@@ -1724,6 +1946,25 @@ def main():
         results[t] = {"rc": rc, "seconds": dur, "mode": "exclusive"}
         print(f"[{'ok' if rc == 0 else 'FAILED'}] {t} ({dur}s, exclusive)", flush=True)
 
+    # C41: the oracle (and the v4.12.0 baseline tree's nift) is re-verified against its pin before
+    # any log produced with it is classified; a mismatch stops the campaign (exit 2)
+    rechecks = []
+    def oracle_changed(where, base=None):
+        if not oracle:
+            return False
+        probs = oracle_recheck(oracle, pin, provenance, base, (facts.get("cxx_identity") or {}).get("sha256"),
+                               (facts.get("cc_identity") or {}).get("sha256"))
+        rechecks.append({"where": where, "time": time.time(), "problems": probs})
+        if probs:
+            (logdir / "_oracle-recheck.json").write_text(json.dumps(rechecks, indent=2) + "\n")
+            for pr in probs:
+                print(f"PREFLIGHT BLOCKED ({where}): " + pr, file=sys.stderr)
+            print("certify: the CP19 legacy oracle is no longer the pinned binary; the campaign stops "
+                  "(.build/certify/_oracle-recheck.json)", file=sys.stderr)
+        return bool(probs)
+    if oracle_changed("after the gate runs", v412_baseline if v412_baseline and (v412_baseline / "nift").exists() else None):
+        return 2
+
     # Classification of failures: rerun alone, then environment, then baseline.
     user = unprivileged_user(a.unprivileged_user)
     user_copy = None
@@ -1748,6 +1989,8 @@ def main():
     env_record["compiler_sha256"] = (facts.get("cxx_identity") or {}).get("sha256")  # C21
     env_record["cc_sha256"] = (facts.get("cc_identity") or {}).get("sha256")
     for t, r in sorted(results.items()):
+        if oracle_changed(f"before classifying {t}"):
+            return 2
         # Gather facts; the verdict comes only from decide(), which is pure and
         # table-tested (tests/runtime2/certification_guard.sh).
         f = {"target": t, "rc": r["rc"], "load_sensitive": t in LOAD_SENSITIVE or t in PERF_LANE, "user": user}
@@ -1788,6 +2031,8 @@ def main():
                         base_dir = baseline_user_copy
                     blog = logdir / f"{t}.baseline.log"
                     f["base_rc"], _ = run_target(base_dir, t, blog, a.timeout, base_user, olds[t], extra)
+                    if oracle_changed(f"after the v4.12.0 baseline run of {t}", base_dir):
+                        return 2
                     btext = blog.read_text(errors="replace")
                     f["base_has_target"] = not lacks_target(btext, t)
                     f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
@@ -1841,6 +2086,8 @@ def main():
             line_note = "recipe lines failing on their own: " + (", ".join(map(str, failing)) or "none")
             if f.get("base_identical"):
                 bl = run_lines(base_tree_used, t, olds[t], logdir, a.timeout, extra, ".baseline")
+                if oracle_changed(f"after the v4.12.0 baseline line runs of {t}", base_tree_used):
+                    return 2
                 only = lines_match(cand_lines, bl, ROOT, base_tree_used)
                 if only:
                     f["base_identical"] = False
@@ -1852,6 +2099,8 @@ def main():
                     if only:
                         r["regression"][name] = False
                         line_note += f"; on the candidate only (not {name}): {', '.join(map(str, only))}"
+        if oracle_changed(f"before deciding {t}"):
+            return 2
         r["status"], r["reason"] = decide(f)
         logtext = (logdir / f"{t}.log").read_text(errors="replace") if (logdir / f"{t}.log").exists() else ""
         r["blocked"] = blocked_reason(logtext)
@@ -1926,7 +2175,7 @@ def main():
     summary = {
         "root": str(ROOT), "commit": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip(),
         "euid": os.geteuid(), "jobs": a.jobs, "seconds": round(time.time() - started, 1),
-        "counts": counts, "decide_counts": detail, "exclusive": exclusive, "preflight": {"facts": facts, "problems": pf},
+        "counts": counts, "decide_counts": detail, "exclusive": exclusive, "preflight": {"facts": facts, "problems": pf}, "oracle_rechecks": rechecks,
         "baselines": {"v4.12.0 (legacy compatibility)": str(baseline) if baseline else None,
                       **{f"{n} (regression)": str(p) for n, p in regressions.items()},
                       "approved differences": "docs/runtime-2/evidence/b5/expected-changes.tsv (checked by the gates)"},

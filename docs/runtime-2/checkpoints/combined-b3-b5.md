@@ -232,6 +232,9 @@ Tag `v4.12.0` (annotated) = commit `ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb`. O
 The same tree serves as the v4.12.0 baseline. Without the oracle, `test-cp19-proof-cli` exits 2
 and the campaign preflight fails.
 
+**Superseded by section 35 (C41):** the oracle is now built by `certify.py --record-legacy-oracle`
+from a pristine checkout and passed with `--legacy-oracle-sha256` and `--legacy-oracle-provenance`.
+
 ## 8. Release-blocker list (updated)
 
 Carried (B5 close, 2026-11-07): D4 four session regressions (shared-callable, field, element,
@@ -367,7 +370,8 @@ release blocker pending the owner's scope decision (2.2).
 - L1 (recorded): the oracle provenance check (commit, clean checkout, `make -q nift`) catches
   accidental misuse but not a deliberate copy of a newer binary over a clean `ce8cd36a` checkout
   (`make -q` compares timestamps; the binary is untracked). Recording and checking the oracle's
-  sha256 would close it.
+  sha256 would close it. **Closed by C41 (section 35):** the oracle's sha256 is pinned right after
+  its build and verified before every use.
 - L2 (recorded, known harness limitation pending a decision): a gate that exits 0 after printing
   a SKIP other than the known patterns counts as PASSED (e.g. `tests/runtime2/read_limit.py`
   prints `SKIP default 1 GiB limit` on hosts with less than 4 GiB available, which includes small
@@ -486,7 +490,9 @@ conservative direction) rather than as a pass. Normalisation of varying values i
   (`git worktree add --detach <tree> ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb && make -C <tree>
   -j"$(nproc)" nift`) in `.build/certify/_preflight.json` and summary.json. Deliberate substitution
   (copying another binary over the oracle's checkout after the build) is an **accepted
-  threat-model limitation** (L1).
+  threat-model limitation** (L1). **C41 (section 35) replaces this for the oracle:** the checkout
+  checks stay, the `make -q` and mtime checks are recorded only, and the binary is pinned by the
+  sha256 recorded right after its build. Substitution after pinning is now refused.
 
 ### 12.1 Linode instance minimums (every mandatory assertion executes)
 
@@ -1589,12 +1595,17 @@ EXPECTED_BASELINE since C36 (section 30).
     git worktree add --detach ../nift-v4.12.0 ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb
     git worktree add --detach ../nift-17f7964c 17f7964cb4f5890740658bd90af2d411b2f7d8ce
     git worktree add --detach ../nift-0b5079fc 0b5079fc6874f998bfe82bf3a7e86e2485724477
-    for t in ../nift-v4.12.0 ../nift-17f7964c ../nift-0b5079fc; do
+    # C41 (section 35): the oracle under its checksum-pinned provenance contract
+    test -z "$(git -C ../nift-v4.12.0 status --porcelain --untracked-files=all --ignored)"; test ! -e ../nift-v4.12.0/.build
+    python3 scripts/certify.py --jobs 4 --record-legacy-oracle ../nift-v4.12.0 --legacy-oracle-provenance /work/oracle-provenance.json
+    sha256sum ../nift-v4.12.0/nift | tee /work/oracle-sha256 /work/stage3-builds.txt   # the pin, at once
+    for t in ../nift-17f7964c ../nift-0b5079fc; do
         make -C "$t" -j4 nift; make -q -C "$t" nift; test -x "$t/nift"; sha256sum "$t/nift"
-    done | tee /work/stage3-builds.txt
+    done | tee -a /work/stage3-builds.txt
     ../nift-v4.12.0/nift --version                                  # Nift v4.12.0
     make -j4 nift
     FLAGS=(--legacy-oracle "$PWD/../nift-v4.12.0/nift" --campaign-start "$NIFT_CAMPAIGN_START"
+           --legacy-oracle-sha256 "$(cut -d' ' -f1 /work/oracle-sha256)" --legacy-oracle-provenance /work/oracle-provenance.json
            --baseline ../nift-v4.12.0
            --regression-baseline 17f7964c=../nift-17f7964c --regression-baseline weekend/r2=../nift-0b5079fc)
     python3 scripts/certify.py --list "${FLAGS[@]}" > /work/stage1-preflight.txt 2>&1 \
@@ -1743,6 +1754,10 @@ Review: `scratchpad/review-ha/PRELAUNCH-R2.md`. Harness and docs only (no `src/`
 
 ## 33. Linode finding: the v4.12.0 oracle can never pass plain `make -q nift` (C39)
 
+(Owner 2026-11-08 14:01: this instance, like all five failed ones, failed in setup or in the
+provenance preflight. It was not a Runtime 2.0 certification failure, because no certification gate
+ran. The C39 check is a supporting fact only since C41; see section 35.)
+
 Found by the coordinator on instance 110453277 (setup passed in full, `--toolchain-preflight: ok`;
 the oracle built; then builds stopped with `FAILED (23): oracle v4.12.0: make -q nift is not 0 after
 the build`; instance deleted; spend so far US$8.43). Cause, verified there: v4.12.0's Makefile
@@ -1778,6 +1793,10 @@ the candidate.
 
 ## 34. Linode finding 2: a fresh v4.12.0 build deletes its own signature (C40)
 
+(Owner 2026-11-08 14:01: a provenance-preflight failure, not a Runtime 2.0 certification failure;
+no certification gate ran. The C40 timestamp proof is a supporting fact only since C41; see
+section 35.)
+
 Found by the coordinator on instance 110455151 (setup passed; the oracle built; builds exit 23):
 `oracle_freshness` gave `signature_present: False`, `make_q: 0`. Cause (verified in a ce8cd36a
 tree): v4.12.0's `scripts/build_vendored_libffi.sh:68` runs `rm -rf "$BUILD"`, deleting
@@ -1810,3 +1829,134 @@ fails (the C39 check).
 the link line, every build product newer than the campaign start: accepted ("fresh in-campaign
 build"); with a campaign start after the build it is refused (`.build/libffi/.../.build.log` and
 the rest older); plain `make -q nift` there is 1 (the C39 finding).
+
+## 35. Owner decision 2026-11-08 14:01: the oracle's checksum-pinned provenance contract (C41)
+
+**The five failed instances.** Every one stopped in setup or in the oracle's provenance preflight
+(sections 33 and 34 are two of them). They were setup and provenance-preflight failures, **not
+Runtime 2.0 certification failures**: no certification gate ran on any of them, and none says
+anything about the candidate.
+
+**Decision.** v4.12.0 (ce8cd36a) is a **legacy semantic oracle**. It is not held to the later build
+system's invariants (libffi toolchain signature, `make -q nift`), and v4.12.0 is not modified. The
+strict modern checks are unchanged for the candidate, 17f7964c and weekend/r2. The owner prefers a
+checksum-pinned contract to timestamps.
+
+**Contract (harness only; no src/ or Makefile change):**
+1. `certify.py --record-legacy-oracle TREE --legacy-oracle-provenance JSON` (`record_legacy_oracle`)
+   first checks that TREE is a pristine checkout of exactly ce8cd36a (tree `c128ba47`):
+   - HEAD and tree are those;
+   - `git status --porcelain --untracked-files=all --ignored` is empty, so there is no tracked
+     change, untracked file or ignored build output anywhere;
+   - there is no `.build`;
+   - the provenance file does not exist yet, because a pin is written once.
+   If any check fails it exits 3 and builds nothing.
+2. It builds `make -j<N> nift` from scratch in the campaign's environment (`clean_env()`; job.sh
+   exports CC=gcc-15 and CXX=g++-15 after the toolchain preflight). It records:
+   - the command and cwd;
+   - CC/CXX as make resolves them, with each compiler's `--version` line and identity (resolved
+     path, sha256, owning package and version: the same `compiler_identity` the toolchain
+     preflight uses);
+   - CC, CXX, CFLAGS, CXXFLAGS, CPPFLAGS, LDFLAGS and LDLIBS as make reports them (dry
+     `make -n --eval`, read before the build);
+   - the commit, the tree and the pre-build check;
+   - the host;
+   - the build log.
+3. The build must exit 0 and leave an executable `nift`. Otherwise it exits 1, and the record
+   carries build_rc.
+4. The sha256 of `nift` is taken immediately after the build. It goes into the provenance file
+   (read-only, schema `nift-legacy-oracle-provenance/1`) with the start and end timestamps, the
+   `--version` output and, as supporting facts only, the C39/C40 `oracle_freshness` (including
+   `make -q -o <signature> nift` and the fresh-build timestamps). job.sh writes `sha256sum` of the
+   binary to `/root/out/oracle-sha256` at once.
+5. The existing checks remain: distinct from the candidate (sha256 and real path) and from the
+   regression baselines; reports v4.12.0; executable; its checkout at ce8cd36a with no tracked
+   change.
+6. Every certify run given `--legacy-oracle` (`--list`, focused runs and the full campaign) needs
+   `--legacy-oracle-sha256 HEX` and `--legacy-oracle-provenance JSON`. It **exits 2** unless all of
+   these hold (`oracle_pin_problems`, pure):
+   - the pin is a sha256;
+   - the record exists and parses;
+   - its schema, commit and tree are ce8cd36a's;
+   - its pre-build check is ok;
+   - build_rc is 0;
+   - the command and timestamps are present;
+   - the pin equals the recorded sha256;
+   - the binary is the recorded path;
+   - the recorded CC/CXX identities equal this campaign's verified toolchain;
+   - the oracle's current sha256 equals the pin.
+   The v4.12.0 baseline tree's nift (`--baseline`, the oracle's own tree) must also equal the pin;
+   a full campaign requires it to exist.
+   During classification `oracle_recheck` runs again (logged in summary.json `oracle_rechecks`):
+   after the gate runs, before each target is classified, after every v4.12.0 baseline run and
+   baseline line run, and before each decision. A mismatch stops the campaign with exit 2 and
+   writes `.build/certify/_oracle-recheck.json`.
+   `make -q -o <signature>` (C39), the signature content (C39), the fresh-build timestamps (C40)
+   and the in-campaign mtime (D4) are recorded for the oracle but decide nothing. A campaign start
+   is still required when regression baselines are given (their mtime check is unchanged).
+
+**Guard (215 cases; toy git checkouts recorded by `record_legacy_oracle`, each build a different
+binary):**
+- **Recording:**
+  - an untracked file or an existing `.build` before the build is refused (3), and so is a
+    checkout that is not ce8cd36a; nothing is written in either case;
+  - the pristine toy is recorded (commit, tree, command, rc 0, sha256, both compiler identities,
+    make's flags);
+  - a second record is refused, because the pin is never rewritten;
+  - a failing build exits 1 and its record is refused.
+- **Pin and recheck:**
+  - the correct pin passes;
+  - a different pin is refused;
+  - a substituted file is refused;
+  - the candidate copied over the oracle is refused, and also counts as the same binary as the
+    candidate;
+  - a binary rebuilt after pinning is refused, both for the oracle and for the v4.12.0 baseline
+    tree's nift;
+  - a missing `--legacy-oracle-sha256` is refused;
+  - a missing provenance file, or no provenance flag, is refused;
+  - a provenance commit or tree that is not ce8cd36a's is refused (the toy itself, and the table);
+  - a non-pristine pre-build record is refused;
+  - another compiler is refused;
+  - a non-hex pin is refused;
+  - a baseline tree whose nift is not the pin is refused, and so is a full campaign whose baseline
+    tree has no nift.
+- **CLI:** `--list --targets …` with an unpinned oracle exits 2, and with the pinned toy exits 2
+  (not ce8cd36a).
+- **Superseded cases:** the C39/C40 cases now check that their facts are still computed and decide
+  nothing.
+
+**Real check, local (a scratch clone of ce8cd36a, not bench-v412; GCC 13.3 here; deleted
+afterwards):**
+- `--record-legacy-oracle` checked the checkout pristine (empty status, no .build), built it in
+  93 s with exit 0, and recorded sha256 `7dd42dce…` (CC cc → x86_64-linux-gnu-gcc-13, CXX g++ →
+  x86_64-linux-gnu-g++-13, both with sha256; the flags as make reports them; the supporting
+  freshness facts were make_q 0, signature absent, and 45 objects, all fresh).
+- `--list --targets test-runtime2-b5 --legacy-oracle … --baseline <tree>`:
+  - with the pin and the record: exit 0, no oracle problem (only this host's GCC 13 and tool
+    problems);
+  - without `--legacy-oracle-sha256`: exit 2;
+  - without the record: exit 2;
+  - with the candidate's binary copied over the oracle: exit 2. Three problems are reported: the
+    sha256 is now `f2fed67d…`, not the pinned `7dd42dce…`; it is the same binary as the candidate;
+    and the baseline tree's nift is not the pin;
+  - after restoring the binary: exit 0 again.
+- A second record (same file) was refused, and one into a new file was refused because the tree is
+  not pristine (its .build outputs).
+- `oracle_recheck` passed, failed after one byte was appended, and passed again once the binary
+  was restored.
+- A second `make nift` in a built v4.12.0 tree re-runs the libffi step (its cache exits early) but
+  does not relink: the sha256 is unchanged. So the v4.12.0 baseline runs, which use the same tree,
+  leave the pinned binary as it is.
+- The build is reproducible here: a second fresh clone gave the same `7dd42dce…`.
+
+**Driver (`scratchpad/linode/cb35/job.sh`, builds phase):**
+- Before the oracle build it checks the checkout (HEAD ce8cd36a, empty `status --porcelain
+  --untracked-files=all --ignored`, no `.build`, no pin or provenance yet); failing that is the
+  new exit **27**.
+- It then runs `certify.py --record-legacy-oracle` (exit 3 → 27, any other failure → 20), writes
+  `/root/out/oracle-sha256` right after it, and checks that pin against the provenance (exit 23).
+- `--list` and `--certify` get `--legacy-oracle-sha256 <pin> --legacy-oracle-provenance
+  /root/out/oracle-provenance.json` (`pin_flags`, read from that file, never recomputed from the
+  binary later).
+- The two baselines and the candidate keep `make -q nift`.
+- collect also copies the provenance and the pin.
