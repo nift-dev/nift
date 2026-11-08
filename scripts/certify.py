@@ -722,6 +722,12 @@ def preflight_problems(f):
             out.append("the CP19 legacy oracle and the candidate are the same binary (sha256)")
         if f.get("oracle_realpath") and f.get("oracle_realpath") == f.get("candidate_realpath"):
             out.append("the CP19 legacy oracle and the candidate are the same file (real path)")
+        fr = f.get("oracle_freshness") or {}
+        if fr.get("signature") and fr.get("signature_ok") is not True:
+            out.append(f"the CP19 legacy oracle's libffi toolchain signature {fr.get('signature')} "
+                       + ("is missing" if not fr.get("signature_present") else
+                          "does not match what its Makefile's recipe writes for this toolchain"
+                          if fr.get("expected") is not None else "cannot be recomputed from its Makefile's recipe"))
         if f.get("oracle_executable") is False:
             out.append(f"the CP19 legacy oracle {f.get('oracle')} is not an executable file")
     # C37 (pre-launch review B2): every regression baseline is checked here, before any gate runs
@@ -801,6 +807,44 @@ REGRESSION_COMMITS = {"17f7964c": "17f7964cb4f5890740658bd90af2d411b2f7d8ce",
 
 
 _RO_GIT = dict(os.environ, GIT_OPTIONAL_LOCKS="0")  # read-only git (no index refresh in a baseline tree)
+
+
+def oracle_freshness(tree):
+    """C39 (Linode instance 110453277): `make -q nift` for the v4.12.0 oracle's tree. Its Makefile
+    (ce8cd36a line 117) has `$(LIBFFI_SIGNATURE): FORCE`: the signature target is re-made on every
+    make and only rewritten when its content changes, so a plain `make -q nift` can never be 0. Here,
+    all in dry mode (nothing is written): the signature's path is the tree's own `LIBFFI_SIGNATURE`
+    (`make -pq` database); `nift` must be current with that one file treated as old
+    (`make -q -o <signature> nift`); and the file must exist and equal what the tree's own recipe
+    writes now: the recipe's `printf` line, taken from `make -n <signature>` and run with its
+    `> "$@.tmp"` redirect removed, is that content for the current CC/CXX/flags and compiler
+    versions, so `-o` cannot hide a toolchain change. A tree without that variable keeps the plain
+    `make -q nift`."""
+    t = Path(tree)
+    env = clean_env()
+    out = {"signature": None, "signature_present": None, "expected": None, "signature_ok": None, "make_q": None}
+    if not (t / "Makefile").is_file():
+        return out
+    db = subprocess.run(["make", "-pq", "nift"], cwd=t, capture_output=True, text=True, env=env)
+    m = re.search(r"^LIBFFI_SIGNATURE :?= (\S+)\s*$", db.stdout, re.M)
+    forced = m and re.search(r"^" + re.escape(m.group(1)) + r": FORCE\b", db.stdout, re.M)
+    if not forced:
+        out["make_q"] = subprocess.run(["make", "-q", "nift"], cwd=t, capture_output=True, env=env).returncode
+        return out
+    sig = m.group(1)
+    out["signature"] = sig
+    out["make_q"] = subprocess.run(["make", "-q", "-o", sig, "nift"], cwd=t, capture_output=True, env=env).returncode
+    dry = subprocess.run(["make", "-n", sig], cwd=t, capture_output=True, text=True, env=env)
+    tail = f' > "{sig}.tmp"'
+    line = next((l for l in dry.stdout.splitlines() if l.startswith("printf ") and l.endswith(tail)), None)
+    if line is not None:
+        p = subprocess.run(["sh", "-c", line[: -len(tail)]], cwd=t, capture_output=True, text=True, env=env)
+        out["expected"] = p.stdout if p.returncode == 0 else None
+    path = t / sig
+    out["signature_present"] = path.is_file()
+    out["signature_ok"] = bool(out["signature_present"] and out["expected"] is not None
+                               and path.read_text(errors="replace") == out["expected"])
+    return out
 
 
 def regression_facts(name, tree):
@@ -1160,9 +1204,12 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regression
         facts["oracle_commit"] = head.stdout.strip() if head.returncode == 0 else "not a git checkout"
         st = git("status", "--porcelain", "--untracked-files=no")
         facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
-        oracle_q = subprocess.run(["make", "-q", "nift"], cwd=tree, capture_output=True, env=clean_env())
+        # C39: v4.12.0's Makefile re-makes its libffi toolchain signature on every make
+        # (`$(LIBFFI_SIGNATURE): FORCE`), so a plain `make -q nift` is never 0 there
+        fresh = oracle_freshness(tree)
+        facts["oracle_freshness"] = fresh
         facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file()
-                                   and oracle_q.returncode == 0)
+                                   and fresh["make_q"] == 0)
         facts["campaign_start"] = campaign_start
         try:
             facts["oracle_mtime"] = int(os.stat(oracle).st_mtime)

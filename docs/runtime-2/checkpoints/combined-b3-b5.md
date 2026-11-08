@@ -1740,3 +1740,38 @@ Review: `scratchpad/review-ha/PRELAUNCH-R2.md`. Harness and docs only (no `src/`
   host checks only (no build, oracle or baselines needed; `toolchain_problems`, table-tested) and
   exits 2 on a problem; 29.5 runs it in stage 1 before the stage-3 builds, and stage 0's tip and
   tree check is an automatic `test` against the frozen hashes. B1 stays the owner's decision.
+
+## 33. Linode finding: the v4.12.0 oracle can never pass plain `make -q nift` (C39)
+
+Found by the coordinator on instance 110453277 (setup passed in full, `--toolchain-preflight: ok`;
+the oracle built; then builds stopped with `FAILED (23): oracle v4.12.0: make -q nift is not 0 after
+the build`; instance deleted; spend so far US$8.43). Cause, verified there: v4.12.0's Makefile
+(ce8cd36a line 117) has `$(LIBFFI_SIGNATURE): FORCE`: the libffi toolchain signature is re-made on
+every make (and rewritten only when its content changes), so `make -q nift` in a v4.12.0 tree is
+never 0 (`make --debug=b -q`: "Must remake target 'FORCE'", then the signature). 17f7964c, 0b5079fc
+and the candidate compute the signature with `$(shell)` (Makefile lines 138-147) and pass plain
+`make -q`. So the C37/C38 oracle requirement could not be met by the frozen reference.
+
+**Fix (harness only; the oracle only; baselines and candidate keep plain `make -q nift`).**
+`certify.oracle_freshness(tree)`, all dry (nothing is written):
+- the signature's path is the oracle tree's own `LIBFFI_SIGNATURE`, read from its `make -pq`
+  database, and the rule must be the FORCE'd one (otherwise the plain `make -q nift` is used);
+- `make -q -o <signature> nift` must be 0: everything else is current, the signature alone
+  treated as old;
+- the signature file must exist and equal what the tree's own recipe writes for the current
+  toolchain: the recipe's `printf` line, taken verbatim from `make -n <signature>` and run with only
+  its `> "$@.tmp"` redirect removed. This is the recipe's own computation (CC, CXX, the libffi
+  target, CFLAGS, both compilers' `--version` lines) on this host now, so `-o` cannot hide a
+  toolchain change: a signature from another compiler or flags no longer matches, and a missing one
+  fails.
+Every other oracle check is unchanged (commit ce8cd36a, clean, executable, built after the campaign
+start, sha256, distinct from the candidate and the baselines). Guard (a v4.12.0-style toy tree with
+the FORCE'd signature rule, built by its own make): plain `make -q` is not 0 there (the finding);
+the fresh tree passes; a stale binary fails; a signature written by another toolchain fails; a
+missing signature fails; a tree without the FORCE'd rule keeps the plain `make -q`. Locally, the
+real ce8cd36a tree `bench-v412` reports its signature missing for this host's toolchain (that tree
+was not built with it), as intended.
+
+The campaign driver's builds phase (`scratchpad/linode/cb35/job.sh`) checks the oracle the same way
+(`certify.oracle_freshness`, exit 23 on failure) and keeps plain `make -q` for the two baselines and
+the candidate.

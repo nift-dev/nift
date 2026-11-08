@@ -249,6 +249,27 @@ open(STALE + '/src.c', 'w').write('x\n'); os.utime(STALE + '/nift', (1000, 1000)
 _g = dict(os.environ, GIT_AUTHOR_NAME='g', GIT_AUTHOR_EMAIL='g@x', GIT_COMMITTER_NAME='g', GIT_COMMITTER_EMAIL='g@x')
 subprocess.run('git init -q && git add Makefile src.c && git commit -qm t', shell=True, cwd=STALE, env=_g, check=True)
 STALE_NAME = subprocess.run(['git', '-C', STALE, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()[:12]
+# C39: a v4.12.0-style oracle tree: its libffi toolchain signature is re-made on every make
+# (`$(LIBFFI_SIGNATURE): FORCE`, ce8cd36a line 117), so plain `make -q nift` is never 0 there
+V412T = tempfile.mkdtemp(prefix='cert-guard-v412-')
+open(V412T + '/Makefile', 'w').write(
+    'LIBFFI_SIGNATURE := .build/libffi/toy/.nift-toolchain-signature\nFORCE:\n'
+    'nift: src.c $(LIBFFI_SIGNATURE)\n\tcp src.c nift && chmod +x nift\n'
+    '$(LIBFFI_SIGNATURE): FORCE\n\t@mkdir -p .build/libffi/toy\n'
+    "\t@printf '%s\\n' \"$(CC)|toy|$$(echo compiler-1)\" > \"$@.tmp\"\n"
+    '\t@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi\n')
+open(V412T + '/src.c', 'w').write('x\n'); os.utime(V412T + '/src.c', (1000, 1000))
+subprocess.run(['make', '-s', 'nift'], cwd=V412T, check=True, capture_output=True)
+SIG = V412T + '/.build/libffi/toy/.nift-toolchain-signature'
+FR_OK = certify.oracle_freshness(V412T)
+FR_PLAIN_Q = subprocess.run(['make', '-q', 'nift'], cwd=V412T, capture_output=True).returncode
+os.utime(V412T + '/src.c', None)                       # a source newer than the binary: stale
+FR_STALE = certify.oracle_freshness(V412T)
+os.utime(V412T + '/src.c', (1000, 1000))
+open(SIG, 'w').write('cc|toy|compiler-0\n')           # written by another toolchain
+FR_OTHER = certify.oracle_freshness(V412T)
+os.unlink(SIG)
+FR_MISSING = certify.oracle_freshness(V412T)
 # a baseline tree whose nift is a symlink to a binary outside it (the substituted candidate)
 LINKED = tempfile.mkdtemp(prefix='cert-guard-linked-')
 CANDIDATE = tempfile.mkdtemp(prefix='cert-guard-cand-')
@@ -339,6 +360,13 @@ checks = [
     # C37 (pre-launch review B2): the regression baselines are checked before any gate runs
     ('preflight baselines ok', pp({**GOOD, 'regression_baselines': [RB_OK, RB_R2]}), []),
     ('preflight baselines ok, full campaign', pp({**GOOD, 'require_baselines': True, 'regression_baselines': [RB_OK, RB_R2]}), []),
+    # C39: the v4.12.0 oracle's freshness: `make -q -o <signature> nift` plus the signature's content
+    ('oracle v4.12.0-style tree: plain make -q is never 0 (the finding)', FR_PLAIN_Q != 0, True),
+    ('oracle v4.12.0-style tree passes', (FR_OK['make_q'], FR_OK['signature_ok'], pp({**GOOD, 'oracle_freshness': FR_OK})), (0, True, [])),
+    ('oracle v4.12.0-style tree, stale binary', FR_STALE['make_q'] != 0, True),
+    ('oracle v4.12.0-style tree, signature of another toolchain', len(pp({**GOOD, 'oracle_freshness': FR_OTHER})), 1),
+    ('oracle v4.12.0-style tree, signature missing', [x[-10:] for x in pp({**GOOD, 'oracle_freshness': FR_MISSING})], ['is missing']),
+    ('oracle without a FORCE signature: plain make -q', certify.oracle_freshness(STALE)['signature'], None),
     # C38 (PRELAUNCH-R2 C1): each baseline a distinct binary, no symlink out of its tree
     ('preflight baseline symlinked to the candidate', sorted(x.split(': ', 1)[1][:40] for x in pp({**GOOD, 'regression_baselines': [
         {**RB_OK, 'realpath': '/c/nift', 'sha256': 'bb', 'symlink_outside': True}]})),
@@ -509,7 +537,7 @@ checks = [
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
-for _d in (STALE, LINKED, CANDIDATE):
+for _d in (STALE, LINKED, CANDIDATE, V412T):
     shutil.rmtree(_d, ignore_errors=True)
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:
