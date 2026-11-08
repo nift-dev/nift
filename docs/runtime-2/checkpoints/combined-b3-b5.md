@@ -1775,3 +1775,38 @@ was not built with it), as intended.
 The campaign driver's builds phase (`scratchpad/linode/cb35/job.sh`) checks the oracle the same way
 (`certify.oracle_freshness`, exit 23 on failure) and keeps plain `make -q` for the two baselines and
 the candidate.
+
+## 34. Linode finding 2: a fresh v4.12.0 build deletes its own signature (C40)
+
+Found by the coordinator on instance 110455151 (setup passed; the oracle built; builds exit 23):
+`oracle_freshness` gave `signature_present: False`, `make_q: 0`. Cause (verified in a ce8cd36a
+tree): v4.12.0's `scripts/build_vendored_libffi.sh:68` runs `rm -rf "$BUILD"`, deleting
+`$(LIBFFI_BUILD)/.nift-toolchain-signature`, which the FORCE'd rule had just written inside that
+directory; so after any fresh v4.12.0 build the file never exists (later trees keep it beside the
+directory, `$(LIBFFI_BUILD).nift-toolchain-signature`). The C39 content check could therefore never
+pass on a freshly built oracle.
+
+**Fix (harness; the oracle only).** If the signature file is present, the C39 content check is
+unchanged. If it is absent, the oracle is accepted only when both hold:
+- `make -q -o <signature> nift` is 0; and
+- a mechanical proof that its whole build happened during this campaign (`fresh_build_facts`,
+  dry): every object on nift's link line (the last `-o nift` line of `make -n -B nift`; at least
+  one required), nift itself, every file under `.build/`, and every untracked or ignored file of
+  the tree (`git ls-files --others`: every build product anywhere) has mtime >= the campaign start.
+  Nothing in the tree predates the campaign, so it was built from scratch in this run's
+  environment, with this run's CC/CXX (which the toolchain preflight binds).
+
+**Recorded v4.12.0 limitation:** for the oracle, toolchain identity is established by this
+in-campaign fresh build, not by its signature file (v4.12.0 deletes it).
+
+Guard (a FORCE'd toy git tree whose libffi step deletes the signature, built by its own make):
+the fresh in-campaign build passes (signature absent, accepted by the fresh build, objects >= 1);
+one object older than the campaign start fails; the binary older than the campaign start fails; a
+stray build product older than the campaign start fails; a present but mismatched signature still
+fails (the C39 check).
+
+**Real check, local:** a fresh build of ce8cd36a in a scratch clone (not bench-v412; GCC 13.3 here;
+1 min 32 s; deleted afterwards): signature absent, `make -q -o <signature> nift` 0, 45 objects on
+the link line, every build product newer than the campaign start: accepted ("fresh in-campaign
+build"); with a campaign start after the build it is refused (`.build/libffi/.../.build.log` and
+the rest older); plain `make -q nift` there is 1 (the C39 finding).

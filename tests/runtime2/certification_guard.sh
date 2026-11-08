@@ -241,7 +241,7 @@ RB_R2 = {**RB_OK, 'name': 'weekend/r2', 'expected_commit': certify.REGRESSION_CO
          'commit': certify.REGRESSION_COMMITS['weekend/r2'], 'tree': '/b/r2', 'sha256': 'dd', 'realpath': '/b/r2/nift',
          'tree_realpath': '/b/r2'}
 # a stale baseline tree: a git checkout whose nift is older than its source (make -q nift fails)
-import os, shutil, subprocess, tempfile
+import os, shutil, subprocess, tempfile, time
 STALE = tempfile.mkdtemp(prefix='cert-guard-stale-')
 open(STALE + '/Makefile', 'w').write('nift: src.c\n\tcp src.c nift && chmod +x nift\n')
 open(STALE + '/nift', 'w').write('#!/bin/sh\n'); os.chmod(STALE + '/nift', 0o755)
@@ -270,6 +270,38 @@ open(SIG, 'w').write('cc|toy|compiler-0\n')           # written by another toolc
 FR_OTHER = certify.oracle_freshness(V412T)
 os.unlink(SIG)
 FR_MISSING = certify.oracle_freshness(V412T)
+# C40: a v4.12.0-style tree whose libffi step deletes the signature it was just given (v4.12.0's
+# scripts/build_vendored_libffi.sh:68 `rm -rf "$BUILD"`): a git checkout, built by its own make
+T40 = tempfile.mkdtemp(prefix='cert-guard-v412b-')
+open(T40 + '/Makefile', 'w').write(
+    'LIBFFI_BUILD := .build/libffi/toy\nLIBFFI_SIGNATURE := $(LIBFFI_BUILD)/.nift-toolchain-signature\n'
+    'LIBFFI_A := $(LIBFFI_BUILD)/libffi.a\nFORCE:\n'
+    'nift: obj.o $(LIBFFI_A)\n\tsh link.sh obj.o $(LIBFFI_A) -o nift\n'
+    'obj.o: src.c\n\tcp src.c obj.o\n'
+    '$(LIBFFI_A): $(LIBFFI_SIGNATURE)\n\trm -rf $(LIBFFI_BUILD) && mkdir -p $(LIBFFI_BUILD) && echo ffi > $@\n'
+    '$(LIBFFI_SIGNATURE): FORCE\n\t@mkdir -p $(LIBFFI_BUILD)\n'
+    "\t@printf '%s\\n' \"$(CC)|toy|$$(echo compiler-1)\" > \"$@.tmp\"\n"
+    '\t@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi\n')
+open(T40 + '/src.c', 'w').write('x\n')
+open(T40 + '/link.sh', 'w').write('out=; ins=; while [ $# -gt 0 ]; do if [ "$1" = -o ]; then out=$2; shift; else ins="$ins $1"; fi; shift; done; cat $ins > "$out"; chmod +x "$out"\n')
+open(T40 + '/.gitignore', 'w').write('*.o\nnift\n.build/\n')
+subprocess.run('git init -q && git add Makefile src.c link.sh .gitignore && git commit -qm t', shell=True, cwd=T40, env=_g, check=True)
+for _f in ('src.c', 'Makefile', 'link.sh'):
+    os.utime(T40 + '/' + _f, (1000, 1000))
+START40 = int(time.time()) - 1
+subprocess.run(['make', '-s', 'nift'], cwd=T40, check=True, capture_output=True)
+assert not os.path.exists(T40 + '/.build/libffi/toy/.nift-toolchain-signature'), 'toy: the build kept the signature'
+FR40_OK = certify.oracle_freshness(T40, START40)
+os.utime(T40 + '/obj.o', (START40 - 100, START40 - 100)); os.utime(T40 + '/nift', None)
+FR40_OLD_OBJ = certify.oracle_freshness(T40, START40)
+os.utime(T40 + '/obj.o', None); os.utime(T40 + '/nift', (START40 - 100, START40 - 100))
+FR40_OLD_BIN = certify.oracle_freshness(T40, START40)
+os.utime(T40 + '/nift', None)
+open(T40 + '/.build/libffi/old.log', 'w').write('x\n'); os.utime(T40 + '/.build/libffi/old.log', (START40 - 100, START40 - 100))
+FR40_OLD_OTHER = certify.oracle_freshness(T40, START40)
+os.unlink(T40 + '/.build/libffi/old.log')
+open(T40 + '/.build/libffi/toy/.nift-toolchain-signature', 'w').write('cc|toy|compiler-0\n')
+FR40_OTHER = certify.oracle_freshness(T40, START40)
 # a baseline tree whose nift is a symlink to a binary outside it (the substituted candidate)
 LINKED = tempfile.mkdtemp(prefix='cert-guard-linked-')
 CANDIDATE = tempfile.mkdtemp(prefix='cert-guard-cand-')
@@ -365,7 +397,20 @@ checks = [
     ('oracle v4.12.0-style tree passes', (FR_OK['make_q'], FR_OK['signature_ok'], pp({**GOOD, 'oracle_freshness': FR_OK})), (0, True, [])),
     ('oracle v4.12.0-style tree, stale binary', FR_STALE['make_q'] != 0, True),
     ('oracle v4.12.0-style tree, signature of another toolchain', len(pp({**GOOD, 'oracle_freshness': FR_OTHER})), 1),
-    ('oracle v4.12.0-style tree, signature missing', [x[-10:] for x in pp({**GOOD, 'oracle_freshness': FR_MISSING})], ['is missing']),
+    ('oracle v4.12.0-style tree, signature missing, no fresh-build proof', [x.split(' is missing')[1][:45] for x in pp({**GOOD, 'oracle_freshness': FR_MISSING})],
+        [' and the oracle was not built from scratch du']),
+    # C40: v4.12.0's libffi build deletes the signature; a fresh in-campaign build is the proof then
+    ('oracle signature deleted by its build, fresh in-campaign build passes', (FR40_OK['signature_present'], FR40_OK['signature_ok'],
+        FR40_OK.get('accepted_by'), FR40_OK['fresh_build']['objects'] >= 1, pp({**GOOD, 'oracle_freshness': FR40_OK})),
+        (False, True, 'fresh in-campaign build', True, [])),
+    ('oracle signature deleted by its build, an object older than the campaign start', (FR40_OLD_OBJ['signature_ok'],
+        FR40_OLD_OBJ['fresh_build']['old'], len(pp({**GOOD, 'oracle_freshness': FR40_OLD_OBJ}))), (False, ['obj.o'], 1)),
+    ('oracle signature deleted by its build, nift older than the campaign start', (FR40_OLD_BIN['signature_ok'],
+        FR40_OLD_BIN['fresh_build']['old']), (False, ['nift'])),
+    ('oracle signature deleted by its build, a stray product older than the campaign start', FR40_OLD_OTHER['fresh_build']['old'],
+        ['.build/libffi/old.log']),
+    ('oracle signature present but another toolchain\'s (still the C39 check)', (FR40_OTHER['signature_ok'],
+        len(pp({**GOOD, 'oracle_freshness': FR40_OTHER}))), (False, 1)),
     ('oracle without a FORCE signature: plain make -q', certify.oracle_freshness(STALE)['signature'], None),
     # C38 (PRELAUNCH-R2 C1): each baseline a distinct binary, no symlink out of its tree
     ('preflight baseline symlinked to the candidate', sorted(x.split(': ', 1)[1][:40] for x in pp({**GOOD, 'regression_baselines': [
@@ -537,7 +582,7 @@ checks = [
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
 ]
-for _d in (STALE, LINKED, CANDIDATE, V412T):
+for _d in (STALE, LINKED, CANDIDATE, V412T, T40):
     shutil.rmtree(_d, ignore_errors=True)
 bad = [(n, got, want) for n, got, want in checks if got != want]
 if bad:

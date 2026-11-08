@@ -725,7 +725,9 @@ def preflight_problems(f):
         fr = f.get("oracle_freshness") or {}
         if fr.get("signature") and fr.get("signature_ok") is not True:
             out.append(f"the CP19 legacy oracle's libffi toolchain signature {fr.get('signature')} "
-                       + ("is missing" if not fr.get("signature_present") else
+                       + (f"is missing and the oracle was not built from scratch during this campaign "
+                          f"({(fr.get('fresh_build') or {}).get('reason') or 'make -q -o <signature> nift is not 0'})"
+                          if not fr.get("signature_present") else
                           "does not match what its Makefile's recipe writes for this toolchain"
                           if fr.get("expected") is not None else "cannot be recomputed from its Makefile's recipe"))
         if f.get("oracle_executable") is False:
@@ -809,7 +811,7 @@ REGRESSION_COMMITS = {"17f7964c": "17f7964cb4f5890740658bd90af2d411b2f7d8ce",
 _RO_GIT = dict(os.environ, GIT_OPTIONAL_LOCKS="0")  # read-only git (no index refresh in a baseline tree)
 
 
-def oracle_freshness(tree):
+def oracle_freshness(tree, campaign_start=None):
     """C39 (Linode instance 110453277): `make -q nift` for the v4.12.0 oracle's tree. Its Makefile
     (ce8cd36a line 117) has `$(LIBFFI_SIGNATURE): FORCE`: the signature target is re-made on every
     make and only rewritten when its content changes, so a plain `make -q nift` can never be 0. Here,
@@ -844,6 +846,55 @@ def oracle_freshness(tree):
     out["signature_present"] = path.is_file()
     out["signature_ok"] = bool(out["signature_present"] and out["expected"] is not None
                                and path.read_text(errors="replace") == out["expected"])
+    if not out["signature_present"]:
+        # C40 (Linode instance 110455151): v4.12.0's scripts/build_vendored_libffi.sh:68 does
+        # `rm -rf "$BUILD"`, deleting the signature the FORCE'd rule had just written inside that
+        # directory, so after any fresh v4.12.0 build the file never exists. Then the toolchain
+        # identity is established by a fresh build during this campaign instead (the compilers
+        # themselves are bound by the toolchain preflight).
+        out["fresh_build"] = fresh_build_facts(t, campaign_start)
+        out["signature_ok"] = out["make_q"] == 0 and out["fresh_build"]["ok"]
+        out["accepted_by"] = "fresh in-campaign build" if out["signature_ok"] else None
+    return out
+
+
+def fresh_build_facts(t, campaign_start):
+    """C40, dry: did the whole build of tree `t` happen during this campaign? Every object `make`
+    would link into nift (the link line of `make -n -B nift`; at least one), nift itself, every file
+    under .build/ and every untracked or ignored file of the tree (git ls-files --others: every
+    build product anywhere) must have mtime >= the campaign start."""
+    out = {"ok": False, "objects": 0, "old": [], "reason": None}
+    if campaign_start is None:
+        out["reason"] = "no campaign start"
+        return out
+    dry = subprocess.run(["make", "-n", "-B", "nift"], cwd=t, capture_output=True, text=True, env=clean_env())
+    link = next((l for l in reversed(dry.stdout.splitlines()) if re.search(r"(^|\s)-o\s+nift(\s|$)", l)), None)
+    objects = [x for x in (link or "").split() if x.endswith((".o", ".a"))]
+    out["objects"] = len(objects)
+    if not objects:
+        out["reason"] = "no object on nift's link line (make -n -B nift)"
+        return out
+    others = subprocess.run(["git", "-C", str(t), "ls-files", "--others"], capture_output=True, text=True, env=_RO_GIT)
+    if others.returncode != 0:
+        out["reason"] = "cannot list the tree's build products (git ls-files --others failed)"
+        return out
+    products = set(objects) | {"nift"} | set(others.stdout.splitlines())
+    if (t / ".build").is_dir():
+        products |= {os.path.relpath(os.path.join(d, f), t) for d, _, fs in os.walk(t / ".build") for f in fs}
+    for rel in sorted(products):
+        p = t / rel
+        try:
+            m = os.lstat(p).st_mtime
+        except OSError:
+            if rel in objects or rel == "nift":
+                out["old"].append(rel + " (missing)")
+            continue
+        if m < campaign_start:
+            out["old"].append(rel)
+    out["old"] = out["old"][:10]
+    if out["old"]:
+        out["reason"] = "build products older than the campaign start (or missing): " + ", ".join(out["old"][:5])
+    out["ok"] = not out["old"]
     return out
 
 
@@ -1206,7 +1257,7 @@ def preflight_facts(root, oracle, campaign_start=None, build_rc=None, regression
         facts["oracle_clean"] = st.returncode == 0 and not st.stdout.strip()
         # C39: v4.12.0's Makefile re-makes its libffi toolchain signature on every make
         # (`$(LIBFFI_SIGNATURE): FORCE`), so a plain `make -q nift` is never 0 there
-        fresh = oracle_freshness(tree)
+        fresh = oracle_freshness(tree, campaign_start)
         facts["oracle_freshness"] = fresh
         facts["oracle_current"] = (Path(oracle).resolve() == tree / "nift" and (tree / "Makefile").is_file()
                                    and fresh["make_q"] == 0)
