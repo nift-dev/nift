@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CP22 coroutine fixtures: legacy oracle, VM differential, refusals, mutants.
 
-  run.py --nift ./nift --mode legacy      legacy (NIFT_VM unset) == recorded goldens
+  run.py --nift ./nift --mode legacy      legacy (NIFT_VM=0) == recorded goldens
   run.py --nift ./nift --mode vm          NIFT_VM=require == legacy golden (or the
                                           case's .r2 golden under its EXPECT.tsv
                                           policy); real VM execution checked in
@@ -154,6 +154,10 @@ def run(nift, folder, name, vm=None, extra=None, trace=None, switches=True):
         stats = Path(d) / "stats.jsonl"
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
                "LC_ALL": "C", "TZ": "UTC", "NIFT_PREVALIDATE": "off"}
+        if not vm:
+            # The legacy oracle (review of C67-C71, S-1): an unset NIFT_VM requires the VM since
+            # the VM-default policy, so legacy is selected explicitly.
+            env["NIFT_VM"] = "0"
         if vm:
             env.update({"NIFT_VM": vm, "NIFT_VM_STATS": str(stats)})
             # thread() compiles only with the cooperative opt-in (owner decision

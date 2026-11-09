@@ -3441,3 +3441,40 @@ the hook expanded to nothing.
   - Before the fix it reported exactly `src/rt/vm_report.cpp`; after the fix it passes.
   - The selftest plants four negative controls (a hook macro, a `vm_mutant()` test, a CORO macro
     and a FOR macro outside their lists) and rejects each; the control passes.
+
+**C72 result (gate run after the commit).** `make test-rt-vm-mutants`: the mutant-list lint and its
+selftest pass; the unmutated binary passes every suite; **12 of 12 mutants are rejected**. Mutant 5
+is rejected by int-bounds (505), golden (60 of 108), review (14), d018 (15), parity (24),
+adversarial (161), former-replay (152) and records.
+
+## 62. Review of C67–C71, S-1: harnesses that used the bare binary as legacy (C73, tests and Makefile)
+
+Since b61784a2 (2026-10-31) an unset `NIFT_VM` runs the VM, and rt-diff passes a minimal
+environment, so the bare binary is no longer legacy. The 7 `test-runtime2-rt-diff-selftest`
+failures of section 60 all have this one cause.
+- **New `$(TEST_DIR)/nift-legacy`:** a `NIFT_VM=0` wrapper around the same binary (Makefile
+  rule `LEGACY_NIFT`).
+- **Fixed:**
+  - `test-runtime2-rt-diff-selftest`: `NIFT_BIN` is now the wrapper. PASS, 87 checks, 0 FAIL
+    (before: 7 FAIL).
+  - `test-runtime2-prevalidate-gate`, `rules_test.py --legacy`: the wrapper. 119 cases, 0
+    failures (before: 36 failures, legacy reading as the VM).
+  - `test-runtime2-prevalidate-gate`, `positive_test.py --nift`: the wrapper. Its "legacy" and
+    "prevalidating default" runs date from CP13, when the default engine was legacy. 17 programs
+    and 346 operator programs, 0 failures (before: 30 failures). The target never got this far
+    before, because `rules_test.py` failed first. The whole target now passes.
+  - `tests/runtime2/cp22/run.py`: a run without a VM mode (the legacy goldens, `--record`, the
+    trace comparison's legacy side) now sets `NIFT_VM=0`. Its `legacy` mode passes 177 cases and
+    `trace` passes 3, both identical with the bare binary and the wrapper.
+- **Checked and left as they are** (their use is intended, or observation only):
+  - `tests/runtime2/prevalidate/gate.py --nift`: legacy observations only ("never the
+    criterion"), and its classify step sets `NIFT_VM=classify` itself, which a wrapper would
+    override.
+  - `tests/site_dx_smoke.sh` (`env -u NIFT_VM`, deliberately checks the default-mode refusal).
+  - `tests/runtime2/memory_c1.sh` (`NIFT_VM=require`).
+  - `tests/runtime2/refrep/refrep_cli.py` and `tests/runtime2/cp19/cleanup_cli.py` (they test
+    the default session).
+  - `cp25/inventory.py` (VM against VM).
+  - `test-runtime2-rt-diff` (the same binary on both sides; a determinism check).
+  - `builtins_diff.cpp` and `vm_parity.py` (already pin `NIFT_VM=0`).
+  - `cp19/widening_error_boundary.py` (sets `NIFT_VM=0` for its legacy row).

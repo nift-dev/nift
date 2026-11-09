@@ -2777,14 +2777,23 @@ test-runtime2-diagnostics: $(TARGET)
 	python3 tests/runtime2/diagnostics/codes_check.py
 	python3 tests/runtime2/diagnostics/json_check.py
 
+# Review of C67-C71, S-1: since b61784a2 (2026-10-31) the bare binary runs the VM when NIFT_VM
+# is unset, and rt-diff passes a minimal environment, so harnesses that need the legacy oracle use
+# this NIFT_VM=0 wrapper around the same binary.
+LEGACY_NIFT := $(TEST_DIR)/nift-legacy
+$(LEGACY_NIFT): $(TARGET)
+	mkdir -p "$(TEST_DIR)"
+	printf '#!/bin/sh\nNIFT_VM=0\nexport NIFT_VM\nexec "%s" "$$@"\n' "$(CURDIR)/$(TARGET)" > "$@.tmp"
+	chmod +x "$@.tmp" && mv "$@.tmp" "$@"
+
 # Syntax prevalidation (D-022 #3): the rules decided against legacy, and the
 # permanent zero-false-rejection gate over every corpus and the vendored
 # real-project units (every rejection must cite a grammar/lexical rule and be
 # reviewed). Not yet in the certification guard's REQUIRED list.
-test-runtime2-prevalidate-gate: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
-	python3 tests/runtime2/prevalidate/rules_test.py --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT) --legacy "$(CURDIR)/$(TARGET)"
+test-runtime2-prevalidate-gate: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(LEGACY_NIFT)
+	python3 tests/runtime2/prevalidate/rules_test.py --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT) --legacy "$(CURDIR)/$(LEGACY_NIFT)"
 	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
-	python3 tests/runtime2/prevalidate/positive_test.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	python3 tests/runtime2/prevalidate/positive_test.py --nift "$(CURDIR)/$(LEGACY_NIFT)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 
 # Runtime 2.0 CP08: differential harness self-check (A = B = this binary) over
 # the committed corpora, scripts extracted from the smoke tests, and a seeded
@@ -2801,8 +2810,8 @@ test-runtime2-rt-diff: $(TARGET)
 
 # The harness catches seeded differences on every channel, hides only what its
 # normalisations document, and its policies approve only exact differences.
-test-runtime2-rt-diff-selftest: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/rt_diff_selftest.sh
+test-runtime2-rt-diff-selftest: $(TARGET) $(LEGACY_NIFT)
+	NIFT_BIN="$(CURDIR)/$(LEGACY_NIFT)" bash tests/runtime2/rt_diff_selftest.sh
 	$(PYTHON) tests/runtime2/rt_diff_trace_policy_selftest.py
 
 # Runtime 2.0 CP01 (review defect D1): modified-mode timestamp races.
