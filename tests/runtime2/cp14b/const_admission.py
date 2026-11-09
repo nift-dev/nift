@@ -20,6 +20,21 @@ PARITY=[
 SHARED=[
 'const a:=[[1],[2]]; for(v:a) { v.push(9) }; print(a.stringify())',
 ]
+# Review of C47-C49 (combined-b3-b5.md section 44), part 3 of the binding-only const contract:
+# values the language treats as immutable (strings, numbers; booleans and null have no operation
+# that could change them in place) stay unchanged when a const binding's value is "changed" through
+# an alias, a function parameter, a lambda or a collection element: each such change makes a new
+# value. Each runs on the VM and equals legacy exactly. (Element stores and pushes on a string are
+# errors in legacy and refusals or the same errors on the VM: they never change the string.)
+IMMUTABLE=[
+'const s:="ab"; t:=s; t+="c"; print(s); print(t)',
+'const s:="ab"; t:=s.to_upper(); print(s); print(t)',
+'fn(f(x)) { x+="c"; return x }; const s:="ab"; print(f(s)); print(s)',
+'const s:="ab"; g:=(x)=>x+"c"; print(g(s)); print(s)',
+'const s:="ab"; xs:=[s]; xs[0]=xs[0]+"c"; print(s); print(xs[0])',
+'const n:=1; m:=n; m+=1; print(n); print(m)',
+'const d:=2.5; e:=d; e*=2; print(d); print(e)',
+]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--base',required=True);p.add_argument('--output',required=True);p.add_argument('--vm-only-harness',action='store_true');a=p.parse_args();rows=[]
     with tempfile.TemporaryDirectory(prefix='cp14b-const-') as folder:
@@ -36,5 +51,10 @@ def main():
             legacy=run(a.base,'0',source,root);vm=run(a.nift,'require',source,root);st=vm['stats'][-1] if vm['stats'] else {}
             ok=all(vm[k]==legacy[k] for k in ['out','err','exit']) and st.get('vm_executions')==1 and st.get('legacy_executions')==0
             rows.append(dict(kind='shared loop element (B5, legacy-equal)',source=source,pass_=bool(ok),legacy=legacy,require=vm))
+        for source in IMMUTABLE:
+            legacy=run(a.base,'0',source,root);vm=run(a.nift,'require',source,root);st=vm['stats'][-1] if vm['stats'] else {}
+            ok=(all(vm[k]==legacy[k] for k in ['out','err','exit']) and vm['exit']==0 and
+                st.get('vm_executions')==1 and st.get('legacy_executions')==0)
+            rows.append(dict(kind='immutable value through a const binding (B5 Q2B)',source=source,pass_=bool(ok),legacy=legacy,require=vm))
     Path(a.output).write_text(json.dumps(rows,indent=2)+'\n');print('PASS' if all(r['pass_'] for r in rows) else 'FAIL',len(rows),'const admission checks');return 0 if all(r['pass_'] for r in rows) else 1
 if __name__=='__main__':raise SystemExit(main())

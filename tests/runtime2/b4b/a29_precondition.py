@@ -4,7 +4,8 @@
 A29 removes the exposure of a value a session statement stores into an earlier value that has no
 site (src/rt/infer_sites.cpp, Inference::site_store, the `session_ && !has_site(container)`
 branch). In sessions that branch is reached only by stores into an earlier non-aggregate value
-(int, bool, string, null, a lambda) or an earlier struct instance. Every such statement is refused
+(int, bool, string, null, a lambda; and, from the review of C47-C49, a double, a declared fn used
+as a value, a mutex, a channel, a set, an error) or an earlier struct instance. Every such statement is refused
 for its receiver's kind alone, unmutated and mutated alike, inside a dead branch too, so the
 dropped exposure is never observable and A29 is retired from tests/runtime2/b4b/mutants.sh.
 
@@ -26,7 +27,16 @@ EARLIER = {
     "null": "x := null",
     "lambda": "x := () => 1",
     "struct": "struct(S) { a := 1 }\nx := S()",
+    # Review of C47-C49 (combined-b3-b5.md section 44): line 298 is also reached from these.
+    "double": "x := 1.5",
+    "fn value": "fn(h()) { return 1 }\nx := h",
+    "mutex": "x := mutex()",
+    "channel": "x := channel(1)",
+    "set": "x := set()",
+    "error": 'x := error("e")',
 }
+# A receiver kind with its own refusal reason for a store (a set has no push method).
+OVERRIDE = {("set", "push"): "method:push"}
 STORES = {  # store -> (non-struct reason, struct reason)
     "push": ("x.push(ys)", "type:push", "type:push"),
     "index": ("x[0] = ys", "type:element-assignment", "type:element-assignment"),
@@ -44,7 +54,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="a29-precondition-") as work:
         for kind, decl in EARLIER.items():
             for store, (text, plain, struct) in STORES.items():
-                want = struct if kind == "struct" else plain
+                want = OVERRIDE.get((kind, store), struct if kind == "struct" else plain)
                 for guarded in (False, True):
                     body = f"if (false) {{ {text} }}" if guarded else text
                     stdin = f'{decl}\nys := [" a "]; {body}; print(ys[0].trim())\nprint("end")\n'

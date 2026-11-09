@@ -13,7 +13,8 @@ APPROVED_CONTROLS={DRAIN:dict(vm=dict(out='CATCH\n[{"k":3},{"k":1},{"k":2}]\nAFT
                               citation='owner ruling Q7 (2026-11-07), copy-sort-commit; B04 approval 2026-11-09 17:31')}
 # C47: a witness the functional suite already pins as an approved difference (functional.APPROVED)
 # is pinned the same way here: the VM to the approved output, legacy to its own recorded output.
-# Mutant 11's witness, const_precedence: owner Q2 option B, `const` is binding-only (B5).
+# const_precedence (owner Q2 option B, `const` is binding-only, B5) stays pinned here, run as an
+# approved control on its own (below) since its mutant, 11, is retired.
 for _name,_want in APPROVED.items():
     if 'vm_err' in _want:
         APPROVED_CONTROLS.setdefault(CASES[_name],dict(vm=dict(out=_want['vm'],err=_want['vm_err'],exit=_want['vm_exit']),
@@ -29,8 +30,14 @@ MUTANTS=[
 (8,'group-each-duplicate-membership','collection_helpers',CASES['group_by_each']),
 (9,'skip-caught-sort-drain','vm_collection_sort',DRAIN),
 (10,'duplicate-callback-prefix','vm_collection_report',CASES['block_error']),
-(11,'missing-const-guard','compiler_array_mutation',CASES['const_precedence']),
 ]
+# Mutant 11 (missing-const-guard, compiler_array_mutation, witness const_precedence) is RETIRED as
+# obsolete (combined-b3-b5.md sections 40 and 44; review of C47-C49): B5 2 (519b9690) deleted its
+# hook with the const-array guard it removed, and owner Q2 option B (`const` is binding-only) makes
+# that guard obsolete. Built with this file's own command, -DNIFT_COLLECTION_MUTANT=11 gives the same
+# preprocessed source and a byte-identical object. The const contract's coverage is listed in
+# section 44 (const_admission.py, cp25's const differential, functional.py's exact pins).
+RETIRED={11:('missing-const-guard','compiler_array_mutation','const_precedence')}
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',required=True);a=p.parse_args();out=Path(a.out);out.mkdir(parents=True,exist_ok=True)
     objects=[str(p) for root in ['src','minifypp','markuppp'] for p in Path(root).rglob('*.o')]
@@ -39,6 +46,19 @@ def main():
     prof=cprof.profile(a.nift);unverified=0
     with tempfile.TemporaryDirectory(prefix='cp14b-mutants-') as folder:
         root=Path(folder)
+        mutated={m[3] for m in MUTANTS}
+        for source,want in APPROVED_CONTROLS.items():
+            if source in mutated:continue  # checked as that mutant's control below
+            label=next((n for n,c in CASES.items() if c==source),source[:40])
+            normal=run(a.nift,'require',source,root);oracle=run(a.nift,'0',source,root)
+            st=normal['stats'][-1] if normal['stats'] else {}
+            if any(normal[k]!=want['vm'][k] for k in ['out','err','exit']):
+                raise RuntimeError('Approved control failed its VM pin: '+label)
+            if any(oracle[k]!=want['legacy'][k] for k in ['out','err','exit']):
+                raise RuntimeError('Approved control: legacy differs from its recorded output: '+label)
+            if st.get('outcome') not in ['vm','vm-error'] or st.get('vm_executions')!=1 or st.get('legacy_executions')!=0:
+                raise RuntimeError('Approved control did not execute on the VM: '+label)
+            print('PASS approved control',label,'('+want['citation']+')',flush=True)
         for number,name,stem,source in MUTANTS:
             if prof.refused and cprof.is_comparator(source):
                 # The production gate refuses this witness before the mutated code can run.

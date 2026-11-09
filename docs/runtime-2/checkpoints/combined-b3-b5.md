@@ -2648,3 +2648,53 @@ production order, reproduces `c528e7eb...` exactly. That build fails 24 of the n
 **Cost.** Per chunk or per growth step, one comparison more. No change per byte.
 `read_line` adds one capacity test per character, then the existing append. There is no
 wall-clock benchmark (standing rule), and no callgrind gate covers these natives.
+
+## 44. Review of C47-C49 (ACCEPT-WITH-FINDINGS, all Low): cp14b mutant 11 retired; the A29 precondition widened (C52)
+
+Tests and docs only. The production binary is unchanged (`864952359673b64e...`, C50).
+
+### 44.1 cp14b mutant 11 retired as obsolete
+
+**History (kept).**
+- Mutant 11 (`missing-const-guard`, `src/rt/compiler_array_mutation.cpp`, witness `const_precedence`) removed the VM's const-array guard. That guard implemented legacy's "cannot mutate const array".
+- Owner Q2 option B (`const` is binding-only) made the guard wrong. B5 2 (519b9690) deleted it together with the mutant's `NIFT_COLLECTION_MUTANT == 11` hook.
+- The mutant stayed listed. Its control failed first, so its emptiness went unseen until C47 pinned the approved control (section 40). From then on it SURVIVED.
+
+**Proof (the reviewer's, reproduced here).** `compiler_array_mutation.cpp` was compiled with
+`mutations.py`'s own command, once with `-DNIFT_COLLECTION_MUTANT=11` and once without. The
+preprocessed sources are equal and the objects byte-identical. No `NIFT_COLLECTION_MUTANT` test
+against 11 is left in `src/`.
+
+**Retirement, following A29 and B5 mutant 2.**
+- Mutant 11 leaves `MUTANTS` in `tests/runtime2/cp14b/mutations.py`. A comment and `RETIRED` record it there.
+- The `const_precedence` witness pin stays. Every `functional.APPROVED` pin whose witness no mutant uses now runs as an **approved control on its own**: `const_precedence` and `const_capture`. The VM must equal its approved output and legacy its recorded one, and the program must run on the VM.
+- No replacement mutant: the contract's coverage is below.
+- `test-runtime2-cp14b-mutants` passes:
+  - both approved controls;
+  - mutants 3-8 and 10 DETECTED; 1, 2 and 9 (DRAIN) UNVERIFIED on GCC 13.3;
+  - design mutants: all DETECTED, 12 UNVERIFIED.
+
+**The binding-only `const` contract and what covers each part.**
+
+| Part | Covered by |
+| --- | --- |
+| 1. Rebinding a `const` is refused (D-009 #2, D-058) | `tests/runtime2/cp25/const/` through `test-cp25r` (in `test-rt-vm`): assign, compound, increment, decrement, assign before the value, in try, shadowed, unreached, in loop bodies and callees, for int, string, bool, double and null in every context, the VM against legacy; also `cp13b` `s03_binding_readonly`, `vm-corpus/cp04/callee_const` and `semantics/loop_const` |
+| 2. Mutating a mutable collection through a `const` binding is allowed (Q2 B) | `cp14b/const_admission.py` Q2B (an element store at top level, in a function, through a lambda, and after a side effect, each pinned to its B5 result) and SHARED (a nested element through the loop binding); `functional.py` exact pins `const_precedence` and `const_capture`, also approved controls in `mutations.py` |
+| 3. Immutable runtime values stay protected | **strings and numbers**: new in `const_admission.py` (IMMUTABLE, 7 programs; no existing test pinned this through a const binding). A const string or number "changed" through an alias (`+=`, `*=`), a method (`to_upper`), a function parameter, a lambda, or an array element keeps its value: each change makes a new value, on the VM and equal to legacy. Element stores and `push` on a string are errors in legacy and refusals (or the same errors) on the VM. **`args`** is immutable through every alias (owner Q1): `refsem/approved/args_copy_push` (`cannot mutate const array: b`) and `args_cmd.py`. **Booleans and null** have no in-place operation; rebinding them is part 1 |
+
+The language treats as immutable: strings, numbers (int and double), booleans and null, and `args`
+(the one immutable collection, Q1). Arrays, objects, maps, sets, stacks and struct instances are
+mutable through every binding, const or not (Q2 B). Handles (mutex, channel, files) keep their identity.
+
+### 44.2 The A29 precondition widened
+
+The review found more earlier-value kinds that reach `infer_sites.cpp:298`: a double, a declared
+`fn` used as a value, `mutex()`, `channel(1)`, `set()` and `error("e")`.
+- `tests/runtime2/b4b/a29_precondition.py` adds each with the same four stores (push, index, key, member), live and in a dead branch.
+- Each is refused for its receiver-kind reason: `type:push` (a set's push is `method:push`), `type:element-assignment`, `index-target`, `static-error:member-assign`.
+- Result: 96 session statements (12 kinds x 4 stores x 2), all refused, none run.
+
+### 44.3 Low, recorded only
+
+`tests/runtime2/for_s2_bench.py` still mixes the deterministic memory checks with a wall-clock
+ratio that only reports MISS (never fails). Unchanged, as asked.
