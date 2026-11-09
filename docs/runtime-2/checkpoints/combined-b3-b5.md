@@ -3541,3 +3541,21 @@ fake VM.
   argument. A narrower rule could allow `thread(declared_fn, scalar literals...)` when the task
   function's body reaches no aggregate shared with the caller. That needs a sound definition and
   an owner decision; it is not done here.
+
+## 64. Owner 08:57, extra requirements for the batch: permanent controls (C75, tests and Makefile)
+
+- **S-1, legacy really is legacy.** `tests/runtime2/legacy_engine_check.sh LEGACY VM` runs a
+  probe that differs between the engines (a callee's `push(99)`: legacy prints `[1,2]`, the VM
+  `[1,2,99]`). It fails if the two binaries agree or either deviates.
+  - `test-runtime2-rt-diff-selftest` runs it on `nift-legacy` against `nift` (PASS), and then as a
+    permanent negative control on the bare `nift` against itself, which must be rejected (it is:
+    "both binaries print '[1,2,99]'").
+  - `test-runtime2-prevalidate-gate` runs the positive check.
+- **O-1:** the direct-path fake-VM control is a permanent selftest case (`n_direct_path_only_bug`,
+  section 63).
+- **Mutant 5, the objects differ.** `test-rt-vm-mutants` now first requires every
+  `RT_VM_MUTATED` object to differ byte-wise from its mutant counterpart in `.build/mutants/`; an
+  identical pair means the hooks compiled to nothing. All five differ, `vm_report.o` included.
+  In the C72 gate run, mutant 5 was caught by the three suites that pin error positions, golden
+  (60 of 108), d018 (15) and review (14), and by int-bounds, parity, adversarial, former-replay
+  and records too: 12 of 12 rejected (section 62).

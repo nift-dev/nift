@@ -1311,6 +1311,9 @@ test-rt-vm: test-rt-vm-sharing-oracle
 test-rt-vm-mutants: test-rt-vm-mutants-sharing-oracle
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
 	python3 -B scripts/build/check-mutant-lists.py
+	@for o in $(RT_VM_MUTATED); do m="$(TEST_DIR)/mutants/$$(basename $$o)"; \
+		if cmp -s "$$o" "$$m"; then echo "FAIL $$m is identical to $$o: its mutant hooks compiled to nothing"; exit 1; fi; \
+		echo "PASS $$m differs from $$o (mutant hooks compiled in)"; done
 	python3 -B scripts/build/check-mutant-lists.py --selftest
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff --jobs "$${NIFT_MUTANT_JOBS:-$$(( ($$(nproc) + 1) / 2 ))}"
 
@@ -2791,6 +2794,7 @@ $(LEGACY_NIFT): $(TARGET)
 # real-project units (every rejection must cite a grammar/lexical rule and be
 # reviewed). Not yet in the certification guard's REQUIRED list.
 test-runtime2-prevalidate-gate: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(LEGACY_NIFT)
+	@bash tests/runtime2/legacy_engine_check.sh "$(CURDIR)/$(LEGACY_NIFT)" "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/prevalidate/rules_test.py --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT) --legacy "$(CURDIR)/$(LEGACY_NIFT)"
 	python3 tests/runtime2/prevalidate/gate.py --nift "$(CURDIR)/$(TARGET)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	python3 tests/runtime2/prevalidate/positive_test.py --nift "$(CURDIR)/$(LEGACY_NIFT)" --tool $(TEST_DIR)/rt-parse-dump$(EXEEXT)
@@ -2810,7 +2814,12 @@ test-runtime2-rt-diff: $(TARGET)
 
 # The harness catches seeded differences on every channel, hides only what its
 # normalisations document, and its policies approve only exact differences.
+LEGACY_ENGINE_CHECK = bash tests/runtime2/legacy_engine_check.sh "$(CURDIR)/$(LEGACY_NIFT)" "$(CURDIR)/$(TARGET)" && \
+	if bash tests/runtime2/legacy_engine_check.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(TARGET)" >/dev/null; then \
+		echo "FAIL legacy/VM engine check negative control: the bare binary passed as legacy"; exit 1; fi && \
+	echo "PASS legacy/VM engine check negative control: the bare binary is rejected as legacy"
 test-runtime2-rt-diff-selftest: $(TARGET) $(LEGACY_NIFT)
+	@$(LEGACY_ENGINE_CHECK)
 	NIFT_BIN="$(CURDIR)/$(LEGACY_NIFT)" bash tests/runtime2/rt_diff_selftest.sh
 	$(PYTHON) tests/runtime2/rt_diff_trace_policy_selftest.py
 
