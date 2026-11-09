@@ -3035,3 +3035,34 @@ adds the negative controls; the approved difference must stay exactly this one:
   - **(b)** a test-side oracle that reruns the program on the VM with every call argument wrapped in `deepcopy(...)` and requires that run to equal legacy exactly. No production change, but a source transform to maintain;
   - **(c)** exact rules for the gate's seed 3 too, or running the gate's parity step with seed 1. This keeps the per-source approach the task wanted replaced.
 - Until then the gate's `[0] parity` still fails: 3 differing entries (g00013, g00021, g00047) and 48 unused B5 policies. The 12-mutant re-run was not done, since the unmutated step does not pass yet.
+
+## 53. B16: cp19 admission mutants, recommendation for the owner (C63, analysis only)
+
+Pending the owner's decision on b5-refsem.md 11.4. **No test is changed.**
+
+`make test-cp19-admission-mutants` fails 2 of 15 cases, and `-switch` fails the same way:
+- **loop m3:** the control and m3 are both refused (exit 1);
+- **native m10:** m10 survives.
+
+Its m12 and m13 rows pass: m12 is a tripwire, and m13 is caught by `shared-scalar`.
+`test-cp19-admission-sanitize` runs `loop admitted`, so its CHECK failures at
+`admission_mutants.cpp:108`, `:109` and `:128` are the loop control's refusal (the not-admitted,
+no-output and wrong-value checks), not a sanitizer finding. There is no ASan/UBSan report.
+
+**None of m3, m10 or m12 is a preprocessor no-op.** Each mutant's translation unit, preprocessed
+with and without its `-DNIFT_SESSION_ADMISSION_MUTANT=n`, differs by its hook lines (2 lines each).
+So none can be retired as obsolete the way A29 and cp14b mutant 11 were.
+
+| Mutant | Recommendation |
+| --- | --- |
+| **m3** (`cell.cpp`: `cell_plain_capture` treats a source-slot capture as not plain) | **Keep, pending D4 (release blocker).** It has two effects: (1) `session_callable.cpp:67`, where a session function upvalue that is a loop source-slot capture goes through `may_call` (more conservative: incomplete callable shape); (2) `session_activation.cpp:32`, where functions reached only through such a capture are not relinked to their recompiled code after a session redefinition (stale code). Both need a session function, reached through a captured loop variable, to be **called** in a later statement, and that is exactly what D4 (`session:current-callable-proof`, the U6 exposure of B5 1) refuses. No admitted shape reaches it today: 11.4's 2,144-session search found none, and the probes here agree. Recommend **approving the loop control's refusal as the B5 D4 refusal**: pin it exactly (reason `session:current-callable-proof`, no effect, no output) as a refusal witness, and mark m3 "unexercised while D4 stands". Restore the admitted witness when D4 is resolved, since the original program becomes admitted again. No replacement program is proposed, because any shape that reaches the source-slot path also calls through the D4-refused route. |
+| **m10** (`compiler_session_native.cpp`: the session native dispatch tag forced to the string family) | **Masked by B4's dispatch precondition (defence in depth); reclassify as a tripwire with a double-mutant witness.** The session branch emits a flagged `CallNative`. At run time `Vm::builtin` checks the receiver family and `redispatch` selects the sibling native of the actual family (`vm_builtin.cpp`), so the forced tag only changes which branch is entered first; the result is identical. Built here: B4 mutant **A4** alone (no redispatch) still passes `native admitted` (the control behaviour), while **m10 + A4** fails `native admitted` and passes `native internal` (`unexpected operands (compiler defect): built-in contains`). So the hook is live and is masked only by redispatch. Recommended witness: keep `native` as a tripwire row for m10 (m10 must behave as the control), and add the double-mutant row m10+A4, which must show the internal failure. If B4's redispatch is ever removed, m10 becomes observable again and the tripwire trips. |
+| **m12** (`session_callable.cpp`: `may_call` always true) | **No change.** Already classified in 13.1, owner-accepted: observationally equivalent on the tested reachable paths (production's `may_call` is already true at every arrival). It is a tripwire row plus the reachable-path probe `test-cp19-m12-reachable`. |
+| **m13** (`infer_session_location.cpp`: capture-location inference skipped) | **No change.** Caught by `shared-scalar` (b5-refsem.md 12.1), with `shared` as a tripwire. PASS here. |
+
+**The loop control, specifically.**
+- **Program:** `fn(g()){return 1};fn(makec()){caparr:=[[()=>g()]];...};c:=makec();warm:=c(0)`, then `fn(g()){return 3};last:=c(1)`.
+- **Refused at statement 2:** `session:current-callable-proof` ("the VM gave no exact position"), before any effect. Legacy prints `3`, `3`.
+- **Cause:** the D4 exposure of B5 1 (**141b847e**, "U6, session persistence without stale assumptions"). `infer_session.cpp` marks both session-heap site classes `exposed_` ("earlier code reaches every earlier value"), so a fact-proved historical call opens every exposed class.
+- **Status:** one of the release-blocker shapes of b5-refsem.md 11.1.
+- **Recommendation:** as for m3, approve the refusal as a pinned witness until D4 is resolved; do not look for an admitted replacement while the U6 exposure stands.
