@@ -3705,3 +3705,59 @@ Ir/call. `obj.merge_deep` also passes its guard. After A, the only remaining gua
   `copy_graph`'s deep copy fills its copies through the in-place key's construction primitives,
   which mark the summary per stored value (`aggregate_store.h:171`), with no `copy_summary`. The `deepcopy-map` route covers it, and refsem's
   `cycle_*` fixtures cover the rest.
+
+## 69. Review of C72–C78, L-1: the mutant-list lint covers the per-number families (C80, build lint)
+
+`scripts/build/check-mutant-lists.py` (section 61) covered 5 explicit-list families. It now also
+checks the **per-number** form: mutant N is built by compiling specific sources with
+`-DMACRO=N`. Every source whose code tests `MACRO == N` (or `!=`; comments excluded) must be
+compiled into mutant N's build. A header hook counts when a compiled source includes it directly.
+Every hook number must have a build; a number can be exempted only as retired, with its record,
+and none is today.
+
+**Extractors (read from the real wiring, not a copied list):**
+- **`make`:** `define` templates compiled with `-DMACRO=$(1)`, their `$(call ...,N,stem)` and
+  `$(foreach ...)` instances, and explicit `x.o: src/...cpp` rules whose recipe passes
+  `-DMACRO=N`. Sources: the Makefile and every `tests/**/*.mk`.
+- **`shell`:** one-line compiles `-DMACRO=N ... -c src/x.cpp` in test scripts.
+- **`b4`:** the `[N]=src/x.cpp` table of `tests/runtime2/b4/mutants.sh`.
+- **`cp14b`:** the `MUTANTS` rows of `tests/runtime2/cp14b/mutations.py`.
+
+**Families checked, all clean:**
+
+| Family | Wiring | Numbers |
+| --- | --- | --- |
+| cp19 admission and proof (`NIFT_SESSION_ADMISSION_MUTANT`) | `admission_mutants.mk` (1–13), `proof.mk` (14–26; M17 compiles two sources) | 1–26 |
+| cp19 resource (`NIFT_SESSION_RESOURCE_MUTANT`) | `resources.mk` | 1–6 |
+| cp19 job (`NIFT_SESSION_JOB_MUTANT`) | `jobs.mk` | 1, 2 |
+| cp19 session (`NIFT_SESSION_MUTANT`) | Makefile | 1–7 |
+| COLLECTION | cp14b `mutations.py` (11 retired: its hook is gone) | 1–10 |
+| B4 | `b4/mutants.sh`, plus A4 in `admission_mutants.mk` and A9 in `safety/mutants.sh` | 1, 3–7, 9–18 |
+
+**Not checked, with the reason:**
+- **EXC:** `cp13b/mutant_build.py` builds a whole clean tree with the flag, so every source is
+  compiled into every mutant by construction.
+- **Each of these families wires its numbers in its own script** (shell loops and maps of varied
+  forms): REFSEM (`refsem/mutants.sh`, `rt/isolation/run.sh`), HOST (`host_mutants.sh`), B4B
+  (`b4b/mutants.sh`), B5 and D2 (`b5/mutants.sh`), READ_LIMIT, PACKAGES, B3, COLLECTIONS, SAFETY,
+  FILE_MODE, ARGSCMD, TLS, B06, INTERP (`literals/*negative_control.sh`).
+  - The generic extractors read none of them: they report every hook as "no build", which is an
+    extractor gap, not a finding.
+  - Covering each needs a parser for its script, which was not done here.
+  - Each family's own harness requires its mutants to be caught, so a compiled-out hook shows
+    there as a surviving mutant, though without naming the cause.
+- **Makefile rule families the generic extractor already reads, with no finding** (not added to
+  the gate): R1, KIND, CP21_D2, CP21_D3, INVENTORY, INVENTORY_HOST.
+- **Not readable by the generic extractor:**
+  - CP20, CP21 and MUTATION: Makefile pattern rules on `$*`.
+  - SORT: a shell loop in a Makefile recipe.
+  - RT_BUILDER: header hooks compiled into a test translation unit.
+  - CP21_D1: a truthiness hook, plus `== 0` as the "no mutant" case.
+  - SHELL_DISPATCH and CP19_EVAL: named, not numbered, macros.
+
+**Selftest:** three new planted per-number cases.
+- Control: a hook compiled into its build is accepted.
+- A hook `== 1` in a source mutant 1's build does not compile: rejected.
+- A hook number with no build: rejected.
+
+Together with the four explicit-list controls, all pass.

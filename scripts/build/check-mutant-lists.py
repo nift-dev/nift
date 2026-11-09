@@ -35,6 +35,137 @@ DEFINING_HEADERS = {"src/rt/vm_mutants.h", "src/rt/vm_ops.h"}
 INCLUDE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.M)
 
 
+# Per-number families (review of C72-C78, L-1): mutant N is built by compiling specific sources
+# with -DMACRO=N. Every source whose code tests `MACRO == N` (or `!=`) must be compiled into
+# mutant N's build, and every hook number must have a build (or be listed as retired below).
+#   family -> (macro, extractor names)
+PER_NUMBER = {
+    "cp19-admission": ("NIFT_SESSION_ADMISSION_MUTANT", ["make"]),
+    "cp19-resource": ("NIFT_SESSION_RESOURCE_MUTANT", ["make"]),
+    "cp19-job": ("NIFT_SESSION_JOB_MUTANT", ["make"]),
+    "cp14b-collection": ("NIFT_COLLECTION_MUTANT", ["cp14b"]),
+    "b4": ("NIFT_B4_MUTANT", ["b4", "make", "shell"]),
+    "cp19-session": ("NIFT_SESSION_MUTANT", ["make"]),
+}
+# Families whose wiring cannot (or need not) be checked here, with the reason.
+UNCHECKED = {
+    "NIFT_EXC_MUTANT": "tests/runtime2/cp13b/mutant_build.py builds a whole clean tree with the flag: "
+                       "every source is compiled into every mutant by construction",
+}
+# Hook numbers deliberately without a build (retired), per family, with the record.
+RETIRED = {}
+HOOK_TEST = r"\b%s\s*(?:==|!=)\s*(\d+)"
+
+
+def make_files(root):
+    paths = [os.path.join(root, "Makefile")]
+    for d, _, names in os.walk(os.path.join(root, "tests")):
+        paths += [os.path.join(d, n) for n in names if n.endswith(".mk")]
+    return paths
+
+
+def extract_make(root, macro):
+    """number -> sources compiled with -DMACRO=number, from define/call templates and explicit rules."""
+    builds = {}
+    for path in make_files(root):
+        with open(path) as handle:
+            text = handle.read()
+        templates = {}
+        for m in re.finditer(r"^define (\w+)\n(.*?)^endef", text, re.M | re.S):
+            body = m.group(2)
+            if re.search(r"-D%s=\$\(1\)" % macro, body):
+                src = re.search(r"^\S+\.o:\s*(src/\S+\.cpp)", body, re.M)
+                if src:
+                    templates[m.group(1)] = src.group(1)
+        for name, src in templates.items():
+            calls = re.findall(r"\$\(call %s,(\d+)(?:,([\w/]+))?\)" % name, text)
+            for number, stem in calls:
+                builds.setdefault(int(number), set()).add(src.replace("$(2)", stem) if stem else src)
+            for m in re.finditer(r"\$\(foreach (\w+),([\d ]+),\$\(eval \$\(call %s,\$\(\1\)\)\)\)" % name, text):
+                for number in m.group(2).split():
+                    builds.setdefault(int(number), set()).add(src)
+        for m in re.finditer(r"^\S+\.o:\s*(src/\S+\.cpp)[^\n]*\n((?:\t[^\n]*\n)+)", text, re.M):
+            for number in re.findall(r"-D%s=(\d+)\b" % macro, m.group(2)):
+                builds.setdefault(int(number), set()).add(m.group(1))
+    return builds
+
+
+def extract_shell(root, macro):
+    """number -> sources from one-line compiles `-DMACRO=N ... -c src/x.cpp` in test scripts."""
+    builds = {}
+    for d, _, names in os.walk(os.path.join(root, "tests")):
+        for n in names:
+            if n.endswith(".sh"):
+                with open(os.path.join(d, n), errors="replace") as handle:
+                    for number, src in re.findall(r"-D%s=(\d+)\b[^\n]*?-c (src/\S+\.cpp)" % macro, handle.read()):
+                        builds.setdefault(int(number), set()).add(src)
+    return builds
+
+
+def extract_b4(root, macro):
+    """tests/runtime2/b4/mutants.sh: `[N]=src/x.cpp` table compiled with -DNIFT_B4_MUTANT=$n."""
+    path = os.path.join(root, "tests", "runtime2", "b4", "mutants.sh")
+    builds = {}
+    if os.path.exists(path):
+        with open(path) as handle:
+            text = handle.read()
+        if "-D%s=$n" % macro in text:
+            for number, src in re.findall(r"^\s*\[(\d+)\]=(src/\S+\.cpp)", text, re.M):
+                builds.setdefault(int(number), set()).add(src)
+    return builds
+
+
+def extract_cp14b(root, macro):
+    """tests/runtime2/cp14b/mutations.py: MUTANTS rows (number, name, stem, ...), each compiled
+    with -DNIFT_COLLECTION_MUTANT={number} -c src/rt/{stem}.cpp."""
+    path = os.path.join(root, "tests", "runtime2", "cp14b", "mutations.py")
+    builds = {}
+    if os.path.exists(path):
+        with open(path) as handle:
+            text = handle.read()
+        if "-D%s={number}" % macro in text and "src/rt/{stem}.cpp" in text:
+            for number, stem in re.findall(r"^\((\d+),'[^']*','(\w+)'", text, re.M):
+                builds.setdefault(int(number), set()).add("src/rt/%s.cpp" % stem)
+    return builds
+
+
+EXTRACTORS = {"make": extract_make, "shell": extract_shell, "b4": extract_b4, "cp14b": extract_cp14b}
+
+
+def check_per_number(root, families=None):
+    families = PER_NUMBER if families is None else families
+    problems = []
+    files = {}
+    for rel, path in sources(root):
+        with open(path, errors="replace") as handle:
+            files[rel] = COMMENT.sub("", handle.read())
+    for family, (macro, extractors) in families.items():
+        builds = {}
+        for name in extractors:
+            for number, srcs in EXTRACTORS[name](root, macro).items():
+                builds.setdefault(number, set()).update(srcs)
+        hooks = {}
+        for rel, body in files.items():
+            for number in re.findall(HOOK_TEST % macro, body):
+                hooks.setdefault(int(number), set()).add(rel)
+        for number, where in sorted(hooks.items()):
+            if number in RETIRED.get(family, {}):
+                continue
+            if number not in builds:
+                problems.append("%s: hook %s == %d (%s) has no mutant build" % (family, macro, number, ", ".join(sorted(where))))
+                continue
+            for rel in sorted(where):
+                compiled = builds[number]
+                if rel.endswith(".h"):
+                    ok = any(('#include "%s"' % rel[4:]) in files.get(c, "") for c in compiled)
+                else:
+                    ok = rel in compiled
+                if not ok:
+                    problems.append("%s: hook %s == %d in %s is not compiled into mutant %d's build (%s)"
+                                    % (family, macro, number, rel, number, ", ".join(sorted(compiled))))
+    return problems
+
+
 def make_variable(text, name):
     m = re.search(r"^%s\s*[:+]?=\s*((?:.*\\\n)*.*)$" % re.escape(name), text, re.M)
     if not m:
@@ -140,6 +271,35 @@ def selftest(root, makefile):
             print("%s selftest %s: %s" % ("PASS" if ok else "FAIL", name, "rejected" if ok else "NOT caught"))
             failures += 0 if ok else 1
             os.remove(path)
+        # Per-number form: mutant N is built from a define/call template; a hook == N in a source
+        # that N's build does not compile, and a hook number without any build, must be caught.
+        family = {"planted": ("NIFT_PLANTED_MUTANT", ["make"])}
+        with open(os.path.join(scratch, "Makefile"), "a") as h:
+            h.write("\ndefine PLANTED_MUTANT\n$(TEST_DIR)/p-m$(1).o: src/rt/$(2).cpp\n"
+                    "\t$$(CXX) -DNIFT_PLANTED_MUTANT=$(1) -c $$< -o $$@\nendef\n"
+                    "$(eval $(call PLANTED_MUTANT,1,planted_a))\n")
+        with open(os.path.join(fake, "planted_a.cpp"), "w") as h:
+            h.write("#if NIFT_PLANTED_MUTANT == 1\n#endif\n")
+        found = check_per_number(scratch, family)
+        ok = not found
+        print("%s selftest per-number control: a hook compiled into its build is accepted" % ("PASS" if ok else "FAIL"))
+        failures += 0 if ok else 1
+        per_cases = {
+            "hook in a source the build does not compile": ("planted_b.cpp", "#if NIFT_PLANTED_MUTANT == 1\n#endif\n",
+                                                             "planted_b.cpp is not compiled into mutant 1"),
+            "hook number without a build": ("planted_c.cpp", "#if NIFT_PLANTED_MUTANT == 2\n#endif\n",
+                                            "== 2 (src/rt/planted_c.cpp) has no mutant build"),
+        }
+        for name, (fname, body, expect) in per_cases.items():
+            path = os.path.join(fake, fname)
+            with open(path, "w") as h:
+                h.write(body)
+            found = check_per_number(scratch, family)
+            ok = any(expect in p for p in found)
+            print("%s selftest per-number %s: %s" % ("PASS" if ok else "FAIL", name, "rejected" if ok else "NOT caught"))
+            failures += 0 if ok else 1
+            os.remove(path)
+        os.remove(os.path.join(fake, "planted_a.cpp"))
         clean = [p for p in check(scratch, os.path.join(scratch, "Makefile"))]
         print("%s selftest control: %s" % ("PASS" if not clean else "FAIL", "no finding without a stray hook" if not clean else clean))
         failures += 1 if clean else 0
@@ -158,12 +318,15 @@ def main():
         failures = selftest(a.root, a.makefile)
         print("%s mutant-list lint selftest: %d failure(s)" % ("PASS" if not failures else "FAIL", failures))
         return 1 if failures else 0
-    problems = check(a.root, a.makefile)
+    problems = check(a.root, a.makefile) + check_per_number(a.root)
     for p in problems:
         print("FAIL " + p)
     if problems:
         return 1
-    print("PASS mutant-list lint: every hook of %s is in a mutated object" % ", ".join(FAMILIES))
+    print("PASS mutant-list lint: every hook of %s is in a mutated object; every numbered hook of %s is "
+          "compiled into its number's build" % (", ".join(FAMILIES), ", ".join(PER_NUMBER)))
+    for macro, why in UNCHECKED.items():
+        print("  not checked: %s (%s)" % (macro, why))
     return 0
 
 
