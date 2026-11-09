@@ -2811,3 +2811,20 @@ pass on the VM. The other 87 need a broader change or a decision, so I did not f
 - **Seen, not in scope:** at the end of a script the VM prefixes the left-open report with `1:1:` (`error: case.f:1:1: managed file left open: ...`), where legacy prints `error: managed file left open: ...`. This is CP17 cleanup reporting, not a method precondition.
 
 **Production sha256.** `3161f6862597c5c828bf6bf20e99c0332a76263f4a141e66f36bb94fefd46ded`.
+
+## 47. Review of C53-C55 (ACCEPT-WITH-FINDINGS): F-1 fixed, L-1 recorded (C56)
+
+**F-1 (Medium, pre-existing; c528e7eb behaves the same).** `write_line([1])` or `write_line({...})`
+reported `write: value is not directly renderable` on the VM. Legacy reports `write_line: ...` at
+the same position.
+- **Cause:** `file_write_line` delegated the value to `file_write`, which checks renderability under its own name.
+- **Fix:** `write_line` checks the value's renderability under its own name, after its preconditions (legacy's order) and before anything is written.
+- **Table:** `file_mode_parity.py` gains 8 calls: `write` and `write_line` of an array, an object, a number, a double, a bool and null, in every state. That makes 168 cells x 2 programs, 0 failures.
+- **Mutant 4** (`NIFT_FILE_MODE_MUTANT=4`, renderability left to `write`) is rejected by 13 checks. All 4 file-mode mutants are rejected, and the control is byte-identical to `nift`.
+
+**L-1 (recorded, deliberately unchanged).** Legacy's `save` records the build write and runs the
+build-write guard (`guard_build_write`, `note_written`) *before* checking `need_write`. So a
+`save()` on a read-only or closed buffer is still noted as a build write in legacy. The VM checks
+the preconditions first and records nothing for a save that cannot happen. This is a deliberate,
+safer difference: no effect is observable in the script, and a build does not see a phantom write.
+**Production sha256.** `f6de04a56a92b5e6c710932c2e834cb32e08254c7acecd11bb46b39384ba38e1`.

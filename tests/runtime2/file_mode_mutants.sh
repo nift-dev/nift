@@ -6,7 +6,8 @@
 #   0  control (no mutation): must pass, and its object and binary must equal production's;
 #   1  revert() without legacy's need_write (a read-only buffer reverted silently: the B02 defect);
 #   2  flush() without need_write;
-#   3  write_line() reporting its preconditions as "write: ...".
+#   3  write_line() reporting its preconditions as "write: ...";
+#   4  write_line() leaving the value's renderability to write() ("write: value is not ...", C56).
 # Each mutant's object must differ from the control's and the mutant must fail the table.
 # Usage (from the repository root; the Makefile passes the objects):
 #   FILE_MODE_OBJECTS="<CLI objects> <libffi.a>" FILE_MODE_CPPFLAGS="..." file_mode_mutants.sh
@@ -45,7 +46,7 @@ python3 -B tests/runtime2/file_mode_parity.py --nift "$OUT/0/nift" >"$OUT/0/test
   { grep -v '^PASS' "$OUT/0/test.log" | tail -20; fail "control (NIFT_FILE_MODE_MUTANT=0) failed the table"; }
 echo "PASS file-mode control: NIFT_FILE_MODE_MUTANT=0 passes ($(tail -1 "$OUT/0/test.log"))"
 status=0
-for n in 1 2 3; do
+for n in 1 2 3 4; do
   build "$n"
   cmp -s "$OUT/$n/host_file_handles.o" "$OUT/0/host_file_handles.o" && fail "mutant $n: its object equals the control's"
   if python3 -B tests/runtime2/file_mode_parity.py --nift "$OUT/$n/nift" >"$OUT/$n/test.log" 2>&1; then
@@ -55,5 +56,5 @@ for n in 1 2 3; do
   fi
 done
 rm -rf "$OUT"
-[ "$status" = 0 ] && echo "file-mode mutants: all 3 rejected, control passes"
+[ "$status" = 0 ] && echo "file-mode mutants: all 4 rejected, control passes"
 exit "$status"

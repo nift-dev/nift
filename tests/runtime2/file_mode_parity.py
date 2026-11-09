@@ -42,6 +42,11 @@ CALLS = {
     "revert": "f.revert()", "save": "f.save()", "modified": "f.modified()", "tell": "f.tell()",
     "seek(1)": "f.seek(1)", "path": "f.path()", "exists": "f.exists()", "copy": 'f.copy("copied")',
     "move": 'f.move("moved")', "remove": "f.remove()",
+    # C56 (review of C53-C55, F-1): non-string values through write and write_line.
+    "write([1])": "f.write([1])", "write_line([1])": "f.write_line([1])",
+    'write({"k":1})': 'f.write({"k":1})', 'write_line({"k":1})': 'f.write_line({"k":1})',
+    "write(7)": "f.write(7)", "write_line(2.5)": "f.write_line(2.5)",
+    "write(true)": "f.write(true)", "write_line(null)": "f.write_line(null)",
 }
 STATEMENT = {"copy", "move"}  # return a file value: called as a statement, not printed
 CLOSED = "handle is closed (file handle 0/1, runtime.handle_closed)"

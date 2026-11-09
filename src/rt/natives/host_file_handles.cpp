@@ -254,6 +254,14 @@ Status file_write_line(const Context& context, const Value* args, std::uint32_t 
         if (file->mode == "r") { error = "write_line: file is not open for writing"; return Status::Error; }
     }
 #endif
+#if !(defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 4)
+    // C56 (review of C53-C55, F-1): the value's renderability under this method's name too (legacy:
+    // "write_line: value is not directly renderable"), before anything is written.
+    {
+        std::string probe;
+        if (!render_arg(args[1], probe)) { error = "write_line: value is not directly renderable"; return Status::Error; }
+    }
+#endif
     Value newline = make_string("\n");
     Value armed[2] = {args[0], args[1]};
     Status status = file_write(context, armed, 2, out, error);
