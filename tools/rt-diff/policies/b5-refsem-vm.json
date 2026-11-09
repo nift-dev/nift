@@ -11,7 +11,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'true\\ntrue\\n3\\n[1,2]\\ntrue\\ntrue\\ntrue\\ndata-$\\ntrue\\nfalse\\n-2.5\\ntrue\\n'; VM 'true\\ntrue\\n3\\n[1,2,99]\\ntrue\\ntrue\\ntrue\\ndata-$\\ntrue\\nfalse\\n-2.5\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 1 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00002/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "559f4e88e244d7b0ef018f2ec13deba1d51b3ecdab277f6161e4e974381ccfbf"
  },
  {
   "id": "b5-gen_g00002_main-combined",
@@ -25,7 +26,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'true\\ntrue\\n3\\n[1,2]\\ntrue\\ntrue\\ntrue\\ndata-$\\ntrue\\nfalse\\n-2.5\\ntrue\\n'; VM 'true\\ntrue\\n3\\n[1,2,99]\\ntrue\\ntrue\\ntrue\\ndata-$\\ntrue\\nfalse\\n-2.5\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 1 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00002/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "559f4e88e244d7b0ef018f2ec13deba1d51b3ecdab277f6161e4e974381ccfbf"
  },
  {
   "id": "b5-gen_g00008_main-stdout",
@@ -39,7 +41,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'true\\ntrue\\n2016\\n2.1\\nnull\\nC\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n16\\n18\\n0.7\\n3\\n[1,2]\\n16.875\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n'; VM 'true\\ntrue\\n2016\\n2.1\\nnull\\nC\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n16\\n18\\n0.7\\n3\\n[1,2,99]\\n16.875\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 2 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00008/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "f8bcd9d279604efbc7876f395db6c3604a4e17e56d8900c5bfd6a39598148b25"
  },
  {
   "id": "b5-gen_g00008_main-combined",
@@ -53,7 +56,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'true\\ntrue\\n2016\\n2.1\\nnull\\nC\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n16\\n18\\n0.7\\n3\\n[1,2]\\n16.875\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n'; VM 'true\\ntrue\\n2016\\n2.1\\nnull\\nC\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n16\\n18\\n0.7\\n3\\n[1,2,99]\\n16.875\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 2 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00008/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "f8bcd9d279604efbc7876f395db6c3604a4e17e56d8900c5bfd6a39598148b25"
  },
  {
   "id": "b5-gen_g00028_main-stdout",
@@ -67,7 +71,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'false\\ntrue\\n3\\n[1,2]\\n1\\nitem 1\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n2\\nitem 2\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n3\\nitem 3\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n6\\n'; VM 'false\\ntrue\\n3\\n[1,2,99]\\n1\\nitem 1\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n2\\nitem 2\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n3\\nitem 3\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 4 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00028/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "de406d920cbaec928aa9baef0d8115a82f01ff6c6da2e938d7f625e69d89aa6d"
  },
  {
   "id": "b5-gen_g00028_main-combined",
@@ -81,7 +86,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'false\\ntrue\\n3\\n[1,2]\\n1\\nitem 1\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n2\\nitem 2\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n3\\nitem 3\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n6\\n'; VM 'false\\ntrue\\n3\\n[1,2,99]\\n1\\nitem 1\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n2\\nitem 2\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]\\n3\\nitem 3\\n2\\nPQ\\nfalse\\nfalse\\n[\"pq\"]'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 4 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00028/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "de406d920cbaec928aa9baef0d8115a82f01ff6c6da2e938d7f625e69d89aa6d"
  },
  {
   "id": "b5-gen_g00045_main-stdout",
@@ -95,7 +101,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '465\\n4\\n10\\nq\\n{\"k\":10,\"s\":\"q\"}\\n-4\\np\\n{\"k\":-4,\"s\":\"p\"}\\n3\\n[1,2]\\n8\\n5\\n1\\n'; VM '465\\n4\\n10\\nq\\n{\"k\":10,\"s\":\"q\"}\\n-4\\np\\n{\"k\":-4,\"s\":\"p\"}\\n3\\n[1,2,99]\\n8\\n5\\n1\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 7 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00045/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "a8688b7671298da839fd3a31cf26fec97523b0399ae779d54fa72d82ec42ff8a"
  },
  {
   "id": "b5-gen_g00045_main-combined",
@@ -109,7 +116,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '465\\n4\\n10\\nq\\n{\"k\":10,\"s\":\"q\"}\\n-4\\np\\n{\"k\":-4,\"s\":\"p\"}\\n3\\n[1,2]\\n8\\n5\\n1\\n'; VM '465\\n4\\n10\\nq\\n{\"k\":10,\"s\":\"q\"}\\n-4\\np\\n{\"k\":-4,\"s\":\"p\"}\\n3\\n[1,2,99]\\n8\\n5\\n1\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 7 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00045/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "a8688b7671298da839fd3a31cf26fec97523b0399ae779d54fa72d82ec42ff8a"
  },
  {
   "id": "b5-gen_g00060_main-stdout",
@@ -123,7 +131,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'hello\\n10\\n4\\n14\\n6\\n1\\n-\\n{\"k\":1,\"s\":\"-\"}\\n3\\n[1,2]\\n1\\n1\\n2\\n3\\nq\\n0\\n'; VM 'hello\\n10\\n4\\n14\\n6\\n1\\n-\\n{\"k\":1,\"s\":\"-\"}\\n3\\n[1,2,99]\\n1\\n1\\n2\\n3\\nq\\n0\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 8 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00060/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "69a23d9d4088847cd0a9600a18f60cfca3b2ab033aba03bbb4f822635e205515"
  },
  {
   "id": "b5-gen_g00060_main-combined",
@@ -137,7 +146,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'hello\\n10\\n4\\n14\\n6\\n1\\n-\\n{\"k\":1,\"s\":\"-\"}\\n3\\n[1,2]\\n1\\n1\\n2\\n3\\nq\\n0\\n'; VM 'hello\\n10\\n4\\n14\\n6\\n1\\n-\\n{\"k\":1,\"s\":\"-\"}\\n3\\n[1,2,99]\\n1\\n1\\n2\\n3\\nq\\n0\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 8 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00060/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "69a23d9d4088847cd0a9600a18f60cfca3b2ab033aba03bbb4f822635e205515"
  },
  {
   "id": "b5-gen_g00071_main-stdout",
@@ -151,7 +161,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '4\\nNift\\n{\"k\":4,\"s\":\"Nift\"}\\n4\\n10\\n1\\nitem 1\\n1\\n3\\n4\\n1\\n2\\n2\\nitem 2\\n1\\n3\\n4\\n1\\n2\\n3\\nitem 3\\n1\\n3\\n4\\n1\\n2\\nNift\\nNift\\nNiftpNift\\n3\\n[1,2]\\n192\\n'; VM '4\\nNift\\n{\"k\":4,\"s\":\"Nift\"}\\n4\\n10\\n1\\nitem 1\\n1\\n3\\n4\\n1\\n2\\n2\\nitem 2\\n1\\n3\\n4\\n1\\n2\\n3\\nitem 3\\n1\\n3\\n4\\n1\\n2\\nNift\\nNift\\nNiftpNift\\n3\\n[1,2,99]\\n1'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 9 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00071/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "917e9e869da91634715cb096fc3f0bf546281220f4bf6ef014626734fd15c6e2"
  },
  {
   "id": "b5-gen_g00071_main-combined",
@@ -165,7 +176,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '4\\nNift\\n{\"k\":4,\"s\":\"Nift\"}\\n4\\n10\\n1\\nitem 1\\n1\\n3\\n4\\n1\\n2\\n2\\nitem 2\\n1\\n3\\n4\\n1\\n2\\n3\\nitem 3\\n1\\n3\\n4\\n1\\n2\\nNift\\nNift\\nNiftpNift\\n3\\n[1,2]\\n192\\n'; VM '4\\nNift\\n{\"k\":4,\"s\":\"Nift\"}\\n4\\n10\\n1\\nitem 1\\n1\\n3\\n4\\n1\\n2\\n2\\nitem 2\\n1\\n3\\n4\\n1\\n2\\n3\\nitem 3\\n1\\n3\\n4\\n1\\n2\\nNift\\nNift\\nNiftpNift\\n3\\n[1,2,99]\\n1'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 9 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00071/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "917e9e869da91634715cb096fc3f0bf546281220f4bf6ef014626734fd15c6e2"
  },
  {
   "id": "b5-gen_g00101_main-stdout",
@@ -179,7 +191,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '[42,2,100,7]\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n3\\n[1,2]\\n0.7\\ntrue\\ntrue\\ntrue\\ndata-Nift\\ntrue\\ntrue\\n'; VM '[42,2,100,7]\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n3\\n[1,2,99]\\n0.7\\ntrue\\ntrue\\ntrue\\ndata-Nift\\ntrue\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 11 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00101/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "97a1d4372d162ae37440a9b3af9df22ab9bb1fe28ad48760bb1f6812401c4a6c"
  },
  {
   "id": "b5-gen_g00101_main-combined",
@@ -193,7 +206,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '[42,2,100,7]\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n3\\n[1,2]\\n0.7\\ntrue\\ntrue\\ntrue\\ndata-Nift\\ntrue\\ntrue\\n'; VM '[42,2,100,7]\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n3\\n[1,2,99]\\n0.7\\ntrue\\ntrue\\ntrue\\ndata-Nift\\ntrue\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 11 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00101/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "97a1d4372d162ae37440a9b3af9df22ab9bb1fe28ad48760bb1f6812401c4a6c"
  },
  {
   "id": "b5-gen_g00112_main-stdout",
@@ -207,7 +221,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'boom 2\\n3\\n[1,2]\\n8\\n14\\n'; VM 'boom 2\\n3\\n[1,2,99]\\n8\\n14\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 12 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00112/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "c2432be520588bfaab7db1344e9a408cb20a880f32a911818c6223044b5f30ad"
  },
  {
   "id": "b5-gen_g00112_main-combined",
@@ -221,7 +236,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'boom 2\\n3\\n[1,2]\\n8\\n14\\n'; VM 'boom 2\\n3\\n[1,2,99]\\n8\\n14\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 12 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00112/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "c2432be520588bfaab7db1344e9a408cb20a880f32a911818c6223044b5f30ad"
  },
  {
   "id": "b5-gen_g00125_main-stdout",
@@ -235,7 +251,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '3\\n[1,2]\\n42\\nq\\n{\"k\":42,\"s\":\"q\"}\\nboom 2\\n2\\n1\\n3\\n4\\ntrue\\ntrue\\n84\\n8\\n4\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n'; VM '3\\n[1,2,99]\\n42\\nq\\n{\"k\":42,\"s\":\"q\"}\\nboom 2\\n2\\n1\\n3\\n4\\ntrue\\ntrue\\n84\\n8\\n4\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 15 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00125/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "2eea2ec5a5efd46651b27026ac050384b9926ef3163d9d491420ab3dc90bf5b3"
  },
  {
   "id": "b5-gen_g00125_main-combined",
@@ -249,7 +266,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '3\\n[1,2]\\n42\\nq\\n{\"k\":42,\"s\":\"q\"}\\nboom 2\\n2\\n1\\n3\\n4\\ntrue\\ntrue\\n84\\n8\\n4\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n'; VM '3\\n[1,2,99]\\n42\\nq\\n{\"k\":42,\"s\":\"q\"}\\nboom 2\\n2\\n1\\n3\\n4\\ntrue\\ntrue\\n84\\n8\\n4\\n10\\nALPHA-BETA\\ntrue\\nfalse\\n[\"alpha\",\"beta\"]\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 15 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00125/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "2eea2ec5a5efd46651b27026ac050384b9926ef3163d9d491420ab3dc90bf5b3"
  },
  {
   "id": "b5-gen_g00133_main-stdout",
@@ -263,7 +281,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '4\\n8\\ntrue\\ntrue\\ntrue\\ndata--q\\ntrue\\nfalse\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n0.45\\n5\\n0.5\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n5\\n3\\n[1,2]\\n'; VM '4\\n8\\ntrue\\ntrue\\ntrue\\ndata--q\\ntrue\\nfalse\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n0.45\\n5\\n0.5\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n5\\n3\\n[1,2,99]\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 17 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00133/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "dc62c0f32e0dc38beb40491cd7f2e81b5d94282f86d54e85f01423cb5f59ab32"
  },
  {
   "id": "b5-gen_g00133_main-combined",
@@ -277,7 +296,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '4\\n8\\ntrue\\ntrue\\ntrue\\ndata--q\\ntrue\\nfalse\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n0.45\\n5\\n0.5\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n5\\n3\\n[1,2]\\n'; VM '4\\n8\\ntrue\\ntrue\\ntrue\\ndata--q\\ntrue\\nfalse\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n0.45\\n5\\n0.5\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n5\\n3\\n[1,2,99]\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 17 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00133/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "dc62c0f32e0dc38beb40491cd7f2e81b5d94282f86d54e85f01423cb5f59ab32"
  },
  {
   "id": "b5-gen_g00159_main-stdout",
@@ -291,7 +311,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'boom 4\\n3\\n[1,2]\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\ntrue\\nfalse\\nfalse\\n55\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n12\\n4\\n1\\n1\\n3\\n'; VM 'boom 4\\n3\\n[1,2,99]\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\ntrue\\nfalse\\nfalse\\n55\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n12\\n4\\n1\\n1\\n3\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 19 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00159/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "d7f6cb999a2dae15404f94496c146a0919b7122f7c325c4b7977a06f15ed8f16"
  },
  {
   "id": "b5-gen_g00159_main-combined",
@@ -305,7 +326,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'boom 4\\n3\\n[1,2]\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\ntrue\\nfalse\\nfalse\\n55\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n12\\n4\\n1\\n1\\n3\\nerror: $ROOT/main.f:'; VM 'boom 4\\n3\\n[1,2,99]\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\ntrue\\nfalse\\nfalse\\n55\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n12\\n4\\n1\\n1\\n3\\nerror: $ROOT/main'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 19 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00159/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "d7f6cb999a2dae15404f94496c146a0919b7122f7c325c4b7977a06f15ed8f16"
  },
  {
   "id": "b5-gen_g00169_main-stdout",
@@ -319,7 +341,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '5\\nq\\n10\\n18\\nfalse\\nfalse\\n3\\n[1,2]\\nnull\\nC\\nfalse\\nfalse\\n'; VM '5\\nq\\n10\\n18\\nfalse\\nfalse\\n3\\n[1,2,99]\\nnull\\nC\\nfalse\\nfalse\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 20 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00169/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "dd4aad31e5bd19343705df5e5a87994d10dc3706461418a57930a0c6a79438dd"
  },
  {
   "id": "b5-gen_g00169_main-combined",
@@ -333,7 +356,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '5\\nq\\n10\\n18\\nfalse\\nfalse\\n3\\n[1,2]\\nnull\\nC\\nfalse\\nfalse\\n'; VM '5\\nq\\n10\\n18\\nfalse\\nfalse\\n3\\n[1,2,99]\\nnull\\nC\\nfalse\\nfalse\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 20 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00169/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "dd4aad31e5bd19343705df5e5a87994d10dc3706461418a57930a0c6a79438dd"
  },
  {
   "id": "b5-gen_g00189_main-stdout",
@@ -347,7 +371,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '-\\nnull\\nC\\nfalse\\ntrue\\n16\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n4.6\\n3\\n[1,2]\\nnull\\nC\\n'; VM '-\\nnull\\nC\\nfalse\\ntrue\\n16\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n4.6\\n3\\n[1,2,99]\\nnull\\nC\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 23 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00189/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "c33e60194c9d334b327540d9f14ba4002fb75a3eebaaaef97ac3eaa19b142669"
  },
  {
   "id": "b5-gen_g00189_main-combined",
@@ -361,7 +386,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '-\\nnull\\nC\\nfalse\\ntrue\\n16\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n4.6\\n3\\n[1,2]\\nnull\\nC\\n'; VM '-\\nnull\\nC\\nfalse\\ntrue\\n16\\n0\\np\\n{\"k\":0,\"s\":\"p\"}\\n4.6\\n3\\n[1,2,99]\\nnull\\nC\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 23 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00189/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: a closure captures parameter(s) k of an enclosing function)",
+  "tree_sha256": "c33e60194c9d334b327540d9f14ba4002fb75a3eebaaaef97ac3eaa19b142669"
  },
  {
   "id": "b5-gen_g00190_main-stdout",
@@ -375,7 +401,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\nfalse\\nfalse\\n0.1\\nfalse\\ntrue\\ntrue\\ntrue\\ntr'; VM '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\nfalse\\nfalse\\n0.1\\nfalse\\ntrue\\ntrue\\ntrue\\ntr'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 24 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00190/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "86cdc46ccca2e4748882cb92fed590c28bcc17586729599cdf6e1a4a555dc2e4"
  },
  {
   "id": "b5-gen_g00190_main-combined",
@@ -389,7 +416,8 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\nfalse\\nfalse\\n0.1\\nfalse\\ntrue\\ntrue\\ntrue\\ntr'; VM '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\nfalse\\nfalse\\n0.1\\nfalse\\ntrue\\ntrue\\ntrue\\ntr'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 24 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00190/main.f)",
   "gen_seed": 1,
-  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())"
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
+  "tree_sha256": "86cdc46ccca2e4748882cb92fed590c28bcc17586729599cdf6e1a4a555dc2e4"
  },
  {
   "id": "b5-semantics_copy_at_call-stdout",
@@ -558,5 +586,155 @@
   "count": 1,
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): grow(a) pushes to the caller's array (5/4 becomes 5/5). Legacy combined '4\\n4\\n4\\n20\\n20\\n5\\n4\\n16\\n5\\n3\\n0\\nz\\n30\\ntrue\\n'; VM '4\\n4\\n4\\n20\\n20\\n5\\n5\\n16\\n5\\n3\\n0\\nz\\n30\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 30 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tests/runtime2/vm-corpus/cp11/arrays.f"
+ },
+ {
+  "id": "b5-gen_g00030_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00030/main.f",
+  "source_sha256": "e69a34ca56ecf32d626fd89596c8f18771b2b8ac05e185267ddb1339040b530b",
+  "channel": "stdout",
+  "old": "0.5\n-\n2\n3\n4\n1\n2\nnull\nC\ntrue\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n1\nv=3!\nnull\nC\n3\n[1,2]\ntrue\ntrue\n465\n70\n1\n2\n1\n",
+  "new": "0.5\n-\n2\n3\n4\n1\n2\nnull\nC\ntrue\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n1\nv=3!\nnull\nC\n3\n[1,2,99]\ntrue\ntrue\n465\n70\n1\n2\n1\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '0.5\\n-\\n2\\n3\\n4\\n1\\n2\\nnull\\nC\\ntrue\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n1\\nv=3!\\nnull\\nC\\n3\\n[1,2]\\ntrue\\ntrue\\n465\\n70\\n1\\n2\\n1\\n'; VM '0.5\\n-\\n2\\n3\\n4\\n1\\n2\\nnull\\nC\\ntrue\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n1\\nv=3!\\nnull\\nC\\n3\\n[1,2,99]\\ntrue\\ntrue\\n465\\n70\\n1\\n2\\n1\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 5 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00030/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "5ce612223b1963f801f847a3d52cd62e55ffed7d55086197d6c9f00b9ff99997",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00030_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00030/main.f",
+  "source_sha256": "e69a34ca56ecf32d626fd89596c8f18771b2b8ac05e185267ddb1339040b530b",
+  "channel": "combined",
+  "old": "0.5\n-\n2\n3\n4\n1\n2\nnull\nC\ntrue\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n1\nv=3!\nnull\nC\n3\n[1,2]\ntrue\ntrue\n465\n70\n1\n2\n1\n",
+  "new": "0.5\n-\n2\n3\n4\n1\n2\nnull\nC\ntrue\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n1\nv=3!\nnull\nC\n3\n[1,2,99]\ntrue\ntrue\n465\n70\n1\n2\n1\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '0.5\\n-\\n2\\n3\\n4\\n1\\n2\\nnull\\nC\\ntrue\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n1\\nv=3!\\nnull\\nC\\n3\\n[1,2]\\ntrue\\ntrue\\n465\\n70\\n1\\n2\\n1\\n'; VM '0.5\\n-\\n2\\n3\\n4\\n1\\n2\\nnull\\nC\\ntrue\\n4\\nNIFT\\nfalse\\ntrue\\n[\"Nift\"]\\n1\\nv=3!\\nnull\\nC\\n3\\n[1,2,99]\\ntrue\\ntrue\\n465\\n70\\n1\\n2\\n1\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 5 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00030/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "5ce612223b1963f801f847a3d52cd62e55ffed7d55086197d6c9f00b9ff99997",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00114_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00114/main.f",
+  "source_sha256": "3bcc69222d59180669f20951eb1b66f9b81757b9df192b089196a75f7ef23bc6",
+  "channel": "stdout",
+  "old": "3\n[1,2]\n-32\ntrue\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n",
+  "new": "3\n[1,2,99]\n-32\ntrue\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '3\\n[1,2]\\n-32\\ntrue\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n'; VM '3\\n[1,2,99]\\n-32\\ntrue\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 13 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00114/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "956a25978fc1647792e8709476592e9111701236fee29b7d46f0c8bdd8afc595",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00114_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00114/main.f",
+  "source_sha256": "3bcc69222d59180669f20951eb1b66f9b81757b9df192b089196a75f7ef23bc6",
+  "channel": "combined",
+  "old": "3\n[1,2]\n-32\ntrue\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\nerror: $ROOT/main.f:19:1: cannot assign double to int binding 'i3'\n",
+  "new": "3\n[1,2,99]\n-32\ntrue\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\nerror: $ROOT/main.f:19:1: cannot assign double to int binding 'i3'\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '3\\n[1,2]\\n-32\\ntrue\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\nerror: $ROOT/main.f:19:1: cannot assign double to int binding \\'i3\\'\\n'; VM '3\\n[1,2,99]\\n-32\\ntrue\\n5\\nX-Y-Z\\nfalse\\nfalse\\n[\"x\",\"y\",\"z\"]\\nerror: $ROOT/main.f:19:1: cannot assign double to int binding \\'i3\\''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 13 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00114/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "956a25978fc1647792e8709476592e9111701236fee29b7d46f0c8bdd8afc595",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00118_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00118/main.f",
+  "source_sha256": "6efae30917a6ac9c3372e451f3e9cd769a7bba1a11bb87a2b8d6da50c1302ef2",
+  "channel": "stdout",
+  "old": "3\n[1,2]\n2\nq\n{\"k\":2,\"s\":\"q\"}\ntrue\n",
+  "new": "3\n[1,2,99]\n2\nq\n{\"k\":2,\"s\":\"q\"}\ntrue\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '3\\n[1,2]\\n2\\nq\\n{\"k\":2,\"s\":\"q\"}\\ntrue\\n'; VM '3\\n[1,2,99]\\n2\\nq\\n{\"k\":2,\"s\":\"q\"}\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 14 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00118/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "b4ad0629c2e9fd311f760c93a01ff9eb2cf39e635632a8d1cef59657f34150aa",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00118_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00118/main.f",
+  "source_sha256": "6efae30917a6ac9c3372e451f3e9cd769a7bba1a11bb87a2b8d6da50c1302ef2",
+  "channel": "combined",
+  "old": "3\n[1,2]\n2\nq\n{\"k\":2,\"s\":\"q\"}\ntrue\n",
+  "new": "3\n[1,2,99]\n2\nq\n{\"k\":2,\"s\":\"q\"}\ntrue\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '3\\n[1,2]\\n2\\nq\\n{\"k\":2,\"s\":\"q\"}\\ntrue\\n'; VM '3\\n[1,2,99]\\n2\\nq\\n{\"k\":2,\"s\":\"q\"}\\ntrue\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 14 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00118/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "b4ad0629c2e9fd311f760c93a01ff9eb2cf39e635632a8d1cef59657f34150aa",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00131_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00131/main.f",
+  "source_sha256": "ce62c9d541529e78795ae12d5316a3c4557fcbf27c6c23d97b963dad762dfc87",
+  "channel": "stdout",
+  "old": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\n2\n3\n1\n52\np\n{\"k\":52,\"s\":\"p\"}\ntrue\n3\n[1,2]\nnull\nC\n",
+  "new": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\n2\n3\n1\n52\np\n{\"k\":52,\"s\":\"p\"}\ntrue\n3\n[1,2,99]\nnull\nC\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\n2\\n3\\n1\\n52\\np\\n{\"k\":52,\"s\":\"p\"}\\ntrue\\n3\\n[1,2]\\nnull\\nC\\n'; VM '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\n2\\n3\\n1\\n52\\np\\n{\"k\":52,\"s\":\"p\"}\\ntrue\\n3\\n[1,2,99]\\nnull\\nC\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 16 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00131/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "97393d2065640c7903413c21e59770fb2028ac5bfee500faf65f875808c157e2",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00131_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00131/main.f",
+  "source_sha256": "ce62c9d541529e78795ae12d5316a3c4557fcbf27c6c23d97b963dad762dfc87",
+  "channel": "combined",
+  "old": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\n2\n3\n1\n52\np\n{\"k\":52,\"s\":\"p\"}\ntrue\n3\n[1,2]\nnull\nC\n",
+  "new": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\n2\n3\n1\n52\np\n{\"k\":52,\"s\":\"p\"}\ntrue\n3\n[1,2,99]\nnull\nC\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\n2\\n3\\n1\\n52\\np\\n{\"k\":52,\"s\":\"p\"}\\ntrue\\n3\\n[1,2]\\nnull\\nC\\n'; VM '1\\nitem 1\\n2\\nitem 2\\n3\\nitem 3\\n1\\n2\\n3\\n1\\n52\\np\\n{\"k\":52,\"s\":\"p\"}\\ntrue\\n3\\n[1,2,99]\\nnull\\nC\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 16 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00131/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "97393d2065640c7903413c21e59770fb2028ac5bfee500faf65f875808c157e2",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00170_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00170/main.f",
+  "source_sha256": "314a1916c687465286b2190ab471f6da3fb869e2faf72189844ef98d71a6bd8f",
+  "channel": "stdout",
+  "old": "Nift\n3\n[1,2]\nqqqq\nboom 4\ntrue\n680\n",
+  "new": "Nift\n3\n[1,2,99]\nqqqq\nboom 4\ntrue\n680\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy stdout 'Nift\\n3\\n[1,2]\\nqqqq\\nboom 4\\ntrue\\n680\\n'; VM 'Nift\\n3\\n[1,2,99]\\nqqqq\\nboom 4\\ntrue\\n680\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 21 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00170/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "7bdf42e11253c8a0ff0be56feba51f03d05fd8298df870dfa36bdc45ec704cfd",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen_g00170_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00170/main.f",
+  "source_sha256": "314a1916c687465286b2190ab471f6da3fb869e2faf72189844ef98d71a6bd8f",
+  "channel": "combined",
+  "old": "Nift\n3\n[1,2]\nqqqq\nboom 4\ntrue\n680\n",
+  "new": "Nift\n3\n[1,2,99]\nqqqq\nboom 4\ntrue\n680\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 shared references (D-NEXT-refsem-b; b5-refsem.md section 1): arrays and objects are shared references, so a callee's mutation of an argument is visible to the caller. Legacy combined 'Nift\\n3\\n[1,2]\\nqqqq\\nboom 4\\ntrue\\n680\\n'; VM 'Nift\\n3\\n[1,2,99]\\nqqqq\\nboom 4\\ntrue\\n680\\n'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 21 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00170/main.f)",
+  "gen_seed": 1,
+  "tree_sha256": "7bdf42e11253c8a0ff0be56feba51f03d05fd8298df870dfa36bdc45ec704cfd",
+  "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
  }
 ]

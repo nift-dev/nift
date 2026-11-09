@@ -12,6 +12,10 @@ the mutation hits VM(P) and VM(T(P)) alike, as an unrelated VM bug would:
   exit-only     exit status 3 instead of the real one (stdout and stderr unchanged)
   refusal       the run's VM statistics report a refusal (outcome refused, no VM execution)
   abort         the process aborts (SIGABRT) after writing its output
+  hang          the process sleeps 30 s first (rt-diff's timeout must stop it)
+  direct-path   an extra stdout line only when the program passes bare arguments, i.e. neither
+                under the oracle's rewrite T (deepcopy) nor its control T' (identity wrapper):
+                a bug confined to the VM's direct-argument code paths (review of C67-C71, O-1)
 """
 import json
 import os
@@ -27,8 +31,17 @@ def main():
     try:
         with open(args[0], "rb") as handle:
             first = handle.readline().decode("utf-8", "replace").strip()
-        if first.startswith("// fake:"):
-            mode = first.split(":", 1)[1].strip()
+        if "// fake:" in first:  # the oracle's control rewrite T' prefixes line 1
+            mode = first.split("// fake:", 1)[1].strip()
+    except (OSError, IndexError):
+        pass
+    if mode == "hang":
+        import time
+        time.sleep(30)
+    source = b""
+    try:
+        with open(args[0], "rb") as handle:
+            source = handle.read()
     except (OSError, IndexError):
         pass
     env = dict(os.environ, NIFT_VM="1")
@@ -38,6 +51,8 @@ def main():
     proc = subprocess.run([real] + args, env=env, input=stdin_data, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT if combined else subprocess.PIPE, pass_fds=fds)
     out, err, code = proc.stdout, proc.stderr or b"", proc.returncode
+    if mode == "direct-path" and b"deepcopy(" not in source and b"rtdiff_identity_" not in source:
+        out += b"DIRECT-PATH-BUG\n"
     if mode == "extra-stdout":
         out += b"UNRELATED\n"
     elif mode == "error-column":

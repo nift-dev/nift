@@ -46,10 +46,22 @@ PROBES = {
                 "not-approved", None),
     "p_closure_captures_arg": ("fn(mk(xs)) { return (v) => xs.push(v) }\na := [1]\nadd := mk(a)\nadd(5)\n"
                                "print(a.stringify())\n", "unclassified", "closure captures parameter(s) xs"),
-    "p_same_builtin": (SHARE + "print(same(a, a))\n", "unclassified", "identity-sensitive or handle built-in same()"),
+    "p_same_builtin": (SHARE + "print(same(a, a))\n", "unclassified", "built-in same()"),
     "p_handle": (SHARE + "h := file(\"x.txt\")\nprint(h.path())\n", "unclassified",
-                 "identity-sensitive or handle built-in file()"),
+                 "built-in file()"),
     "p_struct": ("struct(P) { v := 1 }\n" + SHARE, "unclassified", "node kinds outside"),
+    # review of C67-C71 (Lows): cycle trigger, shadowing, concurrency, imported modules
+    "p_cycle_store": ("fn(link(x, y)) { x.push(y); return 0 }\na := [1]\nb := [a]\nprint(link(a, b))\n"
+                      "print(a.length())\n", "unclassified", "reports a reference cycle"),
+    "p_param_shadows_fn": (SHARE + "fn(g(add9)) { return add9 }\nprint(g(1))\n", "not-approved", None),
+    "p_async_task": ("@fn[async](af(n)) { return n }\nfu := af(1)\nprint(await fu)\n" + SHARE, "unclassified",
+                     None),
+    "p_thread_call": (SHARE + "t := thread(() => 1)\n", "unclassified", None),
+    "p_module_clean": ({"main.f": "import(\"m.f\")\n" + SHARE, "m.f": "fn(triple(n)) { return n * 3 }\nexport(triple)\n"},
+                       "approved", None),
+    "p_module_struct": ({"main.f": "import(\"m.f\")\n" + SHARE, "m.f": "struct(Q) { v := 1 }\nfn(mk()) { return 1 }\nexport(mk)\n"},
+                        "unclassified", "module m.f"),
+    "p_module_missing": ({"main.f": "import(\"absent.f\")\n" + SHARE}, "not-approved", None),
     # negative controls
     "n_unrelated_stdout": ("// fake: extra-stdout\n" + NOSHARE, "unclassified", "check 2"),
     "n_sharing_plus_unrelated": ("// fake: extra-stdout\n" + SHARE, "unclassified", "check 2"),
@@ -58,6 +70,8 @@ PROBES = {
     "n_exit_only_sharing": ("// fake: exit-only\n" + SHARE, "unclassified", "check 2"),
     "n_refusal": ("// fake: refusal\n" + SHARE, "unclassified", "check 4"),
     "n_abort": ("// fake: abort\n" + SHARE, "unclassified", "check 4"),
+    # O-1: a VM bug only on the direct-argument code paths (bare arguments): absent under T and T'
+    "n_direct_path_only_bug": ("// fake: direct-path\n" + SHARE, "unclassified", "check 6"),
     "n_rewrite_changes_legacy": ("fn(put(xs)) { xs.push(7); return 0 }\na := [1]\nprint(put(a))\n"
                                  "print(a.stringify())\nprint(put(a) + a[9])\n", "unclassified", "check 1"),
 }
@@ -72,10 +86,10 @@ def wrapper(path, body):
     return path
 
 
-def run_rt_diff(a, b, corpus, dump, report):
+def run_rt_diff(a, b, corpus, dump, report, timeout=60):
     cmd = [sys.executable, "-B", os.path.join(REPO, "tools", "rt-diff", "rt-diff"), "--a", a, "--b", b,
            "--corpus", corpus, "--quiet", "--b-vm-stats", "--sharing-oracle", dump, "--report", report,
-           "--timeout", "60", "--jobs", "4"]
+           "--timeout", str(timeout), "--jobs", "4"]
     proc = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
     if proc.returncode not in (0, 1) or not os.path.exists(report):
         sys.exit("FAIL rt-diff harness error (exit %d): %s" % (proc.returncode, proc.stderr[-2000:]))
@@ -107,12 +121,21 @@ def main():
         corpus = os.path.join(work, "probes")
         os.makedirs(corpus)
         for name, (source, _, _) in PROBES.items():
+            if isinstance(source, dict):  # a program with modules: its own directory
+                os.makedirs(os.path.join(corpus, name))
+                for fname, text in source.items():
+                    with open(os.path.join(corpus, name, fname), "w") as handle:
+                        handle.write(text)
+                with open(os.path.join(corpus, name, "rt-diff.only"), "w") as handle:
+                    handle.write("main.f\n")
+                continue
             with open(os.path.join(corpus, name + ".f"), "w") as handle:
                 handle.write(source)
         report = run_rt_diff(legacy, fake, corpus, args.parse_dump, os.path.join(work, "probes.json"))
         seen = {}
         for r in report["results"]:
-            seen[os.path.basename(r["path"])[:-2]] = r
+            stem = os.path.basename(r["path"])[:-2]
+            seen[os.path.basename(os.path.dirname(r["path"])) if stem == "main" else stem] = r
         for name, (_, want, reason) in PROBES.items():
             r = seen.get(name)
             if r is None:
@@ -138,6 +161,7 @@ def main():
              "fn(f(x)) { return x }\nprint(f(deepcopy(f(deepcopy([1])))))\n"),
             ("no-call-site", "a := [1]\na.push(2)\nprint(a.stringify())\n", None),
             ("unparsable", "fn(f(x) { return\n", None),
+            ("param-shadows", "fn(f(x)) { return x }\nfn(g(f)) { return f }\nprint(f([1]))\n", None),
         ]
         for name, source, expected in static:
             path = os.path.join(work, "static-%s.f" % name)
@@ -150,8 +174,18 @@ def main():
             print("%s static %-14s %s" % ("PASS" if ok else "FAIL", name, "rewritten as expected" if expected and ok
                                           else (why or "no rewrite (fail closed)") if ok else repr(got)))
             failures += 0 if ok else 1
+        # A timeout (review of C67-C71): the VM side hangs past rt-diff's timeout; check 4.
+        hang_corpus = os.path.join(work, "hang")
+        os.makedirs(hang_corpus)
+        with open(os.path.join(hang_corpus, "n_timeout.f"), "w") as handle:
+            handle.write("// fake: hang\n" + SHARE)
+        rep = run_rt_diff(legacy, fake, hang_corpus, args.parse_dump, os.path.join(work, "hang.json"), timeout=4)
+        got, why = status_of(rep["results"][0])
+        ok = got == "unclassified" and "timed out" in why
+        print("%s %-26s %-13s %s" % ("PASS" if ok else "FAIL", "n_timeout", got, why or "-"))
+        failures += 0 if ok else 1
         # The existing rt-diff mutants over the real VM: nothing may be approved by the oracle.
-        sharing = [n for n, (_, want, _) in PROBES.items() if want == "approved"]
+        sharing = [n for n, (src, want, _) in PROBES.items() if want == "approved" and isinstance(src, str)]
         mutant_corpus = os.path.join(work, "mutant-probes")
         os.makedirs(mutant_corpus)
         for name in sharing:
@@ -174,7 +208,7 @@ def main():
             failures += 0 if ok else 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    total = len(PROBES) + len(MUTANT_MODES) + 4
+    total = len(PROBES) + len(MUTANT_MODES) + 5 + 1
     print("%s sharing oracle selftest: %d of %d checks failed" % ("FAIL" if failures else "PASS", failures, total))
     return 1 if failures else 0
 

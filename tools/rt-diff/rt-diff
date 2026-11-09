@@ -580,6 +580,13 @@ def source_hash(entry):
     return digest.hexdigest()
 
 
+def tree_hash(entry):
+    """sha256 of every file of a generated program's directory (the script and its modules;
+    sorted, relative names), for exact rules that carry `tree_sha256` (review of C67-C71: the
+    script's own sha256 does not cover the modules it imports)."""
+    return source_hash({"path": entry.get("tree") or os.path.dirname(entry["path"])})
+
+
 # Class rules approve one narrowly defined difference on any entry; each class
 # is a function of (a, b) below. Unlike exact rules, a class rule that
 # approves nothing in a run is not a failure.
@@ -752,6 +759,8 @@ def load_policies(paths):
                     if "gen_seed" in rule and (not isinstance(rule["gen_seed"], int) or isinstance(rule["gen_seed"], bool)
                                                or not rule["entry"].startswith("gen/")):
                         problems.append("`gen_seed` must be an integer and the entry a generated one (gen/...)")
+                    if "gen_seed" in rule and not re.match(r"^[0-9a-f]{64}$", str(rule.get("tree_sha256", ""))):
+                        problems.append("a `gen_seed` rule needs `tree_sha256` (the program's directory, modules included)")
                 if problems:
                     usage_error("rt-diff: policy %s: %s" % (rid, "; ".join(problems)))
                 ids.add(rid)
@@ -775,6 +784,8 @@ def apply_policies(entry, a, b, diffs, rules, used=None):
             if candidate["entry"] != entry["id"] or candidate["channel"] != diff["channel"]:
                 continue
             entry_hash = entry_hash or source_hash(entry)
+            if "tree_sha256" in candidate and candidate["tree_sha256"] != tree_hash(entry):
+                continue
             if candidate["source_sha256"] == entry_hash and policy_matches(candidate, a, b):
                 rule = candidate
                 break
@@ -903,6 +914,12 @@ def run_sharing_oracle(entry, a, b, options, a_bin, b_bin, use_trace, interleave
     rewritten, wrapped, why = sharing_oracle.transform(source, root)
     if rewritten is None:
         return unclassified(why)
+    why = sharing_oracle.check_modules(options.sharing_oracle, entry["path"], root)
+    if why:
+        return unclassified(why)
+    control, _, why = sharing_oracle.transform(source, root, identity=sharing_oracle.IDENTITY)
+    if control is None:
+        return unclassified(why)
     tree = entry.get("tree") or os.path.dirname(entry["path"])
     scratch = tempfile.mkdtemp(prefix="rtdiff-oracle-")
     base = tempfile.mkdtemp(prefix="rtdiff-oracle-run-")
@@ -910,11 +927,15 @@ def run_sharing_oracle(entry, a, b, options, a_bin, b_bin, use_trace, interleave
         copy = os.path.join(scratch, "tree")
         shutil.copytree(tree, copy, symlinks=True)
         script = os.path.join(copy, os.path.relpath(entry["path"], tree))
-        with open(script, "wb") as handle:
-            handle.write(rewritten)
         probe = dict(entry, path=script, tree=copy)
-        at = run_one(a_bin, probe, base, options.timeout, use_trace, 2 if interleave else 0)
-        bt = run_one(b_bin, probe, base, options.timeout, use_trace, 1 if interleave else 0, vm_stats=True)
+        runs = {}
+        for label, text in (("t", rewritten), ("c", control)):
+            with open(script, "wb") as handle:
+                handle.write(text)
+            runs[label] = (run_one(a_bin, probe, base, options.timeout, use_trace, 2 if interleave else 0),
+                           run_one(b_bin, probe, base, options.timeout, use_trace, 1 if interleave else 0,
+                                   vm_stats=True))
+        (at, bt), (ac, bc) = runs["t"], runs["c"]
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
         shutil.rmtree(base, ignore_errors=True)
@@ -928,10 +949,10 @@ def run_sharing_oracle(entry, a, b, options, a_bin, b_bin, use_trace, interleave
         run["files"] = {k: v for k, v in run["files"].items() if k != script_key}
         return run
 
-    if not all(script_key in run["files"] for run in (a, b, at, bt)):
+    if not all(script_key in run["files"] for run in (a, b, at, bt, ac, bc)):
         return unclassified("the script's own file is missing from a snapshot (%s)" % script_key, wrapped=wrapped)
-    a, b, at, bt = (without_script(run) for run in (a, b, at, bt))
-    ok, why, evidence = sharing_oracle.decide(a, b, at, bt, lambda x, y: compare(x, y, use_trace, excluded))
+    a, b, at, bt, ac, bc = (without_script(run) for run in (a, b, at, bt, ac, bc))
+    ok, why, evidence = sharing_oracle.decide(a, b, at, bt, ac, bc, lambda x, y: compare(x, y, use_trace, excluded))
     if not ok:
         return unclassified(why, wrapped=wrapped)
     return {"status": "approved", "reason": "five checks hold", "wrapped": wrapped, "evidence": evidence}

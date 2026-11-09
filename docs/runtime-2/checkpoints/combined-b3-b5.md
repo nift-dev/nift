@@ -3478,3 +3478,66 @@ failures of section 60 all have this one cause.
   - `test-runtime2-rt-diff` (the same binary on both sides; a determinism check).
   - `builtins_diff.cpp` and `vm_parity.py` (already pin `NIFT_VM=0`).
   - `cp19/widening_error_boundary.py` (sets `NIFT_VM=0` for its legacy row).
+
+## 63. Review of C67–C71, O-1 and Lows: the oracle's control rewrite T′ (C74, tests and tools)
+
+**O-1.** T does more than remove sharing: a wrapped argument is no longer a bare argument or an
+argument path, so the VM compiles the call through other code (`compiler_call.cpp`:
+`argument_path`, alias/escaping handling, `bare_argument`). A VM bug that exists only on those
+direct-argument paths disappears under T and would be approved. The reviewer showed this with a
+fake VM.
+- **Control rewrite T′(P).** The same arguments are wrapped in injected identity functions. Each
+  wrapped argument gets its own `fn(rtdiff_identity_K(v)) { return v }`, all declared at the
+  start of line 1. One shared identity function was tried first: its return type is the union of
+  every argument type, which makes the VM fall back (`type:push`, `type:<=`) on 5 of the 13
+  oracle-approved programs. One function per argument stays monomorphic.
+
+  The call then compiles as under T, but nothing is copied and the sharing is preserved. Two new
+  checks, both required:
+  - **1′:** Legacy(T′(P)) == Legacy(P).
+  - **6:** VM(T′(P)) == VM(P) on every channel.
+
+  If either fails, or a T′ run is refused or falls back (check 4 applies to it), the row is
+  UNCLASSIFIED.
+- **Permanent negative control** `n_direct_path_only_bug`. The fake VM's `direct-path` mode adds a
+  stdout line only when the program has neither `deepcopy(` nor the identity wrapper, which is a
+  bug on the direct-argument path alone. It is rejected by check 6. Before T′, the same control
+  would have passed checks 1 to 5.
+
+**Lows.**
+- **Imported modules are scanned.** Every literal `import("...")` is resolved beside the script,
+  parsed, and given the same static checks, recursively. An unresolvable or non-literal import,
+  or an unparsable module, is UNCLASSIFIED. `Export` is a known node kind.
+- **Concurrency built-ins** (thread, async, parallel, spawn) are unsafe. `Await` is no longer a
+  known node kind, and an `@fn[async|thread|parallel]` declaration is rejected.
+- **A parameter named like a declared function** (shadowing) is rejected.
+- **New selftest cases** (36 checks, PASS):
+  - a cycle store, `link(a, [a])`, where the VM refuses with "reference cycle" and T would remove
+    the cycle: rejected by the cycle trigger;
+  - a VM side that hangs past rt-diff's timeout (`n_timeout`, 4 s): check 4;
+  - a thread call, an async task, a parameter shadowing a function (static);
+  - modules: clean (approved), declaring a struct (rejected), missing.
+- **The corpus rules for `vm-corpus/cp11/arrays.f` and `semantics/copy_at_call.f`** stay loaded,
+  but they are now approvable by the oracle (run without their rules: both "five checks hold").
+  `semantics/copy_at_return.f` is not: it has no call site to rewrite. Retiring them needs the
+  owner's approval.
+- **Gen rules now pin the program's modules.** A rule's `source_sha256` covered only `main.f`.
+  Every `gen_seed` rule now also carries `tree_sha256` (every file of the program's directory,
+  modules included), and rt-diff requires both to match; a `gen_seed` rule without it is refused
+  at load. Each of the 38 values was computed after checking `main.f` against the pinned
+  `source_sha256`.
+
+**Consequence of the thread rule. BLOCKER for the gate's `[0] parity`, stopped and reported.**
+- Six programs the oracle approved at C71 call `thread()`: seed-1 g00030, g00114, g00118, g00131
+  and g00170, and seed-3 g00047. They are now UNCLASSIFIED.
+- **Seed 1:** the 10 owner-approved exact rules of the five seed-1 programs (2026-11-08), retired
+  at C71, are restored from `b5-refsem-vm-retired.json`, scoped (`gen_seed` 1, `tree_sha256`).
+  These are old rules restored, not new approvals. The retired file keeps the 10 rules of
+  g00024, g00034, g00073, g00139 and g00181, which the oracle still approves.
+- **Seed 3:** g00047 has no prior rule, and new per-program approvals are not allowed (owner
+  2026-11-10 06:15). So `[0] parity` fails again on exactly this one row: rt-diff reports 659
+  entries, 1 differing, 0 unused policies; the oracle approves g00013 and g00021.
+- The program is `th3 := thread(tw2, 3)`: a task over a declared function with a literal scalar
+  argument. A narrower rule could allow `thread(declared_fn, scalar literals...)` when the task
+  function's body reaches no aggregate shared with the caller. That needs a sound definition and
+  an owner decision; it is not done here.

@@ -16,7 +16,18 @@ nested inside an argument would still be shared and a callee's mutation through 
 would stay visible; deepcopy copies every reachable array and object, which is what legacy's
 by-value passing gives the callee. copy and deepcopy are never used interchangeably here.
 
-THE FIVE CHECKS (all must hold to approve a row):
+THE CONTROL REWRITE T' (review of C67-C71, O-1). Wrapping an argument changes how the VM
+compiles the call: a bare argument or argument path (compiler_call.cpp: argument_path,
+alias/escaping handling, bare_argument) becomes a call result. A VM bug that exists only on
+those direct-argument paths would vanish under T and be approved. T'(P) wraps the same
+arguments in an injected identity function (`fn(rtdiff_identity_N(v)) { return v }`, declared
+at the start of line 1), so the call compiles as under T but nothing is copied: the sharing is
+preserved. Two more checks must hold:
+  1'. Legacy(T'(P)) == Legacy(P) exactly (T' is a no-op under value semantics).
+  6.  VM(T'(P)) == VM(P) exactly, on every channel: the direct-argument code paths alone change
+      nothing, so what T removes is the sharing and not a direct-path behaviour.
+
+THE FIVE CHECKS (all must hold to approve a row, with 1' and 6 above):
   1. Legacy(T(P)) == Legacy(P) exactly on every compared channel (exit, stdout, stderr, combined,
      files, trace): T is behaviour-preserving under value semantics.
   2. VM(T(P)) == Legacy(P) exactly on every channel: with argument sharing removed, nothing else
@@ -33,12 +44,14 @@ THE FIVE CHECKS (all must hold to approve a row):
      such a change and only when the rewrite moves that very channel back to legacy's.
 
 FAIL CLOSED. A row is UNCLASSIFIED (it stays a difference and blocks the gate) when any check
-fails or when preservation cannot be established statically: rt-parse-dump cannot parse P, P has
-a node kind outside the known list, P declares structs (struct `==` is identity), P calls an
-identity-sensitive or handle/reference built-in (same, file, ifstream, ofstream, mutex, channel,
-atomic, map, set, stack, ...), a closure captures a parameter of an enclosing function, a
-declared function's name is rebound, P has no rewritable call site, or any run reports a
-reference cycle. It is never approved by default.
+fails or when preservation cannot be established statically: rt-parse-dump cannot parse P or an
+imported module, P or a module has a node kind outside the known list, declares structs (struct
+`==` is identity), calls an identity-sensitive, handle/reference or concurrency built-in (same,
+file, ifstream, ofstream, mutex, channel, atomic, map, set, stack, thread, async, parallel, ...),
+awaits or declares an async/thread function, a closure captures a parameter of an enclosing
+function, a declared function's name is rebound or shadowed by a parameter, an import cannot be
+resolved to a module file, P has no rewritable call site, or any run reports a reference cycle.
+It is never approved by default.
 """
 import re
 import subprocess
@@ -48,14 +61,19 @@ KNOWN_KINDS = {
     "Program", "Block", "ExprStmt", "Declare", "Assign", "CompoundAssign", "Return", "If", "While",
     "For", "ForBinding", "Break", "Continue", "Try", "Throw", "FnDecl", "Param", "Call", "Member",
     "Index", "Ident", "Number", "String", "StringPart", "True", "False", "Binary", "Unary",
-    "Logical", "Array", "Object", "Property", "Lambda", "Await", "Import",
+    "Logical", "Array", "Object", "Property", "Lambda", "Import", "Export",
 }
 # Built-ins whose result is identity-sensitive or a handle/reference value (deepcopy would keep or
 # change identity in ways the oracle cannot judge).
 UNSAFE_CALLS = {
     "same", "file", "ifstream", "ofstream", "close", "mutex", "channel", "send", "recv", "cancel",
     "atomic", "atomic<int>", "atomic<bool>", "map", "set", "stack",
+    # concurrency (review of C67-C71): tasks share or transfer values outside the call graph T sees
+    "thread", "async", "parallel", "spawn",
 }
+# function decorators that make a declared function a task (`@fn[async](...)`).
+TASK_DECORATOR = re.compile(rb"@fn\[[^\]]*\b(async|thread|parallel)\b")
+IDENTITY = "rtdiff_identity_"
 LINE = re.compile(r"^( *)(\S+)(?: (\S+))? @(\d+)\.\.(\d+)(?: `(.*)`)?$")
 CYCLE = re.compile(rb"cyclic|reference_cycle|reference cycle")
 INTERNAL = re.compile(rb"compiler defect|internal error|\[internal\]|vm-internal")
@@ -109,19 +127,23 @@ def _name(node):
     return node.text if node is not None and node.kind == "Ident" else None
 
 
-def transform(source, root):
-    """(T(P) bytes, number of wrapped arguments, None) or (None, 0, reason)."""
+def static_reason(source, root):
+    """Why P (or a module) cannot be judged statically, or None."""
     nodes = list(root.walk())
     unknown = sorted({n.kind for n in nodes} - KNOWN_KINDS)
     if unknown:
-        return None, 0, "node kinds outside the oracle's known list: %s" % ", ".join(unknown)
+        return "node kinds outside the oracle's known list: %s" % ", ".join(unknown)
+    if TASK_DECORATOR.search(source):
+        return "an async/thread/parallel function declaration"
     declared = {_name(n.children[0]) for n in nodes if n.kind == "FnDecl" and n.children}
     declared.discard(None)
     for n in nodes:
         if n.kind == "Call" and n.children and _name(n.children[0]) in UNSAFE_CALLS:
-            return None, 0, "identity-sensitive or handle built-in %s()" % _name(n.children[0])
+            return "identity-sensitive, handle or concurrency built-in %s()" % _name(n.children[0])
         if n.kind in ("Declare", "Assign", "CompoundAssign") and n.children and _name(n.children[0]) in declared:
-            return None, 0, "declared function %s is rebound" % _name(n.children[0])
+            return "declared function %s is rebound" % _name(n.children[0])
+        if n.kind == "Param" and n.text in declared:
+            return "parameter %s shadows a declared function" % n.text
         if n.kind == "Lambda":
             own = {c.text for c in n.children if c.kind == "Param"}
             enclosing, p = set(), n.parent
@@ -132,12 +154,74 @@ def transform(source, root):
             used = {_name(c) for c in n.walk() if c.kind == "Ident"}
             captured = sorted((used & enclosing) - own - {None})
             if captured:
-                return None, 0, "a closure captures parameter(s) %s of an enclosing function" % ", ".join(captured)
+                return "a closure captures parameter(s) %s of an enclosing function" % ", ".join(captured)
+    return None
+
+
+def imports(root):
+    """The literal module paths P imports, or None when an import is not a literal path."""
+    paths = []
+    for n in root.walk():
+        if n.kind == "Import":
+            lits = [c for c in n.walk() if c.kind == "String" and c.text is not None]
+            if len(lits) != 1 or any(c.kind not in ("String", "StringPart", "Import") for c in n.walk()):
+                return None
+            text = lits[0].text
+            if len(text) < 2 or text[0] != '"' or text[-1] != '"' or "\\" in text or "${" in text:
+                return None
+            paths.append(text[1:-1])
+    return paths
+
+
+def check_modules(dump_binary, script_path, root, seen=None, depth=0):
+    """Static checks over every module P imports (recursively): a reason, or None."""
+    import os
+    seen = set() if seen is None else seen
+    if depth > 16:
+        return "imports nested deeper than 16"
+    paths = imports(root)
+    if paths is None:
+        return "an import that is not a literal module path"
+    for rel in paths:
+        path = os.path.normpath(os.path.join(os.path.dirname(script_path), rel))
+        if path in seen:
+            continue
+        seen.add(path)
+        if not os.path.isfile(path):
+            return "imported module %s not found beside the script" % rel
+        mod, why = parse(dump_binary, path)
+        if mod is None:
+            return "module %s: %s" % (rel, why)
+        with open(path, "rb") as handle:
+            why = static_reason(handle.read(), mod)
+        if why:
+            return "module %s: %s" % (rel, why)
+        why = check_modules(dump_binary, path, mod, seen, depth + 1)
+        if why:
+            return why
+    return None
+
+
+def transform(source, root, identity=None):
+    """(T(P) bytes, number of wrapped arguments, None) or (None, 0, reason). With `identity`,
+    the control rewrite T'(P): the same arguments wrapped in the injected identity function
+    `identity` (declared at the start of line 1) instead of deepcopy."""
+    nodes = list(root.walk())
+    why = static_reason(source, root)
+    if why:
+        return None, 0, why
+    declared = {_name(n.children[0]) for n in nodes if n.kind == "FnDecl" and n.children}
+    declared.discard(None)
+    if IDENTITY.encode() in source:
+        return None, 0, "the program already uses the oracle's identity name %s" % IDENTITY
     inserts = []
+    names = []  # T': one identity function per wrapped argument, so each stays monomorphic
     for n in nodes:
         if n.kind == "Call" and n.children and _name(n.children[0]) in declared:
             for arg in n.children[1:]:
-                inserts.append((arg.start, 1, b"deepcopy("))
+                if identity:
+                    names.append("%s%d" % (identity, len(names)))
+                inserts.append((arg.start, 1, (names[-1] + "(").encode() if identity else b"deepcopy("))
                 inserts.append((arg.end, 0, b")"))
     if not inserts:
         return None, 0, "no call to a declared function: nothing to rewrite"
@@ -147,6 +231,8 @@ def transform(source, root):
         if pos > len(out):
             return None, 0, "rt-parse-dump offset beyond the source"
         out[pos:pos] = text
+    if identity:
+        out[0:0] = "".join("fn(%s(v)) { return v }; " % name for name in names).encode()
     return bytes(out), len(inserts) // 2, None
 
 
@@ -174,11 +260,12 @@ def harness_failure(run, label, vm=False):
     return None
 
 
-def decide(a, b, at, bt, compare):
-    """The five checks over Legacy(P)=a, VM(P)=b, Legacy(T(P))=at, VM(T(P))=bt. `compare(x, y)`
-    returns rt-diff's list of differing channels. Returns (approved, reason, evidence)."""
+def decide(a, b, at, bt, ac, bc, compare):
+    """The checks over Legacy(P)=a, VM(P)=b, Legacy(T(P))=at, VM(T(P))=bt, Legacy(T'(P))=ac and
+    VM(T'(P))=bc. `compare(x, y)` returns rt-diff's list of differing channels. Returns
+    (approved, reason, evidence)."""
     for run, label, vm in ((a, "Legacy(P)", False), (b, "VM(P)", True), (at, "Legacy(T(P))", False),
-                           (bt, "VM(T(P))", True)):
+                           (bt, "VM(T(P))", True), (ac, "Legacy(T'(P))", False), (bc, "VM(T'(P))", True)):
         why = harness_failure(run, label, vm)
         if why:
             return False, "check 4: " + why, {}
@@ -186,6 +273,13 @@ def decide(a, b, at, bt, compare):
     d1 = compare(a, at)
     if d1:
         return False, "check 1: the rewrite changes legacy (%s)" % ", ".join(sorted({d["channel"] for d in d1})), {}
+    d1c = compare(a, ac)
+    if d1c:
+        return False, "check 1': the control rewrite T' changes legacy (%s)" % ", ".join(sorted({d["channel"] for d in d1c})), {}
+    d6 = compare(b, bc)
+    if d6:
+        return False, ("check 6: VM(T'(P)) differs from VM(P) (%s): the direct-argument code paths alone change "
+                       "the result, so T would hide a direct-path behaviour" % ", ".join(sorted({d["channel"] for d in d6}))), {}
     d2 = compare(a, bt)
     if d2:
         return False, "check 2: VM(T(P)) still differs from legacy (%s)" % ", ".join(sorted({d["channel"] for d in d2})), {}
