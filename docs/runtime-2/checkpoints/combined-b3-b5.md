@@ -2441,3 +2441,34 @@ no unmutated control, and ran each suite on the unmutated build:
   per-mutant expected signatures, not a suite-failure signal.
 
 **Low (record only):** the error-position item is in section 38 (P2 group).
+
+## 40. cp14b-mutants: the approved-difference controls (C47)
+
+**What changed.** Mutant 11 (`missing-const-guard`) has `const_precedence` as its witness. Its
+normal control now gets the treatment DRAIN got (section 38): the VM is pinned to the approved B5
+output, and legacy to its own recorded output. The approval is owner Q2 option B, `const` is
+binding-only (B5).
+- `tests/runtime2/cp14b/mutations.py` reads both pins from `functional.APPROVED`, the one place the
+  approval is recorded:
+  - VM: `ARG`, `9`, exit 0;
+  - legacy: `cannot mutate const array: a` at 1:59, exit 1.
+- In general, every witness that `functional.APPROVED` pins is now pinned the same way in the
+  mutant controls.
+
+**Result: mutant 11 now SURVIVES.** It has had no hook since B5 2 (519b9690, "guard removal"):
+- that commit deleted the `NIFT_COLLECTION_MUTANT == 11` branch together with the const-array
+  guard, which is the approved Q2B semantics;
+- `src/` has no `NIFT_COLLECTION_MUTANT … 11` left, so its build is the unmutated build;
+- it was never noticed, because its control failed first: since B5 on every host, and on Linode
+  behind DRAIN.
+
+As with A29 (section 39), I propose retiring it with this proof, like B5's mutant 2, pending
+review. Until then it stays listed and the gate fails on it alone.
+
+**Other mutants' controls.** Mutants 3-8 and 10 use the witnesses `snapshot_mutation`,
+`core_factory`, `predicate_error`, `short_any`, `sort_by_stable`, `group_by_each` and `block_error`.
+- All of them pass exact legacy parity on the current build, and all are DETECTED.
+- Their hooks exist: hooks 6 and 8 are spelled `!= n`.
+- None carries a stale pre-B5 expectation.
+- Mutants 1, 2 and 9 use DRAIN, pinned in C45. They are UNVERIFIED on GCC 13.3 (the profile gate)
+  and are judged on Linode.

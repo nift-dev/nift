@@ -2,7 +2,7 @@
 """Build real named mutants, require passing controls, then semantic detection."""
 import argparse,hashlib,json,subprocess,tempfile
 from pathlib import Path
-from functional import CASES,run
+from functional import APPROVED,CASES,run
 DRAIN='a:=[{"k":3},{"k":1},{"k":2}]; n:=0; fn(cmp(x,y)) { n+=1; if(n==2) { throw error("stop") }; return x.k<y.k }; try { a.sort(cmp) } catch(e) { print("CATCH"); print(a.stringify()) }; print("AFTER")'
 # B04 (owner approval 2026-11-09 17:31): the DRAIN control's VM result is the copy-sort-commit one
 # (owner ruling Q7, 2026-11-07, docs/runtime-2/compatibility.md: a failed comparator sort leaves the
@@ -11,6 +11,13 @@ DRAIN='a:=[{"k":3},{"k":1},{"k":2}]; n:=0; fn(cmp(x,y)) { n+=1; if(n==2) { throw
 APPROVED_CONTROLS={DRAIN:dict(vm=dict(out='CATCH\n[{"k":3},{"k":1},{"k":2}]\nAFTER\n',err='',exit=0),
                               legacy=dict(out='CATCH\n[{"k":1},{"k":3},{"k":2}]\nAFTER\n',err='',exit=0),
                               citation='owner ruling Q7 (2026-11-07), copy-sort-commit; B04 approval 2026-11-09 17:31')}
+# C47: a witness the functional suite already pins as an approved difference (functional.APPROVED)
+# is pinned the same way here: the VM to the approved output, legacy to its own recorded output.
+# Mutant 11's witness, const_precedence: owner Q2 option B, `const` is binding-only (B5).
+for _name,_want in APPROVED.items():
+    if 'vm_err' in _want:
+        APPROVED_CONTROLS.setdefault(CASES[_name],dict(vm=dict(out=_want['vm'],err=_want['vm_err'],exit=_want['vm_exit']),
+            legacy=dict(out=_want['legacy'],err=_want['legacy_err'],exit=_want['legacy_exit']),citation=_want['citation']))
 MUTANTS=[
 (1,'logical-drain-failure','vm_collection_sort',DRAIN),
 (2,'escaping-drain-bad-alloc','vm_collection_sort',DRAIN),
