@@ -43,8 +43,9 @@ $(TEST_DIR)/cp19/admission-switch-sanitize: tests/runtime2/cp19/admission_mutant
 	@mkdir -p $(dir $@)
 	$(CXX) $(SAN_CPPFLAGS) -Itests/rt $(SANITIZER_FLAGS) -std=c++17 -pthread $< $(filter-out $(TEST_DIR)/san/src/rt/vm.o,$(CP19_EXPR_SAN_OBJECTS)) $(TEST_DIR)/cp19/vm-switch-sanitize.o $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 .PHONY: test-cp19-admission-sanitize
+# B16 (section 59): `loop` runs as the D4 sentinel (d4-refused); its admitted run is no longer expected.
 test-cp19-admission-sanitize: $(TEST_DIR)/cp19/admission-sanitize $(TEST_DIR)/cp19/admission-switch-sanitize
-	@for binary in $^; do for case in wrapper field loop alias schema order direct nested capture numeric native native-once selector shared shared-scalar; do ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $$binary $$case admitted || exit $$?; done; done
+	@for binary in $^; do for case in wrapper field loop alias schema order direct nested capture numeric native native-once selector shared shared-scalar; do expect=admitted; if [ $$case = loop ]; then expect=d4-refused; fi; ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $$binary $$case $$expect || exit $$?; done; done
 
 $(TEST_DIR)/cp19/admission-control-switch: tests/runtime2/cp19/admission_mutants.cpp $(filter-out src/rt/vm.o,$(CP19_EXPR_OBJECTS)) $(TEST_DIR)/cp13b/vm-switch.o
 	@mkdir -p $(dir $@)
@@ -88,3 +89,27 @@ $(eval $(call CP19_SESSION_SWITCH,7,compiler_session_contract))
 .PHONY: test-cp19-session-mutants-switch
 test-cp19-session-mutants-switch: $(TEST_DIR)/cp19/session-control-switch $(addsuffix -switch,$(addprefix $(TEST_DIR)/cp19/session-m,1 2 3 4 5 6 7))
 	$(PYTHON) tests/runtime2/cp19/session_mutants.py --dir "$(CURDIR)/$(TEST_DIR)/cp19" --suffix=-switch --out "$(TEST_DIR)/cp19/session-mutants-switch.json"
+
+# B16 (combined-b3-b5.md section 59, owner 2026-11-10): m10's combined-mutant witness. m10 forces
+# the session native dispatch tag; B4's redispatch (vm_builtin.cpp) masks it in production. B4
+# mutant A4 removes the redispatch. Rows: m10 alone and A4 alone behave as the control on `native`,
+# and m10+A4 must show the internal failure, so the hook stays observable and detected.
+$(TEST_DIR)/cp19/admission-a4.o: src/rt/vm_builtin.cpp $(RT_VALUE_HEADERS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_B4_MUTANT=4 -c $< -o $@
+CP19_A4_BASE := $(filter-out src/rt/vm_builtin.o,$(CP19_EXPR_OBJECTS))
+CP19_M10A4_BASE := $(filter-out src/rt/vm_builtin.o src/rt/compiler_session_native.o,$(CP19_EXPR_OBJECTS))
+$(TEST_DIR)/cp19/admission-a4: tests/runtime2/cp19/admission_mutants.cpp $(CP19_A4_BASE) $(TEST_DIR)/cp19/admission-a4.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_A4_BASE) $(TEST_DIR)/cp19/admission-a4.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/admission-m10-a4: tests/runtime2/cp19/admission_mutants.cpp $(CP19_M10A4_BASE) $(TEST_DIR)/cp19/admission-m10.o $(TEST_DIR)/cp19/admission-a4.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(CP19_M10A4_BASE) $(TEST_DIR)/cp19/admission-m10.o $(TEST_DIR)/cp19/admission-a4.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/admission-a4-switch: tests/runtime2/cp19/admission_mutants.cpp $(filter-out src/rt/vm.o,$(CP19_A4_BASE)) $(TEST_DIR)/cp19/admission-a4.o $(TEST_DIR)/cp13b/vm-switch.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_A4_BASE)) $(TEST_DIR)/cp19/admission-a4.o $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
+$(TEST_DIR)/cp19/admission-m10-a4-switch: tests/runtime2/cp19/admission_mutants.cpp $(filter-out src/rt/vm.o,$(CP19_M10A4_BASE)) $(TEST_DIR)/cp19/admission-m10.o $(TEST_DIR)/cp19/admission-a4.o $(TEST_DIR)/cp13b/vm-switch.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $< $(filter-out src/rt/vm.o,$(CP19_M10A4_BASE)) $(TEST_DIR)/cp19/admission-m10.o $(TEST_DIR)/cp19/admission-a4.o $(TEST_DIR)/cp13b/vm-switch.o $(LDLIBS) -o $@
+test-cp19-admission-mutants: $(TEST_DIR)/cp19/admission-a4 $(TEST_DIR)/cp19/admission-m10-a4
+test-cp19-admission-mutants-switch: $(TEST_DIR)/cp19/admission-a4-switch $(TEST_DIR)/cp19/admission-m10-a4-switch

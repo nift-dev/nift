@@ -10,6 +10,10 @@ int main(int argc, char** argv) {
     const bool refused = std::string(argv[2]) == "refused";
     const bool internal = std::string(argv[2]) == "internal";
     const bool replayed = std::string(argv[2]) == "replayed";
+    // B16 (combined-b3-b5.md section 59): the loop control's D4 sentinel. The probe is refused by
+    // the B5 D4 exposure (141b847e), exactly, before any effect; see the loop branch below.
+    const bool d4_refused = std::string(argv[2]) == "d4-refused";
+    if (d4_refused && test != "loop") return 2;
     std::string seed, probe, check, expected, reason;
     if (test == "wrapper") {
         seed = "a:=[[1]];f:=()=>a.stringify()";
@@ -88,6 +92,20 @@ int main(int argc, char** argv) {
     CHECK(output.empty() && !session.contains("leaked") && session.binding_count() == count);
     CHECK(!original_f.is(Kind::Function) || session.value("f").heap() == original_f.heap());
     r = session.execute(probe + ";print(\"ONCE\");throw error(\"stop\")", "probe", output);
+    if (d4_refused) {
+        // Exact D4 refusal: reason, no VM or legacy execution, no output, no binding, and the
+        // earlier definition of g() still current. Admission of the probe fails this witness.
+        CHECK(!r.admitted && r.refusal == "session:current-callable-proof");
+        CHECK(r.vm_executions == 0 && r.legacy_executions == 0);
+        CHECK(output.empty() && !session.contains("last") && session.binding_count() == count);
+        output.clear();
+        r = session.evaluate(check, "check", output);
+        CHECK(r.admitted && r.execution.reason == StopReason::None && r.value.is(Kind::Int) && r.value.as_int() == 1);
+        CHECK(output.empty());
+        const auto status = rt_test::finish("CP19 admission witness");
+        if (!status) std::cout << "WITNESS " << test << " d4-refused\n";
+        return status;
+    }
     if (test == "shared-scalar") {
         if (internal) {
             CHECK(r.admitted && r.vm_executions == 1 && r.execution.reason == StopReason::Internal);
