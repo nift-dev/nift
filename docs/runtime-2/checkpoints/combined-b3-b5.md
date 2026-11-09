@@ -3559,3 +3559,66 @@ fake VM.
   In the C72 gate run, mutant 5 was caught by the three suites that pin error positions, golden
   (60 of 108), d018 (15) and review (14), and by int-bounds, parity, adversarial, former-replay
   and records too: 12 of 12 rejected (section 62).
+
+## 65. Owner 08:57, A: merge and merge_deep use the one-step clone (C76, production)
+
+**Change.** `object_methods.cpp`'s `shallow_object`, the first step of `merge` and of each
+`merge_deep` level, built the result with one `set` per receiver entry. Each set paid a
+`find_position`, a `rebuild_index`, vector growth and a `heap_retally`, which is the
+`Construction::object_set` / `heap_retally` profile of section 56. It now starts from
+`object_shallow_clone`: the entries and the index are copied and the heap is retallied once.
+- **One supporting line in `build.h`, flagged for review.** The clone is a published Value, and
+  only a builder may populate a fresh object. So `build::Object` gains
+  `static Object shallow_clone(const Value&)` with a private constructor from the fresh clone.
+  This is exactly `build::Array::shallow_clone`'s existing form (tooling 2, fa10fc9b), not a new
+  authority: the builder owns the fresh clone until `publish()` and holds nothing afterwards.
+  `object_methods.cpp` could not do this alone: the alternatives were a builder entry point, or
+  `obj_merge` as an `InPlaceKey` owner, which is the construction model's authority list.
+- **Production sha256:** `f063f1a968b286c69b406d49d5d6f7978c379e2e69bba43f4d97744cd0a73b54`
+  (was c88bf749…).
+
+**Guarantees and their tests.**
+- **Fresh outer identity.** Unit: the result is never the receiver's or the argument's object.
+  CLI: `same(a.merge(b), a)`, `same(.., b)`, `same(a.merge_deep(b), a)` and `same(a.merge(a), a)`
+  are all false. B2-pinned, because legacy's `same()` refuses objects.
+- **merge shares nested values; merge_deep merges nested objects into new objects and shares
+  the rest** (B2). Unit: identity checks against the former construction, entry for entry. CLI:
+  B2-pinned outputs (a push through a merged result's nested array is visible in the receiver).
+- **Sources unchanged.** Unit and CLI; legacy-equal for the contents.
+- **No builder keeps authority after publish:** the existing builder discipline
+  (`test-rt-build`'s B-M1/B-M2 mutants); the clone enters through the builder, never a raw Value.
+- **Allocation failure: no partial construction, no leak.** `tests/rt/merge_alloc_fail.cpp`
+  (`make test-rt-merge-alloc`, part of `test-rt-builtins`) fails every allocation point of a call
+  in turn, with a replaced `operator new`, and checks after each failure:
+  - outstanding allocations are back to their value before the call (no leak);
+  - the live-heap tally is unchanged;
+  - the receiver and argument are unchanged (keys, values, nested refcounts).
+
+  It covers the clone (merge: 4 points; merge_deep: 6; merge of an object with itself: 3) and,
+  side by side, a reference copy of the former per-entry construction (16 points). All pass;
+  336 checks, 0 failures.
+- **Accounting stays correct, nested values included.** After success, the live-heap tally grows
+  by exactly the result's footprint. A VM-level comparison against a one-off binary built with
+  the former `object_methods.cpp` (deleted afterwards) printed identical output for both CLI
+  probes. Heap statistics were equal for the nested case and +64 bytes for the 3-entry case;
+  the clone copies the source's index vector, and the tally counts it exactly.
+- **No cycle check is skipped.** A fresh outer object cannot be reachable from the values stored
+  in it, and the former construction (`build::Object::set`) had no cycle check either; the stored
+  values are the receiver's and the argument's, unchanged.
+- **CLI regression test** `tests/runtime2/merge_contract.py` (in `test-rt-merge-alloc`). Contents,
+  order, sources unchanged, `o.merge(o)`, merge_deep and `{}.merge(a)` must equal legacy exactly;
+  the two B2 cases are pinned. It also passes on the former binary.
+
+**Original CP15 callgrind limits for `obj.merge` (not re-baselined): PASS at all four sizes and
+the exponent.**
+
+| n | Ir per call | CP15 guard |
+| --- | --- | --- |
+| 100 | 2,988 | 3,055 |
+| 1,000 | 18,038 | 18,105 |
+| 10,000 | 292,429 | 292,528 |
+| 100,000 | 1,717,322 | 1,717,389 |
+
+The exponent is 0.769 against 0.769. Before this commit `obj.merge` measured 22,848 to 18,314,388
+Ir/call. `obj.merge_deep` also passes its guard. After A, the only remaining guard failure is
+`str.replace` (B, next commit).

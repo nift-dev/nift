@@ -4241,10 +4241,23 @@ test-rt-builtins-guards: $(RT_BUILTINS_BENCH)
 	python3 tests/runtime2/builtins/builtins_guards.py "$(RT_BUILTINS_BENCH)" \
 		--check tests/runtime2/builtins/builtin_guards.json
 
+# Owner 2026-11-10 08:57 (combined-b3-b5.md section 65): merge/merge_deep's one-step clone under
+# allocation failure at every allocation point (no leak, no visible partial construction),
+# against the former per-entry construction, and its contract on success.
+RT_MERGE_ALLOC := $(TEST_DIR)/rt/merge-alloc-fail$(EXEEXT)
+$(RT_MERGE_ALLOC): tests/rt/merge_alloc_fail.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/merge_alloc_fail.cpp $(RT_UNIT_OBJECTS) -o "$@"
+.PHONY: test-rt-merge-alloc
+test-rt-merge-alloc: $(RT_MERGE_ALLOC) $(TARGET)
+	"$(RT_MERGE_ALLOC)"
+	$(PYTHON) -B tests/runtime2/merge_contract.py --nift "$(CURDIR)/$(TARGET)"
+
 .PHONY: test-rt-builtins test-rt-builtins-sanitize test-rt-builtins-probe
 # RT_BUILTINS_SEED / RT_BUILTINS_CASES vary the differential test.
 test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative test-rt-host-random-budget \
-		test-rt-parallel-isolation-stubs
+		test-rt-parallel-isolation-stubs test-rt-merge-alloc
 	@test -x "$(RT_BUILTINS_LEGACY)" || { echo "legacy oracle $(RT_BUILTINS_LEGACY) missing (set RT_BUILTINS_LEGACY)" >&2; exit 1; }
 	"$(RT_BUILTINS_UNIT)"
 	"$(RT_BUILTINS_DIFF)" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_CASES:-5000}

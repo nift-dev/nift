@@ -268,6 +268,9 @@ private:
 class Object {
 public:
     Object() : v_(make_object()) {}
+    // A new object with `source`'s entries and index (object_shallow_clone), to change some; as
+    // build::Array::shallow_clone (owner 2026-11-10 08:57: merge/merge_deep's one-step clone).
+    static Object shallow_clone(const Value& source) { return Object(object_shallow_clone(source)); }
     Object(Object&& other) noexcept : v_(NIFT_RT_BUILDER_TRANSFER(other.v_)) {}
     Object(const Object&) = delete;
     Object& operator=(const Object&) = delete;
@@ -278,6 +281,7 @@ public:
     [[nodiscard]] Value publish() && { live(); return NIFT_RT_BUILDER_RELEASE(v_); }
 
 private:
+    explicit Object(Value fresh) : v_(static_cast<Value&&>(fresh)) {}
     Value& live() { check_live(v_.is(Kind::Object)); return v_; }
     const Value& live_view() const { check_live(v_.is(Kind::Object)); return v_; }
     Value v_;

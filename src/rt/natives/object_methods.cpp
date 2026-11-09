@@ -43,12 +43,11 @@ Status listing(const Value* args, std::uint32_t argc, Value& out, std::string& e
 }
 
 // A new object with `source`'s entries (shared values), in order: the result
-// of merge/merge_deep before the other side's entries are applied.
-build::Object shallow_object(const Value& source) {
-    build::Object out;
-    for (const auto& entry : object_view(source)) out.set(entry.first, entry.second);
-    return out;
-}
+// of merge/merge_deep before the other side's entries are applied. One step
+// (object_shallow_clone: the entries and the index copied, the heap retallied
+// once) instead of one set per entry (owner 2026-11-10 08:57; the CP15
+// obj.merge guard). The builder owns the fresh clone until publish().
+build::Object shallow_object(const Value& source) { return build::Object::shallow_clone(source); }
 
 // Legacy merge_deep's recursive merge, at most 64 nested levels (the depth
 // bounds the C++ recursion too).
