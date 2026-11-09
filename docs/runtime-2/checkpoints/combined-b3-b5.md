@@ -3475,7 +3475,10 @@ failures of section 60 all have this one cause.
   - `tests/runtime2/refrep/refrep_cli.py` and `tests/runtime2/cp19/cleanup_cli.py` (they test
     the default session).
   - `cp25/inventory.py` (VM against VM).
-  - `test-runtime2-rt-diff` (the same binary on both sides; a determinism check).
+  - `test-runtime2-rt-diff` (the same binary on both sides; a determinism check). Note (review of
+    C72–C78, Low): since b61784a2 both sides run the VM, so this check has been VM against VM, not
+    legacy against legacy. It still checks the determinism of the default engine; no legacy
+    determinism check runs there.
   - `builtins_diff.cpp` and `vm_parity.py` (already pin `NIFT_VM=0`).
   - `cp19/widening_error_boundary.py` (sets `NIFT_VM=0` for its legacy row).
 
