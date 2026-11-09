@@ -36,7 +36,15 @@ declare -A FILES=(
   [37]="src/rt/infer_notify.cpp"                                # A37: every notification scans its whole reader list (4c9632b8: quadratic on `many`)
   [38]="src/rt/infer_collection.cpp"                            # A38: reverse()/sort() results get a new site, not the receiver's (ce0a9a44, review N-1)
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 29 30 31 32 34 35 36 37 38)
+# A29 is RETIRED as an equivalent mutant (C49; proof: docs/runtime-2/checkpoints/combined-b3-b5.md
+# section 39, confirmed by the independent review of C45/C46), as B5 retired its mutant 2. Its hook
+# stays in src/rt/infer_sites.cpp. Its precondition is pinned below (a29_precondition.py): if any of
+# those session statements is ever admitted, A29 must come back into this list.
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(2 19 20 21 22 23 24 25 26 27 28 30 31 32 34 35 36 37 38)
+python3 tests/runtime2/b4b/a29_precondition.py --nift "$NIFT" > "$OUT/a29-precondition.log" 2>&1 || {
+  tail -5 "$OUT/a29-precondition.log"
+  echo "FAIL b4b mutants: the precondition of A29's retirement no longer holds: restore A29"; exit 1; }
+echo "PASS b4b mutants: A29 retired (equivalent); $(tail -1 "$OUT/a29-precondition.log")"
 CXX=${CXX:-g++}
 CPPFLAGS="-include src/build/production_tu.h -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

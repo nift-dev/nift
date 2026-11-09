@@ -2523,3 +2523,44 @@ diagnostics group.
 **B05 status:** bench corrected. Reclassifying it from P0 to a P2 test defect is the owner's
 decision after verification; Linode GCC 15.2 should give byte-identical figures, since the sizes
 depend only on `sizeof(Value)`.
+
+## 42. A29 retired as an equivalent mutant (C49)
+
+The independent review of C45/C46 (`REVIEW-C45-C46.md`, item 8) confirmed that A29 is equivalent,
+but with a **corrected reason**. Section 39's "re-exposed at line 319" does not apply to the cases
+that reach the hooked line. The proof as the review established it:
+
+1. **Only two kinds of session statement reach the hooked branch** (`infer_sites.cpp:298`,
+   `session_ && !has_site(container)`). The review's trap build (`__builtin_trap()` there) showed
+   that it is reached only by:
+   - stores into an earlier **non-aggregate** value (int, bool, string, null, a lambda) through
+     `push` or `[i] =`;
+   - stores into an earlier **struct** instance (`push`, `[0] =`, `["k"] =`, `.k =` on an
+     undeclared field).
+
+   Earlier arrays, objects, nested and returned or aliased arrays carry the heap site through
+   `sited()` and never reach it.
+2. **For those cases A29 really does skip the exposure.** The recursive
+   `site_store(heap_sited(...))` returns at `if (!aggregate) return;`, before line 319.
+3. **The skipped exposure is never observable.** Every such statement is refused for its
+   receiver's kind alone (`type:push`, `type:element-assignment`, `index-target`,
+   `static-error:member-assign` / `struct-no-field`). That holds in production and in A29 alike,
+   inside a dead branch too. The review ran 1,056 session programs with identical output on
+   production and A29: 8 earlier-value kinds × 3 stores × 4 values × 4 later uses, guarded or not,
+   plus 288 with aggregate and struct receivers and receiver-kind-sensitive later uses. Every
+   program reaching the line was refused.
+
+**Retirement, following B5 mutant 2's precedent.**
+- A29 leaves the default list of `tests/runtime2/b4b/mutants.sh`. A comment there points here.
+- The hook stays in `src/rt/infer_sites.cpp`, and section 39 keeps the original analysis.
+- `tests/runtime2/b4b/a29_precondition.py` runs in the gate first and **pins the precondition**.
+  It covers 48 session statements: each earlier kind (int, bool, string, null, lambda, struct) ×
+  each store (push, index, key, member), live and in a dead branch. Every one must be refused for
+  its receiver-kind reason, with the statement's own output never printed.
+- If any is ever admitted, the gate fails with "restore A29": the line-298 exposure would become
+  observable, and A29 must come back.
+- `test-runtime2-b4b-mutants` passes: the negative control, the A29 precondition (48 refused), and 19 of 19 mutants caught (each by the same signals as in section 39).
+
+**Low (record only, the review's item 9).** The latent mutant gates without an unmutated control
+should get the same `signals 0`-style negative control later: b3, b4, refsem, collections,
+coro-module, args-cmd, packages and b5. Their suites pass unmutated today, so none is vacuous now.
