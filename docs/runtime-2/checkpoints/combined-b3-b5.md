@@ -267,7 +267,8 @@ Added (owner 2026-11-07 18:00 D4/D5):
   pre-existing (weekend/r2, B3, B4).
 - **B4b `script_return_kernel_error`** (C36, section 30): `a := []; return a.pop()` refused
   `type:script-return` since B4b (B3 and weekend/r2 run it legacy-equal); cp14b is FAILED-NEW
-  against weekend/r2 until fixed or decided.
+  against weekend/r2 until fixed or decided. **Fixed in C44 (B06, section 37)**, with
+  `comparator_factory`; awaiting review and the GCC 15.2 confirmation on Linode.
 - **M-3** `for-capture-vanishing` / `for-missing-write`: deferred precision limitation (safely
   refused before any effect, not previously admitted: 17f7964c refuses them too). Fixtures in
   tree, run by `test-runtime2-b5`: `tests/runtime2/b5/precision/m3_nested_loop_shared.f` (the
@@ -2121,3 +2122,122 @@ Further guard cases:
 - **collect:** copies the evidence directory (`artefacts/evidence/`) instead of `.build/certify`,
   plus the campaign id. It still collects the gates' own harness JSON from `.build`.
 - **Rerun:** B21 acceptance 4 requires a full campaign rerun.
+
+## 37. B06: two B4b admission regressions, fixed in the kind inference (C44)
+
+**Owner order (2026-11-09 16:46, item 4).** B06 is a genuine admission regression. The order:
+find the earliest commit that causes it; restore legitimate execution through the existing
+admission and runtime-kind mechanisms; add regression tests; no broad type-inference redesign.
+This is a production change in `src/rt` (two compile-time inference files), bounded as follows.
+
+**Bisect.** The B4b range runs from 4c7d0b40 (B3) to 17f7964c. It was bisected by building nift in
+a sparse scratch clone of the repository, one commit at a time, then deleting the clone. The clone
+left out `docs/` and the cp14b fixtures; free disk ranged from 498 MB to 816 MB. The comparator's
+libstdc++ profile gate (`compiler_collection_sort.cpp:8`) was compiled out in the scratch clone
+only, so the comparator case could run on GCC 13.3.
+
+| Program | Earliest bad | Its parent | Result there |
+| --- | --- | --- | --- |
+| `a := []; return a.pop()` (cp14b `script_return_kernel_error`) | **29d7ef0f** B4b 1 (per-site element types) | 982187d2 (B4b 0, design note only, code = B4a) | refused `type:script-return` / runs legacy-equal |
+| `a:=[3,2,1]; n:=0; fn(mk()) { n+=1; return (x,y)=>x<y }; a.sort(mk()); …` (cp14b `comparator_factory`) | **3eb749cc** B4b 8 (review H1: inexact callees widen every function value) | 2a24421f (B4b 7) | refused `type:<` / `[1,2,3]`, `3` |
+
+The other probes in the second bisect also placed the regression at 3eb749cc: 29d7ef0f and
+2a24421f were good, and 3eb749cc, 0abc0649, a42035c1 and 17f7964c were bad.
+
+**Root causes.**
+
+1. **Family 1: the empty-literal proof.** B3 10 (1f46b0e6, the N1 rule) kept an empty literal's
+   element type as proven empty ("holds nothing"). It relied on the literal's positional fact
+   (`tuple` with no items), so `a.pop()` had no kinds and passed the top-level script-return check
+   (`compiler.cpp:228`). B4b 1 made every mutator's site store drop the positional fact of the
+   receiver's sites (B3 N1 per site). The pop itself made the literal non-positional, so on the
+   next fixed-point walk the receiver no longer looked like an empty tuple.
+   `collection_result` then turned the empty element type into anything
+   (`infer_collection.cpp`), and the return was refused.
+   - **Mechanism r2 used:** the B3 N1 rule. The program compiled for the VM, and the VM's `pop`
+     raised the run-time error at legacy's position (`1:10: return: pop: array is empty`).
+2. **Family 2: callbacks still unknown on the first walk.** B4b 8 (H1) made every call whose
+   targets are not exact call `untracked_call()`, which widens every function value to parameters
+   of anything. `exact_callee` requires a non-empty `callables` list. A collection method's
+   callback reached `call_callables` through `collection_result` / `collection_callables` even
+   when its type was still empty, as with a factory's result before the factory's body is walked
+   (`a.sort(mk())`, `a.map(mk())`). That transient bottom triggered the permanent widening, so the
+   lambda's `x < y` saw anything and was refused.
+   - **The direct-call path never did this:** `Inference::call` reaches `call_callables` only with
+     callables, and calls `untracked_call()` only for a callee that is any, Unknown or
+     Function-kind.
+   - **Mechanism r2 used:** no H1 widening. The lambda's parameters took the sort's element kinds
+     from the call (`call_callables`), and the program ran on the VM, `[1,2,3]` / `3`. B4b and the
+     candidate probe builds refuse it with `type:<`.
+
+**Fix (`src/rt`; 2 files; 2 conditions):**
+
+1. **`infer_collection.cpp`, `collection_result`.** An empty element type also stays "holds
+   nothing" when the receiver was read precisely from its allocation sites and nothing was ever
+   stored there. The condition: not a session; not `any`; it has an element type; it has sites;
+   none of them is `kOpenSite`.
+   - An open, exposed or collapsed class reads its element as anything when materialized, so it
+     never has an empty element type.
+   - This is the same per-site contents soundness every other element read relies on since B4b. It
+     restates B3's N1 proof in B4b's terms. It is not a new inference rule.
+   - Sessions keep only the B3 positional rule.
+2. **`infer_callable.cpp`, `call_callables`.** A callee with no kind, no callables and no untracked
+   flag is pending: it has no target yet, so it does not call `untracked_call()`. The fixed point
+   re-walks the call when the callee's type grows: the factory's `returns_` grows, and its callers
+   are re-walked. At that point the callee is exact or inexact as before.
+   - This aligns the collection-callback path with the direct-call path.
+   - A callee that is any, Unknown, Function-kind without callables, or an untracked callable
+     still widens.
+   - The H1 mutant A28 is still caught (`test-runtime2-b4b-mutants`: 20 caught).
+
+Mutant hooks: `NIFT_B06_MUTANT` 1 and 2 restore each refusal (`tests/runtime2/b06/build_mutant.sh`).
+
+**Behaviour after the fix (GCC 13.3 production build; the comparator fixtures also on the probe
+build).**
+- Every family-1 and family-2 program runs on the VM. Stdout, stderr and exit status equal legacy
+  on the same binary, error positions included.
+- They equal r2 too where r2 admits them:
+  - `a := []; return a.pop()`: `1:10: return: pop: array is empty` on legacy, r2 and the fixed
+    build;
+  - `a := []; a.pop(); return a.pop()`: `1:10: pop: array is empty`;
+  - `a := []; return a.remove(0)`: `1:10: return: remove: index out of range`;
+  - comparator_factory: `[1,2,3]` / `3`.
+- On production GCC 13.3, comparator_factory is still refused `method:sort` by the libstdc++
+  profile gate. cp14b reports it UNVERIFIED locally (as for every comparator case), and it runs on
+  the certified GCC 15.2.
+
+**Tests.** `test-runtime2-b06` and `test-runtime2-b06-mutants` are new targets, in the inventory
+and in MANDATORY.
+- `tests/runtime2/b06/run.py` has 28 fixtures in `tests/runtime2/b06/fixtures/`.
+  - **Family 1:** pop, remove, twice, in an expression, compared, after clear, after reverse,
+    inside an `if`.
+  - **Family-1 controls admitted before as well:** bound, expression, in a function, an
+    unknown-kind array parameter, pushed then popped.
+  - **Family 2:** sort by factory, factory bound to a variable, map, filter, reduce, find, any,
+    sort_by, and a callback error with its position.
+  - **Refusals that must stay:** an array pushed then popped and returned; the same through an
+    alias, through a callee's store, and with an object; `shift` (method:shift).
+- **Mutants.** `tests/runtime2/b06/mutants.sh`: mutant 1 fails 8 checks and mutant 2 fails 10 (the comparator fixtures count on both builds).
+  Both are caught.
+- **No refusal for safety became admitted.** A compile-only differential (`NIFT_VM=classify`,
+  nothing runs) of all 2,490 `tests/**/*.f` programs ≤ 16 KiB compared mutant 1, mutant 2 and
+  the fixed production and probe builds: **not one program changes admission**.
+  - The programs r2 admits and the fixed build still refuses (26) are all deliberate refusal
+    fixtures: b3/refuse N1, b4/refuse context:* and struct-this-binding, and the b4b H1
+    unknown-callee cases (`call_unknown_callee`, `thread_unknown_callee`, `escape_export`:
+    builtin-receiver). None shares B06's cause.
+  - The cp14b failures B4b had beyond these two (`nested_sort_internal`, `nested_sort_escape`,
+    `return_comparator_result_error`) were fixed earlier. test-rt-vm-mutants (B07) is a policy gap,
+    not an admission difference.
+
+**Gates (local, GCC 13.3).**
+
+| Class | Gates |
+| --- | --- |
+| PASS | test-runtime2-b06, test-runtime2-b06-mutants (2 caught), test-runtime2-b4b, test-runtime2-b4b-gen-alias, test-runtime2-b4b-fixpoint, test-runtime2-b4b-work (deterministic analysis-work budgets), test-runtime2-b4b-mutants (20 caught, A28 included), test-runtime2-b3, test-runtime2-b4, test-runtime2-b5, test-runtime2-b5-mutants, test-runtime2-b5-generators, test-runtime2-b5-evalorder, test-runtime2-guardoff, gen_operators (880 programs, 795 admitted, floor 795, 0 bad), test-rt-lint |
+| PASS, was FAILED-BASELINE | test-runtime2-cp14b: `script_return_kernel_error` now PASS; `comparator_factory` UNVERIFIED (method:sort profile gate on GCC 13.3), like every comparator case |
+| Linode (GCC 15.2) | comparator_factory on the production build; cp14b's comparator cases with detail |
+
+**Cost.** No VM execution path changed. Both files are compile-time inference (rt-lint
+`cold-file`), so no callgrind run applies. The deterministic analysis-work gate
+(test-runtime2-b4b-work) passes unchanged.

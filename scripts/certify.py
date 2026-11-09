@@ -270,6 +270,7 @@ MANDATORY = [
     "test-runtime2-b4b", "test-runtime2-b4b-mutants", "test-runtime2-b4b-fixpoint", "test-runtime2-b4b-work",
     "test-rt-b4b-types-unit", "test-runtime2-b4b-gen-alias",
     "test-runtime2-b5", "test-runtime2-b5-mutants", "test-runtime2-b5-generators", "test-runtime2-b5-evalorder",
+    "test-runtime2-b06", "test-runtime2-b06-mutants",  # B06 (combined-b3-b5.md section 37)
     "test-runtime2-b5-evalorder-sanitize", "test-runtime2-b5-snapshot-memory",
     "test-runtime2-guardoff", "test-runtime2-guardoff-sanitize", "test-cp19-proof-cli",
     "test-runtime2-cp14b-design-mutants", "test-runtime2-diagnostics", "test-runtime2-scanner-parity",

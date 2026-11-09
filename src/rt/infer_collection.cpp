@@ -53,7 +53,19 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
     using M=CollectionMethod;
     const auto m=static_cast<M>(id);
     TyRef element=element_of(recv,nullptr,false);
-    if(element->kinds==0&&!(recv->tuple&&recv->items.empty()))element=any_ty();
+    // B06 (owner 2026-11-09 16:46, item 4): an empty element type is "holds nothing" when it is
+    // proven: the empty literal's positional fact (B3 N1), or, since B4b's per-site contents, a
+    // receiver read precisely from its allocation sites (none of unknown origin; an open or
+    // collapsed class reads as anything) into which nothing was ever stored. B4b's site stores
+    // drop the positional fact on the first mutator (`a := []; return a.pop()`), so the B3 rule
+    // alone no longer sees it. Persistent sessions keep the B3 rule only.
+#if !(defined(NIFT_B06_MUTANT) && NIFT_B06_MUTANT == 1)  // B06-1: only the B3 positional rule
+    const bool stored_nothing=!session_&&!recv->any&&recv->elem&&!recv->sites.empty()&&
+                              recv->sites.back()!=kOpenSite;
+#else
+    const bool stored_nothing=false;
+#endif
+    if(element->kinds==0&&!element->any&&!(recv->tuple&&recv->items.empty())&&!stored_nothing)element=any_ty();
     const NodeId receiver_id=ast_.at(n.a).a;
     result_.collection_elements[receiver_id]=element->kinds;
     if(element->legacy_text_number)result_.collection_text_numbers.insert(receiver_id);

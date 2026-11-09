@@ -36,7 +36,19 @@ std::size_t Inference::lambda_unit(NodeId node) {
 }
 
 TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& values, bool& grew) {
-    if (!exact_callee(callee)) untracked_call();  // B4b H1: some targets are not in `callables`
+    // B4b H1: some targets are not in `callables`. B06 (owner 2026-11-09 16:46, item 4): a callee
+    // with no kind and no target yet (a value not computed so far in the fixed-point walk: a
+    // factory's result before its body is walked) has no target to miss; the walk returns here when
+    // it grows. The direct-call path treats it the same way (Inference::call: no untracked_call for
+    // a callee of no kind). Without this, a collection method's callback from `mk()` widened every
+    // function value to parameters of anything on the first walk (`a.sort(mk())`: type:<).
+#if !(defined(NIFT_B06_MUTANT) && NIFT_B06_MUTANT == 2)  // B06-2: a pending callee is inexact (B4b 8)
+    const bool pending = callee && !callee->any && callee->kinds == 0 && callee->callables.empty() &&
+                         !callee->untracked_callable;
+#else
+    const bool pending = false;
+#endif
+    if (!pending && !exact_callee(callee)) untracked_call();
     TyRef out = empty_ty();
     for (std::uint32_t unit : callee->callables) {
         if (static_cast<std::size_t>(unit) < plan_.functions.size()) {

@@ -1017,6 +1017,17 @@ test-runtime2-b5: $(TARGET) $(B4B_GUARDOFF_NIFT)
 test-runtime2-b5-mutants: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
 	bash tests/runtime2/b5/mutants.sh
+# B06 (docs/runtime-2/checkpoints/combined-b3-b5.md section 37): the B4b admission regressions
+# (an empty literal's element type; a factory's callback) against legacy on the same binary, error
+# positions included, with the refusals that must stay; the comparator fixtures on the probe build
+# too. Mutants: tests/runtime2/b06/mutants.sh (each restores one refusal).
+.PHONY: test-runtime2-b06 test-runtime2-b06-mutants
+test-runtime2-b06: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b06: $(TARGET) $(B4B_GUARDOFF_NIFT)
+	$(PYTHON) tests/runtime2/b06/run.py --nift "$(CURDIR)/$(TARGET)" --probe "$(CURDIR)/$(B4B_GUARDOFF_NIFT)"
+test-runtime2-b06-mutants: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-b06-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
+	bash tests/runtime2/b06/mutants.sh
 # B5 fix-up (review F6): the gen1 and gen_struct wrong-kind generators, from the candidate tree only
 # (tests/runtime2/b5/gen, the tree's builtin table), on the production build, then their negative
 # controls (a missing tree and a truncated builtin table must exit 2 and write nothing).
