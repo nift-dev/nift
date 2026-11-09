@@ -2969,3 +2969,39 @@ All 57 are now resolved by fixes, so none is recorded as an exception. The gate 
 | cp25r-inventory | `collect` (the changed step) passes; `report --check` fails on unclassified reasons (`method:open/close/save/write`), as before (EXPECTED_BASELINE) |
 | test-test-integrity, test-rt-lint, certification guard | PASS |
 | **Not run here** | test-build-reuse (destructive: clean and distclean of the tree); test-production-deps (needs the sanitizer and TSan libffi builds; disk); `cp23/default_controls.py` (wired to no target; needs the R2 binary) |
+
+## 51. B09: stale unit-test source lists (C61, Makefile and tests only)
+
+**Cause.** The built-in unit tests compiled a hand-kept list: `RT_BUILTINS_SOURCES` (the natives)
+plus `RT_BUILTINS_CORE`. After B3-B5 the natives need `copy_graph.cpp` (`shallow_copy`,
+`deep_copy`), `shared_state.cpp`, `shared_channel.cpp` (`shared_make_*`, `shared_channel_close`,
+`shared_handle_type_name`) and `op_admission.cpp` (`note_dispatch_defect`), so the five gates
+failed to link.
+
+**Fix: the lists are derived, not kept.**
+- **Unit, differential and case-conversion binaries** (`builtins-unit`, `builtins-diff`, `case-conversion-unit`, `case-conversion-bench`) link the production runtime objects `RT_UNIT_OBJECTS`. That list is derived from the source tree, as `value-unit`'s is, and checked by `check-config.sh`.
+  - `test-rt-case-conversion-negative` links the same objects with `string_methods.o` replaced by the candidate or the mutant, each compiled from source the way production compiles it.
+  - `test-rt-builtins-sanitize` links the sanitized production object set `RT_OBJECTS_san`, as `test-rt-value-sanitize` does.
+- **Isolated binaries** (`builtins-bench`, `host-random-budget`). Their contract: the natives link without the legacy value bridge. They now link the closure computed by the new `scripts/build/link_closure.py` over the production objects:
+  - seeds: the isolated natives' objects plus the stubs;
+  - candidates: `RT_UNIT_OBJECTS`;
+  - excluded: `RuntimeValue.o`, `legacy_bridge.o`, `render.o`.
+
+  A native that needs the bridge, directly or through another object, fails the closure and the message names the dependency chain. A stale list can no longer be the failure.
+
+**Results.**
+- **test-rt-case-conversion:** PASS (1679 checks).
+- **test-rt-case-conversion-negative:** PASS (candidate 0 failures, mutant 120).
+- **builtins-unit links, but 4 checks fail.** These are genuine findings: expectations made stale by the product, not by the test build.
+  - `builtin_count() == 120`: the table has 186 entries since CP17 W13, which added the file/stream handle built-ins after the Host built-ins.
+  - `copy(struct)`, `copy([1, {"p": struct}])` and `deepcopy({"h": file handle})` expect `Status::Internal`, the review-D2 rule that "a struct or handle anywhere is a compiler defect". Since B3/B5 `copy` of a struct succeeds, and the CLI matches legacy (`struct(P){x:=1}; q:=copy(p); q.x=2` prints `1`, `2` on both).
+  - **Not changed here:** they need a decision on the intended contract (update the expectations, or restore the rule).
+- **builtins-diff does not compile.** `static_assert(HostSecureRandomBytes + 1 == Count)` ("the Host built-ins must stay last") fails: 120 against 186. This is the same CP17 W13 ordering finding; the differential's pure/Host split needs updating. Not changed here.
+- **test-rt-builtins-sanitize:** the ASan/UBSan unit links and runs, with the same 4 stale checks and no sanitizer report. The differential stops on the same `static_assert`. The sanitized objects (631 MB) were deleted afterwards for disk.
+- **test-rt-host-random-budget and test-rt-builtins-isolation fail: the isolation contract is broken by production code.** `link_closure.py` shows the chain:
+  - `natives/shared_methods.o` and `natives/format_methods.o` need `shared_state.o`;
+  - `shared_state.o` reaches `isolate_transfer_decode.o`, then `parallel_task.o`, `isolate_task.o`, `vm_parallel_cleanup.o`, `vm_coro.o`, ... `vm.o`, `vm_session_render.o` and `eval_result.o`;
+  - those need `legacy_bridge.o` (`to_legacy`) and `render.o` (`append_rendered`, `callable_marker`).
+
+  Restoring the contract needs a production change: splitting `shared_state` from the transfer and parallel code, or stubbing the shared natives in the isolated build. Per the instructions, **stopped and reported, not changed.**
+- **test-rt-builtins** depends on the two isolated gates, so it fails with them. Its own lines beyond the unit and the differential: rt-lint of `src/rt/natives` passes. `context_probe.py` fails against its expectation file; that probe of legacy's context-dependent behaviour is independent of B09 and was not examined further here.

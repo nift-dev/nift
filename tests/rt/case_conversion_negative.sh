@@ -13,21 +13,23 @@ trap cleanup EXIT
 
 CXX=${CXX:-g++}
 CXXFLAGS=${CXXFLAGS:--std=c++17 -O2 -Wall -Wextra -pedantic -pthread}
-# Source lists come from the Makefile (RT_BUILTINS_CORE / RT_BUILTINS_SOURCES)
-# so the control links exactly what the real test links. Paths are relative to
-# ROOT; every compile runs from ROOT.
-: "${RT_BUILTINS_CORE:?run via 'make test-rt-case-conversion-negative'}"
-: "${RT_BUILTINS_SOURCES:?run via 'make test-rt-case-conversion-negative'}"
+# B09 (combined-b3-b5.md section 51): the control links the production runtime objects the real
+# test links (RT_UNIT_OBJECTS from the Makefile), with string_methods.o replaced by the candidate
+# or the mutant, each compiled from source exactly as production compiles it.
+: "${RT_UNIT_OBJECTS:?run via 'make test-rt-case-conversion-negative'}"
+: "${NIFT_CPPFLAGS:?run via 'make test-rt-case-conversion-negative'}"
 cd "$ROOT"
-read -r -a CORE <<<"$RT_BUILTINS_CORE"
-NATIVES=()
-for file in $RT_BUILTINS_SOURCES; do
-  [ "$(basename "$file")" = "string_methods.cpp" ] || NATIVES+=("$file")
+OBJECTS=()
+for file in $RT_UNIT_OBJECTS; do
+  [ "$file" = src/rt/natives/string_methods.o ] || OBJECTS+=("$file")
 done
+[ "${#OBJECTS[@]}" -lt "$(wc -w <<<"$RT_UNIT_OBJECTS")" ] ||
+  { echo "FAIL: src/rt/natives/string_methods.o is not in RT_UNIT_OBJECTS (harness error)" >&2; exit 1; }
 
 build() { # source, binary: a build failure is a harness failure, never a detection
-  if ! "$CXX" -I"$ROOT/src" -I"$ROOT/include" -I"$ROOT/tests/rt" $CXXFLAGS \
-       "$ROOT/tests/rt/case_conversion_unit.cpp" "$1" "${NATIVES[@]}" "${CORE[@]}" -o "$2"; then
+  if ! "$CXX" ${PRODUCTION_GUARD:-} $NIFT_CPPFLAGS $CXXFLAGS -c "$1" -o "$2.string_methods.o" ||
+     ! "$CXX" $NIFT_CPPFLAGS -I"$ROOT/tests/rt" $CXXFLAGS \
+       "$ROOT/tests/rt/case_conversion_unit.cpp" "$2.string_methods.o" "${OBJECTS[@]}" -o "$2"; then
     echo "FAIL: could not build $2 (harness error, not a mutant detection)" >&2
     exit 1
   fi

@@ -4056,30 +4056,37 @@ RT_BUILTINS_DEPS := $(RT_BUILTINS_SOURCES) $(wildcard src/rt/natives/*.h src/rt/
 RT_BUILTINS_UNIT := $(TEST_DIR)/rt/builtins-unit$(EXEEXT)
 RT_BUILTINS_DIFF := $(TEST_DIR)/rt/builtins-diff$(EXEEXT)
 
-$(RT_BUILTINS_UNIT): tests/rt/builtins_unit.cpp $(RT_BUILTINS_DEPS)
+# B09 (docs/runtime-2/checkpoints/combined-b3-b5.md section 51): the built-in unit, differential
+# and case-conversion binaries link the production runtime objects (RT_UNIT_OBJECTS, derived from
+# the source tree like value-unit's) instead of a hand-kept source list, which went stale when the
+# natives started to need copy_graph, shared_state, shared_channel and op_admission.
+$(RT_BUILTINS_UNIT): tests/rt/builtins_unit.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
-$(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_BUILTINS_DEPS)
+$(RT_BUILTINS_DIFF): tests/rt/builtins_diff.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/builtins_diff.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # ASCII case-conversion fast path (DeepSeek, D-044): all 256 bytes, the
 # inline/heap boundary, 1 MiB input, locale independence, unchanged errors.
 RT_CASE_UNIT := $(TEST_DIR)/rt/case-conversion-unit$(EXEEXT)
 RT_CASE_BENCH := $(TEST_DIR)/rt/case-conversion-bench$(EXEEXT)
 
-$(RT_CASE_UNIT): tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_DEPS)
+$(RT_CASE_UNIT): tests/rt/case_conversion_unit.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/case_conversion_unit.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
-$(RT_CASE_BENCH): tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_DEPS)
+$(RT_CASE_BENCH): tests/rt/case_conversion_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/case_conversion_bench.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$@"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/rt/case_conversion_bench.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 .PHONY: test-rt-case-conversion test-rt-case-conversion-negative bench-rt-case-conversion
 test-rt-case-conversion: $(RT_CASE_UNIT)
@@ -4087,8 +4094,8 @@ test-rt-case-conversion: $(RT_CASE_UNIT)
 
 # Permanent negative control: the unmutated test must pass and a planted wrong
 # ASCII mapping must make it exit nonzero (a mutant build failure is an error).
-test-rt-case-conversion-negative:
-	RT_BUILTINS_CORE="$(RT_BUILTINS_CORE)" RT_BUILTINS_SOURCES="$(RT_BUILTINS_SOURCES)" \
+test-rt-case-conversion-negative: $(RT_UNIT_OBJECTS)
+	RT_UNIT_OBJECTS="$(RT_UNIT_OBJECTS)" NIFT_CPPFLAGS="$(CPPFLAGS)" PRODUCTION_GUARD="$(PRODUCTION_GUARD)" \
 		CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" bash tests/rt/case_conversion_negative.sh
 
 # Both run in `make test`, so `make certify` covers them on every candidate.
@@ -4105,20 +4112,35 @@ RT_BUILTINS_ISOLATED_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.
 	compare.cpp number.cpp decimal.cpp error.cpp handle.cpp) src/Sha256.cpp src/JsonSchema.cpp $(RT_BUILTINS_HOST)
 RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 
-$(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_BUILTINS_DEPS)
+# B09 (combined-b3-b5.md section 51): the isolated binaries link the closure of the natives
+# (RT_ISOLATION_SOURCES' production objects plus the stubs) over the production runtime objects,
+# with the legacy value bridge excluded (scripts/build/link_closure.py), instead of a hand-kept
+# core list. A native that needs the bridge, directly or through another object, fails the
+# closure with the dependency chain.
+RT_ISOLATION_FORBIDDEN := src/RuntimeValue.o src/rt/legacy_bridge.o src/rt/render.o
+RT_ISOLATION_STUBS_OBJ := $(TEST_DIR)/rt/host-handle-native-stubs.o
+$(RT_ISOLATION_STUBS_OBJ): $(RT_ISOLATION_STUBS) $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -c $(RT_ISOLATION_STUBS) -o "$@"
+RT_ISOLATION_CLOSURE = python3 -B scripts/build/link_closure.py --seed $(RT_ISOLATION_SOURCES:.cpp=.o) \
+	$(RT_ISOLATION_STUBS_OBJ) --candidates $(RT_UNIT_OBJECTS) --exclude $(RT_ISOLATION_FORBIDDEN)
+
+$(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	objects=$$($(RT_ISOLATION_CLOSURE)) && \
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) -g tests/rt/builtins_bench.cpp $$objects -o "$@"
 
 # CP16 certification fix: secure_random_bytes checks the budget before its
 # buffer exists and keeps one result-sized buffer. Linked with the isolated core
 # (no RuntimeValue/legacy_bridge/render): a Host native that needs the legacy
 # value model fails this link. NIFT_HOST_MUTANT=13 must fail the run.
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
-$(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_BUILTINS_DEPS)
+$(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $(RT_ISOLATION_SOURCES) $(RT_ISOLATION_STUBS) $(RT_BUILTINS_ISOLATED_CORE) -o "$@"
+	objects=$$($(RT_ISOLATION_CLOSURE)) && \
+	$(CXX) -Isrc -Iinclude -Itests/rt $(CXXFLAGS) tests/rt/host_random_budget.cpp $$objects -o "$@"
 
 .PHONY: test-rt-host-random-budget
 test-rt-host-random-budget: $(RT_HOST_RANDOM_BUDGET)
@@ -4156,14 +4178,16 @@ test-rt-builtins-probe:
 
 # ASan+UBSan build of the built-in tests; every CP09 mutation entry point
 # relocates storage, so a reference held across a mutation aborts.
-test-rt-builtins-sanitize:
+# B09: the sanitized production runtime objects (RT_OBJECTS_san, as test-rt-value-sanitize).
+test-rt-builtins-sanitize: $(RT_OBJECTS_san)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt-san"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-unit"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_diff.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/builtins-diff"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_san) -- $(RT_OBJECTS_san)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/builtins-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/builtins_diff.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/builtins-diff"
 	"$(TEST_DIR)/rt-san/builtins-unit"
 	"$(TEST_DIR)/rt-san/builtins-diff" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_SAN_CASES:-2000}
-	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/case_conversion_unit.cpp $(RT_BUILTINS_SOURCES) $(RT_BUILTINS_CORE) -o "$(TEST_DIR)/rt-san/case-conversion-unit"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(RT_SANITIZE_FLAGS) tests/rt/case_conversion_unit.cpp $(RT_OBJECTS_san) -o "$(TEST_DIR)/rt-san/case-conversion-unit"
 	"$(TEST_DIR)/rt-san/case-conversion-unit"
 
 # Loop-literal regression (v4.12.0 regressions 55cb323c, 5fe38bd1): string
