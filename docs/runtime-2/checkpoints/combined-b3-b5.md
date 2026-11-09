@@ -2749,3 +2749,65 @@ All 8 read-limit mutants are rejected, and the control is byte-identical to `nif
 - **Bounded increments:** the read goes through a 64 KiB stack chunk. The running total is compared with the limit before the buffer grows, and the buffer grows by `growth_target`, bounded by min(n, L).
 - **Mutant 8:** rejected by 13 checks. All 8 read-limit mutants are rejected.
 - **Recorded only (owner):** the reviewer's observation that a file growing during a read can transiently need about 2 L stays a release-audit item. I found no unbounded allocation and no memory-safety defect there.
+
+## 46. B02 (P0): file() buffer mode preconditions, legacy parity (C55)
+
+**Symptom.** test-v410-file-buffer-parity row `open-r`:
+`f:=file("data");f.open("r");print(f.modified());f.revert();print(f.modified());f.close();print(f.exists())`.
+- Legacy prints `false`, then `1:49: revert: file is not open for writing`, exit 1.
+- The VM printed `false`, `false`, then `1:96: exists: handle is closed`.
+
+**Root cause (established).** Legacy's `execute_file_method` (`src/ParserExpression.cpp`) gives
+each method one precondition:
+- `need_open`: modified, tell, seek, close;
+- `need_read` (open, mode r or rw): read, read_all, read_line, eof, cat;
+- `need_write` (open, mode w, a or rw): write, write_line, flush, revert, save and the edit methods;
+- closed only: copy, move, remove;
+- none: path, exists.
+
+These errors are fatal, not catchable. The VM natives (`src/rt/natives/host_file_handles.cpp`) had three divergences:
+1. `revert()` checked only `open`, so a read-only buffer was reverted silently (the reported defect).
+2. `flush()` also checked only `open`: legacy says `flush: file is not open for writing`.
+3. `write_line()` delegated to `write()` and reported `write: file is not open (for writing)` instead of `write_line: ...`.
+
+**Fix.** `revert` and `flush` take legacy's `need_write`, in legacy's order: arguments, then
+open, then mode. `write_line` checks its preconditions under its own name before writing.
+Nothing changes state before a precondition fails.
+
+**The mode x method table (permanent: `tests/runtime2/file_mode_parity.py`, `make test-runtime2-file-mode-parity`).**
+- The setup: 6 states x 20 methods, each in two programs.
+  - **plain:** the call, then AFTER, then a cleanup that cannot fail.
+  - **try:** the call inside try/catch, then the buffer state it left: `modified()` and, in r and rw, the contents.
+- The comparison: VM (require) against legacy (`NIFT_VM=0`), on exit, stdout, stderr and every file's bytes. So an invalid-mode operation that partially changed the buffer or the file would be caught.
+- Legacy's precondition errors are fatal, so after a refused operation only the file bytes remain to observe. Those are compared in every cell.
+- 240 programs, 0 failures. Legend:
+  - `=` the VM equals legacy;
+  - `D-039` the approved closed-handle semantics, where the VM's exact result is pinned: `runtime.handle_closed` at the call (catchable), the files untouched, and a repeated `close()` idempotent;
+  - `refused` the VM refuses the program before it runs (`host-handle-flow`, B27): copy and move return a file value;
+  - `x/y` the plain and try programs differ: in try, the observation after `close()` is D-039.
+
+| state | open | close | read | read(2) | read_all | read_line | eof | write | write_line | flush | revert | save | modified | tell | seek(1) | path | exists | copy | move | remove |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| never | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | refused | refused | = |
+| r | = | =/D-039 | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | refused | refused | = |
+| w | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | refused | refused | = |
+| a | = | =/D-039 | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | refused | refused | = |
+| rw | = | =/D-039 | = | = | = | = | = | = | = | = | = | = | = | = | = | = | = | refused | refused | = |
+| closed | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | D-039 | refused | refused | D-039 |
+
+**Negative controls (`tests/runtime2/file_mode_mutants.sh`, `make test-runtime2-file-mode-mutants`, a prerequisite of the table's target).**
+- The harness rebuilds `host_file_handles.cpp` with `NIFT_FILE_MODE_MUTANT` 1-3:
+  1. revert without need_write;
+  2. flush without need_write;
+  3. write_line reporting as `write`.
+- All three are rejected. The control's object and binary are byte-identical to production.
+
+**test-v410-file-buffer-parity.** The `open-r` row now matches exactly (exit, stdout, stderr,
+files). The gate itself still fails. It stops at the first differing row, and of its 102 rows 15
+pass on the VM. The other 87 need a broader change or a decision, so I did not fix them here:
+- **80 refusals:** `opaque:nesting-limit` 39, `host-handle-flow` 26, `opaque:legacy-runtime-error` 8, `builtin-arg-fault-context` 2, and 1 each of `builtin-receiver:path`, `builtin-receiver:write`, `builtin-arity:open`, `builtin-arity:save` and `builtin-lazy-args:replace`. Nothing runs in these.
+- **5 D-039 rows:** `open-rw`, `open-w`, `open-a` and `new-empty-write` call `exists()` after `close()`; `reopen-external-edit` calls `open()` after `close()`. Legacy allows both; the VM raises `runtime.handle_closed` (D-039). **For the owner:** `path()` and `exists()` need no open file in legacy, and reopening a closed `file()` buffer is a legacy feature. D-039 covers handles in general; whether it was meant to remove these for `file()` buffers needs confirming.
+- **2 rows** (`closed-write-factory-count`, `readonly-write-factory-count`): `write` / `write_line` failing inside a `while` or `for` body. Legacy reports `script failed` (`CLI.cpp`: the prepared loop executor drops the method's message). The VM reports `write: file is not open`, at the same position. Matching it would mean copying a legacy message loss in loop contexts. **Needs a decision.**
+- **Seen, not in scope:** at the end of a script the VM prefixes the left-open report with `1:1:` (`error: case.f:1:1: managed file left open: ...`), where legacy prints `error: managed file left open: ...`. This is CP17 cleanup reporting, not a method precondition.
+
+**Production sha256.** `3161f6862597c5c828bf6bf20e99c0332a76263f4a141e66f36bb94fefd46ded`.

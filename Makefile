@@ -3895,6 +3895,16 @@ $(FILE_BUFFER_GUARD): tests/v410_file_buffer_guard.cpp $(filter-out src/nift.o s
 .PHONY: test-v410-file-buffer-parity test-v410-file-buffer-guard
 test-v410-file-buffer-parity: $(TARGET)
 	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_file_buffer_parity.py
+# B02 (docs/runtime-2/checkpoints/combined-b3-b5.md section 46): file() methods by open state, the
+# VM against legacy (the mode x method table), and its mutants (each must fail the table).
+.PHONY: test-runtime2-file-mode-parity test-runtime2-file-mode-mutants
+test-runtime2-file-mode-parity: $(TARGET)
+	python3 -B tests/runtime2/file_mode_parity.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-file-mode-mutants: $(TARGET) $(LIBFFI_A)
+	FILE_MODE_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" FILE_MODE_CPPFLAGS="$(PRODUCTION_GUARD) $(CPPFLAGS)" CXX="$(CXX)" \
+		bash tests/runtime2/file_mode_mutants.sh
+test-runtime2-file-mode-parity: test-runtime2-file-mode-mutants
+test: test-runtime2-file-mode-parity
 test-v410-file-buffer-guard: $(FILE_BUFFER_GUARD)
 	$(FILE_BUFFER_GUARD)
 test: test-v410-file-buffer-parity test-v410-file-buffer-guard

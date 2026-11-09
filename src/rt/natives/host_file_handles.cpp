@@ -243,6 +243,17 @@ Status file_write(const Context& context, const Value* args, std::uint32_t argc,
 Status file_write_line(const Context& context, const Value* args, std::uint32_t argc, Value& out,
                        std::string& error) {
     if (argc != 2) { error = "write_line: expected one value"; return Status::Error; }
+#if !(defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 3)
+    // B02 (combined-b3-b5.md section 46): legacy's need_write under this method's own name, before
+    // the two writes below (which would otherwise report "write: ...").
+    {
+        std::shared_ptr<FileResource> file;
+        Status status = Status::Ok;
+        if (!resource_arg(context, args, argc, "write_line", file, error, status)) return status;
+        if (!file->open) { error = "write_line: file is not open"; return Status::Error; }
+        if (file->mode == "r") { error = "write_line: file is not open for writing"; return Status::Error; }
+    }
+#endif
     Value newline = make_string("\n");
     Value armed[2] = {args[0], args[1]};
     Status status = file_write(context, armed, 2, out, error);
@@ -255,8 +266,12 @@ Status file_flush(const Context& context, const Value* args, std::uint32_t argc,
     std::shared_ptr<FileResource> file;
     Status status = Status::Ok;
     if (!resource_arg(context, args, argc, "flush", file, error, status)) return status;
-    if (!file->open) { error = "flush: file is not open"; return Status::Error; }
+    // B02: legacy's order and preconditions (no_args, then need_write: open, and not mode "r").
     if (!no_args(argc, "flush", error)) return Status::Error;
+    if (!file->open) { error = "flush: file is not open"; return Status::Error; }
+#if !(defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 2)
+    if (file->mode == "r") { error = "flush: file is not open for writing"; return Status::Error; }
+#endif
     out = Value::null();
     return Status::Ok;
 }
@@ -265,8 +280,13 @@ Status file_revert(const Context& context, const Value* args, std::uint32_t argc
     std::shared_ptr<FileResource> file;
     Status status = Status::Ok;
     if (!resource_arg(context, args, argc, "revert", file, error, status)) return status;
-    if (!file->open) { error = "revert: file is not open"; return Status::Error; }
+    // B02: legacy's order and preconditions (no_args, then need_write). A read-only buffer cannot
+    // be reverted: before B02 the VM reverted it silently and went on.
     if (!no_args(argc, "revert", error)) return Status::Error;
+    if (!file->open) { error = "revert: file is not open"; return Status::Error; }
+#if !(defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 1)
+    if (file->mode == "r") { error = "revert: file is not open for writing"; return Status::Error; }
+#endif
     if (!file->saved_is_working) file->working = file->saved;
     file->saved_is_working = true;
     file->saved.clear();
