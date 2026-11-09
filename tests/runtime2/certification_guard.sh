@@ -82,6 +82,7 @@ deps, _ = certify.make_db(certify.ROOT, 'certify-targets')
 EDGES = [('test-rt-vm', 'test-runtime2-cp16-n1'),
          ('test-rt-vm', 'test-rt-vm-sharing-oracle'),
          ('test-rt-vm-mutants', 'test-rt-vm-mutants-sharing-oracle'),
+         ('test-rt-vm-mutants', 'test-rt-vm-g00047-exception'),
          ('test-rt-host', 'test-runtime2-f6-cleanup'),
          ('test-rt-host-mutants', 'test-runtime2-f6-mutants'),
          ('test-rt-host-sanitize', 'test-runtime2-f6-sanitize'),

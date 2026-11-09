@@ -13,6 +13,9 @@ the mutation hits VM(P) and VM(T(P)) alike, as an unrelated VM bug would:
   refusal       the run's VM statistics report a refusal (outcome refused, no VM execution)
   abort         the process aborts (SIGABRT) after writing its output
   hang          the process sleeps 30 s first (rt-diff's timeout must stop it)
+  extra-stderr  an extra stderr line (stdout and exit unchanged)
+The environment variable FAKE_VM_MODE, when set (in a wrapper script), overrides the marker: used
+for a program whose source must stay byte-identical (tests/runtime2/g00047_exception_controls.py).
   direct-path   an extra stdout line only when the program passes bare arguments, i.e. neither
                 under the oracle's rewrite T (deepcopy) nor its control T' (identity wrapper):
                 a bug confined to the VM's direct-argument code paths (review of C67-C71, O-1)
@@ -44,7 +47,9 @@ def main():
             source = handle.read()
     except (OSError, IndexError):
         pass
+    mode = os.environ.get("FAKE_VM_MODE", mode)
     env = dict(os.environ, NIFT_VM="1")
+    env.pop("FAKE_VM_MODE", None)
     stdin_data = sys.stdin.buffer.read() if not sys.stdin.isatty() else b""
     combined = os.fstat(1).st_ino == os.fstat(2).st_ino
     fds = (int(env["NIFT_TRACE_HOST"]),) if "NIFT_TRACE_HOST" in env else ()
@@ -59,6 +64,11 @@ def main():
         bump = lambda m: b":%s:%d:" % (m.group(1), int(m.group(2)) + 1)  # noqa: E731
         out = re.sub(rb":(\d+):(\d+):", bump, out) if combined else out
         err = re.sub(rb":(\d+):(\d+):", bump, err)
+    elif mode == "extra-stderr":
+        if combined:
+            out += b"UNRELATED-STDERR\n"
+        else:
+            err += b"UNRELATED-STDERR\n"
     elif mode == "exit-only":
         code = 3
     elif mode == "refusal" and env.get("NIFT_VM_STATS") and os.path.exists(env["NIFT_VM_STATS"]):

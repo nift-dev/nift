@@ -1309,6 +1309,13 @@ test-rt-vm-mutants-sharing-oracle: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	$(SHARING_ORACLE_SELFTEST)
 test-rt-vm: test-rt-vm-sharing-oracle
 test-rt-vm-mutants: test-rt-vm-mutants-sharing-oracle
+# Owner 2026-11-10 10:10 (combined-b3-b5.md section 70): the gate's g00047 one-row exception and its
+# negative controls (extra output, stderr or exit, source or module change, another seed).
+.PHONY: test-rt-vm-g00047-exception
+test-rt-vm-g00047-exception: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	$(PYTHON) -B tests/runtime2/g00047_exception_controls.py --nift "$(CURDIR)/$(TARGET)" \
+		--parse-dump "$(CURDIR)/$(TEST_DIR)/rt-parse-dump$(EXEEXT)"
+test-rt-vm-mutants: test-rt-vm-g00047-exception
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
 	python3 -B scripts/build/check-mutant-lists.py
 	@for o in $(RT_VM_MUTATED); do m="$(TEST_DIR)/mutants/$$(basename $$o)"; \

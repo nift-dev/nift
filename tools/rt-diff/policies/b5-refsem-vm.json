@@ -736,5 +736,33 @@
   "gen_seed": 1,
   "tree_sha256": "7bdf42e11253c8a0ff0be56feba51f03d05fd8298df870dfa36bdc45ec704cfd",
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md sections 60 and 63): retired at C71, restored at C74 as this exact owner-approved rule, scoped to rt-diff --gen --seed 1: the sharing oracle now fails closed on thread() (review of C67-C71)"
+ },
+ {
+  "id": "b5-gen-seed3_g00047_main-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00047/main.f",
+  "source_sha256": "02f3ce30790fb7206f8edb68ebd44a121bd555b27d1662312f2b29f335e80738",
+  "tree_sha256": "cfe7504cbf1eca367a56f9796dbb981fdbf68690a798bb07c067d2d02bce5e95",
+  "gen_seed": 3,
+  "channel": "stdout",
+  "old": "[1,2]\n",
+  "new": "[1,2,99]\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-10 10:10: B5 shared-reference difference, one-row exception (review: docs/runtime-2/checkpoints/combined-b3-b5.md section 70; REVIEW-C72-C78.md). Cause: B5 shared references (D-NEXT-refsem-b): mut6(a7) pushes 99 into the caller's array (line 16), visible in print(a7.stringify()) (line 17). The program's thread (line 4, tw2(3): is_dir(\".\")) is joined at line 5 before a7 exists (line 15), and its task receives only the scalar 3. Exact: stdout line '[1,2]' -> '[1,2,99]', count 1; exit and stderr must be identical (no rule for them). The sharing oracle still reports this program UNCLASSIFIED (thread()); this rule approves it. Expires when main.f or any file of the program changes (source_sha256, tree_sha256).",
+  "test": "tests/runtime2/g00047_exception_controls.py (rt-diff --gen 50 --seed 3, entry gen/g00047/main.f)"
+ },
+ {
+  "id": "b5-gen-seed3_g00047_main-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "gen/g00047/main.f",
+  "source_sha256": "02f3ce30790fb7206f8edb68ebd44a121bd555b27d1662312f2b29f335e80738",
+  "tree_sha256": "cfe7504cbf1eca367a56f9796dbb981fdbf68690a798bb07c067d2d02bce5e95",
+  "gen_seed": 3,
+  "channel": "combined",
+  "old": "[1,2]\n",
+  "new": "[1,2,99]\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-10 10:10: B5 shared-reference difference, one-row exception (review: docs/runtime-2/checkpoints/combined-b3-b5.md section 70; REVIEW-C72-C78.md). Cause: B5 shared references (D-NEXT-refsem-b): mut6(a7) pushes 99 into the caller's array (line 16), visible in print(a7.stringify()) (line 17). The program's thread (line 4, tw2(3): is_dir(\".\")) is joined at line 5 before a7 exists (line 15), and its task receives only the scalar 3. Exact: stdout line '[1,2]' -> '[1,2,99]', count 1; exit and stderr must be identical (no rule for them). The sharing oracle still reports this program UNCLASSIFIED (thread()); this rule approves it. Expires when main.f or any file of the program changes (source_sha256, tree_sha256).",
+  "test": "tests/runtime2/g00047_exception_controls.py (rt-diff --gen 50 --seed 3, entry gen/g00047/main.f)"
  }
 ]
