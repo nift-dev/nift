@@ -29,6 +29,10 @@ plus every suite the CI certification workflows run). It:
    `--resume` continues a campaign from its records under the same identity.
    Destructive gates (`DESTRUCTIVE` in the runner) run in private copies under
    `--work-root`.
+   Only one campaign (one certify invocation) may operate on a given evidence
+   directory at a time. The certification workflow is sequential, so this holds
+   without a lock: a `--resume` starts only after the previous invocation on that
+   directory has ended.
 
 `tests/runtime2/certification_guard.sh` (part of `make test`) keeps
 `certify-targets` complete: it fails if any `make` target, or any test/script a
