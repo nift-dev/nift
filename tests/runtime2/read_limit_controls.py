@@ -130,6 +130,10 @@ def counted_reads(work, address_space):
     fatal("D read(huge) on L+1 bytes", "read", body % (over, HUGE), work, SMALL)
     fatal("D read(L+1) on L+1 bytes", "read", body % (over, SMALL + 1), work, SMALL)
     reads("D read(L) on L+1 bytes", body % (over, SMALL) + "\n", work, SMALL, [str(SMALL)])
+    shorter = work / "shorter.txt"
+    shorter.write_bytes(b"s" * (SMALL - 1))
+    reads("D read(L+1) on a file shorter than L", body % (shorter, SMALL + 1) + "\n", work, SMALL, [str(SMALL - 1)])
+    reads("D read(huge) on a file shorter than L", body % (shorter, HUGE) + "\n", work, SMALL, [str(SMALL - 1)])
     large = work / "exact-large.bin"                      # LARGE bytes, sparse (large_limit)
     # VM only: legacy itself holds the result twice here (std::bad_alloc under this RLIMIT_AS).
     proc = rl.run(body % (large, HUGE) + "\n", work, limit=LARGE, address_space=address_space)
@@ -227,6 +231,18 @@ def paced_short_reads(work):
               before=writer(PACED + 1))
         fatal("C %s: paced short reads, writer far past the limit" % name, operation, body, work, PACED,
               before=writer(4 * PACED))
+    # C53 (owner): read(n > L) from the paced FIFO accumulates the short reads against L: exactly
+    # L then close reads them; L and more (the writer keeps producing) is the limit error, and the
+    # read stops there (the writer then sees the reader gone).
+    counted = 's := ifstream("%s")\nx := s.read(%d)\nprint(x.length())\nclose(s)' % (fifo, HUGE)
+    reads("C read(huge): paced short reads, exactly %d bytes then close" % PACED, counted + "\n", work, PACED,
+          [str(PACED)], before=writer(PACED))
+    reads("C read(L+1): paced short reads, %d bytes then close" % (PACED - 1),
+          counted.replace(str(HUGE), str(PACED + 1)) + "\n", work, PACED, [str(PACED - 1)], before=writer(PACED - 1))
+    fatal("C read(huge): paced short reads, a writer that never stops (the read ends at the limit)", "read",
+          counted, work, PACED, before=writer(10 ** 12))
+    fatal("C read(L+1): paced short reads, exactly L + 1 bytes", "read",
+          counted.replace(str(HUGE), str(PACED + 1)), work, PACED, before=writer(PACED + 1))
     line = 's := ifstream("%s")\nx := s.read_line()\nprint("LINE")\nprint(s.read_line())\nclose(s)\n' % fifo
     reads("C read_line: paced short reads, a line just under the limit", line, work, PACED, ["LINE", "null"],
           before=writer(PACED - 1, newline=True))

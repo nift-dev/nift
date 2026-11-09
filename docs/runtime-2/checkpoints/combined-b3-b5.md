@@ -2738,3 +2738,14 @@ All 8 read-limit mutants are rejected, and the control is byte-identical to `nif
 **Gates.**
 - test-runtime2-host-deps: every line passes except read_limit.py's 24 refusals (section 43), the same list.
 - test-runtime2-read-limit-mutants: 8 of 8 rejected.
+
+**Owner additions to C53 (C54, tests only).** The limit applies to the bytes actually read. These are added to `read_limit_controls.py`, each VM == legacy (93 checks in all):
+- **D:** `read(L+1)` and `read(huge)` on a file *shorter* than L return its bytes.
+- **C, paced FIFO** (short chunks, released as the reader drains each one; no sleeps):
+  - `read(huge)` of exactly L bytes then close returns L bytes;
+  - `read(L+1)` of L - 1 bytes then close returns L - 1 bytes;
+  - `read(L+1)` of exactly L + 1 bytes is the limit error;
+  - `read(huge)` from a writer that never stops (10^12 bytes) is the limit error at L. The read stops there and the writer then sees the reader gone, so nothing runs on indefinitely.
+- **Bounded increments:** the read goes through a 64 KiB stack chunk. The running total is compared with the limit before the buffer grows, and the buffer grows by `growth_target`, bounded by min(n, L).
+- **Mutant 8:** rejected by 13 checks. All 8 read-limit mutants are rejected.
+- **Recorded only (owner):** the reviewer's observation that a file growing during a read can transiently need about 2 L stays a release-audit item. I found no unbounded allocation and no memory-safety defect there.
