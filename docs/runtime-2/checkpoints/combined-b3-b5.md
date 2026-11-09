@@ -2349,3 +2349,95 @@ and 9).
 at 1:25 where legacy errors at 1:17. r2 does the same, and the already admitted `fs[0]` variant has
 the same difference. This belongs to the P2 error-position group (with `first`/`last` on an empty
 array, section 37).
+
+## 39. Review of C44 (B06): condition C1, the vacuous b4b-mutants suite signal (C46)
+
+**Review (`REVIEW-B06.md`): ACCEPT-WITH-CONDITIONS, no unsound admission.**
+
+**Condition C1.** `tests/runtime2/b4b/mutants.sh` ran `b4b_types.py --quick` without `--guardoff`.
+- Since B5 the production build shares references. In that mode the unmutated build fails 64
+  checks here (61 on the reviewer's run): `trim: unsupported` against legacy, the B5 shares.
+- Every mutant was therefore "caught" by the suite signal alone, which proves nothing.
+
+**Fix (tests only).**
+- The suite step runs `--guardoff --quick`, as `test-runtime2-b4b` does. On the unmutated build it
+  gives 1,897 checks with 0 failures.
+- Every signal first runs on the unmutated build (`signals 0`: the tree's own objects, no
+  `NIFT_B4B_MUTANT`): the unit oracle, the suite, the work gate, guard-off and the fixed-point
+  gate. If any of them fails there, the gate fails ("a mutant cannot be judged by it").
+- Each mutant now reports the signals that caught it.
+
+**Re-check (all 20 mutants; the negative control passes).**
+
+| Mutant | Caught by |
+| --- | --- |
+| A2 | oracle 48; suite 54; guard-off |
+| A19 | oracle 21; suite 15; guard-off |
+| A20 | oracle 1 |
+| A21 | oracle 8 |
+| A22 | oracle 1 |
+| A23 | oracle 9; suite 5; guard-off |
+| A24 | oracle 2 |
+| A25 | suite 8; guard-off |
+| A26 | oracle 65; suite 31; work gate 16; guard-off |
+| A27 | oracle 56; suite 28; guard-off; fixed-point gate (15) |
+| A28 | oracle 6; suite 5; guard-off |
+| **A29** | **SURVIVED** |
+| A30 | oracle 6; suite 4; work gate 11; guard-off |
+| A31 | oracle 65; suite 31; work gate 6; guard-off |
+| A32 | oracle 66; suite 19; guard-off; fixed-point gate (19) |
+| A34 | oracle 4 |
+| A35 | oracle 47; suite 21; guard-off; fixed-point gate (13) |
+| A36 | oracle 31; suite 11; guard-off; fixed-point gate (11) |
+| A37 | work gate 6 |
+| A38 | oracle 11; suite 22; guard-off |
+
+**A29 survives, and it is an equivalent mutant since B5 1 (141b847e).** No fixture can catch it.
+- A29 removes `expose(value)` in `Inference::site_store` (`infer_sites.cpp:298-300`): a store into
+  an earlier session value that has no site here.
+- Since B5 1, that same branch then stores into the session heap,
+  `site_store(heap_sited(container), …)` at line 303.
+- The heap's site classes are in `exposed_` from the start of every session unit
+  (`infer_session.cpp:135-137`: "earlier code reaches every earlier value").
+- `site_store` exposes every value stored into an exposed class (`infer_sites.cpp:319`, the M1
+  rule "stored later into a container earlier code reaches").
+- So the guarded `expose(value)` runs a second time on the same path, and removing it changes no
+  inference result.
+- The evidence agrees:
+  - the unit oracle's M1 cases all pass with A29: `session-exposed`, `-push-exposed`,
+    `-index-exposed`, `-member-exposed`, `-closure-exposed`, `-late-store`, `-store-after-call`;
+  - session probes built for it were refused identically, or ran identically, on the A29 binary
+    and production (store into an earlier array, object or map, then an earlier function's
+    mutation through a local);
+  - the guard-off generator passes.
+- **The test-only fix is not possible.** The gate now fails, on A29 alone, until the owner decides.
+  The options are:
+  - (a) retire A29 as equivalent, the way B5 retired its mutant 2;
+  - (b) move the hook to line 319, the mechanism that carries M1 since B5 (a `src/` change: a new
+    `NIFT_B4B_MUTANT` value). The existing M1 oracle cases should catch it.
+- The harness is left with A29 in its list, so the result is visible.
+
+**The same vacuity pattern in other mutant gates.** I looked for a suite-failure kill signal with
+no unmutated control, and ran each suite on the unmutated build:
+- **No unmutated control in the harness, but the suite passes unmutated today (not vacuous now,
+  latent):**
+  - b3 (`b3_structs.py`: 468 checks);
+  - b4 (`b4_dispatch.py --quick`: 6,085);
+  - refsem (`refsem_a.py`: 566, production and probe);
+  - collections (`weekend_collections.py`: 284);
+  - coro-module (`coro_module.py`; it checks only that the binary differs);
+  - args-cmd (`args_cmd.py`);
+  - packages (`packages.py`);
+  - b5 (`run.py`, all 148 programs on the probe build, plus `refsem_a.py`, `gen_operators.py` with
+    880 programs, and `d2_append.py`).
+- **With an unmutated control:**
+  - safety (`base.log`);
+  - host mutants ("a passing unmutated baseline first");
+  - closures-s1 and for-s2 (the suite runs on the target first);
+  - cp22 (the normal sha256);
+  - cp14b mutations (a per-witness normal control, plus §38's DRAIN pin);
+  - b06, which gets one in this commit.
+- **Not individually audited:** the bespoke cp20/cp21 fd/terminal/protocol mutants. They use
+  per-mutant expected signatures, not a suite-failure signal.
+
+**Low (record only):** the error-position item is in section 38 (P2 group).

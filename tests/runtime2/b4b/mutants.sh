@@ -45,13 +45,21 @@ unit_objects=${B4B_UNIT_OBJECTS:?the Makefile passes the unit objects}
 guardoff_objects=${B4B_GUARDOFF_OBJECTS:-}  # the guard-off CLI's objects (review L4: end to end)
 fixpoint_object=${B4B_FIXPOINT_OBJECT:-}    # B4b 27: the fixed-point build's inference entry
 fail=0
-for n in "${list[@]}"; do
+# C46 (review of C44, condition C1): every signal is first run on the unmutated build (n=0: the
+# tree's own objects, no NIFT_B4B_MUTANT). Since B5 the production build shares references, so the
+# b4b suite runs in its shared-reference mode (--guardoff), as test-runtime2-b4b does; without it the
+# unmutated build failed 61+ checks and every mutant was "caught" by that alone. A signal that fails
+# unmutated cannot judge a mutant: the gate fails (negative control against vacuous kills).
+signals() {  # signals N: build mutant N (0 = unmutated) and run every signal; sets unit suite workgate guard fixpoint
+  local n=$1
   replaced=(); built=()
-  for src in ${FILES[$n]}; do
-    obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
-    $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4B_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant A$n: build failed"; exit 2; }
-    replaced+=("$obj"); built+=("$mobj")
-  done
+  if [ "$n" != 0 ]; then
+    for src in ${FILES[$n]}; do
+      obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
+      $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4B_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant A$n: build failed"; exit 2; }
+      replaced+=("$obj"); built+=("$mobj")
+    done
+  fi
   filter() { local list=$1; for r in "${replaced[@]}"; do list=$(printf '%s\n' $list | grep -vx "$r"); done; printf '%s ' $list; }
   link=$(filter "$(printf '%s\n' $objects | grep -v '\.a$')")
   libs=$(printf '%s\n' $objects | grep '\.a$' | tr '\n' ' ')
@@ -66,7 +74,7 @@ for n in "${list[@]}"; do
   unit=0; suite=0; guard="-"; workgate=0
   "$OUT/unit-$n" > "$OUT/u$n.log" 2>&1 || unit=1
   python3 tests/runtime2/b4b/work.py --harness "$OUT/work-$n" > "$OUT/w$n.log" 2>&1 || workgate=1
-  python3 tests/runtime2/b4b_types.py --nift "$OUT/nift-$n" --quick > "$OUT/m$n.log" 2>&1 || suite=1
+  python3 tests/runtime2/b4b_types.py --nift "$OUT/nift-$n" --guardoff --quick > "$OUT/m$n.log" 2>&1 || suite=1
   if [ -n "$guardoff_objects" ]; then
     glink=$(filter "$(printf '%s\n' $guardoff_objects | grep -v '\.a$')")
     $CXX $CXXFLAGS $glink "${built[@]}" -ldl $libs -o "$OUT/guardoff-$n" || { echo "mutant A$n: guard-off link failed"; exit 2; }
@@ -82,12 +90,27 @@ for n in "${list[@]}"; do
     python3 tests/runtime2/b4b/fixpoint.py --nift "$OUT/fixpoint-$n" --corpus-only b4b > "$OUT/f$n.log" 2>&1 \
       && fixpoint=passed || fixpoint=failed
   fi
-  if [ $unit -eq 0 ] && [ $suite -eq 0 ] && [ $workgate -eq 0 ] && [ "$guard" != failed ] && [ "$fixpoint" != failed ]; then
+  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n" "$OUT/work-$n" "$OUT/fixpoint-$n"
+}
+signals 0
+if [ $unit -ne 0 ] || [ $suite -ne 0 ] || [ $workgate -ne 0 ] || [ "$guard" = failed ] || [ "$fixpoint" = failed ]; then
+  echo "FAIL b4b mutants: the unmutated build fails a signal (oracle $unit, suite $suite, work gate $workgate, guard-off $guard, fixed-point gate $fixpoint): a mutant cannot be judged by it (see $OUT/*0.log)"
+  exit 1
+fi
+echo "PASS b4b mutants negative control: the unmutated build passes every signal (oracle, suite --guardoff, work gate, guard-off, fixed-point gate)"
+for n in "${list[@]}"; do
+  signals "$n"
+  by=()
+  [ $unit -ne 0 ] && by+=("oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases")
+  [ $suite -ne 0 ] && by+=("suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks")
+  [ $workgate -ne 0 ] && by+=("work gate $(grep -c '^FAIL ' "$OUT/w$n.log") failures")
+  [ "$guard" = failed ] && by+=("guard-off")
+  [ "$fixpoint" = failed ] && by+=("fixed-point gate ($(grep -c '^FAIL non-fixed' "$OUT/f$n.log") non-fixed points)")
+  if [ ${#by[@]} -eq 0 ]; then
     echo "mutant A$n (${FILES[$n]}): SURVIVED"; fail=1
   else
-    echo "mutant A$n (${FILES[$n]}): caught (oracle $(grep -c 'case ' "$OUT/u$n.log") failing cases; suite $(grep -c '^FAIL ' "$OUT/m$n.log") failing checks; work gate $(grep -c '^FAIL ' "$OUT/w$n.log") failures; guard-off $guard; fixed-point gate $fixpoint$([ "$fixpoint" = failed ] && echo " ($(grep -c '^FAIL non-fixed' "$OUT/f$n.log") non-fixed points)"))"
+    echo "mutant A$n (${FILES[$n]}): caught by $(IFS=';'; echo "${by[*]}" | sed 's/;/; /g')"
   fi
-  rm -f "$OUT/nift-$n" "$OUT/unit-$n" "$OUT/guardoff-$n" "$OUT/work-$n" "$OUT/fixpoint-$n"
 done
 [ $fail -eq 0 ] && echo "PASS b4b mutants: ${#list[@]} caught" || echo "FAIL b4b mutants"
 exit $fail

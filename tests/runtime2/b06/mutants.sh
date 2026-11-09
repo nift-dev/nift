@@ -9,6 +9,11 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$ROOT"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 fail=0
+# negative control (C46): the unmutated build passes the fixtures, so a failure is the mutant's
+make -s .build/b4b-guardoff/nift-guardoff >/dev/null
+python3 tests/runtime2/b06/run.py --nift "$ROOT/nift" --probe "$ROOT/.build/b4b-guardoff/nift-guardoff" >"$TMP/base.log" 2>&1 \
+    || { tail -5 "$TMP/base.log"; echo "FAIL b06 mutants: the unmutated build fails the fixtures (a mutant cannot be judged)"; exit 1; }
+echo "PASS b06 mutants negative control: the unmutated build passes every fixture"
 for n in 1 2; do
     bash tests/runtime2/b06/build_mutant.sh "$n" "$TMP/nift-m$n"
     rc=0
