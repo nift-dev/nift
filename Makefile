@@ -3916,6 +3916,7 @@ test-v410-file-buffer-parity: $(TARGET)
 .PHONY: test-runtime2-file-mode-parity test-runtime2-file-mode-mutants
 test-runtime2-file-mode-parity: $(TARGET)
 	python3 -B tests/runtime2/file_mode_parity.py --nift "$(CURDIR)/$(TARGET)"
+	python3 -B tests/runtime2/file_loop_diagnostic.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-file-mode-mutants: $(TARGET) $(LIBFFI_A)
 	FILE_MODE_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" FILE_MODE_CPPFLAGS="$(PRODUCTION_GUARD) $(CPPFLAGS)" CXX="$(CXX)" \
 		bash tests/runtime2/file_mode_mutants.sh

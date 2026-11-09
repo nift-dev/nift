@@ -13,6 +13,15 @@ def normalize(value,root):
  return value
 import gzip
 binary=Path(os.environ.get('NIFT','./nift')).resolve();rows=json.loads(gzip.decompress((Path(__file__).resolve().parent/'data/v410-file-buffer-oracle.json.gz').read_bytes()))
+# Owner 2026-11-10 (docs/runtime-2/compatibility.md, "loop write diagnostics"): when write or
+# write_line fails inside a while/for body, legacy's loop executor drops the method's message and
+# reports "script failed"; the VM reports the method's own error at the same position. Approved
+# for exactly these rows and only for the stderr text: exit status, stdout and file bytes must
+# still equal the oracle.
+APPROVED_STDERR={
+ 'closed-write-factory-count':'error: <ORACLE_ROOT>/case.f:1:73: write: file is not open\n',
+ 'readonly-write-factory-count':'error: <ORACLE_ROOT>/case.f:1:85: write: file is not open for writing\n',
+}
 for row in rows:
  with tempfile.TemporaryDirectory(prefix='nift-file-buffer-oracle-') as directory:
   root=Path(directory).resolve();(root/'sub/sub').mkdir(parents=True)
@@ -20,6 +29,10 @@ for row in rows:
   path=root/'case.f';path.write_text(row['source']+'\n')
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   actual=dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),files={f.relative_to(root).as_posix():f.read_bytes().hex() for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
-  expected={key:row[key] for key in actual};assert actual==expected,(row['name'],actual,expected)
+  expected={key:row[key] for key in actual}
+  if os.environ.get('NIFT_VM')!='0' and row['name'] in APPROVED_STDERR:
+   assert row['stderr'].endswith(': script failed\n'),(row['name'],'the approval is for legacy\'s dropped message only')
+   expected['stderr']=APPROVED_STDERR[row['name']]
+  assert actual==expected,(row['name'],actual,expected)
   print('PASS',row['name'],flush=True)
 print('PASS',len(rows),'exact buffer/factory/cwd/reentry/file-effect contracts')

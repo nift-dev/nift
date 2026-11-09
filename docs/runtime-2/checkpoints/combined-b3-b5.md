@@ -3098,3 +3098,34 @@ it stands for every other handle kind. The amendment is in `decisions.md` under 
 - **Unchanged and passing:** `file_stream_handles.py`, `handle_flow_regressions.py`, `unwind_handle_release.py` (168 cases) and `vm_host.py` (160).
 
 **Production sha256.** `c88bf749d92215615e47fc487a8a7331f59ae3ce2fcb1198e49ddaf78e52a3f7`.
+
+## 55. Owner decision 2026-11-10: the loop write diagnostic is an approved difference (C65, tests and docs)
+
+**The difference.** When a `file()` `write` or `write_line` fails a precondition (not open, or
+open read-only) inside a `while`/`for` body, legacy reports `script failed`: its prepared loop
+executor drops the method's message (`CLI.cpp`). The VM reports the method's own error
+(`write: file is not open`, `write_line: file is not open for writing`, ...) at the same position.
+It is recorded in `docs/runtime-2/compatibility.md` under the approved differences. The approval
+covers **only that message text**; it is not general permission to change error handling.
+
+**Pinned against legacy** (`tests/runtime2/file_loop_diagnostic.py`, in
+`test-runtime2-file-mode-parity`). There are 2 states (closed, read-only), 2 loops (while, for)
+and 2 methods, giving 8 programs and 56 checks. For each program:
+- the same exit status (1);
+- the same stdout, everything printed before the error;
+- the same file bytes;
+- nothing extra printed;
+- legacy's text exactly `script failed` at the position the VM reports;
+- the VM's message exactly `<method>: file is not open[ for writing]`, with no VM tag, compiler diagnostic or handle text;
+- the same program with the file open for writing succeeds identically on both engines.
+
+**test-v410-file-buffer-parity.** The two rows `closed-write-factory-count` and
+`readonly-write-factory-count` accept the VM's pinned stderr, and only when the oracle's stderr is
+legacy's `script failed`. Every other channel still equals the oracle. With `NIFT_VM=0` the oracle
+is unchanged: 102 of 102 pass.
+
+**Result on the VM.** Of the 102 rows, 22 pass and 80 fail. All 80 are VM refusals (`not compiled
+for the VM`): `opaque:nesting-limit` 39, `host-handle-flow` 26, `opaque:legacy-runtime-error` 8,
+`builtin-arg-fault-context` 2, `builtin-receiver:path`, `builtin-receiver:write`,
+`builtin-arity:open`, `builtin-arity:save` and `builtin-lazy-args:replace`. No semantic
+difference remains. The gate itself still stops at its first refused row.
