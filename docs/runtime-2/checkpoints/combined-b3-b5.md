@@ -3239,3 +3239,11 @@ expected. It now sets `NIFT_VM=0`, since legacy is the oracle by design (`RT_BUI
 `make test-rt-builtins-probe`: PASS (inventory pinned), 272 cases × 6 contexts, 10
 context-dependent; 11 pairs, 9 shape-dependent. With this and section 56, `make test-rt-builtins`
 passes as a whole.
+
+## 58. F-4: the C66 slot-reuse check asserts the reuse (C69, tests only)
+
+`tests/rt/host_observer_native.cpp` (C66) checked that a closed `ifstream` handle stays closed after
+a new stream is created, but not that the new stream took the old slot. If allocation stopped
+reusing the slot, the check would pass vacuously. It now asserts that the new stream has the same
+handle id (owner tag and slot index) and a later generation. `host-native-unit`: 37 checks, 0
+failures.

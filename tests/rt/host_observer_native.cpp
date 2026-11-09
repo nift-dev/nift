@@ -123,6 +123,11 @@ bool file_stream_cases() {
     Value reused_stream;
     CHECK(call(nift::rt::natives::ifstream_factory, context, {make_string(path)}, reused_stream, error) ==
           nift::rt::natives::Status::Ok);
+    // F-4 (review C59-C66): the new stream must actually take the stale stream's slot (same slot
+    // index and owner tag, a later generation), or the stale check below would pass vacuously.
+    CHECK(reused_stream.handle_kind() == HandleKind::Stream &&
+          reused_stream.handle_id() == stream.handle_id() &&
+          reused_stream.handle_generation() > stream.handle_generation());
     CHECK(call(nift::rt::natives::stream_read_line, context, {stream}, out, error) ==
           nift::rt::natives::Status::Recoverable);
     CHECK(call(nift::rt::natives::stream_close, context, {reused_stream}, out, error) ==
