@@ -4,6 +4,13 @@ import argparse,hashlib,json,subprocess,tempfile
 from pathlib import Path
 from functional import CASES,run
 DRAIN='a:=[{"k":3},{"k":1},{"k":2}]; n:=0; fn(cmp(x,y)) { n+=1; if(n==2) { throw error("stop") }; return x.k<y.k }; try { a.sort(cmp) } catch(e) { print("CATCH"); print(a.stringify()) }; print("AFTER")'
+# B04 (owner approval 2026-11-09 17:31): the DRAIN control's VM result is the copy-sort-commit one
+# (owner ruling Q7, 2026-11-07, docs/runtime-2/compatibility.md: a failed comparator sort leaves the
+# receiver unchanged), an approved difference from legacy, which leaves the permutation of its
+# in-place sort. Both sides are pinned exactly: the VM's Q7 output, and legacy's own output.
+APPROVED_CONTROLS={DRAIN:dict(vm=dict(out='CATCH\n[{"k":3},{"k":1},{"k":2}]\nAFTER\n',err='',exit=0),
+                              legacy=dict(out='CATCH\n[{"k":1},{"k":3},{"k":2}]\nAFTER\n',err='',exit=0),
+                              citation='owner ruling Q7 (2026-11-07), copy-sort-commit; B04 approval 2026-11-09 17:31')}
 MUTANTS=[
 (1,'logical-drain-failure','vm_collection_sort',DRAIN),
 (2,'escaping-drain-bad-alloc','vm_collection_sort',DRAIN),
@@ -33,7 +40,13 @@ def main():
                 print('UNVERIFIED' if ok else 'FAIL',number,name,flush=True);continue
             normal=run(a.nift,'require',source,root)
             oracle=run(a.nift,'0',source,root)
-            if any(normal[k]!=oracle[k] for k in ['out','err','exit']):
+            if source in APPROVED_CONTROLS:
+                want=APPROVED_CONTROLS[source]
+                if any(normal[k]!=want['vm'][k] for k in ['out','err','exit']):
+                    raise RuntimeError('Normal control failed the approved Q7 semantics: '+name)
+                if any(oracle[k]!=want['legacy'][k] for k in ['out','err','exit']):
+                    raise RuntimeError('Legacy control differs from its recorded output (Q7 difference): '+name)
+            elif any(normal[k]!=oracle[k] for k in ['out','err','exit']):
                 raise RuntimeError('Normal control failed exact legacy semantics: '+name)
             st=normal['stats'][-1] if normal['stats'] else {}
             if st.get('outcome') not in ['vm','vm-error'] or st.get('vm_executions')!=1 or st.get('legacy_executions')!=0:

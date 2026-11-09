@@ -1,0 +1,5 @@
+call 1 92746 [9,2,7,4,6] [9,2,7,4,6]
+call 2 92746 [9,2,7,4,6] [9,2,7,4,6]
+call 3 92746 [9,2,7,4,6] [9,2,7,4,6]
+-- exit 1
+error: q7_failure_bad_return.f:10:1: sort: comparator must return bool

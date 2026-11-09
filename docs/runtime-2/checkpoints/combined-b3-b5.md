@@ -2241,3 +2241,111 @@ and in MANDATORY.
 **Cost.** No VM execution path changed. Both files are compile-time inference (rt-lint
 `cold-file`), so no callgrind run applies. The deterministic analysis-work gate
 (test-runtime2-b4b-work) passes unchanged.
+
+## 38. B04: the cp14b comparator expectations under copy-sort-commit (C45)
+
+**Status: expectations corrected, pending verification.** B04 is not downgraded here. The owner
+decides that only after independent verification and the Linode GCC 15.2 run.
+
+**Owner approval (2026-11-09 17:31).** Regenerate the cp14b comparator receiver-view expectations
+under the approved B5 copy-sort-commit semantics. That is owner ruling **Q7, 2026-11-07**
+(compatibility.md row "comparator `sort`": aliases see the original order; a failure leaves the
+receiver unchanged; identity is kept). This commit changes tests and expectations only; nothing in
+src/ changes. The evidence is triage `ADJ-B04.md` and `work/b04/`.
+
+**The historical evidence is unchanged.** `tests/runtime2/cp14b/fixtures/d4-traces.json.gz` keeps
+its original sha256 pins in `SHA256.json` (`03f9f45b…` for the file, `0219807d…` for its content).
+It records the superseded in-place semantics.
+
+**The derived expectations.**
+- `tests/runtime2/cp14b/q7_expectations.py` generates
+  `fixtures/d4-q7-expectations.json.gz` mechanically, for 234 cases. The frozen data is copied as
+  is wherever Q7 does not change it:
+  - every comparator call's pair (l, r), in order;
+  - the call count;
+  - the failure flag. The failure is the caught `throw error("stop")`, printed `Estop`; the D4
+    programs print no position for it.
+- Only two things come from the Q7 model:
+  - each call's view of the receiver is the original array, as the D4 program builds it;
+  - the final array is the frozen final after a completed sort, and the original array after a
+    failed one.
+- Pins in `SHA256.json`:
+  - the file, `d4-q7-expectations.json.gz` = `4864d3ab4dc65968d3522cc13166856403de1574598ddf795b338a87ec146886`;
+  - its content, `d4_q7_uncompressed` = `a5ad90977cbb3f6695ae194b8bcfd246e4a5e7ef237aa92ab1324d673b50e188`.
+- `--check` regenerates the content from the pinned frozen traces and requires it to be
+  byte-identical, with both pins holding.
+- `--self-test` has negative controls: a changed pair, receiver view, final array, call count or
+  failure flag is refused.
+- `test-runtime2-cp14b-sort` runs both before the replay.
+- `sort_replay.py` checks the derived file first (generator identity and pins) and re-asserts per
+  case that the pairs, count and flag are the frozen trace's. It then requires each case's actual
+  `{trace (l, r, a per call), final, calls, failed}` to equal the derived expectation exactly. No
+  field was dropped or loosened.
+
+**The DRAIN control** (`tests/runtime2/cp14b/mutations.py`, the normal control of mutants 1, 2
+and 9).
+- Under Q7 the VM is pinned to `CATCH`, `[{"k":3},{"k":1},{"k":2}]`, `AFTER` (exit 0, no
+  stderr).
+- Legacy is pinned to its own recorded output: `CATCH`, `[{"k":1},{"k":3},{"k":2}]`, `AFTER`.
+- The legacy difference is recorded as approved under Q7 (owner ruling 2026-11-07).
+- On the probe build both sides match.
+
+**Explicit failure tests** (`tests/runtime2/b5/sort/`, run on the probe build by
+`test-runtime2-b5`; hand-derived goldens):
+- `q7_failure_throw.f`: the comparator throws at its k-th call, for every k the sort makes (caught).
+  After each failure the receiver and its aliases are unchanged, element by element: the direct
+  alias, the alias in an object field and the alias in an array. A push through the receiver is
+  then seen through every alias. VM: 0 bad. Legacy: 106.
+- `q7_failure_bad_return.f`: the comparator returns a string at its 3rd call.
+- `q7_failure_runtime_error.f`: the comparator body divides by zero at its 3rd call.
+- In both fatal cases, every comparator call up to the failure sees the receiver and its aliases in
+  the original order, element by element. Legacy shows the partial sort. The fatal error and its
+  position equal legacy's: `sort: comparator must return bool` at 10:1, and
+  `return: division by zero` at 4:3.
+- In nift these two failures are fatal. A `try` does not catch them, and neither does a thread
+  join. So "unchanged after the failure" can only be observed through the views up to the failure.
+- B5 sort fixtures: 8 programs, all pass on the probe build.
+
+**Case counts (local, GCC 13.3; the authoritative check is Linode with GCC 15.2).**
+
+| Binary | Admitted, equal to the Q7 expectations | Refused `method:sort` | Mismatches |
+| --- | --- | --- | --- |
+| The adjudication's probe build (pre-B06 tree, `work/b04/nift-guardoff`, the code Linode ran) | 192 | 42 | 0 |
+| This tree's probe build (with C44) | 202 | 32 | 0 |
+| Production (GCC 13.3) | 0 (all 234 refused by the libstdc++ profile gate) | 234 | 0 |
+
+- **The first row is Linode's split.** The adjudication found 50 exact plus 142 mismatching
+  against the frozen traces, and 42 refused; the case IDs match `replay-guardoff.json` 234/234.
+  Against the derived expectations, every one of the 192 matches.
+- **What changed between the rows.** The 10 cases that moved from refused to admitted are
+  `0-{asc,desc,dups,equal,seed}-{0,1}`, comparator sorts of an empty literal. B06's family-1 fix
+  (C44) proves the empty element type, so they are now admitted. Their result equals the Q7
+  expectation and legacy: no calls, final `[]`. Weekend/r2 refused them too.
+- **This is a B06 consequence the B06 report did not name.** The corpus differential found no
+  admission change in `.f` files, and these D4 programs are generated.
+- **The remaining refusals** (32, or 42 without C44) are record arrays of 17, 31, 32 and 33
+  elements. They were refused on r2 too (P2). They still count as failures in the replay.
+
+**Gates.**
+- **Pass:** `test-runtime2-cp14b-sort` (Q7 check, self-test, then 234 UNVERIFIED on production
+  GCC 13.3), `test-runtime2-cp14b`, `test-runtime2-b5` (the sort fixtures on the probe build),
+  `test-rt-lint`, the certification guard, and test-integrity (57 findings, unchanged).
+- **`test-runtime2-cp14b-mutants`: still fails locally (pre-existing).**
+  - Mutants 1, 2 and 9 are UNVERIFIED (comparator), and 3-8 and 10 are DETECTED.
+  - Mutant 11 (`missing-const-guard`) stops at its normal control. Its witness is
+    `const_precedence`, an owner-approved B5 difference (Q2 option B), which `functional.py`
+    already pins in `APPROVED` but `mutations.py` compares for legacy parity.
+  - The HEAD harness fails the same way. On Linode it was masked by the DRAIN failure and will
+    surface once DRAIN passes.
+  - Left unchanged: it is outside the DRAIN item. The same treatment, the Q2 pin from
+    `functional.APPROVED`, is proposed.
+- **Linode, to confirm:**
+  - `test-runtime2-cp14b-sort` with `sort.json` kept: 202 equal to the Q7 expectations on GCC 15.2
+    production, 32 refused;
+  - the DRAIN control;
+  - comparator_factory.
+
+**Also recorded (B06 review, low).** The newly admitted `fs := []; print([1].map(fs.pop())…)` errors
+at 1:25 where legacy errors at 1:17. r2 does the same, and the already admitted `fs[0]` variant has
+the same difference. This belongs to the P2 error-position group (with `first`/`last` on an empty
+array, section 37).

@@ -112,7 +112,7 @@ tests/runtime2/cp14b/origins.py	detected	-	result=dict(status='PASS' if all(r['p
 tests/runtime2/cp14b/reporting_regression.py	detected	-	print(cprof.banner(prof,unverified,'reporting'))
 tests/runtime2/cp14b/reporting_regression.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in rows) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),results=rows)
 tests/runtime2/cp14b/sort_replay.py	detected	-	if prof.refused:print(cprof.banner(prof,unverified,'sort replay'))
-tests/runtime2/cp14b/sort_replay.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),oracle_sha256=hashlib.sha256(Path(a.oracle).read_bytes()).hexdigest(),results=results)
+tests/runtime2/cp14b/sort_replay.py	detected	-	report=dict(status='PASS' if all(r['pass_'] for r in results) else 'FAIL',comparator_profile=prof.found,unverified_comparator_cases=unverified,binary_sha256=hashlib.sha256(Path(a.nift).read_bytes()).hexdigest(),oracle_sha256=hashlib.sha256(Path(a.oracle).read_bytes()).hexdigest(),expected_sha256=hashlib.sha256(Path(a.expected).read_bytes()).hexdigest(),expectation='Q7 copy-sort-commit (q7_expectations.py)',results=results)
 tests/runtime2/cp14b/sort_replay.py	detected	-	Path(a.output).write_text(json.dumps(report,indent=2)+'\n');print((report['status']+' '+str(len(results))+' production VM traces') if not prof.refused else (('UNVERIFIED' if report['status']=='PASS' else 'FAIL')+' '+str(len(results))+' D4 cases refused with method:sort (no VM trace replayed)'));return 0 if report['status']=='PASS' else 1
 tests/runtime2/cp16/capture.py	detected	-	print("SKIPPED %s (needs Linux setpriv for priv=nodac)" % probe.id)
 tests/runtime2/cp16_n1.py	detected	-	print(f"SKIP {skipped} post-open read-failure cases: /proc/self/mem is unavailable "
@@ -172,3 +172,4 @@ tests/v44_shell_foreground_tty_smoke.py	detected	-	print("SKIP v4.4 shell foregr
 tests/v44_shell_glob.sh	detected	-	echo 'SKIP v4.4 shell glob (Windows passthrough pending glob backend)'
 tests/v46_b4_cp8_embedding_abi.sh	detected	-	echo 'nm unavailable; skipping symbol-surface check' >&2
 tests/v46_resource_paths.py	detected	-	print("  (package symlink escape skipped: native symlinks unavailable)")
+tests/runtime2/b06/run.py	justified	a FAIL (exit 1), never a skip: the gate fails when the probe build is missing	print("FAIL b06: no --probe build: the comparator-sort fixtures did not run on the VM")

@@ -4908,6 +4908,8 @@ test-runtime2-cp14b: $(TARGET) $(CP13B_SWITCH_NIFT)
 	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/origins.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --base "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/origins-switch.json"
 test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 	mkdir -p "$(CP14B_EVIDENCE)"
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tests/runtime2/cp14b/q7_expectations.py --check
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) tests/runtime2/cp14b/q7_expectations.py --self-test
 	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(TARGET)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort.json"
 	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/sort_replay.py --nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)" --oracle "$(CP14B_ORACLE)" --output "$(CP14B_EVIDENCE)/sort-switch.json"
 
