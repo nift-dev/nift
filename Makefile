@@ -1281,9 +1281,12 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(RT_OBJEC
 # src/rt/vm_mutants.h); the differential gates must reject every mutant and
 # pass the unmutated binary. Normal builds contain no mutant code.
 RT_VM_MUTANTS := $(TEST_DIR)/nift-mutants$(EXEEXT)
+# vm_report.o (review of C67-C71, must-fix 1): Vm::report_offset holds mutant 5's hook since
+# vm_report.cpp was split out of vm.cpp (94873269); without it here MUTATE_ERROR_OFFSET compiled
+# to nothing and mutant 5 was dead. scripts/build/check-mutant-lists.py keeps the list complete.
 RT_VM_MUTANT_OBJECTS := $(TEST_DIR)/mutants/vm.o $(TEST_DIR)/mutants/vm_ops.o $(TEST_DIR)/mutants/compiler_call.o \
-	$(TEST_DIR)/mutants/prepared_outer.o
-RT_VM_MUTATED := src/rt/vm.o src/rt/vm_ops.o src/rt/compiler_call.o src/rt/prepared_outer.o
+	$(TEST_DIR)/mutants/prepared_outer.o $(TEST_DIR)/mutants/vm_report.o
+RT_VM_MUTATED := src/rt/vm.o src/rt/vm_ops.o src/rt/compiler_call.o src/rt/prepared_outer.o src/rt/vm_report.o
 $(TEST_DIR)/mutants/%.o: src/rt/%.cpp $(RT_VALUE_HEADERS)
 	mkdir -p "$(TEST_DIR)/mutants"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_VM_MUTANTS -c $< -o $@
@@ -1307,6 +1310,8 @@ test-rt-vm-mutants-sharing-oracle: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 test-rt-vm: test-rt-vm-sharing-oracle
 test-rt-vm-mutants: test-rt-vm-mutants-sharing-oracle
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
+	python3 -B scripts/build/check-mutant-lists.py
+	python3 -B scripts/build/check-mutant-lists.py --selftest
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff --jobs "$${NIFT_MUTANT_JOBS:-$$(( ($$(nproc) + 1) / 2 ))}"
 
 # CP16 Host layer (src/rt/host): Host-op interface, trace v1/v2, run()

@@ -3415,3 +3415,29 @@ guard): `tests/runtime2/sharing_oracle_selftest.py`, PASS, 26 checks.
   have not looked into them. `rt_diff_trace_policy_selftest.py` (the same target's second step)
   passes on its own (13 cases, 9 rejected).
 - Gates on this commit: the guard, rt-lint and test-integrity pass.
+
+## 61. Review of C67–C71, must-fix 1: VM mutant 5 was compiled out (C72, Makefile and lint)
+
+Section 60 called mutant 5 obsolete, and that was **wrong**. `RT_VM_MUTATED` listed only `vm.o`,
+`vm_ops.o`, `compiler_call.o` and `prepared_outer.o`. `vm_report.cpp`, which holds
+`Vm::report_offset` and with it mutant 5's `MUTATE_ERROR_OFFSET`, was split out of `vm.cpp` in
+94873269 and never added to the list. The mutant binary linked the production `vm_report.o`, so
+the hook expanded to nothing.
+
+- **Fix (Makefile only).** `vm_report.o` is added to `RT_VM_MUTANT_OBJECTS` and `RT_VM_MUTATED`.
+  Production `nift` is unchanged (c88bf749…). On the mutant build, `NIFT_VM_MUTANT=5` now moves
+  the column of a VM runtime error (`a[i]` out of range: 3:7 becomes 3:8).
+- **Lint** (`scripts/build/check-mutant-lists.py`, run first in `test-rt-vm-mutants`, with its
+  selftest). It covers the families that build an explicit list of mutated objects:
+  - `NIFT_VM_MUTANTS` (`RT_VM_MUTATED`; hooks are the macros `vm_mutants.h` defines, read from it,
+    plus `vm_mutant() ==` and the guard itself);
+  - `NIFT_CORO_MUTANT` (`CP22_CORO_SOURCES`, `CORO_MODULE_SOURCES`);
+  - `NIFT_CORO_MODULE_MUTANT`;
+  - `NIFT_CLOSURE_MUTANT` and `NIFT_FOR_MUTANT` (their per-object rules).
+
+  A source whose code uses a family's hook, directly or through a header whose code does, must be
+  on that family's list. Comments, the defining headers, and a header's `#ifndef X / #define X 0`
+  default do not count.
+  - Before the fix it reported exactly `src/rt/vm_report.cpp`; after the fix it passes.
+  - The selftest plants four negative controls (a hook macro, a `vm_mutant()` test, a CORO macro
+    and a FOR macro outside their lists) and rejects each; the control passes.
