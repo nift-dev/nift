@@ -132,6 +132,7 @@ tests/runtime2/cp22/adversarial.py	justified	a FAIL line: the gate fails	print(f
 tests/runtime2/file_copy_move_freedom.sh	detected	-	else echo "SKIP cross-device move (/dev/shm missing or on the same filesystem)"; fi
 tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print("FAIL: base.f did not run on the VM")
 tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print(f"FAIL: {label}: a loop did not run on the VM")
+tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print("FAIL: the small base arrays did not run on the VM")
 tests/runtime2/host_deps.py	detected	-	print("SKIP [%s] permission steps (root without setpriv)" % mode)
 tests/runtime2/host_deps.py	detected	-	print("SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract")
 tests/runtime2/host_m3_order.py	detected	-	print(f"SKIP root {base}: {error}")

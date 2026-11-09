@@ -2472,3 +2472,54 @@ review. Until then it stays listed and the gate fails on it alone.
 - None carries a stale pre-B5 expectation.
 - Mutants 1, 2 and 9 use DRAIN, pinned in C45. They are UNVERIFIED on GCC 13.3 (the profile gate)
   and are judged on Linode.
+
+## 41. B05: the for-s2 bench under the B5 snapshot contract (C48)
+
+**Owner approval (2026-11-09 17:31): correct the bench, not the runtime.** Evidence: triage
+`ADJ-B05.md`. Tests only; the snapshot semantics are unchanged (B5 D5, b5-refsem.md 1 and 10.9:
+every loop over a binding iterates an explicit, budget-checked O(n) entry snapshot). Skipping the
+snapshot is deferred.
+
+**Budget derivation** (`tests/runtime2/for_s2_bench.py`, written out in its docstring):
+- `snapshot(n) = n × 16 + 64` bytes. This is the copy's storage as the VM charges it: n `Value`s
+  of 16 bytes, plus the vector's fixed part.
+- The reservation checked before the copy is `n × 16 + 128` (`Vm::reserve_snapshot`,
+  `src/rt/vm_iter.cpp`), so a budget stop leaves nothing half built.
+- for budget = `base_peak + (N × 16 + 128) + MARGIN`:
+  - `base_peak` is the array alone: base.f's measured heap_peak, 16,777,280 bytes;
+  - N = 1,000,000;
+  - MARGIN = 64 KiB, for the program's own small values. It is the same tolerance the write
+    loop's no-copy check already uses.
+- Locally that is 16,777,280 + 16,000,128 + 65,536 = **32,842,944**. A second copy (16 MB) does
+  not fit, so the budget asserts exactly one snapshot.
+- The while loops keep the bench's previous budget and their no-copy check.
+
+**Checks (all pass locally):**
+
+| Check | Expected | Measured |
+| --- | --- | --- |
+| min_for, arith_for: heap_peak | base + snapshot(1M) = 32,777,344 | 32,777,344 |
+| … heap_live at exit (snapshot released) | 16,777,280 | 16,777,280 |
+| seq3_for.f: three loops in sequence (no accumulation) | 32,777,344 / live 16,777,280 | same |
+| fn_for.f: a looping function called twice (no accumulation) | 32,777,344 / live 16,777,280 | same |
+| loop_1k.f: one level over 1,000 | 16,448 + 16,064 = 32,512 | 32,512 |
+| nested2_1k.f: two levels over 1,000 (one snapshot each) | 16,448 + 2 × 16,064 = 48,576 | 48,576 |
+| nested3_100.f: three levels over 100 | 2,112 + 3 × 1,664 = 7,104 | 7,104 |
+| write_for.f | runs on the VM, stdout equal to legacy (`1000000`), peak base + snapshot | yes, 32,777,344 |
+| negative: budget base + snapshot/2 = 24,777,312 | the documented heap-budget stop: exit 70, outcome internal-error, reason `memory budget exceeded`, nothing printed | yes |
+
+- **Tolerance** is 256 bytes. The VM charges exact sizes in its own accounting, not through malloc,
+  and 256 is below the smallest snapshot checked (1,664 bytes), so a missing nesting level fails.
+- **write_for.f.** The bench's stale `GUARDED["write_for.f"] = "reference-guard:lent"` is
+  replaced. B5 deleted the Phase A guard, and the loop now runs legacy-equal.
+- **The performance objective** is reported as before. It is a wall-clock question for Linode.
+
+**New P2 item (record only; the message is unchanged).** The heap-budget stop is a documented
+resource stop: exit 70, "a resource stop" (b0-safety.md §1); memory_c1.sh requires `exit 70, memory
+budget exceeded`. The CLI nevertheless renders it as `NIFT_VM internal failure: memory budget
+exceeded`, and "internal failure" misleads the user for a budget the user set. This joins the P2
+diagnostics group.
+
+**B05 status:** bench corrected. Reclassifying it from P0 to a P2 test defect is the owner's
+decision after verification; Linode GCC 15.2 should give byte-identical figures, since the sizes
+depend only on `sizeof(Value)`.

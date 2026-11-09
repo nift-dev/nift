@@ -5,12 +5,34 @@
 
 The 1,000,000-element array is built once by the VM's `range` native. The
 construction time (base.f) is measured separately and subtracted from each
-loop. Memory checks that the loop adds no owning copy: under 18 MB the write
-loop succeeds and its heap_peak stays at the array's baseline footprint. A
-second copy would add ~16.8 MB and fail the budget.
+loop. The 10 % performance objective is reported, not silently waived: a ratio
+above 1.10 prints MISS and is left for the owner. `--strict` exits 1 on a miss.
 
-The 10 % performance objective is reported, not silently waived: a ratio above
-1.10 prints MISS and is left for the owner. `--strict` exits 1 on a miss.
+Memory (B05, owner approval 2026-11-09 17:31; B5 contract D5, b5-refsem.md 1 and
+10.9: every loop over a binding iterates an entry snapshot, an explicit O(n),
+budget-checked copy). The bench used to give the `for` loops a 24 MB budget,
+room for the array only (before B5 a `for` loop made no copy), and to expect
+write_for.f refused by the deleted Phase A guard: both stale. Now:
+
+  snapshot(n) = n * 16 + 64 bytes: the copy's storage as the VM charges it
+      (n Values of 16 bytes, plus the vector's fixed part); the reservation
+      check before the copy asks for n * 16 + 128 (Vm::reserve_snapshot,
+      src/rt/vm_iter.cpp), so a budget stop leaves nothing half built
+  for budget = base_peak + (N * 16 + 128) + MARGIN, base_peak the array alone
+      (base.f's measured heap_peak), MARGIN = 64 KiB: the program's own small
+      values and buffers, the same tolerance the write loop's no-copy check
+      uses. One more copy (16 MB) does not fit, so the budget asserts "one
+      snapshot", not "some memory".
+  checks: each `for` loop's heap_peak = base_peak + snapshot(N) (within TOL,
+      256 bytes, the VM's exact accounting); heap_live at exit = base_peak (the snapshot is released);
+      three loops in sequence and a looping function called twice keep that
+      peak (no accumulation); nested loops hold one snapshot per level (two
+      levels over 1,000 elements, three over 100: base + levels * snapshot);
+      write_for.f runs on the VM with legacy's output (B5: the deleted guard's
+      refusal is gone) within the same peak; a budget of base_peak plus half a
+      snapshot stops with the documented heap-budget stop (exit 70, outcome
+      internal-error, reason "memory budget exceeded", nothing printed); the
+      while loops keep the no-copy check (heap_peak within 64 KiB of the array).
 """
 import argparse
 import json
@@ -27,26 +49,32 @@ FIXTURES = os.path.join(HERE, "for-s2-bench")
 
 BODIES = [("minimal scalar", "min_for.f", "min_while.f"),
           ("arithmetic", "arith_for.f", "arith_while.f")]
-# D-NEXT-refsem #1: write_for.f writes the array its `for` iterates, which the
-# Phase A forward-compatibility guard refuses (Phase B iterates the live
-# array); the bench checks that refusal and measures the write loop's memory
-# with write_while.f.
-GUARDED = {"write_for.f": "reference-guard:lent"}
+N = 1000000
+SNAPSHOT_REQUEST = N * 16 + 128   # Vm::reserve_snapshot: n * sizeof(Value) + 128
+MARGIN = 65536                    # the program's own small values (see the docstring)
+TOL = 256                         # heap_peak tolerance: the VM charges exact sizes (its own accounting,
+                                  # not malloc), below the smallest snapshot checked (100 elements: 1,664)
 
 
-def run_once(nift, work, name, budget, stats_name):
+def snapshot(n):
+    return n * 16 + 64            # the copy's charged storage (n Values + the vector's fixed part)
+
+
+def run_once(nift, work, name, budget, stats_name, vm="require", out=None):
     d = tempfile.mkdtemp(dir=work, prefix=name + "-")
     shutil.copy(os.path.join(FIXTURES, name), os.path.join(d, name))
     stats = os.path.join(d, stats_name)
     time_file = os.path.join(d, "time.txt")
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d,
-           "LANG": "C", "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": "require",
+           "LANG": "C", "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": vm,
            "NIFT_VM_STATS": stats, "NIFT_VM_HEAP_BUDGET": str(budget)}
     try:
         p = subprocess.run(["/usr/bin/time", "-f", "%M", "-o", time_file, nift, name], cwd=d,
                            env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
     except subprocess.TimeoutExpired:
         return None, None, 124, None
+    if out is not None:
+        out.append((p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace")))
     st = None
     if os.path.exists(stats):
         try:
@@ -59,6 +87,16 @@ def run_once(nift, work, name, budget, stats_name):
         if m:
             rss = int(m.group(1))
     return st, p.returncode, p.returncode, rss
+
+
+def memory_case(nift, work, name, budget, want_peak, want_live, label):
+    """one run: on the VM, heap_peak = want_peak and heap_live = want_live (within TOL)"""
+    st, code, _, _ = run_once(nift, work, name, budget, f"m-{name}.json")
+    peak, live = (st or {}).get("heap_peak"), (st or {}).get("heap_live")
+    ok = (code == 0 and st and st.get("outcome") == "vm" and peak is not None and live is not None
+          and abs(peak - want_peak) <= TOL and abs(live - want_live) <= TOL)
+    print(f"  {label:44} heap_peak={peak} (want {want_peak}) live={live} (want {want_live})  {'ok' if ok else 'FAIL'}")
+    return ok
 
 
 def median_runs(nift, work, name, budget, runs, base_name):
@@ -94,9 +132,12 @@ def main():
             return 1
         print(f"array construction: execute={base['execute_us']/1000:.2f} ms "
               f"heap_peak={base['heap_peak']} rss={base['rss_kb']} kB")
+        base_peak = base["heap_peak"]
+        for_budget = base_peak + SNAPSHOT_REQUEST + MARGIN
+        print(f"for budget = base_peak {base_peak} + snapshot request {SNAPSHOT_REQUEST} + margin {MARGIN} = {for_budget}")
         miss = False
         for label, for_name, while_name in BODIES:
-            f = median_runs(nift, work, for_name, args.budget, args.runs, for_name)
+            f = median_runs(nift, work, for_name, for_budget, args.runs, for_name)
             w = median_runs(nift, work, while_name, args.budget, args.runs, while_name)
             if f is None or w is None:
                 print(f"FAIL: {label}: a loop did not run on the VM")
@@ -110,13 +151,50 @@ def main():
                 miss = True
             print(f"{label:16} for={fu/1000:7.2f} ms  while={wu/1000:7.2f} ms  "
                   f"ratio={ratio:5.3f}  {state}  heap_peak={f['heap_peak']} rss={f['rss_kb']} kB")
-
-        for name, reason in GUARDED.items():
-            st, code, _, _ = run_once(nift, work, name, args.budget, f"guard-{name}.json")
-            ok = code == 1 and st and st.get("outcome") == "require-error" and st.get("reason") == reason
-            print(f"{name}: refused before effects ({reason}): {'ok' if ok else 'FAIL'}")
-            if not ok:
-                failures += 1
+        # B05: the snapshot contract (see the docstring)
+        print("memory (for loops: one entry snapshot, released at exit):")
+        one = base_peak + snapshot(N)
+        cases = [("min_for.f", "minimal scalar loop"), ("arith_for.f", "arithmetic loop"),
+                 ("seq3_for.f", "three loops in sequence (no accumulation)"),
+                 ("fn_for.f", "a looping function called twice (no accumulation)")]
+        for name, label in cases:
+            failures += 0 if memory_case(nift, work, name, for_budget, one, base_peak, label) else 1
+        small = {}
+        for name in ("base_1k.f", "base_100.f"):
+            st, code, _, _ = run_once(nift, work, name, for_budget, f"b-{name}.json")
+            small[name] = (st or {}).get("heap_peak") if code == 0 and st and st.get("outcome") == "vm" else None
+        if None in small.values():
+            print("FAIL: the small base arrays did not run on the VM")
+            failures += 1
+        else:
+            b1k, b100 = small["base_1k.f"], small["base_100.f"]
+            for name, base_small, n, levels, label in (
+                    ("loop_1k.f", b1k, 1000, 1, "one level over 1,000 elements"),
+                    ("nested2_1k.f", b1k, 1000, 2, "two nested levels over 1,000 (one snapshot each)"),
+                    ("nested3_100.f", b100, 100, 3, "three nested levels over 100 (one snapshot each)")):
+                ok = memory_case(nift, work, name, for_budget, base_small + levels * snapshot(n), base_small, label)
+                failures += 0 if ok else 1
+        # write_for.f: B5 deleted the Phase A guard (reference-guard:lent); the loop writes the array it
+        # iterates and runs on the VM with legacy's output, within one snapshot
+        outs = []
+        st, code, _, _ = run_once(nift, work, "write_for.f", for_budget, "w-vm.json", out=outs)
+        lst, lcode, _, _ = run_once(nift, work, "write_for.f", for_budget, "w-legacy.json", vm="0", out=outs)
+        peak = (st or {}).get("heap_peak")
+        ok = (code == 0 and lcode == 0 and st and st.get("outcome") == "vm" and outs[0] == outs[1]
+              and peak is not None and abs(peak - one) <= TOL)
+        print(f"write_for.f: runs on the VM, legacy's output {outs[0][0].strip()!r} vs {outs[1][0].strip()!r}, "
+              f"heap_peak={peak} (want {one}): {'ok' if ok else 'FAIL'}")
+        failures += 0 if ok else 1
+        # negative: a budget genuinely too small for the snapshot (the array plus half a copy)
+        small_budget = base_peak + snapshot(N) // 2
+        outs = []
+        st, code, _, _ = run_once(nift, work, "min_for.f", small_budget, "neg.json", out=outs)
+        ok = (code == 70 and st and st.get("outcome") == "internal-error" and st.get("reason") == "memory budget exceeded"
+              and outs[0][0] == "" and "memory budget exceeded" in outs[0][1])
+        print(f"budget {small_budget} (array + half a snapshot): exit {code}, outcome {(st or {}).get('outcome')}, "
+              f"reason {(st or {}).get('reason')!r}, stdout {outs[0][0]!r}: the documented heap-budget stop "
+              f"{'ok' if ok else 'FAIL'}")
+        failures += 0 if ok else 1
         # Memory: the write loop must not copy the array. A copy would roughly
         # double heap_peak and fail an 18 MB budget.
         print("memory (write loop, no copy):")
