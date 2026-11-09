@@ -2828,3 +2828,91 @@ build-write guard (`guard_build_write`, `note_written`) *before* checking `need_
 the preconditions first and records nothing for a save that cannot happen. This is a deliberate,
 safer difference: no effect is observable in the script, and a build does not see a phantom write.
 **Production sha256.** `f6de04a56a92b5e6c710932c2e834cb32e08254c7acecd11bb46b39384ba38e1`.
+
+## 48. B03 (P0): abort on out-of-memory during VM teardown (C57)
+
+**Symptom.** `NIFT_VM=require tests/runtime2/memory/c1_push.f` under `ulimit -v` (400000 to
+2097152 KiB) ended in SIGABRT (exit 134) with `Fatal glibc error: failed to register TLS
+destructor: out of memory`, where it should exit 70 with the memory error. Here, on 03b31fa2 to
+C56 (glibc 2.39), 15 of 24 cells failed on each of two runs.
+
+**Root cause (gdb backtrace of a failing cell).** `abort` came from `__cxa_thread_atexit_impl`.
+The call chain was:
+- `__cxa_thread_atexit`;
+- `HandleTable::in_own_hook()`;
+- `HandleTable::shutdown()` / `shutdown_noexcept()`;
+- `Vm::~Vm()`.
+
+`t_hook_tables` (`src/rt/handles/table.cpp`, a `thread_local std::vector`) has a destructor, so its
+first use registers that destructor with the C++ runtime. glibc 2.39 allocates the registration
+and, if the allocation fails, **aborts** (it does not throw). In a VM run the first use is
+`in_own_hook()` during the handle-table close/shutdown at the end of the run. After an
+out-of-memory stop, memory is still exhausted at that point. `git log -S t_hook_tables` shows the
+vector was introduced by **CP17 4fb04376** (2026-10-20, "fix adversarial-review findings R1-R14"),
+the suspected earliest bad commit. That commit was not rebuilt here, which would need a full tree
+copy. No memory corruption was found. ASan/UBSan and valgrind are clean on the new code; see below.
+
+**Fix (bounded).**
+- **`t_hook_tables`** becomes an intrusive list of the `HookScope` objects on the thread's stack, headed by a constant-initialised `thread_local const HookScope*`. It has no destructor and allocates nothing (the vector also allocated when pushed).
+- **Every other destructor-bearing `thread_local`** goes through `nift::tls::owned<T>()` (new `src/rt/thread_owned.h`).
+  - The object is created on first use with `new`, so exhaustion is an ordinary `std::bad_alloc`, handled as every allocation failure is.
+  - It is reached through trivially destructible TLS pointers.
+  - At thread exit, one POSIX TSD key destructor destroys the thread's objects newest first, as C++ destroys thread_locals. `pthread_key_create` and `pthread_setspecific` allocate nothing here, and fail softly.
+  - The main thread's objects live until the process exits. A thread_local's destructor would have run at `exit()`; none of these objects does more than free memory.
+  - There is no new allocation at startup: everything is created on first use, as before, and only the failure mode changes (`bad_alloc` instead of an abort).
+
+**Audit of the thread_locals.** All 298 production objects were scanned for `__cxa_thread_atexit`.
+
+| Site | Destructor | First touched | Under OOM? | Action |
+| --- | --- | --- | --- | --- |
+| `rt/handles/table.cpp` `t_hook_tables` | yes (vector) | `in_own_hook()`, at VM teardown | **yes (the abort)** | intrusive list, no TLS destructor |
+| `rt/atom.cpp:51` `AtomTable::current()::table` | yes | only without an active `AtomTableScope` (not reached in the runs traced) | possible (a later first use) | `owned<AtomTable>` |
+| `rt/value_cycle.cpp:22` `cycle_check_stats()::stats` | no (trivial) | first cycle check | harmless | none |
+| `rt/value_cycle.cpp:207` cycle-walk `Buffers` | yes (vectors) | the first aggregate-into-aggregate store check, mid-run | **yes** | `owned<Buffers>` |
+| `rt/transfer_heap.cpp:45` `root_heap` | yes | the first cyclic transfer without a scope (embedding/sessions) | **yes** | `owned<TransferHeapScope>` |
+| `HostTrace.h` `context()` / `child_label()` counters | yes (string, map) | only while host tracing (`NIFT_TRACE_HOST`) is on; inline in 13 objects | yes, under tracing | `owned<…>` |
+| `FileSystem.cpp:55` / `:202` parent caches | yes (`fs::path`, strings) | the first file write in a thread (builds, `save`) | **yes** | `owned<…>` |
+| `ParserExpression.cpp` lambda caches, ffi tag/error (legacy) | yes | the first legacy lambda / ffi call | yes (legacy otherwise reports `error: std::bad_alloc`, exit 1) | `owned<…>` accessors |
+| `rt/heap_account.cpp`, `rt/parser.cpp`, `rt/parallel_task.cpp`, `rt/infer_types`, `rt/shared_gc.cpp`, `rt/aggregate_store.h`, `ParserAsyncPool.cpp`, `ParserExpression.cpp` ffi parser pointer | no (scalars, pointers) | various | harmless | none |
+
+After the fix, `nift` imports no `__cxa_thread_atexit`, and no object references it.
+
+**Tests (permanent).**
+- **`tests/runtime2/tls_destructors.py`** (`make test-runtime2-tls-destructors`; a prerequisite of `test-rt-memory-c1` and in `make test`). A deterministic check that the binary imports no `__cxa_thread_atexit` and that no object references it; a failure names the object and its TLS symbols.
+- **`tests/runtime2/tls_mutants.sh`.** `NIFT_TLS_MUTANT=1` restores the CP17 vector, and the check rejects it, naming `table.o`. The control's object and binary are byte-identical to production. This static check is the deterministic regression test the nondeterministic abort needed.
+- **`tests/rt/thread_owned_unit.cpp`**, built with ASan/UBSan and LeakSanitizer. It checks:
+  - one instance per thread;
+  - destruction newest first;
+  - a later object used from an earlier one's destructor;
+  - an object created during destruction is destroyed too;
+  - no leak after worker threads exit.
+
+  It also passes under valgrind (no definite leaks, no errors).
+- **`tests/runtime2/memory_c1.sh`** now treats `Fatal glibc error` as a failure, prints a failing cell's whole stderr, and copies it to `$MEMORY_C1_KEEP` when that is set.
+
+**Results (local, GCC 13.3, glibc 2.39).**
+- **test-rt-memory-c1 20 x 24 cells** on the frozen binary: 480 of 480 pass, every one exit 70, no SIGABRT and no `terminate called`.
+- **The memory error is still reported** in every cell: `memory budget exceeded` in 5 of 24 cells each run, and `out of memory (std::bad_alloc)` where the address space runs out first (19).
+- **gdb (`break __cxa_thread_atexit`):** no TLS destructor is registered in a c1 cell (600000 and 2097152 KiB) or in a normal run.
+- **valgrind** (`--leak-check=full`, definite leaks as errors) is clean on a VM script, the same script on legacy, and the threaded VM fixtures `b3/equiv/thread.f` and `thread_methods.f`.
+- **Handle units** (table, lifecycle including reentrant close inside a hook, close under allocation failure, stress) all pass.
+- The **final Linode confirmation** (24 cells x at least 20 on GCC 15.2) is part of the targeted follow-up.
+
+**Also in C57 (lint).** C56 had taken `src/rt/natives/host_file_handles.cpp` past rt-lint's
+400-line one-concern limit, with one line over 120 columns. Both it and `table.cpp` are compacted
+without changing behaviour (the file-mode table and mutants pass), and rt-lint passes.
+
+**Gates on C57.** These pass:
+- the certification guard and rt-lint;
+- test-runtime2-tls-destructors (with its mutant and the sanitized unit);
+- test-runtime2-file-mode-parity (168 x 2, with 4 of 4 mutants rejected);
+- test-runtime2-read-limit-mutants (8 of 8), with read_limit_controls (93);
+- the cp17 file/stream handles, script handle lifecycle and closed-handle catchability tests;
+- vm_host (160 pass, 0 fail, 5 refused) and vm_parity.
+
+test-runtime2-host-deps passes every line except read_limit.py's same 24 refusals (section 43). In
+test-rt-vm every prerequisite passes, and its own recipe stops only at vm_modules
+(`import-scope:collision`, failing before this change too). test-rt-handles fails only on the
+`no_handle_strings` problem in `render.cpp`, which also predates this change.
+
+**Production sha256.** `fbdb05fbda30fba17ba0817f6d171dac3a26937055fa4e7681354096d6e9b42a`.
