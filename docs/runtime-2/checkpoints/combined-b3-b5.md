@@ -3622,3 +3622,28 @@ the exponent.**
 The exponent is 0.769 against 0.769. Before this commit `obj.merge` measured 22,848 to 18,314,388
 Ir/call. `obj.merge_deep` also passes its guard. After A, the only remaining guard failure is
 `str.replace` (B, next commit).
+
+## 66. Owner 08:57, B: the str.replace guard re-baselined (C77, tests only)
+
+- **Reason.** 32e402b2 (C3) made `str.replace` build into `BudgetedText`: a heap-budget check
+  before the result buffer is reserved, and before every larger growth. That check is required
+  memory safety, it stays, and it costs instructions per call.
+- **Old baseline (CP15, Ir/call):** 484, 2,945, 20,881, 209,316 and 2,081,931 at n = 1, 100,
+  1,000, 10,000 and 100,000; exponent 0.998.
+- **Measured** with the established workload (`tests/rt/builtins_bench.cpp`, `str.replace` over
+  `builtins_guards.measure`, callgrind), 3 runs, identical to the instruction, before and after
+  section 65: 581, 3,356, 23,002, 228,537 and 2,272,273; exponent 0.998. That is +97 Ir at n=1
+  and +9 to +14 % from n=100.
+- **New guard:** the measured values. The tolerance is unchanged and the same as every other
+  guard (+10 % + 50 Ir, exponent slack 0.15); nothing generous was added.
+- **Result:** `make test-rt-builtins-guards`, 35 workloads, 0 guard failures (after section 65 and
+  this commit).
+- **Negative control** (`tests/rt/replace_budget_negative.sh`, `make
+  test-rt-replace-budget-negative`, a prerequisite of `test-rt-builtins-guards` and part of
+  `test`). It builds `tests/rt/native_budget.cpp` against the real `string_methods.o`, which
+  passes (105 checks), and against a copy whose `str_replace` builds into an unchecked
+  `std::string`. The mutant must fail on native_budget checks, and it does: 20 CHECK failures (for
+  example `live <= limit + kSlack`), after which it runs away and is killed. So removing the
+  check cannot pass as an optimisation.
+- **Approving a cost required for memory safety does not license future regressions:** the new
+  values are the guard, at the same tolerance as every other.

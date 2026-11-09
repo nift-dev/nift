@@ -4237,9 +4237,16 @@ test-rt-builtins-isolation: $(RT_BUILTINS_BENCH)
 # Per-native instruction guards (callgrind; sequential, ~30 s): fails when a
 # workload exceeds its locked Ir/call by more than 10 % at any size or its
 # scaling exponent grows (tests/runtime2/builtins/builtin_guards.json).
-test-rt-builtins-guards: $(RT_BUILTINS_BENCH)
+# The str.replace guard was re-baselined for its required budget check (32e402b2; owner
+# 2026-11-10 08:57, combined-b3-b5.md section 66): removing the check must fail correctness tests.
+test-rt-builtins-guards: $(RT_BUILTINS_BENCH) test-rt-replace-budget-negative
 	python3 tests/runtime2/builtins/builtins_guards.py "$(RT_BUILTINS_BENCH)" \
 		--check tests/runtime2/builtins/builtin_guards.json
+.PHONY: test-rt-replace-budget-negative
+test-rt-replace-budget-negative: $(RT_UNIT_OBJECTS)
+	RT_UNIT_OBJECTS="$(RT_UNIT_OBJECTS)" NIFT_CPPFLAGS="$(CPPFLAGS)" PRODUCTION_GUARD="$(PRODUCTION_GUARD)" \
+		CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" bash tests/rt/replace_budget_negative.sh
+test: test-rt-replace-budget-negative
 
 # Owner 2026-11-10 08:57 (combined-b3-b5.md section 65): merge/merge_deep's one-step clone under
 # allocation failure at every allocation point (no leak, no visible partial construction),
