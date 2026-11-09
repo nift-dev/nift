@@ -1,4 +1,5 @@
 #include "rt/transfer_heap.h"
+#include "rt/thread_owned.h"
 #include "rt/heap.h"
 #include <algorithm>
 namespace nift::rt {
@@ -42,8 +43,8 @@ TransferHeapScope::~TransferHeapScope() {
 }
 void TransferHeapScope::retain_cycle(const std::vector<Value>& nodes) {
     if (!current) {
-        thread_local TransferHeapScope root_heap; // embedding/session graph roots
-        (void)root_heap;
+        // embedding/session graph roots; B03: no TLS destructor registration (rt/thread_owned.h)
+        (void)nift::tls::owned<TransferHeapScope>();
     }
     current->collect();
     auto& owned = current->nodes_;

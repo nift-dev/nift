@@ -412,6 +412,22 @@ test-rt-memory-c2: $(TARGET)
 # with the original error, never an abort in the release (workers only).
 test-rt-memory-c1: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/memory_c1.sh
+# B03 (docs/runtime-2/checkpoints/combined-b3-b5.md section 48): no thread_local with a destructor
+# (glibc aborts when the lazy registration cannot be allocated), and its negative control.
+.PHONY: test-runtime2-tls-destructors test-runtime2-tls-mutants
+THREAD_OWNED_UNIT := $(TEST_DIR)/rt/thread-owned-unit$(EXEEXT)
+$(THREAD_OWNED_UNIT): tests/rt/thread_owned_unit.cpp src/rt/thread_owned.h
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) $(RT_SANITIZE_FLAGS) -pthread -Isrc tests/rt/thread_owned_unit.cpp -o "$@"
+test-runtime2-tls-destructors: $(TARGET) $(THREAD_OWNED_UNIT)
+	python3 -B tests/runtime2/tls_destructors.py --nift "$(CURDIR)/$(TARGET)" --objects $(filter %.o,$(CLI_OBJECTS))
+	ASAN_OPTIONS=detect_leaks=1 "$(THREAD_OWNED_UNIT)"
+test-runtime2-tls-mutants: $(TARGET) $(LIBFFI_A)
+	TLS_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" TLS_CPPFLAGS="$(PRODUCTION_GUARD) $(CPPFLAGS)" CXX="$(CXX)" \
+		bash tests/runtime2/tls_mutants.sh
+test-runtime2-tls-destructors: test-runtime2-tls-mutants
+test-rt-memory-c1: test-runtime2-tls-destructors
+test: test-runtime2-tls-destructors
 # Large values count at their real size against the VM heap budget (~1.5 GiB
 # RSS; workers only, not part of `make test`).
 test-rt-heap-saturation: $(TARGET)

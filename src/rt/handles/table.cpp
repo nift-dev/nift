@@ -9,16 +9,26 @@ namespace nift::rt::handles {
 namespace {
 
 const std::string kNoLabel;
-
-// Tables whose cleanup hook this thread is running (innermost last): close
-// and shutdown from inside a hook would wait for that hook (deadlock).
-thread_local std::vector<const void*> t_hook_tables;
-
+// Tables whose cleanup hook this thread is running (innermost first): close and shutdown from
+// inside a hook would wait for that hook (deadlock). B03 (combined-b3-b5.md section 48): a list
+// of the HookScopes on this thread's stack under a trivially destructible pointer: no TLS
+// destructor (glibc aborted when it could not allocate one after an out-of-memory stop).
+thread_local const struct HookScope* t_hook_top = nullptr;
+#if defined(NIFT_TLS_MUTANT) && NIFT_TLS_MUTANT == 1
+thread_local std::vector<const void*> t_hook_tables;  // mutant 1: the CP17 vector (lazy TLS dtor)
+#endif
 struct HookScope {
-    explicit HookScope(const void* table) { t_hook_tables.push_back(table); }
-    ~HookScope() { t_hook_tables.pop_back(); }
+    explicit HookScope(const void* table) : table_(table), previous_(t_hook_top) {
+        t_hook_top = this;
+#if defined(NIFT_TLS_MUTANT) && NIFT_TLS_MUTANT == 1
+        t_hook_tables.push_back(table);
+#endif
+    }
+    ~HookScope() { t_hook_top = previous_; }
     HookScope(const HookScope&) = delete;
     HookScope& operator=(const HookScope&) = delete;
+    const void* const table_;
+    const HookScope* const previous_;
 };
 
 std::uint32_t next_table_tag() {
@@ -34,9 +44,10 @@ HandleTable::HandleTable(TableOptions options)
     : store_(next_table_tag(), options.capacity), invalid_setting_(std::move(options.invalid_setting)) {}
 
 bool HandleTable::in_own_hook() const {
-    for (const void* t : t_hook_tables) {
-        if (t == this) return true;
-    }
+#if defined(NIFT_TLS_MUTANT) && NIFT_TLS_MUTANT == 1
+    for (const void* t : t_hook_tables) if (t == this) return true;
+#endif
+    for (const HookScope* s = t_hook_top; s != nullptr; s = s->previous_) if (s->table_ == this) return true;
     return false;
 }
 
@@ -285,7 +296,6 @@ bool HandleTable::run_cleanup(Started& started, std::unique_lock<std::mutex>& lo
     }
 }
 
-
 HandleStatus HandleTable::close_locked(std::uint32_t index, std::unique_lock<std::mutex>& lock,
                                        CleanupFailure* failure) {
     Started started = begin_cleanup_locked(index, ReleaseReason::Explicit);
@@ -336,7 +346,6 @@ HandleStatus HandleTable::drop(const Value& handle) {
     run_cleanup(started, lock, nullptr);  // the hook schedules; failures settle into the owner's report
     return HandleStatus::Ok;
 }
-
 
 HandleStatus HandleTable::begin_termination(const Value& handle, HandleKind kind, TerminationCause cause,
                                             CompletionTicket& ticket, TerminationStart* info) {

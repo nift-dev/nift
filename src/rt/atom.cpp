@@ -1,4 +1,5 @@
 #include "rt/atom.h"
+#include "rt/thread_owned.h"
 
 #include "rt/heap_account.h"
 #include "rt/struct_type.h"
@@ -48,7 +49,7 @@ StructTypeTable& AtomTable::struct_types() {
 
 AtomTable& AtomTable::current() {
     if (active_atoms) return *active_atoms;
-    thread_local AtomTable table;
+    AtomTable& table = nift::tls::owned<AtomTable>();  // B03: no TLS destructor registration (rt/thread_owned.h)
     active_atoms = &table;
     return table;
 }

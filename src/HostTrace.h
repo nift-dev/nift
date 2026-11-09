@@ -18,6 +18,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "rt/thread_owned.h"
+
 #ifdef _WIN32
 #include <io.h>
 #include <stdlib.h>
@@ -115,16 +117,17 @@ inline std::mutex& write_mutex() {
 // Per-thread context: the tracked page being built, or "script" for a
 // standalone script. Builds may run pages on several threads, so the harness
 // compares traces per context, in order within each context.
+struct TraceContext { std::string value = "script"; };
 inline std::string& context() {
-    thread_local std::string value = "script";
-    return value;
+    return nift::tls::owned<TraceContext>().value;  // B03: no TLS destructor registration
 }
 // Async tasks and threads are attributed to the context that created them,
 // numbered in creation order within that context ("<ctx>/async#1"): creation
 // happens in program order on the owning thread, so labels are stable across
 // runs and engines, and each task's operations are compared in order.
 inline std::string child_label(const char* kind) {
-    thread_local std::unordered_map<std::string, unsigned> counters;
+    struct Counters { std::unordered_map<std::string, unsigned> map; };
+    auto& counters = nift::tls::owned<Counters>().map;  // B03: no TLS destructor registration
     const std::string owner = context();
     const unsigned n = ++counters[owner + "|" + kind];
     return owner + "/" + kind + "#" + std::to_string(n);

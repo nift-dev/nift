@@ -1,4 +1,5 @@
 #include "FileSystem.h"
+#include "rt/thread_owned.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -52,8 +53,11 @@ static void ensure_parent_directory(const fs::path& path) {
     // Build workers tend to alternate between a very small number of output and
     // metadata directories. A tiny path cache avoids allocating/normalising a
     // string and hashing it for every generated file.
-    thread_local std::array<fs::path, 4> recent_parents;
-    thread_local std::size_t recent_count = 0;
+    // B03: no TLS destructor registration (rt/thread_owned.h).
+    struct Recent { std::array<fs::path, 4> parents; std::size_t count = 0; };
+    Recent& recent = nift::tls::owned<Recent>();
+    auto& recent_parents = recent.parents;
+    std::size_t& recent_count = recent.count;
     for (std::size_t i = 0; i < recent_count; ++i)
         if (recent_parents[i] == parent) return;
 
@@ -199,8 +203,11 @@ static void remove_stale_temporaries(const fs::path& path) {
     // repeated-write path. The epoch is part of the key so persistent threads
     // cannot accidentally turn once-per-build recovery back into once-per-process.
     struct RecentParent { native_path_string parent; std::uint64_t epoch = 0; };
-    thread_local std::array<RecentParent, 4> recent_parents;
-    thread_local std::size_t recent_count = 0;
+    // B03: no TLS destructor registration (rt/thread_owned.h).
+    struct RecentCache { std::array<RecentParent, 4> parents; std::size_t count = 0; };
+    RecentCache& recent_cache = nift::tls::owned<RecentCache>();
+    auto& recent_parents = recent_cache.parents;
+    std::size_t& recent_count = recent_cache.count;
     for (std::size_t i = 0; i < recent_count; ++i)
         if (recent_parents[i].epoch == epoch && native_path_view(recent_parents[i].parent) == parent_view)
             return;

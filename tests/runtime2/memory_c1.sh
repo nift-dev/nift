@@ -25,10 +25,12 @@ for budget in default 100000000000; do
       NIFT_VM=require exec timeout 300 "$NIFT" p.f >"$T/out" 2>"$T/err" )
     rc=$?
     reason=$(grep -o "memory budget exceeded\|out of memory (std::bad_alloc)" "$T/err" | head -1)
-    if [ "$rc" = 70 ] && [ -n "$reason" ] && ! grep -q "terminate called" "$T/err"; then
+    if [ "$rc" = 70 ] && [ -n "$reason" ] && ! grep -q "terminate called\|Fatal glibc error" "$T/err"; then
       echo "PASS ulimit -v $v budget $budget: exit 70, $reason"
     else
-      echo "FAIL ulimit -v $v budget $budget: exit $rc err=$(tail -c 300 "$T/err" | tr '\n' ' ')"; fail=1
+      # B03: every failing cell keeps its whole stderr (printed, and copied to $MEMORY_C1_KEEP if set).
+      echo "FAIL ulimit -v $v budget $budget: exit $rc; stderr:"; sed 's/^/  | /' "$T/err"; fail=1
+      if [ -n "${MEMORY_C1_KEEP:-}" ]; then mkdir -p "$MEMORY_C1_KEEP"; cp "$T/err" "$MEMORY_C1_KEEP/v$v-b$budget-$$.err"; fi
     fi
   done
 done

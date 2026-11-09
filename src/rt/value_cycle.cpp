@@ -1,4 +1,5 @@
 #include "rt/value_cycle.h"
+#include "rt/thread_owned.h"
 
 #include "rt/aggregate.h"
 #include "rt/cell.h"
@@ -204,7 +205,7 @@ bool legacy_reference_cycle(const HeapObject* receiver, const Value& stored) {
 
 bool would_close_cycle_walk(const CycleTarget& target, const Value& stored, const CycleGraph& graph) {
     ++cycle_check_stats().checks;
-    thread_local Buffers shared;
+    Buffers& shared = nift::tls::owned<Buffers>();  // B03: no TLS destructor registration (rt/thread_owned.h)
     if (shared.busy) {
         Buffers own;
         return Walk(target, graph, own).run(stored);

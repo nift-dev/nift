@@ -1,4 +1,5 @@
 #include "ProcessEnvironment.h"
+#include "rt/thread_owned.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <cerrno>
@@ -139,12 +140,19 @@ std::vector<nift::RuntimeValue> callback_value_arguments(const nift::RuntimeValu
 }
 
 using LambdaSyntax = nift::detail::LambdaSyntaxMetadata;
-thread_local std::unordered_map<std::string, std::shared_ptr<const LambdaSyntax>> lambda_syntax_cache;
+// B03: per-thread caches without TLS destructor registration (rt/thread_owned.h).
+struct LambdaSyntaxCacheTls { std::unordered_map<std::string, std::shared_ptr<const LambdaSyntax>> map; };
+std::unordered_map<std::string, std::shared_ptr<const LambdaSyntax>>& lambda_syntax_cache_tls() {
+    return nift::tls::owned<LambdaSyntaxCacheTls>().map;
+}
 struct NumericLambdaPlan {
     std::unique_ptr<const nift::ast::Expr> expression;
     unsigned depth = 0;
 };
-thread_local std::unordered_map<std::string, std::shared_ptr<const NumericLambdaPlan>> numeric_lambda_cache;
+struct NumericLambdaCacheTls { std::unordered_map<std::string, std::shared_ptr<const NumericLambdaPlan>> map; };
+std::unordered_map<std::string, std::shared_ptr<const NumericLambdaPlan>>& numeric_lambda_cache_tls() {
+    return nift::tls::owned<NumericLambdaCacheTls>().map;
+}
 
 #ifdef NIFT_TEST_LAMBDA_CACHE_STATS
 struct LambdaCacheStats {
@@ -164,16 +172,16 @@ struct LambdaCacheStats {
 #endif
 
 std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& body) {
-    auto found = numeric_lambda_cache.find(body);
-    if (found != numeric_lambda_cache.end()) return found->second;
-    if (numeric_lambda_cache.size() >= kLambdaCodeCacheLimit || body.size() > 4096) return {};
+    auto found = numeric_lambda_cache_tls().find(body);
+    if (found != numeric_lambda_cache_tls().end()) return found->second;
+    if (numeric_lambda_cache_tls().size() >= kLambdaCodeCacheLimit || body.size() > 4096) return {};
     NIFT_LAMBDA_COUNT(numeric);
     // The AST parser treats adjacent +/- as nested unary operators, whereas
     // compatibility syntax includes mutating ++/--. Hexadecimal literals also
     // differ between parsers. Keep both forms on compatibility dispatch.
     if (body.find("++") != std::string::npos || body.find("--") != std::string::npos ||
         body.find("0x") != std::string::npos || body.find("0X") != std::string::npos) {
-        numeric_lambda_cache.emplace(body, nullptr);
+        numeric_lambda_cache_tls().emplace(body, nullptr);
         return {};
     }
     auto parsed = nift::ast::parse_expression(body);
@@ -215,17 +223,18 @@ std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& 
     }
     // Negative entries avoid repeatedly preparing unsupported syntax. Parse
     // errors stay deferred to the compatibility evaluator, exactly as before.
-    numeric_lambda_cache.emplace(body, result);
+    numeric_lambda_cache_tls().emplace(body, result);
     return result;
 }
 
 thread_local Parser* nift_ffi_callback_parser = nullptr;
-thread_local std::string nift_ffi_callback_tag;
-thread_local std::string nift_ffi_callback_error;
+// B03: no TLS destructor registration (rt/thread_owned.h).
+struct FfiCallbackTls { std::string tag; std::string error; };
+FfiCallbackTls& ffi_callback_tls() { return nift::tls::owned<FfiCallbackTls>(); }
 extern "C" std::int64_t nift_ffi_callback_i64_trampoline(std::int64_t x) {
     if (!nift_ffi_callback_parser) return std::numeric_limits<std::int64_t>::min();
     std::int64_t out = 0; std::string error;
-    if (!nift_ffi_callback_parser->invoke_ffi_callback_i64(nift_ffi_callback_tag, x, out, error)) { nift_ffi_callback_error = std::move(error); return std::numeric_limits<std::int64_t>::min(); }
+    if (!nift_ffi_callback_parser->invoke_ffi_callback_i64(ffi_callback_tls().tag, x, out, error)) { ffi_callback_tls().error = std::move(error); return std::numeric_limits<std::int64_t>::min(); }
     return out;
 }
 
@@ -234,8 +243,8 @@ public:
     ~NiftFfiCallbackActivation() {
         if (!active_) return;
         nift_ffi_callback_parser = old_parser_;
-        nift_ffi_callback_tag = std::move(old_tag_);
-        nift_ffi_callback_error = std::move(old_error_);
+        ffi_callback_tls().tag = std::move(old_tag_);
+        ffi_callback_tls().error = std::move(old_error_);
     }
 
     bool activate(Parser* parser, const std::string& tag, std::string& error) {
@@ -244,16 +253,16 @@ public:
             return false;
         }
         old_parser_ = nift_ffi_callback_parser;
-        old_tag_ = std::move(nift_ffi_callback_tag);
-        old_error_ = std::move(nift_ffi_callback_error);
+        old_tag_ = std::move(ffi_callback_tls().tag);
+        old_error_ = std::move(ffi_callback_tls().error);
         nift_ffi_callback_parser = parser;
-        nift_ffi_callback_tag = tag;
-        nift_ffi_callback_error.clear();
+        ffi_callback_tls().tag = tag;
+        ffi_callback_tls().error.clear();
         active_ = true;
         return true;
     }
 
-    const std::string& error() const { return nift_ffi_callback_error; }
+    const std::string& error() const { return ffi_callback_tls().error; }
 
 private:
     Parser* old_parser_ = nullptr;
@@ -2445,8 +2454,8 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id);
                 return true;
             };
-            auto cached = lambda_syntax_cache.find(text);
-            if (cached != lambda_syntax_cache.end()) return instantiate_lambda(cached->second);
+            auto cached = lambda_syntax_cache_tls().find(text);
+            if (cached != lambda_syntax_cache_tls().end()) return instantiate_lambda(cached->second);
             std::size_t arrow = std::string::npos; int pd=0, bd=0, cd=0; bool iq=false; char qc=0;
             for(std::size_t ai=0;ai+1<text.size();++ai){char ch=text[ai];if(iq){if(ch=='\\')++ai;else if(ch==qc)iq=false;continue;}if(ch=='\"'||ch=='\''){iq=true;qc=ch;continue;}if(ch=='(')++pd;else if(ch==')')--pd;else if(ch=='[')++bd;else if(ch==']')--bd;else if(ch=='{')++cd;else if(ch=='}')--cd;else if(ch=='='&&text[ai+1]=='>'&&pd==0&&bd==0&&cd==0){arrow=ai;break;}}
             if (arrow != std::string::npos && text.substr(0, arrow).find(":=") == std::string::npos && text.substr(0, arrow).find(" = ") == std::string::npos) {
@@ -2466,8 +2475,8 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 code->async = async_lambda; code->block = rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 code->body = code->block ? rhs.substr(1,rhs.size()-2) : rhs;
                 code->body_offset = text.find_first_not_of(" \t\r\n", arrow + 2) + (code->block ? 1 : 0);
-                if (lambda_syntax_cache.size() < kLambdaCodeCacheLimit && text.size() <= 4096)
-                    lambda_syntax_cache.emplace(text, code);
+                if (lambda_syntax_cache_tls().size() < kLambdaCodeCacheLimit && text.size() <= 4096)
+                    lambda_syntax_cache_tls().emplace(text, code);
                 return instantiate_lambda(code);
             }
 
