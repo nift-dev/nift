@@ -34,6 +34,29 @@ ROUTES = {
                            'a := [1]\nprint(f(a))\n', 1, "2\n"),
     "closure-captured": ('a := [1]\ng := () => a.push(a)\ntry { g() } catch (e) { print(e.code) }\nprint(a.length())\n',
                          1, "2\n"),
+    # Review of C72-C78, T-1: values built by a clone carry the source's cycle summary
+    # (copy_summary); a clone that dropped it would let the store below close a real cycle.
+    # object_shallow_clone: merge (C76) and every merge_deep level.
+    "merge-result": ('arr := [1]\no := {"a": arr}\nm := o.merge({"b": 2})\ntry { arr.push(m) } catch (e) { print(e.code) }\n'
+                     'print(arr.length())\n', 1, "2\n"),
+    "merge-deep-result": ('arr := [1]\no := {"a": arr}\nm := o.merge_deep({"b": 2})\ntry { arr.push(m) } catch (e) '
+                          '{ print(e.code) }\nprint(arr.length())\n', 1, "2\n"),
+    # collection_shallow_clone: copy()/deepcopy() of a map or stack (copy_graph).
+    "copy-map": ('arr := [1]\nm := map()\nm.set("a", arr)\nc := copy(m)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
+                 'print(arr.length())\n', 1, "2\n"),
+    "deepcopy-map": ('arr := [1]\nm := map()\nm.set("a", arr)\nc := deepcopy(m)\nx := c.get("a")\ntry { x.push(c) } '
+                     'catch (e) { print(e.code) }\nprint(x.length())\n', 1, "2\n"),
+    "copy-stack": ('arr := [1]\ns := stack()\ns.push(arr)\nc := copy(s)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
+                   'print(arr.length())\n', 1, "2\n"),
+    # copy() of an object and an array (copy_graph's shallow copy).
+    "copy-object": ('arr := [1]\no := {"a": arr}\nc := copy(o)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
+                    'print(arr.length())\n', 1, "2\n"),
+    "copy-array": ('arr := [1]\nouter := [arr]\nc := copy(outer)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
+                   'print(arr.length())\n', 1, "2\n"),
+    # array_shallow_clone is only an internal snapshot (for-loop source, sort keys and source): the
+    # loop snapshot cannot be stored, the array it was taken from can.
+    "loop-snapshot": ('arr := [1]\nouter := [arr]\nfor (x : outer) { try { arr.push(outer) } catch (e) { print(e.code) } }\n'
+                      'print(arr.length())\n', 1, "2\n"),
 }
 
 

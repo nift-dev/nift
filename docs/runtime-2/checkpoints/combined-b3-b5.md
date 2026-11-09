@@ -3673,3 +3673,35 @@ Ir/call. `obj.merge_deep` also passes its guard. After A, the only remaining gua
   - 11 routes, 0 failures.
   - The existing refsem fixtures keep covering maps, stacks, cells, structs and closure-cycle
     witnesses (`refsem/approved/*cycle*`).
+
+## 68. Review of C72–C78, T-1: clone routes in the cycle tests, and a copy_summary negative control (C79, tests)
+
+- **The gap.** A clone must carry its source's "may hold identity" summary (`copy_summary`):
+  the cycle check skips a value whose summary says it cannot hold identity. The reviewer's mutant,
+  `object_shallow_clone` without `copy_summary`, stored a real cycle
+  (`arr := [1]; o := {"a": arr}; m := o.merge({"b": 2}); arr.push(m)`) and passed every merge
+  test. Production refuses it with `runtime.reference_cycle`.
+- **`cycle_refusal_routes.py` gains 8 clone and copy routes** (19 routes in total), each refused
+  on the VM before the store, with legacy (copies) pinned:
+  - `merge-result` and `merge-deep-result` (`object_shallow_clone`);
+  - `copy-map`, `deepcopy-map` and `copy-stack` (`collection_shallow_clone` via `copy_graph`);
+  - `copy-object` and `copy-array`;
+  - `loop-snapshot`.
+- **Negative control** `tests/runtime2/clone_summary_negative.sh` (`make
+  test-runtime2-clone-summary-negative`, a prerequisite of `test-runtime2-refsem-mutants`). For
+  each clone site it links a temporary `nift` from a copy of the source with that one
+  `copy_summary` call removed (test-side only; production source and binary unchanged,
+  f063f1a9…), and `cycle_refusal_routes.py` must fail on it. The unmodified binary passes first.
+  - `object_shallow_clone`: **caught** (merge-result, merge-deep-result).
+  - `collection_shallow_clone`: **caught** (copy-map, copy-stack).
+  - `array_shallow_clone`: survives, as expected and reported. Its clones are only internal
+    snapshots that no script can store (the for-loop source in `vm_iter.cpp`, the sort keys in
+    `vm_array_mutation.cpp`, the collection source in `collection_helpers.cpp`).
+- **Every `copy_summary` site, checked:**
+  - `object_shallow_clone`, `collection_shallow_clone`: covered and caught;
+  - `array_shallow_clone`: internal only, listed;
+  - `array_write`: exists only in the `NIFT_REFSEM_MUTANT == 24` build.
+
+  `copy_graph`'s deep copy fills its copies through the in-place key's construction primitives,
+  which mark the summary per stored value (`aggregate_store.h:171`), with no `copy_summary`. The `deepcopy-map` route covers it, and refsem's
+  `cycle_*` fixtures cover the rest.

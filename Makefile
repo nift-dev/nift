@@ -5598,6 +5598,13 @@ test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collection
 test-runtime2-refsem: $(TARGET)
 	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) -B tests/runtime2/cycle_refusal_routes.py --nift "$(CURDIR)/$(TARGET)"
+# Review of C72-C78, T-1 (combined-b3-b5.md section 68): a clone without its cycle summary must be
+# caught by the cycle routes (temporary test-side mutant links; production is never modified).
+.PHONY: test-runtime2-clone-summary-negative
+test-runtime2-clone-summary-negative: $(TARGET) $(CLI_OBJECTS) $(LIBFFI_A)
+	CXX="$(CXX)" CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDLIBS="$(LDLIBS)" CLI_OBJECTS="$(CLI_OBJECTS)" \
+		PRODUCTION_GUARD="$(PRODUCTION_GUARD)" bash tests/runtime2/clone_summary_negative.sh "$(CURDIR)/$(TARGET)"
+test-runtime2-refsem-mutants: test-runtime2-clone-summary-negative
 test-runtime2-refsem-mutants: $(TARGET) $(LIBFFI_A)
 	REFSEM_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/refsem/mutants.sh "$(CURDIR)/$(TARGET)"
 test-runtime2-refsem-sanitize: $(SAN_TARGET)
