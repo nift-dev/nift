@@ -2641,8 +2641,17 @@ test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/host_deps.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/build_write_ownership.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_controls.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
 test: test-runtime2-host-deps
+
+# B01 (docs/runtime-2/checkpoints/combined-b3-b5.md section 43): the read-limit checks' negative
+# controls: each NIFT_READ_LIMIT_MUTANT build must fail read_limit_controls.py, the unmutated one pass.
+.PHONY: test-runtime2-read-limit-mutants
+test-runtime2-read-limit-mutants: $(TARGET) $(LIBFFI_A)
+	READ_LIMIT_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" READ_LIMIT_CPPFLAGS="$(PRODUCTION_GUARD) $(CPPFLAGS)" CXX="$(CXX)" \
+		bash tests/runtime2/read_limit_mutants.sh
+test-runtime2-host-deps: test-runtime2-read-limit-mutants
 
 # feature-site-dx: website-generator DX fixes (build --auto resilience,
 # unterminated literals, try/catch locations, run() launched, template

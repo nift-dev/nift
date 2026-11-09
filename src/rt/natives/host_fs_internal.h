@@ -196,6 +196,18 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
     std::error_code size_error;
     if (fs::is_regular_file(call.target().path, size_error)) {
         const auto size = fs::file_size(call.target().path, size_error);
+#if !(defined(NIFT_READ_LIMIT_MUTANT) && (NIFT_READ_LIMIT_MUTANT == 1 || NIFT_READ_LIMIT_MUTANT == 5))
+        // B01: the read limit before the heap budget (legacy names the limit; NIFT_READ_LIMIT=1g used
+        // to report "file exceeds the memory budget" for a file one byte over a 1 GiB limit)
+        const auto setting = nift::readlimit::current();
+        if (!size_error && setting.valid && size > setting.bytes)
+            return fail_host(call, host::HostStatus::Limit,
+                             host_error("limit.exceeded",
+                                        nift::readlimit::exceeded_message(std::string(name),
+                                                                          call.target().path.generic_string(),
+                                                                          setting.bytes)),
+                             error);
+#endif
         if (!size_error && !reserve_result(context, static_cast<std::size_t>(size)))
             return fail_host(call, host::HostStatus::Limit,
                              host_error("limit.exceeded",

@@ -84,13 +84,17 @@ inline bool reserve_buffer(Buffer& data, std::size_t bytes) {
 
 template <class Buffer>
 inline bool grow_unknown(const Context& context, Buffer& data, std::size_t needed, std::size_t cap,
-                         bool& tail_reserved, std::size_t& reserved) {
+                         bool& tail_reserved, std::size_t& reserved, std::size_t limit = kSizeOverflow) {
     (void)tail_reserved;
     (void)reserved;
     if (needed > cap) return false;
     const std::size_t old = data.capacity();
     const std::size_t doubled = size_mul(old, 2);
     std::size_t target = doubled < needed ? needed : doubled;
+    // B01: past half the read limit, straight to the limit (ReadLimit.h growth_target), so a
+    // buffer of unknown final size holds at most 1.5 x the limit while it grows (old <= limit / 2
+    // plus the new one), never a doubling beyond it.
+    if (limit != kSizeOverflow && target > limit / 2) target = limit;
     if (target > cap) target = cap;
     if (target < needed) target = needed;
     if (!reserve_result(context, size_add(target, old))) return false;
@@ -118,8 +122,26 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
         const auto size = fs::file_size(path, size_error);
         if (!size_error) hint = size;
     }
+#if !(defined(NIFT_READ_LIMIT_MUTANT) && (NIFT_READ_LIMIT_MUTANT == 1 || NIFT_READ_LIMIT_MUTANT == 5))
+    // B01 (combined-b3-b5.md section 43): a regular file larger than the read limit is rejected from
+    // its size, unread and before any buffer is sized from it (legacy's rule, ReadLimit.h): the
+    // buffer used to be pre-sized to the whole file, so a file 3 x the limit was a bad_alloc under
+    // an address-space limit (exit 70) instead of the limit error.
+    if (hint > setting.bytes) {
+        error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
+        return ReadOutcome::Limit;
+    }
+#endif
     const std::size_t headroom = budget_headroom(context);
-    const std::size_t cap = unknown_capacity_cap(context);
+    std::size_t cap = unknown_capacity_cap(context);
+#if !(defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 1)
+    // B01: nor does a buffer of unknown final size (FIFO, device, pipe) grow past the limit: the
+    // chunk check below keeps every `needed` within it, so this cap only stops doubling beyond it.
+    if (cap > setting.bytes) cap = static_cast<std::size_t>(setting.bytes);
+    const std::size_t growth_limit = static_cast<std::size_t>(setting.bytes);
+#else
+    const std::size_t growth_limit = kSizeOverflow;
+#endif
     std::size_t initial = hint ? static_cast<std::size_t>(hint)
                                : (headroom < (std::size_t(64) << 10) ? headroom : (std::size_t(64) << 10));
     if (!hint && initial > cap) initial = cap;
@@ -139,18 +161,33 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
         if (initial) data.reserve(initial);
 #endif
         while (in) {
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 6
+            in.readsome(chunk, sizeof chunk);  // mutant 6: what is available now, so a short read ends the read
+#else
+            // istream::read extracts `sizeof chunk` bytes or stops at end of file only: the filebuf
+            // repeats read(2) across short reads (a FIFO or pipe written in pieces), and `total` below
+            // accumulates over the whole read, so pieces add up against the limit.
             in.read(chunk, sizeof chunk);
+#endif
             const std::streamsize got = in.gcount();
             if (in.bad()) return ReadOutcome::ReadFailed;
             if (got <= 0) break;
-            if (total > setting.bytes - static_cast<std::uint64_t>(got)) {
+            // B01: `total <= limit` holds here, so `limit - total` cannot wrap (`limit - got` did when one
+            // 64 KiB chunk was larger than the limit: a 1 KiB limit was never enforced).
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 1
+            if (total > setting.bytes - static_cast<std::uint64_t>(got)) {  // mutant 1: the pre-B01 check
+#elif defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 3
+            if (false) {  // mutant 3: no per-chunk limit check at all
+#else
+            if (static_cast<std::uint64_t>(got) > setting.bytes - total) {
+#endif
                 error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
                 return ReadOutcome::Limit;
             }
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
             const std::size_t needed = data.size() + static_cast<std::size_t>(got);
             if (needed > data.capacity() &&
-                !grow_unknown(context, data, needed, cap, tail_reserved, reserved)) {
+                !grow_unknown(context, data, needed, cap, tail_reserved, reserved, growth_limit)) {
                 error = std::string(operation) + ": file exceeds the memory budget";
                 return ReadOutcome::Budget;
             }
@@ -159,7 +196,11 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
                 return ReadOutcome::Budget;
             }
 #endif
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 7
+            total = static_cast<std::uint64_t>(got);  // mutant 7: the count restarts at every read
+#else
             total += static_cast<std::uint64_t>(got);
+#endif
         }
         std::string text = data.take();
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 8
@@ -183,24 +224,43 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
         }
 #endif
         while (in) {
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 6
+            in.readsome(chunk, sizeof chunk);  // mutant 6: what is available now, so a short read ends the read
+#else
+            // istream::read extracts `sizeof chunk` bytes or stops at end of file only: the filebuf
+            // repeats read(2) across short reads (a FIFO or pipe written in pieces), and `total` below
+            // accumulates over the whole read, so pieces add up against the limit.
             in.read(chunk, sizeof chunk);
+#endif
             const std::streamsize got = in.gcount();
             if (in.bad()) return ReadOutcome::ReadFailed;
             if (got <= 0) break;
-            if (total > setting.bytes - static_cast<std::uint64_t>(got)) {
+            // B01: `total <= limit` holds here, so `limit - total` cannot wrap (`limit - got` did when one
+            // 64 KiB chunk was larger than the limit: a 1 KiB limit was never enforced).
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 1
+            if (total > setting.bytes - static_cast<std::uint64_t>(got)) {  // mutant 1: the pre-B01 check
+#elif defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 3
+            if (false) {  // mutant 3: no per-chunk limit check at all
+#else
+            if (static_cast<std::uint64_t>(got) > setting.bytes - total) {
+#endif
                 error = nift::readlimit::exceeded_message(std::string(operation), path.generic_string(), setting.bytes);
                 return ReadOutcome::Limit;
             }
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
             const std::size_t needed = data.size() + static_cast<std::size_t>(got);
             if (needed > data.capacity() &&
-                !grow_unknown(context, data, needed, cap, tail_reserved, reserved)) {
+                !grow_unknown(context, data, needed, cap, tail_reserved, reserved, growth_limit)) {
                 error = std::string(operation) + ": file exceeds the memory budget";
                 return ReadOutcome::Budget;
             }
 #endif
             data.insert(data.end(), chunk, chunk + got);
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 7
+            total = static_cast<std::uint64_t>(got);  // mutant 7: the count restarts at every read
+#else
             total += static_cast<std::uint64_t>(got);
+#endif
         }
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 8
         if (!finalize_bytes(context, data)) {

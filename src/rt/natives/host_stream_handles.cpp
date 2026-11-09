@@ -60,6 +60,16 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
                                                                       stream.path.generic_string(),
                                                                   limit),
                                 "limit.exceeded", error);
+#if !(defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 2)
+        // B01: grow within the bound of this read (the limit, or a smaller count; ReadLimit.h
+        // growth_target), as read_line does: BudgetedText's own doubling would hold 2 x a limit that
+        // is not a power of two while it grows.
+        if (got > data.capacity() - data.size() && data.size() + got > kUncheckedBytes / 2 &&
+            !data.reserve(static_cast<std::size_t>(nift::readlimit::growth_target(
+                data.capacity(), data.size() + got, max_bytes, nift::readlimit::kChunk))))
+            return stream_limit(context, std::string(operation) + ": file exceeds the memory budget",
+                                "limit.exceeded", error);
+#endif
         if (!data.append(std::string_view(buffer, static_cast<std::size_t>(got))))
             return stream_limit(context, std::string(operation) + ": file exceeds the memory budget",
                                 "limit.exceeded", error);
@@ -143,12 +153,26 @@ Status stream_read_line(const Context& context, const Value* args, std::uint32_t
     while (stream->input->get(c)) {
         extracted = true;
         if (c == '\n') break;
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 4
+        if (false)  // mutant 4: no read_line limit check
+#else
         if (line.size() >= setting.bytes)
+#endif
             return stream_limit(context,
                                 nift::readlimit::exceeded_message("read_line",
                                                                   "a line of " + stream->path.generic_string(),
                                                                   setting.bytes),
                                 "limit.exceeded", error);
+#if !(defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 2)
+        // B01: the line buffer grows within the limit (ReadLimit.h growth_target: doubling, then
+        // straight to the limit), never past it: BudgetedText's own doubling took a line bounded at
+        // 64 MiB to a 120 MiB buffer, a bad_alloc under an address-space limit (exit 70) on an
+        // endless line (/dev/zero) instead of the limit error.
+        if (line.size() == line.capacity() && line.size() >= kUncheckedBytes / 2 &&
+            !line.reserve(static_cast<std::size_t>(nift::readlimit::growth_target(
+                line.capacity(), static_cast<std::uint64_t>(line.size()) + 1, setting.bytes, 0))))
+            return stream_limit(context, "read_line: file exceeds the memory budget", "limit.exceeded", error);
+#endif
         if (!line.append(std::string_view(&c, 1)))
             return stream_limit(context, "read_line: file exceeds the memory budget", "limit.exceeded", error);
     }
