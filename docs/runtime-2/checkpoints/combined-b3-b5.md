@@ -2564,3 +2564,87 @@ that reach the hooked line. The proof as the review established it:
 **Low (record only, the review's item 9).** The latent mutant gates without an unmutated control
 should get the same `signals 0`-style negative control later: b3, b4, refsem, collections,
 coro-module, args-cmd, packages and b5. Their suites pass unmutated today, so none is vacuous now.
+
+## 43. B01: the VM's read limit enforced before any unbounded allocation (C50)
+
+**Symptom (P0).** On the VM, `NIFT_READ_LIMIT` was not enforced as legacy enforces it.
+`tests/runtime2/read_limit.py` failed eight cases that are not refusals:
+- one byte over the limit read silently: `open`, `file().open`, a FIFO, and `NIFT_READ_LIMIT=1K` / `=4096` (the script went on to `AFTER`);
+- `ifstream("/dev/zero").read_line()` and `open()` of a regular file 3 x the limit died with `std::bad_alloc`, exit 70, under the test's address-space limit;
+- with `NIFT_READ_LIMIT=1g`, a file of 1 GiB + 1 reported `open: file exceeds the memory budget` instead of the limit error.
+
+**Root cause.** Three defects in the VM read natives. Legacy is correct in each case.
+1. **Wrapping check.** `read_whole` (`src/rt/natives/host_fs_stream.h`) reads 64 KiB chunks and
+   checked `total > limit - got`. When one chunk is larger than the limit (any limit below
+   64 KiB), `limit - got` wraps and the check never fires.
+2. **Sized before checked.** `read_source` (`host_fs_internal.h`) charged a regular file's whole
+   size to the heap budget, and `read_whole` pre-sized its buffer to it, before any comparison
+   with the limit. So a file 3 x the limit was a 3 x allocation (bad_alloc), and the heap budget's
+   message won over the limit's.
+3. **Growth past the limit.** `read_line` (and `read_all`, `host_stream_handles.cpp`) grew through
+   `BudgetedText`'s doubling. The per-character check bounds the *content* at the limit, but the
+   *buffer* doubled to about 2 x the limit (a 64 MiB limit reached a 120 MiB buffer plus the old one).
+
+**Fix (bounded, existing mechanisms: `ReadLimit.h`; no heap-budget change).**
+- `read_whole`:
+  - a regular file larger than the limit is rejected from its size, unread, before any buffer is sized;
+  - the chunk check is `got > limit - total` (`total <= limit` holds, so it cannot wrap);
+  - an unknown-size buffer (FIFO, device) is capped at the limit and, past half the limit, grows straight to it (`growth_target`'s rule), so it never holds more than 1.5 x the limit while it grows.
+- `read_source`: the same size check, before the heap-budget charge.
+- `read_line` and `read_all`: the buffer grows by `growth_target`, bounded by the limit (or by a smaller read count).
+- Errors keep legacy's text and position (`<op>: <what> exceeds the read limit of N bytes (NIFT_READ_LIMIT)`, fatal, nothing printed after it). The controls compare the VM's exit status, stdout and stderr with `NIFT_VM=0` byte for byte.
+- **Short reads.** `read_whole` uses `istream::read`, which stops early only at end of file: the filebuf repeats `read(2)` across short reads, and `total` accumulates over the whole read. `strace` of a paced FIFO shows `read(3, ..., 65536) = 1`, then `= 999`, `= 4096`, `= 3`: each short read counted, and the limit error at the end.
+
+**Production sha256.** `nift` at C50: `864952359673b64ef5e5918c75144bd9d14cb32cc44bc8f7fc68bcdf1eb8a496`
+(was `c528e7eb...`). The pre-B01 build, made from 03b31fa2's six read-native objects linked in
+production order, reproduces `c528e7eb...` exactly. That build fails 24 of the new controls.
+
+**Permanent negative controls.**
+- `tests/runtime2/read_limit_controls.py`: 68 checks, each VM == legacy.
+  - **A, 1000-byte limit** (below one chunk): `open`, `file().open`, `ifstream.read_all` and `read_line` succeed at exactly the limit and fail fatally one byte over.
+  - **B, non-power-of-two limit (40 MiB + 12345)**, under RLIMIT_AS = baseline + 1.5 x limit + 8 MiB:
+    - a regular file of exactly the limit reads;
+    - a sparse file 3 x the limit, `/dev/zero` (open, file().open, read_all, read_line), and a FIFO one byte over all fail with the limit error, never exit 70.
+  - **C, short reads**: a FIFO writer paced chunk by chunk (1, 999, 4096, 3, 65535, 4097, 17 bytes).
+    - Pacing: the writer waits on the pipe's own fill level (FIONREAD) until the reader has drained each chunk. No sleeps.
+    - 299999 and 300000 bytes, then close, read whole; 300001, and 4 x the limit, hit the limit error (open, file().open, read_all, read_line).
+- `tests/runtime2/read_limit_mutants.sh` (`make test-runtime2-read-limit-mutants`, a prerequisite of `test-runtime2-host-deps`):
+  - rebuilds the six TUs that include the read natives with `NIFT_READ_LIMIT_MUTANT=n`;
+  - checks that every including TU is in its list;
+  - requires the control's objects and binary to be byte-identical to production;
+  - requires each mutant's objects to differ from the control's.
+
+  | Mutant | Change | Result |
+  | --- | --- | --- |
+  | 1 | the pre-B01 read_whole/read_source | rejected (16 failing checks) |
+  | 2 | stream growth unbounded (read_line, read_all) | rejected (8: exit 70) |
+  | 3 | no per-chunk limit check | rejected (16) |
+  | 4 | no read_line limit check | rejected (8) |
+  | 5 | no size check before sizing | rejected (4: exit 70 on the 3 x file) |
+  | 6 | `readsome`: a short read ends the read | rejected (24) |
+  | 7 | the byte count restarts at every read | rejected (16, the paced FIFO among them) |
+  | 0 | control | passes |
+
+**Remaining read_limit.py failures (24, all refusals; none is a limit defect).**
+- **B27 refusals (23):**
+  - `builtin-bytes:open_bytes` (7): exact limit, empty file, one byte over, `/dev/zero`, `/dev/full`, a FIFO writer that never stops, and the default 1 GiB limit;
+  - `host-handle-flow` (4): `read_all_bytes`, `read_bytes(huge)`, `read_val`, `read_bytes(limit/2) x 16`;
+  - `statement:Command` (1): `>> token`;
+  - `callable:run` / `callable:cmd` (8): captures of exactly the limit, one byte over and 128 MiB, `run(yes)`, `head -c 150000000`, `cmd(yes).pipe(cat)`, the descendant kill, and stderr capture;
+  - `callable:read` (3): stdin lines.
+- **One more refusal, outside the B27 list (1):** "read_line: line of exactly the limit" is refused as `type:length`. The case prints `s.read_line().length()`, and `read_line()` returns `string|null`, so `.length()` is not proven: a sound refusal, unchanged from 03b31fa2. The same boundary (a line of exactly the limit, then the next line) passes on the VM in read_limit_controls.py A.
+
+**Gates (local, GCC 13.3).**
+
+| Class | Gates |
+| --- | --- |
+| PASS | test-runtime2-certification-guard, test-rt-lint, test-runtime2-read-limit-mutants (7 of 7 rejected, control identical to `nift`), read_limit_controls.py (68), read-limit unit, host_deps.py, file_copy_move_freedom, build_write_ownership, test-runtime2-host-memory (61), test-rt-host's cp17 n2-rebuild mutants, handle mutants (incl. `host_file_handles.cpp` mutants killed), stream-resource guards, file/stream handles |
+| test-runtime2-host-deps | every line passes except read_limit.py: the 24 refusals listed above |
+| test-rt-vm (`make -k`) | every prerequisite passes (cp14b with its comparator cases UNVERIFIED on GCC 13.3, as before). The own recipe passes through vm_parity (PASS) and vm_host (160 PASS, 0 FAIL, 5 REFUSED), then stops at vm_modules: 2 cases `import-scope:collision`, FAILED-BASELINE (sections 9 and 27) |
+| FAILED-BASELINE, sources untouched by C50 | test-rt-handles (`no_handle_strings`: `src/rt/render.cpp:11`); test-rt-handles-guards (handle-bench Ir 2293/2370 against 2288/2369.4; the bench builds only `src/rt/handle*`, `handles/`, `value`, `string`, `heap_account`); test-runtime2-cp17-handles and -routing-mutants (the routing mutant of `src/ParserScript.cpp` no longer compiles: `run_script_on_vm` signature) |
+| Not completed here | test-rt-host's cp17-unwind-mutants (stopped by the 7000 s timeout, every mutant killed until then); test-rt-host-mutants (`host_mutants.sh` builds 7 full tree copies: the disk ran out; its recorded fingerprint is FAILED-BASELINE, "host mutant 1: build failed") |
+| Legacy unchanged | Legacy reads none of the changed code: only `src/rt/vm_handles.cpp` and the six read-native TUs include it. `NIFT_VM=0 read_limit.py` gives identical output on the C50 binary and on the c528e7eb binary (all pass) |
+
+**Cost.** Per chunk or per growth step, one comparison more. No change per byte.
+`read_line` adds one capacity test per character, then the existing append. There is no
+wall-clock benchmark (standing rule), and no callgrind gate covers these natives.
