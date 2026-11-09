@@ -128,6 +128,8 @@ bool generated_key(const Value& key, std::string_view name, std::string& rendere
 // every Context::kBudgetStride elements (so the budget check sees the growing
 // result) and at finish(). The array is private to the builder until finish(),
 // so holding its storage across the pushes is within the CP09 contract.
+// Like every builder it requires cycle-free input and does not check it
+// (rt/build.h, "Cycle-free input").
 class ArrayBuilder {
 public:
     explicit ArrayBuilder(std::size_t reserve = 0);

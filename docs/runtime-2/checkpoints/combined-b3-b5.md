@@ -3647,3 +3647,29 @@ Ir/call. `obj.merge_deep` also passes its guard. After A, the only remaining gua
   check cannot pass as an optimisation.
 - **Approving a cost required for memory safety does not license future regressions:** the new
   values are the guard, at the same tolerance as every other.
+
+## 67. Owner 08:57, C: construction requires cycle-free input (C78, docs and a test)
+
+- **Contract.** The construction primitives (`Construction` in `src/rt/build.h`, reached
+  through `build::Array`, `ArrayBulk`, `Object` and `Struct`, the `InPlaceKey` holders and the
+  storage tests' accessor) and natives' `ArrayBuilder` do **not** check for reference cycles.
+  Their callers must pass cycle-free input. A fresh value is unreachable from what is stored in
+  it, so every builder use in production satisfies this; section 65's merge clone is one such
+  use. The test helper that broke it (`builtins_unit`'s `array_push(a, a)`, section 56) went
+  through the storage tests' accessor.
+- **Recorded in the header comments** of `build.h` ("Cycle-free input") and `natives/support.h`
+  (`ArrayBuilder`). Comments only: `nift` is byte-identical (f063f1a9…).
+- **If an embedding API ever exposes these functions**, their cycle-safety contract must be
+  reconsidered first. That is the one unguarded route in the review of C67–C71 (section 2).
+- **The debug assertion (P0-L1) is deferred,** per the owner; not added.
+- **Public operations refuse cycles: permanent test** `tests/runtime2/cycle_refusal_routes.py` (in
+  `test-runtime2-refsem`). It covers the reviewer's refused routes that had no fixture of their
+  own: `a.push(a)`, `a[0] = a`, `b := a; b[1] = a`, through an object (`a.push({"k": a})`,
+  `inner := o["k"]; inner.push(o)`), mutual arrays, `insert`, `splice`, a nested literal, a
+  function parameter and a closure-captured binding.
+  - Each must run on the VM in one VM execution, print `runtime.reference_cycle` (catchable) and
+    leave the receiver's length unchanged.
+  - Legacy, which copies (an approved difference), is pinned as an observation.
+  - 11 routes, 0 failures.
+  - The existing refsem fixtures keep covering maps, stacks, cells, structs and closure-cycle
+    witnesses (`refsem/approved/*cycle*`).

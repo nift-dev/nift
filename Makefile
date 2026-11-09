@@ -5597,6 +5597,7 @@ test-rt-vm-sanitize: test-runtime2-collections-sanitize test-runtime2-collection
 .PHONY: test-runtime2-refsem test-runtime2-refsem-mutants test-runtime2-refsem-sanitize test-runtime2-refsem-tsan
 test-runtime2-refsem: $(TARGET)
 	$(PYTHON) tests/runtime2/refsem_a.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) -B tests/runtime2/cycle_refusal_routes.py --nift "$(CURDIR)/$(TARGET)"
 test-runtime2-refsem-mutants: $(TARGET) $(LIBFFI_A)
 	REFSEM_OBJECTS="$(CLI_OBJECTS) $(LIBFFI_A)" bash tests/runtime2/refsem/mutants.sh "$(CURDIR)/$(TARGET)"
 test-runtime2-refsem-sanitize: $(SAN_TARGET)

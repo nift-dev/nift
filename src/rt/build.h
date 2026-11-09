@@ -23,6 +23,16 @@
 // The primitives below are the former free construction functions, unchanged
 // and out of line (same calls, same allocations); only builders, key holders
 // and the storage-level tests' accessor reach them.
+//
+// Cycle-free input (owner 2026-11-10 08:57; combined-b3-b5.md section 67): the
+// construction primitives, the builders above and natives' ArrayBuilder do NOT
+// check for reference cycles. Their callers must pass values that cannot make
+// the value under construction contain itself (a fresh value is unreachable from
+// what is stored in it). Every script-reachable store goes through the mutation
+// protocol (rt/mutation.h), which refuses a cycle before any change
+// (D-NEXT-refsem #4, runtime.reference_cycle; tests/runtime2/cycle_refusal_routes.py).
+// If an embedding API ever exposes these functions, their cycle-safety contract
+// must be reconsidered first. (A debug assertion is deferred by the owner.)
 #include "rt/aggregate.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
