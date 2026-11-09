@@ -3129,3 +3129,103 @@ for the VM`): `opaque:nesting-limit` 39, `host-handle-flow` 26, `opaque:legacy-r
 `builtin-arg-fault-context` 2, `builtin-receiver:path`, `builtin-receiver:write`,
 `builtin-arity:open`, `builtin-arity:save` and `builtin-lazy-args:replace`. No semantic
 difference remains. The gate itself still stops at its first refused row.
+
+## 56. B09 repaired test-side: parallel stubs, builtin count, copy contract (C67, tests and docs)
+
+Follows section 51 and the C59–C66 review (ACCEPT-WITH-FINDINGS, classification (b)+(c)). No
+production change; `nift` stays c88bf749….
+
+**Architectural note (recorded, no production effect).** The isolated natives `shared_methods.o`
+and `format_methods.o` need `shared_state.o`, `shared_cancel.o` and the transfer code. These need
+three small functions of `src/rt/parallel_task.cpp`: `ParallelBlock` (constructor and destructor),
+`parallel_task_identity` and `notify_parallel_wait_states`. The same translation unit holds the
+isolate task runner, which needs the whole VM and, through it, `legacy_bridge` and `render`. The
+runtime dependency is intended: a shared wait releases a parallel worker slot, and a transferred
+Future carries its task's identity. Only the object-file granularity is accidental. It dates from
+CP23 (`1dd496d6`, `e002dbc5`, `a5179308`, `ac848f77`, all before r2 `0b5079fc`), and the hand-kept
+link lists hid it until C61. There is no production consequence: the CLI links every object, and no
+native reaches `to_legacy` or `render` through these functions. A later production hygiene option,
+not done here: move the three functions into a leaf `parallel_task_core.cpp`.
+
+**Repair: four test-only stubs** (`tests/rt/parallel_isolation_stubs.cpp`, linked into
+`builtins-bench` and `host-random-budget` through `RT_ISOLATION_CLOSURE`).
+- The `ParallelBlock` constructor and destructor behave as production does when no parallel
+  runtime runs on the thread (`running_pool == nullptr`): admitted, and the destructor does
+  nothing. An isolated binary has no VM, so it never starts a runtime.
+- `parallel_task_identity` and `notify_parallel_wait_states` return 0 and do nothing for a null
+  record, as production does, and **trap** on a non-null record. Such a record exists only when the
+  VM creates one, so the stubs are unreachable in an isolated binary.
+- `RT_ISOLATION_FORBIDDEN` now also excludes `parallel_task.o` and `vm.o`. The stubs are therefore
+  required, and any new path from a native to the VM or the bridge fails `link_closure.py` and
+  names the chain.
+
+**F-2: drift guard** (`make test-rt-parallel-isolation-stubs`, part of `test` and
+`test-rt-builtins`; `tests/rt/parallel_isolation_stubs_check.py`).
+- **Signature:** every symbol the stubs object defines must be defined with the identical mangled
+  name by `parallel_task.o`, and the stubs must define exactly the four functions.
+- **Behaviour:** a sha256 of the production definitions (plus the `running_pool` declaration that
+  their no-runtime path depends on) is pinned. A change fails until the stubs are reviewed and the
+  fingerprint is re-pinned in the same commit.
+- **Parity probe:** `tests/rt/parallel_isolation_probe.cpp` runs every `ParallelWaitKind`, nested
+  blocks, the default kind, a null identity and a null notify, on the main thread and on a new
+  thread. It is linked once with the real objects and once with the stubs, and the two outputs (18
+  lines) must be identical.
+- **Selftest:** six planted drifts are each rejected: a signature change, a missing stub, a
+  destructor that gains behaviour, a changed null-record result, a differing probe line and a
+  crashing probe. The unmodified control is accepted.
+
+**Stale unit expectations, updated.**
+- `builtins-unit`: `builtin_count() == 186`. The count is the real inventory: 89 CP14/CP15, 31 CP16
+  Host, 31 CP17 W13 file/stream handle, 19 CP23 shared-concurrency and 16 D-063 collection
+  built-ins. `builtin.cpp` statically asserts that its dispatch and spec tables have `Count`
+  entries.
+- `builtins-unit`: copy/deepcopy of structs and handles now follow **D-NEXT-refsem #3**
+  (decisions.md, owner 2026-11-01; Nift v4.2's contract), which superseded CP15 Review D2's
+  "a struct or handle is a compiler defect" (`Status::Internal`):
+  - `copy(struct)` is a new outer instance;
+  - `copy([1, {"p": struct}])` shares the nested instance;
+  - `deepcopy([p, p])` copies `p` once and keeps the two elements shared;
+  - `deepcopy({"h": file})` keeps the handle's identity.
+- `builtins-unit` also crashed (stack overflow in the test's JSON printer) once those checks passed.
+  `aliasing_and_cow` did `array_push(a, a)`. Since B2 (`e30bd6c9`) arrays are shared references,
+  so this made a cyclic array through the raw test builder, which does not check for cycles (the VM
+  refuses such a store, D-NEXT-refsem #4). The test now pushes an explicit outer copy, which keeps
+  the CP14 intent of an argument aliased inside the receiver.
+- `builtins-diff`: the "Host built-ins last" `static_assert` is replaced by a real split. Only the
+  pure CP14/CP15 block (`[0, HostOpen)`) runs against legacy. Each later section is excluded, with
+  its reason and its own suite:
+  - CP16 Host: process environment; `vm_host.py` and CP16 engine parity;
+  - CP17 W13 handles: VM-only typed natives; cp17 and file-mode parity;
+  - CP23 shared: no legacy counterpart; the cp23 suites;
+  - D-063 collections: VM-only reference values; the collections suite.
+
+  Five `static_assert`s pin the section boundaries, so a built-in added outside an existing section
+  (in particular one appended at the end) does not compile until it is classified. The argument
+  generator aborts on a receiver of an excluded section instead of the old unhandled `switch`
+  cases.
+
+**Results** (in tree, d9adc4f7 plus this commit):
+- `test-rt-parallel-isolation-stubs`: PASS (6 symbols, fingerprint, probe identical over 18 lines;
+  selftest 6/6 rejected, control accepted).
+- `test-rt-host-random-budget`: PASS, 14 checks.
+- `test-rt-builtins-isolation`: PASS.
+- `builtins-unit`: PASS, 1380 checks.
+- `builtins-diff` against legacy (seed 20261018, 5000 cases): PASS, 4980 checks.
+- **`test-rt-builtins-guards` (callgrind, builtins-bench): FAIL, 6 of 35 workloads. Not caused by
+  the stubs; reported, not re-pinned.**
+  - `obj.merge` costs 22,848 to 18,314,388 Ir/call at n = 100 to 100,000, against guards of 3,055
+    to 1,717,389 (+10 %). Its scaling exponent is 0.97 against 0.77.
+  - `str.replace` at n = 100 costs 3,356 Ir/call against 2,945.
+  - A callgrind profile of `obj.merge` at n = 1000 attributes the cost to `Construction::object_set`
+    (35 %), `heap_retally` (23 %), `shallow_object` (12 %), `find_position`, `rebuild_index` and
+    vector growth. No parallel or stub symbol appears.
+  - The guards were locked at CP15 (2026-10-20). The cost comes from code after that: B2 (`e30bd6c9`,
+    arrays and objects as shared references) and tooling 2 (`fa10fc9b`, construction builders).
+    The isolated bench did not link before this commit (section 51), so the guards had not run on
+    this code. Whether to accept the new costs (re-pin) or treat them as a regression is an owner
+    decision.
+
+**Release audit (recorded):** the isolation stubs stand in for production code in two test
+binaries; the drift guard above fails if they diverge. The CP23 co-location in `parallel_task.cpp`
+has no production effect. The `obj.merge` and `str.replace` instruction counts exceed their CP15
+guards (above).

@@ -4118,15 +4118,57 @@ RT_BUILTINS_BENCH := $(TEST_DIR)/rt/builtins-bench$(EXEEXT)
 # with the legacy value bridge excluded (scripts/build/link_closure.py), instead of a hand-kept
 # core list. A native that needs the bridge, directly or through another object, fails the
 # closure with the dependency chain.
-RT_ISOLATION_FORBIDDEN := src/RuntimeValue.o src/rt/legacy_bridge.o src/rt/render.o
+#
+# Section 56: the shared natives need ParallelBlock, parallel_task_identity and
+# notify_parallel_wait_states, which share src/rt/parallel_task.cpp with the isolate task runner
+# (a CP23 co-location; no production effect). Test-only stubs (tests/rt/parallel_isolation_stubs.cpp,
+# production's behaviour without a parallel runtime) stand in for them, so parallel_task.o and the
+# VM are excluded too; test-rt-parallel-isolation-stubs fails if the stubs drift from production.
+RT_ISOLATION_FORBIDDEN := src/RuntimeValue.o src/rt/legacy_bridge.o src/rt/render.o \
+	src/rt/parallel_task.o src/rt/vm.o
 RT_ISOLATION_STUBS_OBJ := $(TEST_DIR)/rt/host-handle-native-stubs.o
 $(RT_ISOLATION_STUBS_OBJ): $(RT_ISOLATION_STUBS) $(RT_VALUE_HEADERS)
 	mkdir -p "$(TEST_DIR)/rt"
 	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -c $(RT_ISOLATION_STUBS) -o "$@"
+RT_PARALLEL_STUBS_OBJ := $(TEST_DIR)/rt/parallel-isolation-stubs.o
+$(RT_PARALLEL_STUBS_OBJ): tests/rt/parallel_isolation_stubs.cpp src/rt/parallel_task.h $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -c tests/rt/parallel_isolation_stubs.cpp -o "$@"
 RT_ISOLATION_CLOSURE = python3 -B scripts/build/link_closure.py --seed $(RT_ISOLATION_SOURCES:.cpp=.o) \
-	$(RT_ISOLATION_STUBS_OBJ) --candidates $(RT_UNIT_OBJECTS) --exclude $(RT_ISOLATION_FORBIDDEN)
+	$(RT_ISOLATION_STUBS_OBJ) $(RT_PARALLEL_STUBS_OBJ) --candidates $(RT_UNIT_OBJECTS) \
+	--exclude $(RT_ISOLATION_FORBIDDEN)
 
-$(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ)
+# F-2 drift guard for the parallel stubs: mangled signatures, a pinned fingerprint of the
+# production definitions, and a probe whose output must be identical linked with the real
+# objects and with the stubs (plus a selftest that plants each kind of drift).
+RT_PARALLEL_PROBE_OBJ := $(TEST_DIR)/rt/parallel-isolation-probe.o
+RT_PARALLEL_PROBE_REAL := $(TEST_DIR)/rt/parallel-isolation-probe-real$(EXEEXT)
+RT_PARALLEL_PROBE_STUB := $(TEST_DIR)/rt/parallel-isolation-probe-stub$(EXEEXT)
+$(RT_PARALLEL_PROBE_OBJ): tests/rt/parallel_isolation_probe.cpp src/rt/parallel_task.h $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/rt"
+	$(CXX) -Isrc -Iinclude $(CXXFLAGS) -c tests/rt/parallel_isolation_probe.cpp -o "$@"
+$(RT_PARALLEL_PROBE_REAL): $(RT_PARALLEL_PROBE_OBJ) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	objects=$$(python3 -B scripts/build/link_closure.py --seed $(RT_PARALLEL_PROBE_OBJ) \
+		--candidates $(RT_UNIT_OBJECTS)) && \
+	$(CXX) $(CXXFLAGS) $$objects -o "$@"
+$(RT_PARALLEL_PROBE_STUB): $(RT_PARALLEL_PROBE_OBJ) $(RT_PARALLEL_STUBS_OBJ) $(RT_UNIT_OBJECTS)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	objects=$$(python3 -B scripts/build/link_closure.py --seed $(RT_PARALLEL_PROBE_OBJ) $(RT_PARALLEL_STUBS_OBJ) \
+		--candidates $(RT_UNIT_OBJECTS) --exclude $(RT_ISOLATION_FORBIDDEN)) && \
+	$(CXX) $(CXXFLAGS) $$objects -o "$@"
+
+.PHONY: test-rt-parallel-isolation-stubs
+test-rt-parallel-isolation-stubs: $(RT_PARALLEL_PROBE_REAL) $(RT_PARALLEL_PROBE_STUB)
+	python3 -B tests/rt/parallel_isolation_stubs_check.py --stubs-obj $(RT_PARALLEL_STUBS_OBJ) \
+		--production-obj src/rt/parallel_task.o --source src/rt/parallel_task.cpp \
+		--real-probe "$(RT_PARALLEL_PROBE_REAL)" --stub-probe "$(RT_PARALLEL_PROBE_STUB)"
+	python3 -B tests/rt/parallel_isolation_stubs_check.py --selftest --stubs-obj $(RT_PARALLEL_STUBS_OBJ) \
+		--production-obj src/rt/parallel_task.o --source src/rt/parallel_task.cpp
+test: test-rt-parallel-isolation-stubs
+
+$(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ) \
+		$(RT_PARALLEL_STUBS_OBJ)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	objects=$$($(RT_ISOLATION_CLOSURE)) && \
@@ -4137,7 +4179,8 @@ $(RT_BUILTINS_BENCH): tests/rt/builtins_bench.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJ
 # (no RuntimeValue/legacy_bridge/render): a Host native that needs the legacy
 # value model fails this link. NIFT_HOST_MUTANT=13 must fail the run.
 RT_HOST_RANDOM_BUDGET := $(TEST_DIR)/rt/host-random-budget$(EXEEXT)
-$(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ)
+$(RT_HOST_RANDOM_BUDGET): tests/rt/host_random_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS) $(RT_ISOLATION_STUBS_OBJ) \
+		$(RT_PARALLEL_STUBS_OBJ)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	objects=$$($(RT_ISOLATION_CLOSURE)) && \
@@ -4164,7 +4207,8 @@ test-rt-builtins-guards: $(RT_BUILTINS_BENCH)
 
 .PHONY: test-rt-builtins test-rt-builtins-sanitize test-rt-builtins-probe
 # RT_BUILTINS_SEED / RT_BUILTINS_CASES vary the differential test.
-test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative test-rt-host-random-budget
+test-rt-builtins: $(RT_BUILTINS_UNIT) $(RT_BUILTINS_DIFF) test-rt-builtins-isolation test-rt-case-conversion test-rt-case-conversion-negative test-rt-host-random-budget \
+		test-rt-parallel-isolation-stubs
 	@test -x "$(RT_BUILTINS_LEGACY)" || { echo "legacy oracle $(RT_BUILTINS_LEGACY) missing (set RT_BUILTINS_LEGACY)" >&2; exit 1; }
 	"$(RT_BUILTINS_UNIT)"
 	"$(RT_BUILTINS_DIFF)" "$(RT_BUILTINS_LEGACY)" $${RT_BUILTINS_SEED:-20261018} $${RT_BUILTINS_CASES:-5000}

@@ -89,8 +89,9 @@ void table() {
     CHECK(find_builtin(Receiver::String, "size") == nullptr);   // legacy: unsupported for strings
     CHECK(find_builtin(Receiver::Array, "index_of") == nullptr);  // arrays spell it indexOf
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
-    // 89 CP14/CP15 built-ins plus the 31 CP16 Host built-ins (builtin_list.inc).
-    CHECK(builtin_count() == 120);
+    // builtin_list.inc: 89 CP14/CP15 built-ins, 31 CP16 Host built-ins, 31 CP17 W13 file/stream
+    // handle built-ins, 19 CP23 shared-concurrency built-ins and 16 D-063 collection built-ins.
+    CHECK(builtin_count() == 186);
     CHECK(find_builtin(Receiver::Number, "to_string") && find_builtin(Receiver::Any, "stringify"));
     CHECK(find_builtin(Receiver::Number, "to_double") == nullptr);  // Q4: context-dependent in legacy
 }
@@ -409,12 +410,32 @@ void batch_b() {
     const Value raised = make_user_error("boom");
     Result ecopy = call(BuiltinId::FnDeepcopy, {arr({raised, fn})});
     CHECK(ecopy.status == Status::Ok);
-    // Review D2: a struct or handle anywhere in the value is a compiler defect.
+    // D-NEXT-refsem #3 (decisions.md, owner 2026-11-01; Nift v4.2's contract) supersedes CP15
+    // Review D2's "a struct or handle is a compiler defect": copy is shallow (a new outer instance,
+    // nested references shared), deepcopy copies every reachable instance once and preserves the
+    // sharing inside the copy, and handles keep their identity.
     const Value point = Value::adopt(new StructObject(test_struct_type("Point")));
-    CHECK(call(BuiltinId::FnCopy, {point}).status == Status::Internal);
-    CHECK(call(BuiltinId::FnCopy, {arr({i(1), obj({{"p", point}})})}).status == Status::Internal);
-    CHECK(call(BuiltinId::FnDeepcopy, {obj({{"h", Value::handle(HandleKind::File, 1, 0)}})}).status ==
-          Status::Internal);
+    Result pcopy = call(BuiltinId::FnCopy, {point});
+    CHECK(pcopy.status == Status::Ok && pcopy.out.is(Kind::Struct) && pcopy.out.heap() != point.heap());
+    Result nested_copy = call(BuiltinId::FnCopy, {arr({i(1), obj({{"p", point}})})});
+    CHECK(nested_copy.status == Status::Ok);
+    if (nested_copy.status == Status::Ok) {
+        const Value* p = object_get(array_items(nested_copy.out)[1], atom("p"));
+        CHECK(p && p->heap() == point.heap());  // shallow: the nested instance is shared
+    }
+    Result deep_pair = call(BuiltinId::FnDeepcopy, {arr({point, point})});
+    CHECK(deep_pair.status == Status::Ok);
+    if (deep_pair.status == Status::Ok) {
+        const std::vector<Value>& items = array_items(deep_pair.out);
+        CHECK(items[0].is(Kind::Struct) && items[0].heap() != point.heap());  // copied
+        CHECK(items[0].heap() == items[1].heap());  // reached twice, copied once
+    }
+    Result hcopy = call(BuiltinId::FnDeepcopy, {obj({{"h", Value::handle(HandleKind::File, 1, 0)}})});
+    CHECK(hcopy.status == Status::Ok);
+    if (hcopy.status == Status::Ok) {
+        const Value* h = object_get(hcopy.out, atom("h"));
+        CHECK(h && h->is(Kind::Handle) && h->handle_kind() == HandleKind::File && h->handle_id() == 1);
+    }
     // Review R2: validate stops beyond 512 nested levels (Limit), at exactly 512 it validates.
     auto nest = [](int depth) {
         Value v = arr({});
@@ -445,7 +466,11 @@ void aliasing_and_cow() {
           Status::Ok);
     CHECK(shown(deep_args[1]) == shown(o));
     Value a = arr({arr({i(1)}), i(2)});
-    array_push(a, a);  // a = [[1], 2, [[1], 2]]
+    // B2 (e30bd6c9): arrays are shared references, so pushing `a` into itself would be a cycle
+    // (D-NEXT-refsem #4 refuses it in the VM; this raw builder does not check). The CP14 intent,
+    // an argument aliased inside the receiver, is kept with an explicit outer copy.
+    Value snapshot = array_shallow_clone(a);
+    array_push(a, snapshot);  // a = [[1], 2, [[1], 2]], the inner [1] shared
     Value flat_args[1] = {a};
     CHECK(call_builtin(builtin_spec(BuiltinId::ArrFlatten), context, flat_args, 1, flat_args[0], error) == Status::Ok);
     CHECK(shown(flat_args[0]) == "ok array | [[1,2,[1],2]]");

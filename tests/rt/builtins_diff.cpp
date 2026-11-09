@@ -203,6 +203,12 @@ std::vector<Value> arguments(BuiltinId id) {
         case Receiver::Any: args.push_back(chance(70) ? random_array(0) : random_value(0)); break;
         case Receiver::Bytes: args.push_back(random_bytes(id == BuiltinId::BytesDecode)); break;
         case Receiver::None: break;
+        // Receivers of the excluded sections (see main): never generated here.
+        case Receiver::File: case Receiver::Stream: case Receiver::Mutex: case Receiver::Atomic:
+        case Receiver::Channel: case Receiver::Map: case Receiver::Set: case Receiver::Stack:
+            std::fprintf(stderr, "builtins-diff: %.*s is outside the differential block\n",
+                         static_cast<int>(spec.name.size()), spec.name.data());
+            std::abort();
     }
     const Value receiver = args.empty() ? Value() : args[0];
     std::size_t count = spec.min_args + (spec.max_args > spec.min_args && spec.max_args != kVariadic ? pick(spec.max_args - spec.min_args + 1) : 0);
@@ -479,15 +485,31 @@ int main(int argc, char** argv) {
     const char* dir = mkdtemp(dir_template);
     if (!dir) { std::perror("mkdtemp"); return 2; }
 
-    // The CP16 Host built-ins (open ... secure_random_bytes, last in
-    // builtin_list.inc) read and change the process environment (cwd, files,
-    // variables, clock, CSPRNG): random calls to them are neither deterministic
-    // nor safe to run here. tests/runtime2/vm_host.py and the CP16 engine-parity
-    // suite compare them with legacy in controlled sandboxes instead.
-    const std::size_t pure_builtins = static_cast<std::size_t>(BuiltinId::HostOpen);
-    static_assert(static_cast<std::size_t>(BuiltinId::HostSecureRandomBytes) + 1 ==
-                      static_cast<std::size_t>(BuiltinId::Count),
-                  "the Host built-ins must stay last in builtin_list.inc");
+    // Differential split (B09, combined-b3-b5.md section 56). Only the pure built-ins, the
+    // CP14/CP15 block that starts builtin_list.inc, run against legacy here. Every section after
+    // it is excluded for a stated reason and tested elsewhere:
+    //   CP16 Host (open ... secure_random_bytes): read and change the process environment (cwd,
+    //     files, variables, clock, CSPRNG); tests/runtime2/vm_host.py and the CP16 engine-parity
+    //     suite compare them with legacy in sandboxes.
+    //   CP17 W13 file/stream handles (file ... Stream.eof): VM-only typed handle natives; the
+    //     cp17 suites and test-runtime2-file-mode-parity compare them with legacy.
+    //   CP23 shared concurrency (mutex ... compare_exchange): registry-backed, no legacy
+    //     counterpart; the cp23 suites.
+    //   D-063 collections (map ... same): VM-only reference values; the collections suite.
+    // The asserts pin each section's bounds, so a built-in added anywhere but inside an existing
+    // section (in particular one appended at the end) fails to compile until it is classified.
+    constexpr auto at = [](BuiltinId id) { return static_cast<std::size_t>(id); };
+    static_assert(at(BuiltinId::FnDeepcopy) + 1 == at(BuiltinId::HostOpen),
+                  "the pure (differential) block must end at deepcopy, just before the CP16 Host block");
+    static_assert(at(BuiltinId::HostSecureRandomBytes) + 1 == at(BuiltinId::HandleFile),
+                  "the CP17 W13 handle block must follow the CP16 Host block");
+    static_assert(at(BuiltinId::StreamEof) + 1 == at(BuiltinId::SharedMutex),
+                  "the CP23 shared block must follow the CP17 W13 handle block");
+    static_assert(at(BuiltinId::AtomicCompareExchange) + 1 == at(BuiltinId::FnMap),
+                  "the D-063 collections block must follow the CP23 shared block");
+    static_assert(at(BuiltinId::FnSame) + 1 == at(BuiltinId::Count),
+                  "classify a new built-in: add it to the pure block or to an excluded section above");
+    const std::size_t pure_builtins = at(BuiltinId::HostOpen);
     std::vector<Case> cases;
     for (std::size_t n = 0; n < count; ++n) {
         // One case in eight is a json_parse case (CP15).
