@@ -126,8 +126,10 @@ def deps_of(depfile, out):
 
 
 def system_dirs(compiler, lang, cache_dir):
-    real = os.path.realpath(subprocess.run(['sh', '-c', 'command -v "$0"', compiler], capture_output=True,
-                                          text=True).stdout.strip() or compiler)
+    # B18: `command -v` only resolves the path for the cache key; when it finds nothing the
+    # compiler name itself is the key (the probe below then fails if the compiler is missing).
+    found = subprocess.run(['sh', '-c', 'command -v "$0"', compiler], capture_output=True, text=True)
+    real = os.path.realpath((found.stdout.strip() if found.returncode == 0 else '') or compiler)
     stamp = os.stat(real).st_mtime_ns if os.path.exists(real) else 0
     key = hashlib.sha256(f'{real}\0{stamp}\0{lang}'.encode()).hexdigest()[:16]
     cache = os.path.join(cache_dir, f'sysdirs-{key}.txt')
@@ -135,8 +137,10 @@ def system_dirs(compiler, lang, cache_dir):
         return [l.rstrip('\n') for l in open(cache)]
     except OSError:
         pass
-    out = subprocess.run([compiler, '-x', lang, '-E', '-v', '-'], input='', capture_output=True,
-                         text=True).stderr
+    probe = subprocess.run([compiler, '-x', lang, '-E', '-v', '-'], input='', capture_output=True, text=True)
+    if probe.returncode != 0:  # B18: no search list would make every system header look local
+        sys.exit(f'check-production-tu: {compiler} -x {lang} -E -v failed (exit {probe.returncode})')
+    out = probe.stderr
     dirs, on = [], False
     for line in out.splitlines():
         if line.startswith('#include <...> search starts here'):

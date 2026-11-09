@@ -8,7 +8,7 @@
 # executable needs libnift_c.so and that every nift_* symbol it uses is
 # undefined in it (resolved from the library at run time), then runs it with
 # a minimal environment from that directory.
-set -eu
+set -eu -o pipefail
 lib=$(readlink -f "${1:?usage: external_consumer.sh LIBRARY [CC]}")
 cc=${2:-cc}
 repo=$(cd "$(dirname "$0")/../.." && pwd -P)
@@ -22,8 +22,8 @@ cp "$lib" "$work/lib/libnift_c.so"
 cd "$work"
 "$cc" -std=c99 -Wall -Wextra -pedantic -Werror -Iinclude external_consumer.c -Llib -lnift_c \
   -Wl,-rpath,'$ORIGIN/lib' -o consumer
-readelf -d consumer | grep -q 'NEEDED.*\[libnift_c.so\]' || { echo "FAIL abi-consumer: not linked dynamically"; exit 1; }
-if nm --defined-only consumer | awk '{print $3}' | grep -q '^nift_'; then
+grep -q 'NEEDED.*\[libnift_c.so\]' <<< "$(readelf -d consumer)" || { echo "FAIL abi-consumer: not linked dynamically"; exit 1; }
+if awk '{print $3}' <<< "$(nm --defined-only consumer)" | grep -q '^nift_'; then
   echo "FAIL abi-consumer: a nift_* symbol is defined in the executable"; exit 1
 fi
 used=$(nm -u consumer | awk '{print $2}' | grep -c '^nift_' || true)

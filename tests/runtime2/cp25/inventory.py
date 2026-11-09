@@ -84,7 +84,11 @@ def collect_execute_rt_diff(nift, out, seed):
         for c in cp12b_inventory.SHARED:
             cmd += ["--corpus", c]
         env = dict(os.environ, NIFT_VM_BIN=nift)
-        subprocess.run(cmd, cwd=REPO, env=env, stdout=subprocess.DEVNULL)
+        # B18: rt-diff exits 1 when it finds differences (expected here: VM against itself with
+        # stats); anything else (2: usage, a crash) is a harness failure, not an inventory.
+        rd = subprocess.run(cmd, cwd=REPO, env=env, stdout=subprocess.DEVNULL)
+        if rd.returncode not in (0, 1):
+            sys.exit("cp25 inventory: rt-diff failed (exit %d)" % rd.returncode)
         rows = []
         for r in json.load(open(report))["results"]:
             execs = [{"outcome": st.get("outcome"), "reason": st.get("reason", ""),

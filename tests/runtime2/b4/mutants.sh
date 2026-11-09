@@ -10,7 +10,7 @@
 # precondition: the flagged branches are redirected within the family table and
 # the session prints legacy's output (without B4 the mutant stops with exit 70).
 #   mutants.sh <nift> <unit-objects-file> [n ...]   (default: every mutant)
-set -u
+set -u -o pipefail
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
 UNIT_OBJECTS_FILE=$1; shift
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)

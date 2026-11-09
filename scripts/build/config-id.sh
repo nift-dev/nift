@@ -15,6 +15,9 @@
 # mutant provenance rebuild) computes the same identity for the in-tree objects
 # and reuses them instead of rebuilding them into the source tree with another
 # configuration. A compiler's version hash is computed once per shell.
+# B18: pipefail in every shell that sources this file (compile-object.sh, write-signature.sh,
+# check-config.sh); none of their pipelines' statuses decided anything before.
+set -o pipefail
 declare -A NIFT_VERSION_SHA 2>/dev/null || true
 config_text() {
   local cc=$1; shift

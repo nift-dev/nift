@@ -12,7 +12,7 @@
 #   3. (re-review N1) a weak reference, by attribute or #pragma weak, planted
 #      into src/Hooks.cpp also fails make nift at the allowlist.
 #   run.sh   (from the repository root, after `make nift libnift_c.so`)
-set -u
+set -u -o pipefail
 export LC_ALL=C
 here=tests/rt/sort_forgery
 work=$(mktemp -d "${TMPDIR:-/tmp}/nift-sort-forgery.XXXXXX")
@@ -59,7 +59,7 @@ for form in attribute pragma; do
   [ "$form" = attribute ] && plant=$WEAK_A || plant=$WEAK_B
   printf '\n%s\n' "$plant" >> src/Hooks.cpp
   make src/Hooks.o > "$work/weak-$form-obj.log" 2>&1 || { echo "FAIL sort-forgery 3 ($form): the plant does not compile"; fail=1; }
-  if nm -u src/Hooks.o | grep -Eq '^ *[wv] _ZN4nift2rt7Storage9array_mutERNS0_5ValueE$'; then
+  if grep -Eq '^ *[wv] _ZN4nift2rt7Storage9array_mutERNS0_5ValueE$' <<< "$(nm -u src/Hooks.o)"; then
     echo "PASS sort-forgery 3 ($form): the planted reference is weak (nm: $(nm -u src/Hooks.o | grep -E '^ *[wv] _ZN4nift2rt7Storage9array_mut' | awk '{print $1}'))"
   else echo "FAIL sort-forgery 3 ($form): the planted reference is not weak, so this case shows nothing"; fail=1; fi
   if make nift > "$work/weak-$form.log" 2>&1; then echo "FAIL sort-forgery 3 ($form): nift linked a weak reference to Storage::array_mut"; fail=1

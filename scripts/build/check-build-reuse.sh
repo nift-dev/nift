@@ -26,7 +26,7 @@
 #              of one configuration sharing objects: every object, sidecar and
 #              dependency file identical to a clean build of its own
 #              configuration, no temporary left
-set -u
+set -u -o pipefail
 out=${1:?usage: check-build-reuse.sh OUTDIR}
 mkdir -p "$out"
 fail=0
@@ -44,8 +44,10 @@ DEFAULT_BINS=".build/rt/value-unit .build/rt/atom-budget .build/rt/native-budget
 C1=no-cycle-check; C1_BIN=.build/rt/value-cycle-bench-off
 C2=saturated-slots; C2_BIN=.build/rt/heap-account-oom
 C1OBJ=$(var RT_OBJECTS_$C1); C2OBJ=$(var RT_OBJECTS_$C2)
-[ -n "$DOBJ" ] && [ -n "$C1OBJ" ] && [ -n "$C2OBJ" ] || { bad "setup: cannot list the object sets"; exit 1; }
-side() { for o in "$@"; do echo "$o" "${o%.o}.cfg" "${o%.o}.d"; done; }
+if [ -z "$DOBJ" ] || [ -z "$C1OBJ" ] || [ -z "$C2OBJ" ]; then bad "setup: cannot list the object sets"; exit 1; fi
+side() {
+  for o in "$@"; do echo "$o" "${o%.o}.cfg" "${o%.o}.d"; done
+}
 manifest() { sha256sum $(side "$@") 2>/dev/null | sort -k2; }
 DSET="$DOBJ $GEN_OBJ"
 dmanifest() { { manifest $DSET; sha256sum $DEFAULT_BINS; } | sort -k2; }
@@ -89,7 +91,7 @@ aba() {
   # a failed B still restores A, so a later check does not start from B's
   # signature (Linode recertification of e6d21fa4: the define row's failure
   # made the next row rebuild every object)
-  build_default "$@" || { bad "$label: B build failed"; build_default; return; }
+  if ! build_default "$@"; then bad "$label: B build failed"; build_default; return; fi
   t1=$(mtimes $DSET); rebuilt_b=$(changed "$t0" "$t1")
   manifest $DSET > "$out/B-$label.txt"
   if [ "$must" = all ]; then want=$(echo $DSET | tr ' ' '\n' | sort); else want=$(echo $must | tr ' ' '\n' | sort); fi
@@ -98,7 +100,7 @@ aba() {
     pass "$label: B rebuilt exactly the $(echo "$want" | wc -l) affected objects ($n of them happen to be the same bytes as A)"
   else bad "$label: B rebuilt $(echo "$rebuilt_b" | grep -c .) objects, expected $(echo "$want" | wc -l)"; fi
   sleep 1
-  build_default || { bad "$label: A rebuild failed"; return; }
+  if ! build_default; then bad "$label: A rebuild failed"; return; fi
   t2=$(mtimes $DSET); rebuilt_a=$(changed "$t1" "$t2")
   dmanifest > "$out/A2-$label.txt"
   if [ "$rebuilt_a" = "$want" ] && cmp -s "$out/A1.txt" "$out/A2-$label.txt"; then
@@ -222,7 +224,7 @@ dmanifest > "$out/A3-relocated.txt"; rm -rf "$reloc"
 if cmp -s "$out/A3.txt" "$out/A3-relocated.txt" && M .build/rt/value-unit nift; then
   pass "relocated: make TEST_DIR=<tmp> reused every in-tree object (none rebuilt or rewritten); the default links pass"
 else bad "relocated: the in-tree objects changed under another TEST_DIR"; fi
-if make -q nift && ! make -s -n nift | grep -qE -- ' -o nift$'; then
+if make -q nift && ! grep -qE -- ' -o nift$' <<< "$(make -s -n nift)"; then
   pass "dry run: an up-to-date tree is up to date for make -q nift, and make -n nift plans no link"
 else bad "dry run: make -q nift or make -n nift sees an up-to-date tree as stale"; fi
 

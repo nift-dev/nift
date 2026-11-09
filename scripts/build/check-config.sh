@@ -21,8 +21,9 @@
 # same object directory), so the link stops instead of mixing configurations.
 # What remains open: an object and its sidecar replaced together, by another
 # configuration, between this check and the link (tooling.md 1.4).
-set -u
+set -u -o pipefail
 . "$(dirname "$0")/config-id.sh"
+enable set; builtin set -o pipefail  # (B18) restated after sourcing (config-id.sh sets it too)
 bad=0; first=""; total=0
 # check OBJECT ID...: the sidecar names one of the IDs and this object's content
 check() {
@@ -65,7 +66,7 @@ if [ "${1:-}" = --sets ]; then
 else
   tpl=()
   while [ $# -gt 0 ] && [ "$1" != -- ]; do tpl+=("$1"); shift; done
-  [ "${1:-}" = -- ] || { echo "check-config.sh: usage: COMPILER ARGS... -- OBJECTS... | --sets TEST_DIR OBJECTS..." >&2; exit 2; }
+  if [ "${1:-}" != -- ]; then echo "check-config.sh: usage: COMPILER ARGS... -- OBJECTS... | --sets TEST_DIR OBJECTS..." >&2; exit 2; fi
   shift
   want=$(config_id "${tpl[@]}")
   for o in "$@"; do check "$o" "$want"; done

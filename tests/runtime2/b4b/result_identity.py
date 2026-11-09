@@ -25,6 +25,7 @@ Programs run in a temporary directory; the repository is not written.
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -182,7 +183,7 @@ def run(nift, src):
                            capture_output=True)
         return p.returncode, p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace")
     finally:
-        subprocess.run(["rm", "-rf", d])
+        shutil.rmtree(d, ignore_errors=True)  # B18: cleanup only (was an unchecked `rm -rf` run)
 
 
 def check(nift, label, expected_class, probe, recorded, failures):

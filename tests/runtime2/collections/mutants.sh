@@ -3,7 +3,7 @@
 # translation unit holding its deliberate defect (-DNIFT_COLLECTIONS_MUTANT=n),
 # links it with the normal objects, and the suite must FAIL on it.
 #   mutants.sh <nift> [n ...]      (default: every mutant)
-set -u
+set -u -o pipefail
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$ROOT" || exit 2

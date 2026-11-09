@@ -19,7 +19,7 @@
 # symbol (every builder user is allowed Construction::array_push, for
 # example) it cannot tell a builder's use from an in-place or forged one;
 # there the compile-time key and the lint are the guards (tooling.md 4.3, 2.4).
-set -u
+set -u -o pipefail
 allow=$1; shift
 [ $# -gt 0 ] || { echo "error: check-symbol-refs.sh: no objects to check" >&2; exit 1; }
 RESTRICTED='^nift::rt::(Storage::|Construction::|mutation::Protocol::(sort_storage|sort_items|commit_permutation|commit_array)\()'
@@ -35,7 +35,7 @@ for o in "$@"; do
   fi
   if [ ! -s "$errs.u" ]; then
     sections=$(readelf -SW "$o" 2>/dev/null) || { echo "error: check-symbol-refs.sh: cannot read $o" >&2; exit 1; }
-    if printf '%s\n' "$sections" | grep -q '\.gnu\.lto_'; then
+    if grep -q '\.gnu\.lto_' <<< "$sections"; then
       echo "error: check-symbol-refs.sh: $o is LTO bytecode nm did not read" >&2; exit 1
     fi
   fi

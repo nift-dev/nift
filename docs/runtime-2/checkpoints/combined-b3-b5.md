@@ -2930,3 +2930,42 @@ rather than fixing `table.cpp` alone. Two Lows:
   - **Embedding case:** an embedding that keeps transferred cyclic values holding handles alive on its main thread past its VMs no longer gets that release at exit. The OS reclaims the process's resources, but no handle cleanup hook runs for them.
   - Both texts are corrected; no code changes.
 - **L-2.** If the TSD key cannot be created (`pthread_key_create` fails), every worker thread's `owned<T>` objects leak until the process exits: soft (no abort), but unbounded in the number of threads.
+
+## 50. B18: test-test-integrity clean (C60, tests and scripts only)
+
+`scripts/test_integrity_check.py` reported 57 findings on the candidate, and it has no allowlist.
+All 57 are now resolved by fixes, so none is recorded as an exception. The gate reports
+`test-integrity clean: 680 files scanned, 0 findings`.
+
+**The 14 the coordinator named** (new in the candidate or since B4/B4b):
+- `swallowed-returncode` in `b4b/result_identity.py`: the unchecked `rm -rf` cleanup run becomes `shutil.rmtree`.
+- `pipefail-missing` in `b3/mutants.sh` (4), `b4/mutants.sh` (6) and `b4b/mutants.sh` (3): `set -u -o pipefail`.
+  - In b4b, the checker could not follow the inline `|| { echo ...; exit 2; }` groups inside `signals()`; they become `|| die "..."` (the same echo and exit 2).
+
+**Pre-existing findings, all fixed:**
+- **`pipefail-missing`** (pipefail now on). In `check-build-reuse.sh`, `config-id.sh` and `check-config.sh`, the checker lost track of state through brace groups after `||`, a one-line function holding a loop, and a sourced file. Those constructs were restructured: `if ...; then ...; fi`, a multi-line `side()`, and `enable set; builtin set -o pipefail` after the source. Files:
+  - `collections`, `refsem` and `safety` `mutants.sh`;
+  - `scripts/build/check-build-reuse.sh`, `check-config.sh`, `check-production-deps.sh`, `check-symbol-refs.sh` and `config-id.sh`. `config-id.sh` is sourced by `compile-object.sh`, `write-signature.sh` and `check-config.sh`; none of their pipelines' statuses decides anything.
+  - `tests/abi/external_consumer.sh`, `tests/rt/refrep_production.sh` and `tests/rt/sort_forgery/run.sh`.
+- **SIGPIPE.** Under pipefail, `producer | grep -q` can turn a found match into a failure: grep exits at the first match and the producer dies of SIGPIPE. Each one whose status decides a result now reads its input from a here-string (`grep -q PAT <<< "$(producer)"`). Sites:
+  - `check-build-reuse.sh`, the dry-run check (`! make -n | grep -q`, which could otherwise have passed falsely);
+  - `external_consumer.sh` (readelf, nm);
+  - `refrep_production.sh` (nm x3, printf x3);
+  - `sort_forgery/run.sh` (nm);
+  - `check-symbol-refs.sh` (printf).
+- **`swallowed-returncode`:**
+  - `cp25/inventory.py`: rt-diff exiting with anything other than 0/1 (differences) is a harness failure. **This could mask a failure before**: a crashed rt-diff was read as an inventory.
+  - `scripts/build/check-production-tu.py`: a failing `-E -v` probe exits, where an empty search list would make every system header look local. **This could mask a failure.** The `command -v` lookup (a cache key only) is explicit about its fallback.
+  - `cp23/default_controls.py`: a false positive. The wrapper source's `\nq=` was read as a variable `nq`; the string is split, with no behaviour change.
+
+**Gates re-run after the change.** The binary relinked identically (`check-config.sh`,
+`check-symbol-refs.sh` and `config-id.sh` run in every `nift` link).
+
+| Gate | Result |
+| --- | --- |
+| test-runtime2-b3/b4/b4b/collections/refsem/safety-mutants | all PASS: no failure newly revealed |
+| test-rt-refrep-production, test-c-abi-symbols (external_consumer), test-rt-sort-forgery | PASS |
+| test-runtime2-guardoff | FAIL at `guardoff.py` on `cp22/vm-only/v_preempt.f` before reaching `result_identity.py`. That case is timing-dependent: whether an async task is seen done within 5,000 loop iterations; `nift` printed `true` and then `false` on repeated runs. It is unrelated to B18 and recorded as flaky. `result_identity.py` run directly: PASS (61 probes) |
+| cp25r-inventory | `collect` (the changed step) passes; `report --check` fails on unclassified reasons (`method:open/close/save/write`), as before (EXPECTED_BASELINE) |
+| test-test-integrity, test-rt-lint, certification guard | PASS |
+| **Not run here** | test-build-reuse (destructive: clean and distclean of the tree); test-production-deps (needs the sanitizer and TSan libffi builds; disk); `cp23/default_controls.py` (wired to no target; needs the R2 binary) |

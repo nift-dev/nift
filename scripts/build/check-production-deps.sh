@@ -7,7 +7,7 @@
 # headers included) and fails if any dependency resolves into the repository's
 # tests/ tree. The compiler resolves includes, so no spelling, macro or
 # relative path can hide one.
-set -u
+set -u -o pipefail
 out=${1:?usage: check-production-deps.sh OUTDIR [TARGET...]}; shift
 targets=${*:-nift libnift_c.so .build/nift-sanitize .build/nift-sanitize-lifetime .build/nift-tsan}
 mkdir -p "$out"

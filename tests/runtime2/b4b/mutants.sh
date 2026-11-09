@@ -7,7 +7,8 @@
 # mutant's CLI is also linked as a fixed-point build and the fixed-point gate runs on the b4b
 # fixtures (tests/runtime2/b4b, guard on): its result is reported for every mutant.
 #   mutants.sh <nift> [n ...]   (default: every mutant)
-set -u
+set -u -o pipefail
+die() { echo "$1"; exit 2; }  # (B18) a harness failure
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$ROOT" || exit 2
@@ -64,28 +65,28 @@ signals() {  # signals N: build mutant N (0 = unmutated) and run every signal; s
   if [ "$n" != 0 ]; then
     for src in ${FILES[$n]}; do
       obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
-      $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4B_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant A$n: build failed"; exit 2; }
+      $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4B_MUTANT=$n -c "$src" -o "$mobj" || die "mutant A$n: build failed"
       replaced+=("$obj"); built+=("$mobj")
     done
   fi
   filter() { local list=$1; for r in "${replaced[@]}"; do list=$(printf '%s\n' $list | grep -vx "$r"); done; printf '%s ' $list; }
   link=$(filter "$(printf '%s\n' $objects | grep -v '\.a$')")
   libs=$(printf '%s\n' $objects | grep '\.a$' | tr '\n' ' ')
-  $CXX $CXXFLAGS $link "${built[@]}" -ldl $libs -o "$OUT/nift-$n" || { echo "mutant A$n: link failed"; exit 2; }
+  $CXX $CXXFLAGS $link "${built[@]}" -ldl $libs -o "$OUT/nift-$n" || die "mutant A$n: link failed"
   ulink=$(filter "$(printf '%s\n' $unit_objects | grep -v '\.a$')")
   ulibs=$(printf '%s\n' $unit_objects | grep '\.a$' | tr '\n' ' ')
   $CXX $CPPFLAGS -Itests/rt $CXXFLAGS tests/rt/b4b_types_unit.cpp $ulink "${built[@]}" -ldl $ulibs -o "$OUT/unit-$n" \
-    || { echo "mutant A$n: unit link failed"; exit 2; }
+    || die "mutant A$n: unit link failed"
   # B4b 23: the analysis-work gate (tests/runtime2/b4b/work.py) on the mutant's inference
   $CXX $CPPFLAGS -Itests/rt $CXXFLAGS tests/rt/b4b_work.cpp $ulink "${built[@]}" -ldl $ulibs -o "$OUT/work-$n" \
-    || { echo "mutant A$n: work harness link failed"; exit 2; }
+    || die "mutant A$n: work harness link failed"
   unit=0; suite=0; guard="-"; workgate=0
   "$OUT/unit-$n" > "$OUT/u$n.log" 2>&1 || unit=1
   python3 tests/runtime2/b4b/work.py --harness "$OUT/work-$n" > "$OUT/w$n.log" 2>&1 || workgate=1
   python3 tests/runtime2/b4b_types.py --nift "$OUT/nift-$n" --guardoff --quick > "$OUT/m$n.log" 2>&1 || suite=1
   if [ -n "$guardoff_objects" ]; then
     glink=$(filter "$(printf '%s\n' $guardoff_objects | grep -v '\.a$')")
-    $CXX $CXXFLAGS $glink "${built[@]}" -ldl $libs -o "$OUT/guardoff-$n" || { echo "mutant A$n: guard-off link failed"; exit 2; }
+    $CXX $CXXFLAGS $glink "${built[@]}" -ldl $libs -o "$OUT/guardoff-$n" || die "mutant A$n: guard-off link failed"
     { python3 tests/runtime2/b4b_types.py --nift "$OUT/guardoff-$n" --guardoff --quick &&
       python3 tests/runtime2/b4b/gen_alias.py --nift "$OUT/guardoff-$n" --sample 600 --seed 1; } > "$OUT/g$n.log" 2>&1 \
       && guard=passed || guard=failed
@@ -94,7 +95,7 @@ signals() {  # signals N: build mutant N (0 = unmutated) and run every signal; s
   if [ -n "$fixpoint_object" ]; then
     flink=$(filter "$(printf '%s\n' $objects | grep -v '\.a$' | grep -vx src/rt/infer_session.o)")
     $CXX $CXXFLAGS $flink "${built[@]}" "$fixpoint_object" -ldl $libs -o "$OUT/fixpoint-$n" \
-      || { echo "mutant A$n: fixed-point link failed"; exit 2; }
+      || die "mutant A$n: fixed-point link failed"
     python3 tests/runtime2/b4b/fixpoint.py --nift "$OUT/fixpoint-$n" --corpus-only b4b > "$OUT/f$n.log" 2>&1 \
       && fixpoint=passed || fixpoint=failed
   fi

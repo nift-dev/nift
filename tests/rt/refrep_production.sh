@@ -14,7 +14,7 @@
 #    admitted libstdc++ profile. B5 (b5-refsem.md): the Phase A guard and the
 #    `aliasing` refusal are deleted from every build; production must now share
 #    (the two former witnesses run and show the shared object).
-set -u
+set -u -o pipefail
 nift=$1; lib=$2; probe=$3
 fail=0
 # Each recipe defining the probe must belong to a test-only target: the refrep
@@ -22,17 +22,17 @@ fail=0
 # sanitizer objects ($(TEST_DIR)/san-guardoff/); never a production object.
 rules=$(awk '/^[^\t#][^=]*:/ { target = $0 } /^\t.*-DNIFT_RT_REFERENCE_PROBE/ { print NR ": " target " :: " $0 }' Makefile)
 count=$(printf '%s\n' "$rules" | grep -c .)
-if [ "$count" -ne 3 ] || printf '%s\n' "$rules" | grep -qv '^[0-9]*: \$(RT_REFREP_DIR)/\|^[0-9]*: \$(TEST_DIR)/san-guardoff/'; then
+if [ "$count" -ne 3 ] || grep -qv '^[0-9]*: \$(RT_REFREP_DIR)/\|^[0-9]*: \$(TEST_DIR)/san-guardoff/' <<< "$rules"; then
   echo "FAIL: unexpected NIFT_RT_REFERENCE_PROBE build rules:"; printf '%s\n' "$rules"; fail=1; fi
 if grep -nE '^(CPPFLAGS|CXXFLAGS|CFLAGS)\b.*NIFT_RT_REFERENCE_PROBE' Makefile; then
   echo "FAIL: production flags define the probe"; fail=1; fi
 for artifact in "$nift" "$lib"; do
-  if nm -D "$artifact" 2>/dev/null | grep -q nift_rt_reference_probe_build ||
-     nm "$artifact" 2>/dev/null | grep -q nift_rt_reference_probe_build ||
+  if grep -q nift_rt_reference_probe_build <<< "$(nm -D "$artifact" 2>/dev/null)" ||
+     grep -q nift_rt_reference_probe_build <<< "$(nm "$artifact" 2>/dev/null)" ||
      grep -q 'B2 reference probe (test configuration)' "$artifact"; then
     echo "FAIL: $artifact contains the reference probe"; fail=1; fi
 done
-if ! nm "$probe" | grep -q nift_rt_reference_probe_build; then
+if ! grep -q nift_rt_reference_probe_build <<< "$(nm "$probe")"; then
   echo "FAIL: control: the probe test binary lacks its marker"; fail=1; fi
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 printf 'n := [3,1,2]\nn.sort((x,y)=>x<y)\nprint(n)\n' > "$tmp/sort.f"
@@ -40,7 +40,7 @@ printf 'fn(g(a)) { a.push(1); return a.length() }\nb := [5]\nprint(g(b))\n' > "$
 profile=$(printf '#include <cstddef>\n__GLIBCXX__\n' | ${CXX:-g++} -E -x c++ - | tail -1)
 out=$(cd "$tmp" && NIFT_VM=require "$nift" sort.f 2>&1); rc=$?
 if [ "$profile" != 20260321 ]; then
-  if [ $rc -eq 0 ] || ! printf '%s' "$out" | grep -q '(method:sort)' || printf '%s' "$out" | grep -q '^\['; then
+  if [ $rc -eq 0 ] || ! grep -q '(method:sort)' <<< "$out" || grep -q '^\[' <<< "$out"; then
     echo "FAIL: production comparator sort not refused (method:sort): rc=$rc $out"; fail=1
   else echo "PASS production keeps the comparator sort refusal (method:sort; libstdc++ $profile)"; fi
 else echo "SKIP comparator refusal: admitted libstdc++ profile $profile (the production VM runs it)"; fi

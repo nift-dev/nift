@@ -5,7 +5,7 @@
 # (struct-render-unit), and the B3 suites must FAIL on it: b3_structs.py on
 # the mutant nift, or the unit on the mutant objects.
 #   mutants.sh <nift> <unit-objects-file> [n ...]   (default: every mutant)
-set -u
+set -u -o pipefail
 NIFT=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift
 UNIT_OBJECTS_FILE=$1; shift
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)

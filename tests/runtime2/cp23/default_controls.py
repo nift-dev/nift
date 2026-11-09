@@ -12,7 +12,7 @@ def gate(name,exe,passed,env=None):
 gate('normal',binary,True);gate('actual-R2-missing-prefix',old,False)
 with tempfile.TemporaryDirectory(prefix='cp23-default-controls-') as d:
  for name,change in [('duplicate','err=err.replace(b"thread: boom",b"thread: thread: boom")'),('wrong-location','err=err.replace(b":1:13:",b":1:14:")'),('prefix-on-stdout','out=out.replace(b"start\\n",b"thread: start\\n")')]:
-  wrapper=pathlib.Path(d)/name;wrapper.write_text('#!'+sys.executable+'\nimport os,subprocess,sys\nq=subprocess.run('+repr([str(binary)])+'+sys.argv[1:],capture_output=True)\nout,err=q.stdout,q.stderr\n'+change+'\nsys.stdout.buffer.write(out);sys.stderr.buffer.write(err);sys.exit(q.returncode)\n');wrapper.chmod(0o755);gate(name,wrapper,False)
+  wrapper=pathlib.Path(d)/name;wrapper.write_text('#!'+sys.executable+'\nimport os,subprocess,sys\n'+'q=subprocess.run('+repr([str(binary)])+'+sys.argv[1:],capture_output=True)\nout,err=q.stdout,q.stderr\n'+change+'\nsys.stdout.buffer.write(out);sys.stderr.buffer.write(err);sys.exit(q.returncode)\n');wrapper.chmod(0o755);gate(name,wrapper,False)
  dead=pathlib.Path(d)/'dead';dead.write_text('#!/bin/sh\nexit 0\n');dead.chmod(0o755);gate('dead',dead,False)
  timeout=pathlib.Path(d)/'timeout';timeout.write_text('#!'+sys.executable+'\nimport time\ntime.sleep(3)\n');timeout.chmod(0o755);gate('actual-timeout',timeout,False,{'CP22_TIMEOUT':'1'})
 a.output.write_text(json.dumps({'candidate_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'r2_sha256':hashlib.sha256(old.read_bytes()).hexdigest(),'rows':rows,'passed':True},indent=2)+'\n');print('PASS exact default contract: positive VM run; missing/duplicate/wrong-location/misapplied prefixes, dead binary and actual timeout rejected')
