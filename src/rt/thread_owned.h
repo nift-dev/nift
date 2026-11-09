@@ -15,10 +15,14 @@
 // destructor destroys that thread's objects in reverse order of creation, as C++ destroys
 // thread_locals (later objects may refer to earlier ones). pthread_key_create and
 // pthread_setspecific allocate nothing here (one key, created once; glibc keeps the first 32
-// keys' values in the thread descriptor); a failure there only leaves the objects to the end of
-// the process, never an abort. The main thread's objects live until the process exits (a
-// thread_local's destructor would have run at exit(); none of these has an effect beyond freeing
-// memory).
+// keys' values in the thread descriptor); a failure there never aborts, but then every thread's
+// objects are left to the end of the process (a soft, unbounded leak per worker thread). The
+// main thread's objects live until the process exits, where a thread_local's destructor would
+// have run at exit(). All of them only free memory except the TransferHeapScope root
+// (transfer_heap.cpp): its destructor releases retained cycle values, which for counted handles
+// runs handle-table cleanup. In the CLI that has no effect, because every VM's handle tables
+// shut down at VM teardown before exit; an embedding that keeps handles alive past its VMs on
+// the main thread no longer gets that cleanup at exit (combined-b3-b5.md section 49).
 //
 // tests/runtime2/tls_destructors.py requires that nift registers no TLS destructor (imports no
 // __cxa_thread_atexit).

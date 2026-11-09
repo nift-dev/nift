@@ -2858,7 +2858,7 @@ copy. No memory corruption was found. ASan/UBSan and valgrind are clean on the n
   - The object is created on first use with `new`, so exhaustion is an ordinary `std::bad_alloc`, handled as every allocation failure is.
   - It is reached through trivially destructible TLS pointers.
   - At thread exit, one POSIX TSD key destructor destroys the thread's objects newest first, as C++ destroys thread_locals. `pthread_key_create` and `pthread_setspecific` allocate nothing here, and fail softly.
-  - The main thread's objects live until the process exits. A thread_local's destructor would have run at `exit()`; none of these objects does more than free memory.
+  - The main thread's objects live until the process exits. A thread_local's destructor would have run at `exit()`. (Corrected in section 49: not every one of them only frees memory; the TransferHeapScope root releases retained cycle values.)
   - There is no new allocation at startup: everything is created on first use, as before, and only the failure mode changes (`bad_alloc` instead of an abort).
 
 **Audit of the thread_locals.** All 298 production objects were scanned for `__cxa_thread_atexit`.
@@ -2916,3 +2916,17 @@ test-rt-vm every prerequisite passes, and its own recipe stops only at vm_module
 `no_handle_strings` problem in `render.cpp`, which also predates this change.
 
 **Production sha256.** `fbdb05fbda30fba17ba0817f6d171dac3a26937055fa4e7681354096d6e9b42a`.
+
+## 49. Review of C56-C58 (ACCEPT-WITH-FINDINGS, two Low): wording corrected (C59)
+
+The review confirmed the root cause and the fix and found no corruption. Legacy output is
+unchanged across the 2,528-program corpus. It also agreed with converting every thread_local
+rather than fixing `table.cpp` alone. Two Lows:
+
+- **L-1.** Section 48 and `src/rt/thread_owned.h` said none of the main thread's `owned<T>` objects does more than free memory. That is wrong for the `TransferHeapScope` root (`transfer_heap.cpp`):
+  - Its destructor releases the retained cycle values (`cut`). For counted handles among them, that runs handle-table cleanup.
+  - On the main thread it no longer runs at `exit()`.
+  - **In the CLI this has no effect:** every VM's handle tables shut down at VM teardown (`Vm::~Vm`), before the process exits, so no handle is left for that cleanup to act on.
+  - **Embedding case:** an embedding that keeps transferred cyclic values holding handles alive on its main thread past its VMs no longer gets that release at exit. The OS reclaims the process's resources, but no handle cleanup hook runs for them.
+  - Both texts are corrected; no code changes.
+- **L-2.** If the TSD key cannot be created (`pthread_key_create` fails), every worker thread's `owned<T>` objects leak until the process exits: soft (no abort), but unbounded in the number of threads.
