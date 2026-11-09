@@ -3,7 +3,8 @@
 
 Differential where legacy's observable result is defined (nested frames,
 abandoned frames), VM-only where CP17's D-039 close/closed semantics or the
-runtime.handle_closed error are the contract (legacy handles are strings).
+runtime.handle_closed error are the contract (legacy handles are strings). D-039 is checked on
+stream handles: owner 2026-11-10 exempts file() values (legacy-equal after close()).
 """
 import argparse
 import json
@@ -23,10 +24,16 @@ CASES = [
     ("abandoned_frame",
      'fn(inner()) {\n  f := file("p")\n  f.open("r")\n  return f.read_all()\n}\nprint(inner())\n',
      "managed-error"),
-    ("alias_close", 'f := file("p")\nf.open("r")\ng := f\nf.close()\ng.close()\nprint("closed")\n', "vm-only"),
+    # Owner 2026-11-10 (decisions.md D-039 amendment): a file() value keeps legacy's behaviour after
+    # close(), so these two are legacy-equal now ("close: file is not open", "read_all: file is not
+    # open"); D-039 (idempotent close, runtime.handle_closed) is checked on stream handles below.
+    ("alias_close", 'f := file("p")\nf.open("r")\ng := f\nf.close()\ng.close()\nprint("closed")\n', "vm-equal-error"),
     ("stale_after_close",
      'f := file("p")\nf.open("r")\nprint(f.read_all())\nf.close()\nprint(f.read_all())\n',
-     "vm-error-only"),
+     "vm-equal-error"),
+    ("stream_alias_close", 's := ifstream("p")\ng := s\nclose(s)\nclose(g)\nprint("closed")\n', "vm-only"),
+    ("stream_stale_after_close",
+     's := ifstream("p")\nprint(s.read_line())\nclose(s)\nprint(s.read_line())\n', "vm-error-only"),
 ]
 
 
@@ -65,6 +72,11 @@ def main():
             elif mode == "vm":
                 if record.get("outcome") != "vm":
                     problems.append(f"expected vm, got {record.get('outcome')}/{record.get('reason')}")
+                elif vm != legacy:
+                    problems.append(f"legacy {legacy!r} != vm {vm!r}")
+            elif mode == "vm-equal-error":  # the VM ran it and ended in legacy's own error
+                if record.get("outcome") != "vm-error":
+                    problems.append(f"expected vm-error, got {record.get('outcome')}/{record.get('reason')}")
                 elif vm != legacy:
                     problems.append(f"legacy {legacy!r} != vm {vm!r}")
             elif mode == "vm-only":

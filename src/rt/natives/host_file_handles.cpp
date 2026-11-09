@@ -140,14 +140,10 @@ Status file_close(const Context& context, const Value* args, std::uint32_t argc,
     std::shared_ptr<FileResource> file;
     Status status = Status::Ok;
     if (!resource_arg(context, args, argc, "close", file, error, status)) {
-        // D-039: close on an already closed handle is Ok.
-        if (status == Status::Recoverable) {
-            const HandleStatus h = handles::native_handle_close(context.handles, "close", args[0],
-                                                                HandleKind::File, error);
-            if (h == HandleStatus::Ok) { out = Value::null(); return Status::Ok; }
-            return map_handle(h);
-        }
-        return status;
+        if (status != Status::Recoverable) return status;  // a handle closed otherwise: Ok (D-039)
+        const HandleStatus h = handles::native_handle_close(context.handles, "close", args[0], HandleKind::File, error);
+        if (h == HandleStatus::Ok) { out = Value::null(); return Status::Ok; }
+        return map_handle(h);
     }
     if (!no_args(argc, "close", error)) return Status::Error;
     if (!file->open) { error = "close: file is not open"; return Status::Error; }
@@ -158,8 +154,12 @@ Status file_close(const Context& context, const Value* args, std::uint32_t argc,
     file->saved.clear();
     file->saved_is_working = false;
     file->cursor = 0;
-    const HandleStatus h = handles::native_handle_close(context.handles, "close", args[0], HandleKind::File, error);
-    if (h != HandleStatus::Ok) return map_handle(h);
+    // Owner 2026-11-10 (decisions.md D-039 amendment): close() ends the buffer, not the file()
+    // value: path(), exists() and open() work after it; other methods: "<m>: file is not open".
+#if defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 5  // mutant 5: D-039 for file() again
+    if (const HandleStatus h = handles::native_handle_close(context.handles, "close", args[0], HandleKind::File, error);
+        h != HandleStatus::Ok) return map_handle(h);
+#endif
     out = Value::null();
     return Status::Ok;
 }

@@ -14,7 +14,10 @@ Status handle_close(const Context& context, const Value* args, std::uint32_t arg
         error = "close: expected a file or stream handle";
         return Status::Error;
     }
-    if (args[0].handle_kind() == HandleKind::File) return file_close(context, args, argc, out, error);
+    if (args[0].handle_kind() == HandleKind::File) {  // owner 2026-11-10: legacy's close() takes a stream
+        error = "close: expected stream";
+        return Status::Error;
+    }
     if (args[0].handle_kind() == HandleKind::Stream) return stream_close(context, args, argc, out, error);
     if (args[0].handle_kind() == HandleKind::Channel) {
         SharedOpError failure;

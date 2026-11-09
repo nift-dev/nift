@@ -3066,3 +3066,35 @@ So none can be retired as obsolete the way A29 and cp14b mutant 11 were.
 - **Cause:** the D4 exposure of B5 1 (**141b847e**, "U6, session persistence without stale assumptions"). `infer_session.cpp` marks both session-heap site classes `exposed_` ("earlier code reaches every earlier value"), so a fact-proved historical call opens every exposed class.
 - **Status:** one of the release-blocker shapes of b5-refsem.md 11.1.
 - **Recommendation:** as for m3, approve the refusal as a pinned witness until D4 is resolved; do not look for an admitted replacement while the U6 exposure stands.
+
+## 54. Owner decision 2026-11-10: `file()` after `close()` keeps legacy behaviour (C64, production)
+
+**Decision.** `close()` closes the active buffer of a `file()` value, not the value itself.
+D-039's "every later operation raises runtime.handle_closed" does not apply to `file()` values;
+it stands for every other handle kind. The amendment is in `decisions.md` under D-039.
+
+**Legacy's behaviour, taken from legacy** (`NIFT_VM=0`; checked cell by cell by the table below):
+- After `close()`, `path()` and `exists()` work, and `open(mode)` reopens the value. On reopen the buffer is re-read: mode r/rw/a reads the file, w starts empty and modified, a starts at the end. The modified flag and the cursor are reset as by a first `open`.
+- Every other method reports the ordinary `<method>: file is not open` error: fatal, not catchable, at legacy's position. This is the same text as for a never-opened value; legacy does not distinguish the two, and neither does the VM.
+- A second `close()` is `close: file is not open`, not idempotent.
+- The free `close(f)` on a `file()` value is `close: expected stream`, never-opened or open.
+
+**Change (bounded to `file()`).**
+- `file_close` (`src/rt/natives/host_file_handles.cpp`) clears the buffer state as before, but **no longer closes the handle-table slot**. The value stays live until it is dropped, as before, and cleanup still reports a buffer left open.
+- `handle_close` (`host_file_ops.cpp`, the free `close(x)`) raises legacy's `close: expected stream` for a `file()` value.
+- Streams, processes, timers and channels are unchanged: D-039 still closes their handles.
+
+**Tests.**
+- `tests/runtime2/file_mode_parity.py`:
+  - no approved D-039 cells remain;
+  - two reopen states (`reopened-r`: written, saved, closed, reopened r; `reopened-rw`) and the free `close(f)` are added;
+  - result: 8 states x 29 calls = 232 cells x 2 programs, every one equal to legacy except copy/move, which stay refused (B27).
+- **Mutant 5** (`NIFT_FILE_MODE_MUTANT=5`, D-039 for `file()` restored) is rejected by 164 checks. All 5 file-mode mutants are rejected, and the control is byte-identical to `nift`.
+- **test-v410-file-buffer-parity:** the 5 rows `open-rw`, `open-w`, `open-a`, `new-empty-write` and `reopen-external-edit` now match the oracle exactly.
+- **cp17 tests that pinned D-039 on `file()`** are moved to stream handles, for which D-039 still stands. The `file()` variants are kept as legacy-equal checks.
+  - `script_handle_lifecycle.py`: `alias_close` and `stale_after_close` are now legacy-equal errors; new `stream_alias_close` and `stream_stale_after_close` cover D-039.
+  - `closed_handle_catchable.py`: decision D on an `ifstream`; all 6 cases pass.
+  - `resource_contracts.py`: `closed_read_code` is the legacy error, new `closed_reopen` reopens, new `stream_closed_read_code` is `runtime.handle_closed`.
+- **Unchanged and passing:** `file_stream_handles.py`, `handle_flow_regressions.py`, `unwind_handle_release.py` (168 cases) and `vm_host.py` (160).
+
+**Production sha256.** `c88bf749d92215615e47fc487a8a7331f59ae3ce2fcb1198e49ddaf78e52a3f7`.

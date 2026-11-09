@@ -9,7 +9,8 @@ Before D, using a closed handle stopped the VM with an internal "catchable
 Error construction: code is not catchable" (exit 70).
 
 VM-only (NIFT_VM=require): legacy handles are strings and have no closed
-state, so there is no legacy oracle for these programs. Every case also proves
+state, so there is no legacy oracle for these programs. The closed handle is a stream
+(ifstream): file() values are exempt from D-039 since the owner's 2026-11-10 decision. Every case also proves
 that no internal failure occurred (exit is never 70, no "internal" text).
   uncaught      exit 1; stderr names the use site (line 5, column of the call)
                 and "handle is closed"; statistics vm-error, code
@@ -37,8 +38,11 @@ from pathlib import Path
 
 READ = "one\ntwo\n\n"  # print(f.read_all()) of "one\ntwo\n"
 # The Error message of a closed-handle use (D-035 wording plus the handle identity).
-MESSAGE = r"read_all: handle is closed \(file handle \d+/\d+, runtime\.handle_closed\)"
-USE = 'f := file("p")\nf.open("r")\nprint(f.read_all())\nf.close()\n'
+MESSAGE = r"read_all: handle is closed \(stream handle \d+/\d+, runtime\.handle_closed\)"
+# Owner 2026-11-10 (decisions.md D-039 amendment): a file() value keeps legacy's behaviour after
+# close() ("read_all: file is not open", fatal), so decision D is exercised on a stream handle,
+# for which D-039 stands. Four lines, so the use site stays on line 5.
+USE = 'f := ifstream("p")\nk := 0\nprint(f.read_all())\nclose(f)\n'
 
 CASES = [
     ("uncaught", USE + 'print(f.read_all())\nprint("unreachable")\n', {}),

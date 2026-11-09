@@ -775,6 +775,15 @@ language-cleanup checkpoint.
 - The lifecycle cost (create+resolve+release ~1,250 → ~2,100 instructions) is
   accepted while the resolve hot path is unchanged; the guard stays, and
   optimisation waits for measurements that justify it.
+- **Amendment (owner, 2026-11-10): `file()` values are exempt.** `close()` on a
+  `file()` value closes its open buffer, not the value: `path()`, `exists()` and
+  `open()` (reopen) stay available, and every other method reports legacy's
+  ordinary error (`<method>: file is not open`, fatal, legacy's position). A
+  second `close()` is legacy's `close: file is not open`; the free `close(f)`
+  of a `file()` value is legacy's `close: expected stream`. Reopening resets
+  the buffer exactly as legacy's `open` does. D-039 is unchanged for every other
+  handle kind (streams, processes, timers, channels, ...).
+  Record: `checkpoints/combined-b3-b5.md` section 54.
 
 ## D-040 — L7: value semantics for ordinary values (owner, 2026-10-20)
 

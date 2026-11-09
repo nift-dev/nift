@@ -52,9 +52,14 @@ CASES = [
      {"p": "abc\n"}, {}, "vm", "ok\n", "", ""),
     ("write_empty_existing", 'f := file("empty"); f.open("w"); f.write(""); f.close(); print("ok")',
      {"empty": ""}, {}, "vm", "ok\n", "", ""),
+    # Owner 2026-11-10 (decisions.md D-039 amendment): a closed file() keeps legacy's behaviour (the
+    # ordinary "file is not open" error; open() reopens it); D-039's runtime.handle_closed is pinned
+    # on a stream handle instead.
     ("closed_read_code", 'f := file("p"); f.open("r"); f.close(); print(f.read_all())', {"p": "abc\n"},
-     {}, "vm-error", "", "runtime.handle_closed", "handle is closed"),
-    ("closed_open_code", 'f := file("p"); f.open("r"); f.close(); f.open("r")', {"p": "abc\n"},
+     {}, "vm-error", "", "", "read_all: file is not open"),
+    ("closed_reopen", 'f := file("p"); f.open("r"); f.close(); f.open("r"); print(f.read_all()); f.close()',
+     {"p": "abc\n"}, {}, "vm", "abc\n\n", "", ""),
+    ("stream_closed_read_code", 's := ifstream("p"); close(s); print(s.read_all())', {"p": "abc\n"},
      {}, "vm-error", "", "runtime.handle_closed", "handle is closed"),
     ("handle_limit_one", 'f := file("p"); g := file("p"); print("SUCCESS")', {"p": "abc\n"},
      {"NIFT_HANDLE_LIMIT": "1"}, "vm-error", "", "limit.exceeded", "NIFT_HANDLE_LIMIT"),

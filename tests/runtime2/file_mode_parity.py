@@ -34,6 +34,9 @@ STATES = {
     "a": 'f.open("a")',
     "rw": 'f.open("rw")',
     "closed": 'f.open("rw")\nf.close()',
+    # Owner 2026-11-10: a closed file() value can be reopened; its state is legacy's.
+    "reopened-r": 'f.open("rw")\nf.write("xy")\nf.save()\nf.close()\nf.open("r")',
+    "reopened-rw": 'f.open("r")\nf.close()\nf.open("rw")',
 }
 CALLS = {
     "open": 'f.open("r")', "close": "f.close()", "read": "f.read()", "read(2)": "f.read(2)",
@@ -41,7 +44,7 @@ CALLS = {
     "write": 'f.write("xy")', "write_line": 'f.write_line("xy")', "flush": "f.flush()",
     "revert": "f.revert()", "save": "f.save()", "modified": "f.modified()", "tell": "f.tell()",
     "seek(1)": "f.seek(1)", "path": "f.path()", "exists": "f.exists()", "copy": 'f.copy("copied")',
-    "move": 'f.move("moved")', "remove": "f.remove()",
+    "move": 'f.move("moved")', "remove": "f.remove()", "close(f)": "close(f)",
     # C56 (review of C53-C55, F-1): non-string values through write and write_line.
     "write([1])": "f.write([1])", "write_line([1])": "f.write_line([1])",
     'write({"k":1})': 'f.write({"k":1})', 'write_line({"k":1})': 'f.write_line({"k":1})',
@@ -51,11 +54,9 @@ CALLS = {
 STATEMENT = {"copy", "move"}  # return a file value: called as a statement, not printed
 CLOSED = "handle is closed (file handle 0/1, runtime.handle_closed)"
 D039 = "D-039 (owner 2026-10-20): after close(), later operations raise runtime.handle_closed (catchable)"
-# The cells an approved decision covers: every call on a closed file (D-039), and an operation
-# after close() in the try variant's observation (D-039 too: catchable handle_closed there, where
-# legacy's "file is not open" is fatal).
-APPROVED = {("closed", c): D039 for c in CALLS}
-APPROVED.update({(st, "close"): D039 for st in ("r", "w", "a", "rw")})
+# Owner 2026-11-10 (decisions.md D-039 amendment): D-039 does not apply to file() values; a
+# closed file() behaves as legacy's in every cell, so no cell is approved.
+APPROVED = {}
 REFUSED = "not compiled for the VM (host-handle-flow)"
 # copy() and move() return a file value: the VM refuses the program before it runs (a B27
 # refusal: nothing runs, no file changes), never a different result.
@@ -66,9 +67,9 @@ def cleanup(state, call):
     """Statements that leave no file open and cannot fail, after `call` succeeded in `state`."""
     if call in ("close", "move", "remove"):
         return ""
-    if state in ("w", "a", "rw"):
+    if state in ("w", "a", "rw", "reopened-rw"):
         return "f.revert()\nf.close()\n"
-    if state == "r" or (state == "never" and call == "open"):
+    if state in ("r", "reopened-r") or (state in ("never", "closed") and call == "open"):
         return "f.close()\n"
     return ""
 
@@ -81,7 +82,7 @@ def programs(state, call):
     tail = cleanup(state, call) + 'print("END")\n'
     plain = 'f:=file("data")\n%s\nprint("BEFORE")\n%s\nprint("AFTER")\n%s' % (setup, shown, tail)
     observe = 'try { print(f.modified()) } catch(e) { print("M " + e.message) }\n'
-    if state in ("r", "rw"):
+    if state in ("r", "rw", "reopened-r", "reopened-rw"):
         observe += 'try { f.seek(0); print(f.read_all()) } catch(e) { print("R " + e.message) }\n'
     guarded = ('f:=file("data")\n%s\nprint("BEFORE")\ntry { %s } catch(e) { print("CAUGHT " + e.message) }\n'
                '%sprint("AFTER")\n%s' % (setup, shown, observe, tail))
