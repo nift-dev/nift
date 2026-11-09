@@ -28,6 +28,8 @@ import argparse, collections, json, os, resource, shutil, subprocess, sys, tempf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
+# B07: the sharing oracle parses programs with the CP10 parse dump (make .build/rt-parse-dump).
+PARSE_DUMP = os.environ.get("VM_PARSE_DUMP", os.path.join(REPO, ".build", "rt-parse-dump"))
 sys.path.insert(0, HERE)
 import vm_gen  # noqa: E402
 import d040_witnesses  # noqa: E402
@@ -305,6 +307,11 @@ def rt_diff(args, work):
            # B5 (owner 2026-11-08 06:46): the 30 approved shared-reference differences
            # (combined-b3-b5.md section 23.1), exact rules; approved changes, not legacy parity.
            "--policy", "tools/rt-diff/policies/b5-refsem-vm.json",
+           # B07 option 2 (owner 2026-11-10, combined-b3-b5.md section 60): the sharing oracle
+           # classifies the remaining B5 shared-reference differences of generated and corpus
+           # scripts (attribution, not correctness; fail closed). The 28 seed-1 exact rules it
+           # cannot replace are scoped to --seed 1 (gen_seed) in b5-refsem-vm.json.
+           "--sharing-oracle", PARSE_DUMP,
            "--extract-smoke", "tests", "--gen", str(args.rt_diff_gen), "--seed", str(args.seed), "--quiet",
            "--timeout", str(max(60, args.timeout)),
            "--b-vm-stats",
@@ -382,6 +389,23 @@ def rt_diff(args, work):
                 or own[0].get("legacy_executions", 0) != 0):
             print(f"FAIL rt-diff B5 approval for {r['id']} not confirmed by VM statistics")
             bad_class += 1
+    # B07: each sharing-oracle approval must carry its passed checks (five checks, evidence) and
+    # come from one VM execution of P with no legacy execution, like the exact B5 rules.
+    for r in report["results"]:
+        if not any(d["policy"] == "b5-sharing-oracle" for d in r["approved"]):
+            continue
+        approvals["b5-sharing-oracle"] += 1
+        own = r.get("vm_stats") or []
+        oracle = r.get("sharing_oracle") or {}
+        if (oracle.get("status") != "approved" or not (oracle.get("evidence") or {}).get("vm_vs_vm_t")
+                or len(own) != 1 or own[0].get("outcome") not in ("vm", "vm-error")
+                or own[0].get("legacy_executions", 0) != 0):
+            print(f"FAIL rt-diff sharing-oracle approval for {r['id']} not confirmed by its checks and VM statistics")
+            bad_class += 1
+    oracle_summary = report["summary"].get("sharing_oracle", {})
+    print(f"rt-diff sharing oracle: {oracle_summary.get('approved', 0)} approved, "
+          f"{oracle_summary.get('unclassified', 0)} unclassified (each unclassified row stays a difference); "
+          f"{len(report['summary'].get('out_of_scope_policies', []))} seed-scoped policies out of scope")
     print(f"rt-diff class approvals (confirmed by VM statistics): {dict(sorted(approvals.items()))}")
     if bad_class:
         return 1

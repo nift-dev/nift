@@ -153,6 +153,42 @@ runs. `vm_parity.py` requires the VM statistics of every approval of the two
 latter classes to show the evidence (`error_in_loop_path`,
 `large_in_loop_path`).
 
+**Seed-scoped exact rules** (B07, combined-b3-b5.md section 60). An exact rule may carry
+`"gen_seed": N`; its entry must then be a generated one (`gen/...`). It applies only to a run
+with `--gen` and `--seed N`. In any other run it is out of scope, because its entry names a
+different program: it is neither used nor reported unused, and the report lists it under
+`out_of_scope_policies`.
+
+**Sharing oracle** (B07 option 2, owner 2026-11-10; `--sharing-oracle RT_PARSE_DUMP`, which
+needs `--b-vm-stats`; implemented in `tools/rt-diff/sharing_oracle.py`). It handles a script
+entry's differences that no rule approved. It rewrites P to T(P): every argument of every call
+to a function the program declares is wrapped in `deepcopy(...)` at the call site. It uses
+deepcopy, not copy: copy is shallow, so an array nested inside an argument would stay shared.
+It approves the entry (policy `b5-sharing-oracle`, decision `D-NEXT-refsem-b`) only if all five
+checks hold:
+1. Legacy(T(P)) == Legacy(P) on every channel.
+2. VM(T(P)) == Legacy(P) on every channel.
+3. VM(P) != VM(T(P)).
+4. There is no refusal, timeout, crash, abort, exit 70 or internal tag, and each VM run was one
+   VM execution.
+5. Every differing channel moves back under T, and an exit or stderr difference alone, with
+   stdout equal, is never approved.
+
+The comparison of the T runs leaves out only the script file itself, which differs by
+construction. The oracle **fails closed**: the entry is reported `SHARING-ORACLE UNCLASSIFIED`
+and stays a difference when any check fails or when preservation cannot be shown statically:
+- a parse failure or an unknown node kind;
+- structs;
+- `same()` or a handle or reference built-in;
+- a closure capturing a parameter of an enclosing function;
+- a declared function's name rebound;
+- no rewritable call site;
+- a reference cycle.
+
+It establishes **attribution, not correctness**: a VM bug confined to the shared-mutation path
+would be approved. The B5 semantic suites stay the correctness oracle. Self-test:
+`make test-rt-vm-sharing-oracle` (`tests/runtime2/sharing_oracle_selftest.py`).
+
 ## Reproducibility
 
 Generated programs start with `// rt-diff gen.py --seed S index I`; the same

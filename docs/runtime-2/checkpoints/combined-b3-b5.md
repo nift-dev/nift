@@ -3303,3 +3303,115 @@ Owner rulings 2026-11-10, following section 53 and the C59–C66 review (F-3).
   `shared` is its tripwire.
 - Both rows already fail if the mutant starts to differ from the control, which would force a
   reclassification.
+
+## 60. B07 option 2: the rt-diff sharing oracle (C71, tests and tools only)
+
+Owner 2026-11-10 06:15: option 2 is approved. Seeds are not aligned, so the mutation gate keeps its
+independent seed 3, and no new per-program approvals are added. This follows section 52. No
+production change; `nift` stays c88bf749….
+
+**The oracle** (`tools/rt-diff/sharing_oracle.py`; `rt-diff --sharing-oracle RT_PARSE_DUMP`,
+used by `vm_parity.py` in both tiers). For a script entry whose differences no rule approves:
+- **Rewrite T(P):** every argument of every call to a function the program declares is wrapped
+  in `deepcopy(...)` at the call site. It is built on the CP10 parse dump (byte offsets), and
+  nothing else changes.
+- **deepcopy, not copy.** copy is shallow (D-NEXT-refsem #3): an array or object nested in an
+  argument would stay shared, and a callee's mutation through a nested element would remain
+  visible. deepcopy gives the callee what legacy's by-value passing gives it. The two are never
+  used interchangeably, and the self-test asserts that T contains no `copy(`.
+- **It approves only if all five checks hold:**
+  1. Legacy(T(P)) == Legacy(P) on every channel.
+  2. VM(T(P)) == Legacy(P) on every channel.
+  3. VM(P) != VM(T(P)).
+  4. No refusal, timeout, crash or abort, exit 70 or internal tag, and each VM run is exactly one
+     VM execution with no legacy execution.
+  5. Exit and stderr are justified separately: every differing channel must move back under T
+     (implied by 2 and 3, asserted anyway), and an exit or stderr difference **alone** (stdout
+     equal) is never approved.
+
+  Only the script file itself is left out of the T comparisons, since it differs by construction.
+- **Fail closed:** the entry is reported `SHARING-ORACLE UNCLASSIFIED` and stays a difference
+  that blocks the gate when:
+  - any check fails;
+  - rt-parse-dump cannot parse P, or P has an unknown node kind;
+  - P declares structs (struct `==` is identity);
+  - P calls `same()` or a handle or reference built-in (file, ifstream, ofstream, close, mutex,
+    channel, send, recv, cancel, atomic, map, set, stack);
+  - a closure captures a parameter of an enclosing function;
+  - a declared function is rebound;
+  - P has no rewritable call site;
+  - any run reports a reference cycle.
+- **The limit, recorded here and in the tool's header:** the oracle establishes **attribution**
+  (the difference comes from argument sharing), **not correctness**. A VM bug confined to the
+  shared-mutation path would be approved. B5's semantic suites (b5, refsem, collections; written
+  expectations) remain the correctness oracle and stay in the gate.
+- `vm_parity.py` additionally requires each oracle approval to carry its passed checks and to come
+  from one VM execution of P with no legacy execution.
+
+**Old rules.**
+- The 48 seed-1 exact rules (24 generated programs) were checked against the oracle.
+  - **The oracle approves 10 of the 24 programs:** g00024, g00030, g00034, g00073, g00114,
+    g00118, g00131, g00139, g00170 and g00181. Their 20 rules are retired, moved to
+    `tools/rt-diff/policies/b5-refsem-vm-retired.json` (not loaded), each with its reason.
+  - **The other 14 are unclassified (fail closed):**
+    - 11 use `file()`: g00002, g00008, g00060, g00071, g00101, g00112, g00125, g00133, g00159,
+      g00169, g00190;
+    - 3 have a closure capturing parameter `k`: g00028, g00045, g00189.
+
+    Their 28 owner-approved rules (2026-11-08) stay exact. They are **scoped** with
+    `"gen_seed": 1`: they apply only to `--gen --seed 1`, and in any other seed they are out of
+    scope, neither used nor unused (`out_of_scope_policies` in the report). The source sha256
+    still pins each program.
+- The 14 rules for the 6 corpus entries (semantics, smoke, vm-corpus) are unchanged; they run in
+  every tier.
+
+**Self-test** (`make test-rt-vm-sharing-oracle` under `test-rt-vm`, and
+`test-rt-vm-mutants-sharing-oracle` under `test-rt-vm-mutants`; both edges in the certification
+guard): `tests/runtime2/sharing_oracle_selftest.py`, PASS, 26 checks.
+- **Semantic probes on the real VM:**
+  - approved: direct mutation of an argument, mutation through a nested array element and
+    through an array nested in an object, two arguments aliasing one array, a function returning
+    its argument, and a sharing difference ending in the same runtime error;
+  - not approved: a cycle store (no difference: both engines leave the array unchanged);
+  - unclassified: a closure capturing an argument, `same()`, a handle (`file()`), a struct.
+- **Negative controls**, using `tests/runtime2/sharing_oracle_fake_vm.py`, a fake VM that plants
+  one unrelated bug in both VM(P) and VM(T(P)). Each is rejected by the named check:
+  - an unrelated stdout change, with and without a sharing difference: check 2;
+  - a wrong error position: check 2;
+  - a changed exit status only, with and without sharing: check 2;
+  - an unexpected refusal: check 4;
+  - an abort (SIGABRT): check 4;
+  - a rewrite that changes legacy (a runtime error column on a rewritten line): check 1.
+- **Existing rt-diff mutants** (`rt_diff_mutant.py` stdout-only, stderr-only and exit-only over
+  the real VM): every program where the mutation shows is unclassified, with no oracle approval.
+- **Static checks:** the rewrite is exact (several arguments, nested calls), and it fails closed
+  without a call site and on a parse error.
+
+**Results** (in tree, production c88bf749…):
+- **The gate's unmutated `[0] parity`** (`vm_parity.py --gen 100 --seed 3 --rt-diff
+  --rt-diff-gen 50`): **PASS**. rt-diff found 659 entries, **0 differing, 0 unused policies**;
+  the oracle approved 3 (g00013, g00021, g00047) and left 0 unclassified; 28 seed-scoped rules
+  were out of scope.
+- **The functional tier** (`--gen 300 --seed 1 --rt-diff`): PASS. rt-diff found 817 entries, 0
+  differing, 0 unused; the oracle approved 10; b5-refsem exact approvals 20.
+- **`make test-rt-vm-mutants`: the unmutated run passes every suite, and 11 of 12 mutants are
+  rejected. Mutant 5 ("wrong error column") SURVIVES every suite. This is not caused by B07;
+  production change needed, stopped and reported.**
+  - At CP12 mutant 5 was rejected by seven suites (cp12-engine-selection.md, line 401).
+  - Its hook, `MUTATE_ERROR_OFFSET` in `Vm::report_offset` (`vm_report.cpp:60`), no longer
+    reaches any printed position. On the `-DNIFT_VM_MUTANTS` build, `NIFT_VM_MUTANT=5` prints the
+    same positions as 0 for VM runtime errors (division by zero at 1:19, index out of range at
+    3:7 and 5:7; statistics outcome `vm-error`). Mutant 6 changes its message on the same
+    program.
+  - The same run without the oracle and with the old B5 rules shows no mutant-5 difference
+    either. Earlier the gate stopped at `[0] parity` (section 52), which hid this.
+  - Restoring mutant 5 means moving the hook to where VM error positions are rendered now, which
+    is production code (compiled only under `-DNIFT_VM_MUTANTS`). Alternatively, retire it as
+    obsolete with evidence. This is an owner decision.
+- **`make test-runtime2-rt-diff-selftest` fails 7 checks, identically with C70's
+  `tools/rt-diff/rt-diff` (HEAD) and with this commit's.** The failing checks: interleave
+  channel, combined text-match, trace ops touch/env-all/spawn, D-009 policies and timeout
+  reporting. So these failures predate B07. They are not in `prelaunch-known-failures.tsv`, and I
+  have not looked into them. `rt_diff_trace_policy_selftest.py` (the same target's second step)
+  passes on its own (13 cases, 9 rejected).
+- Gates on this commit: the guard, rt-lint and test-integrity pass.

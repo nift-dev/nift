@@ -749,6 +749,9 @@ def load_policies(paths):
                         problems.append("`test` must start with an existing repository path (got %r)" % test_path)
                     if rid in ids:
                         problems.append("duplicate id")
+                    if "gen_seed" in rule and (not isinstance(rule["gen_seed"], int) or isinstance(rule["gen_seed"], bool)
+                                               or not rule["entry"].startswith("gen/")):
+                        problems.append("`gen_seed` must be an integer and the entry a generated one (gen/...)")
                 if problems:
                     usage_error("rt-diff: policy %s: %s" % (rid, "; ".join(problems)))
                 ids.add(rid)
@@ -875,6 +878,65 @@ def minimise(entry, a_bin, b_bin, options, rules, out_dir):
         shutil.rmtree(base, ignore_errors=True)
 
 
+# --------------------------------------------------------------------- sharing oracle (B07)
+SHARING_ORACLE_POLICY = "b5-sharing-oracle"
+
+
+def run_sharing_oracle(entry, a, b, options, a_bin, b_bin, use_trace, interleave):
+    """B07 option 2 (owner 2026-11-10): runs T(P) on both binaries and applies the five checks of
+    tools/rt-diff/sharing_oracle.py. Attribution only, never correctness. Fail closed: any
+    problem leaves the entry UNCLASSIFIED."""
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    import sharing_oracle  # tools/rt-diff/sharing_oracle.py
+
+    def unclassified(reason, **extra):
+        return dict({"status": "unclassified", "reason": reason}, **extra)
+
+    if entry["kind"] != "script":
+        return unclassified("not a script entry")
+    root, why = sharing_oracle.parse(options.sharing_oracle, entry["path"])
+    if root is None:
+        return unclassified(why)
+    with open(entry["path"], "rb") as handle:
+        source = handle.read()
+    rewritten, wrapped, why = sharing_oracle.transform(source, root)
+    if rewritten is None:
+        return unclassified(why)
+    tree = entry.get("tree") or os.path.dirname(entry["path"])
+    scratch = tempfile.mkdtemp(prefix="rtdiff-oracle-")
+    base = tempfile.mkdtemp(prefix="rtdiff-oracle-run-")
+    try:
+        copy = os.path.join(scratch, "tree")
+        shutil.copytree(tree, copy, symlinks=True)
+        script = os.path.join(copy, os.path.relpath(entry["path"], tree))
+        with open(script, "wb") as handle:
+            handle.write(rewritten)
+        probe = dict(entry, path=script, tree=copy)
+        at = run_one(a_bin, probe, base, options.timeout, use_trace, 2 if interleave else 0)
+        bt = run_one(b_bin, probe, base, options.timeout, use_trace, 1 if interleave else 0, vm_stats=True)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+        shutil.rmtree(base, ignore_errors=True)
+    excluded = entry.get("excluded", ())
+    # The script file itself differs between P and T(P) by construction; every other file, and
+    # every other channel, is compared as is.
+    script_key = "s/t/u/w/" + os.path.relpath(entry["path"], tree).replace(os.sep, "/")
+
+    def without_script(run):
+        run = dict(run)
+        run["files"] = {k: v for k, v in run["files"].items() if k != script_key}
+        return run
+
+    if not all(script_key in run["files"] for run in (a, b, at, bt)):
+        return unclassified("the script's own file is missing from a snapshot (%s)" % script_key, wrapped=wrapped)
+    a, b, at, bt = (without_script(run) for run in (a, b, at, bt))
+    ok, why, evidence = sharing_oracle.decide(a, b, at, bt, lambda x, y: compare(x, y, use_trace, excluded))
+    if not ok:
+        return unclassified(why, wrapped=wrapped)
+    return {"status": "approved", "reason": "five checks hold", "wrapped": wrapped, "evidence": evidence}
+
+
 # --------------------------------------------------------------------- main
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -897,6 +959,9 @@ def main():
     parser.add_argument("--repro-limit", type=int, default=3, help="minimise at most this many programs")
     parser.add_argument("--extract-smoke", metavar="TESTS_DIR", help="also run scripts extracted from smoke-test heredocs")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--sharing-oracle", metavar="RT_PARSE_DUMP",
+                        help="B07: classify remaining differences of script entries with the B5 sharing "
+                             "oracle (tools/rt-diff/sharing_oracle.py; needs --b-vm-stats)")
     parser.add_argument("--b-vm-stats", action="store_true",
                         help="collect B's NIFT_VM_STATS per entry (CP12 class rules, report field vm_stats)")
     options = parser.parse_args()
@@ -923,6 +988,13 @@ def main():
     for path in options.ignore:
         global_ignore += load_ignore(path)
     rules = load_policies(options.policy)
+    if options.sharing_oracle and (not options.b_vm_stats or not os.access(options.sharing_oracle, os.X_OK)):
+        usage_error("rt-diff: --sharing-oracle needs --b-vm-stats and an executable rt-parse-dump")
+    # B07 (combined-b3-b5.md section 60): a rule with "gen_seed" approves a generated entry of that
+    # generator seed only. In a run with another seed (or without --gen) it is out of scope: it
+    # cannot match (its entry is a different program) and is neither used nor unused.
+    out_of_scope = sorted(r["id"] for r in rules if "gen_seed" in r and not (options.gen and r["gen_seed"] == options.seed))
+    rules = [r for r in rules if r["id"] not in out_of_scope]
     try:
         entries, errors = discover(corpus, global_ignore)
         if len(entries) < options.min_entries:
@@ -949,15 +1021,26 @@ def main():
                 shutil.rmtree(base, ignore_errors=True)
             diffs = compare(a, b, use_trace, entry.get("excluded", ()))
             approved, remaining = apply_policies(entry, a, b, diffs, rules, used)
+            oracle = None
+            if remaining and options.sharing_oracle:
+                oracle = run_sharing_oracle(entry, a, b, options, a_bin, b_bin, use_trace, interleave)
+                if oracle["status"] == "approved":
+                    approved += [{"channel": d["channel"], "policy": SHARING_ORACLE_POLICY,
+                                  "decision": "D-NEXT-refsem-b"} for d in remaining]
+                    remaining = []
             vm_stats = [{k: v for k, v in st.items() if k != "_source"} for st in b.get("vm_stats", [])]
-            return entry, approved, remaining, len(a["trace"]), a.get("combined_unstable", False), vm_stats
+            return entry, approved, remaining, len(a["trace"]), a.get("combined_unstable", False), vm_stats, oracle
 
         results = []
         with cf.ThreadPoolExecutor(max_workers=max(1, options.jobs)) as pool:
-            for entry, approved, diffs, events, unstable, vm_stats in pool.map(job, entries):
+            for entry, approved, diffs, events, unstable, vm_stats, oracle in pool.map(job, entries):
                 results.append({"id": entry["id"], "kind": entry["kind"], "diffs": diffs, "vm_stats": vm_stats,
                                 "approved": approved, "trace_events": events, "path": entry["path"],
                                 "combined_unstable": unstable, "excluded": entry.get("excluded", [])})
+                if oracle is not None:
+                    results[-1]["sharing_oracle"] = oracle
+                    if oracle["status"] != "approved":
+                        print("SHARING-ORACLE UNCLASSIFIED %s: %s" % (entry["id"], oracle["reason"]))
         differing = [r for r in results if r["diffs"]]
         approved = [r for r in results if r["approved"]]
         counts = {}
@@ -993,6 +1076,9 @@ def main():
                    "channels": sorted({d["channel"] for r in differing for d in r["diffs"]}),
                    "trace": use_trace, "seed": options.seed, "generated": options.gen,
                    "combined_unstable": unstable, "unused_policies": unused,
+                   "out_of_scope_policies": out_of_scope,
+                   "sharing_oracle": {k: sum(1 for r in results if (r.get("sharing_oracle") or {}).get("status") == k)
+                                      for k in ("approved", "unclassified")},
                    "command": " ".join(shlex.quote(a) for a in sys.argv)}
         print("rt-diff: %d entries %s, %d differing, %d approved; %d entries traced (%d Host ops); "
               "combined order unstable (not compared) in %d; %d unused policies"

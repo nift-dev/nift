@@ -1293,6 +1293,19 @@ $(RT_VM_MUTANTS): $(filter-out $(RT_VM_MUTATED),$(CLI_OBJECTS)) $(RT_VM_MUTANT_O
 		$(LDLIBS) -o $@
 
 .PHONY: test-rt-vm-mutants
+# B07 option 2 (owner 2026-11-10, combined-b3-b5.md section 60): the rt-diff sharing oracle's
+# self-test (semantic probes, negative controls with a fake VM, the rt-diff mutants). vm_parity's
+# rt-diff runs use the oracle in both tiers, so each tier runs it through its own target (the
+# certification guard's removal control requires one edge per target).
+SHARING_ORACLE_SELFTEST = $(PYTHON) -B tests/runtime2/sharing_oracle_selftest.py --nift "$(CURDIR)/$(TARGET)" \
+	--parse-dump "$(CURDIR)/$(TEST_DIR)/rt-parse-dump$(EXEEXT)"
+.PHONY: test-rt-vm-sharing-oracle test-rt-vm-mutants-sharing-oracle
+test-rt-vm-sharing-oracle: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	$(SHARING_ORACLE_SELFTEST)
+test-rt-vm-mutants-sharing-oracle: $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	$(SHARING_ORACLE_SELFTEST)
+test-rt-vm: test-rt-vm-sharing-oracle
+test-rt-vm-mutants: test-rt-vm-mutants-sharing-oracle
 test-rt-vm-mutants: $(RT_VM_MUTANTS) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(TARGET)
 	python3 tests/runtime2/vm_mutation_gate.py --nift "$(CURDIR)/$(RT_VM_MUTANTS)" --rt-diff --jobs "$${NIFT_MUTANT_JOBS:-$$(( ($$(nproc) + 1) / 2 ))}"
 
