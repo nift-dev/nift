@@ -3229,3 +3229,13 @@ not done here: move the three functions into a leaf `parallel_task_core.cpp`.
 binaries; the drift guard above fails if they diverge. The CP23 co-location in `parallel_task.cpp`
 has no production effect. The `obj.merge` and `str.replace` instruction counts exceed their CP15
 guards (above).
+
+## 57. F-1: context_probe probes legacy (C68, tests only)
+
+`tests/runtime2/builtins/context_probe.py` removed `NIFT_VM` from the environment and so ran the
+binary's default engine, which has been the VM since Runtime 2.0. Its "legacy context-dependence
+inventory" (D-015) was recording VM refusals and found 7 context-dependent cases against the 19
+expected. It now sets `NIFT_VM=0`, since legacy is the oracle by design (`RT_BUILTINS_LEGACY`).
+`make test-rt-builtins-probe`: PASS (inventory pinned), 272 cases × 6 contexts, 10
+context-dependent; 11 pairs, 9 shape-dependent. With this and section 56, `make test-rt-builtins`
+passes as a whole.

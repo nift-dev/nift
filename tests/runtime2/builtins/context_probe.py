@@ -76,8 +76,10 @@ def outcome(nift, workdir, source):
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(source)
     env = dict(os.environ)
-    for key in ("NIFT_VM", "NIFT_VM_STATS"):
-        env.pop(key, None)
+    env.pop("NIFT_VM_STATS", None)
+    # Legacy is the oracle of this inventory (D-015); the binary defaults to the VM since
+    # Runtime 2.0, so the legacy engine is selected explicitly (review C59-C66 F-1).
+    env["NIFT_VM"] = "0"
     proc = subprocess.run([nift, "p.f"], cwd=workdir, env=env, capture_output=True,
                           stdin=subprocess.DEVNULL, timeout=30)
     out = proc.stdout.decode("utf-8", "replace").strip("\n").split("\n")
