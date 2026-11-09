@@ -87,11 +87,12 @@ bool file_stream_cases() {
     CHECK(call(nift::rt::natives::file_save, context, {file}, out, error) == nift::rt::natives::Status::Ok);
     Value alias = file;
     CHECK(call(nift::rt::natives::file_close, context, {alias}, out, error) == nift::rt::natives::Status::Ok);
-    CHECK(call(nift::rt::natives::file_path, context, {file}, out, error) ==
-          nift::rt::natives::Status::Recoverable);
-    CHECK(error.find("runtime.handle_closed") != std::string::npos);
+    // Owner 2026-11-10 (D-039 amendment): close() ends the buffer, not the file() value.
+    CHECK(call(nift::rt::natives::file_path, context, {file}, out, error) == nift::rt::natives::Status::Ok);
+    CHECK(out.is(Kind::String) && string_view_of(out) == path);
     CHECK(call(nift::rt::natives::file_close, context, {file}, out, error) ==
-          nift::rt::natives::Status::Ok);  // idempotent through the alias
+          nift::rt::natives::Status::Error);  // legacy: a second close through the alias fails
+    CHECK(error == "close: file is not open");
 
     Value forged = Value::handle(HandleKind::File, file.handle_id() + 1, file.handle_generation());
     CHECK(call(nift::rt::natives::file_path, context, {forged}, out, error) ==
@@ -101,10 +102,11 @@ bool file_stream_cases() {
     Value reused;
     CHECK(call(nift::rt::natives::file_factory, context, {make_string((root / "other.txt").generic_string())},
                reused, error) == nift::rt::natives::Status::Ok);
-    CHECK(call(nift::rt::natives::file_path, context, {file}, out, error) ==
-          nift::rt::natives::Status::Recoverable);
+    CHECK(call(nift::rt::natives::file_path, context, {file}, out, error) == nift::rt::natives::Status::Ok);
+    CHECK(out.is(Kind::String) && string_view_of(out) == path);
     CHECK(call(nift::rt::natives::file_path, context, {reused}, out, error) ==
           nift::rt::natives::Status::Ok);
+    CHECK(out.is(Kind::String) && string_view_of(out) == (root / "other.txt").generic_string());
 
     Value stream;
     CHECK(call(nift::rt::natives::ifstream_factory, context, {make_string(path)}, stream, error) ==
@@ -116,6 +118,15 @@ bool file_stream_cases() {
           nift::rt::natives::Status::Ok);
     CHECK(call(nift::rt::natives::stream_read_line, context, {stream}, out, error) ==
           nift::rt::natives::Status::Recoverable);
+    CHECK(error.find("runtime.handle_closed") != std::string::npos);
+    // Slot reuse must not alias the stale (D-039 closed) stream handle.
+    Value reused_stream;
+    CHECK(call(nift::rt::natives::ifstream_factory, context, {make_string(path)}, reused_stream, error) ==
+          nift::rt::natives::Status::Ok);
+    CHECK(call(nift::rt::natives::stream_read_line, context, {stream}, out, error) ==
+          nift::rt::natives::Status::Recoverable);
+    CHECK(call(nift::rt::natives::stream_close, context, {reused_stream}, out, error) ==
+          nift::rt::natives::Status::Ok);
 
     Value output;
     CHECK(call(nift::rt::natives::ofstream_factory, context, {make_string((root / "out.txt").generic_string())},
