@@ -616,8 +616,43 @@ def trace_continues(a, b):
     stopped at legacy's 64-frame limit, B went on), B's Host trace may extend
     A's: A's events, in emission order and byte for byte, are exactly the
     first events of B's, and B's further events come after all of them. A
-    modified, reordered or missing common event is never approved."""
-    return a["trace"] == b["trace"][:len(a["trace"])]
+    modified, reordered or missing common event is never approved.
+
+    B07 (combined-b3-b5.md section 52): with concurrent tasks the global
+    emission order is not deterministic, so the extension is also accepted per
+    context (trace_continues_by_context): every context of A is, event for
+    event, the start of the same context of B, and a context only B has is a
+    task (`<owner>/async#N`, `<owner>/thread#N`) that B started after its
+    owner had emitted every event A's owner emitted: after legacy's failure
+    point. A task context B started earlier is never approved."""
+    return a["trace"] == b["trace"][:len(a["trace"])] or trace_continues_by_context(a["trace"], b["trace"])
+
+
+def trace_continues_by_context(ta, tb):
+    ga, gb = trace_groups(ta), trace_groups(tb)
+    for ctx, events in ga.items():
+        if gb.get(ctx, [])[:len(events)] != events:
+            return False
+    # B's global index of each context's n-th event.
+    seen, index_of = {}, {}
+    for i, (ctx, _) in enumerate(tb):
+        seen[ctx] = seen.get(ctx, 0) + 1
+        index_of[(ctx, seen[ctx])] = i
+    first = {}
+    for i, (ctx, _) in enumerate(tb):
+        first.setdefault(ctx, i)
+
+    def after_failure(ctx, depth=0):
+        if depth > 64 or ("/async#" not in ctx and "/thread#" not in ctx):
+            return False  # only a task context can be new
+        owner = ctx.rsplit("/", 1)[0]
+        if owner in ga:
+            return first[ctx] > index_of.get((owner, len(ga[owner])), -1)
+        if owner in gb:  # the owner is itself a task B alone started
+            return after_failure(owner, depth + 1) and first[ctx] > first[owner]
+        return False
+
+    return all(after_failure(ctx) for ctx in gb if ctx not in ga)
 
 
 sys.path.insert(0, os.path.join(REPO, "tests", "runtime2"))

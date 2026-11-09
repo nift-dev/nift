@@ -23,6 +23,8 @@ RULE = {"id": "cp11-recursion-budget-class", "decision": "D-001#4", "class": "re
 E = [("script", '{"op":"stat","res":"file"}'), ("script", '{"op":"read","res":"ok"}'),
      ("script/thread#1", '{"op":"stat","res":"directory"}')]
 EXTRA = ("script/thread#1", '{"op":"stat","res":"directory","arg":"x"}')
+A1, A2 = ("script/async#1", '{"op":"write","res":"ok"}'), ("script/async#1", '{"op":"rm","res":"ok"}')
+A1X = ("script/async#1", '{"op":"write","res":"err"}')
 
 
 def run(trace_a, trace_b, recursion=True):
@@ -45,6 +47,15 @@ CASES = [
     ("extra VM event before the divergence", E[:2], [E[0], EXTRA, E[1], E[2]], True, False),
     ("VM trace shorter than legacy", E, E[:2], True, False),
     ("not the recursion-budget shape", E[:2], E, False, False),
+    # B07 (combined-b3-b5.md section 52): per-context extension with concurrent tasks.
+    ("tasks interleave; each legacy context a prefix; a new task after the failure point",
+     [E[0], A1, E[1], A2], [E[0], A1, A2, E[1], E[2]], True, True),
+    ("a new task context started before legacy's failure point", E[:2], [E[0], E[2], E[1]], True, False),
+    # (A new non-task context after every legacy event is approved by the original global-prefix rule.)
+    ("a task context of legacy's modified", [E[0], A1, E[1]], [E[0], A1X, E[1], E[2]], True, False),
+    ("a task context of legacy's shorter in the VM", [E[0], A1, A2, E[1]], [E[0], A1, E[1], E[2]], True, False),
+    ("a new task owned by a task that is new too, after the failure point",
+     E[:2], E[:2] + [("script/thread#1", '{"op":"stat"}'), ("script/thread#1/async#1", '{"op":"read"}')], True, True),
 ]
 
 

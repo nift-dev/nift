@@ -3005,3 +3005,33 @@ failed to link.
 
   Restoring the contract needs a production change: splitting `shared_state` from the transfer and parallel code, or stubbing the shared natives in the isolated build. Per the instructions, **stopped and reported, not changed.**
 - **test-rt-builtins** depends on the two isolated gates, so it fails with them. Its own lines beyond the unit and the differential: rt-lint of `src/rt/natives` passes. `context_probe.py` fails against its expectation file; that probe of legacy's context-dependent behaviour is independent of B09 and was not examined further here.
+
+## 52. B07: test-rt-vm-mutants unmutated parity (C62, partial; tools and tests only)
+
+**Reproduced** with `vm_parity.py --gen 100 --seed 3 --rt-diff --rt-diff-gen 50` on `nift`, as the
+mutation gate's `[0]` step runs it: rt-diff reports 4 differing entries and 48 unused policies, and
+the gate fails.
+- `gen/g00013`, `g00021`, `g00047`: the B5 shared-reference difference (a callee's `push(99)` visible to the caller: legacy `[1,2]`, VM `[1,2,99]`). The 62 B5 rules in `b5-refsem-vm.json` are exact per-source rules from gen.py **seed 1**. They do not cover seed 3, and 48 of them approve nothing there.
+- `gen/g00046`: the `cp11-recursion-budget-class` approves stdout, stderr and exit. The trace channel stayed a difference: legacy stopped at `rec8(70)` before `thread(tw9, 0)`, and the VM's new context `script/thread#1` was not covered. The rule required legacy's whole trace to be a prefix of the VM's in **global** emission order, and that order is not deterministic with the program's concurrent async tasks.
+
+**Done: D-001#4 extended to the trace after legacy's failure point.** `trace_continues`
+(`tools/rt-diff/rt-diff`) keeps the global-prefix rule, and also accepts the extension **per
+context**:
+- every context of legacy's trace is, event for event, the start of the same context of the VM's;
+- a context only the VM has must be a task (`<owner>/async#N`, `<owner>/thread#N`) whose first event the VM emitted after its owner had emitted every event legacy's owner emitted, that is, after legacy's failure point (applied recursively for a task owned by a new task).
+
+`g00046` is now approved. `tests/runtime2/rt_diff_trace_policy_selftest.py` (13 cases, 9 rejected)
+adds the negative controls; the approved difference must stay exactly this one:
+- a new task context started **before** legacy's failure point is rejected;
+- a modified event in one of legacy's task contexts is rejected;
+- a legacy task context that is shorter in the VM is rejected;
+- tasks interleaving with each legacy context a prefix, and a nested new task after the failure point, are approved.
+
+**Stopped: the B5 class rule needs a production change.**
+- A class rule for the B5 shared-reference difference, "confirmed by VM statistics as cp11-recursion-budget-class is", needs a statistic that attributes the output difference to a mutation made visible through a shared reference. The recursion class has `beyond_legacy_depth`; the VM statistics have nothing for sharing (fields: outcome, executions, heap, dispatch defects, ...).
+- Any text-only class rule ("legacy and VM differ in an array's printed contents") would approve unrelated differences, which is the weakening the task forbids.
+- Options for the owner:
+  - **(a)** a production statistic, for example a count of stores into an aggregate reachable from more than one binding, with the class rule requiring it to be non-zero and the rest of the output equal;
+  - **(b)** a test-side oracle that reruns the program on the VM with every call argument wrapped in `deepcopy(...)` and requires that run to equal legacy exactly. No production change, but a source transform to maintain;
+  - **(c)** exact rules for the gate's seed 3 too, or running the gate's parity step with seed 1. This keeps the per-source approach the task wanted replaced.
+- Until then the gate's `[0] parity` still fails: 3 differing entries (g00013, g00021, g00047) and 48 unused B5 policies. The 12-mutant re-run was not done, since the unmutated step does not pass yet.
