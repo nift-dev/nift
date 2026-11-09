@@ -2698,3 +2698,43 @@ The review found more earlier-value kinds that reach `infer_sites.cpp:298`: a do
 
 `tests/runtime2/for_s2_bench.py` still mixes the deterministic memory checks with a wall-clock
 ratio that only reports MISS (never fails). Unchanged, as asked.
+
+## 45. Review of B01 (ACCEPT-WITH-FINDINGS): F1, `read(n)` counts the bytes read (C53)
+
+**F1 (parity).** The VM failed `s.read(n)` when n > L (the limit) from the count *asked for*. On a
+file of exactly L bytes:
+- legacy's `read(1001)` (L = 1000) prints `1000`;
+- the VM failed at 2:6 with `read: a read of ... exceeds the read limit`.
+
+c528e7eb behaved the same. The difference predates B01 and is on no approved list.
+
+**Cause.** `stream_read_impl` (`src/rt/natives/host_stream_handles.cpp`) refused
+`requested > limit` before reading anything. Legacy (`ReadLimit.h` `read_bounded`, called from
+`ParserExpression.cpp`) counts the bytes actually read. It reads at most the room plus one probe
+byte, and fails only when that byte exists.
+
+**Fix.**
+- `read(n)` reads and buffers at most min(n, L) bytes.
+- When n > L and L bytes were read, one byte more is probed, as `read_all` already did. If it exists, the result is the limit error, with legacy's text (`a read of <path>`) and position.
+- No allocation is proportional to n. Growth stays bounded by min(n, L) (`growth_target`, section 43), so the peak stays within 1.5 L.
+
+**Controls** (`read_limit_controls.py` D, 7 new checks, 81 in all). Each is VM against legacy on exit, stdout and stderr, unless marked otherwise.
+- `read(L+1)` and `read(huge)` on L bytes return L bytes.
+- `read(L)` on L+1 bytes returns L bytes.
+- `read(L+1)` and `read(huge)` on L+1 bytes fail with the limit error.
+- `read(huge)` on `/dev/zero` stops at the limit under RLIMIT_AS = baseline + 1.5 L.
+- `read(huge)` on a sparse file of exactly L (40 MiB + 12345) under the same RLIMIT_AS reads whole. This one is VM only: legacy itself dies with `std::bad_alloc` there, because it holds the result twice.
+
+**Mutant 8** (`NIFT_READ_LIMIT_MUTANT=8`, the pre-C53 requested-count check) is rejected by 5 checks.
+All 8 read-limit mutants are rejected, and the control is byte-identical to `nift`.
+
+**Recorded only (the review's other findings; unchanged).**
+- A regular file that grows after `stat` can transiently hold up to about 2 L. The buffer is pre-sized to the stat size, at most L, and the chunk loop then grows it to the limit before the next chunk fails.
+- A limit error inside `return` is reported at 1:18 where legacy reports 1:11. This belongs to the existing error-position P2 group.
+- test-rt-handles-guards: the handle-bench Ir counts (cycle 2293 > 2288, counted 2370 > 2369.4) are a new local signature. The bench binaries are byte-identical at 03b31fa2 and at the tip, so this predates B01 and is independent of it. **Flagged for a Linode follow-up.**
+
+**Production sha256.** `d78510a29a95eddcf63768aa4f333b50507b63166f63c6f501fb7b1cc08d4bd5`.
+
+**Gates.**
+- test-runtime2-host-deps: every line passes except read_limit.py's 24 refusals (section 43), the same list.
+- test-runtime2-read-limit-mutants: 8 of 8 rejected.

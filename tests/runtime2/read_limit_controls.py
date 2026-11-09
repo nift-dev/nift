@@ -17,6 +17,8 @@ stdout and stderr (the fatal "<op>: <what> exceeds the read limit of N bytes
      std::bad_alloc (exit 70); a regular file of exactly the limit is read.
      Before B01 the 3x file was pre-sized whole and read_line doubled past
      the limit.
+  D. (C53) read(n) counts the bytes read, not n: read(L+1) and read(huge) on L bytes return
+     them; on L+1 bytes they fail; read(huge) on /dev/zero stops at the limit under RLIMIT_AS.
   C. Short reads count against the limit: a FIFO writer paced chunk by chunk
      (each chunk is written only once the reader has drained the previous
      one, so every read(2) the reader makes returns at most that one chunk,
@@ -112,6 +114,29 @@ def small_limit(work):
     reads("A read_line: a line of exactly the limit", script % (work / "line-exact.txt"), work, SMALL, ["LINE", "next"])
     fatal("A read_line: a line one byte over", "read_line",
           's := ifstream("%s")\nx := s.read_line()' % (work / "line-over.txt"), work, SMALL)
+
+
+HUGE = 10 ** 15                        # a read count far beyond any limit or file
+
+
+def counted_reads(work, address_space):
+    """C53 (review of B01, F1): read(n) counts the bytes read, not the bytes asked for (legacy's
+    read_bounded): n > limit on a stream of at most `limit` bytes returns them; one byte more is
+    the limit error; a huge n allocates nothing in proportion to n."""
+    exact, over = work / "exact.txt", work / "over.txt"   # SMALL and SMALL + 1 bytes (small_limit)
+    body = 's := ifstream("%s")\nx := s.read(%d)\nprint(x.length())\nclose(s)'
+    reads("D read(L+1) on L bytes", body % (exact, SMALL + 1) + "\n", work, SMALL, [str(SMALL)])
+    reads("D read(huge) on L bytes", body % (exact, HUGE) + "\n", work, SMALL, [str(SMALL)])
+    fatal("D read(huge) on L+1 bytes", "read", body % (over, HUGE), work, SMALL)
+    fatal("D read(L+1) on L+1 bytes", "read", body % (over, SMALL + 1), work, SMALL)
+    reads("D read(L) on L+1 bytes", body % (over, SMALL) + "\n", work, SMALL, [str(SMALL)])
+    large = work / "exact-large.bin"                      # LARGE bytes, sparse (large_limit)
+    # VM only: legacy itself holds the result twice here (std::bad_alloc under this RLIMIT_AS).
+    proc = rl.run(body % (large, HUGE) + "\n", work, limit=LARGE, address_space=address_space)
+    check("D read(huge) on a file of exactly the limit under RLIMIT_AS: read whole (VM only)",
+          proc.returncode == 0 and proc.stdout.split() == [str(LARGE)], (proc.stdout + proc.stderr)[-300:])
+    fatal("D read(huge) on /dev/zero under RLIMIT_AS", "read", body % ("/dev/zero", HUGE), work, LARGE,
+          address_space)
 
 
 def fifo_writer(fifo, total, paced=False, newline=False):
@@ -223,6 +248,7 @@ def main():
     try:
         small_limit(work)
         large_limit(work, address_space)
+        counted_reads(work, address_space)
         paced_short_reads(work)
     finally:
         shutil.rmtree(work, ignore_errors=True)

@@ -35,12 +35,21 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
     const nift::readlimit::Setting setting = nift::readlimit::current();
     if (!setting.valid) return stream_invalid_setting(context, setting, operation, error);
     const std::uint64_t limit = setting.bytes;
-    const std::uint64_t max_bytes = all ? limit : static_cast<std::uint64_t>(requested);
-    if (max_bytes > limit)
+#if defined(NIFT_READ_LIMIT_MUTANT) && NIFT_READ_LIMIT_MUTANT == 8
+    // mutant 8: the pre-C53 check, on the requested count instead of the bytes read
+    if (!all && static_cast<std::uint64_t>(requested) > limit)
         return stream_limit(context,
                             nift::readlimit::exceeded_message(std::string(operation),
                                                               "a read of " + stream.path.generic_string(), limit),
                             "limit.exceeded", error);
+#endif
+    // C53 (review of B01, F1; combined-b3-b5.md section 45): the limit applies to the bytes read,
+    // as legacy's read_bounded does, not to the count asked for: read(n) with n > limit on a stream
+    // of at most `limit` bytes returns them. At most min(n, limit) bytes are read and buffered; when
+    // more were asked for, one byte more is probed to prove "too large".
+    const std::uint64_t max_bytes =
+        all ? limit : std::min<std::uint64_t>(static_cast<std::uint64_t>(requested), limit);
+    const bool probe = all || static_cast<std::uint64_t>(requested) > limit;
 
     BudgetedText data(context);
     char buffer[64 * 1024];
@@ -76,14 +85,16 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
         total += got;
         if (static_cast<std::size_t>(got) < ask) break;
     }
-    if (all && total == limit && stream.input->good()) {
+    if (probe && total == limit && stream.input->good()) {
         char extra = 0;
         stream.input->read(&extra, 1);
         if (stream.input->bad()) return stream_read_failure(context, operation, error);
         if (stream.input->gcount() > 0)
             return stream_limit(context,
                                 nift::readlimit::exceeded_message(std::string(operation),
-                                                                  "the rest of " + stream.path.generic_string(), limit),
+                                                                  (all ? "the rest of " : "a read of ") +
+                                                                      stream.path.generic_string(),
+                                                                  limit),
                                 "limit.exceeded", error);
     }
     std::string text = data.take();

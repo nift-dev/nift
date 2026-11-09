@@ -13,7 +13,8 @@
 #   4  no read_line limit check;
 #   5  no size-against-limit check before a regular file's buffer is sized;
 #   6  read_whole reads what is available now (readsome): a short read ends the read;
-#   7  read_whole's byte count restarts at every read.
+#   7  read_whole's byte count restarts at every read;
+#   8  stream read(n) checks the requested count n, not the bytes read (C53, the pre-C53 rule).
 # Each mutant must compile to objects that differ from the control's (provenance: no vacuous
 # build) and must fail the controls. A build failure is a harness failure.
 # Usage (from the repository root; the Makefile passes the objects):
@@ -69,7 +70,7 @@ NIFT_BIN="$PWD/$OUT/0/nift" python3 -B tests/runtime2/read_limit_controls.py >"$
 echo "PASS read-limit control: NIFT_READ_LIMIT_MUTANT=0 passes ($(grep -c '^PASS' "$OUT/0/test.log") checks)"
 
 status=0
-for n in 1 2 3 4 5 6 7; do
+for n in 1 2 3 4 5 6 7 8; do
   build "$n"
   differs=0
   for tu in "${TUS[@]}"; do
@@ -84,5 +85,5 @@ for n in 1 2 3 4 5 6 7; do
   fi
 done
 find tests/runtime2 -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
-[ "$status" = 0 ] && echo "read-limit mutants: all 7 rejected, control passes"
+[ "$status" = 0 ] && echo "read-limit mutants: all 8 rejected, control passes"
 exit "$status"
