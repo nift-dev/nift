@@ -1960,3 +1960,164 @@ afterwards):**
   binary later).
 - The two baselines and the candidate keep `make -q nift`.
 - collect also copies the provenance and the pin.
+
+## 36. B21: certification evidence outside every tree, durable per gate (C42)
+
+**Finding (BLOCKERS.md B21, instance 110461664).** The campaign ran 404 of 404 gates: 281 ok, 123
+FAILED, certify exit 1. Classification then crashed with `FileNotFoundError` on
+`.build/certify/test-build-reuse.log`:
+- test-build-reuse's `scripts/build/check-build-reuse.sh:244-248` runs `make clean nift` and
+  `make distclean nift` in the checkout.
+- `distclean` removes `$(TEST_DIR)` = `.build`, and with it `.build/certify`: every earlier gate
+  log, the running gate's own log, the preflight and the build logs.
+- The 190 exclusive gates after it ran in a tree that had been distcleaned and rebuilt, and that
+  the 3,600 s kill may have left in an intermediate configuration.
+- The owner (2026-11-09 16:46) approved B21 as the last harness correction. Harness and tests only;
+  no src/ or Makefile change.
+
+**1. Evidence outside every tree.**
+- Everything certify writes goes to `--evidence-root/<campaign-id>/` (default
+  `/var/tmp/nift-certify`, `scripts/certify_evidence.py`): identity, per-gate logs and records,
+  kept rt-diff reports, fingerprint inputs, preflight, build logs, oracle rechecks and summaries.
+- `--campaign-id` defaults to UTC time, commit and pid. The private copies of destructive gates go
+  to `--work-root/<campaign-id>/` (default `/var/tmp/nift-certify-work`).
+- Both are refused (exit 2, every run mode, `--list` included) when they lie inside:
+  - the checkout;
+  - the oracle's tree;
+  - the v4.12.0 baseline;
+  - a regression baseline;
+  - the unprivileged copies.
+  They are also refused when either lies inside the other.
+- `.build/certify` is no longer written.
+
+**2. Durable per gate.**
+- **First pass.** Each gate's first pass writes `gates/<target>/run.log`, fsynced, and then
+  `run.json` (atomic: temp file, fsync, link, directory fsync, written once, read-only).
+  `run.json` holds:
+  - rc, start, end, seconds and timeout;
+  - the cwd and source tree, and whether the run used an isolated copy;
+  - the log's sha256 and size;
+  - the tree identity before and after: commit, tree, working-tree diff sha256 and nift sha256;
+  - the toolchain, the environment, the campaign id and the identity sha256.
+- **Classification.** Classification reads these and never writes them. Its own runs (rerun,
+  unprivileged, v4.12.0 baseline, regression baselines, recipe lines) go into a new attempt
+  directory `gates/<target>/cls-<N>/`, each run with the same kind of record. `class.json` is
+  written last.
+- **Resume.** `--resume` reopens a campaign:
+  - gates with a `run.json` are read, not rerun;
+  - an interrupted first pass's log is kept as `run.log.interrupted-<k>`;
+  - targets with a completed attempt are read back;
+  - an interrupted attempt (no `class.json`) is kept as it is, and classification continues in
+    attempt N+1.
+- **Interruption.** SIGTERM or SIGINT kills the running gates' process groups (their exact PGIDs,
+  tracked by certify) and exits 128+signal.
+- **Missing evidence.** A missing or altered first-pass log, or a missing record, makes the gate
+  FAILED-NEW with an `EVIDENCE-LOST` reason; classification never crashes on it (B21 acceptance 2).
+  An OSError during classification is handled the same way.
+- `--no-classify` runs and records the first passes only.
+
+**3. Identities kept apart.**
+- `identity.json`, written once, records:
+  - the candidate's tree identity;
+  - the toolchain (CXX version line, resolved CC/CXX and their sha256s, `__GLIBCXX__`, libstdc++
+    sha256);
+  - the environment;
+  - the configuration (flag and make variables, CC, CXX, the comparator switch, the unprivileged
+    user);
+  - each regression baseline's and the v4.12.0 baseline's tree identity, built first if missing;
+  - the oracle and its pin.
+  Its sha256 leaves out the campaign id and the paths.
+- **Resume.** A resume under a different identity is refused with exit 2, and each difference is
+  printed.
+- **Records at classification.**
+  - A first-pass record from another campaign or identity, or one that ran on another candidate
+    tree or binary, is BLOCKED `IDENTITY-MISMATCH (not classified)`, with the difference given.
+  - Each classification run's record must match the identity its role expects (candidate,
+    `v4.12.0`, `regression:<name>`); otherwise the gate is BLOCKED in the same way.
+  - So a gate that left a different binary behind cannot silently colour the gates after it.
+- **Merge.** `--merge` lists each summary's campaign and identity, and refuses summaries of
+  different source trees unless `--merge-mixed-identities` is given (that merge is then labelled
+  as mixed). The existing binary and libstdc++ refusal is unchanged.
+- **Separation.** Recovery reruns and baseline comparisons are separated by attempt directory and
+  record role, and campaigns by their directories.
+
+**4. Owner's acceptance test (guard, the real `scripts/certify.py` on a toy git tree whose
+`distclean` removes `.build` and nift):**
+1. test-ev-a runs; its log and result are stored.
+2. `make distclean` removes the checkout's `.build` and nift.
+3. Both files still exist, byte for byte (sha256).
+4. test-ev-b runs in the resumed campaign; test-ev-a's record is read, not rerun.
+5. Classification reads both: test-ev-a is classified from its record.
+6. SIGTERM to certify's exact PID during test-ev-b's rerun:
+   - every stored record is unchanged;
+   - the interrupted attempt `cls-1` is kept;
+   - the resumed classification completes in `cls-2` with both gates FAILED-NEW (exit 1).
+
+Negative control: the C41 runner (`git show 2bedfb33:scripts/certify.py`, logs under `.build/certify`)
+fails step 3, because distclean deletes its log.
+
+Further guard cases:
+- **Refusals (exit 2):**
+  - evidence inside the checkout;
+  - a reused campaign id without `--resume`;
+  - a resume after a source change.
+- **Lost evidence:** a deleted `run.log` makes the gate FAILED-NEW `EVIDENCE-LOST`, and the
+  campaign completes.
+- **Isolation:** a destructive toy `test-build-reuse` runs `make distclean` in its copy. The
+  checkout keeps `.build` and nift, `timing.txt` is kept in the evidence, the copy is removed, and
+  the cap is 7,200 s.
+- **Table cases (19):**
+  - root containment;
+  - tree and identity comparison;
+  - the evidence verdicts;
+  - the destructive detector (positives, comments, `make nift … clean tree`, the script behind a
+    recipe, an unlisted cleaning gate as a plan problem);
+  - the per-gate cap.
+- The harness self-test now has 234 cases.
+
+**5. Destructive gates (`DESTRUCTIVE` in scripts/certify.py, recorded):**
+
+| Gate | Why it is destructive | Kept from its copy |
+| --- | --- | --- |
+| test-build-reuse | `make clean nift` and `make distclean nift` (removes `.build`, the objects and nift) and rebuilds the shared objects under other configurations | `.build/build-reuse/` (timing.txt, make.log), and the gate's TMPDIR (its clean-check logs) |
+| test-rt-isolation | plants reproducers into production sources and rebuilds their objects (restored, but a kill mid-run leaves them planted) | none |
+| test-rt-sort-forgery | plants the forged-header reproducer into `src/Hooks.cpp` and relinks nift (same) | none |
+
+**How they are isolated.**
+- Each runs, on every tree it runs in (candidate first pass and rerun, the unprivileged copy, the
+  v4.12.0 and regression baselines, its recipe lines), in a private `cp -a` copy under the work
+  root, chowned for the unprivileged user. Its own outputs are copied into the evidence and the
+  copy is then removed.
+- **Why a copy is the least invasive choice:**
+  - the gate's script and the Makefile stay unchanged;
+  - it starts from the same built state;
+  - no repository metadata changes, unlike `git worktree add`;
+  - scheduling the gate last is not enough: classification reruns other gates in the same trees
+    afterwards, and a timeout kill leaves a tree half-reconfigured.
+- **Cost:** one copy of the tree (about 2 GB here with .build) per run of these three gates.
+- **Detection:** `--check-plan` and full campaigns refuse any planned gate whose recipe, or a
+  script it runs, contains a `make clean|distclean|pristine` goal, `distclean`, or
+  `rm -rf $(TEST_DIR)/.build`, unless it is in `DESTRUCTIVE` or `NOT_DESTRUCTIVE`.
+  `NOT_DESTRUCTIVE` holds one reviewed entry: test-runtime2-certification-guard, whose distclean
+  acts only on its toy trees.
+- On the real plan the detector finds test-build-reuse, through check-build-reuse.sh.
+- **Limitation:** a copy of a `git worktree` checkout shares its gitdir. On Linode the trees are
+  clones.
+
+**6. The test-build-reuse timeout (B21 item 6): open.**
+- A cheap lead: tooling.md records test-build-reuse at **4,031 s** on Linode at e6d21fa4, which
+  exceeds certify's 3,600 s per-gate default, so the kill on 110461664 is likely a cap below the
+  gate's runtime.
+- **Not confirmed.** The campaign's own timing.txt was lost, and that 4,031 s run included failing
+  checks.
+- `GATE_TIMEOUTS` gives test-build-reuse 7,200 s, and its timing.txt and logs are now kept in the
+  evidence, so the next campaign will establish its runtime.
+
+**Driver (`scratchpad/linode/cb35/job.sh`, read fresh).**
+- **builds:** writes `/root/out/campaign-id` (`cb35-<campaign start>-<tip8>`). `--list` and the
+  campaign get `--evidence-root /var/tmp/nift-certify --work-root /var/tmp/nift-certify-work
+  --campaign-id <id>`.
+- **campaign:** a re-started campaign phase adds `--resume`, and `campaign.out` is appended to.
+- **collect:** copies the evidence directory (`artefacts/evidence/`) instead of `.build/certify`,
+  plus the campaign id. It still collects the gates' own harness JSON from `.build`.
+- **Rerun:** B21 acceptance 4 requires a full campaign rerun.

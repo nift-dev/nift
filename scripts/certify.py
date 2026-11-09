@@ -75,12 +75,17 @@ v4.12.0 oracle is a legacy semantic oracle held to a checksum-pinned provenance 
 --legacy-oracle-provenance JSON; every run given --legacy-oracle needs --legacy-oracle-sha256 and
 that record, exits 2 if the oracle's sha256 differs, and re-verifies it during classification.
 --toolchain-preflight: the toolchain and host checks only, before any build.
-Logs: .build/certify/<target>.log; summary: .build/certify/summary.json and summary.txt.
+Evidence (C42, BLOCKERS B21): --evidence-root/<campaign-id>/ (default /var/tmp/nift-certify; never
+inside the checkout, a baseline, the oracle's tree or a user copy): gates/<target>/run.log and
+run.json per first pass (durable, written once), gates/<target>/cls-<N>/ per classification
+attempt, summary.json and summary.txt (scripts/certify_evidence.py). --resume continues a campaign
+from its records under the same identity; DESTRUCTIVE gates run in private copies (--work-root).
 """
 import argparse, concurrent.futures as cf, json, os, pwd, re, shutil, signal, subprocess, sys, time
 from pathlib import Path
 
 import certify_fingerprints as FP  # owner 2026-11-08 01:06: per-gate failure fingerprints
+import certify_evidence as EV      # C42 (B21): evidence outside every tree, durable per gate
 
 ROOT = Path(__file__).resolve().parent.parent
 AGGREGATE = "certify-targets"
@@ -112,6 +117,113 @@ EXCLUSIVE = {
     "test-rt-isolation": "plants reproducers into production sources and rebuilds their objects",
     "test-rt-sort-forgery": "plants the forged-header reproducer into src/Hooks.cpp and relinks nift",
 }
+
+# C42 (BLOCKERS B21, owner 2026-11-09 16:46): gates that are destructive by design. Each runs, on
+# every tree (candidate, rerun, unprivileged, baselines, recipe lines), in a private `cp -a` copy of
+# that tree under --work-root, never in the tree itself; the paths listed are its own outputs,
+# copied into the evidence after the run, and the copy is then removed. A copy (not a git worktree:
+# no change to any repository's metadata; not "schedule it last": classification reruns other gates
+# in the trees afterwards, and a timeout kill leaves a tree half-reconfigured) is the least invasive
+# isolation: the gate's script and the Makefile are unchanged and it starts from the same built
+# state. --check-plan refuses a planned gate whose recipe or script runs make clean/distclean/
+# pristine or removes .build without an entry here.
+DESTRUCTIVE = {
+    "test-build-reuse": ("make clean nift and make distclean nift in the checkout (removes .build, every "
+                         "object and nift), and rebuilds the shared objects under other configurations",
+                         [".build/build-reuse"]),
+    "test-rt-isolation": ("plants reproducers into production sources and rebuilds their objects (restored "
+                          "afterwards; a kill mid-run would leave them planted)", []),
+    "test-rt-sort-forgery": ("plants the forged-header reproducer into src/Hooks.cpp and relinks nift "
+                             "(restored afterwards; a kill mid-run would leave it planted)", []),
+}
+_DESTRUCTIVE_TEXT = re.compile(r"(?:^|[;&|(`]\s*|\s)(?:make|\$\(MAKE\)|\$\{MAKE\})\s+(?:-\S+\s+)*(?:clean|distclean|pristine)\b"
+                               r"|\bdistclean\b"
+                               r"|rm\s+-[a-zA-Z]*r[a-zA-Z]*\s+\"?(?:\$\(TEST_DIR\)|\$TEST_DIR|\.build)/?\"?(?:\s|;|$)")
+_SCRIPT_REF = re.compile(r"(?:^|\s)((?:scripts|tests|tools)/[\w./-]+\.(?:sh|py|bash))")
+
+
+def destructive_hits(root, recipe_text):
+    """C42: the lines of a recipe, and of the scripts it runs, that clean the tree."""
+    code = lambda text: [l for l in text.splitlines() if not l.lstrip().startswith("#")]
+    hits = [l.strip() for l in code(recipe_text) if _DESTRUCTIVE_TEXT.search(l)]
+    for rel in sorted(set(_SCRIPT_REF.findall(recipe_text))):
+        try:
+            text = (Path(root) / rel).read_text(errors="replace")
+        except OSError:
+            continue
+        hits += [f"{rel}: {l.strip()}" for l in code(text) if _DESTRUCTIVE_TEXT.search(l)]
+    return hits
+
+
+# Gates whose clean commands provably act only on trees of their own (reviewed; never the checkout)
+NOT_DESTRUCTIVE = {
+    "test-runtime2-certification-guard": "runs make distclean only inside its own temporary toy trees "
+                                         "(the C42 acceptance test)",
+}
+
+
+def destructive_problems(root, recipe, planned):
+    return [f"{t} cleans the tree ({hits[0][:120]}) but is not in DESTRUCTIVE: it would run in the certified "
+            f"checkout" for t in planned if t not in DESTRUCTIVE and t not in NOT_DESTRUCTIVE
+            and (hits := destructive_hits(root, recipe.get(t, "")))]
+
+
+# C42 (B21 item 6): per-gate caps above --timeout. test-build-reuse ran 4,031 s on Linode at e6d21fa4
+# (tooling.md) against certify's 3,600 s default: the likely, not confirmed, reason for its kill on
+# 110461664. Its own timing (.build/build-reuse/timing.txt) is now kept in the evidence.
+GATE_TIMEOUTS = {"test-build-reuse": 7200}
+
+
+def gate_timeout(target, default):
+    return max(default, GATE_TIMEOUTS.get(target, 0))
+
+
+# C42: the context every run record carries (set by main(); None outside a campaign)
+CONTEXT = {"campaign_id": None, "identity_sha256": None, "toolchain": None, "environment": None,
+           "roles": {}, "work_root": EV.DEFAULT_WORK}
+ACTIVE_GROUPS = set()   # process groups of running gates, killed on SIGTERM/SIGINT
+
+
+def _on_terminate(signum, frame):
+    for pg in list(ACTIVE_GROUPS):
+        try:
+            os.killpg(pg, signal.SIGKILL)
+        except OSError:
+            pass
+    os._exit(128 + signum)
+
+
+def _role(cwd):
+    return CONTEXT["roles"].get(os.path.realpath(cwd), "other")
+
+
+def _prepare_log(log):
+    """A log path is written once: an existing log with a record is evidence (refused); one
+    without (an interrupted run) is kept under a new name."""
+    log = Path(log)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    if log.with_suffix(".json").exists():
+        raise FileExistsError(f"evidence is written once: {log.with_suffix('.json')} exists")
+    if log.exists():
+        n = 1
+        while log.with_name(f"{log.name}.interrupted-{n}").exists():
+            n += 1
+        os.rename(log, log.with_name(f"{log.name}.interrupted-{n}"))
+    return log
+
+
+def _record(log, target, rc, t0, t1, cwd, src, copy, user, timeout, before, kept, extra=None):
+    rec = {"schema": EV.SCHEMA_RUN, "campaign_id": CONTEXT["campaign_id"],
+           "identity_sha256": CONTEXT["identity_sha256"], "target": target, "log": Path(log).name,
+           "log_sha256": EV.sha256_file(log), "log_bytes": os.path.getsize(log), "rc": rc,
+           "seconds": round(t1 - t0, 1), "start": t0, "end": t1, "cwd": os.path.realpath(cwd),
+           "source_tree": os.path.realpath(src), "role": _role(src), "isolated_copy": copy,
+           "user": user, "timeout": timeout, "tree_before": before, "tree_after": EV.tree_identity(cwd),
+           "toolchain": CONTEXT["toolchain"], "environment": CONTEXT["environment"], "kept": kept}
+    rec.update(extra or {})
+    EV.write_json(Path(log).with_suffix(".json"), rec)
+    return rec
+
 
 # Load-sensitive measurements (owner review of D-012): targets whose pass/fail
 # depends on wall-clock upper bounds. Their thresholds are unchanged; they run
@@ -529,23 +641,45 @@ def recipe_lines(cwd, target, old=()):
 
 def run_lines(cwd, target, old, logdir, timeout, extra_env=None, tag=""):
     """C2: a failing recipe stops at its first failing line, hiding the rest: run every line on its
-    own (the target's prerequisites are built) and return [(command, rc, failure fingerprint)]."""
+    own (the target's prerequisites are built) and return [(command, rc, failure fingerprint)].
+    C42: each line's log gets a durable run record; a DESTRUCTIVE gate's lines run in a copy."""
     results = []
-    env = clean_env()
-    env.update(extra_env or {})
-    env.update(runner_env(target, cwd, logdir / f"{target}{tag}.lines"))
-    for i, cmd in enumerate(recipe_lines(cwd, target, old), 1):
-        log = logdir / f"{target}{tag}.line{i}.log"
-        with open(log, "w") as f:
-            f.write(f"$ {cmd}\n")
-            f.flush()
-            try:
-                rc = subprocess.run(["bash", "-c", cmd], cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=env,
-                                    timeout=timeout).returncode
-            except subprocess.TimeoutExpired:
-                rc = 124
-        # owner 01:06: each failing line's own fingerprint (same extractor on both trees)
-        results.append((cmd, rc, FP.fingerprint(target, log.read_text(errors="replace"), [cwd], rc) if rc else None))
+    src = cwd
+    base = None
+    if target in DESTRUCTIVE:
+        base, cwd = EV.isolated_copy(src, CONTEXT["work_root"], target)
+    try:
+        env = clean_env()
+        env.update(extra_env or {})
+        env.update(runner_env(target, cwd, logdir / f"{target}{tag}.lines"))
+        for i, cmd in enumerate(recipe_lines(cwd, target, old), 1):
+            log = _prepare_log(logdir / f"{target}{tag}.line{i}.log")
+            before = EV.tree_identity(cwd)
+            t0 = time.time()
+            with open(log, "w") as f:
+                f.write(f"$ {cmd}  (cwd={cwd})\n")
+                f.flush()
+                p = subprocess.Popen(["bash", "-c", cmd], cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=env,
+                                     start_new_session=True)
+                ACTIVE_GROUPS.add(p.pid)
+                try:
+                    rc = p.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    os.killpg(p.pid, signal.SIGKILL)
+                    p.wait()
+                    f.write(f"\n[certify] TIMEOUT after {timeout}s\n")
+                    rc = 124
+                finally:
+                    ACTIVE_GROUPS.discard(p.pid)
+                f.flush()
+                os.fsync(f.fileno())
+            _record(log, target, rc, t0, time.time(), cwd, src, base is not None, None, timeout, before, [],
+                    {"line": i, "command": cmd})
+            # owner 01:06: each failing line's own fingerprint (same extractor on both trees)
+            results.append((cmd, rc, FP.fingerprint(target, log.read_text(errors="replace"), [cwd, src], rc) if rc else None))
+    finally:
+        if base is not None:
+            shutil.rmtree(base, ignore_errors=True)
     return results
 
 
@@ -1507,7 +1641,13 @@ def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
     under the temp directory, e.g. temp_directory_path()/"nift-host-seam-pg",
     cannot collide with concurrent targets, other checkouts or other users),
     in its own process group (killed on timeout)."""
-    log.parent.mkdir(parents=True, exist_ok=True)
+    log = _prepare_log(log)
+    timeout = gate_timeout(target, timeout)
+    # C42: a DESTRUCTIVE gate runs in a private copy of the tree, never in the tree itself
+    src, base = cwd, None
+    if target in DESTRUCTIVE:
+        base, cwd = EV.isolated_copy(src, CONTEXT["work_root"], target, user)
+    before = EV.tree_identity(cwd)
     # Review of 4ec1aa80 (F2): the same path LENGTH for every run of every tree (candidate, rerun,
     # baselines, unprivileged copy): harnesses that print a fixed-size tail of their output
     # (read_limit.py) then cut it at the same offset everywhere, so the tail can be compared.
@@ -1538,6 +1678,7 @@ def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
         f.flush()
         p = subprocess.Popen(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT, env=env,
                              start_new_session=True)
+        ACTIVE_GROUPS.add(p.pid)
         try:
             rc = p.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -1545,8 +1686,22 @@ def run_target(cwd, target, log, timeout, user=None, old=(), extra_env=None):
             p.wait()
             f.write(f"\n[certify] TIMEOUT after {timeout}s\n")
             rc = 124
+        finally:
+            ACTIVE_GROUPS.discard(p.pid)
+        f.flush()
+        os.fsync(f.fileno())   # C42: the log is durable before its record
+    t1 = time.time()
+    kept = []
+    if base is not None:
+        kept = EV.keep_from_copy(cwd, DESTRUCTIVE[target][1], str(log) + ".kept-tree")
+        # the gate's own TMPDIR (check-build-reuse.sh keeps its clean-check logs there)
+        kept += ["TMPDIR/" + x for x in EV.keep_from_copy(tmp, [x.name for x in tmp.iterdir()] if tmp.is_dir() else [],
+                                                            str(log) + ".kept-tmp")]
+    _record(log, target, rc, t0, t1, cwd, src, base is not None, user, timeout, before, kept)
     shutil.rmtree(tmp, ignore_errors=True)
-    return rc, round(time.time() - t0, 1)
+    if base is not None:
+        shutil.rmtree(base, ignore_errors=True)
+    return rc, round(t1 - t0, 1)
 
 
 # ----- environment-condition detectors (environment fact AND log evidence) -----
@@ -1611,7 +1766,7 @@ def tmp_names():
         return set()
 
 
-def audit(planned, timeout, out_path):
+def audit(planned, timeout, out_path, logdir):
     """Serial run recording, per target, every file it created/changed/removed
     in the checkout (including .build/) and every new top-level TMPDIR name it
     left behind. Shared outputs between targets and writes outside .build/
@@ -1620,7 +1775,7 @@ def audit(planned, timeout, out_path):
     before = snapshot(ROOT)
     for t in planned:
         tmp0 = tmp_names()
-        rc, dur = run_target(ROOT, t, ROOT / ".build" / "certify" / "audit" / f"{t}.log", timeout)
+        rc, dur = run_target(ROOT, t, Path(logdir) / f"{t}.log", timeout)
         after = snapshot(ROOT)
         changed = sorted(k for k in after if before.get(k) != after[k])
         removed = sorted(k for k in before if k not in after)
@@ -1696,7 +1851,7 @@ def decide(f):
                                              f"step, both root runs); complete target incl. timing passes as "
                                              f"unprivileged user '{f['user']}'")
         return "FAIL", (f"load-sensitive guard failed under exclusive execution "
-                        f"(re-run alone: {'passed' if f['rerun_rc'] == 0 else 'failed'}); see .build/certify/{t}.log")
+                        f"(re-run alone: {'passed' if f['rerun_rc'] == 0 else 'failed'}); see gates/{t}/run.log")
     if f["rerun_rc"] == 0:
         return "FLAKY", "failed in the concurrent run, passed when re-run alone"
     if f.get("unverified"):
@@ -1711,7 +1866,7 @@ def decide(f):
             return "BASELINE-FAILURE", f"equal failure fingerprint on the v4.12.0 baseline, same user (steps {cs} / {bs})"
         return "FAIL", (f"the v4.12.0 baseline also fails, but its failure fingerprint differs or none could be "
                         f"extracted ({'; '.join(f.get('base_fp_diff') or ['no comparison'])[:300]}); see {f.get('cand_log')}")
-    return "FAIL", f"see .build/certify/{t}.log"
+    return "FAIL", f"see gates/{t}/run.log"
 
 
 def ensure_baseline(path, jobs):
@@ -1725,11 +1880,19 @@ def ensure_baseline(path, jobs):
     return (path / "nift").exists()
 
 
-def merge_summaries(paths):
-    """Owner 2026-11-07 23:10: merged results list each environment and which gates ran in it."""
-    envs, gates = [], {}
+def merge_summaries(paths, mixed_identities=False):
+    """Owner 2026-11-07 23:10: merged results list each environment and which gates ran in it.
+    C42: each summary's campaign and source-tree identity is listed; summaries of different source
+    trees (commit, tree, working-tree diff) are refused unless --merge-mixed-identities says so."""
+    envs, gates, sources = [], {}, {}
     for p in paths:
         data = json.loads(Path(p).read_text())
+        ev = data.get("evidence") or {}
+        cand = (ev.get("identity") or {}).get("candidate") or {}
+        src = (data.get("commit"), cand.get("tree"), cand.get("diff_sha256"))
+        sources.setdefault(src, []).append(p)
+        print(f"summary {p}: campaign {ev.get('campaign_id')}, identity {str((ev.get('identity') or {}).get('identity_sha256'))[:16]}, "
+              f"commit {str(src[0])[:12]} tree {str(src[1])[:12]} diff {str(src[2])[:12]}")
         for t, r in data.get("targets", {}).items():
             env = r.get("environment") or data.get("environment") or {}
             key = json.dumps(env, sort_keys=True)
@@ -1752,7 +1915,50 @@ def merge_summaries(paths):
         if len(seen) > 1:
             print(f"MERGE REFUSED: {field} differs between environments: " + ", ".join(x[:12] for x in seen))
             rc = 1
+    if len(sources) > 1:
+        what = "; ".join(f"commit {str(k[0])[:12]} tree {str(k[1])[:12]} diff {str(k[2])[:12]}: {len(v)} summary(ies)"
+                         for k, v in sources.items())
+        if mixed_identities:
+            print(f"MERGE OF MIXED SOURCE TREES (--merge-mixed-identities): {what}")
+        else:
+            print(f"MERGE REFUSED: the summaries come from different source trees ({what}); "
+                  f"pass --merge-mixed-identities to merge them anyway")
+            rc = 1
     return rc
+
+
+def evidence_verdict(kind, why):
+    """C42, pure (table-tested): the class of a gate whose evidence cannot be classified. Lost
+    evidence is never evidence of a pass (B21 acceptance 2: FAILED with an evidence-lost note);
+    a record from another identity is not classified at all (BLOCKED, saying so)."""
+    if kind == "EVIDENCE-LOST":
+        return {"status": "FAIL", "class": "FAILED-NEW", "assertion": "FAIL", "evidence": kind,
+                "reason": f"EVIDENCE-LOST: {why}"}
+    return {"status": None, "class": "BLOCKED", "assertion": "BLOCKED", "evidence": kind,
+            "reason": f"IDENTITY-MISMATCH (not classified): {why}"}
+
+
+def default_campaign_id():
+    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short=12", "HEAD"], capture_output=True,
+                          text=True).stdout.strip() or "nogit"
+    return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + f"-{head}-{os.getpid()}"
+
+
+def protected_trees(oracle, baseline, regression_specs, user):
+    """C42: the trees the evidence and work directories must stay out of."""
+    out = {"certified checkout": str(ROOT)}
+    if oracle:
+        out["oracle tree"] = str(Path(oracle).resolve().parent)
+    if baseline:
+        out["v4.12.0 baseline tree"] = str(baseline)
+    for n, tr in regression_specs:
+        if tr:
+            out[f"regression baseline {n}"] = tr
+    if user:
+        home = Path(pwd.getpwnam(user).pw_dir)
+        out["unprivileged copy"] = str(home / "nift-certify-copy")
+        out["unprivileged baseline copy"] = str(home / "nift-certify-baseline-copy")
+    return out
 
 
 def main():
@@ -1790,11 +1996,23 @@ def main():
     ap.add_argument("--drop", action="append", default=[], metavar="TARGET",
                     help="remove TARGET from the plan before --check-plan (negative control)")
     ap.add_argument("--audit", metavar="JSON", help="isolation audit: run targets serially and record writes (use a disposable copy)")
+    ap.add_argument("--evidence-root", default=os.environ.get("NIFT_CERTIFY_EVIDENCE_ROOT", EV.DEFAULT_ROOT),
+                    help="C42: certification evidence goes to EVIDENCE_ROOT/<campaign-id>/ (never inside a tree)")
+    ap.add_argument("--work-root", default=os.environ.get("NIFT_CERTIFY_WORK_ROOT", EV.DEFAULT_WORK),
+                    help="C42: private copies for destructive gates (WORK_ROOT/<campaign-id>/)")
+    ap.add_argument("--campaign-id", default=os.environ.get("NIFT_CERTIFY_CAMPAIGN_ID", ""),
+                    help="C42: the campaign's evidence directory name (default: UTC time and commit)")
+    ap.add_argument("--resume", action="store_true",
+                    help="C42: continue --campaign-id from its stored records (refused under another identity)")
+    ap.add_argument("--no-classify", action="store_true",
+                    help="C42: run and record the first passes only (classify later with --resume)")
+    ap.add_argument("--merge-mixed-identities", action="store_true",
+                    help="C42: let --merge combine summaries of different source trees (listed explicitly)")
     ap.add_argument("--merge", nargs="+", metavar="SUMMARY_JSON",
                     help="merge certification summaries: list each environment and the gates that ran in it")
     a = ap.parse_args()
     if a.merge:
-        return merge_summaries(a.merge)
+        return merge_summaries(a.merge, a.merge_mixed_identities)
     if a.record_legacy_oracle:
         if not a.legacy_oracle_provenance:
             print("certify: --record-legacy-oracle needs --legacy-oracle-provenance JSON", file=sys.stderr)
@@ -1832,6 +2050,7 @@ def main():
         covered.discard(t)
     problems = inventory_problems({e[0] for e in entries} | {t for t in covered if not recipe.get(t)},
                                   inv, NON_GATE, MANDATORY, set(deps))
+    problems += destructive_problems(ROOT, recipe, [e[0] for e in entries])   # C42
     if a.check_plan or (a.list and not a.targets):
         for pr in problems:
             print("FAIL certify plan: " + pr)
@@ -1879,11 +2098,23 @@ def main():
               f"{len(inv)} inventory targets, {len(NON_GATE)} non-gates: " + ", ".join(sorted(NON_GATE)))
         for pr in pf:
             print("PREFLIGHT BLOCKED: " + pr)
+        # C42: where the evidence would go, and whether that is allowed
+        luser = unprivileged_user(a.unprivileged_user)
+        lcid = a.campaign_id or "<campaign-id>"
+        lrp = EV.root_problems(Path(a.evidence_root) / lcid, Path(a.work_root) / lcid,
+                               protected_trees(oracle, Path(a.baseline) if a.baseline else None, regression_specs, luser))
+        print(f"evidence: {Path(a.evidence_root) / lcid} (work copies: {Path(a.work_root) / lcid}); destructive gates "
+              f"isolated: {', '.join(t for t in planned if t in DESTRUCTIVE) or 'none planned'}")
+        for pr in lrp:
+            print("PREFLIGHT BLOCKED: " + pr)
+        pf = pf + lrp
         print("preflight: " + ("ok" if not pf else f"{len(pf)} problem(s): a full campaign would exit 2 here"))
         if pf and full:
             return 2  # C37: stage 1/3 stops here
         if oracle and pinned_problems(lfacts):
             return 2  # C41: an oracle that is not the pinned one stops every run
+        if lrp:
+            return 2  # C42: an evidence or work root inside a tree is refused for every run
         return 1 if problems and not a.targets else 0
     if not planned:
         print("certify: no targets planned", file=sys.stderr)
@@ -1893,31 +2124,82 @@ def main():
             print("certify: plan incomplete: " + pr, file=sys.stderr)
         return 2
 
-    logdir = ROOT / ".build" / "certify"
-    logdir.mkdir(parents=True, exist_ok=True)
+    # C42 (B21): the evidence directory, outside the checkout and every tree a gate or a clean can
+    # delete; refused otherwise (before anything is built or run)
+    user = unprivileged_user(a.unprivileged_user)
+    baseline = Path(a.baseline) if a.baseline else None
+    protected = protected_trees(oracle, baseline, regression_specs, user)
+    campaign_id = a.campaign_id or default_campaign_id()
+    store = EV.Store(a.evidence_root, campaign_id)
+    work_root = Path(a.work_root) / campaign_id
+    rp = EV.root_problems(store.dir, work_root, protected)
+    if rp:
+        for pr in rp:
+            print("certify: evidence refused: " + pr, file=sys.stderr)
+        return 2
+    CONTEXT["work_root"] = str(work_root)
     if a.audit:
         built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, env=clean_env())
         if built.returncode != 0:
             print("certify: could not build nift for the audit", file=sys.stderr)
             return 1
-        audit(planned, a.timeout, a.audit)
+        audit(planned, a.timeout, a.audit, store.dir / "audit")
         return 0
     # C3 preflight, before anything else is built: the production binary (for the comparator
     # check), then the toolchain, switch and oracle facts. A full campaign does not start with a
     # preflight problem.
     built = subprocess.run(["make", f"-j{a.jobs}", "nift"], cwd=ROOT, capture_output=True, text=True, env=clean_env())
-    (logdir / "_build-nift.log").write_text(built.stdout + built.stderr)
     facts = preflight_facts(ROOT, oracle, a.campaign_start, built.returncode, regression_specs, require_baselines=full,
                             oracle_pin=pin, oracle_provenance=provenance, baseline=v412_baseline)
     pf = preflight_problems(facts)
-    (logdir / "_preflight.json").write_text(json.dumps({"facts": facts, "problems": pf}, indent=2) + "\n")
+    # The baselines are built (when missing) before the identity is taken: every later run in them is
+    # checked against it (C42)
+    regressions = {}
+    for spec in a.regression_baseline:
+        name, _, tree = spec.partition("=")
+        if name and tree and ensure_baseline(Path(tree), a.jobs):
+            regressions[name] = Path(tree)
+        else:
+            # F2: a named baseline that cannot be built is never "not applicable": it differs
+            regressions[name or spec] = None
+            print(f"certify: regression baseline {spec!r} unavailable; it counts as differing", file=sys.stderr)
+    baseline_ready = ensure_baseline(baseline, a.jobs) if baseline else None
+    # C42: the campaign identity (each record carries it): the candidate tree and binary, the
+    # toolchain, the environment, the configuration, the baselines and the oracle
+    toolchain = {"cxx": facts.get("cxx"), "cxx_resolved": facts.get("cxx_resolved"),
+                 "cxx_sha256": (facts.get("cxx_identity") or {}).get("sha256"), "cc_resolved": facts.get("cc_resolved"),
+                 "cc_sha256": (facts.get("cc_identity") or {}).get("sha256"), "glibcxx": facts.get("glibcxx"),
+                 "stdlib_sha256": (facts.get("profile_files") or {}).get("libstdc++.so")}
+    environment = facts.get("environment") or {}
+    identity = {"candidate": EV.tree_identity(ROOT), "toolchain": toolchain, "environment": environment,
+                "configuration": {"flags_env": facts.get("flags_env"), "make_env": facts.get("make_env"),
+                                  "driver_env": facts.get("driver_env"), "makefile_env": facts.get("makefile_env"),
+                                  "CC": os.environ.get("CC"), "CXX": os.environ.get("CXX"),
+                                  "NIFT_CP14B_REQUIRE_COMPARATOR": os.environ.get("NIFT_CP14B_REQUIRE_COMPARATOR"),
+                                  "unprivileged_user": user},
+                "baselines": {n: EV.tree_identity(tr) for n, tr in regression_specs if tr},
+                "v412_baseline": EV.tree_identity(baseline) if baseline and baseline.is_dir() else None,
+                "oracle": {"path": os.path.realpath(oracle), "pin": pin} if oracle else None}
+    sp = store.open(identity, a.resume)
+    if sp:
+        for pr in sp:
+            print("certify: " + pr, file=sys.stderr)
+        return 2
+    CONTEXT.update(campaign_id=campaign_id, identity_sha256=store.identity["identity_sha256"],
+                   toolchain=toolchain, environment=environment)
+    CONTEXT["roles"][os.path.realpath(ROOT)] = "candidate"
+    inv_dir = store.new_invocation()
+    print(f"certify: evidence {store.dir} (campaign {campaign_id}{', resumed' if a.resume else ''}; "
+          f"this invocation {inv_dir.name})", flush=True)
+    EV.write_durable(inv_dir / "build-nift.log", (built.stdout + built.stderr).encode(), mode=0o644)
+    EV.write_json(inv_dir / "preflight.json", {"facts": facts, "problems": pf}, mode=0o644)
     for pr in pf:
         print("PREFLIGHT BLOCKED: " + pr, file=sys.stderr)
     if pf and (full or (oracle and pinned_problems(facts))):
-        print("certify: preflight failed; the campaign did not start (.build/certify/_preflight.json)", file=sys.stderr)
+        print(f"certify: preflight failed; the campaign did not start ({inv_dir / 'preflight.json'})", file=sys.stderr)
         return 2
     if built.returncode != 0:  # R4-3: never certify a stale binary
-        print("certify: make nift failed; see .build/certify/_build-nift.log", file=sys.stderr)
+        print(f"certify: make nift failed; see {inv_dir / 'build-nift.log'}", file=sys.stderr)
         return 2
     # Phase 0: build every non-test prerequisite once (binaries, objects,
     # staged prefixes, bindings), so concurrent make processes do not race to
@@ -1925,26 +2207,51 @@ def main():
     # missing toolchain) is left for its targets to fail and be classified.
     prereqs = sorted({d for t in planned for d in deps.get(t, []) if not TEST_NAME.match(d)} | {"nift"})
     pre = subprocess.run(["make", "-k", f"-j{a.jobs}"] + prereqs, cwd=ROOT, capture_output=True, text=True, env=clean_env())
-    (logdir / "_prebuild.log").write_text(pre.stdout + pre.stderr)
+    EV.write_durable(inv_dir / "prebuild.log", (pre.stdout + pre.stderr).encode(), mode=0o644)
     if not (ROOT / "nift").exists():
-        print("certify: could not build nift, see .build/certify/_prebuild.log", file=sys.stderr)
+        print(f"certify: could not build nift, see {inv_dir / 'prebuild.log'}", file=sys.stderr)
         return 1
+    after_pre = EV.tree_identity(ROOT)
+    if EV.tree_mismatch(after_pre, store.identity["candidate"]):
+        print("certify: the prerequisite build changed the candidate tree or binary: "
+              + "; ".join(EV.tree_mismatch(after_pre, store.identity["candidate"])), file=sys.stderr)
+        return 2
     # The v4.12.0 oracle is also test-runtime2-scanner-parity's reference binary (NIFT_REF).
     extra = {"CP19_LEGACY_ORACLE": oracle, "NIFT_REF": os.environ.get("NIFT_REF") or oracle} if oracle else {}
+    signal.signal(signal.SIGTERM, _on_terminate)
+    signal.signal(signal.SIGINT, _on_terminate)
 
+    # C42: each gate's first pass is written durably as soon as it finishes (log, then run.json,
+    # both fsynced, read-only); a resumed campaign reads the gates that already have one
     results = {}
     started = time.time()
+
+    def first_pass(t, mode):
+        rec = store.first_record(t)
+        if rec is not None:
+            return rec, True
+        if (store.gate_dir(t) / "run.json").exists():   # unreadable: never rerun over it
+            return {"rc": None, "seconds": 0.0, "unreadable": True}, True
+        rc, _ = run_target(ROOT, t, store.first_log(t), a.timeout, None, olds[t], extra)
+        for x in (store.first_log(t), store.first_log(t).with_suffix(".json")):
+            os.chmod(x, 0o444)
+        return store.first_record(t), False
+
     with cf.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as pool:
-        futs = {pool.submit(run_target, ROOT, t, logdir / f"{t}.log", a.timeout, None, olds[t], extra): t for t in parallel}
+        futs = {pool.submit(first_pass, t, "parallel"): t for t in parallel}
         for fut in cf.as_completed(futs):
             t = futs[fut]
-            rc, dur = fut.result()
-            results[t] = {"rc": rc, "seconds": dur, "mode": "parallel"}
-            print(f"[{'ok' if rc == 0 else 'FAILED'}] {t} ({dur}s)", flush=True)
+            rec, old = fut.result()
+            results[t] = {"rc": rec["rc"], "seconds": rec["seconds"], "mode": "parallel"}
+            print(f"[{'ok' if rec['rc'] == 0 else 'FAILED'}] {t} ({rec['seconds']}s{', recorded earlier' if old else ''})", flush=True)
     for t in exclusive:
-        rc, dur = run_target(ROOT, t, logdir / f"{t}.log", a.timeout, None, olds[t], extra)
-        results[t] = {"rc": rc, "seconds": dur, "mode": "exclusive"}
-        print(f"[{'ok' if rc == 0 else 'FAILED'}] {t} ({dur}s, exclusive)", flush=True)
+        rec, old = first_pass(t, "exclusive")
+        results[t] = {"rc": rec["rc"], "seconds": rec["seconds"], "mode": "exclusive"}
+        print(f"[{'ok' if rec['rc'] == 0 else 'FAILED'}] {t} ({rec['seconds']}s, exclusive"
+              f"{', isolated copy' if rec.get('isolated_copy') else ''}{', recorded earlier' if old else ''})", flush=True)
+    if a.no_classify:
+        print(f"certify: {len(results)} first-pass record(s) in {store.dir / 'gates'}; classification not run (--no-classify)")
+        return 0
 
     # C41: the oracle (and the v4.12.0 baseline tree's nift) is re-verified against its pin before
     # any log produced with it is classified; a mismatch stops the campaign (exit 2)
@@ -1956,30 +2263,58 @@ def main():
                                (facts.get("cc_identity") or {}).get("sha256"))
         rechecks.append({"where": where, "time": time.time(), "problems": probs})
         if probs:
-            (logdir / "_oracle-recheck.json").write_text(json.dumps(rechecks, indent=2) + "\n")
+            EV.write_json(inv_dir / "oracle-recheck.json", rechecks, mode=0o644, exclusive=False)
             for pr in probs:
                 print(f"PREFLIGHT BLOCKED ({where}): " + pr, file=sys.stderr)
-            print("certify: the CP19 legacy oracle is no longer the pinned binary; the campaign stops "
-                  "(.build/certify/_oracle-recheck.json)", file=sys.stderr)
+            print(f"certify: the CP19 legacy oracle is no longer the pinned binary; the campaign stops "
+                  f"({inv_dir / 'oracle-recheck.json'})", file=sys.stderr)
         return bool(probs)
     if oracle_changed("after the gate runs", v412_baseline if v412_baseline and (v412_baseline / "nift").exists() else None):
         return 2
 
+    def _text(path):
+        return Path(path).read_text(errors="replace")
+
+    def log_roots(*logs):
+        """the trees a log's run actually used (an isolated copy), for path normalisation"""
+        out = []
+        for lg in logs:
+            rec = EV.read_json(Path(lg).with_suffix(".json")) or {}
+            out += [x for x in (rec.get("cwd"), rec.get("source_tree")) if x]
+        return out
+
+    expected = {"candidate": store.identity["candidate"], "v4.12.0": store.identity.get("v412_baseline"),
+                **{f"regression:{n}": v for n, v in (store.identity.get("baselines") or {}).items()}}
+
+    def run_identity_problems(cdir):
+        out = []
+        for rj in sorted(Path(cdir).glob("*.json")):
+            rec = EV.read_json(rj) or {}
+            if rec.get("schema") != EV.SCHEMA_RUN:
+                continue
+            if rec.get("campaign_id") != campaign_id or rec.get("identity_sha256") != store.identity["identity_sha256"]:
+                out.append((rj.name, "recorded under another campaign or identity"))
+                continue
+            want = expected.get(rec.get("role"))
+            if rec.get("role") in expected and want is not None:
+                d = EV.tree_mismatch(rec.get("tree_before"), want)
+                if d:
+                    out.append((rj.name, f"ran on another {rec.get('role')} tree or binary: " + "; ".join(d)))
+        return out
+
     # Classification of failures: rerun alone, then environment, then baseline.
-    user = unprivileged_user(a.unprivileged_user)
     user_copy = None
-    baseline = Path(a.baseline) if a.baseline else None
-    baseline_ready = None
     baseline_user_copy = None
-    regressions = {}
-    for spec in a.regression_baseline:
-        name, _, tree = spec.partition("=")
-        if name and tree and ensure_baseline(Path(tree), a.jobs):
-            regressions[name] = Path(tree)
-        else:
-            # F2: a named baseline that cannot be built is never "not applicable": it differs
-            regressions[name or spec] = None
-            print(f"certify: regression baseline {spec!r} unavailable; it counts as differing", file=sys.stderr)
+    # C42: which tree a classification run used (its record's role, checked against the identity)
+    if user:
+        home = Path(pwd.getpwnam(user).pw_dir)
+        CONTEXT["roles"][os.path.realpath(home / "nift-certify-copy")] = "candidate"
+        CONTEXT["roles"][os.path.realpath(home / "nift-certify-baseline-copy")] = "v4.12.0"
+    if baseline:
+        CONTEXT["roles"][os.path.realpath(baseline)] = "v4.12.0"
+    for name, tree in regressions.items():
+        if tree is not None:
+            CONTEXT["roles"][os.path.realpath(tree)] = f"regression:{name}"
     comparator_skipped = []
     # owner 2026-11-07 23:10: every result states the environment it ran in
     env_record = {**facts.get("environment", {}), "compiler": facts.get("cxx"),
@@ -1991,179 +2326,204 @@ def main():
     for t, r in sorted(results.items()):
         if oracle_changed(f"before classifying {t}"):
             return 2
-        # Gather facts; the verdict comes only from decide(), which is pure and
-        # table-tested (tests/runtime2/certification_guard.sh).
-        f = {"target": t, "rc": r["rc"], "load_sensitive": t in LOAD_SENSITIVE or t in PERF_LANE, "user": user}
-        if r["rc"] != 0:
-            f["rerun_rc"], _ = run_target(ROOT, t, logdir / f"{t}.rerun.log", a.timeout, None, olds[t], extra)
-        if r["rc"] != 0 and f["rerun_rc"] != 0 and f["load_sensitive"] and os.geteuid() == 0 and user:
-            # Root evidence is kept as is ({t}.log, {t}.rerun.log); the unprivileged
-            # run is the complete target, timing steps included.
-            texts = [(logdir / f"{t}.log").read_text(errors="replace"), (logdir / f"{t}.rerun.log").read_text(errors="replace")]
-            f["root_steps"] = tuple(failure_signature(x) for x in texts)
-            f["root_reached_timing"] = any(reached_timing(x) for x in texts)
-            if f["root_steps"][0] is not None and f["root_steps"][0] == f["root_steps"][1] and not f["root_reached_timing"]:
-                if user_copy is None:
-                    user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
-                    prepare_copy(ROOT, user_copy, user)
-                f["unpriv_rc"], _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
-        if r["rc"] != 0 and f["rerun_rc"] != 0 and not f["load_sensitive"]:
-            text = (logdir / f"{t}.log").read_text(errors="replace") + (logdir / f"{t}.rerun.log").read_text(errors="replace")
-            f["unverified"] = detect_unverified(text)
-            cand_log, base_user = logdir / f"{t}.log", None
-            if not f["unverified"] and os.geteuid() == 0 and user:
-                if user_copy is None:
-                    user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
-                    prepare_copy(ROOT, user_copy, user)
-                f["unpriv_rc"], _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
-                # The unprivileged run gets past root-only steps and may fail later:
-                # it is the candidate result the baseline must be compared with.
-                cand_log, base_user = logdir / f"{t}.unprivileged.log", user
-            if not f["unverified"] and f.get("unpriv_rc") != 0 and baseline:
-                if baseline_ready is None:
-                    baseline_ready = ensure_baseline(baseline, a.jobs)
-                if baseline_ready:
-                    base_dir = baseline   # same user as the candidate log it is compared with
-                    if base_user:
-                        if baseline_user_copy is None:
-                            baseline_user_copy = Path(pwd.getpwnam(base_user).pw_dir) / "nift-certify-baseline-copy"
-                            prepare_copy(baseline, baseline_user_copy, base_user)
-                        base_dir = baseline_user_copy
-                    blog = logdir / f"{t}.baseline.log"
-                    f["base_rc"], _ = run_target(base_dir, t, blog, a.timeout, base_user, olds[t], extra)
-                    if oracle_changed(f"after the v4.12.0 baseline run of {t}", base_dir):
+        # C42: a target classified by an earlier (interrupted, resumed) invocation is read back
+        done = store.completed_class(t)
+        if done is not None:
+            results[t] = done["result"]
+            print(f"[classified earlier] {t}: {results[t].get('class')}", flush=True)
+            continue
+        first = store.first_log(t)
+        rec = store.first_record(t)
+        bad = EV.first_pass_problem(store, t, rec)
+        if bad is None:
+            diff = EV.tree_mismatch(rec.get("tree_before"), store.identity["candidate"])
+            if diff:
+                bad = ("IDENTITY-MISMATCH", "the first pass ran on another source tree or binary than the "
+                       "campaign's candidate: " + "; ".join(diff))
+        cdir = store.new_attempt(t)
+        if bad is not None:
+            r.update(evidence_verdict(*bad))
+            store.write_class(cdir, t, r)
+            print(f"[{bad[0]}] {t}: {bad[1]}", flush=True)
+            continue
+        try:
+            # Gather facts; the verdict comes only from decide(), which is pure and
+            # table-tested (tests/runtime2/certification_guard.sh).
+            f = {"target": t, "rc": r["rc"], "load_sensitive": t in LOAD_SENSITIVE or t in PERF_LANE, "user": user}
+            if r["rc"] != 0:
+                f["rerun_rc"], _ = run_target(ROOT, t, cdir / f"{t}.rerun.log", a.timeout, None, olds[t], extra)
+            if r["rc"] != 0 and f["rerun_rc"] != 0 and f["load_sensitive"] and os.geteuid() == 0 and user:
+                # Root evidence is kept as is ({t}.log, {t}.rerun.log); the unprivileged
+                # run is the complete target, timing steps included.
+                texts = [first.read_text(errors="replace"), (cdir / f"{t}.rerun.log").read_text(errors="replace")]
+                f["root_steps"] = tuple(failure_signature(x) for x in texts)
+                f["root_reached_timing"] = any(reached_timing(x) for x in texts)
+                if f["root_steps"][0] is not None and f["root_steps"][0] == f["root_steps"][1] and not f["root_reached_timing"]:
+                    if user_copy is None:
+                        user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                        prepare_copy(ROOT, user_copy, user)
+                    f["unpriv_rc"], _ = run_target(user_copy, t, cdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
+            if r["rc"] != 0 and f["rerun_rc"] != 0 and not f["load_sensitive"]:
+                text = first.read_text(errors="replace") + (cdir / f"{t}.rerun.log").read_text(errors="replace")
+                f["unverified"] = detect_unverified(text)
+                cand_log, base_user = first, None
+                if not f["unverified"] and os.geteuid() == 0 and user:
+                    if user_copy is None:
+                        user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                        prepare_copy(ROOT, user_copy, user)
+                    f["unpriv_rc"], _ = run_target(user_copy, t, cdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
+                    # The unprivileged run gets past root-only steps and may fail later:
+                    # it is the candidate result the baseline must be compared with.
+                    cand_log, base_user = cdir / f"{t}.unprivileged.log", user
+                if not f["unverified"] and f.get("unpriv_rc") != 0 and baseline:
+                    if baseline_ready:
+                        base_dir = baseline   # same user as the candidate log it is compared with
+                        if base_user:
+                            if baseline_user_copy is None:
+                                baseline_user_copy = Path(pwd.getpwnam(base_user).pw_dir) / "nift-certify-baseline-copy"
+                                prepare_copy(baseline, baseline_user_copy, base_user)
+                            base_dir = baseline_user_copy
+                        blog = cdir / f"{t}.baseline.log"
+                        f["base_rc"], _ = run_target(base_dir, t, blog, a.timeout, base_user, olds[t], extra)
+                        if oracle_changed(f"after the v4.12.0 baseline run of {t}", base_dir):
+                            return 2
+                        btext = blog.read_text(errors="replace")
+                        f["base_has_target"] = not lacks_target(btext, t)
+                        f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
+                        f["base_step"] = failure_signature(btext)
+                        f["cand_log"] = str(cand_log.relative_to(store.dir))
+                        croots = ([ROOT, user_copy] if user_copy else [ROOT]) + log_roots(cand_log)
+                        ctext0 = cand_log.read_text(errors="replace")
+                        diff = FP.differences(FP.fingerprint(t, ctext0, croots), FP.fingerprint(t, btext, [base_dir] + log_roots(blog)))
+                        f["base_identical"], f["base_fp_diff"] = not diff, diff
+                        # the stricter whole-log identity: reported, does not decide
+                        r.setdefault("whole_log_identical", {})["v4.12.0"] = same_failure(
+                            failure_identity(ctext0, croots), failure_identity(btext, [base_dir] + log_roots(blog)))
+                        base_tree_used = base_dir
+                # C2: the regression baselines, each compared on its own (same step AND same FAIL lines).
+                if not f["unverified"] and f.get("unpriv_rc") != 0 and regressions:
+                    ctext = cand_log.read_text(errors="replace")
+                    r["regression"], r["baselines"] = {}, {}
+                    for name, tree in regressions.items():
+                        if tree is None:
+                            r["regression"][name], r["baselines"][name] = False, "applicable, unavailable (counts as differing)"
+                            continue
+                        rlog = cdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
+                        rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
+                        rtext = rlog.read_text(errors="replace")
+                        # F2 (decision 2026-11-08), C1 (confirmation of C20): not applicable only when the
+                        # baseline's own Makefile has no such target; a missing prerequisite, or a log that
+                        # is harness-blocked there, is applicable and differing (no evidence either way)
+                        if rrc != 0 and lacks_target(rtext, t):
+                            r["regression"][name], r["baselines"][name] = None, "not applicable: no such target there"
+                            continue
+                        if rrc != 0 and blocked_reason(rtext):
+                            r["regression"][name] = False
+                            r["baselines"][name] = f"applicable, cannot run there ({blocked_reason(rtext)}): counts as differing"
+                            r.setdefault("fingerprint_diff", {})[name] = ["the baseline log is harness-blocked"]
+                            continue
+                        diff = (FP.differences(FP.fingerprint(t, ctext, [ROOT] + log_roots(cand_log)), FP.fingerprint(t, rtext, [tree] + log_roots(rlog)))
+                                if rrc != 0 else ["the gate passes on this baseline"])
+                        r["regression"][name] = not diff
+                        r["baselines"][name] = "applicable, " + ("fingerprint equal" if not diff else
+                                                                 "passes there" if rrc == 0 else "fingerprint differs")
+                        r.setdefault("fingerprint_diff", {})[name] = diff[:20]
+                        r.setdefault("whole_log_identical", {})[name] = rrc != 0 and same_failure(
+                            failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree]))
+            line_note = ""
+            if r["rc"] != 0 and recipe.get(t, "").count("\n") > 1:
+                # C2: the lines after the failing one would never run: each line on its own. H2a: a
+                # baseline matches only if every line failing on the candidate fails identically there.
+                cand_lines = run_lines(ROOT, t, olds[t], cdir, a.timeout, extra)
+                r["lines"] = [(c[:200], lrc) for c, lrc, _ in cand_lines]
+                failing = [i for i, (_, lrc, _) in enumerate(cand_lines, 1) if lrc]
+                line_note = "recipe lines failing on their own: " + (", ".join(map(str, failing)) or "none")
+                if f.get("base_identical"):
+                    bl = run_lines(base_tree_used, t, olds[t], cdir, a.timeout, extra, ".baseline")
+                    if oracle_changed(f"after the v4.12.0 baseline line runs of {t}", base_tree_used):
                         return 2
-                    btext = blog.read_text(errors="replace")
-                    f["base_has_target"] = not lacks_target(btext, t)
-                    f["cand_step"] = failure_signature(cand_log.read_text(errors="replace"))
-                    f["base_step"] = failure_signature(btext)
-                    f["cand_log"] = str(cand_log.relative_to(ROOT))
-                    croots = [ROOT, user_copy] if user_copy else [ROOT]
-                    ctext0 = cand_log.read_text(errors="replace")
-                    diff = FP.differences(FP.fingerprint(t, ctext0, croots), FP.fingerprint(t, btext, [base_dir]))
-                    f["base_identical"], f["base_fp_diff"] = not diff, diff
-                    # the stricter whole-log identity: reported, does not decide
-                    r.setdefault("whole_log_identical", {})["v4.12.0"] = same_failure(
-                        failure_identity(ctext0, croots), failure_identity(btext, [base_dir]))
-                    base_tree_used = base_dir
-            # C2: the regression baselines, each compared on its own (same step AND same FAIL lines).
-            if not f["unverified"] and f.get("unpriv_rc") != 0 and regressions:
-                ctext = cand_log.read_text(errors="replace")
-                r["regression"], r["baselines"] = {}, {}
-                for name, tree in regressions.items():
-                    if tree is None:
-                        r["regression"][name], r["baselines"][name] = False, "applicable, unavailable (counts as differing)"
-                        continue
-                    rlog = logdir / f"{t}.regression-{re.sub(r'[^\w.-]', '_', name)}.log"
-                    rrc, _ = run_target(tree, t, rlog, a.timeout, None, olds[t], extra)
-                    rtext = rlog.read_text(errors="replace")
-                    # F2 (decision 2026-11-08), C1 (confirmation of C20): not applicable only when the
-                    # baseline's own Makefile has no such target; a missing prerequisite, or a log that
-                    # is harness-blocked there, is applicable and differing (no evidence either way)
-                    if rrc != 0 and lacks_target(rtext, t):
-                        r["regression"][name], r["baselines"][name] = None, "not applicable: no such target there"
-                        continue
-                    if rrc != 0 and blocked_reason(rtext):
-                        r["regression"][name] = False
-                        r["baselines"][name] = f"applicable, cannot run there ({blocked_reason(rtext)}): counts as differing"
-                        r.setdefault("fingerprint_diff", {})[name] = ["the baseline log is harness-blocked"]
-                        continue
-                    diff = (FP.differences(FP.fingerprint(t, ctext, [ROOT]), FP.fingerprint(t, rtext, [tree]))
-                            if rrc != 0 else ["the gate passes on this baseline"])
-                    r["regression"][name] = not diff
-                    r["baselines"][name] = "applicable, " + ("fingerprint equal" if not diff else
-                                                             "passes there" if rrc == 0 else "fingerprint differs")
-                    r.setdefault("fingerprint_diff", {})[name] = diff[:20]
-                    r.setdefault("whole_log_identical", {})[name] = rrc != 0 and same_failure(
-                        failure_identity(ctext, [ROOT]), failure_identity(rtext, [tree]))
-        line_note = ""
-        if r["rc"] != 0 and recipe.get(t, "").count("\n") > 1:
-            # C2: the lines after the failing one would never run: each line on its own. H2a: a
-            # baseline matches only if every line failing on the candidate fails identically there.
-            cand_lines = run_lines(ROOT, t, olds[t], logdir, a.timeout, extra)
-            r["lines"] = [(c[:200], lrc) for c, lrc, _ in cand_lines]
-            failing = [i for i, (_, lrc, _) in enumerate(cand_lines, 1) if lrc]
-            line_note = "recipe lines failing on their own: " + (", ".join(map(str, failing)) or "none")
-            if f.get("base_identical"):
-                bl = run_lines(base_tree_used, t, olds[t], logdir, a.timeout, extra, ".baseline")
-                if oracle_changed(f"after the v4.12.0 baseline line runs of {t}", base_tree_used):
-                    return 2
-                only = lines_match(cand_lines, bl, ROOT, base_tree_used)
-                if only:
-                    f["base_identical"] = False
-                    line_note += f"; on the candidate only (not v4.12.0): {', '.join(map(str, only))}"
-            for name, tree in regressions.items():
-                if r.get("regression", {}).get(name):
-                    tag = ".regression-" + re.sub(r"[^\w.-]", "_", name)
-                    only = lines_match(cand_lines, run_lines(tree, t, olds[t], logdir, a.timeout, extra, tag), ROOT, tree)
+                    only = lines_match(cand_lines, bl, ROOT, base_tree_used)
                     if only:
-                        r["regression"][name] = False
-                        line_note += f"; on the candidate only (not {name}): {', '.join(map(str, only))}"
-        if oracle_changed(f"before deciding {t}"):
-            return 2
-        r["status"], r["reason"] = decide(f)
-        logtext = (logdir / f"{t}.log").read_text(errors="replace") if (logdir / f"{t}.log").exists() else ""
-        r["blocked"] = blocked_reason(logtext)
-        if COMPARATOR_SKIP in logtext:
-            comparator_skipped.append(t)
-        silent = False
-        echo = recipe_echo(ROOT, t, olds[t])
-        r["skipped"] = skipped_assertions(logtext, echo)
-        if r["rc"] not in (None, 0) and t in FP.ABORT_CASES:
-            # F3 (review of 4ec1aa80), D3: checks a failing script never reached, on every tree
-            texts = [logtext] + [(logdir / f"{t}.line{i}.log").read_text(errors="replace")
-                                 for i, (_, lrc) in enumerate(r.get("lines") or [], 1)
-                                 if lrc and (logdir / f"{t}.line{i}.log").exists()]
-            hidden = []
-            for text in texts:
-                hidden += [x for x in FP.not_executed(t, text, [ROOT]) if x not in hidden]
-            r["skipped"] = r["skipped"] + hidden
-        if r["rc"] == 0 and t not in SILENT_BY_DESIGN:  # R4-5: no line cap
-            silent = not own_output(logtext, echo)
-        # R4-1: a check skipped only because the run is root is run as the unprivileged user
-        rootonly = [x for x in r["skipped"] if x[1].startswith("a non-root run")]
-        if rootonly and r["rc"] == 0 and os.geteuid() == 0 and user:
-            if user_copy is None:
-                user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
-                prepare_copy(ROOT, user_copy, user)
-            urc, _ = run_target(user_copy, t, logdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
-            r["unprivileged_check"] = urc
-            if urc == 0:
+                        f["base_identical"] = False
+                        line_note += f"; on the candidate only (not v4.12.0): {', '.join(map(str, only))}"
+                for name, tree in regressions.items():
+                    if r.get("regression", {}).get(name):
+                        tag = ".regression-" + re.sub(r"[^\w.-]", "_", name)
+                        only = lines_match(cand_lines, run_lines(tree, t, olds[t], cdir, a.timeout, extra, tag), ROOT, tree)
+                        if only:
+                            r["regression"][name] = False
+                            line_note += f"; on the candidate only (not {name}): {', '.join(map(str, only))}"
+            if oracle_changed(f"before deciding {t}"):
+                return 2
+            r["status"], r["reason"] = decide(f)
+            logtext = _text(first)
+            r["blocked"] = blocked_reason(logtext)
+            if COMPARATOR_SKIP in logtext:
+                comparator_skipped.append(t)
+            silent = False
+            echo = recipe_echo(ROOT, t, olds[t])
+            r["skipped"] = skipped_assertions(logtext, echo)
+            if r["rc"] not in (None, 0) and t in FP.ABORT_CASES:
+                # F3 (review of 4ec1aa80), D3: checks a failing script never reached, on every tree
+                texts = [logtext] + [(cdir / f"{t}.line{i}.log").read_text(errors="replace")
+                                     for i, (_, lrc) in enumerate(r.get("lines") or [], 1)
+                                     if lrc and (cdir / f"{t}.line{i}.log").exists()]
+                hidden = []
+                for text in texts:
+                    hidden += [x for x in FP.not_executed(t, text, [ROOT]) if x not in hidden]
+                r["skipped"] = r["skipped"] + hidden
+            if r["rc"] == 0 and t not in SILENT_BY_DESIGN:  # R4-5: no line cap
+                silent = not own_output(logtext, echo)
+            # R4-1: a check skipped only because the run is root is run as the unprivileged user
+            rootonly = [x for x in r["skipped"] if x[1].startswith("a non-root run")]
+            if rootonly and r["rc"] == 0 and os.geteuid() == 0 and user:
+                if user_copy is None:
+                    user_copy = Path(pwd.getpwnam(user).pw_dir) / "nift-certify-copy"
+                    prepare_copy(ROOT, user_copy, user)
+                urc, _ = run_target(user_copy, t, cdir / f"{t}.unprivileged.log", a.timeout, user, olds[t], extra)
+                r["unprivileged_check"] = urc
+                if urc == 0:
+                    r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
+                        (l + " [ran as " + user + ": passed]", why, False) for l, why, _ in rootonly]
+            elif rootonly:  # never run anywhere: a required check that did not execute
                 r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
-                    (l + " [ran as " + user + ": passed]", why, False) for l, why, _ in rootonly]
-        elif rootonly:  # never run anywhere: a required check that did not execute
-            r["skipped"] = [x for x in r["skipped"] if x not in rootonly] + [
-                (l, why + " (no unprivileged run available)", True) for l, why, _ in rootonly]
-        r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent, r["skipped"])
-        r["skip_outcome"] = skip_outcome(r["skipped"], silent)
-        if r.get("unprivileged_check") not in (None, 0):
-            r["assertion"] = "FAIL"
-        if silent:
-            r["skipped"] = r["skipped"] + [("(no output of its own)", "a gate that prints its results "
-                                            "(or an entry in SILENT_BY_DESIGN with a reason)", True)]
-        r["class"] = report_class(r["status"], r.get("regression"), r["blocked"], r["assertion"])
-        if r["assertion"] == "FAIL" and r["rc"] == 0:
-            r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} (.build/certify/{t}.unprivileged.log)"
-        r["environment"] = env_record
-        if r["assertion"] in ("PARTIAL", "SKIP"):
-            r["reason"] = (f"{r['assertion']}: required assertions skipped: "
-                           + "; ".join(f"{l} [{why}]" for l, why, req in r["skipped"] if req))
-        if r["class"] == "BLOCKED":
-            r["reason"] = r["blocked"] or r["reason"]
-        elif r["class"] == "FAILED-BASELINE" and not any(v is not None for v in (r.get("regression") or {}).values()):
-            r["legacy_only"] = True  # F2: visibly distinct
-            r["reason"] = "LEGACY-ONLY (no regression baseline applicable; v4.12.0 fingerprint equal): " + r["reason"]
-        elif r["class"] == "FAILED-BASELINE":
-            r["reason"] = "equal failure fingerprint on every applicable regression baseline: " + ", ".join(
-                n for n, same in r["regression"].items() if same) + "; whole log identical: " + ", ".join(
-                f"{n}={v}" for n, v in r.get("whole_log_identical", {}).items()) + "; " + r["reason"]
-        if r["class"] == "FAILED-NEW" and r.get("fingerprint_diff"):
-            r["reason"] += "; fingerprint differs: " + " / ".join(
-                f"{n}: {'; '.join(d[:3])}" for n, d in r["fingerprint_diff"].items() if d)[:600]
-        if r["class"].startswith("FAILED") and r.get("baselines"):
-            r["reason"] += "; baselines: " + "; ".join(f"{n}: {w}" for n, w in r["baselines"].items())
-        if line_note:
-            r["reason"] += "; " + line_note  # H2a: never overwritten
+                    (l, why + " (no unprivileged run available)", True) for l, why, _ in rootonly]
+            r["assertion"] = assertion_class(r["rc"], logtext, r["blocked"], silent, r["skipped"])
+            r["skip_outcome"] = skip_outcome(r["skipped"], silent)
+            if r.get("unprivileged_check") not in (None, 0):
+                r["assertion"] = "FAIL"
+            if silent:
+                r["skipped"] = r["skipped"] + [("(no output of its own)", "a gate that prints its results "
+                                                "(or an entry in SILENT_BY_DESIGN with a reason)", True)]
+            r["class"] = report_class(r["status"], r.get("regression"), r["blocked"], r["assertion"])
+            if r["assertion"] == "FAIL" and r["rc"] == 0:
+                r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} ({(cdir / f'{t}.unprivileged.log').relative_to(store.dir)})"
+            r["environment"] = env_record
+            if r["assertion"] in ("PARTIAL", "SKIP"):
+                r["reason"] = (f"{r['assertion']}: required assertions skipped: "
+                               + "; ".join(f"{l} [{why}]" for l, why, req in r["skipped"] if req))
+            if r["class"] == "BLOCKED":
+                r["reason"] = r["blocked"] or r["reason"]
+            elif r["class"] == "FAILED-BASELINE" and not any(v is not None for v in (r.get("regression") or {}).values()):
+                r["legacy_only"] = True  # F2: visibly distinct
+                r["reason"] = "LEGACY-ONLY (no regression baseline applicable; v4.12.0 fingerprint equal): " + r["reason"]
+            elif r["class"] == "FAILED-BASELINE":
+                r["reason"] = "equal failure fingerprint on every applicable regression baseline: " + ", ".join(
+                    n for n, same in r["regression"].items() if same) + "; whole log identical: " + ", ".join(
+                    f"{n}={v}" for n, v in r.get("whole_log_identical", {}).items()) + "; " + r["reason"]
+            if r["class"] == "FAILED-NEW" and r.get("fingerprint_diff"):
+                r["reason"] += "; fingerprint differs: " + " / ".join(
+                    f"{n}: {'; '.join(d[:3])}" for n, d in r["fingerprint_diff"].items() if d)[:600]
+            if r["class"].startswith("FAILED") and r.get("baselines"):
+                r["reason"] += "; baselines: " + "; ".join(f"{n}: {w}" for n, w in r["baselines"].items())
+            if line_note:
+                r["reason"] += "; " + line_note  # H2a: never overwritten
+            # C42: every classification run of this target ran on the tree identity its role expects
+            for name, why in run_identity_problems(cdir):
+                r.update(evidence_verdict("IDENTITY-MISMATCH", f"classification run {name}: {why}"))
+        except OSError as e:   # B21 acceptance 2: missing evidence never crashes classification
+            r.update(evidence_verdict("EVIDENCE-LOST", f"during classification: {e}"))
+        store.write_class(cdir, t, r)
     for t in planned:
         if t not in results:
             results[t] = {"rc": None, "status": None, "class": "NOT-RUN", "reason": "planned, not run"}
@@ -2189,7 +2549,10 @@ def main():
                              "build_signature": facts.get("build_sig"), "source": facts.get("source")},
         "targets": {t: results[t] for t in sorted(results)},
     }
-    (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    summary["evidence"] = {"dir": str(store.dir), "campaign_id": campaign_id, "invocation": inv_dir.name,
+                           "identity": store.identity, "attempts": {t: store.attempts(t) for t in sorted(results)},
+                           "lost_or_mismatched": {t: results[t].get("evidence") for t in sorted(results)
+                                                  if results[t].get("evidence")}}
     lines = [f"certify @ {summary['commit'][:7]}: " + ", ".join(f"{k} {v}" for k, v in counts.items())]
     for k in classes[:-1]:
         for t in sorted(t for t, r in results.items() if r["class"] == k):
@@ -2227,11 +2590,13 @@ def main():
         lines.append("PARTIAL is not a pass: required checks did not execute (owner 2026-11-08 06:46)")
     if gaps and any(g[2] == "A" for g in gaps):
         lines.append("NOT RELEASE-QUALIFYING: a Category A (release-critical) check did not execute")
-    (logdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     not_passed = sum(counts[k] for k in classes[:-1])
     if not_passed:
         lines.append(f"NOT PASSED: {not_passed} required gate(s) are not PASSED (only PASSED counts as a pass)")
-    (logdir / "summary.txt").write_text("\n".join(lines) + "\n")
+    lines.append(f"EVIDENCE: {store.dir} (campaign {campaign_id}, identity {store.identity['identity_sha256'][:16]})")
+    for d in (store.dir, inv_dir):   # C42: durable; the campaign-level copy is the latest invocation's
+        EV.write_json(d / "summary.json", summary, mode=0o644, exclusive=False)
+        EV.write_durable(d / "summary.txt", ("\n".join(lines) + "\n").encode(), mode=0o644, exclusive=False)
     print("\n".join(lines))
     return VERDICT_EXIT[verdict]
 

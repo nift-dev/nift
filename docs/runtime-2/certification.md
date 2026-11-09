@@ -22,7 +22,13 @@ plus every suite the CI certification workflows run). It:
 2. runs parallel-safe targets concurrently (`CERTIFY_JOBS`, default `nproc`)
    and **exclusive** targets serially afterwards;
 3. re-runs every failure alone, then classifies it;
-4. writes `.build/certify/<target>.log` and `.build/certify/summary.{txt,json}`.
+4. writes its evidence outside the checkout (C42, combined-b3-b5.md section 36):
+   `--evidence-root` (default `/var/tmp/nift-certify`)`/<campaign-id>/`, with
+   `gates/<target>/run.log` and `run.json` per first pass (durable, written once),
+   `gates/<target>/cls-<N>/` per classification attempt, and `summary.{txt,json}`.
+   `--resume` continues a campaign from its records under the same identity.
+   Destructive gates (`DESTRUCTIVE` in the runner) run in private copies under
+   `--work-root`.
 
 `tests/runtime2/certification_guard.sh` (part of `make test`) keeps
 `certify-targets` complete: it fails if any `make` target, or any test/script a

@@ -226,6 +226,7 @@ python3 - <<'PYC'
 import sys
 sys.path.insert(0, 'scripts')
 import certify
+import certify_evidence as EV
 ip, rc, pp, fl, br = (certify.inventory_problems, certify.report_class, certify.preflight_problems,
                       certify.fail_lines, certify.blocked_reason)
 INV = ['test-runtime2-a', 'test-runtime2-b', 'test-runtime2-prep']
@@ -692,6 +693,33 @@ checks = [
     ('sha256 root-only skip', certify.skipped_assertions(
         'note: running as root; unreadable-file check skipped (root bypasses permissions)')[0][2], os.geteuid() != 0),
     ('class skip', rc('PASS', None, None, 'SKIP'), 'NOT-RUN'),
+    # C42 (B21): evidence placement, identities, lost evidence, destructive gates
+    ('C42 evidence inside the checkout refused', len(EV.root_problems('/r/c/.build/ev/x', '/w/x', {'certified checkout': '/r/c'})), 1),
+    ('C42 evidence inside a baseline tree refused', len(EV.root_problems('/b/17f/ev/x', '/w/x', {'certified checkout': '/r/c', 'regression baseline 17f7964c': '/b/17f'})), 1),
+    ('C42 work root inside the oracle tree refused', len(EV.root_problems('/v/ev/x', '/o/work/x', {'oracle tree': '/o'})), 1),
+    ('C42 evidence inside the work root refused', len(EV.root_problems('/w/x/ev', '/w/x', {})), 1),
+    ('C42 evidence outside every tree', EV.root_problems('/var/tmp/nift-certify/x', '/var/tmp/nift-certify-work/x', {'certified checkout': '/r/c'}), []),
+    ('C42 a sibling path is not inside', EV.inside('/r/c2/ev', '/r/c'), False),
+    ('C42 same tree identity', EV.tree_mismatch({'commit': 'a', 'tree': 't', 'diff_sha256': 'clean', 'nift_sha256': 'n'},
+        {'commit': 'a', 'tree': 't', 'diff_sha256': 'clean', 'nift_sha256': 'n', 'path': '/x'}), []),
+    ('C42 another binary is a mismatch', [x[:11] for x in EV.tree_mismatch({'commit': 'a', 'tree': 't', 'diff_sha256': 'clean', 'nift_sha256': 'm'},
+        {'commit': 'a', 'tree': 't', 'diff_sha256': 'clean', 'nift_sha256': 'n'})], ['nift_sha256']),
+    ('C42 identity sha ignores the campaign id and path', EV.identity_sha256({'campaign_id': 'a', 'candidate': {'path': '/a', 'commit': 'c'}})
+        == EV.identity_sha256({'campaign_id': 'b', 'candidate': {'path': '/b', 'commit': 'c'}}), True),
+    ('C42 identity sha sees the toolchain', EV.identity_sha256({'toolchain': {'cxx_sha256': 'a'}}) == EV.identity_sha256({'toolchain': {'cxx_sha256': 'b'}}), False),
+    ('C42 lost evidence is FAILED-NEW', (certify.evidence_verdict('EVIDENCE-LOST', 'x')['class'], certify.evidence_verdict('EVIDENCE-LOST', 'x')['reason']),
+        ('FAILED-NEW', 'EVIDENCE-LOST: x')),
+    ('C42 a mismatched identity is not classified', certify.evidence_verdict('IDENTITY-MISMATCH', 'y')['class'], 'BLOCKED'),
+    ('C42 destructive: make distclean in a recipe', bool(certify.destructive_hits('.', '\tmake distclean nift')), True),
+    ('C42 destructive: rm -rf $(TEST_DIR)', bool(certify.destructive_hits('.', '\trm -rf "$(TEST_DIR)"')), True),
+    ('C42 destructive: a comment is not', certify.destructive_hits('.', '\t# make clean here'), []),
+    ('C42 destructive: make nift in a clean tree is not', certify.destructive_hits('.', '\tmake nift # the clean tree'), []),
+    ('C42 destructive: check-build-reuse.sh is detected through the recipe', bool(certify.destructive_hits('.',
+        'bash scripts/build/check-build-reuse.sh "$(TEST_DIR)/build-reuse"')), True),
+    ('C42 destructive: an unlisted cleaning gate is a plan problem', [x[:42] for x in certify.destructive_problems('.',
+        {'test-new-clean': 'make clean', 'test-build-reuse': 'make distclean'}, ['test-new-clean', 'test-build-reuse'])],
+        ['test-new-clean cleans the tree (make clean']),
+    ('C42 test-build-reuse cap above the default', (certify.gate_timeout('test-build-reuse', 3600), certify.gate_timeout('test-x', 3600)), (7200, 3600)),
 ]
 for _d in (STALE, LINKED, CANDIDATE, V412T, T40, T41, OUT41, CAND41, F41):
     shutil.rmtree(_d, ignore_errors=True)
@@ -785,11 +813,13 @@ PYSKIP
 # different FAIL lines at the same step on the v4.12.0 baseline: each must be FAILED-NEW (exit 1).
 # Positive control: an identical failure is FAILED-BASELINE (exit 0).
 TOY=$(mktemp -d)
-trap 'rm -rf "$TOY"' EXIT
+trap 'chmod -R u+w "$TOY" 2>/dev/null; rm -rf "$TOY"' EXIT
+# C42: the toy campaigns' evidence and work copies stay in this guard's own temporary directory
+export NIFT_CERTIFY_EVIDENCE_ROOT="$TOY/evidence" NIFT_CERTIFY_WORK_ROOT="$TOY/work"
 toy() {  # toy DIR TARGET RECIPE-LINES...  (CERTIFY_PY: the runner copied in, default the tree's)
     local dir=$1 target=$2; shift 2
     mkdir -p "$dir/scripts"; cp "${CERTIFY_PY:-scripts/certify.py}" "$dir/scripts/certify.py"
-    cp scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv "$dir/scripts/"
+    cp scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv scripts/certify_evidence.py "$dir/scripts/"
     { printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\n'
       printf 'certify-targets: %s\n.PHONY: %s\n%s: nift\n' "$target" "$target" "$target"
       for l in "$@"; do printf '\t@%s\n' "$l"; done; } >> "$dir/Makefile"
@@ -1006,12 +1036,12 @@ skiprun s3 test-rt-platform 0 "not-required test-rt-platform: SKIP CP20 Windows 
 toy "$TOY/s4/cand" test-rt-silent 'true'
 skiprun s4 test-rt-silent 1 "NOT-RUN          test-rt-silent: SKIP"
 # R4-5: a silent recipe whose command make echoes over two lines (a continuation) is SKIP too
-mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv "$TOY/s5/cand/scripts/"
+mkdir -p "$TOY/s5/cand/scripts"; cp scripts/certify.py scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv scripts/certify_evidence.py "$TOY/s5/cand/scripts/"
 printf 'nift:\n\tprintf "#!/bin/sh\\necho stub\\n" > nift; chmod +x nift\ncertify-targets: test-rt-cont\n.PHONY: test-rt-cont\ntest-rt-cont: nift\n\ttrue \\\n\t  \&\& true\n' > "$TOY/s5/cand/Makefile"
-skiprun s5 test-rt-cont 1 "NOT-RUN          test-rt-cont: SKIP"
+NIFT_CERTIFY_CAMPAIGN_ID=toy-s5 skiprun s5 test-rt-cont 1 "NOT-RUN          test-rt-cont: SKIP"
 # owner 23:10: each result states its environment
 python3 -B -c "
-import json,sys; d=json.load(open('$TOY/s5/cand/.build/certify/summary.json'))
+import json,sys; d=json.load(open('$TOY/evidence/toy-s5/summary.json'))
 env=d['targets']['test-rt-cont'].get('environment') or {}
 need=('hostname','kernel','distro','container','compiler','stdlib_sha256','binary_sha256')
 miss=[k for k in need if k not in env]
@@ -1021,7 +1051,7 @@ echo "PASS certification guard environment record: every result states its envir
 python3 -B - "$TOY" <<'MERGE' || exit 1
 import json, subprocess, sys
 toy = sys.argv[1]
-d = json.load(open(f"{toy}/s5/cand/.build/certify/summary.json"))
+d = json.load(open(f"{toy}/evidence/toy-s5/summary.json"))
 def write(name, **env):
     e = json.loads(json.dumps(d))
     for r in e["targets"].values():
@@ -1037,6 +1067,126 @@ if same.returncode != 0 or b.returncode == 0 or "binary_sha256 differs" not in b
     sys.exit("FAIL certification guard merge: rc %s/%s/%s\n%s%s" % (same.returncode, b.returncode, l.returncode, b.stdout, l.stdout))
 MERGE
 echo "PASS certification guard merge: differing binary or libstdc++ between environments refused"
+# C42 (BLOCKERS B21, owner 2026-11-09 16:46): the owner's six-step acceptance test, on the real
+# scripts/certify.py in a toy git tree whose `make distclean` removes .build and nift (as the
+# Makefile's does): (1) a gate runs and its log and result are stored; (2) make distclean in the
+# checkout; (3) the earlier log and result still exist, unchanged; (4) another gate runs (resumed
+# campaign); (5) classification reads both results; (6) classification is interrupted (SIGTERM to
+# certify's exact PID during the second gate's rerun) and nothing is lost: the stored records are
+# unchanged, the interrupted attempt is kept, and a resumed classification completes from them.
+# Negative control: the C41 runner (2bedfb33, logs under .build/certify) fails step 3.
+EV6="$TOY/ev6"; T6="$TOY/six"
+mk6() {  # mk6 DIR [CERTIFY_PY]
+    mkdir -p "$1/scripts"
+    cp "${2:-scripts/certify.py}" "$1/scripts/certify.py"
+    cp scripts/certify_fingerprints.py scripts/certify_hidden_checks.tsv scripts/certify_evidence.py "$1/scripts/"
+    printf '#!/bin/sh\necho "Nift v0"\n' > "$1/src.sh"
+    { printf 'TEST_DIR := .build\nnift: src.sh\n\tmkdir -p $(TEST_DIR) && cp src.sh nift && chmod +x nift\n'
+      printf 'certify-targets: test-ev-a test-ev-b\n.PHONY: test-ev-a test-ev-b test-build-reuse distclean\n'
+      printf 'test-ev-a: nift\n\t@echo "running tests/a.sh"; echo "FAIL a: 1 of 3"; exit 1\n'
+      printf 'test-ev-b: nift\n\t@echo "running tests/b.sh"; sleep 3; echo "FAIL b: 2 of 3"; exit 1\n'
+      printf 'test-build-reuse: nift\n\t@$(MAKE) -s distclean; mkdir -p .build/build-reuse; echo "timing 1" > .build/build-reuse/timing.txt; echo "PASS reuse $$$$((1+1))"\n'
+      printf 'distclean:\n\trm -rf "$(TEST_DIR)" nift\n'; } > "$1/Makefile"
+    printf 'nift\n.build/\n' > "$1/.gitignore"
+    (cd "$1" && git init -q && git add -A && git -c user.name=g -c user.email=g@x commit -qm toy) || exit 1
+}
+mk6 "$T6"
+c6() {  # c6 CAMPAIGN ARGS...: the real certify in the toy checkout
+    local id=$1; shift
+    (cd "$T6" && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/certify.py --jobs 1 --unprivileged-user '' --baseline '' \
+        --evidence-root "$EV6" --work-root "$TOY/work6" --campaign-id "$id" "$@")
+}
+g6() { echo "$EV6/six/gates/$1"; }
+fail6() { echo "FAIL certification guard C42 six-step acceptance: $*"; exit 1; }
+# (1)
+c6 six --targets test-ev-a --no-classify > "$TOY/six-1.out" 2>&1 || fail6 "step 1: certify exited $? ($(tail -2 "$TOY/six-1.out"))"
+[ -s "$(g6 test-ev-a)/run.log" ] && [ -s "$(g6 test-ev-a)/run.json" ] || fail6 "step 1: no stored log and result"
+(cd "$EV6/six" && find gates -type f | sort | xargs sha256sum) > "$TOY/six-1.sha"
+echo "PASS certification guard C42 step 1: test-ev-a ran; gates/test-ev-a/run.log and run.json stored outside the checkout"
+# (2)
+(cd "$T6" && make -s distclean) || fail6 "step 2: make distclean failed"
+[ ! -e "$T6/.build" ] && [ ! -e "$T6/nift" ] || fail6 "step 2: distclean left .build or nift"
+echo "PASS certification guard C42 step 2: make distclean removed the checkout's .build and nift"
+# (3)
+(cd "$EV6/six" && sha256sum -c --quiet "$TOY/six-1.sha") || fail6 "step 3: the stored log or result changed or vanished"
+echo "PASS certification guard C42 step 3: the earlier log and result still exist, byte for byte"
+# (4)
+c6 six --targets test-ev-a test-ev-b --resume --no-classify > "$TOY/six-4.out" 2>&1 || fail6 "step 4: certify exited $?"
+grep -q '^\[FAILED\] test-ev-a .*recorded earlier' "$TOY/six-4.out" && [ -s "$(g6 test-ev-b)/run.json" ] \
+    || fail6 "step 4: test-ev-a was not read back or test-ev-b not recorded ($(grep -v PREFLIGHT "$TOY/six-4.out" | tail -3))"
+(cd "$EV6/six" && sha256sum -c --quiet "$TOY/six-1.sha") || fail6 "step 4: the first record changed"
+(cd "$EV6/six" && find gates -type f | sort | xargs sha256sum) > "$TOY/six-4.sha"
+echo "PASS certification guard C42 step 4: test-ev-b ran in the resumed campaign; test-ev-a's record was read, not rerun"
+# (5) and (6): classification starts, reads both records, and is interrupted during test-ev-b's rerun
+c6 six --targets test-ev-a test-ev-b --resume > "$TOY/six-5.out" 2>&1 & P6=$!
+for _ in $(seq 1 200); do [ -e "$(g6 test-ev-b)/cls-1/test-ev-b.rerun.log" ] && break; sleep 0.1; done
+[ -s "$(g6 test-ev-a)/cls-1/class.json" ] || { kill -TERM "$P6"; wait "$P6"; fail6 "step 5: test-ev-a was not classified from its record"; }
+sleep 0.5; kill -TERM "$P6"; wait "$P6"; rc6=$?
+[ "$rc6" = 143 ] || fail6 "step 6: certify was not interrupted (exit $rc6)"
+(cd "$EV6/six" && sha256sum -c --quiet "$TOY/six-4.sha") || fail6 "step 6: a stored record changed after the interruption"
+[ -e "$(g6 test-ev-b)/cls-1/test-ev-b.rerun.log" ] && [ ! -e "$(g6 test-ev-b)/cls-1/class.json" ] \
+    || fail6 "step 6: the interrupted attempt is not kept as it was"
+c6 six --targets test-ev-a test-ev-b --resume > "$TOY/six-6.out" 2>&1; rc6=$?
+python3 -B - "$EV6/six" "$rc6" <<'SIX' || exit 1
+import json, sys
+d = json.load(open(sys.argv[1] + "/summary.json"))
+cls = {t: r["class"] for t, r in d["targets"].items()}
+att = d["evidence"]["attempts"]
+ok = (sys.argv[2] == "1" and cls == {"test-ev-a": "FAILED-NEW", "test-ev-b": "FAILED-NEW"}
+      and att == {"test-ev-a": ["cls-1"], "test-ev-b": ["cls-1", "cls-2"]}
+      and all("see gates/" in r["reason"] for r in d["targets"].values()))
+sys.exit(0 if ok else f"FAIL certification guard C42 steps 5-6: exit {sys.argv[2]}, classes {cls}, attempts {att}")
+SIX
+echo "PASS certification guard C42 step 5: classification read both stored results (test-ev-a and test-ev-b FAILED-NEW)"
+echo "PASS certification guard C42 step 6: SIGTERM mid-classification lost nothing; the resumed classification kept attempt cls-1 and completed in cls-2"
+# negative control: the C41 runner keeps its logs under .build/certify; make distclean loses them (step 3 fails)
+if git cat-file -e 2bedfb33:scripts/certify.py 2>/dev/null; then
+    git show 2bedfb33:scripts/certify.py > "$TOY/c41-certify.py"
+    mk6 "$TOY/old6" "$TOY/c41-certify.py"
+    (cd "$TOY/old6" && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/certify.py --jobs 1 --targets test-ev-a \
+        --unprivileged-user '' --baseline '' > "$TOY/old6.out" 2>&1)
+    [ -s "$TOY/old6/.build/certify/test-ev-a.log" ] || fail6 "negative control: the C41 runner wrote no .build/certify log"
+    (cd "$TOY/old6" && make -s distclean)
+    if [ -e "$TOY/old6/.build/certify/test-ev-a.log" ]; then fail6 "negative control: the old layout survived distclean"; fi
+    echo "PASS certification guard C42 negative control: with the old layout (.build/certify, the 2bedfb33 runner) step 3 fails: distclean deleted the log"
+else
+    echo "SKIP certification guard C42 negative control: commit 2bedfb33 is not in this repository"
+fi
+# refusals: evidence inside the checkout; a campaign directory reused without --resume; a resume
+# under another identity; lost evidence is FAILED (EVIDENCE-LOST), never a crash
+c6 bad --targets test-ev-a --evidence-root "$T6/.build/ev" > "$TOY/six-r1.out" 2>&1; r1=$?
+c6 six --targets test-ev-a --no-classify > "$TOY/six-r2.out" 2>&1; r2=$?
+echo '# changed' >> "$T6/src.sh"
+c6 six --targets test-ev-a --resume > "$TOY/six-r3.out" 2>&1; r3=$?
+(cd "$T6" && git checkout -q src.sh)
+if [ "$r1" != 2 ] || ! grep -q "evidence refused: the evidence directory .* is inside the certified checkout" "$TOY/six-r1.out" \
+   || [ "$r2" != 2 ] || ! grep -q "exists: pass --resume" "$TOY/six-r2.out" \
+   || [ "$r3" != 2 ] || ! grep -q "cannot resume campaign six: its identity differs" "$TOY/six-r3.out"; then
+    fail6 "refusals: exits $r1/$r2/$r3"
+fi
+echo "PASS certification guard C42 refusals: evidence inside the checkout, a reused campaign id, a resume under another identity (exit 2)"
+c6 lost --targets test-ev-a test-ev-b --no-classify > /dev/null 2>&1
+chmod u+w "$EV6/lost/gates/test-ev-a/run.log" && rm -f "$EV6/lost/gates/test-ev-a/run.log"
+c6 lost --targets test-ev-a test-ev-b --resume > "$TOY/six-lost.out" 2>&1; rl=$?
+[ "$rl" = 1 ] && grep -q "FAILED-NEW       test-ev-a: EVIDENCE-LOST: the first-pass log .* is missing" "$TOY/six-lost.out" \
+    || fail6 "lost evidence: exit $rl ($(grep -v PREFLIGHT "$TOY/six-lost.out" | tail -3))"
+echo "PASS certification guard C42 lost evidence: a missing first-pass log is FAILED-NEW (EVIDENCE-LOST), classification completes"
+# a destructive gate runs in a private copy: the checkout keeps .build and nift, the gate's own
+# outputs are kept in the evidence, the copy is removed
+c6 iso --targets test-build-reuse > "$TOY/six-iso.out" 2>&1; ri=$?
+python3 -B - "$EV6/iso" "$T6" "$ri" <<'ISO' || exit 1
+import json, os, sys
+ev, tree, rc = sys.argv[1:]
+rec = json.load(open(ev + "/gates/test-build-reuse/run.json"))
+kept = os.path.isfile(ev + "/gates/test-build-reuse/run.log.kept-tree/.build/build-reuse/timing.txt")
+ok = (rc == "0" and rec["isolated_copy"] and rec["rc"] == 0 and rec["cwd"] != os.path.realpath(tree)
+      and os.path.isfile(tree + "/nift") and os.path.isdir(tree + "/.build") and kept and not os.path.exists(rec["cwd"])
+      and rec["source_tree"] == os.path.realpath(tree) and rec["timeout"] == 7200)
+sys.exit(0 if ok else f"FAIL certification guard C42 isolation: exit {rc}, record {rec}, kept {kept}")
+ISO
+grep -q "^\[ok\] test-build-reuse .*exclusive, isolated copy" "$TOY/six-iso.out" || fail6 "isolation: not reported as an isolated copy"
+echo "PASS certification guard C42 isolation: test-build-reuse (DESTRUCTIVE) ran make distclean in a private copy; the checkout kept .build and nift; its timing.txt is in the evidence"
+
 # R3-1 inventory check of the D3 phrases the guard itself prints: the historical control's
 # missing-commit branch prints a SKIP line, so that gate cannot be PASSED (see above).
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;

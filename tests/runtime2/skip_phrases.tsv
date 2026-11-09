@@ -28,7 +28,8 @@ scripts/certify.py	detected	-	"""D3: [(line, requirement, required)] for every s
 scripts/certify.py	detected	-	the recipe (R4-1 local pass: a recipe that contains `echo "... skipped ..."` is not a skip
 scripts/certify.py	detected	-	"""D3, pure (table-tested): PASS / PARTIAL / SKIP / FAIL / BLOCKED of one gate's assertions.
 scripts/certify.py	detected	-	r["skipped"] = skipped_assertions(logtext, echo)
-scripts/certify.py	detected	-	r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} (.build/certify/{t}.unprivileged.log)"
+scripts/certify.py	detected	-	r["class"], r["reason"] = "FAILED-NEW", f"its root-skipped check failed as {user} ({(cdir / f'{t}.unprivileged.log').relative_to(store.dir)})"
+scripts/certify.py	justified	C42 --no-classify: the run phase only, by request; no assertion is skipped	print(f"certify: {len(results)} first-pass record(s) in {store.dir / 'gates'}; classification not run (--no-classify)")
 scripts/certify.py	detected	-	order = ["FAIL", "BASELINE-FAILURE", "UNVERIFIED", "SKIPPED-ENVIRONMENTAL", "FLAKY", "PASS"]
 scripts/certify.py	detected	-	for k in ("PASS", "PARTIAL", "SKIP", "FAIL", "BLOCKED")}
 scripts/certify_fingerprints.py	detected	-	while i < len(lines) and lines[i].strip() and not re.match(r"^\s*(?:PASS|FAIL|SKIP|ok|note)\b", lines[i]) \
@@ -80,6 +81,7 @@ tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s1/cand" test-rt-part
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s2/cand" test-rt-skipall 'echo "running tests/refs.sh"; echo "SKIP package refs/local lock (git unavailable)"; exit 0'
 tests/runtime2/certification_guard.sh	detected	-	toy "$TOY/s3/cand" test-rt-platform 'echo "running tests/w.py"; echo "PASS w"; echo "SKIP CP20 Windows pipeline (POSIX host)"; exit 0'
 tests/runtime2/certification_guard.sh	detected	-	echo "SKIP certification guard historical control: commit 0d853db4 is not in this repository (manual evidence: combined-b3-b5.md 10)"
+tests/runtime2/certification_guard.sh	detected	-	echo "SKIP certification guard C42 negative control: commit 2bedfb33 is not in this repository"
 tests/runtime2/cp01/syscall_harness_negative.sh	detected	-	if ! command -v strace >/dev/null 2>&1; then echo "SKIP syscall harness: strace unavailable"; exit 77; fi
 tests/runtime2/cp01/syscall_harness_negative.sh	detected	-	elif [ "$want" = 77 ]; then [ $rc -eq 77 ] && { echo "PASS syscall harness: $desc (skip)"; ok=$((ok+1)); } || { echo "FAIL syscall harness: $desc rc=$rc expected 77"; fail=1; }
 tests/runtime2/cp01/syscalls.sh	detected	-	echo "SKIP syscalls: tracer '$TRACE' is unavailable"
