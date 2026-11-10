@@ -88,6 +88,15 @@ MUTANTS = [
        "(ast_.at(p.a).kind == NodeKind::Index && ast_.at(ast_.at(p.a).a).kind == NodeKind::Ident)",
        "ast_.at(p.a).kind == NodeKind::Index")],
      "refused_future_nested"),
+    # Review of C105-C108, P2-2: the two admission checks that keep legacy-error forms refused.
+    ("object-number-key-admitted", "admission: an object level accepts a key of any kind",
+     [(CPATH, "    const bool object = (receiver & ~kKindObject) == 0 && (key & ~kKindString) == 0;\n",
+       "    const bool object = (receiver & ~kKindObject) == 0;\n")],
+     "refused_object_number_key"),
+    ("string-compound-any-op", "admission: two strings admitted for every compound operator, not only +=",
+     [(CPATH, "    const bool strings = node.op == Op::AddAssign && l == kKindString && rk == kKindString;\n",
+       "    const bool strings = l == kKindString && rk == kKindString;\n")],
+     "refused_string_compound_sub"),
 ]
 
 

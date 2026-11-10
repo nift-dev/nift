@@ -4997,3 +4997,56 @@ The freeze gates found four things. Each was fixed test-side; there is no produc
 - the certification instance;
 - `make cp25r-inventory` on the release toolchain;
 - the GCC 15.2 comparator-sort profile.
+
+## 97. Review of C105-C108 (ACCEPT-WITH-REPAIRS): repairs (C109, tests, docs, inventory)
+
+No production change. `src/` is unchanged since 28a6368b, and `nift` is still 8195f1b3….
+
+- **P2-1. D2 differences that were not pinned before.** Each is now an exact case in
+  `assign_family.py`, with both engines pinned. Each has a row in compatibility.md and a sentence
+  in known-limitations.md, citing D2 and the owner's 16:35 ruling.
+  - The right-hand side replaces an intermediate container. The VM updates the container it read
+    first; legacy updates the new one. This holds for every callee, so the earlier "lambda callee
+    legacy-equal" wording is corrected: it is true only when the rhs rebinds the receiver.
+
+    | Program | VM | Legacy |
+    | --- | --- | --- |
+    | `g[0][1] += f()`, where `f` (a `fn` or a lambda) sets `g[0] = [100,200]` | `g` `[[100,200],[3,4]]`, `row` `[1,7]` | `[[100,7],[3,4]]`, `[100,7]` |
+    | `o["m"]["x"][0] += f()`, where `f` replaces `o["m"]` (`fn` and lambda) | `{"m":{"x":[50,60]}}` | `{"m":{"x":[6,60]}}` |
+
+  - An inline assignment in the rhs rebinds the key. The VM uses the key it read first.
+
+    | Program | VM | Legacy |
+    | --- | --- | --- |
+    | `a[i] += (i = 1)` | `[2,2]` | `[1,2]` |
+    | `g[i][i] += (i = 1) + 10` | `[[12,2],[3,4]]` | `[[1,2],[3,12]]` |
+
+  - These are owner items to confirm under D2.
+- **P2-2. Forms that legacy rejects stay refused.** Each case pins the refusal reason, with
+  legacy's error as the oracle:
+  - `o := {"a": 1}; o[0] = 5` is refused with `type:element-assignment`. Legacy: `assignment index
+    does not address an array or object: 0`.
+  - `a[0] -= "y"`, `*=`, `/=` and `%=` on `["x"]` are refused with `type:compound-assignment`.
+    Legacy: `arithmetic operators require numeric operands`.
+
+  Two new sanctioned mutants each drop one of these checks. `sanctioned_mutant.py` fails the
+  build when a mutant object is identical to production (the C75 check), so each built mutant
+  differs from production. Both are caught by the case that names them:
+  - `object-number-key-admitted` (an object level accepts any key kind) is caught by
+    `refused_object_number_key`; the VM exits 70;
+  - `string-compound-any-op` (two strings accepted for every operator) is caught by
+    `refused_string_compound_sub`, and by 8 cases in all.
+
+  `assign_family.py` now has 86 cases (46 legacy-equal, 40 pinned). The assignment-family mutants
+  are 15 of 15 caught.
+- **L-1.** `gen_operators` labels a row `index-compound` only when the callee is `fn`. The row
+  count is pinned at 10.
+- **L-2. Inventory.**
+  - `index-assign-target` and `compound-target` go back to `implement`, narrowed:
+    - `index-assign-target` remains for a fourth level (`g[0][0][0][0] = 5`, which legacy runs)
+      and for a receiver that is not a plain name (`o.k[0] = 2`);
+    - `compound-target` remains for `o.k += 1`.
+  - `type:element-assignment` stays retired. Its row now notes the five b5/u6 session goldens that
+    emit it. `tests/runtime2/b5` is not an inventory corpus. A fresh local `inventory.py collect`
+    shows no sighting, and `--check` reports retired 0 seen.
+  - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.

@@ -112,6 +112,26 @@ CASES = [
     case("receiver_rebound_fn_compound", "g := [[1]]\nfn(f()) { g = [[9]]; return 5 }\nkeep := g\n"
          "g[0][0] += f()\nprint(g.stringify())\nprint(keep.stringify())", "[[9]]\n[[6]]\n-- exit 0\n",
          (D2, "[[6]]\n[[1]]\n-- exit 0\n")),
+    # Review of C105-C108, P2-1: the rhs replaces an intermediate container, for every callee (the
+    # receiver-rebinding lambda case above is legacy-equal; these are not): the update goes to the
+    # container read first.
+    case("order_compound_intermediate_replaced_fn", "g := [[1, 2], [3, 4]]\nrow := g[0]\n"
+         "fn(f()) { g[0] = [100, 200]; return 5 }\ng[0][1] += f()\nprint(g.stringify())\nprint(row.stringify())",
+         "[[100,200],[3,4]]\n[1,7]\n-- exit 0\n", (D2, "[[100,7],[3,4]]\n[100,7]\n-- exit 0\n")),
+    case("order_compound_intermediate_replaced_lambda", "g := [[1, 2], [3, 4]]\nrow := g[0]\n"
+         "f := () => { g[0] = [100, 200]; return 5 }\ng[0][1] += f()\nprint(g.stringify())\nprint(row.stringify())",
+         "[[100,200],[3,4]]\n[1,7]\n-- exit 0\n", (D2, "[[100,7],[3,4]]\n[100,7]\n-- exit 0\n")),
+    case("order_compound_object_intermediate_replaced", 'o := {"m": {"x": [1, 60]}}\n'
+         'fn(f()) { o["m"] = {"x": [50, 60]}; return 5 }\no["m"]["x"][0] += f()\nprint(o.stringify())',
+         '{"m":{"x":[50,60]}}\n-- exit 0\n', (D2, '{"m":{"x":[6,60]}}\n-- exit 0\n')),
+    case("order_compound_object_intermediate_replaced_lambda", 'o := {"m": {"x": [1, 60]}}\n'
+         'f := () => { o["m"] = {"x": [50, 60]}; return 5 }\no["m"]["x"][0] += f()\nprint(o.stringify())',
+         '{"m":{"x":[50,60]}}\n-- exit 0\n', (D2, '{"m":{"x":[6,60]}}\n-- exit 0\n')),
+    # an inline assignment in the rhs rebinds the key: the key read first is used
+    case("order_compound_inline_key", "a := [1, 2]\ni := 0\na[i] += (i = 1)\nprint(a.stringify())",
+         "[2,2]\n-- exit 0\n", (D2, "[1,2]\n-- exit 0\n")),
+    case("order_compound_inline_key_nested", "g := [[1, 2], [3, 4]]\ni := 0\ng[i][i] += (i = 1) + 10\n"
+         "print(g.stringify())", "[[12,2],[3,4]]\n-- exit 0\n", (D2, "[[1,2],[3,12]]\n-- exit 0\n")),
     case("compound_rhs_shrinks", "a := [1, 2]\nf := () => { a.pop(); return 5 }\na[1] += f()\nprint(a.stringify())",
          "-- exit 1\nerror: {name}:3:1: index out of range: 1\n"),
     # ---- aliases (B5) ----
@@ -231,6 +251,27 @@ CASES = [
          refused(4, 1, "type:element-assignment", "an operation whose operand types the VM cannot prove "
                  "(element-assignment)"), ("refusal", "x\n-- exit 1\n"
                  "error: {name}:4:1: assignment index does not address an array or object: 0\n")),
+    # Review P2-2: an object with a number key, and a non-`+=` operator on two strings, stay refused.
+    case("refused_object_number_key", 'o := {"a": 1}\nprint("x")\no[0] = 5',
+         refused(3, 1, "type:element-assignment", "an operation whose operand types the VM cannot prove "
+                 "(element-assignment)"), ("refusal", "x\n-- exit 1\n"
+                 "error: {name}:3:1: assignment index does not address an array or object: 0\n")),
+    case("refused_string_compound_sub", 'a := ["x"]\nprint("x")\na[0] -= "y"',
+         refused(3, 1, "type:compound-assignment", "an operation whose operand types the VM cannot prove "
+                 "(compound-assignment)"), ("refusal", "x\n-- exit 1\n"
+                 "error: {name}:3:1: arithmetic operators require numeric operands\n")),
+    case("refused_string_compound_mul", 'a := ["x"]\nprint("x")\na[0] *= "y"',
+         refused(3, 1, "type:compound-assignment", "an operation whose operand types the VM cannot prove "
+                 "(compound-assignment)"), ("refusal", "x\n-- exit 1\n"
+                 "error: {name}:3:1: arithmetic operators require numeric operands\n")),
+    case("refused_string_compound_div", 'a := ["x"]\nprint("x")\na[0] /= "y"',
+         refused(3, 1, "type:compound-assignment", "an operation whose operand types the VM cannot prove "
+                 "(compound-assignment)"), ("refusal", "x\n-- exit 1\n"
+                 "error: {name}:3:1: arithmetic operators require numeric operands\n")),
+    case("refused_string_compound_mod", 'a := ["x"]\nprint("x")\na[0] %= "y"',
+         refused(3, 1, "type:compound-assignment", "an operation whose operand types the VM cannot prove "
+                 "(compound-assignment)"), ("refusal", "x\n-- exit 1\n"
+                 "error: {name}:3:1: arithmetic operators require numeric operands\n")),
     case("refused_compound_mixed", 'a := [1, "s"]\nprint("x")\na[1] += 1',
          refused(3, 1, "type:compound-assignment", "an operation whose operand types the VM cannot prove "
                  "(compound-assignment)"), ("refusal", "x\n-- exit 1\n"

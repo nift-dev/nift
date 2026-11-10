@@ -88,7 +88,10 @@ main ones:
 - a function value has no shown form in `nift eval` (b4-dispatch.md 6).
 - the assignment family (checkpoint 1): a compound element update `a[i] += f()` reads and writes
   the element at the key read before the right-hand side (D2, owner 2026-11-10 16:35), where legacy
-  reads at the old key and writes at the new one; a path store or update reads its receiver first
+  reads at the old key and writes at the new one. The same rule decides when the rhs replaces an
+  intermediate container (`g[0][1] += f()` where `f` sets `g[0]`; the object form too; any callee)
+  or rebinds the key inline (`a[i] += (i = 1)`): the VM writes the container and key it read
+  first, legacy the new ones (D2, owner 16:35; compatibility.md). A path store or update reads its receiver first
   for every callee (H-A D1.1, D2); its aliases, cycles, `const` and loop wording follow B5, Q2 B and
   D-018c.
 

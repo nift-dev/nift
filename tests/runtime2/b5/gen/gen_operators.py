@@ -107,6 +107,7 @@ COMPOUND = {"c_add": lambda v, r: v + r, "c_sub": lambda v, r: v - r, "c_mul": l
 # receiver, its key and the element before the rhs; the rhs's rebinding of the receiver leaves the
 # write in the old container, so the binding prints the rebinding value.
 INDEXED = {"c_index": "[20]", "c_okey": '{"k":20}'}
+INDEX_COMPOUND_ROWS = 10  # legacy_class "index-compound": c_index/c_okey with a `fn` callee
 MODELLED = sorted(list(VALUE) + ["and_sc"] + list(COMPOUND) + list(INDEXED))
 
 
@@ -142,7 +143,7 @@ def expected(op, family, context):
 #                  member target's receiver late with a `fn` callee (the old element, written into
 #                  the rebinding value); the VM keeps the receiver read first.
 def legacy_class(op, family, callee, context):
-    if op in INDEXED:
+    if op in INDEXED and callee == "fn":
         return "index-compound"
     if family == "fld":
         return "no-field-op"
@@ -322,6 +323,11 @@ def run_gate(args):
         if not keep:
             shutil.rmtree(out, ignore_errors=True)
     ok = bad == 0 and n == len(its) and admitted >= ADMITTED_FLOOR
+    # Review of C105-C108, L-1: the index-compound class is exactly the `fn`-callee rows (10).
+    if known.get("index-compound", 0) != INDEX_COMPOUND_ROWS:
+        print("FAIL operators: index-compound rows %d, pinned %d" % (known.get("index-compound", 0),
+                                                                   INDEX_COMPOUND_ROWS))
+        ok = False
     print("%s operators: %d programs (%d refused, %d admitted; floor %d), %d bad; legacy differs (known classes): %s"
           % ("PASS" if ok else "FAIL", n, refused, admitted, ADMITTED_FLOOR, bad,
              ", ".join("%s %d" % kv for kv in sorted(known.items())) or "none"), flush=True)
