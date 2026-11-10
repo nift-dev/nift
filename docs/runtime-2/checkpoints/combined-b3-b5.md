@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C115; tsv and docs only)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; tsv and docs only)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -5130,7 +5130,8 @@ the owner decides the families.**
 
 Row count: C113 had 505 PENDING-OWNER + 23 implement = 528; C114 added `type:for-source` (restored) and
 `coro-future-flow:Coalesce` (new): 530; C115 adds `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`,
-`session:opaque` and `difference:import-depth`: 512 PENDING-OWNER + 23 implement = 535 rows in all. Every one carries exactly one outcome class at the start of its tsv disposition
+`session:opaque` and `difference:import-depth` (535); C116 un-retires `free-name:legacy-binding`, `coro-collection-callback`,
+`coro-main-cell`: 515 PENDING-OWNER + 23 implement = 538 rows in all. Every one carries exactly one outcome class at the start of its tsv disposition
 (`outcome:i`, `outcome:ii-A`/`ii-B`/`ii-C`, `outcome:iii`, `outcome:D`, `outcome:E`), so this split can be recomputed from the tsv:
 
 - **(i)** the VM refuses a program legacy runs to completion: a real capability gap;
@@ -5151,7 +5152,7 @@ agrees with the confirmation review's approximate one; the differences are liste
 | method (undefined or wrong-kind method) | 2 | 41 | 0 | 0 | 29 | 7 | 79 |
 | builtin-receiver | 0 | 77 | 1 | 0 | 0 | 1 | 79 |
 | callable (unbound callee) | 17 | 20 | 0 | 0 | 0 | 2 | 39 |
-| coroutines and coro-future-flow | 10 | 10 | 0 | 0 | 0 | 7 | 27 |
+| coroutines and coro-future-flow | 10 | 10 | 0 | 0 | 0 | 9 | 29 |
 | module-host-op (host op in a program with imports) | 27 | 0 | 0 | 0 | 0 | 0 | 27 |
 | syntax forms | 19 | 5 | 0 | 0 | 0 | 0 | 24 |
 | type:<op> and type checks | 2 | 16 | 0 | 0 | 2 | 0 | 20 |
@@ -5160,13 +5161,13 @@ agrees with the confirmation review's approximate one; the differences are liste
 | context and prepared code | 11 | 3 | 0 | 0 | 0 | 0 | 14 |
 | built-in argument rules | 11 | 1 | 0 | 0 | 0 | 0 | 12 |
 | other (singles) | 7 | 1 | 1 | 0 | 0 | 2 | 11 |
+| dynamic scope and free names | 4 | 2 | 0 | 0 | 4 | 0 | 10 |
 | expression and statement forms | 7 | 1 | 0 | 0 | 2 | 0 | 10 |
-| dynamic scope and free names | 4 | 2 | 0 | 0 | 3 | 0 | 9 |
 | exports and imports | 4 | 3 | 0 | 1 | 0 | 0 | 8 |
 | bytes | 4 | 0 | 0 | 0 | 1 | 0 | 5 |
 | variadics, spread, destructuring | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
 | capacity limits | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
-| **total** | **152** | **321** | **3** | **1** | **38** | **20** | **535** |
+| **total** | **152** | **321** | **3** | **1** | **39** | **22** | **538** |
 
 Changes in C115 (confirmation review P2-1, verified): 14 rows moved from (ii) to (i), because legacy runs the refused
 construct and the earlier probe's legacy error came from something downstream: `builtin-arity:entries`/`values`,
@@ -5254,15 +5255,15 @@ printing the value; C114 replaced them). `builtin-arity:copy`/`move` cite the re
 #### 1.3 Completeness boundary (owner 00:08)
 
 Inventory identity: `0c66cad6` `src/` (unchanged at C115), nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`,
-tsv revision = the C115 commit (tests/runtime2/cp25/classification.tsv, 607 rows).
+tsv revision = the C116 commit (tests/runtime2/cp25/classification.tsv, 607 rows).
 The inventory is complete when it covers:
 
 | Criterion | Coverage at C114 |
 | --- | --- |
-| every statically named VM refusal reason | C115 statement-level scan of 15 emit idioms in `src/rt` (sites / reason literals): `fail(` 595/271, `refuse(` 42/34, `reject(` 10/9, `add(` 120/7, `kinds_within(` 12/10, `write_refusal(` 7/6, `record_entry`/`record_linked(` 5/2, `reason =` 85/24, `reason_ =` 4/2, `why =` 12/3, `refusal =` 8/7, `stop =` 20/9, `return "..."` 328/21, `return {..., "..."}` 2/2, concatenation `"prefix:" +` 42/44: 255 distinct literals. Each has a row or a section 9 disposition. C115 found 13 the C112 literal scan missed: `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque` (rows, reachable), `fn-shape`, `statement:Try`, `session:function-assignment`, `session:capture-contract`, `coro-main-cell`, `coro-collection-callback`, `free-name:legacy-binding` (rows, retired at creation after five-context probes), and the non-reason strings `lambda:`/`named:`/`nift:` (render text), `opaque-limit`/`round-limit`/`unmaskable:` (inventory stop markers) |
+| every statically named VM refusal reason | C115 statement-level scan of 15 emit idioms in `src/rt` (sites / reason literals): `fail(` 595/271, `refuse(` 42/34, `reject(` 10/9, `add(` 120/7, `kinds_within(` 12/10, `write_refusal(` 7/6, `record_entry`/`record_linked(` 5/2, `reason =` 85/24, `reason_ =` 4/2, `why =` 12/3, `refusal =` 8/7, `stop =` 20/9, `return "..."` 328/21, `return {..., "..."}` 2/2, concatenation `"prefix:" +` 42/44: 255 distinct literals. Each has a row or a section 9 disposition. C115 found 13 the C112 literal scan missed: `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque` (rows, reachable), `fn-shape`, `statement:Try`, `session:function-assignment`, `session:capture-contract` (rows, retired at creation; no context emits them, classify-all included), `free-name:legacy-binding` (D), `coro-collection-callback`, `coro-main-cell` (E2/F12; un-retired in C116 because classify-all emits the first two), and the non-reason strings `lambda:`/`named:`/`nift:` (render text), `opaque-limit`/`round-limit`/`unmaskable:` (inventory stop markers) |
 | every run-time-generated family | 17 concatenated-name families (section 9.2), enumerated from their emit sites and probed with 1010 generated programs plus the C114 spellings; every reached suffix has an exact row or is absorbed by a stated family row (`method:*`, `callable:*`, `type:*` absorbs nothing producible) |
 | every reachable refusal in the approved test corpus | fresh `inventory.py collect` (vm-corpus, semantics, rt-diff-corpus, conformance, cp410 probes, smoke heredocs): 155 reasons seen, G1 PASS (all classified), no retired reason seen |
-| the contexts | script, module import, `nift -i` session, function called from a loop, and uncalled function and lambda bodies, for every retired row and every unreachable claim (sections 9.1, 9.3, 9.4) |
+| the contexts | script, module import, `nift -i` session, function called from a loop, uncalled function and lambda bodies, and classify-all (the inventory's own mode, C116), for every retired row; the first five for every unreachable claim (sections 9.1, 9.3, 9.4, 9.8) |
 | async expressions | 25 coro-future-flow spellings (section 9.2; `:Binary`, `:Coalesce` found by them), coroutine-module forms, thread values |
 
 After confirmation the inventory freezes for this campaign; later findings are tracked as separate issues.
@@ -5287,46 +5288,47 @@ After confirmation the inventory freezes for this campaign; later findings are t
 
 ### 2. Summary
 
-| Class | C111 | C112 | C113 | C114 | C115 | Meaning |
-| --- | --- | --- | --- | --- | --- | --- |
-| E1 | 2 | 2 | 2 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
-| E2 | 19 | 18 (+2 from N) | 18 (+1 from N) | 18 (+1 from N) | 18 (+1 from N) | 16 F12, `method:join`, `method:increment` (row deleted in C113); `callable:prit` |
-| A | 4 | 3 | 3 | 3 | 3 | covered by an approved ruling, not yet that behaviour |
-| Q | 0 | 1 | 1 | 1 | 1 | owner question: `fn-flags` |
-| D | 42 | 39 | 39 | 38 | 38 | derivative, with a named root |
-| G | 113 | 117 (+2) | 117 (+8) | 118 (+9) | 118 (+9) | genuine remaining capability |
-| **classified** | **180** | **180** | **180** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
-| N | 45 | 58 | 340 | 341 | 346 | + `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque`, `difference:import-depth` (C115) |
+| Class | C111 | C112 | C113 | C114 | C115 | C116 | Meaning |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| E1 | 2 | 2 | 2 | 2 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
+| E2 | 19 | 18 (+2 from N) | 18 (+1 from N) | 18 (+1 from N) | 18 (+1 from N) | 18 (+3 outside the 180) | 16 F12, `method:join`, `method:increment` (row deleted in C113); `callable:prit`; C116: `coro-collection-callback`, `coro-main-cell` (F12) |
+| A | 4 | 3 | 3 | 3 | 3 | 3 | covered by an approved ruling, not yet that behaviour |
+| Q | 0 | 1 | 1 | 1 | 1 | 1 | owner question: `fn-flags` |
+| D | 42 | 39 | 39 | 38 | 38 | 38 (+1 outside) | derivative (C116: `free-name:legacy-binding`), with a named root |
+| G | 113 | 117 (+2) | 117 (+8) | 118 (+9) | 118 (+9) | 118 (+9) | genuine remaining capability |
+| **classified** | **180** | **180** | **180** | **180** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
+| N | 45 | 58 | 340 | 341 | 346 | 346 | + `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque`, `difference:import-depth` (C115) |
 
-Rows by class at C115: E1 2, E2 18, A 3, Q 1, D 38, G 127, N 346 = 535 (= PENDING-OWNER 512 + implement 23). Row count
-history: 528 at C113; +2 in C114 (`type:for-source` restored, `coro-future-flow:Coalesce` new) = 530; +5 in C115 = 535.
-Seven further C115 rows are retired at creation (unreached in five contexts) and are not in the 535.
+Rows by class at C116: E1 2, E2 20, A 3, Q 1, D 39, G 127, N 346 = 538 (= PENDING-OWNER 515 + implement 23). Row count
+history: 528 at C113; +2 in C114 (`type:for-source` restored, `coro-future-flow:Coalesce` new) = 530; +5 in C115 = 535;
++3 in C116 (un-retired). Four C115 rows remain retired at creation (no context emits them, classify-all included).
 
-| Status | 0c66cad6 | C111 | C112 | C113 | C114 | C115 |
-| --- | --- | --- | --- | --- | --- | --- |
-| approved | 44 | 44 | 44 | 44 | 44 | 44 |
-| deferred-named | 17 | 17 | 17 | 17 | 17 | 17 |
-| implement | 23 | 23 | 23 | 23 | 23 | 23 |
-| PENDING-OWNER | 157 | 200 | 217 | 505 | 507 | 512 |
-| retired | 7 | 9 | 9 | 5 | 4 | 11 |
-| rows | 248 | 293 | 310 | 594 | 595 | 607 |
+| Status | 0c66cad6 | C111 | C112 | C113 | C114 | C115 | C116 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| approved | 44 | 44 | 44 | 44 | 44 | 44 | 44 |
+| deferred-named | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
+| implement | 23 | 23 | 23 | 23 | 23 | 23 | 23 |
+| PENDING-OWNER | 157 | 200 | 217 | 505 | 507 | 512 | 515 |
+| retired | 7 | 9 | 9 | 5 | 4 | 11 | 8 |
+| rows | 248 | 293 | 310 | 594 | 595 | 607 | 607 |
 
-Inventory identity: `0c66cad6` `src/`, nift sha256 `8195f1b3...`, tsv revision = the C115 commit.
+Inventory identity: `0c66cad6` `src/`, nift sha256 `8195f1b3...`, tsv revision = the C116 commit.
 
 #### 2.1 Per-row classes (C115)
 
 - **E1 (2)**
   - assign (2): `compound-target`, `index-assign-target`
-- **E2 (18)**
-  - f12 (16): `builtin-arity:join`, `builtin-receiver:join`, `callable:thread`, `coro-blocking-host:exists`, `coro-blocking-host:file`, `coro-blocking-host:rm`, `coro-observe:done`, `coro-observe:print`, `coro-observe:status`, `coro-struct`, `method:close`, `method:done`, `method:open`, `method:save`, `method:status`, `method:write`
+- **E2 (20)**
+  - f12 (18): `builtin-arity:join`, `builtin-receiver:join`, `callable:thread`, `coro-blocking-host:exists`, `coro-blocking-host:file`, `coro-blocking-host:rm`, `coro-collection-callback`, `coro-main-cell`, `coro-observe:done`, `coro-observe:print`, `coro-observe:status`, `coro-struct`, `method:close`, `method:done`, `method:open`, `method:save`, `method:status`, `method:write`
   - f12+D (1): `method:join`
   - test-artefact (1): `callable:prit`
 - **A (3)**
   - approved (3): `alias-argument`, `context:assignment-error`, `fn-name-reserved`
 - **Q (1)**
   - owner-question (1): `fn-flags`
-- **D (38)**
+- **D (39)**
   - derivative (38): `assign-free-name:undeclared`, `builtin-bytes:decode`, `free-name:undeclared`, `method:array_value`, `method:await`, `method:call`, `method:call_helper`, `method:call_step`, `method:catch`, `method:command`, `method:count`, `method:decode`, `method:encode`, `method:error`, `method:filter`, `method:fixed`, `method:group_by`, `method:helper`, `method:hidden`, `method:m`, `method:map`, `method:public_helper`, `method:push`, `method:q`, `method:read`, `method:secret`, `method:stringify`, `method:sum`, `method:throw`, `method:to_global`, `method:to_string`, `method:trim`, `statement:Import`, `statement:TemplateStmt`, `struct-construction`, `type:index`, `type:push`, `unresolved-name:legacy-binding`
+  - inventory refinement (1): `free-name:legacy-binding`
 - **G (127)**
   - aliasing (1): `path-in-call-argument`
   - builtins (19): `builtin-arity:copy`, `builtin-arity:move`, `builtin-bytes:bytes`, `builtin-bytes:encode`, `builtin-bytes:open_bytes`, `builtin-bytes:secure_random_bytes`, `builtin-lazy-args:move`, `builtin-lazy-args:setenv`, `builtin-lazy-args:substr`, `builtin-lazy-args:validate`, `callable:err`, `callable:minify`, `callable:module_path`, `callable:read`, `callable:secure_random_bytes`, `callable:sorted_map`, `callable:sorted_set`, `callable:warn`, `statement:Command`
@@ -6873,11 +6875,12 @@ reachable reasons stay reachable (`compound-operator`, `path-in-call-argument:im
 `text-type-name` is emitted by `x := await` inside a lambda body, called or not (now G, outcome (ii): legacy errors when
 the body runs). The `92 cff` rows were re-probed with the async declaration at top level (the first pass nested it).
 
-#### 9.5 Retirement policy (C114)
+#### 9.5 Retirement policy (C114; sixth context added in C116)
 
 A row may be retired, or a reason literal called unreachable or not reached, only after its best program has been run
 in all five contexts: a script, a module import (the program as the imported module), a `nift -i` session, a
-function called from a loop, and the body of a function and of a lambda that are never called. The five results are
+function called from a loop, the body of a function and of a lambda that are never called, and (C116) classify-all, the
+inventory's own mode (`NIFT_VM=classify-all`), on the same programs. The results are
 recorded in the row's evidence or in section 9. A reason emitted in any context is not retired; an exact retired row
 for an emitted reason is deleted when a family row should classify it (inventory.py matches the exact row first).
 
@@ -6927,6 +6930,26 @@ for an emitted reason is deleted when a family row should classify it (inventory
 | `type:script-return` | - | main.f:1:1 | (ii) | VM more precise: legacy prints no position |
 
 Remaining in (ii) with a different position: 17 (7 fix, 10 VM more precise).
+
+#### 9.8 Sixth context: classify-all (C116)
+
+Each retired row's probes were run under `NIFT_VM=classify-all` (non-consequential reasons listed; `(c)` = consequential).
+
+| Row | script | module | loop-called fn | uncalled fn | uncalled lambda | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `type:print` | compiled | compiled | compiled | compiled | type:* | stays retired: its own reason is not emitted |
+| `aliasing` | compiled | compiled | prepared-decl-type, method:push | compiled | compiled | stays retired: its own reason is not emitted |
+| `reference-guard:*` | opaque:legacy-runtime-error | import-opaque:legacy-runtime-error | opaque:legacy-runtime-error | opaque:legacy-runtime-error | opaque:legacy-runtime-error | stays retired: its own reason is not emitted |
+| `coro-module` | coro-module-capture | coro-module-init-task, coro-module-private-async | coro-module-capture | coro-module-capture | coro-module-capture | stays retired: its own reason is not emitted |
+| `coro-module (thread)` | coro-module-capture, method:join | coro-module-init-task, method:join | coro-module-capture, method:join | coro-module-capture, method:join | coro-module-capture, method:join | stays retired: its own reason is not emitted |
+| `fn-shape` | opaque:legacy-runtime-error | import-opaque:legacy-runtime-error | opaque:legacy-runtime-error | opaque:legacy-runtime-error | opaque:legacy-runtime-error | stays retired: its own reason is not emitted |
+| `statement:Try` | - | module-error:syntax | - | - | - | stays retired: its own reason is not emitted |
+| `session:function-assignment` | assign-free-name | assign-free-name | statement:FnDecl | statement:FnDecl | statement:FnDecl | stays retired: its own reason is not emitted |
+| `session:capture-contract` | compiled | compiled | context:assignment-error | compiled | compiled | stays retired: its own reason is not emitted |
+| `coro-main-cell` | compiled | coro-module-init-task, coro-module-init-task, coro-module-private-asyn | statement:FnDecl | statement:FnDecl | statement:FnDecl | **un-retired: E2/F12 (consistency)** |
+| `coro-collection-callback` | coro-collection-callback, method:map | coro-module-init-task, coro-module-init-task | statement:FnDecl | statement:FnDecl | statement:FnDecl | **un-retired: E2/F12** |
+| `free-name:legacy-binding` | free-name:legacy-binding | free-name:legacy-binding | statement:FnDecl | statement:FnDecl | statement:FnDecl | **un-retired: D** |
+
 
 ### 10. Src-side and scope proposals (none applied)
 
@@ -7019,7 +7042,9 @@ Recorded from the C114 confirmation review, Part 3. **A reviewer finding marked 
 - `S().field` directly on a call result errors in legacy ("current JSON value is not an object"); use `a := S(); a.v`.
 
 **Recommendation (PROPOSAL):** CP2 = Group A + Group B limited to construction and storage in loops (about 300-400 lines
-of src, about 500 of tests and mutants; must preserve fresh per-construction defaults, initialiser order, B5 semantics).
+of src, about 500 of tests and mutants; must preserve fresh per-construction defaults (extend the R6 refsem mutant to
+expression defaults), no shared mutable defaults, initialiser side-effect order, loop-local captures of instances, B5
+semantics, bounded scope and no re-baselining).
 CP2b = Group C (about 250-350 lines; B4b struct-id soundness, B5 aliasing of instances). Group D with the B4 session
 work; Group E with the early-refusal policy. L42 needs an owner ruling: reproduce legacy's loop-context errors, or
 approve one meaning everywhere (D-040 value semantics).
@@ -7041,8 +7066,7 @@ and async forms.
 2. **Dead code (question).** 316 of the 321 (ii) refusals also fire in code that never runs, in programs legacy
    completes (`fn(f()) { print(1, 2) }` never called; `if (false) { sha256("a", "b") }`; `if (x > 1) { y := "a" - 1 }`
    with x <= 1). Not covered by 00:29, because these programs do not fail. Options, neutrally:
-   (a) refusing statically invalid code even when unreachable is an approved part of the early-refusal design
-       (precedent: compiled languages reject type errors in dead branches); or
+   (a) refusing statically invalid code even when it is unreachable is an approved part of the early-refusal design; or
    (b) only provably reachable errors may refuse; dead-code cases are capability gaps.
    Counts: fires in dead code 316; does not fire 1 (`coro-module-before-import`, flow-sensitive); `import-dynamic` in a dead
    block is refused as `import-nested`; 3 module-initialisation rows always execute. Corpus impact: 0 corpus programs
@@ -7095,19 +7119,18 @@ and async forms.
 19. Deferral candidates: dynamic scope (`free-name`, `free-name:dynamic-caller`); `import-reinitialised` (D-041 #2
     removal condition); CP24 project APIs; comparator-sort portability (Linode); family dispositions in sections 1, 5-9.
 
-### 14. Gates at the tip (C115)
+### 14. Gates at the tip (C116)
 
 | Gate | Result |
 | --- | --- |
 | `make test-runtime2-certification-guard` | PASS (historical control; classification self-test, 31 cases) |
 | `make test-rt-lint` | PASS (boundary: 0 problems in 710 files) |
 | `make test-test-integrity` | clean (700 files scanned, 0 findings) |
-| fresh `inventory.py collect` + `report --check` (C115 tsv) | **exit 3** |
+| fresh `inventory.py collect` + `report --check` (C116 tsv) | **exit 3** |
 | `python3 -B tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases: 47 legacy-equal, 47 pinned differences or refusals) |
 
 - **Inventory**: G1 PASS, 155 reasons seen (approved 8, deferred-named 17, implement 17, PENDING-OWNER 113, retired 0).
-  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen again,
-  including the 7 rows retired at creation in C115.
+  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen.
 - **Production code**: `git diff 0c66cad6 -- src/` is empty; nift sha256 is
   `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
 - **Scratch**: all probes ran in the session scratch directory; `git status` shows only the tsv and the two docs.
@@ -7117,6 +7140,11 @@ and async forms.
 `tests/v44_root_path_corruption_reproducers.sh` **FAILS** at the tip (re-run in C112): `destruct` (`declare-pattern`),
 `structarr` and `mapstruct` (`context:struct-new`). `escaped-ref` passes. The file is not passing; the failures are
 recorded on the `declare-pattern` and `context:struct-new` rows.
+
+**Tracked issue (C115 final confirmation, L-2): no gate checks class (iv) differences.** A behaviour where the VM
+accepts a program legacy rejects, such as `difference:import-depth` (import chains 33-63 deep), is not an emitted
+reason, so `inventory.py --check` cannot see it; only a corpus program in an rt-diff corpus would expose it. Tracked
+as a separate issue after the inventory freezes.
 
 ### 16. Linode-only items (not run here)
 
@@ -7181,3 +7209,16 @@ recorded on the `declare-pattern` and `context:struct-new` rows.
 | 5 | sections 11 and 12 (reviewer Parts 2 and 3, PROPOSAL); items 10-12 |
 | 6 | section 13 in the owner's order |
 | 7 | row counts reconciled (528 → 530 → 535); inventory identity recorded |
+
+#### 17.5 C116 changes (C115 final confirmation)
+
+| Item | Change |
+| --- | --- |
+| P2-1 | `free-name:legacy-binding` un-retired: D, PENDING-OWNER (classify-all emits it on its own probe) |
+| P2-2 | `coro-collection-callback` un-retired: E2/F12, PENDING-OWNER (classify-all, !parallel); `coro-main-cell` given the same E2/F12 treatment |
+| Policy | classify-all added as the sixth context of the retirement rule (9.5); the four remaining retired-at-creation rows and the four older retired rows re-checked (9.8) |
+| L-1 | TRACE labels on the retired-at-creation rows |
+| L-2 | class (iv) gap recorded as a tracked issue (section 15) |
+| L-3 | section 12 must-preserve list completed |
+| L-4 | the 14 reclassified rows keep their C114 ii-B tags as "Previous outcome" notes |
+| L-5 | section 13.1 option (a) stated without the precedent clause |
