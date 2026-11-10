@@ -4629,3 +4629,89 @@ owner-approved B5 semantic difference.
   | nested-returned-factory | `method:sort_by` | PENDING-OWNER |
   | module-definition-error | `type:member` | PENDING-OWNER |
 - No production change: `nift` is f063f1a9….
+
+## 92. Review of C100–C102, P2-1 and the Lows: no smoke aborts silently; error oracles; the killpg limit (C104, tests and inventory)
+
+- **Rule applied.** Every touched smoke reports each failing check on a `FAIL <check>:` line. A
+  refused run is reported with its reason and inventory status. The smoke goes on and exits
+  non-zero at the end. A VM-default refusal is accepted only for a check that pins it through
+  `approved_refusal`: status approved or deferred-named, legacy oracle mandatory.
+- **`tests/v44_relative_import_ownership_smoke.sh`.**
+  - It has new `vm_ok` and `vm_err` checks.
+  - The package checks pin `import-nested` (deferred-named, D-065 1) and are accepted, with legacy
+    exact. These are:
+    - the package ownership output;
+    - child export leak;
+    - traversal;
+    - symlink escape.
+
+    The last three have legacy error oracles: exit 1, no stdout, and their message.
+  - Result: FAIL, 1 case. `plain @fn in a script` is refused `fn-flags` (PENDING-OWNER). The direct,
+    missing-sibling, cycle and template checks pass.
+- **`tests/script_import_syntax.sh`.**
+  - It has named `ok` and `err` checks. The REPL status check no longer exits early.
+  - The malformed import pins `opaque:template-text`. The four non-string imports pin
+    `import-dynamic`: same-line, comment-line, bare and `@import` (the old position-only greps hid
+    that).
+  - Result: FAIL, 6 cases.
+
+    | Case | Reason | Status |
+    | --- | --- | --- |
+    | REPL fn named import | `fn-name-reserved` | PENDING-OWNER |
+    | bare malformed import | `opaque:template-text` | PENDING-OWNER |
+    | same-line non-string import | `import-dynamic` | PENDING-OWNER |
+    | same-line comment import | `import-dynamic` | PENDING-OWNER |
+    | non-string bare import | `import-dynamic` | PENDING-OWNER |
+    | non-string `@import` | `import-dynamic` | PENDING-OWNER |
+- **Sweep of the smokes C96–C101 touched:**
+  - The five v48 smokes no longer stop at their first failure:
+    - `ok` and `err` record the failure;
+    - a refused run is named with its reason and status;
+    - the silent template-site `build` now has a FAIL line.
+  - `tests/v46_import_worker_ownership_smoke.sh` (C94) gets named checks. Its refusals are pinned:
+    - `coro-module-init-task` (approved, D-064 #2);
+    - `coro-module-capture` (approved, D-064 #3);
+    - `import-nested` ×3 (deferred-named).
+  - The v44 ast, element and root-path smokes and v46 output were already collecting; they are
+    unchanged.
+  - The legacy channel (`NIFT_VM=0`) passes every v48 smoke.
+  - Results, each FAIL:
+
+    | Smoke | Cases | Failing cases (reason, status) |
+    | --- | --- | --- |
+    | v48 bytes-index | 13 | every case, incl. 2 error checks (`builtin-bytes:bytes`, implement) |
+    | v48 comparison | 11 | 3 `builtin-bytes:bytes` (implement); 2 `binding-name-reserved` (implement); 4 `opaque:irregular-legacy-parse` (PENDING-OWNER); 2 `type:<` error checks (PENDING-OWNER) |
+    | v48 callable | 2 | `prepared-decl-type`; `static-error:arity` error check (both PENDING-OWNER) |
+    | v48 map-set | 3 | 2 `callable:sorted_map`, 1 `callable:sorted_set` (PENDING-OWNER) |
+    | v48 prepared-collection | 4 | 2 `postfix-spelling` (implement); 2 error checks, `builtin-arity:contains` and `builtin-arity:set` (no row before this commit, now PENDING-OWNER) |
+    | v46 worker-ownership | 2 | `compound-target` (implement); module-private async, refused `import-collision` (implement) |
+- **New inventory rows:** `builtin-arity:contains` and `builtin-arity:set`, both PENDING-OWNER.
+  Counts, 248 rows:
+
+  | Status | Rows |
+  | --- | --- |
+  | approved | 44 |
+  | deferred-named | 17 |
+  | implement | 24 |
+  | PENDING-OWNER | 157 |
+  | retired | 6 |
+- **L-1: the shell helper takes an error oracle.**
+  `approved_refusal BIN NAME REASON DECISION FILE LEGACY-STDOUT [LEGACY-EXIT [LEGACY-STDERR]]`.
+  - Legacy's stdout must match exactly, its exit must equal LEGACY-EXIT (default 0), and its stderr
+    must contain LEGACY-STDERR, or be empty when none is given.
+  - Four new self-test controls:
+    - an error oracle passes;
+    - a wrong legacy exit fails;
+    - missing stderr text fails;
+    - a legacy error without an error oracle fails.
+
+    That makes 10 shell controls plus 11 Python: PASS.
+  - The helper now resolves its Python path absolutely, so a caller may `cd` first.
+- **L-2: the killpg limit is documented, not closed.** `unwind_mutants.execute()` records it:
+  - A descendant that calls `setsid()` leaves the witness's process group and is not reached.
+  - No witness starts one: the unit and persist witnesses are single processes, and the vm
+    witness's programs start no process.
+  - A survivor cannot change a verdict: no kill is counted without the witness text.
+
+  `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants, 202 s.
+- No production change: `nift` is f063f1a9….

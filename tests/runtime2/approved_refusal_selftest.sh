@@ -22,6 +22,12 @@ expect fail "wrong legacy oracle"              "$NIFT" key collection-mutable-ke
 expect fail "PENDING-OWNER reason"             "$NIFT" len callable:len D "$t/len.f" ""
 expect fail "reason without an inventory row"  "$NIFT" key no-such-reason:at-all D "$t/key.f" 1
 expect fail "another reason than the refusal"  "$NIFT" key callable:timer D "$t/key.f" 1
+# L-1 (review of C100-C102): an error oracle (legacy exit and stderr) can be pinned.
+printf 'h := set()\nm := map()\nm.set(h, 1)\nprint(m.size())\nprint(1 / 0)\n' > "$t/keyerr.f"
+expect pass "error oracle: legacy exit and stderr" "$NIFT" key collection-mutable-key D "$t/keyerr.f" 1 1 "division by zero"
+expect fail "error oracle: wrong legacy exit"       "$NIFT" key collection-mutable-key D "$t/keyerr.f" 1 0 "division by zero"
+expect fail "error oracle: missing stderr text"     "$NIFT" key collection-mutable-key D "$t/keyerr.f" 1 1 "no-such-text"
+expect fail "legacy error without an error oracle"  "$NIFT" key collection-mutable-key D "$t/keyerr.f" 1
 python3 -B "$HERE/approved_refusal.py" self-test --nift "$NIFT" || failed=1
 [ "$failed" = 0 ] || { echo "FAIL approved_refusal self-test"; exit 1; }
 echo "PASS approved_refusal self-test (shell and Python)"

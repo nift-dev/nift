@@ -11,7 +11,14 @@ case "$NIFT" in /*) B="$NIFT";; *) B="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 # Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run reports
 # its check by name (it used to abort silently at `out=$(...)` under set -e).
-ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, got [$out]" >&2; exit 1; }; }
+# Review of C100-C102, P2-1 (combined-b3-b5.md section 92): each failing check prints its FAIL line and the
+# script goes on; it exits non-zero at the end.
+failed=0
+# A failing check names its VM-default refusal reason and inventory status when it was refused.
+refusal_of(){ sed -n '/not compiled for the VM (/{s/.*not compiled for the VM (\([^)]*\)).*/\1/p;q;}' "$1"; }
+why(){ local r; r=$(refusal_of "$1"); if [ -n "$r" ]; then echo "refused with $r (inventory status $(python3 -B "$(cd "$(dirname "$0")" && pwd)/runtime2/approved_refusal.py" status "$r"))"; else head -c 300 "$1"; fi; }
+ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; printf '%s' "$out" > "$t/o"; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, $(why "$t/o")" >&2; failed=1; return 0; }; }
+err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; failed=1; return 0; fi; grep -q "$3" "$t/e" || { echo "FAIL $1: stderr lacks [$3]: $(why "$t/e")" >&2; failed=1; return 0; }; }
 
 # --- MAP ---------------------------------------------------------
 ok "map get/replace/contains/remove" 'm := map()
@@ -98,14 +105,15 @@ m1.set("a", 1); m2.set("a", 1)
 print(m1 == m2)
 m2.set("b", 2)
 print(m1 == m2)' $'true\nfalse'
-err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; exit 1; fi; grep -q "$3" "$t/e" || { echo "FAIL $1 missing [$3]: $(cat "$t/e")" >&2; exit 1; }; }
+
 err "map missing get errors" 'm := map()
 m.set("a", 1)
 m.get("zz")' "get: key not found"
 # Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): a mutable collection as a map key
 # or set member is an approved VM-default refusal (D-NEXT-refsem #6); the legacy output stays pinned.
 . "$(dirname "$0")/runtime2/approved_refusal.sh"
-refused(){ printf '%s\n' "$3" > "$t/p.f"; approved_refusal "$B" "$1" "$2" "D-NEXT-refsem #6" "$t/p.f" "$4" || exit 1; }
+set -o pipefail  # restated after sourcing the helper (it does not change it), for the integrity check
+refused(){ printf '%s\n' "$3" > "$t/p.f"; approved_refusal "$B" "$1" "$2" "D-NEXT-refsem #6" "$t/p.f" "$4" || failed=1; return 0; }
 refused "map marked/reference key fallback" collection-mutable-key 'h := set()
 m := map()
 m.set(h, "handle-as-key")
@@ -195,7 +203,8 @@ cat > "$t/site/content/index.html" <<'E'
 @fn(fill()){ m := map(); m.set("a", 1); if(m.contains("a")) { m.set("b", 2) }; return m.get("a") + m.get("b") }
 $[fill()]
 E
-(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e")
-grep -q '3</body>' "$t/site/public/index.html" || { echo "FAIL template map index: $(cat "$t/site/public/index.html")" >&2; exit 1; }
+(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e") || { echo "FAIL template site build: $(cat "$t/e")" >&2; failed=1; }
+grep -q '3</body>' "$t/site/public/index.html" || { echo "FAIL template map index: $(cat "$t/site/public/index.html")" >&2; failed=1; }
 
+[ "$failed" = 0 ] || { echo "FAIL v4.8 map/set index semantics" >&2; exit 1; }
 echo "PASS v4.8 map/set index semantics"

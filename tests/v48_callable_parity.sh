@@ -13,7 +13,14 @@ case "$NIFT" in /*) B="$NIFT";; *) B="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 # Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run reports
 # its check by name (it used to abort silently at `out=$(...)` under set -e).
-ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, got [$out]" >&2; exit 1; }; }
+# Review of C100-C102, P2-1 (combined-b3-b5.md section 92): each failing check prints its FAIL line and the
+# script goes on; it exits non-zero at the end.
+failed=0
+# A failing check names its VM-default refusal reason and inventory status when it was refused.
+refusal_of(){ sed -n '/not compiled for the VM (/{s/.*not compiled for the VM (\([^)]*\)).*/\1/p;q;}' "$1"; }
+why(){ local r; r=$(refusal_of "$1"); if [ -n "$r" ]; then echo "refused with $r (inventory status $(python3 -B "$(cd "$(dirname "$0")" && pwd)/runtime2/approved_refusal.py" status "$r"))"; else head -c 300 "$1"; fi; }
+ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; printf '%s' "$out" > "$t/o"; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, $(why "$t/o")" >&2; failed=1; return 0; }; }
+err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; failed=1; return 0; fi; grep -q "$3" "$t/e" || { echo "FAIL $1: stderr lacks [$3]: $(why "$t/e")" >&2; failed=1; return 0; }; }
 
 # Ordinary baseline (callable-as-value already worked before CP-C).
 ok "ordinary named callable as argument" 'fn(g()) { return "hi" }
@@ -76,7 +83,7 @@ fn(inner()) { f := (x) => "lambda:" + x; return f("z") }
 for(i : [1]) { print(inner()) }' "lambda:z"
 
 # Invalid callable behaviour is preserved.
-err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; exit 1; fi; grep -q "$3" "$t/e" || { echo "FAIL $1 missing [$3]: $(cat "$t/e")" >&2; exit 1; }; }
+
 err "wrong arity preserved in prepared" 'fn(g()) { return "hi" }
 fn(call_it(f)) { return f() }
 for(i : [1]) { call_it(g, 1, 2) }' "callable argument count mismatch"
@@ -99,8 +106,9 @@ VIA_H=$[call_it(H)]
 $[L := (x) => x + 1]
 LAMBDA=$[L(1)]
 E
-(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e")
-grep -q 'VIA_H=tpl-hi' "$t/site/public/index.html" || { echo "FAIL template callable pass-through: $(cat "$t/site/public/index.html")" >&2; exit 1; }
-grep -q 'LAMBDA=2' "$t/site/public/index.html" || { echo "FAIL template lambda" >&2; exit 1; }
+(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e") || { echo "FAIL template site build: $(cat "$t/e")" >&2; failed=1; }
+grep -q 'VIA_H=tpl-hi' "$t/site/public/index.html" || { echo "FAIL template callable pass-through: $(cat "$t/site/public/index.html")" >&2; failed=1; }
+grep -q 'LAMBDA=2' "$t/site/public/index.html" || { echo "FAIL template lambda" >&2; failed=1; }
 
+[ "$failed" = 0 ] || { echo "FAIL v4.8 callable parity" >&2; exit 1; }
 echo "PASS v4.8 callable parity"

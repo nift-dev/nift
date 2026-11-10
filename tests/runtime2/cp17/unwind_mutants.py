@@ -188,7 +188,12 @@ def execute(cmd, cap, env=None):
     Review of C83-C99, L-4 (combined-b3-b5.md section 90): the witness runs in its own session, so its
     process group is the one this harness started (its pgid is the child's pid). On the cap the whole
     group is killed, so a python witness's nift grandchildren cannot outlive it. Only that group is
-    signalled; nothing is looked up by name."""
+    signalled; nothing is looked up by name.
+
+    Limit (review of C100-C102, L-2; combined-b3-b5.md section 92): a descendant that calls setsid()
+    itself leaves the group and is not reached by the kill. No witness here starts one (the unit and
+    persist witnesses are single processes; the vm witness runs nift scripts that start no process),
+    and a survivor cannot change a verdict: no kill is counted without the witness text."""
     p = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                          start_new_session=True)
     try:

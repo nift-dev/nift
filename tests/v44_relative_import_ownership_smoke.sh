@@ -41,8 +41,46 @@ make_native_symlink() {
 # D-048 #1) before running anything, while legacy still accepts it (the owner declined the
 # legacy-side rejection: an explicit legacy/VM difference, docs/runtime-2/known-limitations.md).
 . "$(dirname "$0")/runtime2/approved_refusal.sh"
+set -o pipefail  # restated after sourcing the helper (it does not change it), for the integrity check
 printf '@fn(v()) { return 3 }\nprint(v())\n' > "$t/plain-at-fn.f"
-approved_refusal "$NIFT_ABS" "plain @fn in a script" fn-flags "D-047 #1 / D-048 #1" "$t/plain-at-fn.f" 3
+# Review of C100-C102, P2-1 (combined-b3-b5.md section 92): every check below reports a named FAIL
+# line and the script goes on; it exits non-zero at the end. A VM-default refusal is accepted only
+# for a check that pins its reason, through approved_refusal (status approved or deferred-named).
+failed=0
+fail() { echo "FAIL $*" >&2; failed=1; }
+refusal_of() { sed -n '/not compiled for the VM (/{s/.*not compiled for the VM (\([^)]*\)).*/\1/p;q;}' "$1"; }
+status_of() { python3 -B "$(dirname "$0")/runtime2/approved_refusal.py" status "$1"; }
+# vm_ok NAME DIR FILE EXPECTED-STDOUT [PINNED-REASON DECISION]
+vm_ok() {
+  local name=$1 dir=$2 file=$3 want=$4 rc=0 out reason
+  out=$(cd "$dir" && "$NIFT_ABS" "$file" 2>"$t/vm.err") || rc=$?
+  reason=$(refusal_of "$t/vm.err")
+  if [ -n "$reason" ]; then
+    if [ $# -ge 6 ] && [ "$reason" = "$5" ]; then
+      (cd "$dir" && approved_refusal "$NIFT_ABS" "$name" "$5" "$6" "$file" "$want") || failed=1
+    else
+      fail "$name: refused with $reason (inventory status $(status_of "$reason")), not pinned for this check"
+    fi
+  elif [ "$rc" != 0 ] || [ "$out" != "$want" ]; then
+    fail "$name: exit $rc, output [$out], stderr [$(cat "$t/vm.err")]"
+  fi
+}
+# vm_err NAME DIR FILE STDERR-TEXT [PINNED-REASON DECISION]: the run must fail with STDERR-TEXT
+# (empty: any failure). A refusal is accepted only with its pin (approved_refusal, whose legacy oracle
+# is exit 1, no stdout and STDERR-TEXT); otherwise it is named with its reason and status.
+vm_err() {
+  local name=$1 dir=$2 file=$3 want=$4 reason
+  if (cd "$dir" && "$NIFT_ABS" "$file" >/dev/null 2>"$t/vm.err"); then fail "$name: unexpectedly succeeded"; return; fi
+  reason=$(refusal_of "$t/vm.err")
+  if [ -n "$reason" ] && [ $# -ge 6 ] && [ "$reason" = "$5" ]; then
+    (cd "$dir" && approved_refusal "$NIFT_ABS" "$name" "$5" "$6" "$file" "" 1 "$want") || failed=1
+  elif [ -n "$reason" ]; then
+    fail "$name: refused with $reason (inventory status $(status_of "$reason")) instead of the expected error"
+  elif [ -n "$want" ] && ! grep -F "$want" "$t/vm.err" >/dev/null; then
+    fail "$name: stderr lacks [$want]: $(cat "$t/vm.err")"
+  fi
+}
+approved_refusal "$NIFT_ABS" "plain @fn in a script" fn-flags "D-047 #1 / D-048 #1" "$t/plain-at-fn.f" 3 || failed=1
 
 # Direct/legacy parity, nested paths, Windows separators, and no root fallback.
 mkdir -p "$t/direct/modules/nested"
@@ -74,30 +112,21 @@ print(value())
 print(win_value())
 print(two())
 F
-out=$(cd "$t/direct" && "$NIFT_ABS" modules/main.f)
-[ "$out" = "owned
+vm_ok "direct relative import output" "$t/direct" modules/main.f "owned
 win
-nested" ] || { printf 'direct relative import output:\n%s\n' "$out" >&2; exit 1; }
+nested"
 cat > "$t/direct/modules/missing-main.f" <<'F'
 import("./missing.f")
 F
 cp "$t/direct/helper.f" "$t/direct/missing.f"
-if (cd "$t/direct" && "$NIFT_ABS" modules/missing-main.f >"$t/missing.out" 2>"$t/missing.err"); then
-  echo 'missing sibling fell through to consumer-root decoy' >&2
-  exit 1
-fi
-grep -F 'modules/missing.f' "$t/missing.err" >/dev/null
+vm_err "missing sibling does not fall through to the consumer-root decoy" "$t/direct" modules/missing-main.f 'modules/missing.f'
 
 # Canonical identity catches a source imported again through a symlink alias.
 cat > "$t/direct/modules/main-cycle.f" <<'F'
 import("./main-cycle-link.f")
 F
 if make_native_symlink main-cycle.f "$t/direct/modules/main-cycle-link.f"; then
-  if (cd "$t/direct" && "$NIFT_ABS" modules/main-cycle.f >/dev/null 2>"$t/cycle.err"); then
-    echo 'symlink self-import cycle succeeded' >&2
-    exit 1
-  fi
-  grep -F 'script import cycle through' "$t/cycle.err" >/dev/null
+  vm_err "symlink self-import cycle" "$t/direct" modules/main-cycle.f 'script import cycle through'
 else
   echo '  (symlink cycle skipped: native symlinks unavailable)'
 fi
@@ -183,23 +212,20 @@ print(["callback"].map(callback)[0])
 print(child_value())
 print(bare_value())
 F
-out=$(cd "$site" && "$NIFT_ABS" main.f)
-[ "$out" = "function-owned
+# The package entry imports inside functions: a delayed import, deferred by name (D-065 1).
+vm_ok "package ownership output" "$site" main.f "function-owned
 runtime-transitive-owned
 method-owned
 lambda-owned
 package-callback
 transitive-owned
-bare-package" ] || { printf 'package ownership output:\n%s\n' "$out" >&2; exit 1; }
+bare-package" import-nested "D-065 1"
 cat > "$site/leak.f" <<'F'
 import("owner")
 load_function()
 print(dynamic_value())
 F
-if (cd "$site" && "$NIFT_ABS" leak.f >/dev/null 2>&1); then
-  echo 'child module export leaked into consumer namespace' >&2
-  exit 1
-fi
+vm_err "child module export does not leak into the consumer namespace" "$site" leak.f 'dynamic_value' import-nested "D-065 1"
 cat > "$site/package-decoy.f" <<'F'
 fn(package_decoy()) { return "consumer-decoy" }
 export(package_decoy)
@@ -208,11 +234,7 @@ cat > "$site/traversal.f" <<'F'
 import("owner")
 print(traversal_escape())
 F
-if (cd "$site" && "$NIFT_ABS" traversal.f >/dev/null 2>"$t/traversal.err"); then
-  echo 'package-relative traversal reached consumer decoy' >&2
-  exit 1
-fi
-grep -F 'package-relative import escapes package root' "$t/traversal.err" >/dev/null
+vm_err "package-relative traversal does not reach the consumer decoy" "$site" traversal.f 'package-relative import escapes package root' import-nested "D-065 1"
 cat > "$t/outside-package.f" <<'F'
 fn(outside_value()) { return "outside" }
 export(outside_value)
@@ -222,11 +244,7 @@ if make_native_symlink "$t/outside-package.f" "$pkg/src/outside-link.f"; then
 import("owner")
 print(symlink_escape())
 F
-  if (cd "$site" && "$NIFT_ABS" symlink-escape.f >/dev/null 2>"$t/symlink-escape.err"); then
-    echo 'package-relative symlink escaped package root' >&2
-    exit 1
-  fi
-  grep -F 'package-relative import escapes package root' "$t/symlink-escape.err" >/dev/null
+  vm_err "package-relative symlink does not escape the package root" "$site" symlink-escape.f 'package-relative import escapes package root' import-nested "D-065 1"
 else
   echo '  (package symlink escape skipped: native symlinks unavailable)'
 fi
@@ -251,11 +269,13 @@ F
 cat > "$t/template/templates/modules/page.html" <<'F'
 @import("./helper.f")$[template_value()] @content
 F
-(cd "$t/template" && "$NIFT_ABS" build --all >/dev/null)
-grep -F 'template-owned' "$t/template/public/index.html" >/dev/null
-if grep -F 'decoy' "$t/template/public/index.html" >/dev/null; then
-  echo 'template import selected project-root decoy' >&2
-  exit 1
+if ! (cd "$t/template" && "$NIFT_ABS" build --all >/dev/null 2>"$t/build.err"); then
+  fail "template build: $(cat "$t/build.err")"
+elif ! grep -F 'template-owned' "$t/template/public/index.html" >/dev/null; then
+  fail "template import resolves from the template: $(cat "$t/template/public/index.html")"
+elif grep -F 'decoy' "$t/template/public/index.html" >/dev/null; then
+  fail 'template import selected project-root decoy'
 fi
 
+[ "$failed" = 0 ] || { echo 'FAIL v4.4 relative import module ownership' >&2; exit 1; }
 echo 'PASS v4.4 relative import module ownership'

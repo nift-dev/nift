@@ -12,7 +12,14 @@ case "$NIFT" in /*) B="$NIFT";; *) B="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 # Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run reports
 # its check by name (it used to abort silently at `out=$(...)` under set -e).
-ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, got [$out]" >&2; exit 1; }; }
+# Review of C100-C102, P2-1 (combined-b3-b5.md section 92): each failing check prints its FAIL line and the
+# script goes on; it exits non-zero at the end.
+failed=0
+# A failing check names its VM-default refusal reason and inventory status when it was refused.
+refusal_of(){ sed -n '/not compiled for the VM (/{s/.*not compiled for the VM (\([^)]*\)).*/\1/p;q;}' "$1"; }
+why(){ local r; r=$(refusal_of "$1"); if [ -n "$r" ]; then echo "refused with $r (inventory status $(python3 -B "$(cd "$(dirname "$0")" && pwd)/runtime2/approved_refusal.py" status "$r"))"; else head -c 300 "$1"; fi; }
+ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; printf '%s' "$out" > "$t/o"; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, $(why "$t/o")" >&2; failed=1; return 0; }; }
+err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; failed=1; return 0; fi; grep -q "$3" "$t/e" || { echo "FAIL $1: stderr lacks [$3]: $(why "$t/e")" >&2; failed=1; return 0; }; }
 
 # Ordinary expression equality (the canonical baseline).
 ok "ordinary array equality" 'print([1, 2] == [1, 2])' "true"
@@ -74,7 +81,7 @@ while(i != 1) { i += 1 }
 print(i)' "1"
 
 # Invalid ordered comparisons remain invalid (not broadened to collections).
-err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; exit 1; fi; grep -q "$3" "$t/e" || { echo "FAIL $1 missing [$3]: $(cat "$t/e")" >&2; exit 1; }; }
+
 err "ordinary array ordering rejected" 'print([1] < [2])' "ordering comparisons require two numbers or two strings"
 err "direct if array ordering rejected" 'if([1] < [2]) { print("yes") }' "ordering comparisons require two numbers or two strings"
 err "direct if object ordering rejected" 'if({"a":1} > {"b":2}) { print("yes") }' "ordering comparisons require two numbers or two strings"
@@ -92,9 +99,10 @@ cat > "$t/site/content/index.html" <<'E'
 @if(null == null){N_EQ}
 @if("a" == "a"){S_EQ}
 E
-(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e")
+(cd "$t/site" && "$B" build --all >/dev/null 2>"$t/e") || { echo "FAIL template site build: $(cat "$t/e")" >&2; failed=1; }
 for mark in A_EQ A_NE O_EQ B_EQ N_EQ S_EQ; do
-  grep -q "$mark" "$t/site/public/index.html" || { echo "FAIL template missing $mark" >&2; exit 1; }
+  grep -q "$mark" "$t/site/public/index.html" || { echo "FAIL template missing $mark" >&2; failed=1; }
 done
 
+[ "$failed" = 0 ] || { echo "FAIL v4.8 comparison parity" >&2; exit 1; }
 echo "PASS v4.8 comparison parity"

@@ -84,20 +84,39 @@ export(mutate)
 export(state)
 export(mutate_async)
 F
+# Review of C100-C102, P2-1 (combined-b3-b5.md section 92): every check below reports a named FAIL
+# line (a VM-default refusal with its reason and inventory status) and the script goes on; it exits
+# non-zero at the end. A VM-default refusal is accepted only for a check that pins its reason, through
+# approved_refusal (status approved or deferred-named, legacy oracle mandatory).
+. "$(cd "$(dirname "$0")" && pwd)/runtime2/approved_refusal.sh"
+set -o pipefail  # restated after sourcing the helper (it does not change it), for the integrity check
+failed=0
+fail() { echo "FAIL $*" >&2; failed=1; }
+refusal_of() { sed -n '/not compiled for the VM (/{s/.*not compiled for the VM (\([^)]*\)).*/\1/p;q;}' "$1"; }
+status_of() { python3 -B "$(cd "$(dirname "$0")" && pwd)/runtime2/approved_refusal.py" status "$1"; }
+vm_ok() {  # vm_ok NAME FILE EXPECTED-STDOUT [PINNED-REASON DECISION] (run in $site)
+  local rc=0 out reason
+  out=$(cd "$site" && "$NIFT_ABS" "$2" 2>"$t/vm.err") || rc=$?
+  reason=$(refusal_of "$t/vm.err")
+  if [ -n "$reason" ] && [ $# -ge 5 ] && [ "$reason" = "$4" ]; then
+    (cd "$site" && approved_refusal "$NIFT_ABS" "$1" "$4" "$5" "$2" "$3") || failed=1
+  elif [ -n "$reason" ]; then fail "$1: refused with $reason (inventory status $(status_of "$reason"))"
+  elif [ "$rc" != 0 ] || [ "$out" != "$3" ]; then fail "$1: exit $rc, output [$out], stderr [$(cat "$t/vm.err")]"; fi
+}
 cat > "$site/module-init.f" <<'F'
 import("init-worker")
 print(thread_value)
 print(async_value)
 F
-[ "$(cd "$site" && "$NIFT_ABS" module-init.f)" = "42
-43" ] || { echo 'module initialization worker lost its loading module' >&2; exit 1; }
+vm_ok 'module initialization worker keeps its loading module' module-init.f "42
+43" coro-module-init-task "D-064 #2"
 cat > "$site/alias-direct.f" <<'F'
 import("alias-owner")
 print(mutate() == [111, 111, 111])
 print(state() == [111, 111, 111])
 F
-[ "$(cd "$site" && "$NIFT_ABS" alias-direct.f)" = "true
-true" ] || { echo 'direct cross-module alias/reference behavior failed' >&2; exit 1; }
+vm_ok 'direct cross-module alias/reference behaviour' alias-direct.f "true
+true"
 cat > "$site/alias-workers.f" <<'F'
 import("alias-owner")
 worker := thread(mutate)
@@ -108,31 +127,33 @@ async_result := await future
 print(async_result == [111, 111, 111])
 print(state() == [0, 0, 0])
 F
-[ "$(cd "$site" && "$NIFT_ABS" alias-workers.f)" = "true
+vm_ok 'worker alias/reference cloning and parent isolation' alias-workers.f "true
 true
 true
-true" ] || { echo 'worker alias/reference cloning or parent isolation failed' >&2; exit 1; }
+true" coro-module-capture "D-064 #3"
 cat > "$site/direct.f" <<'F'
 import("worker")
 print(worker_job(1))
 F
-[ "$(cd "$site" && "$NIFT_ABS" direct.f)" = "2" ] || { echo 'direct nested package import failed' >&2; exit 1; }
+vm_ok 'direct nested package import' direct.f 2 import-nested "D-065 1"
 cat > "$site/one-worker.f" <<'F'
 import("worker")
 w := thread(worker_job, 1)
 print(w.join())
 F
-[ "$(cd "$site" && "$NIFT_ABS" one-worker.f)" = "2" ] || { echo 'single worker nested package import failed' >&2; exit 1; }
+vm_ok 'single worker nested package import' one-worker.f 2 import-nested "D-065 1"
 cat > "$site/exact-async-owner.f" <<'F'
 import("async-owner")
 future := same_name()
 print(await future)
 F
 if (cd "$site" && "$NIFT_ABS" exact-async-owner.f >/dev/null 2>"$t/exact-async.err"); then
-  echo 'async worker mutated a same-name callable in another module' >&2
-  exit 1
+  fail 'async worker mutated a same-name callable in another module'
+elif [ -n "$(refusal_of "$t/exact-async.err")" ] && [ "$(refusal_of "$t/exact-async.err")" != coro-module-private-async ]; then
+  fail "module-private async callables: refused with $(refusal_of "$t/exact-async.err") (inventory status $(status_of "$(refusal_of "$t/exact-async.err")"))"
+elif [ -z "$(refusal_of "$t/exact-async.err")" ] && ! grep -F 'module-private async callables are unsupported' "$t/exact-async.err" >/dev/null; then
+  fail "module-private async callables: stderr [$(cat "$t/exact-async.err")]"
 fi
-grep -F 'module-private async callables are unsupported' "$t/exact-async.err" >/dev/null
 cat > "$site/main.f" <<'F'
 import("worker")
 import("left")
@@ -149,13 +170,13 @@ print(parent_counter())
 print(worker_job(30))
 print(parent_counter())
 F
-out=$(cd "$site" && "$NIFT_ABS" main.f)
-[ "$out" = "11
+vm_ok 'worker module isolation output' main.f "11
 21
 left
 right
 0
 31
-1" ] || { printf 'worker module isolation output:\n%s\n' "$out" >&2; exit 1; }
+1" import-nested "D-065 1"
 
+[ "$failed" = 0 ] || { echo 'FAIL v4.6 worker module import ownership' >&2; exit 1; }
 echo 'PASS v4.6 worker module import ownership'
