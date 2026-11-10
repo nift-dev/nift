@@ -35,11 +35,11 @@ agrees with the confirmation review's approximate one; the differences are liste
 | method (undefined or wrong-kind method) | 2 | 41 | 0 | 0 | 29 | 7 | 79 |
 | builtin-receiver | 0 | 77 | 1 | 0 | 0 | 1 | 79 |
 | callable (unbound callee) | 17 | 20 | 0 | 0 | 0 | 2 | 39 |
-| coroutines and coro-future-flow | 10 | 10 | 0 | 0 | 0 | 9 | 29 |
+| coroutines and coro-future-flow | 12 | 8 | 0 | 0 | 0 | 9 | 29 |
 | module-host-op (host op in a program with imports) | 27 | 0 | 0 | 0 | 0 | 0 | 27 |
 | syntax forms | 19 | 5 | 0 | 0 | 0 | 0 | 24 |
-| type:<op> and type checks | 2 | 16 | 0 | 0 | 2 | 0 | 20 |
-| static checks, const, interpolation | 2 | 15 | 0 | 0 | 0 | 0 | 17 |
+| type:<op> and type checks | 18 | 0 | 0 | 0 | 2 | 0 | 20 |
+| static checks, const, interpolation | 3 | 14 | 0 | 0 | 0 | 0 | 17 |
 | structs | 12 | 3 | 1 | 0 | 1 | 0 | 17 |
 | context and prepared code | 11 | 3 | 0 | 0 | 0 | 0 | 14 |
 | built-in argument rules | 11 | 1 | 0 | 0 | 0 | 0 | 12 |
@@ -50,7 +50,13 @@ agrees with the confirmation review's approximate one; the differences are liste
 | bytes | 4 | 0 | 0 | 0 | 1 | 0 | 5 |
 | variadics, spread, destructuring | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
 | capacity limits | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
-| **total** | **152** | **321** | **3** | **1** | **39** | **22** | **538** |
+| **total** | **171** | **302** | **3** | **1** | **39** | **22** | **538** |
+
+Changes in C119 (review of C117/C118, P1-2): 19 kind-based rows move from (ii) to (i), as **mixed** rows: the 16
+`type:<op>` rows, `interpolation:non-scalar`, `coro-future-flow:ForBinding` and `coro-future-flow:Throw`. Each refuses
+both a single-kind operand (legacy errors: still ii-B) and an inferred union (legacy runs it when the run-time kind fits:
+a capability gap); both programs are in each row's evidence (dead-code-admission.md section 1.1). The table above shows
+the C119 counts: (i) 171, (ii) 302. The C115-C118 counts in the rest of this file (152 and 321) are historical.
 
 Changes in C115 (confirmation review P2-1, verified): 14 rows moved from (ii) to (i), because legacy runs the refused
 construct and the earlier probe's legacy error came from something downstream: `builtin-arity:entries`/`values`,
@@ -86,13 +92,13 @@ never runs, where legacy completes the program (below). Until the owner rules on
 | Case | Definition | Rows |
 | --- | --- | --- |
 | ii-A | both engines reject before any side effect; only the wording differs | 0 |
-| ii-B | both reject the same error, the VM earlier (approved timing, 00:29) | 321 |
+| ii-B | both reject the same error, the VM earlier (approved timing, 00:29) | 302 (321 before C119) |
 | ii-C | internal failure or a genuinely different failure category | 0 (no exit 70, no defect text, exit 1 on both engines in every probe) |
 
 | Contract | Rows | Meets the 00:29 rule? |
 | --- | --- | --- |
-| B-same-position | 304 | yes for executed errors (wording and timing differ, as approved); the dead-code question remains |
-| B-different-position | 17 | only where the VM position is accepted: 7 marked "fix: take legacy's position", 10 "VM more precise" with a rationale (section 9.7) |
+| B-same-position | 290 (304 before C119) | yes for executed errors (wording and timing differ, as approved); the dead-code question remains |
+| B-different-position | 12 (17 before C119) | only where the VM position is accepted: 7 marked "fix: take legacy's position" (implement, D-067 #1); 5 "VM more precise", approved in C119 after the position review (section 19); the other 5 verified positions are on rows that C119 moved to (i) mixed |
 
 **Dead code (C115 measurement).** Each (ii) row's failing statements were wrapped in `if (false) { ... }` (declarations
 kept at top level), then `print("n")`: legacy completes every such program. The refusal still fires in 316 of the 321
@@ -104,7 +110,7 @@ always runs. **Corpus impact:** of the 94 corpus units (inventory corpora) whose
 complete in legacy, all refused with `prepared-decl-type` or `opaque:legacy-runtime-error`, which C115 moves to (i); for
 the remaining 321 (ii) rows, 0 corpus programs contain such dead code.
 
-**Reading it.** The real gaps (152 rows, class (i)) fall into the families below; the 321 (ii) rows are governed by
+**Reading it.** The real gaps (171 rows since C119, class (i); 152 before) fall into the families below; the 302 (ii) rows are governed by
 the early-refusal policy, subject to the dead-code and position questions (section 13.1).
 
 ### 1.1 Class (i) families ranked by ordinary-scripting impact
@@ -1851,7 +1857,9 @@ Each retired row's probes were run under `NIFT_VM=classify-all` (non-consequenti
    emitter's reason (e.g. `type:mul`).
 3a. **Reasons that are messages.** `async(callable, ...) was removed; ...` and `await(...) was removed; ...` (compiler_thread.cpp:19-21)
    are refusals whose reason string is the error text. PROPOSAL: name them (e.g. `removed-async-call`, `removed-await-call`)
-   and keep the text as the message; a src change with the `type:*` rename (sha256 changes).
+   and keep the text as the message; a src change with the `type:*` rename (sha256 changes). C119 (position review
+   Low): `non-transferable` is the same case; its emitted reason is the long message ("non-transferable resource: cannot
+   transfer ..."); name it (e.g. `thread-arg-non-transferable`) with the others.
 4. **Checkpoint-2 scope (review L-3), PROPOSAL for the owner:**
    - CP2 also takes `struct-after-statement`: reachable on its own in ordinary code (`print("a")` then a struct;
      legacy prints `a`, `1`); after CP2's struct-in-loops work such scripts would still be refused; it masks `method:m`.
@@ -2115,7 +2123,7 @@ decisions.md D-067 records the rulings; the inventory applies them (each row cit
 
 | D-067 item | Applied to |
 | --- | --- |
-| #1 positions | the 7 position fixes set to `implement`; the 10 VM-more-precise positions marked approved-pending-review (still PENDING-OWNER) |
+| #1 positions | the 7 position fixes set to `implement`; the 10 VM-more-precise positions marked approved-pending-review (still PENDING-OWNER); C119: all 10 verified by the review, 5 approved, 5 on mixed rows kept PENDING-OWNER (section 19) |
 | #2 deferrals | 19 rows `deferred-named`: `incdec-target`, `expression:assignment-target`, `coro-future-flow:Assign`; `builtin-receiver:stringify`, `presentation-struct-method:*`, `session:opaque`; `free-name`, `free-name:dynamic-caller`; the CP24 rows (`callable:build`, `build_all`, `build_names`, `inject`, `status`, `track`, `tracked`, `untrack`, `build_repair`, `opaque:template-text`; D-053); `import-dynamic` (D-037 cited, not broadened). known-limitations.md "Further deferrals"; named_deferrals.py gains 5 cases |
 | #3 `@fn` | `fn-flags` approved; amendment recorded under D-047 and D-048 |
 | #4 import depth | `difference:import-depth` approved; kMaxModuleDepth = 64 (module_graph.h:122) documented as a deliberate resource bound of the recursive graph walk (module_graph.cpp:275, introduced with the loader in CP12b f45f52d3); tests/runtime2/import_depth.py (`make test-runtime2-import-depth`) pins depth 33 running, legacy failing at 33, and depth 64 refused |
@@ -2125,4 +2133,40 @@ decisions.md D-067 records the rulings; the inventory applies them (each row cit
 | #8 host-import guard | 27 `module-host-op:*` rows `implement`, sequence slot 2 |
 | #9 investigate first | irregular comparisons, interpolation, loop-context built-ins, futures in expressions, capacity limits and the remaining (i) singles: direction recorded per row, PENDING-OWNER |
 | #10 family grouping | family rows `builtin-arity:*` (123 members), `builtin-receiver:*` (77), `method:*` (40), `callable:*` (10) state their contracts; members keep their rows and evidence, marked "member of <family>"; exceptions unmarked; nothing deleted |
-| #11 dead code | Option A withdrawn; the 321 (ii) rows are reclassified in C118 (docs/runtime-2/checkpoints/dead-code-admission.md) |
+| #11 dead code | Option A withdrawn; the 321 (ii) rows are reclassified in C118 (docs/runtime-2/checkpoints/dead-code-admission.md); revised in C119 (section 19) |
+
+## 19. C119: review of C117/C118 applied (tsv and docs only)
+
+The review (C117 CONFIRMED; C118 dead-code proposal SOUND WITH CHANGES) is applied; docs/runtime-2/checkpoints/dead-code-admission.md is revised.
+
+| Finding | Change |
+| --- | --- |
+| P1-1 design | design (b): defer only kind-certain sites, through an allow-list; (a) (a run-time-checked op) would implement the union operation, a class (i) capability, not a deferral (dead-code-admission.md 5.1) |
+| P1-2 type rows | 19 rows (ii) → (i) mixed, with union and single-kind programs in each row's evidence: (i) 171, (ii) 302; X (ii) 280, plus 19 single-kind sub-cases |
+| P2-1 dynamic scope | `callable:*` (family and 10 members), `assign-free-name`, `assign-free-name:undeclared` and `free-name*` (17 rows) marked deferral-excluded, with the probes `h(1)`, `q = 3` and `h.size()` |
+| P2-2 order | per-site table of legacy order and message (dead-code-admission.md 5.2); every (ii) X row is marked ALLOW-LISTED (249) or NOT allow-listed (19) or excluded (12); 15 of the 19 mixed rows' single-kind sub-cases allow-listed |
+| P2-3 Bottom | a distinct `kKindBottom` bit, the join rule, the trap for `{Bottom}` operands and a mutant (5.3) |
+| P2-4 inventory | `deferred:<reason>` records in classify-all; `reason_key` strips the prefix; `--check` applies the row's status; test (5.4) |
+| P2-5 host guard | options (a) (the slot-2 repair covers uncalled and untaken host ops; soundness: no host op runs before the last module read) and (b) (accept the gap), for the owner (5.5) |
+| P2-6 S rows | legacy accepts all 10 S constructs in dead code (probes in each row's evidence); `jump-outside-loop` marked OWNER RULING NEEDED; `text-type-name` probe fixed (an uncalled lambda) |
+| Must-not-change, mutants | extended (5.7): D-013 early refusal on non-allow-listed sites, exit 1 never 70, heap budget, per-unit sessions and eval, async raise rejects the future (CP22 L1/L4) with a test; 13 mutants |
+| Positions (D-067 #1) | all 10 pass; approved: `builtin-arity:deepcopy`, `coro-module-private-async`, `method:nope`, `non-transferable`, `static-error:push-arity`; verified but PENDING-OWNER (mixed rows): `coro-future-flow:ForBinding`, `coro-future-flow:Throw`, `interpolation:non-scalar`, `type:member`, `type:script-return` |
+| Lows | `which` in the platform list; the corpus base made reproducible and 318/266/298 reconciled (4.1); `number-literal` implement vs S reconciled; `non-transferable` added to section 10 item 3a; `type:script-return` position note (1:8) |
+| Not changed | the slot labels of the D-067 #7 required features (put to the owner by the coordinator) |
+
+Statuses: 609 rows, approved 51 (+5), deferred-named 36, implement 76, PENDING-OWNER 438, retired 8. No row was removed.
+
+Gates at C119 (tsv revision of this commit, pinned binary):
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS (historical control; classification self-test, 31 cases) |
+| `make test-rt-lint` | PASS (0 problems in 710 files) |
+| `make test-test-integrity` | clean |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 155 reasons seen: approved 11, deferred-named 29, implement 27, PENDING-OWNER 88, retired 0 (the intended BLOCKED state) |
+| `tests/runtime2/named_deferrals.py --nift $PWD/nift` | PASS (11 constructs, 0 failures) |
+| `make test-runtime2-import-depth` | PASS |
+| `tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases) |
+
+Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
+
