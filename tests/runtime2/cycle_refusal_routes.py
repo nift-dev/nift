@@ -60,6 +60,13 @@ ROUTES = {
                         'print(x.length())\n', 1, "2\n"),
     "copy-array": ('arr := [1]\nouter := [arr]\nc := copy(outer)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
                    'print(arr.length())\n', 1, "2\n"),
+    # Checkpoint 1 (combined-b3-b5.md section 95): the assignment family's store routes (a nested
+    # element store, an object member store, a nested member store) refuse the same way.
+    "nested-index-store": ('g := [[1]]\ntry { g[0][0] = g } catch (e) { print(e.code) }\nprint(g[0].length())\n', 1,
+                           "1\n"),
+    "object-store": ('o := {"k": 1}\ntry { o["n"] = o } catch (e) { print(e.code) }\nprint(o.size())\n', 1, "2\n"),
+    "nested-object-store": ('o := {"a": {"b": 1}}\ninner := o["a"]\ntry { o["a"]["c"] = [o] } catch (e) '
+                            '{ print(e.code) }\nprint(inner.size())\n', 1, "2\n"),
     # array_shallow_clone is only an internal snapshot (for-loop source, sort keys and source): the
     # loop snapshot cannot be stored, the array it was taken from can.
     "loop-snapshot": ('arr := [1]\nouter := [arr]\nfor (x : outer) { try { arr.push(outer) } catch (e) { print(e.code) } }\n'

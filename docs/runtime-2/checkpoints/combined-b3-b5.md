@@ -4734,7 +4734,7 @@ owner-approved B5 semantic difference.
 - **Result.** `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants.
 - No production change: `nift` is f063f1a9….
 
-## 94. Production checkpoint 1, the assignment family: inventory and scope (STOPPED before src/, awaiting a ruling)
+## 94. Production checkpoint 1, the assignment family: inventory and scope (ruled: option C, section 95)
 
 No production change: `nift` is f063f1a9…. Probes: `scratchpad/cp1/` (VM default and
 `NIFT_VM=0`, this binary).
@@ -4801,3 +4801,141 @@ No production change: `nift` is f063f1a9…. Probes: `scratchpad/cp1/` (VM defau
   - **C.** Legacy's order for the new stores (value, then every key), matching section 2. Compound
     targets still cannot follow legacy (it reads at the old index and writes at the new one), so
     they would use D2's left to right.
+
+## 95. Production checkpoint 1: the assignment family on the VM (C107)
+
+**Ruling.** Owner 2026-11-10 16:35: option C of section 94. The brief's "capture the key before
+the value" line is withdrawn (the 13:26 "value-before-key quirk" wording was wrong); H-A and D2 are
+the contracts:
+- a **store** (`a[i] = v`, `o["k"] = v`, `g[i][j] = v`): the receiver, then the value, then the
+  keys in their order, then validate and commit. `a[i] = v` itself is unchanged (its code is not
+  touched; `b5/evalorder` passes unchanged);
+- a **compound update** (`a[i] op= v`, `o["k"] op= v`, nested): resolve the target and read its
+  value before the right-hand side, then the rhs, then compute and commit, never looking the
+  target up again. Legacy's old-key read / new-key write is the approved difference.
+
+**Production change** (src/: 4 new files, 7 edited):
+- `compiler_element_path.{h,cpp}` (new, `ElementPath`, a friend of `UnitCompiler`):
+  - `form`: an Index target whose receiver is not a plain name, or whose receiver is proved an
+    object, goes here; every other `name[key] = v` keeps the existing code;
+  - admission: a plain-name root, at most 3 levels, each key a plain name, an unsigned integer
+    literal or a string literal without `.`, brackets, quotes, backslash, braces, `$` or control
+    characters (legacy reads other texts as member paths or fails: `o["a]"]` is "invalid
+    assignment target", `o["a.b"]` a member-assignment error); each level's receiver proved an
+    array with a number key or an object with a string key (`type:element-assignment`
+    otherwise); for an update, number operands or two strings for `+=`
+    (`type:compound-assignment` otherwise);
+  - the root is read exactly as the existing store reads it (globals, cells, upvalues, loop
+    bindings, sessions; a const scalar refused, a const array written, Q2 B) and retained when the
+    rhs can rebind it; a captured loop binding commits its cached cell the same way;
+  - a store: value, then per level the key and a `GetIndex` marked `Note::assign_path` (legacy's
+    assignment wording), then the final key and `SetIndex`;
+  - an update: per level the key (retained when the rhs can rebind it), the intermediate
+    `GetIndex` and the element's `GetIndex` (legacy's read wording, the whole target text), then
+    the rhs, the operation (`AddAssign`/`Sub`/`Mul`/`Div`/`Mod`, as `compound_op`) and `SetIndex`
+    into the container read first at the key read first.
+- `vm_element_path.{h,cpp}` (new):
+  - `path_step`: an in-range element or a present member; otherwise `index out of range: <key
+    text>` (integral), `assignment index does not address an array or object: <key text>`
+    (negative or fractional), `object has no member: <key>`;
+  - `set_member`: `mutation::object_put` (immutable, cycle, commit); a refused cycle is the
+    catchable `runtime.reference_cycle`, as every store route.
+- `vm_report.cpp`: a `GetIndex` that fails and whose note is an assignment path re-reports through
+  `path_step` (the success path is unchanged); `vm_ops.cpp`: `set_index`'s existing kind-failure
+  branch hands an object receiver to `set_member` (the array path is unchanged). `proto.h` (the note
+  flag), `codegen.h` (`mark_assign_path`), `compiler_assign.cpp` (the two routes),
+  `compiler_expr.h` (the friend), `compiler_coro.cpp` (CP22's future-flow admission keeps refusing
+  a future stored through a nested path; it admitted only `name[i] = f()` before).
+- Atomicity: every check (kinds at compile time; range, member, index form, arithmetic, cycle at
+  run time) precedes the single commit, so a failed store or update writes nothing. A heap-budget
+  stop after the commit is the existing exit-70 stop (nothing later runs).
+- Not changed: the inference (it already modelled these stores, B4b), the session contracts, the
+  struct, loop-snapshot and comparator-sort paths.
+
+**Approved differences relied on** (compatibility.md, "The assignment family"; each pinned in
+`tests/runtime2/assign_family.py`):
+- D2 + owner 16:35: `a[i] += f()` where `f` changes `i`: legacy `[1,6]`, VM `[6,2]` (lambda, `fn`,
+  nested, object key, loop);
+- H-A D1.1 (store) and D2 (update): a `fn` callee that rebinds the receiver: legacy writes the new
+  receiver, the VM the receiver read first;
+- B5 (Q3 list): aliases, arguments and loop variables see the write;
+- B5 cycle refusal: `g[0][0] = g`, `o["k"] = o`, `o["a"]["b"] = o`, `o["n"] = [o]`;
+- Q2 B: element writes through a const array binding;
+- D-018c: the canonical wording of a failing path store in loop code (`invalid index target` in
+  legacy).
+
+**Tests.**
+- `tests/runtime2/assign_family.py` (`make test-runtime2-assign-family`): 75 cases on the VM and
+  legacy, every failure collected. 46 legacy-equal; 29 pinned (each difference with its ruling,
+  each refusal with legacy's output). Covered:
+  - the three forms;
+  - every compound operator on array, member and nested targets, and string `+=`;
+  - order and counts (value then keys; the rhs once; an update's key, receiver and element before
+    the rhs);
+  - aliases: two names, an extracted inner array, an object alias, arguments, loop variables, a
+    function global, closures;
+  - Q2 B;
+  - failures with legacy's message and position, in scripts, and in sessions with the targets
+    printed unchanged afterwards: out of range, a missing intermediate, a negative or fractional
+    index, division and modulo, overflow, a modulo of a fraction;
+  - loop wording;
+  - cycles through each store form, caught, nothing written;
+  - a heap-budget stop on object stores (exit 70, nothing after it) with its no-budget control;
+  - futures;
+  - the refusals that stay.
+- `tests/runtime2/assign_family_mutants.py` (`make test-runtime2-assign-family-mutants`): 13
+  mutants, each an exact edit built by `sanctioned_mutant.py`, each caught by the named case:
+  - store keys before value;
+  - update rhs first, final key re-read, key not retained;
+  - receiver not retained;
+  - partial commit before the operation;
+  - intermediate step skipped;
+  - step read wording;
+  - step copies its container;
+  - an object store that commits a refused cycle;
+  - the object `SetIndex` route removed;
+  - the missing-member wording;
+  - futures admitted through a path.
+- Updated expectations, each now the VM's result for an admitted form:
+  - `b5/q3/r04_object_alias` (`{"k":2}`, B5) and seven `b5/u6` session goldens (two run with B5
+    results; five now refuse `type:element-assignment` instead of `index-assign-target`, the
+    session heap's kinds);
+  - `b4b/codegen/object_element_store_expr.f` (renamed from `refused_…`: runs, legacy-equal);
+  - `cp18/cow_semantics.py` (object-index, object-alias: 2/2, B5);
+  - `vm_adversarial_gen3` (compound element targets compile and equal legacy);
+  - `vm_subset`, `vm_subset_gen` and `vm_unit` (a computed-key compound and `o.k += 1` stay
+    refused);
+  - `b5/gen/gen_operators.py` (c_index, c_okey modelled; 10 `fn`-callee rows in the approved class
+    `index-compound`);
+  - `v44_root_path_corruption_reproducers.sh` escaped-ref (B5 Extraction: `1`, `2` on the VM,
+    legacy's error pinned).
+- New: VM corpus `cp11/assign_family.f` (vm) and `assign_family_error.f` (vm-error), with legacy
+  goldens (they also reach vm_parity's rt-diff). Sharing oracle probes:
+  - a member store and a nested update in a callee: approved;
+  - an alias store (no call): not approved, nothing to rewrite;
+  - the D2 order: not approved, check 2;
+  - a member cycle through an argument: not approved, the reference cycle.
+
+**Inventory** (`tests/runtime2/cp25/classification.tsv`):
+- `index-assign-target`, `compound-target` and `type:element-assignment`: retired, citing C107.
+  The first two were seen on the local release inventory before this commit and are not after
+  it; `type:element-assignment` was seen in neither.
+- `index-target`: narrowed and still `implement` (the computed and dotted keys:
+  `fallback_index_assign_call`, `review3_f1_member_index`).
+- Counts, 248 rows: approved 44, deferred-named 17, implement 21, PENDING-OWNER 157, retired 9.
+  Local `inventory.py collect` + `report --check`: G1 PASS, 155 reasons seen, exit 3 (PENDING-OWNER,
+  unchanged).
+
+- `tests/runtime2/cycle_refusal_routes.py`: 3 new routes (a nested element store, an object
+  member store, a nested member store): refused before the store, as the other 21.
+
+**Cost** (callgrind Ir, deterministic): the existing store and read paths are unchanged in code;
+a 100,000-iteration loop of `a[j] = n` and `s = s + a[j] + o["k"]` costs 191,138,565 Ir against
+191,038,591 for a build with the original `vm_report.cpp`/`vm_ops.cpp` dispatch (+0.05 %). An
+earlier draft that tested the note on every `GetIndex` and the receiver kind on every `SetIndex`
+cost +0.68 % and was replaced.
+
+**Known limits** (known-limitations.md):
+- the kind inference merges a plain member store's value into every member of that object, so a
+  later path through another member is refused;
+- the other residual refusals of section 94.

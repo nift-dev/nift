@@ -182,7 +182,9 @@ UNSUPPORTED = [
      "index-target"),
     ("index-target-paren", "a := [1, 2]\ni := 1\na[(i)] = 9\nprint(a[1])\n", "index-target"),
     ("index-target-arith", "a := [1, 2]\ni := 0\na[i + 1] = 9\nprint(a[1])\n", "index-target"),
-    ("index-compound", "a := [1, 2]\na[0] += 1\nprint(a[0])\n", "compound-target"),
+    # Checkpoint 1: `a[0] += 1` compiles (D2); a computed key and a member target stay refused.
+    ("index-compound", "a := [1, 2]\ni := 0\na[i + 1] += 1\nprint(a[0])\n", "index-target"),
+    ("member-compound", 'o := {"k": 1}\no.k += 1\nprint(o["k"])\n', "compound-target"),
     ("index-increment", "a := [1, 2]\ni := 0\na[i]++\nprint(a[0])\n", "incdec-target"),
     # Review round 3 (F2): no comparison whose operand is a comparison.
     ("comparison-chain-eq", "print(1 != 1 == 1)\n", "comparison-chain"),

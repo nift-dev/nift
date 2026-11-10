@@ -1059,6 +1059,16 @@ test-runtime2-b06-mutants: $(TARGET) $(LIBFFI_A) $(B4B_GUARDOFF_NIFT)
 # B5 fix-up (review F6): the gen1 and gen_struct wrong-kind generators, from the candidate tree only
 # (tests/runtime2/b5/gen, the tree's builtin table), on the production build, then their negative
 # controls (a missing tree and a truncated builtin table must exit 2 and write nothing).
+# Checkpoint 1, the assignment family (docs/runtime-2/checkpoints/combined-b3-b5.md sections 94-95):
+# `o["k"] = v`, `g[i][j] = v` and `a[i] op= v` against legacy on the same binary, every difference
+# pinned to its ruling; the mutation controls through the sanctioned mutant build.
+.PHONY: test-runtime2-assign-family test-runtime2-assign-family-mutants
+test-runtime2-assign-family: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-assign-family: $(TARGET)
+	$(PYTHON) -B tests/runtime2/assign_family.py --nift "$(CURDIR)/$(TARGET)"
+test-runtime2-assign-family-mutants: export PYTHONDONTWRITEBYTECODE := 1
+test-runtime2-assign-family-mutants: $(TARGET)
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/assign_family_mutants.py --nift "$(CURDIR)/$(TARGET)"
 .PHONY: test-runtime2-b5-generators
 test-runtime2-b5-generators: export PYTHONDONTWRITEBYTECODE := 1
 test-runtime2-b5-generators: $(TARGET)

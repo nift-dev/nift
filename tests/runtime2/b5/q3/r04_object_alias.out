@@ -1,2 +1,2 @@
--- exit 1
-error: r04_object_alias.f:5:1: not compiled for the VM (index-target): this index assignment target is not supported by the Runtime 2.0 VM yet
+{"k":2}
+-- exit 0

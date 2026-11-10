@@ -124,11 +124,19 @@ a["x"] = []
 print(c[0])
 print(e[0])
 F
+# Checkpoint 1 (combined-b3-b5.md section 95): `a["x"] = []` compiles on the VM. B5's Extraction rule
+# (APPROVED 2026-11-07 15:25, compatibility.md "extracted array elements stay valid"): `c` and `e`
+# are the elements themselves and survive the replacement; legacy binds locations and fails. Both
+# engines are pinned exactly, and both must stay clean under the sanitizers.
 set +e
 "$NIFT" "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
+NIFT_VM=0 "$NIFT" "$T/escaped.f" >"$T/lout" 2>"$T/lerr"; lrc=$?
 set -e
-if [[ $rc -eq 0 ]]; then fail 'escaped-ref: unexpectedly succeeded'
-elif ! grep -q 'reference target no longer exists' "$T/err"; then fail "escaped-ref: $(cat "$T/err")"; fi
+if [[ $rc -ne 0 ]] || [[ "$(cat "$T/out")" != "1
+2" ]] || [[ -s "$T/err" ]]; then fail "escaped-ref: VM exit $rc: $(cat "$T/out" "$T/err")"; fi
+if [[ $lrc -ne 1 ]] || [[ -s "$T/lout" ]] || ! grep -q 'reference target no longer exists: c\[0\]' "$T/lerr"; then
+  fail "escaped-ref: legacy exit $lrc: $(cat "$T/lout" "$T/lerr")"
+fi
 
 # Reference created inside a loop scope escapes and stays live after the scope.
 cat >"$T/scope.f" <<'F'

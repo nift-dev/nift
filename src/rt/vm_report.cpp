@@ -14,6 +14,7 @@
 #include "rt/shared_state.h"
 #include "rt/render.h"
 #include "rt/vm_ops.h"
+#include "rt/vm_element_path.h"
 
 namespace nift::rt {
 
@@ -196,7 +197,10 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             Construction::object_set(key, R[in.a], Atom{in.b}, std::move(value));
             return true;
         }
-        case OpCode::GetIndex: if (!get_index(note, R[in.b], RK(in.c), out, fault)) return false; break;
+        case OpCode::GetIndex:  // checkpoint 1: a failed step of an assignment path reports legacy's wording
+            if (!get_index(note, R[in.b], RK(in.c), out, fault))
+                return note && note->assign_path && path_step(note, R[in.b], RK(in.c), out, fault);
+            break;
         case OpCode::SetIndex: {
             bool cycle = false;
             if (set_index(note, R[in.a], RK(in.b), RK(in.c), fault, &cycle_graph_, &cycle)) return true;

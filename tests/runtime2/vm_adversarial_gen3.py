@@ -12,8 +12,11 @@ reason" (vm_adversarial.py checks it with NIFT_VM=classify, nothing runs).
               the index; every other index (anything whose text legacy may
               read as a member path: `a.length() - 1`, `o.k`, `1.0`,
               `g("x.y")`, and all computed forms) must be refused
-              (`index-target`). Compound and `++`/`--` element targets are
-              refused as well (`compound-target`, `incdec-target`).
+              (`index-target`). `++`/`--` element targets are refused as
+              well (`incdec-target`). Checkpoint 1 (combined-b3-b5.md
+              sections 94-95): compound element targets compile (D2) with a
+              plain number index and must match legacy (no rhs effect here);
+              a string index on an array stays refused (`type:element-assignment`).
   cmpchain    F2: every comparison whose operand is itself a comparison: the
               exhaustive two-operator sweep (6 x 6 operators, unparenthesised
               and parenthesised on either side) in eight contexts. All must
@@ -60,13 +63,14 @@ def elemtarget(_seed, _count):
                 src = "fn(g(x)) { return 0 }\n" + wrap(body)
                 expect = None if compiled else ("fallback:index-target", "fallback:opaque:")
                 yield "elemtarget", f"elemtarget-{xi}-{vi}-{cn}", src, {}, expect
-    # Compound and increment element targets: refused whatever the index.
+    # Compound element targets compile (checkpoint 1); increment element targets are refused.
     for xi, (index, _) in enumerate(INDEXES[:8]):
         for cn, wrap in ELEM_CTX.items():
             for op in ("+= 1", "-= 1", "*= 2", "/= 2", "%= 2"):
                 src = "fn(g(x)) { return 0 }\n" + wrap('a := [1, 2, 3]\ni := 1\nj := 0\nk := 2\ns := "x"\n'
                                                           f"d := 1.5\na[{index}] {op}\n" + post)
-                yield "elemtarget", f"elemtarget-compound-{xi}-{op[0]}-{cn}", src, {}, "fallback:compound-target"
+                expect = "fallback:type:element-assignment" if index == "s" else None
+                yield "elemtarget", f"elemtarget-compound-{xi}-{op[0]}-{cn}", src, {}, expect
             for inc in (f"a[{index}]++", f"a[{index}]--", f"++a[{index}]", f"--a[{index}]"):
                 src = "fn(g(x)) { return 0 }\n" + wrap('a := [1, 2, 3]\ni := 1\nj := 0\nk := 2\ns := "x"\n'
                                                           f"d := 1.5\n{inc}\n" + post)

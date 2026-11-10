@@ -889,7 +889,7 @@ INJECT = [
     ("comparison-chain-rel", "", "zx := 2\nprint((zx < 3) == true)", "any", "comparison-chain"),
     ("index-target-dot", "", "za := [1, 2]\nza[za.length() - 1] = 9\nprint(za[1])", "any", "index-target"),
     ("index-target-expr", "", "za := [1, 2]\nzi := 0\nza[zi + 1] = 9\nprint(za[1])", "any", "index-target"),
-    ("index-compound", "", "za := [1, 2]\nza[0] += 1\nprint(za[0])", "any", "compound-target"),
+    ("index-compound", "", "za := [1, 2]\nzi := 0\nza[zi + 1] += 1\nprint(za[0])", "any", "index-target"),  # checkpoint 1
     ("unresolved", "", "print(zz_unbound)", "top", "unresolved-name"),  # was print(args): bound since D-062
     ("nesting", "", "print(" + " + ".join(["1"] * 400) + ")", "any", "nesting-limit"),
     ("jump-not-last", "", "zi := 0\nwhile (zi < 2) { zi += 1\nbreak\nprint(zi) }", "any", "jump-not-last"),

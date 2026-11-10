@@ -1,2 +1,2 @@
 -- exit 1
-error: <stdin>:5:1: NIFT_VM session refused: index-assign-target: this index assignment target is not supported by the Runtime 2.0 VM yet
+error: <stdin>:5:1: NIFT_VM session refused: type:element-assignment: an operation whose operand types the VM cannot prove (element-assignment) is not supported by the Runtime 2.0 VM yet

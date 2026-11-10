@@ -48,6 +48,7 @@ public:
     std::size_t note(std::size_t at, std::string text, bool eval_nullable_error = false,
                      bool session_inspection = false, bool session_numeric_return = false);
     std::size_t note_index(std::size_t at) const { return proto_->notes[at] - 1u; }
+    void mark_assign_path(std::size_t index) { proto_->note_table[index].assign_path = true; }
     Instr& at(std::size_t index) { return proto_->code[index]; }
     void set_params(std::uint16_t count) { proto_->nparams = count; }
 

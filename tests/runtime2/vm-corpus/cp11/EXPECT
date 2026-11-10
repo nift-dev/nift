@@ -5,6 +5,9 @@
 # CP12 D-018: one meaning in every context; differences only through the named policies of
 # tests/runtime2/vm_policies.py, and context-dependent legacy behaviour refused (`context:*`).
 arith.f vm 
+# Checkpoint 1 (combined-b3-b5.md section 95): object member, nested and compound element stores.
+assign_family.f vm
+assign_family_error.f vm-error index out of range: 2
 # B5 (D-NEXT-refsem-b): the guard is deleted; grow(a)'s push reaches the caller's array (Q3 row 1;
 # legacy copies arguments: 4, the VM 5). The .r2 golden is the approved result.
 arrays.f vm approved=Q3

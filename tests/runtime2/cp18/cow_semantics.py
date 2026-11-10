@@ -16,7 +16,10 @@ target (`index-target`, the same refusal as 'object-index'), which the deleted
 `aliasing` check used to pre-empt. 'struct-copy' already ran on the B4b tip
 17f7964c (struct instances are references; B3/B4 admit a field store through
 a parameter; legacy-equal 2/2): its stale `struct-value` expectation failed
-there identically and is corrected here."""
+there identically and is corrected here.
+
+Checkpoint 1 (combined-b3-b5.md sections 94-95): `o["x"] = v` compiles. 'object-index' and
+'object-alias' run with the B5 result (one object; legacy copies the argument and the alias: 2/1)."""
 import importlib.util
 from pathlib import Path
 import sys
@@ -28,8 +31,8 @@ cases=[
  ('array-argument','fn(g(a)) { a.push(1); return a.length(); } b := [5]; print(g(b)); print(b.length());','2\n2\n',None),
  ('array-local','fn(g(n)) { a := [n]; a.push(1); return a.length(); } b := [5]; print(g(5)); print(b.length());','2\n1\n',None),
  ('object-member','fn(g(o)) { o.x = 2; return o.x; } b := {"x":1}; print(g(b)); print(b.x);',None,'static-error:member-assign'),
- ('object-index','fn(g(o)) { o["x"] = 2; return o["x"]; } b := {"x":1}; print(g(b)); print(b["x"]);',None,'index-target'),
- ('object-alias','b := {"x":1}; c := b; c["x"] = 2; print(c["x"]); print(b["x"]);',None,'index-target'),
+ ('object-index','fn(g(o)) { o["x"] = 2; return o["x"]; } b := {"x":1}; print(g(b)); print(b["x"]);','2\n2\n',None),
+ ('object-alias','b := {"x":1}; c := b; c["x"] = 2; print(c["x"]); print(b["x"]);','2\n2\n',None),
  ('struct-copy','struct (S) { x := 1; } fn(g(s)) { s.x = 2; return s.x; } b := S(); print(g(b)); print(b.x);','2\n2\n',None),
  ('struct-alias','struct (S) { x := 1; } b := S(); c := b; c.x = 2; print(c.x); print(b.x);','2\n2\n',None),
  ('struct-unique-method','struct (S) { x := 1; fn(set()) { x = 2; return x; } } b := S(); print(b.set()); print(b.x);','2\n2\n',None),

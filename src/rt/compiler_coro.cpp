@@ -191,8 +191,9 @@ private:
         switch (p.kind) {
             case NodeKind::Declare:  // `x := f()`, or the declared name itself
                 return (p.b == id || p.a == id) && ast_.at(p.a).kind == NodeKind::Ident;
-            case NodeKind::Assign:  // `x = f()` / `hs[i] = f()`, or that target
-                return ast_.at(p.a).kind == NodeKind::Ident || ast_.at(p.a).kind == NodeKind::Index;
+            case NodeKind::Assign:  // `x = f()` / `hs[i] = f()`, or that target (never a path: checkpoint 1)
+                return ast_.at(p.a).kind == NodeKind::Ident ||
+                       (ast_.at(p.a).kind == NodeKind::Index && ast_.at(ast_.at(p.a).a).kind == NodeKind::Ident);
             // A task's result may not hold a future: legacy's parent cannot use
             // a future created in the task ("await: invalid future").
             case NodeKind::Return: return p.a == id && in_function == 1;

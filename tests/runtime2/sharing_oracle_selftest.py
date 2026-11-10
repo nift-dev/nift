@@ -62,6 +62,18 @@ PROBES = {
     "p_module_struct": ({"main.f": "import(\"m.f\")\n" + SHARE, "m.f": "struct(Q) { v := 1 }\nfn(mk()) { return 1 }\nexport(mk)\n"},
                         "unclassified", "module m.f"),
     "p_module_missing": ({"main.f": "import(\"absent.f\")\n" + SHARE}, "not-approved", None),
+    # checkpoint 1 (combined-b3-b5.md section 95): the assignment family through arguments and not
+    "p_member_store_arg": ('fn(setk(o)) { o["k"] = 2; o["n"] = 3; return 0 }\nd := {"k": 1}\nprint(setk(d))\n'
+                           "print(d.stringify())\n", "approved", None),
+    "p_nested_store_arg": ("fn(poke(g)) { g[0][0] += 5; g[1][0] = 7; return 0 }\na := [[1], [2]]\n"
+                           "print(poke(a))\nprint(a.stringify())\n", "approved", None),
+    "p_alias_store_no_call": ('o := {"k": 1}\np := o\np["k"] = 2\nprint(o.stringify())\n', "unclassified",
+                              "nothing to rewrite"),
+    "p_compound_order": ("fn(f(x)) { i = 1; return x }\na := [1, 2]\ni := 0\na[i] += f(5)\nprint(a.stringify())\n",
+                         "unclassified", "check 2"),
+    "p_member_cycle_arg": ('fn(link(o, v)) { o["k"] = v; return 0 }\nd := {"k": 1}\nb := [d]\n'
+                           "try { print(link(d, b)) } catch (e) { print(e.code) }\nprint(d.size())\n",
+                           "unclassified", "reports a reference cycle"),
     # negative controls
     "n_unrelated_stdout": ("// fake: extra-stdout\n" + NOSHARE, "unclassified", "check 2"),
     "n_sharing_plus_unrelated": ("// fake: extra-stdout\n" + SHARE, "unclassified", "check 2"),

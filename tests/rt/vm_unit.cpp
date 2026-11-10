@@ -420,7 +420,8 @@ void check_round3_fallbacks() {
         {"fn(g(x)) { return 0 }\na := [1]\na[g(\"x.y\")] = 9\n", "index-target"},
         {"a := [1, 2]\ni := 1\na[(i)] = 9\n", "index-target"},
         {"a := [1, 2]\ni := 0\na[i + 1] = 9\n", "index-target"},
-        {"a := [1, 2]\na[0] += 1\n", "compound-target"},
+        {"a := [1, 2]\ni := 0\na[i + 1] += 1\n", "index-target"},  // checkpoint 1: a[0] += 1 compiles
+        {"o := {\"k\": 1}\no.k += 1\n", "compound-target"},
         {"print(1 != 1 == 1)\n", "comparison-chain"},
         {"x := 1\nprint((x < 2) == true)\n", "comparison-chain"},
         {"x := 1\nif (true == (x >= 2)) { print(1) }\n", "comparison-chain"},
@@ -434,6 +435,8 @@ void check_round3_fallbacks() {
     // Admitted forms still compile and run.
     const Case ok[] = {
         {"a := [1, 2, 3]\ni := 2\na[i] = 7\na[0] = 5\na[ i ] = a[i] + 1\nprint(a[0] + a[2])\n", "13\n"},
+        {"a := [1, 2]\na[0] += 1\ng := [[1]]\ng[0][0] *= 3\no := {\"k\": 1}\no[\"k\"] -= 4\n"
+         "print(a[0] + g[0][0] + o[\"k\"])\n", "2\n"},  // checkpoint 1
         {"x := 1\nprint(x < 2)\nprint((x + 1) == 2)\nprint((x < 2) && (x > 0))\n", "true\ntrue\ntrue\n"},
     };
     for (const Case& c : ok) {

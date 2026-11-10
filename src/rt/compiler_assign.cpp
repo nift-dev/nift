@@ -1,4 +1,5 @@
 #include "rt/compiler_assign.h"
+#include "rt/compiler_element_path.h"
 
 #include "rt/literal.h"
 #include "rt/native.h"
@@ -140,6 +141,7 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         return fail(node, "static-error:member-assign");  // plain objects reject it
     }
     if (target.kind == NodeKind::Index) {
+        if (ElementPath::form(*this, target)) return ElementPath::store(*this, node, result);  // checkpoint 1
         const Node& object = ast_.at(target.a);
         std::uint16_t reg = 0, key = 0, value = 0;
         const Binding* holder = object.kind == NodeKind::Ident ? find_binding(text(object)) : nullptr;
@@ -269,6 +271,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     if (const StructFieldInfo* field = struct_target(target))
         return field_update(node, target_receiver(target), *field);
     if (!reason_.empty()) return false;
+    if (target.kind == NodeKind::Index) return ElementPath::compound(*this, node);  // checkpoint 1
     if (target.kind != NodeKind::Ident) return fail(target, "compound-target");
     const Binding* binding = find_binding(text(target));
     if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));

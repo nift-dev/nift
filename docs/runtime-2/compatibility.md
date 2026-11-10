@@ -145,7 +145,8 @@ operation or the binding-type check fails after the right-hand side rebound the 
 written back: the binding keeps what the right-hand side left (in a session the next statement
 sees it). The VM read the left operand or target late until this repair (`combined-b3-b5.md`
 section 27). Fixtures: `tests/runtime2/b5/d2/`; generator: `tests/runtime2/b5/gen/gen_operators.py`.
-Compound assignment on an index or a field-key target (`b[i] += v`, `o["k"] += v`) stays refused.
+Compound assignment on an index or a field-key target (`b[i] += v`, `o["k"] += v`) was refused here;
+checkpoint 1 admits it with the same rule (next section).
 
 | Program | Legacy | Runtime 2.0 |
 | --- | --- | --- |
@@ -157,6 +158,38 @@ Compound assignment on an index or a field-key target (`b[i] += v`, `o["k"] += v
 | (**APPROVED 2026-11-08 03:27/03:29**, owner; a difference, not legacy parity) in a `while`/`for` body, `s += k()` with a lambda callee that rebinds `s` | `Z`: the append is lost | `aa`; previously admitted with `Za` (already different from legacy). Fixture `d2/b7_loop_compound_approved.f` |
 | (recorded, no change: r05) in a `while`/`for` body, `l2(x, g())` where `l2` is a lambda and `g` rebinds `x` | `20`: legacy's loop evaluator reads a lambda's call argument late (a `fn` callee and top-level code: `6`) | `6`: arguments once, left to right (unchanged; fixture `d2/b8_lambda_args_loop.f`) |
 | `struct(P) { v := 6 }; p := P(); g := () => { p.v = 20; return 4 }; p.v += g()` | `struct has no method: v += g` (not runnable) | `10` (91a49efa: `24`); a method's implicit `v += h()`: legacy `10`, the same (91a49efa: `24`) |
+
+## The assignment family: object members, nested elements, compound elements (checkpoint 1)
+
+`o["k"] = v`, `g[i][j] = v` (up to three levels, arrays and objects mixed) and `a[i] op= v`,
+`o["k"] op= v` for `+= -= *= /= %=` run on the VM (combined-b3-b5.md sections 94-95). Each key is
+a plain name, an unsigned integer literal, or a string literal without `.`, brackets, quotes,
+backslashes, braces or `$`; every other key, `o.k = v`, `a[0]++` and a fourth level stay refused
+before any effect. Order:
+
+- A **store** follows H-A and legacy (owner 2026-11-10 16:35, option C): the receiver is read
+  first and retained, then the value, then the keys and the intermediate containers, then the
+  checked commit. The existing `a[i] = v` is unchanged.
+- A **compound update** follows D2 (owner 16:35): the receiver, the keys, the intermediate
+  containers and the element are read before the right-hand side; the result is written into the
+  container read first, at the key read first. The target is never looked up again.
+
+A failed store or update writes nothing (out of range, a missing member, a negative or fractional
+index, an arithmetic error, a refused cycle), with legacy's message at legacy's position.
+Fixtures: `tests/runtime2/assign_family.py` (every case against legacy, each difference pinned);
+mutants: `tests/runtime2/assign_family_mutants.py`.
+
+| Program | Legacy | Runtime 2.0 |
+| --- | --- | --- |
+| `o := {"k": 1}; o["k"] = 5; o["n"] = 2`; `grid[1][0] = 7`; `o["k"][1] = 9`; `a[0] += 10`; `o["k"] *= 3`; `g[1][0] -= 1` | the stored values | the same |
+| `g[i][i] = f()` where `f` sets `i = 1`; `o[k] = f()` where `f` sets `k = "b"` | the value first, then every key: `[[1,2],[3,5]]`, `{"a":1,"b":5}` | the same |
+| (**APPROVED 2026-11-10 16:35**, owner, D2; a difference, not legacy parity) `a := [1, 2]; i := 0; f := () => { i = 1; return 5 }; a[i] += f()` (a lambda or a `fn`, in loops too; nested `g[i][0] += f()`, `o[k] += f()`) | `[1,6]`: reads `a[0]`, writes `a[1]` | `[6,2]`: reads and writes `a[0]` |
+| (**APPROVED**, D2 + owner 16:35 for the update; H-A D1.1 for the store) `g := [[1]]; fn(f()) { g = [[9]]; return 5 }; keep := g` then `g[0][0] += f()` (or `g[0][0] = f()`) | the receiver is resolved after a `fn` call: `g` `[[6]]` (`[[5]]`), `keep` `[[1]]` | the receiver is read first, for every callee: `g` `[[9]]`, `keep` `[[6]]` (`[[5]]`); with a lambda callee legacy-equal |
+| `a := [1, 2]; f := () => { a.pop(); return 5 }; a[1] += f()` | `index out of range: 1` | the same (the element read before the rhs is written back into the shrunken array) |
+| (**APPROVED**, B5 Q3 list) `p := o; p["k"] = 2`; `c := o; o["k"][0] = 3`; `fn(f(o)) { o["k"] = 2 }; f(x)`; `for (e : arr) { e["k"] = 9 }` | the other name, the argument, the source array are unchanged (copies) | one object: every alias sees the write |
+| (**APPROVED**, B5 cycle refusal) `g[0][0] = g`, `o["k"] = o`, `o["a"]["b"] = o`, `o["n"] = [o]` | stores a copy | the catchable `runtime.reference_cycle`; nothing is written |
+| (**APPROVED**, Q2 B) `const g := [[1]]; g[0][0] = 2; g[0][0] += 2` | `cannot assign to const binding: g` | `[[4]]` (`const` is binding-only) |
+| (**APPROVED**, D-018c) a failing path store in a `while`/`for` body: `g[0][5] = 7`, `o["q"]["z"] = 1` | `invalid index target` | the canonical message: `index out of range: 5`, `object has no member: q` |
 
 ## Documented compatibility differences (approved by the owner, not release blockers)
 

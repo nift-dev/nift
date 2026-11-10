@@ -51,6 +51,7 @@ struct Note {
     std::string text;
     bool session_inspection = false;
     bool session_numeric_return = false;  // cold SessionNumeric reporting only
+    bool assign_path = false;  // GetIndex: a step of an assignment path (vm_element_path.h)
 };
 
 class SourceMap;

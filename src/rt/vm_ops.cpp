@@ -4,6 +4,7 @@
 #endif
 #include "rt/dispatch_defect.h"  // B4
 #include "rt/vm.h"
+#include "rt/vm_element_path.h"
 
 #include "rt/aggregate.h"
 #include "rt/compare.h"
@@ -296,7 +297,10 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
 // A refused cycle sets *cycle (the caller raises the catchable error).
 bool set_index(const Note* note, Value& object, const Value& key, const Value& value, Fault& fault,
                const CycleGraph* graph, bool* cycle) {
-    if (!object.is(Kind::Array) || !key.is_number()) return internal(fault, "element assignment");
+    if (!object.is(Kind::Array) || !key.is_number()) {
+        if (object.is(Kind::Object)) return set_member(note, object, key, value, fault, graph, cycle);  // checkpoint 1
+        return internal(fault, "element assignment");
+    }
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;
 #if defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 30

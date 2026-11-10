@@ -10,7 +10,8 @@ Generates every combination of
   operation  (tests/runtime2/b5/gen/operators.tsv of --tree: binary operators, comparisons, the
               fused `if` comparison, string `+`/`==`/`>=`, list/object literals and call arguments,
               compound assignment on a variable (family B) and on a struct field (family C), and
-              compound assignment on index targets, which must stay refused),
+              compound assignment on index targets (checkpoint 1, owner 2026-11-10 16:35: D2 for
+              element and member targets too)),
   callee     the right operand rebinds the left one: through a lambda, a `fn`, or an inline
               assignment,
   context    top level, a while-loop body, a top-level binding in a `fn` and in a lambda, a
@@ -23,8 +24,8 @@ error. A refusal must come before any effect. Each admitted program also runs on
 (NIFT_VM=0): legacy must agree (an error: the same error line) except in LEGACY_DIFFERENT, which is
 reported, not failed.
 
-Fails (exit 1) on any mismatch, VM exit 70, timeout, internal tag, refusal after output, an
-admitted index-target compound, fewer admitted programs than ADMITTED_FLOOR, or a legacy
+Fails (exit 1) on any mismatch, VM exit 70, timeout, internal tag, refusal after output, fewer
+admitted programs than ADMITTED_FLOOR, or a legacy
 disagreement outside the known classes. Exits 2, writing nothing, when the operation table is
 missing or does not list exactly the modelled operations (--negative-controls checks both).
 """
@@ -102,14 +103,17 @@ VALUE = {
 COMPOUND = {"c_add": lambda v, r: v + r, "c_sub": lambda v, r: v - r, "c_mul": lambda v, r: v * r,
             "c_div": _div, "c_div_dbl": _div, "c_mod": lambda v, r: v % r, "c_expr": lambda v, r: v + r,
             "c_str": lambda v, r: v + r, "f_add": lambda v, r: v + r, "f_mul": lambda v, r: v * r}
-REFUSED = ["c_index", "c_okey"]  # compound on index targets stays refused (out of D2's scope)
-MODELLED = sorted(list(VALUE) + ["and_sc"] + list(COMPOUND) + REFUSED)
+# Checkpoint 1 (combined-b3-b5.md section 95): a compound element or member update reads the
+# receiver, its key and the element before the rhs; the rhs's rebinding of the receiver leaves the
+# write in the old container, so the binding prints the rebinding value.
+INDEXED = {"c_index": "[20]", "c_okey": '{"k":20}'}
+MODELLED = sorted(list(VALUE) + ["and_sc"] + list(COMPOUND) + list(INDEXED))
 
 
 def expected(op, family, context):
-    """("lines", [...]) | ("error", message) | ("refused", None)."""
-    if op in REFUSED:
-        return "refused", None
+    """("lines", [...]) | ("error", message)."""
+    if op in INDEXED:
+        return "lines", [INDEXED[op]]
     f = FAMILY[family]
     v, new, r = f["init"], f["new"], f["ret"]
     if family == "dbl" and context == "loopbind":
@@ -133,8 +137,13 @@ def expected(op, family, context):
 #   loop-args      r05, recorded (compatibility.md): legacy's loop evaluator reads a lambda's call
 #                  argument late (fixture d2/b8);
 #   no-field-op    legacy cannot run a compound assignment on a struct field (`struct has no method`):
-#                  the contract decides (fixture d2/c2).
+#                  the contract decides (fixture d2/c2);
+#   index-compound APPROVED (owner 2026-11-10 16:35, D2): legacy resolves a compound element or
+#                  member target's receiver late with a `fn` callee (the old element, written into
+#                  the rebinding value); the VM keeps the receiver read first.
 def legacy_class(op, family, callee, context):
+    if op in INDEXED:
+        return "index-compound"
     if family == "fld":
         return "no-field-op"
     if context in ("loop", "loopbind"):
@@ -261,8 +270,6 @@ def job(item):
     elif refused:
         if vo.strip():
             res["bad"] = "refused after output"
-    elif kind == "refused":
-        res["bad"] = "an index-target compound was admitted (out of scope: must stay refused)"
     elif not outcome_ok(kind, want, vo, ve, vc, session):
         res["bad"] = "result differs from the model"
     else:

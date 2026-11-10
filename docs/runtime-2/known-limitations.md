@@ -86,6 +86,20 @@ main ones:
 - receiver and operand order;
 - an import-scope collision is reported before the program runs (B4 C1);
 - a function value has no shown form in `nift eval` (b4-dispatch.md 6).
+- the assignment family (checkpoint 1): a compound element update `a[i] += f()` reads and writes
+  the element at the key read before the right-hand side (D2, owner 2026-11-10 16:35), where legacy
+  reads at the old key and writes at the new one; a path store or update reads its receiver first
+  for every callee (H-A D1.1, D2); its aliases, cycles, `const` and loop wording follow B5, Q2 B and
+  D-018c.
+
+**Assignment family limits (checkpoint 1, refused before any effect).** A key that is not a plain
+name, an unsigned integer literal or a simple string literal (`a[i + 1][0] = v`, `o["a.b"] = v`),
+`o.k = v`, `a[0]++`, a fourth level, and a compound update used as a value stay refused. Each level
+must be proved an array with a number key or an object with a string key (`type:element-assignment`
+otherwise): the kind inference merges a plain store's value (`o["k"] = 5`) into every member of the
+object it names, so a later path through another member of that object (`o["m"]["x"] = 1`) is
+refused; mixed operand kinds of a compound update are refused (`type:compound-assignment`). A future
+stored through a path stays refused (`coro-future-flow:Assign`).
 
 ## Other refusals
 

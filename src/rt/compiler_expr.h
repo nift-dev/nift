@@ -89,7 +89,7 @@ private:
     bool assignment_expr(const Node& node, std::uint16_t dst);
     void assignment_value(std::uint16_t dst, std::uint16_t operand);  // P1: a register or a constant operand
     bool assign(const Node& node, const std::uint16_t* result = nullptr);
-    bool compound_assign(const Node& node);
+    bool compound_assign(const Node& node); friend struct ElementPath;  // checkpoint 1 (compiler_element_path.cpp)
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
     bool while_loop(const Node& node);
