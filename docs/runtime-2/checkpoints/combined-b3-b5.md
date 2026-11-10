@@ -4251,3 +4251,14 @@ owner-approved B5 semantic difference.
     syntax.
 - Original sha256: v44 smoke `596c91c6038e1958…`, v46 smoke `a1e44df7ce6fb4b2…`. Production
   unchanged: f063f1a9….
+
+## 83. Owner 13:26, item 3: the const element-assignment check (C95, tests)
+
+- `v44_element_assignment_smoke.sh` required `const a := [1, 2]; a[0] = 9` to fail. The approved
+  binding-only `const` (owner Q2 option B) allows the element write.
+- **Change.** The check now requires the write to succeed and print `9`. A new check requires
+  rebinding the const (`a = [3]`) to fail.
+  - Under the VM default the write prints `9`, and the rebinding is refused (`declare-const`).
+  - Legacy keeps its old `const` (`cannot assign to const binding: a`). That is the approved
+    difference, so this check is for the default engine.
+- The smoke was also restructured for item 4 (section 84). Original sha256 `2d572fbd91df889e…`.
