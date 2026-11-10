@@ -97,6 +97,25 @@ MUTANTS = [
      [(CPATH, "    const bool strings = node.op == Op::AddAssign && l == kKindString && rk == kKindString;\n",
        "    const bool strings = l == kKindString && rk == kKindString;\n")],
      "refused_string_compound_sub"),
+    # Owner 20:11, item 2: legacy's model, the path resolved again after the rhs (the root re-read,
+    # each intermediate step and the final key evaluated again); the D2 cases must catch it.
+    ("compound-path-reresolved", "compound: the receiver, the intermediate containers and the key resolved again after the rhs",
+     [(CPATH, COMPOUND_RHS, "    if (!c.expr_any(node.b, value)) return false;\n"
+       "    {\n"
+       "        Root again;\n"
+       "        if (!root(c, c.ast_.at(path.front()->a), target, kNoNode, again)) return false;\n"
+       "        std::uint16_t walk = again.reg;\n"
+       "        for (std::size_t q = 0; q + 1 < path.size(); ++q) {\n"
+       "            std::uint16_t k2 = 0, n2 = 0;\n"
+       "            if (!c.expr_any(path[q]->b, k2) || !c.temp(n2)) return false;\n"
+       "            c.fb_->emit(OpCode::GetIndex, n2, walk, k2);\n"
+       "            walk = n2;\n"
+       "        }\n"
+       "        if (!c.expr_any(path.back()->b, key)) return false;\n"
+       "        container = walk;\n"
+       "    }\n"
+       "    c.fb_->set_offset(node.begin);\n    switch (node.op) {")],
+     "d2_container_replaced_fn"),
 ]
 
 

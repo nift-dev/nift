@@ -28,7 +28,7 @@ import tempfile
 INTERNAL = re.compile(r"compiler defect|internal failure|unexpected operands|\x1fnift:|cell reached|"
                       r"AddressSanitizer|LeakSanitizer|runtime error:")
 SAME = "SAME"
-D2 = "D2 + owner 2026-11-10 16:35 (compound: target read before the rhs)"
+D2 = "D2 + owner 16:35 Option C + owner 20:11 confirmation (compound: target captured before the rhs)"
 D11 = "H-A D1.1 (owner 2026-11-07 22:13: receiver first for every callee)"
 B5 = "B5 shared references (Q3 list, owner 2026-11-01/02)"
 B5ARG = "B5 shared references: arguments are not copied (Q3 list)"
@@ -132,6 +132,45 @@ CASES = [
          "[2,2]\n-- exit 0\n", (D2, "[1,2]\n-- exit 0\n")),
     case("order_compound_inline_key_nested", "g := [[1, 2], [3, 4]]\ni := 0\ng[i][i] += (i = 1) + 10\n"
          "print(g.stringify())", "[[12,2],[3,4]]\n-- exit 0\n", (D2, "[[1,2],[3,12]]\n-- exit 0\n")),
+    # Owner 20:11, item 2: each D2 case shows the rhs runs once (cnt), the element read before the rhs
+    # is the one used (the rhs changes it first), the path is not resolved again (the replacement or
+    # the new index is untouched, the captured container is written), unrelated rhs effects stay
+    # (other), and, in the failing variants, a failed commit leaves the captured target unchanged.
+    case("d2_container_replaced_fn", "g := [[1, 2], [3, 4]]\nrow := g[0]\ncnt := 0\nother := [0]\n"
+         "fn(f()) { cnt += 1; other[0] = 9; row[1] = 50; g[0] = [100, 200]; return 5 }\ng[0][1] += f()\n"
+         "print(g.stringify())\nprint(row.stringify())\nprint(cnt)\nprint(other.stringify())",
+         "[[100,200],[3,4]]\n[1,7]\n1\n[9]\n-- exit 0\n", (D2, "[[100,7],[3,4]]\n[100,7]\n1\n[9]\n-- exit 0\n")),
+    case("d2_container_replaced_lambda", "g := [[1, 2], [3, 4]]\nrow := g[0]\ncnt := 0\nother := [0]\n"
+         "f := () => { cnt += 1; other[0] = 9; row[1] = 50; g[0] = [100, 200]; return 5 }\ng[0][1] += f()\n"
+         "print(g.stringify())\nprint(row.stringify())\nprint(cnt)\nprint(other.stringify())",
+         "[[100,200],[3,4]]\n[1,7]\n1\n[9]\n-- exit 0\n", (D2, "[[100,7],[3,4]]\n[100,7]\n1\n[9]\n-- exit 0\n")),
+    case("d2_container_replaced_object", 'o := {"m": {"x": [1, 60]}}\nkept := o["m"]["x"]\ncnt := 0\nother := [0]\n'
+         'fn(f()) { cnt += 1; other[0] = 9; kept[0] = 40; o["m"] = {"x": [50, 60]}; return 5 }\n'
+         'o["m"]["x"][0] += f()\nprint(o.stringify())\nprint(kept.stringify())\nprint(cnt)\nprint(other.stringify())',
+         '{"m":{"x":[50,60]}}\n[6,60]\n1\n[9]\n-- exit 0\n', (D2, '{"m":{"x":[6,60]}}\n[6,60]\n1\n[9]\n-- exit 0\n')),
+    case("d2_index_rebound", "a := [1, 2]\ni := 0\ncnt := 0\nother := [0]\n"
+         "f := () => { cnt += 1; other[0] = 9; i = 1; a[0] = 50; return 1 }\na[i] += f()\n"
+         "print(a.stringify())\nprint(i)\nprint(cnt)\nprint(other.stringify())",
+         "[2,2]\n1\n1\n[9]\n-- exit 0\n", (D2, "[50,2]\n1\n1\n[9]\n-- exit 0\n")),
+    case("d2_index_rebound_nested", "g := [[1, 2], [3, 4]]\ni := 0\ncnt := 0\nother := [0]\n"
+         "f := () => { cnt += 1; other[0] = 9; i = 1; g[0][0] = 50; return 10 }\ng[i][i] += f()\n"
+         "print(g.stringify())\nprint(i)\nprint(cnt)\nprint(other.stringify())",
+         "[[11,2],[3,4]]\n1\n1\n[9]\n-- exit 0\n", (D2, "[[50,2],[3,11]]\n1\n1\n[9]\n-- exit 0\n")),
+    # failing commits (one session unit, so the kinds are proved; the session goes on after the error)
+    case("d2_container_replaced_fails", "g := [[1, 2], [3, 4]]; row := g[0]; cnt := 0; other := [0]; "
+         "f := () => { cnt += 1; other[0] = 9; g[0] = [100, 200]; return 0 }; g[0][1] /= f()\n"
+         "print(g.stringify())\nprint(row.stringify())\nprint(cnt)\nprint(other.stringify())",
+         "[[100,200],[3,4]]\n[1,2]\n1\n[9]\n-- exit 0\nerror: division by zero\n",
+         (D2, "[[100,200],[3,4]]\n[100,200]\n1\n[9]\n-- exit 0\nerror: division by zero\n"), session=True),
+    case("d2_object_container_replaced_fails", 'o := {"m": {"x": [1, 60]}}; kept := o["m"]["x"]; cnt := 0; '
+         'other := [0]; f := () => { cnt += 1; other[0] = 9; o["m"] = {"x": [50, 60]}; return 0 }; '
+         'o["m"]["x"][0] %= f()\nprint(o.stringify())\nprint(kept.stringify())\nprint(cnt)\nprint(other.stringify())',
+         '{"m":{"x":[50,60]}}\n[1,60]\n1\n[9]\n-- exit 0\nerror: modulo by zero\n',
+         (D2, '{"m":{"x":[50,60]}}\n[50,60]\n1\n[9]\n-- exit 0\nerror: modulo by zero\n'), session=True),
+    case("d2_index_rebound_fails", "a := [9223372036854775807, 2]\ni := 0\ncnt := 0\nother := [0]\n"
+         "f := () => { cnt += 1; other[0] = 9; i = 1; return 1 }\na[i] += f()\n"
+         "print(a.stringify())\nprint(i)\nprint(cnt)\nprint(other.stringify())",
+         "[9223372036854775807,2]\n1\n1\n[9]\n-- exit 0\nerror: signed 64-bit integer overflow\n", session=True),
     case("compound_rhs_shrinks", "a := [1, 2]\nf := () => { a.pop(); return 5 }\na[1] += f()\nprint(a.stringify())",
          "-- exit 1\nerror: {name}:3:1: index out of range: 1\n"),
     # ---- aliases (B5) ----

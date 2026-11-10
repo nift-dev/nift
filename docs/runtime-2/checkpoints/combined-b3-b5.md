@@ -5050,3 +5050,65 @@ No production change. `src/` is unchanged since 28a6368b, and `nift` is still 81
     emit it. `tests/runtime2/b5` is not an inventory corpus. A fresh local `inventory.py collect`
     shows no sighting, and `--check` reports retired 0 seen.
   - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
+
+## 98. Owner ruling 20:11: D2 coverage, the escaped-ref invariant, the inference limit (C110, tests and docs)
+
+No production change. `src/` is unchanged since 28a6368b; `nift` is 8195f1b3….
+
+**1. Approved differences.** Both compound differences of section 97 are approved under D2 + owner
+16:35 Option C + owner 20:11 confirmation. They introduce no new rule:
+- the right-hand side replaces an intermediate container: the VM writes to the target it captured
+  first and never resolves the path again;
+- the right-hand side changes an index: `a[i] += (i = 1)` gives `[2,2]` on the VM and `[1,2]` on
+  legacy.
+
+compatibility.md and known-limitations.md cite that ruling. These are no longer owner items.
+
+**2. Coverage.**
+- `assign_family.py` gains eight `d2_*` cases, 94 cases in all. Each pins the exact output of both
+  engines.
+- Each case shows:
+  - **The rhs runs once:** `cnt` is 1 afterwards.
+  - **The pre-rhs element is used:** the rhs first writes 50 (or 40) into the old element, and the
+    result is computed from the value read before the rhs. In the array forms `row` ends as `[1,7]`
+    and `a` as `[2,2]`. In the object form `kept` ends as `[6,60]`.
+  - **No re-resolution:** the replacement container and the element at the new index are untouched;
+    the captured container is the one written.
+  - **Unrelated effects stay:** `other` becomes `[9]`.
+- The forms covered: container replacement with a `fn` callee, with a lambda, and in the object
+  form; index rebinding through `a[i]` and `g[i][i]`.
+- Three failing variants run as sessions, so execution continues after the error and the targets
+  can be printed:
+  - `/=` by zero after the rhs replaced `g[0]`;
+  - `%=` by zero after it replaced `o["m"]`;
+  - an overflow after it rebound `i`.
+
+  In each, the captured target is unchanged (`row` `[1,2]`, `kept` `[1,60]`, `a` unchanged), while
+  the rhs's own effects stay (`cnt` 1, `other` `[9]`, the replacement container, `i`).
+- Every case fails on exit 70, a signal, compiler-defect or internal text, or a nonzero
+  dispatch-defect count.
+- **Mutant `compound-path-reresolved`:** a sanctioned edit of `compiler_element_path.cpp` that
+  re-reads the root, the intermediate steps and the final key after the rhs (legacy's model). It
+  is caught by 18 cases: all five successful `d2_*` cases and every `order_compound_*` case. The
+  three failing variants cannot tell it apart, because the commit fails before any write either
+  way.
+- Assignment-family mutants: 16 of 16 caught.
+
+**3. The escaped-ref reproducer.**
+- The `print("start")` line added in C108 keeps the reproducer's original invariant: memory safety,
+  and exact pins on both engines.
+- The smoke now also runs the original program without the print, written with `printf` so that
+  rt-diff extracts it only once. It requires:
+  - the VM output to equal the pinned output after its first line (`1`, `2`, exit 0, empty stderr);
+  - legacy to fail with the same exit and `reference target no longer exists: c[0]` at the
+    original line, 6:7.
+- Both runs use the smoke's sanitizer settings. The receiver-rebinding cases (H-A/D2) and
+  escaped-ref (B5) are confirmed by the owner.
+
+**4. Inventory.**
+- `index-assign-target` and `compound-target` stay restored to `implement`, narrowed (section 97).
+- The refusal of `o["k"] = 5` followed by `o["m"]["x"] = 1` is documented as a checkpoint-1
+  limitation of the incomplete kind inference, not a permanent one. That is in known-limitations.md
+  and in the `type:element-assignment` row (still retired), so the rescan picks it up.
+- No inference change.
+- Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.

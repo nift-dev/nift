@@ -91,7 +91,7 @@ main ones:
   reads at the old key and writes at the new one. The same rule decides when the rhs replaces an
   intermediate container (`g[0][1] += f()` where `f` sets `g[0]`; the object form too; any callee)
   or rebinds the key inline (`a[i] += (i = 1)`): the VM writes the container and key it read
-  first, legacy the new ones (D2, owner 16:35; compatibility.md). A path store or update reads its receiver first
+  first, legacy the new ones (D2 + owner 16:35 Option C + owner 20:11 confirmation; compatibility.md). A path store or update reads its receiver first
   for every callee (H-A D1.1, D2); its aliases, cycles, `const` and loop wording follow B5, Q2 B and
   D-018c.
 
@@ -101,7 +101,8 @@ name, an unsigned integer literal or a simple string literal (`a[i + 1][0] = v`,
 must be proved an array with a number key or an object with a string key (`type:element-assignment`
 otherwise): the kind inference merges a plain store's value (`o["k"] = 5`) into every member of the
 object it names, so a later path through another member of that object (`o["m"]["x"] = 1`) is
-refused; mixed operand kinds of a compound update are refused (`type:compound-assignment`). A future
+refused. This is a checkpoint-1 limitation of the incomplete kind inference, not a permanent rule
+(owner 20:11): it stays with the inference work for the inventory rescan; mixed operand kinds of a compound update are refused (`type:compound-assignment`). A future
 stored through a path stays refused (`coro-future-flow:Assign`).
 
 ## Other refusals

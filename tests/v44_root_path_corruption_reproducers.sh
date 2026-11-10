@@ -140,6 +140,21 @@ if [[ $rc -ne 0 ]] || [[ "$(cat "$T/out")" != "start
 if [[ $lrc -ne 1 ]] || [[ "$(cat "$T/lout")" != "start" ]] || ! grep -q 'escaped.f:7:7: reference target no longer exists: c\[0\]' "$T/lerr"; then
   fail "escaped-ref: legacy exit $lrc: $(cat "$T/lout" "$T/lerr")"
 fi
+# Owner 20:11: the added first line keeps the reproducer's invariant. The original program (without
+# the print, written with printf so rt-diff does not extract it twice) gives the same pins after the
+# first line on both engines, and runs clean under the same sanitizer settings as the rest.
+printf '%s\n' 'a := {"x": [[1],[2]]}' 'b := a.x' 'c := b[0]' 'e := a.x[1]' 'a["x"] = []' 'print(c[0])' \
+  'print(e[0])' >"$T/escaped_orig.f"
+set +e
+"$NIFT" "$T/escaped_orig.f" >"$T/oout" 2>"$T/oerr"; orc=$?
+NIFT_VM=0 "$NIFT" "$T/escaped_orig.f" >"$T/olout" 2>"$T/olerr"; olrc=$?
+set -e
+if [[ $orc -ne 0 ]] || [[ "$(cat "$T/oout")" != "$(tail -n +2 "$T/out")" ]] || [[ -s "$T/oerr" ]]; then
+  fail "escaped-ref invariant: VM without the print exit $orc: $(cat "$T/oout" "$T/oerr")"
+fi
+if [[ $olrc -ne $lrc ]] || [[ -s "$T/olout" ]] || ! grep -q 'escaped_orig.f:6:7: reference target no longer exists: c\[0\]' "$T/olerr"; then
+  fail "escaped-ref invariant: legacy without the print exit $olrc: $(cat "$T/olout" "$T/olerr")"
+fi
 
 # Reference created inside a loop scope escapes and stays live after the scope.
 cat >"$T/scope.f" <<'F'
