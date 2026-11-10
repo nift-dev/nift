@@ -48,6 +48,8 @@ fail=0
 for n in "${list[@]}"; do
   src=${FILE[$n]}; obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
   $CXX $CPPFLAGS $CXXFLAGS -DNIFT_REFSEM_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant $n: build failed"; exit 2; }
+  # C80-L2 (combined-b3-b5.md section 79): the mutant object must differ from production.
+  if cmp -s "$mobj" "$obj"; then echo "mutant $n: compiles to the production $obj (a compiled-out hook)"; exit 2; fi
   link=$(printf '%s\n' $objects | grep -vx "$obj" | grep -v '\.a$' | tr '\n' ' ')
   libs=$(printf '%s\n' $objects | grep '\.a$' | tr '\n' ' ')
   $CXX $CXXFLAGS $link "$mobj" -ldl $libs -o "$OUT/nift-$n" || { echo "mutant $n: link failed"; exit 2; }

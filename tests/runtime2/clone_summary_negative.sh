@@ -20,7 +20,7 @@ echo "control: PASS ($(tail -n 1 "$TMP/control.log"))"
 
 # site: source file, function whose copy_summary call is removed
 SITES="object_shallow_clone:src/rt/aggregate.cpp array_shallow_clone:src/rt/aggregate.cpp collection_shallow_clone:src/rt/aggregate_collection.cpp"
-caught=0 total=0 missed_required=""
+caught=0 total=0 missed_required="" escaped=""
 for site in $SITES; do
   fn=${site%%:*} src=${site#*:}
   obj=${src%.cpp}.o
@@ -43,19 +43,29 @@ PY
          $LDLIBS -o "$TMP/$fn/nift"; then
     echo "FAIL: could not build the $fn mutant (harness error, not a detection)" >&2; exit 1
   fi
+  # C80-L2: the mutant object must differ from production (a compiled-out removal is a harness error).
+  if cmp -s "$TMP/$fn/mutant.o" "$obj"; then
+    echo "FAIL: the $fn mutant compiles to the production $obj (harness error, not a detection)" >&2; exit 1
+  fi
   if python3 -B tests/runtime2/cycle_refusal_routes.py --nift "$TMP/$fn/nift" > "$TMP/$fn/log"; then
     echo "SURVIVED $fn without copy_summary: every cycle route still refused"
     [ "$fn" = array_shallow_clone ] || missed_required="$missed_required $fn"
   else
     caught=$((caught + 1))
+    # C79-L1: the array clone is an internal snapshot, never stored, so its summary is never read and
+    # its mutant must survive. A route that catches it means a script can now reach (store) a snapshot.
+    [ "$fn" = array_shallow_clone ] && escaped="$escaped $fn"
     echo "caught $fn without copy_summary: $(grep '^FAIL ' "$TMP/$fn/log" | grep -vc 'cycle refusal routes:') route(s) fail ($(grep '^FAIL ' "$TMP/$fn/log" | grep -v 'cycle refusal routes:' | head -3 | awk '{print $2}' | tr '\n' ' '))"
   fi
   rm -f "$TMP/$fn/nift" "$TMP/$fn/mutant.o"
 done
-# array_shallow_clone is only an internal snapshot (no script can store its result): its mutant is
-# expected to survive and is reported, not required (combined-b3-b5.md section 68).
+# array_shallow_clone is only an internal snapshot (no script can store its result): its mutant must
+# survive (combined-b3-b5.md sections 68 and 79, C79-L1); the other two must be caught.
 echo "clone-summary mutants: $caught of $total caught"
 if [ -n "$missed_required" ]; then
   echo "FAIL: a clone that escapes to scripts lost its cycle summary undetected:$missed_required"; exit 1
+fi
+if [ -n "$escaped" ]; then
+  echo "FAIL: the internal array snapshot reached a stored value (its copy_summary mutant was caught):$escaped"; exit 1
 fi
 echo "negative-control: PASS"

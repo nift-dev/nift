@@ -3749,6 +3749,11 @@ and none is today.
   - Covering each needs a parser for its script, which was not done here.
   - Each family's own harness requires its mutants to be caught, so a compiled-out hook shows
     there as a surviving mutant, though without naming the cause.
+  - Addendum (review of C79–C82, C80-L1; section 79): REFSEM is also wired in the Makefile, not
+    only in its scripts. `RT_REFREP_MUTANTS` (`test-rt-refrep-mutants`) builds 21 and 24–31, and
+    `stale-vm-r19` builds 19, by compiling aggregate.cpp and aggregate_collection.cpp, the units that
+    include `aggregate_store.h`, with `-DNIFT_REFSEM_MUTANT=19`. `refsem/mutants.sh` builds 1–16,
+    21–23 and 31, and `rt/isolation/run.sh` uses 26 as an isolation-guard plant.
 - **Makefile rule families the generic extractor already reads, with no finding** (not added to
   the gate): R1, KIND, CP21_D2, CP21_D3, INVENTORY, INVENTORY_HOST.
 - **Not readable by the generic extractor:**
@@ -4128,3 +4133,49 @@ owner-approved B5 semantic difference.
   - A planted `"\x1fnift:file:"` in another file is still flagged.
   - `make test-rt-handles` PASS.
 - No production change: `nift` is f063f1a9….
+
+## 79. Repair batch: the Lows of the review of C79–C82 (C91, tests, comments and record)
+
+- **C79-L1: the array clone's "internal snapshot, never stored" rule is enforced structurally.**
+  - **Comments.** Each `array_shallow_clone` caller now says so in a trailing comment on the call
+    line, so no line moves. The three callers are `vm_array_mutation.cpp:75`,
+    `collection_helpers.cpp:177` and `vm_iter.cpp:52`; the declaration's comment in `aggregate.h:50`
+    is changed too. `make nift` after the edits gives the same binary, `nift` f063f1a9…, and
+    `test-rt-lint` passes (line length included).
+  - **The negative control requires survival.** `clone_summary_negative.sh` now fails when the
+    `array_shallow_clone` mutant (its `copy_summary` call removed) is **caught**: a route catching
+    it would mean a script can reach and store a snapshot. The other two clone mutants must still be
+    caught.
+  - Each mutant object must differ from the production object (C80-L2).
+  - Result: control PASS, 21 routes; `object_shallow_clone` and `collection_shallow_clone` caught;
+    `array_shallow_clone` SURVIVED, as required; negative-control PASS.
+- **C79-L2: deepcopy routes for arrays and objects.**
+  - `cycle_refusal_routes.py` gains `deepcopy-array`
+    (`arr := [[1]]; c := deepcopy(arr); x := c[0]; x.push(c)`) and `deepcopy-object` (the same
+    with `{"k": [1]}`).
+  - These reach copy_graph's per-value marking (`note_store`, through
+    `Construction::array_push` / `object_set`).
+  - Both are refused on the VM with `runtime.reference_cycle`, the length unchanged. Legacy's
+    copy prints `2` (pinned).
+  - 21 routes, 0 failures.
+  - No copy_graph-specific mutant was built for them: the routes were added as the review asked.
+- **C80-L1:** section 69 records REFSEM's Makefile wiring:
+  - `RT_REFREP_MUTANTS` (`test-rt-refrep-mutants`): 21 and 24–31;
+  - `stale-vm-r19`: 19, through aggregate.cpp and aggregate_collection.cpp.
+
+  The addendum sits beside the family list.
+- **C80-L2: the C75 check on the script-wired families.**
+  - Each mutant object is compared with its production object:
+    - the six per-number scripts that compile `$src` into `$mobj` with `-DNIFT_*_MUTANT=$n` (`b3`,
+      `b4`, `b4b`, `refsem`, `collections`, `safety`);
+    - the Makefile's `test-rt-refrep-mutants` loop;
+    - the clone-summary negative control;
+    - every sanctioned build (section 75).
+  - An identical object stops the family with exit 2 ("a compiled-out hook").
+  - These scripts compile without `PRODUCTION_GUARD`. The guard only defines a macro, so that
+    makes no difference to the bytes: `vm_ops`, `aggregate` and `collection_helpers` compiled
+    without it are byte-identical to production. The comparison is therefore meaningful.
+  - Results: `test-rt-refrep-mutants` 9 of 9 caught; `test-runtime2-collections-mutants` PASS.
+  - The other four families' full runs are long and were not repeated here. Their edit is the same
+    line, which can only add a failure; they run in certification.
+- Production source: comments only. `nift` is f063f1a9… before and after.

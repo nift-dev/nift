@@ -66,6 +66,8 @@ signals() {  # signals N: build mutant N (0 = unmutated) and run every signal; s
     for src in ${FILES[$n]}; do
       obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
       $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4B_MUTANT=$n -c "$src" -o "$mobj" || die "mutant A$n: build failed"
+      # C80-L2 (combined-b3-b5.md section 79): the mutant object must differ from production.
+      if cmp -s "$mobj" "$obj"; then echo "mutant A$n: compiles to the production $obj (a compiled-out hook)"; exit 2; fi
       replaced+=("$obj"); built+=("$mobj")
     done
   fi

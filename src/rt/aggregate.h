@@ -47,7 +47,7 @@ std::size_t array_size(const Value& array);
 // below.
 
 Value make_object();
-// B2: a new outer array/object with the same elements (identity kept), O(n).
+// B2: a new outer array/object with the same elements (identity kept), O(n); arrays: snapshots only.
 Value array_shallow_clone(const Value& array);
 Value object_shallow_clone(const Value& object);
 std::size_t object_size(const Value& object);

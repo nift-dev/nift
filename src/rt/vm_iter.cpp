@@ -49,7 +49,7 @@ bool Vm::entry_snapshot(const Instr& in, Value& source, Fault& fault) {
     if (in.c == 0 || source.refcount() <= 1) return true;
     const bool array = source.is(Kind::Array);
     if (!reserve_snapshot(array ? array_size(source) : object_size(source), !array, fault)) return false;
-    source = source.is(Kind::Array) ? array_shallow_clone(source) : object_shallow_clone(source);
+    source = source.is(Kind::Array) ? array_shallow_clone(source) : object_shallow_clone(source);  // never stored
     return memory_ok(fault);
 }
 

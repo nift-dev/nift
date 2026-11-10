@@ -542,6 +542,7 @@ test-rt-refrep-production: $(TARGET) $(SHARED_LIB) $(RT_REFREP_DIR)/refrep-vm$(E
 test-rt-refrep-mutants: test-rt-refrep
 	@for pair in $(RT_REFREP_MUTANTS); do n=$${pair%%:*}; src=$${pair#*:}; obj=$${src%.cpp}.o; \
 		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_REFSEM_MUTANT=$$n -c $$src -o "$(RT_REFREP_DIR)/m$$n.o" || exit 2; \
+		! cmp -s "$(RT_REFREP_DIR)/m$$n.o" "$$obj" || { echo "FAIL refrep mutant $$n: compiles to the production $$obj (C80-L2)"; exit 2; }; \
 		objs=$$(printf '%s\n' $(RT_REFREP_OBJECTS) | grep -vx "$$obj"); \
 		$(CXX) $(CXXFLAGS) $(RT_REFREP_DIR)/refrep_vm.o $$objs "$(RT_REFREP_DIR)/m$$n.o" $(LDLIBS) \
 			-o "$(RT_REFREP_DIR)/refrep-m$$n$(EXEEXT)" || exit 2; \

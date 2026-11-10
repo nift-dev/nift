@@ -69,6 +69,8 @@ for n in "${list[@]}"; do
   fi
   src=${FILE[$n]}; obj=${src%.cpp}.o; mobj=$OUT/m$n-$(basename "$obj")
   $CXX $CPPFLAGS $CXXFLAGS -DNIFT_B4_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant A$n: build failed"; exit 2; }
+  # C80-L2 (combined-b3-b5.md section 79): the mutant object must differ from production.
+  if cmp -s "$mobj" "$obj"; then echo "mutant A$n: compiles to the production $obj (a compiled-out hook)"; exit 2; fi
   link_nift "$obj" "$mobj" "$OUT/nift-$n" || { echo "mutant A$n: link failed"; exit 2; }
   ulink=$(printf '%s\n' $unit_objects | grep -vx "$obj" | grep -v '\.a$' | tr '\n' ' ')
   ulibs=$(printf '%s\n' $unit_objects | grep '\.a$' | tr '\n' ' ')

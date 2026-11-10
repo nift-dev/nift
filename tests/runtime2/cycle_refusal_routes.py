@@ -51,6 +51,13 @@ ROUTES = {
     # copy() of an object and an array (copy_graph's shallow copy).
     "copy-object": ('arr := [1]\no := {"a": arr}\nc := copy(o)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
                     'print(arr.length())\n', 1, "2\n"),
+    # Review of C79-C82, C79-L2: deepcopy() of an array and of an object fills the copies through
+    # Construction::array_push / object_set (copy_graph), whose per-value marking (note_store) the
+    # deepcopy-map route does not reach: the copy's inner array must know it is held by the copy.
+    "deepcopy-array": ('arr := [[1]]\nc := deepcopy(arr)\nx := c[0]\ntry { x.push(c) } catch (e) { print(e.code) }\n'
+                       'print(x.length())\n', 1, "2\n"),
+    "deepcopy-object": ('o := {"k": [1]}\nc := deepcopy(o)\nx := c["k"]\ntry { x.push(c) } catch (e) { print(e.code) }\n'
+                        'print(x.length())\n', 1, "2\n"),
     "copy-array": ('arr := [1]\nouter := [arr]\nc := copy(outer)\ntry { arr.push(c) } catch (e) { print(e.code) }\n'
                    'print(arr.length())\n', 1, "2\n"),
     # array_shallow_clone is only an internal snapshot (for-loop source, sort keys and source): the

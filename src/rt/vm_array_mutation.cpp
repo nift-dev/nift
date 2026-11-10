@@ -72,7 +72,7 @@ bool Vm::op_array_mutate(const Instr& in,Value* R,Fault& fault,const Proto* prot
                 if(in.c==2&&s[Keys].is_heap()&&s[Keys].heap()==s[Source].heap()){
                     if(!mutation::reserve(heap_limit_,n*sizeof(Value)+128))
                         return raise(fault,StopReason::Internal,"memory budget exceeded");
-                    s[Keys]=array_shallow_clone(s[Keys]);}
+                    s[Keys]=array_shallow_clone(s[Keys]);}  // internal snapshot; never stored (C79-L1)
                 out=mutation::Protocol::splice_remove(s[Source],index,count,in.c==2?&s[Keys]:nullptr,&s[Result],env);
             } else {
                 index=static_cast<std::size_t>(s[Index].as_int());

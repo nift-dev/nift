@@ -42,6 +42,8 @@ fail=0
 for n in "${list[@]}"; do
   src=${FILE[$n]}; obj=${src%.cpp}.o; mobj=$OUT/s$n-$(basename "$obj")
   $CXX $CPPFLAGS $CXXFLAGS -DNIFT_SAFETY_MUTANT=$n -c "$src" -o "$mobj" || { echo "mutant S$n: build failed"; exit 2; }
+  # C80-L2 (combined-b3-b5.md section 79): the mutant object must differ from production.
+  if cmp -s "$mobj" "$obj"; then echo "mutant S$n: compiles to the production $obj (a compiled-out hook)"; exit 2; fi
   extra=""; skip="$obj"
   if [ -n "${WITH_A9[$n]:-}" ]; then
     extra=$OUT/a9-compiler_interp.o; skip="$obj|src/rt/compiler_interp.o"

@@ -174,7 +174,7 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
         // not reach the active iteration (O(n) when shared, budget first).
 #if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 28)
         if(s[Source].refcount()>1){if(!budget(context,n*sizeof(Value)+128,fault))return false;
-            s[Source]=array_shallow_clone(s[Source]);}
+            s[Source]=array_shallow_clone(s[Source]);}  // internal snapshot; never stored (C79-L1)
 #endif
         if(core(method)&&!s[Callback].is(Kind::Function))return error(fault,
             "transformation: callback must be callable");
