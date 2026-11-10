@@ -1520,6 +1520,13 @@ test-runtime2-host-memory: $(TARGET)
 test-runtime2-module-host-order-mutant: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/module_host_order_mutant.sh
 
+# Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
+# refused cleanly and deterministically under the VM default, and still runs on legacy.
+.PHONY: test-runtime2-named-deferrals
+test-runtime2-named-deferrals: $(TARGET)
+	$(PYTHON) tests/runtime2/named_deferrals.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-named-deferrals
+
 .PHONY: test-rt-host-sources-list
 test-rt-host-sources-list:
 	@expected="$$(printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort)"; \

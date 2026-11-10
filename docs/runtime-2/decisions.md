@@ -1999,3 +1999,30 @@ owner-approved; no guard changes).** Amends round 3 above (kept as written).
 - **Pre-existing, reported.** Presenting a `mutex()` or `channel()` value
   (alone or in a container) stops after output with an internal failure on
   weekend/r2 as well; not part of this change.
+
+## D-065 — Named release deferrals (owner, 2026-11-10 13:26)
+
+The owner approved these deferrals by name for the initial Runtime 2.0 release. Each one is a VM
+limitation, not a removed feature. Under the VM default (`NIFT_VM` unset), a program that uses one
+is refused before any part of it runs, with `not compiled for the VM (<reason>)`, and is never
+silently run on legacy. The legacy interpreter (`NIFT_VM=0`) keeps running these constructs as
+before. `make test-runtime2-named-deferrals` (tests/runtime2/named_deferrals.py) pins every
+refusal and the legacy channel.
+
+1. **Delayed imports inside functions** (`fn(f()) { import("./m.f"); … }`, reason
+   `import-nested`). Top-level, relative, chained and package imports run on the VM. Only an import
+   executed inside a function body is deferred. It needs run-time module loading with D-041's
+   initialise-once identity and package ownership checks.
+2. **`run()` and `cmd()`** (process execution: `callable:run`, `callable:cmd`, and their handle
+   methods such as `method:run` and `method:pipe`). This keeps the earlier release-scope decision
+   that b5-refsem.md cites. That decision had no decisions.md entry until now. D-029, D-030 and
+   D-034 continue to define the legacy behaviour.
+3. **VM-native FFI** (`ffi_open` and the FFI calls: `callable:ffi_open`). FFI keeps working on
+   legacy and on non-VM paths (docs/ffi.md, D-036).
+4. **VM-native timers** (`timer()` and its handle methods: `callable:timer`, `method:start`,
+   `method:stop`, `method:elapsed`, …). Timers keep working on legacy.
+5. **`project_root()`** (`callable:project_root`), with CP24 under D-053. Project builds keep
+   using the retained renderer and legacy scripting.
+
+They are recorded in the CP25-R inventory (tests/runtime2/cp25/classification.tsv, status
+`deferred-named`) and in docs/runtime-2/known-limitations.md.

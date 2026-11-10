@@ -4392,3 +4392,38 @@ owner-approved B5 semantic difference.
   number-literal, prepared-unpreparable, type:element-assignment.
 - The full PENDING-OWNER list (146, the 25 above included) is the `status` column of
   `tests/runtime2/cp25/classification.tsv`.
+
+## 87. Owner 13:26, item 7: the named deferrals are recorded and gated (C99, docs and tests)
+
+- **decisions.md D-065** (2026-11-10) records the five deferrals the owner approved by name:
+  - delayed imports inside functions;
+  - `run()` and `cmd()`, keeping the earlier release-scope decision, which had no decisions.md
+    entry until now;
+  - VM-native FFI;
+  - VM-native timers;
+  - `project_root()`, with D-053.
+
+  Each is stated as a VM limitation: legacy (`NIFT_VM=0`) keeps running it, and FFI keeps working
+  on legacy and non-VM paths.
+- **`docs/runtime-2/known-limitations.md`** (new) covers:
+  - how a refusal behaves;
+  - the named deferrals, with their reasons and what still runs them;
+  - the four approved refusals, including plain `@fn`: the explicit legacy/VM difference (legacy
+    accepts it; the owner declined the legacy-side rejection);
+  - the approved semantic differences, which it summarises and links to compatibility.md as the
+    authority;
+  - the inventory statuses.
+- **The CP25-R inventory:** 17 rows have status `deferred-named` (section 86):
+  - import-nested;
+  - callable:run, callable:cmd, method:run, method:pipe;
+  - callable:ffi_open, ffi_call, ffi_callback, ffi_close;
+  - callable:timer and the timer methods;
+  - callable:project_root.
+- **The gate:** `make test-runtime2-named-deferrals` (`tests/runtime2/named_deferrals.py`, on the
+  `test-rt-vm` edge). For each construct it requires, under the VM default:
+  - exit 1, no stdout, `not compiled for the VM (<reason>)` and the "no part of it ran" note;
+  - statistics with that reason and no VM or legacy execution (no silent fallback);
+  - the same result on a second run (deterministic).
+
+  It also requires the legacy channel to run the construct. Result: PASS, 6 constructs.
+- Every deferred construct is currently refused cleanly. None needed reporting.
