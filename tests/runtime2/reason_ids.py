@@ -13,9 +13,14 @@ here as `./`):
   (c) `x := async(f)`
       before: error: ./main.f:2:6: not compiled for the VM (async(callable, ...) was removed; declare an async function/lambda and call it directly): a language feature is not supported by the Runtime 2.0 VM yet
       after:  error: ./main.f:2:6: not compiled for the VM (removed-builtin:async): a language feature is not supported by the Runtime 2.0 VM yet
+      session (`nift -i`), before: error: <stdin>:2:6: NIFT_VM session refused: async(callable, ...) was removed; declare an async function/lambda and call it directly: a language feature is not supported by the Runtime 2.0 VM yet
+                           after:  error: <stdin>:2:6: NIFT_VM session refused: removed-builtin:async: a language feature is not supported by the Runtime 2.0 VM yet
       `x := await(f())`
       before: error: ./main.f:2:6: not compiled for the VM (await(...) was removed; use 'await future' or 'await async_fn(args)'): a language feature is not supported by the Runtime 2.0 VM yet
       after:  error: ./main.f:2:6: not compiled for the VM (removed-builtin:await): a language feature is not supported by the Runtime 2.0 VM yet
+      session (`nift -i`, `fn(f()) { return 1 }` / `x := await(f())`; an async callee is refused as session:coroutine first),
+      before: error: <stdin>:2:6: NIFT_VM session refused: await(...) was removed; use 'await future' or 'await async_fn(args)': a language feature is not supported by the Runtime 2.0 VM yet
+      after:  error: <stdin>:2:6: NIFT_VM session refused: removed-builtin:await: a language feature is not supported by the Runtime 2.0 VM yet
 
 The three note lines after the first line, stdout (empty) and the exit status (1) are unchanged, and
 NIFT_VM_STATS records the new id. Legacy's own messages are not touched.
@@ -46,6 +51,15 @@ SCRIPTS = [
      "main.f:2:6: not compiled for the VM (removed-builtin:async): " + FEATURE_TEXT),
     ("removed-builtin-await", "removed-builtin", "fn[async](f()) { return 1 }\nx := await(f())\n",
      "removed-builtin:await", "main.f:2:6: not compiled for the VM (removed-builtin:await): " + FEATURE_TEXT),
+]
+SESSIONS = [
+    # (case, group, stdin of `nift -i`, expected first stderr line)
+    ("type-mul-session", "type-mul", 'print("a" * 1)\n',
+     "error: <stdin>:1:7: NIFT_VM session refused: type:mul: " + TYPE_TEXT),
+    ("removed-builtin-async-session", "removed-builtin", "fn(f()) { return 1 }\nx := async(f)\n",
+     "error: <stdin>:2:6: NIFT_VM session refused: removed-builtin:async: " + FEATURE_TEXT),
+    ("removed-builtin-await-session", "removed-builtin", "fn(f()) { return 1 }\nx := await(f())\n",
+     "error: <stdin>:2:6: NIFT_VM session refused: removed-builtin:await: " + FEATURE_TEXT),
 ]
 OLD_IDS = ["(type:*)", "async(callable, ...) was removed", "await(...) was removed"]
 
@@ -88,14 +102,16 @@ def main():
                         pass
             if reason not in seen:
                 failures.append((case + "-stats", group, "NIFT_VM_STATS reasons %r, want %r" % (seen, reason)))
-    with tempfile.TemporaryDirectory(prefix="reason-ids-") as d:
-        p = subprocess.run([nift, "-i"], cwd=d, env=env_for(d), input='print("a" * 1)\n', capture_output=True,
-                           text=True, timeout=60)
-        first = p.stderr.split("\n")[0]
-        want = "error: <stdin>:1:7: NIFT_VM session refused: type:mul: " + TYPE_TEXT
-        if first != want or p.stdout != "":
-            failures.append(("type-mul-session", "type-mul", "first line %r stdout %r, want %r" %
-                             (first, p.stdout, want)))
+    for case, group, src, want in SESSIONS:
+        with tempfile.TemporaryDirectory(prefix="reason-ids-") as d:
+            p = subprocess.run([nift, "-i"], cwd=d, env=env_for(d), input=src, capture_output=True, text=True,
+                               timeout=60)
+            first = p.stderr.split("\n")[0]
+            if first != want or p.stdout != "" or p.returncode != 1:
+                failures.append((case, group, "exit %d first line %r stdout %r, want %r" %
+                                 (p.returncode, first, p.stdout, want)))
+            if any(old in p.stderr for old in OLD_IDS):
+                failures.append((case + "-old-id", group, "an old reason id is still shown: %r" % p.stderr[:300]))
     if a.mutant is None:
         for case, _, why in failures:
             print("FAIL reason ids: %s: %s" % (case, why))

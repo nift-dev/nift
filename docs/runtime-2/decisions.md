@@ -2124,17 +2124,20 @@ Each item is cited in the CP25-R inventory as "D-067 #n (owner 2026-11-11 02:53)
 
 The owner's rulings on the 11 decisions of docs/runtime-2/checkpoints/dead-code-admission.md (C118-C121, final
 review REVIEW-C120) and rescan-post-cp1.md. Each item is cited in the CP25-R inventory as "D-068 #n (owner
-2026-11-11 05:41)". Slot 1 is authorised to start.
+2026-11-11 05:41)". Slot 1 is authorised to start. Items 1-11 are the 11 decisions; item 12 records the slot-1 scope.
 
 1. **Dead-code plan** (dead-code-admission.md at c15807c0): approved as **slot 3**, after the host guard. The
-   allow-listed rows are marked with their slot.
+   allow-listed rows are marked with their slot. The implementation preserves all six conditions of the soundness
+   review (dead-code-admission.md 5.7a); it stops for an owner decision if it needs substantial new compiler
+   architecture; the name scan covers struct field names explicitly (5.2, C121).
 2. **Host-import guard, Option A** (dead-code-admission.md 5.5, rescan-post-cp1.md section 11): approved as **slot 2**,
    about 150-220 lines of src, as reviewed: a leading import block in the entry; call-free, host-free module
    initialisation (with `import`/`export` exempt and non-host, callback-free natives allowed), checked transitively;
    **a permanent explicit classification of every built-in** as host or pure; **unknown effects are refused**; negative
    controls for host effects, callbacks and transitive imports.
 3. **Undefined-call deferral under full name certainty** (5.2): approved for slot 3, with the distinction between the
-   11 built-ins a binding of their name shadows in legacy and the 50 where the built-in wins kept.
+   11 built-ins a binding of their name shadows in legacy and the 50 where the built-in wins kept. Nift's actual
+   name-resolution rules are preserved; the complete name scan and its negative controls are mandatory.
 4. **Sessions stay conservative in this checkpoint:** session units do not defer. This is a scope boundary of the
    checkpoint, not a permanent rule. The start-up file of `nift -i script.f` must be classified correctly as a session
    unit.
@@ -2146,7 +2149,7 @@ review REVIEW-C120) and rescan-post-cp1.md. Each item is cited in the CP25-R inv
 7. **Positions of the five mixed rows** (`coro-future-flow:ForBinding`, `coro-future-flow:Throw`,
    `interpolation:non-scalar`, `type:member`, `type:script-return`): the precise positions are approved for their
    certain-type cases under D-067 #1, with positions and categories pinned. Their statuses stay PENDING-OWNER because of
-   the union gap.
+   the union gap. A change of position caused by unrelated compiler transformations remains a defect.
 8. **Ordinary-language coverage is slot 7:** `postfix-spelling`, `statement:Export`, `statement:FnDecl` (with
    `fn-redeclared` under "documented redeclaration behaviour") and `declare-const`. The checkpoint has four
    independently reviewed sub-changes and stops if nested functions need broad closure restructuring.
@@ -2156,8 +2159,29 @@ review REVIEW-C120) and rescan-post-cp1.md. Each item is cited in the CP25-R inv
 10. **`import-reinitialised`:** initialise-once per canonical module identity is the intended semantics; legacy does
     not change during this campaign. Recorded as an amendment to D-041 #2 (the VM's eventual initialise-once is an
     intentional difference; the removal condition is VM-only). A bounded VM correction is still to be investigated;
-    the row stays PENDING-OWNER.
+    the row stays PENDING-OWNER. Its tests must cover diamond imports, relative-path aliases of one module, repeated
+    imports, initialisation side effects and cycles; different files must not be conflated.
 11. **Slot order:** 1 infrastructure (inventory-infrastructure corrections); 2 host guard; 3 dead-code admission;
     4 CP2; 5 CP2b; 6 big-int conditions, destructuring, variadics; 7 ordinary-language coverage; 8 remaining bounded
     capabilities; then the async-memory safety checkpoint; then certification.
+12. **Slot 1 scope** (inventory-infrastructure corrections; authorised to start now). User-facing diagnostics are
+    preserved; classification completeness has negative controls; slot 2 does not begin until slot 1 is accepted. The
+    concrete scope, as approved (sources: #9 of the owner's 05:41 attachment and the integrator brief that relayed it):
+    a. the inventory tool's compile settings match real script runs (`cooperative_switches` in
+       refusal_inventory.cpp, as script_runner.cpp does), with the F12 rows that vanish retired, `method:join`'s
+       remaining sightings classified, and a mutant that reverts the limits;
+    b. the multiplication refusal `type:*` renamed to an unambiguous id (`type:mul`), `type:*` removed as a family
+       row (the family grouping covers only builtin-arity, builtin-receiver, method and callable), every `type:<op>`
+       reason with its own exact row and an unlisted one failing G1;
+    c. the two message-shaped reasons (`async(...)`/`await(...)` "was removed") replaced by stable ids
+       (`removed-builtin:async`, `removed-builtin:await`).
+    **Not approved:** renaming `non-transferable`, and the nesting-emitter rename (parser and compiler nesting limits).
+
+**Text completion (C124).** C122 recorded these rulings from the owner's 05:41 attachment (1120cc1e) without some of its
+text; the slot-1 review (REVIEW-C122-C123-SLOT1, finding 8) listed the omissions, which C124 adds above: in #1 the six
+review conditions, the architecture stop rule and the struct-field-name requirement; in #3 name-resolution
+preservation and the mandatory name scan and controls; in #7 the unrelated-transformation rule; in #10 the
+import-identity tests; and #12, the slot-1 scope. The owner's attachment numbers its items differently from this
+record (its #9 is the slot-1 scope and its #11 the `import-reinitialised` item); the tsv cites this record's
+numbering.
 

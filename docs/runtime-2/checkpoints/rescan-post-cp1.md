@@ -2281,7 +2281,19 @@ Program semantics do not change. The only user-visible change is the reason id i
     `builtin-receiver:join`, `coro-blocking-host:exists`/`file`/`rm`, `method:open`/`write`/`save`/`close`,
     `coro-observe:done`/`print`/`status`, `coro-struct`;
   - `coro-collection-callback`, which the corrected tool no longer emits on its probe (the reverted mutant does);
-  - `coro-main-cell`, emitted only when parallel tasks are off, so neither the corrected tool nor the runner can emit it.
+  - `coro-main-cell`, emitted only when parallel tasks are off.
+  - **Corrected in C124 (slot-1 review, finding 3).** Parallel tasks are also off under the non-contractual test
+    switch `NIFT_VM_COOPERATIVE_THREADS=1` (semantics.md:140, evidence only). With that switch the **real runner**
+    emits 8 of the retired reasons:
+    - `coro-observe:done`, `coro-observe:status`, `coro-observe:print`;
+    - `coro-blocking-host:exists` (review probe) and `coro-blocking-host:file` (C124 probe);
+    - `coro-struct`, `coro-collection-callback`, `coro-main-cell`.
+
+    With the default settings it emits none of them in any probed context. These rows are retired on that basis,
+    pending the owner's confirmation that the switch is not user-facing. If the owner treats it as user-facing, they
+    must not be retired. A collect run with the switch set would report "retired reason(s) seen again", which fails
+    safe. The C123 claims that "the real runner never refused with it" and that "neither the corrected tool nor the
+    runner can emit it" were wrong and are removed from the tsv.
 - **`method:join` stays E2+D, PENDING-OWNER.** Its 9 remaining sightings are classified in its row under their real
   families: auto.f and auto2.f are CP24 (`callable:build`/`status`/`project_root`, deferred-named), and ok.f is
   `lambda-variadic` (implement, slot 6).
@@ -2362,4 +2374,73 @@ Freeze gates (C123, every gate run, failures collected):
 | `make test-rt-builtins-guards` (callgrind) | PASS: 35 workloads, 0 guard failures |
 
 nift sha256 at the freeze: `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495` (changed from 8195f1b3..., as approved for slot 1).
+
+## 24. C124: slot-1 review evidence fixes (tsv, docs and tests only)
+
+The slot-1 review (REVIEW-C122-C123-SLOT1) verdict is ACCEPT, with evidence fixes. src/ is unchanged since dda4a0c8,
+and the nift sha256 is still `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495`. No status was changed.
+
+**Finding 3: the TRACE wording.** The 18 retirement TRACEs are rewritten (section 23, corrected). The false "never"
+claims are removed. The switch-emitted rows now say "emitted only under the non-contractual test switch
+NIFT_VM_COOPERATIVE_THREADS=1 (semantics.md:140); never with the default settings in any probed context; retired on
+that basis, pending the owner's confirmation that the switch is not user-facing".
+
+**Finding 4: per-row probes in six contexts.** Each retired row now records its probe in each context: script, imported
+module, session, loop-called function, uncalled function, uncalled lambda, and classify-all. Each context was run three
+ways: the VM by default, the VM with `NIFT_VM_COOPERATIVE_THREADS=1`, and legacy. Classify-all was run on the release
+binary and on the limits-reverted mutant. The probe record is the session scratch file `rescan/p13/probe18.json`.
+
+| Probe (rows) | Default VM: script / loop fn / uncalled fn / uncalled lambda | Module | Session | With the switch | Classify-all (mutant) |
+| --- | --- | --- | --- | --- | --- |
+| rt-diff-corpus async/fileops (`coro-blocking-host:exists`/`file`/`rm`, `method:open`/`write`/`save`/`close`) | runs, runs, runs, runs | coro-module-init-task | session:coroutine | coro-blocking-host:file | compiled (the 7 reasons) |
+| rt-diff-corpus async/thread (`callable:thread`) | runs x4 | coro-module-init-task | session:coroutine | coro-blocking-host:file | compiled (callable:thread, method:join) |
+| future observe (`method:done`, `method:status`, `coro-observe:done`, `coro-observe:status`) | runs x4 | coro-module-init-task | session:coroutine | coro-observe:done | compiled (5 reasons) |
+| async print (`coro-observe:print`) | runs x4 | coro-module-init-task | session:coroutine | coro-observe:print | compiled (coro-observe:print) |
+| smoke v45_threads handle-transfer (`builtin-arity:join`) | runs x4 | coro-module-init-task | **builtin-arity:join** | (as default) | compiled (builtin-arity:join, ...) |
+| thread array join (`builtin-receiver:join`) | runs x4 | coro-module-init-task | session:coroutine | runs | compiled (builtin-receiver:join, ...) |
+| struct to async (`coro-struct`) | runs x4 (legacy fails, see below) | coro-module-init-task | session:coroutine | coro-struct | compiled (coro-struct) |
+| collection callback (`coro-collection-callback`) | runs x4 | coro-module-init-task | session:coroutine | coro-collection-callback | compiled (coro-collection-callback) |
+| loop closure into async (`coro-main-cell`) | runs x4 | coro-module-init-task | session:coroutine | coro-main-cell (script), coro-capture (function contexts) | compiled (coro-main-cell) |
+
+Legacy completes every probe in every context (rc 0), except the struct-to-async probe in the script, module and
+loop-called contexts (below).
+
+**Two new findings, for the coordinator:**
+
+1. **`builtin-arity:join` is emitted by the real session runner with the default settings.**
+   - Program: `nift -i` with handle-transfer.f, where a thread joins a thread handle passed as a parameter
+     (`h.join()`). The VM gives `NIFT_VM session refused: builtin-arity:join` at line 2; legacy runs it.
+   - The retirement rule (section 9.5) counts sessions, so this row should not be retired. It belongs back at
+     PENDING-OWNER (E2, sessions).
+   - The status is left unchanged as instructed; its TRACE says so.
+2. **Outside slot 1: a struct instance passed to an async function.**
+   - Program: `struct(P) { v := 1 }` / `fn[async](af(p)) { return p.v }` / `print(await af(P()))`.
+   - The VM runs it and prints 1. Legacy fails with `async function argument contains a non-transferable resource`.
+   - This is a pre-existing class (iv)-style difference with no row. It is recorded here, and nothing was changed.
+
+**Finding 6: session forms pinned.** `tests/runtime2/reason_ids.py` now also pins the session forms of
+`removed-builtin:async` and `removed-builtin:await`:
+- `error: <stdin>:2:6: NIFT_VM session refused: removed-builtin:async: a language feature is not supported by the
+  Runtime 2.0 VM yet`, and the same with `removed-builtin:await`;
+- the "before" texts are verified on the mutant build;
+- an `await` of an async callee is refused as `session:coroutine` first, so the await case uses a plain callee.
+
+**Finding 8: D-068 completed** with the omitted owner text. The slot-1 scope is item 12; see decisions.md D-068 "Text
+completion (C124)".
+
+Gates at C124:
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS |
+| `make test-test-integrity` | clean |
+| `make test-runtime2-reason-ids` (with the session forms; both mutants; inventory families and its mutant) | PASS |
+| `make test-runtime2-inventory-limits` (and its mutant) | PASS |
+| `make test-runtime2-inventory-links` | PASS (10 cases; mutant detected 10/10) |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 138 reasons seen: approved 10, deferred-named 29, implement 27, PENDING-OWNER 72, retired 0 |
+| `make -q` | exit 0 (up to date), before and after |
+
+`git diff dda4a0c8 -- src/` is empty; nift sha256 `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495` (unchanged).
+The full test-rt-vm is not re-run (src unchanged).
 
