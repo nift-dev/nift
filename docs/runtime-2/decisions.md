@@ -861,6 +861,12 @@ nested and stateful imports, page-render isolation and rebuilds, in both
 engines; corpus and real-package gates preserved. No further module-design round
 unless implementation evidence raises a genuinely open question.
 
+**Amendment to #2 (owner 2026-11-11 05:41, D-068 #10).** Initialise-once per canonical module identity is the
+intended semantics. Legacy does not change during this campaign, so "both engines together" no longer applies to it:
+the VM's eventual initialise-once is an intentional difference from legacy, and the removal condition of the
+temporary `import-reinitialised` refusal is now VM-only (the VM implements initialise-once). A bounded VM correction
+is still to be investigated; the row stays PENDING-OWNER.
+
 ## D-042 — Shell file commands and exactly-once command dispatch (owner, 2026-10-20; CP19)
 
 Evidence: `checkpoints/shell-fs-commands-review.md` (branch `shell-fs-review`,
@@ -2113,3 +2119,45 @@ Each item is cited in the CP25-R inventory as "D-067 #n (owner 2026-11-11 02:53)
     Correct platform-conditional execution is a Runtime 2.0 requirement. The 00:29 early-refusal policy (D-013)
     applies to genuinely static errors only. The 321 class (ii) rows are reclassified under this rule
     (docs/runtime-2/checkpoints/dead-code-admission.md).
+
+## D-068 — Rulings on the dead-code plan, the host guard and the slot order (owner, 2026-11-11 05:41)
+
+The owner's rulings on the 11 decisions of docs/runtime-2/checkpoints/dead-code-admission.md (C118-C121, final
+review REVIEW-C120) and rescan-post-cp1.md. Each item is cited in the CP25-R inventory as "D-068 #n (owner
+2026-11-11 05:41)". Slot 1 is authorised to start.
+
+1. **Dead-code plan** (dead-code-admission.md at c15807c0): approved as **slot 3**, after the host guard. The
+   allow-listed rows are marked with their slot.
+2. **Host-import guard, Option A** (dead-code-admission.md 5.5, rescan-post-cp1.md section 11): approved as **slot 2**,
+   about 150-220 lines of src, as reviewed: a leading import block in the entry; call-free, host-free module
+   initialisation (with `import`/`export` exempt and non-host, callback-free natives allowed), checked transitively;
+   **a permanent explicit classification of every built-in** as host or pure; **unknown effects are refused**; negative
+   controls for host effects, callbacks and transitive imports.
+3. **Undefined-call deferral under full name certainty** (5.2): approved for slot 3, with the distinction between the
+   11 built-ins a binding of their name shadows in legacy and the 50 where the built-in wins kept.
+4. **Sessions stay conservative in this checkpoint:** session units do not defer. This is a scope boundary of the
+   checkpoint, not a permanent rule. The start-up file of `nift -i script.f` must be classified correctly as a session
+   unit.
+5. **The 10 S constructs are rejected even when unreachable** (a deliberate departure from legacy). `jump-outside-loop`
+   is S: `break`/`continue` with no lexically enclosing loop is a static error; a `break` inside a valid loop that never
+   runs is fine. S is not extended to run-time- or platform-dependent validity.
+6. **Uncertain types: conservative refusal.** The 19 mixed rows stay class (i) capability gaps; they are never narrowed
+   by the dead-code plan.
+7. **Positions of the five mixed rows** (`coro-future-flow:ForBinding`, `coro-future-flow:Throw`,
+   `interpolation:non-scalar`, `type:member`, `type:script-return`): the precise positions are approved for their
+   certain-type cases under D-067 #1, with positions and categories pinned. Their statuses stay PENDING-OWNER because of
+   the union gap.
+8. **Ordinary-language coverage is slot 7:** `postfix-spelling`, `statement:Export`, `statement:FnDecl` (with
+   `fn-redeclared` under "documented redeclaration behaviour") and `declare-const`. The checkpoint has four
+   independently reviewed sub-changes and stops if nested functions need broad closure restructuring.
+9. **Async self-recursion:** the VM meaning is conditionally approved. A separate safety checkpoint addresses the
+   task-memory defect; the CP23 qualification (`qualified:legacy-await-chain-defect`) stays open, and the row stays
+   PENDING-OWNER, pending that checkpoint.
+10. **`import-reinitialised`:** initialise-once per canonical module identity is the intended semantics; legacy does
+    not change during this campaign. Recorded as an amendment to D-041 #2 (the VM's eventual initialise-once is an
+    intentional difference; the removal condition is VM-only). A bounded VM correction is still to be investigated;
+    the row stays PENDING-OWNER.
+11. **Slot order:** 1 infrastructure (inventory-infrastructure corrections); 2 host guard; 3 dead-code admission;
+    4 CP2; 5 CP2b; 6 big-int conditions, destructuring, variadics; 7 ordinary-language coverage; 8 remaining bounded
+    capabilities; then the async-memory safety checkpoint; then certification.
+

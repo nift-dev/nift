@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117; reviews applied in C119-C120; tsv, docs and pinned tests only)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117 and D-068 in C122; reviews applied in C119-C121; tsv, docs and pinned tests only)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -6990,7 +6990,26 @@ Each retired row's probes were run under `NIFT_VM=classify-all` (non-consequenti
    - No implement row was added or removed; the 13:26 implement rows for checkpoints 2-5 stay implement (only the
      E1 narrowing of `compound-target`/`index-assign-target` changed scope).
 
-### 11. Host built-ins in programs with imports: root cause and repair (reviewer finding, PROPOSAL)
+### 11. Host built-ins in programs with imports: root cause and repair (APPROVED as slot 2, D-068 #2; design as reviewed)
+
+**Owner 2026-11-11 05:41 (D-068 #2):** Option A is approved as sequence slot 2, about 150-220 lines. **The approved
+design is the reviewed one, dead-code-admission.md section 5.5 (C120, REVIEW-C119 section 3 and REVIEW-C120):**
+
+- **E:** a leading import block in the entry; only `import(...)` statements precede the last import.
+- **M:** call-free, host-free initialisation of every module, checked transitively over the whole graph (diamonds
+  included).
+  - `import(...)`/`export(...)` are exempt.
+  - Non-host, callback-free natives are allowed.
+  - "Call" is any call node in init: interpolation, template text, literals, struct construction and callback
+    built-ins.
+  - A call named like one of the 11 binding-wins built-ins counts as a user call whenever the name is bound anywhere in
+    the program.
+- **H:** a **permanent explicit classification of every built-in** as host or pure, by a test that fails on any
+  unclassified `BuiltinId`. **Unknown effects are refused.**
+- **Negative controls** for host effects, callbacks and transitive imports, plus the mutants listed in 5.5.
+
+The text below is the original C114 reviewer proposal, kept for traceability. Where it differs (it allowed call-free
+declarations before the imports), the reviewed design governs.
 
 Recorded from the C114 confirmation review, Part 2. **A reviewer finding marked PROPOSAL, not a ruling.** The rescan did
 not investigate this family (owner 00:08); it records the raise site and representatives (section 1.1, rank 1).
@@ -7332,3 +7351,33 @@ blocking fix. Both C119 P1s are closed.
 | Blocking: struct fields | the name scan covers every field of every struct in every unit (with struct names and method names); plan test `sf2.f` (legacy prints 7; the VM refuses `struct-field-init` today, latent until CP2); mutant "name scan misses a struct field" |
 | Six conditions | recorded for the implementation checkpoint's review (dead-code-admission.md 5.7a): the session gate covers the `nift -i script.f` startup file; binding-wins names in module init count as user calls; `host_set_complete.py` classifies every BuiltinId; more `deferral_dependencies.py` contexts; "the ordinary error status (eval exits 2), never 70"; statement-prefixed and empty-after-prefix messages |
 | Note | `host_set_complete.py` is proposed, not committed |
+
+### 22. C122: owner rulings 2026-11-11 05:41 (D-068) applied (tsv, docs and one pinned test)
+
+decisions.md D-068 records the rulings. D-041 #2 gains the `import-reinitialised` amendment.
+
+| D-068 item | Applied to |
+| --- | --- |
+| #1 dead-code plan, slot 3 | 249 ALLOW-LISTED (ii) rows and 15 single-kind sub-cases marked "sequence slot 3"; statuses unchanged (the reachable case stays the 00:29 early refusal) |
+| #2 host guard (a), slot 2 | the 27 `module-host-op:*` rows cite the reviewed design; section 11 updated |
+| #3 undefined-call deferral | the 11 `callable:*` rows marked slot 3 under full name certainty; the builtin-arity free forms keep the 11-vs-50 precedence notes |
+| #4 sessions | scope boundary recorded (dead-code-admission.md header, 5.7a condition 1) |
+| #5 S | the 10 S rows confirmed; `jump-outside-loop` ruled S (C122 probes: a break in a never-running loop is fine) |
+| #6 uncertain types | the 19 mixed rows marked: stay (i), never narrowed |
+| #7 positions | the 5 mixed rows' certain-type positions approved under D-067 #1, recorded in each disposition and pinned by the new `tests/runtime2/precise_positions.py` (`make test-runtime2-precise-positions`, in `test-rt-vm`); statuses stay PENDING-OWNER |
+| #8 slot 7 | `postfix-spelling`, `statement:Export`, `statement:FnDecl`, `fn-redeclared`, `declare-const` relabelled from "remaining approved features" to slot 7 |
+| #9 async self-recursion | conditionally approved; safety checkpoint for the task-memory defect; CP23 qualification and its row (tests/runtime2/cp23/CP22-CLASSIFICATION.tsv `deep_chain.f`) unchanged, pending that checkpoint |
+| #10 `import-reinitialised` | D-041 #2 amendment; row note; stays PENDING-OWNER |
+| #11 slot order | recorded in D-068 |
+
+Gates at C122:
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS (31 cases) |
+| `make test-rt-lint` | PASS (0 problems in 710 files) |
+| `make test-test-integrity` | clean |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 155 reasons seen: approved 11, deferred-named 29, implement 27, PENDING-OWNER 88, retired 0 |
+| `make test-runtime2-precise-positions` (new) | PASS (5 rows) |
+
+Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.

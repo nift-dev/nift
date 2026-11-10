@@ -1,4 +1,4 @@
-# Dead-code admission (C118, revised in C119-C121)
+# Dead-code admission (C118, revised in C119-C121; owner rulings D-068 recorded in C122)
 
 Owner ruling 2026-11-11 02:53, D-067 #11. This ruling is a correction: Option A of rescan-post-cp1.md section 13.1 is
 withdrawn. The ruling says:
@@ -12,6 +12,34 @@ withdrawn. The ruling says:
   it is an ordinary error, never a silent legacy fallback.
 - Correct platform-conditional execution is a Runtime 2.0 requirement.
 - The 00:29 early-refusal policy (D-013) remains valid for genuinely static errors only.
+
+**Owner rulings 2026-11-11 05:41 (decisions.md D-068), recorded in C122.**
+
+- **The plan at c15807c0 is approved as sequence slot 3,** after the host guard (D-068 #1). The allow-listed rows carry
+  their slot in the tsv.
+- **Host guard Option A (5.5) is approved as slot 2,** about 150-220 lines (D-068 #2). It includes a permanent
+  explicit host/pure classification of every built-in, unknown effects refused, and negative controls for host
+  effects, callbacks and transitive imports.
+- **Undefined-call deferral under full name certainty is approved for slot 3** (D-068 #3), with the 11-vs-50 built-in
+  shadowing distinction kept.
+- **Sessions stay conservative in this checkpoint** (D-068 #4). This is a scope boundary of the checkpoint, not a
+  permanent rule. The start-up file of `nift -i script.f` must be classified correctly as a session unit (5.7a
+  condition 1).
+- **The 10 S constructs are rejected even when unreachable** (D-068 #5).
+  - `jump-outside-loop` is S: `break`/`continue` with no lexically enclosing loop is a static error.
+  - A `break` inside a valid loop that never runs is fine. C122 probes: `while (false) { break }` and a `continue` in a
+    `for` over an empty array print `n` on both engines.
+  - S is not extended to run-time- or platform-dependent validity.
+- **Uncertain types get the conservative refusal** (D-068 #6). The 19 mixed rows stay class (i) gaps and are never
+  narrowed.
+- **The five mixed rows' precise positions are approved for their certain-type cases** under D-067 #1 (D-068 #7). They
+  are pinned by `tests/runtime2/precise_positions.py`; the rows stay PENDING-OWNER.
+- **The slot order** is in D-068 #11: 1 infrastructure, 2 host guard, 3 dead-code admission, 4 CP2, 5 CP2b,
+  6 big-int conditions, destructuring and variadics, 7 ordinary-language coverage, 8 remaining bounded capabilities,
+  then the async-memory safety checkpoint, then certification.
+
+Section 7's owner items 1-7 and 9 are therefore decided. Item 8 (each 5.6 item) stays open. Item 10 (the D-067 #7
+slot label) is decided for the slot-7 rows only; the other "remaining approved features" rows keep their label.
 
 This document reclassifies the inventory under that rule and proposes a bounded implementation. **Nothing here is
 implemented. Section 5 is a PROPOSAL.**

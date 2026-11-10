@@ -1547,6 +1547,12 @@ test-rt-vm: test-runtime2-import-depth
 test-runtime2-deferral-dependencies: $(TARGET)
 	$(PYTHON) tests/runtime2/deferral_dependencies.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-deferral-dependencies
+
+# D-068 #7 (owner 2026-11-11 05:41): the five mixed rows' precise positions and categories.
+.PHONY: test-runtime2-precise-positions
+test-runtime2-precise-positions: $(TARGET)
+	$(PYTHON) tests/runtime2/precise_positions.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-precise-positions
 # Review of C83-C99, P1-1/P2-2 (combined-b3-b5.md section 89): the refusal helpers' negative controls.
 .PHONY: test-runtime2-approved-refusal-selftest
 test-runtime2-approved-refusal-selftest: $(TARGET)
