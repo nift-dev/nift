@@ -1,25 +1,26 @@
-# Post-checkpoint-1 inventory rescan (C111, repaired in C112, C113 and C114)
+# Post-checkpoint-1 inventory rescan (C111, repaired in C112-C115)
 
 Base: frozen checkpoint-1 candidate `0c66cad6` (owner 21:30: CHECKPOINT 1 ACCEPTED). C111 (`73886c2c`) was the
 rescan; its independent review came back NOT CONFIRMED (no P1; classifications, evidence and gate counts wrong).
 C112 repaired it; its confirmation review was again NOT CONFIRMED (a session-only retirement, rows missing for
 run-time-built reason names), and C113 repaired that; C114 makes the last repairs and adds the decision shape
-(section 1). nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4` is unchanged and
+(section 1); C115 applies owner rulings 00:08 and 00:29 and the C114 confirmation review. nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4` is unchanged and
 `git diff 0c66cad6 -- src/` is empty. Only `tests/runtime2/cp25/classification.tsv` and the docs change. Nothing
 is approved or deferred, and no rt-diff or pending rule is touched. **Every proposed disposition is a PROPOSAL;
 the owner decides the families.**
 
-## 1. How to read the 505 (decision shape)
+## 1. How to read the 535 (decision shape; the 505 of C113 plus later rows)
 
-C114 adds two rows (`type:for-source` restored, `coro-future-flow:Coalesce` new), so there are now 507 PENDING-OWNER
-and 23 implement rows: 530 in all. Every one carries exactly one outcome class at the start of its tsv disposition
+Row count: C113 had 505 PENDING-OWNER + 23 implement = 528; C114 added `type:for-source` (restored) and
+`coro-future-flow:Coalesce` (new): 530; C115 adds `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`,
+`session:opaque` and `difference:import-depth`: 512 PENDING-OWNER + 23 implement = 535 rows in all. Every one carries exactly one outcome class at the start of its tsv disposition
 (`outcome:i`, `outcome:ii-A`/`ii-B`/`ii-C`, `outcome:iii`, `outcome:D`, `outcome:E`), so this split can be recomputed from the tsv:
 
 - **(i)** the VM refuses a program legacy runs to completion: a real capability gap;
 - **(ii)** legacy also errors on the executed path; only the message, the position, the earlier output or the exit
   differ (because the VM refuses before running anything);
 - **(iii)** session-only;
-- **(iv)** the VM accepts where legacy errors: no rows (these are documented differences, not refusals);
+- **(iv)** the VM accepts where legacy errors: one row (`difference:import-depth`), plus documented differences;
 - **D** derivative; **E** test or inventory artefact (E1/E2).
 
 Method: the class comes from the row's recorded programs (tsv legacy column, C111-C114 probes, the rows.json evidence
@@ -27,93 +28,104 @@ runs), counting only a program on which the VM refuses with the row's own reason
 uncalled body's legacy exit. Rows without such a program were probed in C114 (36 programs). This independent split
 agrees with the confirmation review's approximate one; the differences are listed under the table.
 
-| Family | (i) | (ii) | (iii) | D | E | rows |
-| --- | --- | --- | --- | --- | --- | --- |
-| builtin-arity | 3 | 125 | 0 | 0 | 1 | 129 |
-| method (undefined or wrong-kind method) | 2 | 41 | 0 | 29 | 7 | 79 |
-| builtin-receiver | 0 | 77 | 1 | 0 | 1 | 79 |
-| callable (unbound callee) | 17 | 20 | 0 | 0 | 2 | 39 |
-| coroutines and coro-future-flow | 10 | 10 | 0 | 0 | 7 | 27 |
-| module-host-op (host op in a program with imports) | 27 | 0 | 0 | 0 | 0 | 27 |
-| syntax forms | 17 | 7 | 0 | 0 | 0 | 24 |
-| type:<op> and type checks | 2 | 16 | 0 | 2 | 0 | 20 |
-| static checks, const, interpolation | 2 | 15 | 0 | 0 | 0 | 17 |
-| structs | 8 | 7 | 1 | 1 | 0 | 17 |
-| context and prepared code | 8 | 6 | 0 | 0 | 0 | 14 |
-| built-in argument rules | 8 | 4 | 0 | 0 | 0 | 12 |
-| expression and statement forms | 7 | 1 | 0 | 2 | 0 | 10 |
-| dynamic scope and free names | 4 | 2 | 0 | 3 | 0 | 9 |
-| other (singles) | 5 | 1 | 0 | 0 | 2 | 8 |
-| exports and imports | 4 | 3 | 0 | 0 | 0 | 7 |
-| bytes | 4 | 0 | 0 | 1 | 0 | 5 |
-| variadics, spread, destructuring | 4 | 0 | 0 | 0 | 0 | 4 |
-| capacity limits | 3 | 0 | 0 | 0 | 0 | 3 |
-| **total** | **135** | **335** | **2** | **38** | **20** | **530** |
+| Family | (i) | (ii) | (iii) | (iv) | D | E | rows |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| builtin-arity | 5 | 123 | 0 | 0 | 0 | 1 | 129 |
+| method (undefined or wrong-kind method) | 2 | 41 | 0 | 0 | 29 | 7 | 79 |
+| builtin-receiver | 0 | 77 | 1 | 0 | 0 | 1 | 79 |
+| callable (unbound callee) | 17 | 20 | 0 | 0 | 0 | 2 | 39 |
+| coroutines and coro-future-flow | 10 | 10 | 0 | 0 | 0 | 7 | 27 |
+| module-host-op (host op in a program with imports) | 27 | 0 | 0 | 0 | 0 | 0 | 27 |
+| syntax forms | 19 | 5 | 0 | 0 | 0 | 0 | 24 |
+| type:<op> and type checks | 2 | 16 | 0 | 0 | 2 | 0 | 20 |
+| static checks, const, interpolation | 2 | 15 | 0 | 0 | 0 | 0 | 17 |
+| structs | 12 | 3 | 1 | 0 | 1 | 0 | 17 |
+| context and prepared code | 11 | 3 | 0 | 0 | 0 | 0 | 14 |
+| built-in argument rules | 11 | 1 | 0 | 0 | 0 | 0 | 12 |
+| other (singles) | 7 | 1 | 1 | 0 | 0 | 2 | 11 |
+| expression and statement forms | 7 | 1 | 0 | 0 | 2 | 0 | 10 |
+| dynamic scope and free names | 4 | 2 | 0 | 0 | 3 | 0 | 9 |
+| exports and imports | 4 | 3 | 0 | 1 | 0 | 0 | 8 |
+| bytes | 4 | 0 | 0 | 0 | 1 | 0 | 5 |
+| variadics, spread, destructuring | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| capacity limits | 4 | 0 | 0 | 0 | 0 | 0 | 4 |
+| **total** | **152** | **321** | **3** | **1** | **38** | **20** | **535** |
 
-Where this split differs from the review's:
-- `builtin-arity:contains` and `builtin-arity:set` are (ii): legacy errors `contains: expected one key/string`,
-  `set: expected key and value` (C114 probes); `keys`, `copy` (recorded oracle case copy-order: `copy(src(), dst())` in a
-  loop, legacy exit 0) and `move` (oracle case move-spread, legacy exit 0) are (i).
-- `context:number-to-int` is (ii): with 2.0 or 7 the VM runs; it refuses only where legacy errors (`to_int(2.5)`).
-- `text-type-name` was D; C114 found it on its own (`x := await` in a lambda body): G, (ii).
-- `coro-future-flow:Binary` is (i) (`g := f == f` on a future; legacy prints true), as are `:Coalesce` and `type:for-source`.
-- **Never-executed code**: every refusal also fires inside code legacy never runs (an uncalled function or lambda, an
-  untaken branch), where legacy then completes the program. That is the general effect of refusing before
-  execution, so (ii) is defined on the executed path; the (ii) mechanism decision below covers it.
+Changes in C115 (confirmation review P2-1, verified): 14 rows moved from (ii) to (i), because legacy runs the refused
+construct and the earlier probe's legacy error came from something downstream: `builtin-arity:entries`/`values`,
+`builtin-lazy-args:slice`, `builtin-default:get`, `builtin-literal-arg:validate`, `context:modulo-assignment`,
+`context:number-to-int` (C114 was wrong: `x := 3.5` then `y := x * 2` / `y.to_int()` in a loop prints 7 in legacy),
+`param-shadows-fn`, `struct-name`, `struct-nested`, `struct-redeclared`, `struct-member-clash` (legacy fails only when the
+struct is used); and, from the C115 corpus measurement, `prepared-decl-type` (call-locals-2000/4000/8000, official-bfs
+complete in legacy) and `opaque:legacy-runtime-error` (b4.f, s.f, names.f complete in legacy). This gives 149 rather
+than the review's 147; with the three new reachable rows, (i) is 152. Every remaining (ii) probe was re-run with the
+refused construct's result consumed by a plain assignment (`zz := X`, then `print("ok")`): legacy still errors at the
+refused construct in every one (288 programs; the other rows' construct is not a printed expression and was checked
+by position). `builtin-arity:contains`/`set` stay (ii); `keys`, `copy`, `move` are (i).
 
-**(iv), the VM accepts where legacy errors (no rows; documented differences):** async self-recursion (CP23
+**(iv), the VM accepts where legacy errors:** `difference:import-depth` (an import chain 33 to 63 modules deep runs on the VM;
+legacy fails at depth 33; C115 probe). Documented differences without rows: async self-recursion (CP23
 qualification `qualified:legacy-await-chain-defect`, deep_chain.f); a struct method named like a built-in, under D-009 #3;
 the B5 aliasing approvals (D-NEXT-refsem-b, Q3); B3's explicit `.stringify()` on a struct with its own method.
 
-**Class (ii) is not one mechanism (owner 00:08).** Every (ii) row was probed with its program and with the same
-program behind a first line `print("before")` (VM and legacy; C114, 335 rows): 
+### Governing policy for class (ii): early refusal (owner ruling 00:29)
+
+Rejecting a program before execution whenever the VM can determine that it will fail is the established Runtime 2.0
+design (D-013), not a new policy. Earlier error timing, and the absence of legacy's earlier output or side effects, are
+approved consequences. Case B stays B; case C covers only internal failures and genuinely different failure categories.
+The ruling applies only where the program contains an error that legacy also raises **at the same construct**; valid
+constructs the VM refuses stay capability gaps (class (i)); early detection does not excuse a wrong position; internal
+failures are not covered. The (ii) rows are tagged `outcome:ii-B, policy:early-refusal(D-013, owner 00:29)` and are
+closed under this policy as admission-timing findings, without individual approvals.
+
+**Why they stay PENDING-OWNER.** The policy covers programs that will fail. Every (ii) refusal also fires in code that
+never runs, where legacy completes the program (below). Until the owner rules on that dead-code question (section
+13.1), a (ii) row is not fully covered, so no status changes; nothing is approved.
 
 | Case | Definition | Rows |
 | --- | --- | --- |
 | ii-A | both engines reject before any side effect; only the wording differs | 0 |
-| ii-B | both reject, at different points: legacy runs the earlier statements (prints `before`), then raises its error; the VM refuses the whole program before execution | 335 |
-| ii-C | the VM gives an internal error or another failure category (exit 70, a compiler-defect message, a different exit) | 0 |
+| ii-B | both reject the same error, the VM earlier (approved timing, 00:29) | 321 |
+| ii-C | internal failure or a genuinely different failure category | 0 (no exit 70, no defect text, exit 1 on both engines in every probe) |
 
-As expected for a pre-execution admission refusal, every (ii) row is case B: no legacy error in this set is raised before
-execution (none rejects the `before` line). Exit codes agree (1 and 1) for all of them, and no VM run produced an internal
-error. Per row, the tsv tag records the failure category (legacy run-time error vs VM admission refusal, both exit 1),
-the source position (legacy and VM line:column) and the side effect (`before`, printed by legacy only).
+| Contract | Rows | Meets the 00:29 rule? |
+| --- | --- | --- |
+| B-same-position | 304 | yes for executed errors (wording and timing differ, as approved); the dead-code question remains |
+| B-different-position | 17 | only where the VM position is accepted: 7 marked "fix: take legacy's position", 10 "VM more precise" with a rationale (section 9.7) |
 
-**Diagnostic contracts.** The rows group into two uniform contracts:
+**Dead code (C115 measurement).** Each (ii) row's failing statements were wrapped in `if (false) { ... }` (declarations
+kept at top level), then `print("n")`: legacy completes every such program. The refusal still fires in 316 of the 321
+rows (313 with the generic wrapper, `jump-outside-loop`, `fn-called-before-declaration` and `opaque:struct-body` with a
+targeted probe): a static check. It does not fire for `coro-module-before-import` (a flow-sensitive check, effectively
+run-time ordering); `import-dynamic` in a dead block is refused as `import-nested` instead; for `import-limit`,
+`import-opaque:struct-body` and `import-opaque:legacy-runtime-error` the failing code is module initialisation, which
+always runs. **Corpus impact:** of the 94 corpus units (inventory corpora) whose first reason was a C114 (ii) reason, 7
+complete in legacy, all refused with `prepared-decl-type` or `opaque:legacy-runtime-error`, which C115 moves to (i); for
+the remaining 321 (ii) rows, 0 corpus programs contain such dead code.
 
-| Contract | Rows | Failure category | Position | Observable side effects | Meets the provisional rule? |
-| --- | --- | --- | --- | --- | --- |
-| B-same-position | 303 | legacy run-time error, VM admission refusal; exit 1 both | same line:column | lost (earlier output and effects do not happen) | **no** (side effects) |
-| B-different-position | 32 | as above | different (e.g. a nested call's position vs the statement's) | lost | **no** (position and side effects) |
-
-The owner's provisional rule (wording may differ; failure category, source position and observable side effects are
-preserved unless approved separately) is met by **no** (ii) row today, only because the VM refuses before execution.
-If "admission refusal" and "run-time error" are treated as different failure categories, all (ii) rows are also
-case C; with the exit-code definition used here they are B. The 32 different-position rows are listed in section 9.7.
-
-**Reading it.** The real gaps (135 rows, class (i)) fall into the families below; the 335 (ii) rows are diagnostic-
-compatibility decisions (section 13, heading 2).
+**Reading it.** The real gaps (152 rows, class (i)) fall into the families below; the 321 (ii) rows are governed by
+the early-refusal policy, subject to the dead-code and position questions (section 13.1).
 
 ### 1.1 Class (i) families ranked by ordinary-scripting impact
 
 | # | Family | (i) rows | Gates (cases) | Representative | Legacy / VM | PROPOSAL |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Host operations in any program with an import | 27: `module-host-op:arch`, `module-host-op:cat`, `module-host-op:cd`, `module-host-op:cp`, `module-host-op:env`, `module-host-op:epoch`, `module-host-op:exists`, `module-host-op:file`, ... | none of the re-run gates | `import("./m.f")` / `print(pwd())` | legacy prints the directory; VM `module-host-op:pwd` | raise site module_host_op.h:29 (`first_module_host_op`: the first host built-in CallNative in any proto of a program that has imports); one family, investigated by the reviewer during confirmation (owner 00:08) |
+| 1 | Host operations in any program with an import | 27: `module-host-op:arch`, `module-host-op:cat`, `module-host-op:cd`, `module-host-op:cp`, `module-host-op:env`, `module-host-op:epoch`, `module-host-op:exists`, `module-host-op:file`, ... | none of the re-run gates | `import("./m.f")` / `print(pwd())` | legacy prints the directory; VM `module-host-op:pwd` | root cause and the reviewer's bounded repair: section 11 (PROPOSAL); raise site script_runner.cpp:325-339 with module_host_op.h:29 (`first_module_host_op`) |
 | 2 | Postfix spellings | 1: `postfix-spelling` | test-v410-filesystem-recipe-parity 49, test-v48-prepared-collection-parity 2 | `m.set(k,v+1)` style spellings (filesystem-recipe) | legacy runs; VM `postfix-spelling` | admit the legacy spellings (implement row) |
-| 3 | Nested function declarations | 1: `statement:FnDecl` | none of the re-run gates | `fn(f()) { fn(g()) { return 1 } return g() }` / `print(f())` | legacy prints 1; VM `statement:FnDecl` | compile nested `fn` declarations (in functions, loops, ifs) as local function bindings |
+| 3 | Nested and redeclared function declarations | 2: `fn-redeclared`, `statement:FnDecl` | none of the re-run gates | `fn(f()) { fn(g()) { return 1 } return g() }` / `print(f())` | legacy prints 1; VM `statement:FnDecl` | compile nested `fn` declarations (in functions, loops, ifs) as local function bindings |
 | 4 | Safe navigation `?.` / `?[]` | 2: `expression:SafeIndex`, `expression:SafeMember` | none of the re-run gates | `o := {"a": 1}` / `print(o?.a)` | legacy prints 1; VM `expression:SafeMember` | compile SafeMember/SafeIndex as a null-checked member/index |
 | 5 | Irregular legacy parses | 2: `import-opaque:irregular-legacy-parse`, `opaque:irregular-legacy-parse` | test-v48-comparison-parity 4 | `if({"a": 1} == {"a": 1}) { print("yes") }` | legacy prints yes; VM `opaque:irregular-legacy-parse` | structure the `if(` and `await x ?? y` spellings in the parser |
 | 6 | `export(...)` in an entry file | 1: `statement:Export` | none of the re-run gates | `fn(twice(n)) { return n * 2 }` / `export(twice)` / `print(twice(2))` | legacy prints 4; VM `statement:Export` | compile `export` in an entry unit as a no-op |
-| 7 | Structs | 8: `context:struct-new`, `export-struct`, `struct-after-statement`, `struct-assign`, `struct-field-init`, `struct-no-method`, `struct-shadows-fn`, `struct-value` | v44_root_path_corruption_reproducers 2 | `x := P()` / `x = P()` / `x.v = 3` / `print(x.v)` | legacy prints 3; VM `struct-assign` | checkpoint 2 plus the section 10 item 4 scope |
+| 7 | Structs | 12: `context:struct-new`, `export-struct`, `struct-after-statement`, `struct-assign`, `struct-field-init`, `struct-member-clash`, `struct-name`, `struct-nested`, ... | v44_root_path_corruption_reproducers 2 | `x := P()` / `x = P()` / `x.v = 3` / `print(x.v)` | legacy prints 3; VM `struct-assign` | the reviewer's grouping and CP2/CP2b split: section 12 (PROPOSAL) |
 | 8 | Const objects | 1: `declare-const` | none of the re-run gates | `const o := {"k": 1}` / `print(o["k"])` | legacy prints 1; VM `declare-const` | admit const aggregates (binding-only const, B5 Q2) |
 | 9 | Interpolation of unproven kinds | 1: `interpolation:unknown-type` | none of the re-run gates | `fn(f(x)) { return "v=$[x]" }` / `print(f(1))` / `print(f("s"))` | legacy prints v=1, v=s; VM `interpolation:unknown-type` | a run-time-kind render path |
 | 10 | Variadics, spread, destructuring | 4: `declare-pattern`, `fn-param`, `lambda-variadic`, `spread` | v44_root_path_corruption_reproducers 1, test-v410-filesystem-recipe-parity 1 | `fn(sum(...xs)) {...}` / `print(sum(1, 2, 3))` | legacy prints 6; VM `fn-param` | one variadic/spread checkpoint, destructuring next to it |
 | 11 | `a[0]++` and compound assignment as a value | 3: `coro-future-flow:Assign`, `expression:assignment-target`, `incdec-target` | none of the re-run gates | `a := [1]` / `print(a[0] += 5)` | legacy prints 6; VM `expression:assignment-target` | the owner-excluded checkpoint-1 forms, scheduled together (section 13.1 item 4) |
-| 12 | Lazy built-in argument order | 6: `builtin-lazy-args:move`, `builtin-lazy-args:range`, `builtin-lazy-args:replace`, `builtin-lazy-args:setenv`, `builtin-lazy-args:substr`, `builtin-lazy-args:validate` | test-v410-filesystem-recipe-parity 13, test-cp19-s1-dispatch 1 | `s := "abc"` / `t := "b"` / `print(s.replace("a", t + "x"))` | legacy prints bxbc; VM `builtin-lazy-args:replace` | one rule: evaluate built-in arguments in legacy's (lazy) order |
+| 12 | Lazy built-in argument order | 7: `builtin-lazy-args:move`, `builtin-lazy-args:range`, `builtin-lazy-args:replace`, `builtin-lazy-args:setenv`, `builtin-lazy-args:slice`, `builtin-lazy-args:substr`, `builtin-lazy-args:validate` | test-v410-filesystem-recipe-parity 13, test-cp19-s1-dispatch 1 | `s := "abc"` / `t := "b"` / `print(s.replace("a", t + "x"))` | legacy prints bxbc; VM `builtin-lazy-args:replace` | one rule: evaluate built-in arguments in legacy's (lazy) order |
 | 13 | Futures in ordinary expressions | 8: `coro-future-flow:Assign`, `coro-future-flow:Binary`, `coro-future-flow:Call`, `coro-future-flow:Coalesce`, `coro-future-flow:ExprStmt`, `coro-future-flow:Logical`, `coro-future-flow:Property`, `coro-future-flow:String` | none of the re-run gates | `f := af(1) ?? af(2)` / `print(await f)` | legacy prints 1; VM `coro-future-flow:Coalesce` | admit futures as ordinary values in these parent positions |
 | 14 | Loop-context built-ins (`.length()`, `empty()`) | 2: `context:collection-empty`, `context:object-length` | none of the re-run gates | `m := map()` / a while loop with `print(m.empty())` | legacy prints false; VM `context:collection-empty` | implement legacy's loop-context results |
 
-The other 69 class (i) rows (each a smaller family; gates and programs in their tsv rows): `alias-argument`, `binding-name-reserved`, `binding-shadows-fn`, `builtin-arity:copy`, `builtin-arity:keys`, `builtin-arity:move`, `builtin-bytes:bytes`, `builtin-bytes:encode`, `builtin-bytes:open_bytes`, `builtin-bytes:secure_random_bytes`, `builtin-presentation-chain`, `callable:build`, `callable:build_all`, `callable:build_names`, `callable:err`, `callable:minify`, `callable:module_path`, `callable:prique`, `callable:queue`, `callable:read`, `callable:secure_random_bytes`, `callable:sorted_map`, `callable:sorted_set`, `callable:status`, `callable:track`, `callable:tracked`, `callable:untrack`, `callable:warn`, `comparison-chain`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `coro-async-value`, `fn-flags`, `fn-name-reserved`, `for-capture-vanishing`, `free-name`, `free-name:dynamic-caller`, `host-literal-arg`, `import-collision`, `import-name-clash`, `import-opaque:nesting-limit`, `import-opaque:template-text`, `import-reinitialised`, `index-target`, `jump-not-last`, `limit:atoms`, `limit:jump distance exceeds 16 bits`, `limit:too many registers`, `method:sort`, `method:sort_by`, `module-bare-return`, `nesting-limit`, `object-key`, `opaque:nesting-limit`, `opaque:template-text`, `param-name-reserved`, `path-in-call-argument`, `path-in-call-argument:imported`, `postfix-receiver:member`, `prefix-not-precedence`, `prepared-fn-unprepared`, `prepared-unpreparable`, `shebang-statement`, `statement:Command`, `string-literal`, `type:element-assignment`, `type:for-source`, `unresolved-name`.
+The other 80 class (i) rows (each a smaller family; gates and programs in their tsv rows): `alias-argument`, `binding-name-reserved`, `binding-shadows-fn`, `builtin-arity:copy`, `builtin-arity:entries`, `builtin-arity:keys`, `builtin-arity:move`, `builtin-arity:values`, `builtin-bytes:bytes`, `builtin-bytes:encode`, `builtin-bytes:open_bytes`, `builtin-bytes:secure_random_bytes`, `builtin-default:get`, `builtin-literal-arg:validate`, `builtin-presentation-chain`, `callable:build`, `callable:build_all`, `callable:build_names`, `callable:err`, `callable:minify`, `callable:module_path`, `callable:prique`, `callable:queue`, `callable:read`, `callable:secure_random_bytes`, `callable:sorted_map`, `callable:sorted_set`, `callable:status`, `callable:track`, `callable:tracked`, `callable:untrack`, `callable:warn`, `comparison-chain`, `context:modulo-assignment`, `context:negative-zero`, `context:number-to-int`, `context:parameter-type`, `context:string-append-type`, `coro-async-value`, `fn-flags`, `fn-name-reserved`, `for-capture-vanishing`, `free-name`, `free-name:dynamic-caller`, `host-literal-arg`, `import-collision`, `import-name-clash`, `import-opaque:nesting-limit`, `import-opaque:template-text`, `import-reinitialised`, `index-target`, `jump-not-last`, `limit:atoms`, `limit:invocation-arguments`, `limit:jump distance exceeds 16 bits`, `limit:too many registers`, `method:sort`, `method:sort_by`, `module-bare-return`, `nesting-limit`, `object-key`, `opaque:legacy-runtime-error`, `opaque:nesting-limit`, `opaque:template-text`, `param-name-reserved`, `param-shadows-fn`, `path-in-call-argument`, `path-in-call-argument:imported`, `postfix-receiver:member`, `prefix-not-precedence`, `prepared-decl-type`, `prepared-fn-unprepared`, `prepared-unpreparable`, `shebang-statement`, `statement:Command`, `string-literal`, `too-many-functions`, `type:element-assignment`, `type:for-source`, `unresolved-name`.
 
 **(iii)**: `builtin-receiver:stringify` and `presentation-struct-method:*` (sessions only).
 
@@ -124,12 +136,13 @@ printing the value; C114 replaced them). `builtin-arity:copy`/`move` cite the re
 
 ### 1.3 Completeness boundary (owner 00:08)
 
-Source identity: `0c66cad6` `src/` (unchanged at C114), nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
+Inventory identity: `0c66cad6` `src/` (unchanged at C115), nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`,
+tsv revision = the C115 commit (tests/runtime2/cp25/classification.tsv, 607 rows).
 The inventory is complete when it covers:
 
 | Criterion | Coverage at C114 |
 | --- | --- |
-| every statically named VM refusal reason | 221 reason literals in `src/rt` (C112 scan of fail/refuse/add/reason=): each has an exact or family row, or a section 9 disposition (108 triaged; every unreachable or not-reached one probed in five contexts) |
+| every statically named VM refusal reason | C115 statement-level scan of 15 emit idioms in `src/rt` (sites / reason literals): `fail(` 595/271, `refuse(` 42/34, `reject(` 10/9, `add(` 120/7, `kinds_within(` 12/10, `write_refusal(` 7/6, `record_entry`/`record_linked(` 5/2, `reason =` 85/24, `reason_ =` 4/2, `why =` 12/3, `refusal =` 8/7, `stop =` 20/9, `return "..."` 328/21, `return {..., "..."}` 2/2, concatenation `"prefix:" +` 42/44: 255 distinct literals. Each has a row or a section 9 disposition. C115 found 13 the C112 literal scan missed: `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque` (rows, reachable), `fn-shape`, `statement:Try`, `session:function-assignment`, `session:capture-contract`, `coro-main-cell`, `coro-collection-callback`, `free-name:legacy-binding` (rows, retired at creation after five-context probes), and the non-reason strings `lambda:`/`named:`/`nift:` (render text), `opaque-limit`/`round-limit`/`unmaskable:` (inventory stop markers) |
 | every run-time-generated family | 17 concatenated-name families (section 9.2), enumerated from their emit sites and probed with 1010 generated programs plus the C114 spellings; every reached suffix has an exact row or is absorbed by a stated family row (`method:*`, `callable:*`, `type:*` absorbs nothing producible) |
 | every reachable refusal in the approved test corpus | fresh `inventory.py collect` (vm-corpus, semantics, rt-diff-corpus, conformance, cp410 probes, smoke heredocs): 155 reasons seen, G1 PASS (all classified), no retired reason seen |
 | the contexts | script, module import, `nift -i` session, function called from a loop, and uncalled function and lambda bodies, for every retired row and every unreachable claim (sections 9.1, 9.3, 9.4) |
@@ -157,32 +170,33 @@ After confirmation the inventory freezes for this campaign; later findings are t
 
 ## 2. Summary
 
-| Class | C111 | C112 | C113 | C114 | Meaning |
-| --- | --- | --- | --- | --- | --- |
-| E1 | 2 | 2 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
-| E2 | 19 | 18 (+2 from N) | 18 (+1 from N) | 18 (+1 from N) | 16 F12, `method:join`, `method:increment` (row deleted in C113); from the N list `callable:prit` |
-| A | 4 | 3 | 3 | 3 | covered by an approved ruling, not yet that behaviour |
-| Q | 0 | 1 | 1 | 1 | owner question: `fn-flags` |
-| D | 42 | 39 | 39 | 38 | derivative, with a named root (`text-type-name` moved to G in C114) |
-| G | 113 | 117 (+2) | 117 (+8) | 118 (+9) | of the 180: 118; outside: `incdec-target`, `method:*`, `callable:*`, `builtin-receiver:stringify`, `struct-no-method`, `type:element-assignment`, `type:for-source` (restored), `expression:assignment-target`, `coro-future-flow:Assign` |
-| **classified** | **180** | **180** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
-| N | 45 | 58 | 340 | 341 | + `coro-future-flow:Coalesce` (C114) |
+| Class | C111 | C112 | C113 | C114 | C115 | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| E1 | 2 | 2 | 2 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
+| E2 | 19 | 18 (+2 from N) | 18 (+1 from N) | 18 (+1 from N) | 18 (+1 from N) | 16 F12, `method:join`, `method:increment` (row deleted in C113); `callable:prit` |
+| A | 4 | 3 | 3 | 3 | 3 | covered by an approved ruling, not yet that behaviour |
+| Q | 0 | 1 | 1 | 1 | 1 | owner question: `fn-flags` |
+| D | 42 | 39 | 39 | 38 | 38 | derivative, with a named root |
+| G | 113 | 117 (+2) | 117 (+8) | 118 (+9) | 118 (+9) | genuine remaining capability |
+| **classified** | **180** | **180** | **180** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
+| N | 45 | 58 | 340 | 341 | 346 | + `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque`, `difference:import-depth` (C115) |
 
-Rows by class at C114: E1 2, E2 18, A 3, Q 1, D 38, G 127, N 341 = 530 (= PENDING-OWNER 507 + implement 23). The tsv
-tags agree: `expression:assignment-target` and `coro-future-flow:Assign` are tagged class G in their rows since C114.
+Rows by class at C115: E1 2, E2 18, A 3, Q 1, D 38, G 127, N 346 = 535 (= PENDING-OWNER 512 + implement 23). Row count
+history: 528 at C113; +2 in C114 (`type:for-source` restored, `coro-future-flow:Coalesce` new) = 530; +5 in C115 = 535.
+Seven further C115 rows are retired at creation (unreached in five contexts) and are not in the 535.
 
-| Status | 0c66cad6 | C111 | C112 | C113 | C114 |
-| --- | --- | --- | --- | --- | --- |
-| approved | 44 | 44 | 44 | 44 | 44 |
-| deferred-named | 17 | 17 | 17 | 17 | 17 |
-| implement | 23 | 23 | 23 | 23 | 23 |
-| PENDING-OWNER | 157 | 200 | 217 | 505 | 507 |
-| retired | 7 | 9 | 9 | 5 | 4 |
-| rows | 248 | 293 | 310 | 594 | 595 |
+| Status | 0c66cad6 | C111 | C112 | C113 | C114 | C115 |
+| --- | --- | --- | --- | --- | --- | --- |
+| approved | 44 | 44 | 44 | 44 | 44 | 44 |
+| deferred-named | 17 | 17 | 17 | 17 | 17 | 17 |
+| implement | 23 | 23 | 23 | 23 | 23 | 23 |
+| PENDING-OWNER | 157 | 200 | 217 | 505 | 507 | 512 |
+| retired | 7 | 9 | 9 | 5 | 4 | 11 |
+| rows | 248 | 293 | 310 | 594 | 595 | 607 |
 
-C114 status changes: `type:for-source` retired → PENDING-OWNER; `coro-future-flow:Coalesce` added (PENDING-OWNER).
+Inventory identity: `0c66cad6` `src/`, nift sha256 `8195f1b3...`, tsv revision = the C115 commit.
 
-### 2.1 Per-row classes (C114)
+### 2.1 Per-row classes (C115)
 
 - **E1 (2)**
   - assign (2): `compound-target`, `index-assign-target`
@@ -211,11 +225,12 @@ C114 status changes: `type:for-source` retired → PENDING-OWNER; `coro-future-f
   - syntax (12): `binding-name-reserved`, `coro-future-flow:Assign`, `expression-statement`, `expression:assignment-target`, `incdec-target`, `index-target`, `nesting-limit`, `opaque:irregular-legacy-parse`, `param-name-reserved`, `postfix-spelling`, `shebang-statement`, `text-type-name`
   - undef (17): `assign-free-name`, `binding-shadows-fn`, `callable:*`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`, `fn-called-before-declaration`, `method:*`, `method:nope`, `method:nosuch`, `unresolved-name`
   - variadic (4): `declare-pattern`, `fn-param`, `lambda-variadic`, `spread`
-- **N (341)**
+- **N (346)**
 <details><summary>N rows by family</summary>
 
   - builtins (5): `builtin-lazy-args:range`, `builtin-lazy-args:replace`, `builtin-literal-arg:validate`, `builtin-presentation-chain`, `host-literal-arg`
   - context (7): `context:collection-empty`, `context:modulo-assignment`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `context:struct-field`, `for-missing-write`
+  - dynamic: C115 (5): `difference:import-depth`, `fn-redeclared`, `limit:invocation-arguments`, `session:opaque`, `too-many-functions`
   - dynamic: builtin-arity (116): `builtin-arity:arch`, `builtin-arity:atomic<bool>`, `builtin-arity:atomic<int>`, `builtin-arity:attr_escape`, `builtin-arity:cancel`, `builtin-arity:cat`, `builtin-arity:cd`, `builtin-arity:ceil`, `builtin-arity:channel`, `builtin-arity:chunk`, `builtin-arity:close`, `builtin-arity:cp`, `builtin-arity:deepcopy`, `builtin-arity:drop`, `builtin-arity:empty`, `builtin-arity:ends_with`, `builtin-arity:entries`, `builtin-arity:env`, `builtin-arity:eof`, `builtin-arity:epoch`, `builtin-arity:exists`, `builtin-arity:first`, `builtin-arity:flatten`, `builtin-arity:floor`, `builtin-arity:flush`, `builtin-arity:from_entries`, `builtin-arity:get`, `builtin-arity:getenv`, `builtin-arity:hardware_concurrency`, `builtin-arity:has`, `builtin-arity:highlight`, `builtin-arity:html_escape`, `builtin-arity:indexOf`, `builtin-arity:index_of`, `builtin-arity:is_array`, `builtin-arity:is_bool`, `builtin-arity:is_bytes`, `builtin-arity:is_collection`, `builtin-arity:is_dir`, `builtin-arity:is_enum`, `builtin-arity:is_file`, `builtin-arity:is_float`, `builtin-arity:is_function`, `builtin-arity:is_int`, `builtin-arity:is_null`, `builtin-arity:is_number`, `builtin-arity:is_object`, `builtin-arity:is_string`, `builtin-arity:is_struct`, `builtin-arity:last_index_of`, `builtin-arity:length`, `builtin-arity:lock`, `builtin-arity:locked`, `builtin-arity:ls`, `builtin-arity:make_dir`, `builtin-arity:map`, `builtin-arity:max`, `builtin-arity:merge`, `builtin-arity:merge_deep`, `builtin-arity:min`, `builtin-arity:mkdir`, `builtin-arity:modified`, `builtin-arity:mutex`, `builtin-arity:mv`, `builtin-arity:omit`, `builtin-arity:open`, `builtin-arity:os`, `builtin-arity:path`, `builtin-arity:pick`, `builtin-arity:platform`, `builtin-arity:prettify`, `builtin-arity:pwd`, `builtin-arity:range`, `builtin-arity:read`, `builtin-arity:read_all`, `builtin-arity:read_line`, `builtin-arity:recv`, `builtin-arity:remove`, `builtin-arity:replace`, `builtin-arity:revert`, `builtin-arity:rm`, `builtin-arity:round`, `builtin-arity:same`, `builtin-arity:save`, `builtin-arity:seek`, `builtin-arity:send`, `builtin-arity:setenv`, `builtin-arity:size`, `builtin-arity:sleep`, `builtin-arity:slice`, `builtin-arity:stack`, `builtin-arity:starts_with`, `builtin-arity:stat`, `builtin-arity:substr`, `builtin-arity:sum`, `builtin-arity:take`, `builtin-arity:tell`, `builtin-arity:to_double`, `builtin-arity:to_int`, `builtin-arity:to_lower`, `builtin-arity:to_string`, `builtin-arity:to_upper`, `builtin-arity:touch`, `builtin-arity:trim_end`, `builtin-arity:trim_start`, `builtin-arity:try_lock`, `builtin-arity:type`, `builtin-arity:unique`, `builtin-arity:unlock`, `builtin-arity:unsetenv`, `builtin-arity:url_encode`, `builtin-arity:validate`, `builtin-arity:values`, `builtin-arity:which`, `builtin-arity:write`, `builtin-arity:write_line`
   - dynamic: builtin-default (1): `builtin-default:get`
   - dynamic: builtin-lazy-args (1): `builtin-lazy-args:slice`
@@ -1052,7 +1067,7 @@ print(xs[0].stringify())
 - **Affected gates**: v44_root_path_corruption_reproducers: `context:struct-new` 2.
 - **Corpus** (tip, full/consequential/fallback): 13/2/11.
 - **Approval**: `presentation-struct-method:*`: the B3 ruling (2026-11-05) approves that an explicit `.stringify()` calls the struct's own method (so the VM may differ from legacy's `P{v:1}`); B4 implemented the run-time choice for scripts and modules only, so the session refusal is the gap. The others: none.
-- **Ordinary-scripting impact**: high: `x = P()` (`struct-assign`), returning either of two structs (`struct-value`), array defaults with push methods (`struct-field-init`) and structs declared after a `print` (`struct-after-statement`) are ordinary. The escaped-ref smoke fails on `context:struct-new` (section 11).
+- **Ordinary-scripting impact**: high: `x = P()` (`struct-assign`), returning either of two structs (`struct-value`), array defaults with push methods (`struct-field-init`) and structs declared after a `print` (`struct-after-statement`) are ordinary. The escaped-ref smoke fails on `context:struct-new` (section 15).
 - **PROPOSAL**: checkpoint 2 takes `context:struct-new` and `struct-construction`; see the scope PROPOSAL in section 10 for the rest. The legacy-error rows (`struct-no-field` and the declaration checks) fit the 5.1 raise-at-point mechanism.
 
 ### 5.8 Coroutine and loop-capture flow (G 2, N 0)
@@ -1130,7 +1145,7 @@ print(xs.stringify())
 - **Corpus** (tip, full/consequential/fallback): 0/0/0.
 - **Approval**: "owner 2026-10-25 comparator profile" is cited but the row is not approved.
 - **Ordinary-scripting impact**: moderate: comparator sorts are ordinary.
-- **PROPOSAL**: verify on GCC 15.2 on Linode (section 12), then rule.
+- **PROPOSAL**: verify on GCC 15.2 on Linode (section 16), then rule.
 
 ### 5.11 Aliasing (G 1, N 0)
 
@@ -1632,13 +1647,15 @@ other identifier used as a method.
 - **callable** (10): `callable:build_repair` (errors), `callable:ffi_buffer` (errors), `callable:ffi_bytes` (errors), `callable:ffi_sizeof` (errors), `callable:ffi_snapshot_bytes` (errors), `callable:ffi_struct` (errors), `callable:package_path` (errors), `callable:page` (errors), `callable:prique` (errors), `callable:queue` (errors)
 - **coro-future-flow** (10): `coro-future-flow:Binary` (errors), `coro-future-flow:Coalesce` (runs), `coro-future-flow:CompoundAssign` (errors), `coro-future-flow:ExprStmt` (runs), `coro-future-flow:ForBinding` (errors), `coro-future-flow:IncDec` (errors), `coro-future-flow:Logical` (runs), `coro-future-flow:Property` (runs), `coro-future-flow:String` (runs), `coro-future-flow:Throw` (errors)
 - **expression** (2): `expression:SafeIndex` (runs), `expression:SafeMember` (runs)
+- **free-name** (1): `free-name:legacy-binding` (errors)
 - **import-opaque** (5): `import-opaque:irregular-legacy-parse` (runs), `import-opaque:legacy-runtime-error` (errors), `import-opaque:nesting-limit` (runs), `import-opaque:struct-body` (errors), `import-opaque:template-text` (runs)
-- **limit** (3): `limit:atoms` (runs), `limit:jump distance exceeds 16 bits` (runs), `limit:too many registers` (runs)
-- **message** (3): `async(callable, ...) was removed; declare an async function/lambda and call it directly` (errors), `await(...) was removed; use 'await future' or 'await async_fn(args)'` (errors), `compound-operator` (errors)
+- **limit** (4): `limit:atoms` (runs), `limit:invocation-arguments` (runs), `limit:jump distance exceeds 16 bits` (runs), `limit:too many registers` (runs)
+- **message** (8): `async(callable, ...) was removed; declare an async function/lambda and call it directly` (errors), `await(...) was removed; use 'await future' or 'await async_fn(args)'` (errors), `compound-operator` (errors), `coro-collection-callback` (errors), `coro-main-cell` (errors), `fn-redeclared` (runs), `fn-shape` (errors), `too-many-functions` (runs)
 - **method** (37): `method:all` (errors), `method:any` (errors), `method:append` (errors), `method:cat` (errors), `method:clear` (errors), `method:count_by` (errors), `method:cwd` (errors), `method:env` (errors), `method:file` (errors), `method:find` (errors), `method:find_index` (errors), `method:group_by_each` (errors), `method:index_by` (errors), `method:insert` (errors), `method:insert_after` (errors), `method:insert_before` (errors), `method:max_by` (errors), `method:min_by` (errors), `method:mv` (errors), `method:partition` (errors), `method:pop` (errors), `method:prepend` (errors), `method:read_all_bytes` (errors), `method:read_bytes` (errors), `method:read_val` (errors), `method:reduce` (errors), `method:reset` (errors), `method:reverse` (errors), `method:running` (errors), `method:splice` (errors), `method:stat` (errors), `method:stderr` (errors), `method:stdin` (errors), `method:stdout` (errors), `method:unique_by` (errors), `method:write_bytes` (errors), `method:write_val` (errors)
 - **module-host-op** (19): `module-host-op:arch` (runs), `module-host-op:cd` (errors), `module-host-op:env` (errors), `module-host-op:epoch` (runs), `module-host-op:hardware_concurrency` (runs), `module-host-op:ls` (errors), `module-host-op:make_dir` (errors), `module-host-op:mkdir` (errors), `module-host-op:open` (runs), `module-host-op:os` (runs), `module-host-op:platform` (runs), `module-host-op:pwd` (runs), `module-host-op:setenv` (runs), `module-host-op:sha256_file` (runs), `module-host-op:sleep` (errors), `module-host-op:stat` (errors), `module-host-op:touch` (runs), `module-host-op:unsetenv` (runs), `module-host-op:which` (runs)
 - **path-in-call-argument** (1): `path-in-call-argument:imported` (runs)
-- **statement** (1): `statement:FnDecl` (runs)
+- **session** (3): `session:capture-contract` (errors), `session:function-assignment` (errors), `session:opaque` (errors)
+- **statement** (2): `statement:FnDecl` (runs), `statement:Try` (errors)
 
 </details>
 
@@ -1755,42 +1772,44 @@ for an emitted reason is deleted when a family row should classify it (inventory
 - disposition: RETIRED by the post-checkpoint-1 rescan (C111; reworded C112, class E2): its own evidence copy.f runs on the VM (1/2/2, legacy-equal). The name is one member of the generic `method:<name>` family (a method not bound for the receiver kind, compiler_call.cpp:204): `x := 5` / `x.increment()` still emits method:increment (legacy 'unknown value or malformed expression: x.increment()'); that family is covered by the `method:*` row (G undef). Was: consequential (chain masking): the receiver's declaration or producer is refused/masked, so its kind is Unknown or the name unresolved; resolves with the root, no independent work (decisions.md CP15B scope correction (1)). Root: copied struct (struct-value)
 - approval: pending; evidence: count=1; smoke/v42_struct_private_smoke/013-copy/copy.f; real run NIFT_VM=1 (candidate): fb:struct-value 1; rescan C112 program: `x := 5 / x.increment()` (VM method:increment, exit 1; legacy rc=1 out='' err='error: main.f:2:1: unknown value or malformed expression: x.increment()'); raised at: src/rt/compiler_call.cpp:194 (method not bound for the receiver kind); status: retired
 
-### 9.7 The 32 class (ii) rows whose reported position differs (contract B-different-position)
+### 9.7 The 32 rows whose reported position differed (C115 per-row assessment)
 
-| Row | legacy position | VM position | legacy message |
-| --- | --- | --- | --- |
-| `builtin-arity:deepcopy` | main.f:1:16 | main.f:1:7 | unknown value or malformed expression: 1, 1 |
-| `builtin-arity:entries` | main.f:2:1 | main.f:2:7 | print: value is not directly renderable |
-| `builtin-arity:values` | main.f:2:1 | main.f:2:7 | print: value is not directly renderable |
-| `builtin-default:get` | main.f:4:7 | main.f:4:16 | get: key must be a string |
-| `builtin-lazy-args:slice` | main.f:4:1 | main.f:4:18 | print: value is not directly renderable |
-| `builtin-literal-arg:validate` | main.f:1:7 | main.f:1:16 | validate: expected schema and value |
-| `context:modulo-assignment` | main.f:2:1 | main.f:4:17 | cannot assign double to int binding 'x' |
-| `context:number-to-int` | main.f:1:12 | main.f:1:19 | to_int: invalid or out-of-range integer |
-| `context:struct-field` | main.f:4:25 | main.f:4:21 | unknown value or malformed expression: n |
-| `coro-future-flow:ForBinding` | main.f:3:1 | main.f:3:10 | @for can only iterate over JSON arrays or objects |
-| `coro-future-flow:Throw` | main.f:3:1 | main.f:3:7 | throw expression must evaluate to Error |
-| `coro-module-before-import` | main.f:1:22 | main.f:2:6 | thread: return: undefined callable: target |
-| `coro-module-private-async` | pa.f:2:13 | pa.f:2:26 | return: module-private async callables are unsupported |
-| `fn-called-before-declaration` | main.f:2:11 | main.f:3:1 | return: undefined callable: f |
-| `for-missing-write` | main.f:2:24 | main.f:2:1 | cannot change binding type: x |
-| `import-limit` | m32.f:1:1 | m63.f:1:1 | import: import: import: import: import: import: import: import: import: import:  |
-| `import-opaque:legacy-runtime-error` | m.f:1:7 | m.f:1:1 | import: unknown value or malformed expression: 1 ^ 2 |
-| `interpolation:non-scalar` | main.f:3:1 | main.f:3:12 | print: parameter expression must resolve to a scalar value |
-| `method:nope` | main.f:1:16 | main.f:1:23 | return: return: unknown value or malformed expression: x.nope() |
-| `non-transferable` | main.f:3:6 | main.f:3:21 | thread: argument contains a non-transferable resource |
-| `opaque:legacy-runtime-error` | main.f:1:7 | main.f:1:1 | undefined callable: false |
-| `param-shadows-fn` | main.f:3:1 | main.f:2:6 | print: value is not directly renderable |
-| `prepared-decl-type` | main.f:8:22 | main.f:2:3 | cannot change binding type: b |
-| `static-error:push-arity` | main.f:3:17 | main.f:1:21 | push: expected one argument |
-| `string-arg-type` | main.f:2:3 | main.f:6:9 | cannot assign string to null binding 's' |
-| `struct-member-clash` | main.f:3:7 | main.f:2:13 | cannot access member 'v' because the current JSON value is not an object |
-| `struct-name` | main.f:2:6 | main.f:1:1 | unknown value or malformed expression: x := file() |
-| `struct-nested` | main.f:2:7 | main.f:1:13 | cannot access member 'v' because the current JSON value is not an object |
-| `struct-redeclared` | main.f:3:7 | main.f:2:1 | cannot access member 'v' because the current JSON value is not an object |
-| `type:for-source-union` | main.f:2:13 | main.f:3:1 | cannot assign json to array binding 'x' |
-| `type:member` | main.f:2:24 | error-module.f:1:30 | lambda body error: value has no member: missing |
-| `type:script-return` | - | main.f:1:1 | error: script return value is not directly renderable |
+| Row | legacy position | VM position | C115 class | Assessment |
+| --- | --- | --- | --- | --- |
+| `builtin-arity:deepcopy` | main.f:1:16 | main.f:1:7 | (ii) | VM more precise: the arity of the call is wrong, so the call (1:7) is the construct; legacy points at the argument list (1:16) |
+| `builtin-arity:entries` | main.f:2:1 | main.f:2:7 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `builtin-arity:values` | main.f:2:1 | main.f:2:7 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `builtin-default:get` | main.f:4:7 | main.f:4:16 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `builtin-lazy-args:slice` | main.f:4:1 | main.f:4:18 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `builtin-literal-arg:validate` | main.f:1:7 | main.f:1:16 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `context:modulo-assignment` | main.f:2:1 | main.f:4:17 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `context:number-to-int` | main.f:1:12 | main.f:1:19 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `context:struct-field` | main.f:4:25 | main.f:4:21 | (ii) | fix: take legacy's position (the read of the implicit field, 4:25), not the assignment (4:21) |
+| `coro-future-flow:ForBinding` | main.f:3:1 | main.f:3:10 | (ii) | VM more precise: the iterable is the future; legacy reports the statement |
+| `coro-future-flow:Throw` | main.f:3:1 | main.f:3:7 | (ii) | VM more precise: the operand is the future; legacy reports the statement |
+| `coro-module-before-import` | main.f:1:22 | main.f:2:6 | (ii) | fix: take legacy's position (the failing call inside the task) |
+| `coro-module-private-async` | pa.f:2:13 | pa.f:2:26 | (ii) | VM more precise (column only, same statement) |
+| `fn-called-before-declaration` | main.f:2:11 | main.f:3:1 | (ii) | fix: take legacy's position (the call, not the declaration) |
+| `for-missing-write` | main.f:2:24 | main.f:2:1 | (ii) | fix: take legacy's position (the write `x = 5`, not the `for`) |
+| `import-limit` | m32.f:1:1 | m63.f:1:1 | (ii) | fix: take legacy's position (legacy's depth, m32.f); also a class (iv) difference: chains 33-63 deep run on the VM and fail in legacy (row difference:import-depth) |
+| `import-opaque:legacy-runtime-error` | m.f:1:7 | m.f:1:1 | (ii) | fix: take legacy's position (opaque nodes report the statement start, not the failing operand) |
+| `interpolation:non-scalar` | main.f:3:1 | main.f:3:12 | (ii) | VM more precise: the interpolation part, not the print |
+| `method:nope` | main.f:1:16 | main.f:1:23 | (ii) | VM more precise: the method call, not the return |
+| `non-transferable` | main.f:3:6 | main.f:3:21 | (ii) | VM more precise: the non-transferable argument, not the thread call |
+| `opaque:legacy-runtime-error` | main.f:1:7 | main.f:1:1 | (i): corpus programs complete in legacy | fix: take legacy's position (the failing operand); row moved to (i) |
+| `param-shadows-fn` | main.f:3:1 | main.f:2:6 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `prepared-decl-type` | main.f:8:22 | main.f:2:3 | (i): corpus programs complete in legacy | fix: take legacy's position (the failing write, not the declaration); row moved to (i) |
+| `static-error:push-arity` | main.f:3:17 | main.f:1:21 | (ii) | VM more precise: the `push` itself, not the loop's call site |
+| `string-arg-type` | main.f:2:3 | main.f:6:9 | (ii) | fix: take legacy's position (the parameter binding) |
+| `struct-member-clash` | main.f:3:7 | main.f:2:13 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `struct-name` | main.f:2:6 | main.f:1:1 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `struct-nested` | main.f:2:7 | main.f:1:13 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `struct-redeclared` | main.f:3:7 | main.f:2:1 | (i): legacy runs the construct (P2-1) | not a position question: the earlier probe's legacy error was downstream of a construct legacy runs |
+| `type:for-source-union` | main.f:2:13 | main.f:3:1 | (ii) | probe replaced by the function-parameter form: same position on both engines (main.f:1:12); now B-same-position |
+| `type:member` | main.f:2:24 | error-module.f:1:30 | (ii) | VM more precise: the member read in the lambda body, not the call site |
+| `type:script-return` | - | main.f:1:1 | (ii) | VM more precise: legacy prints no position |
+
+Remaining in (ii) with a different position: 17 (7 fix, 10 VM more precise).
 
 ## 10. Src-side and scope proposals (none applied)
 
@@ -1820,76 +1839,177 @@ for an emitted reason is deleted when a family row should classify it (inventory
    - No implement row was added or removed; the 13:26 implement rows for checkpoints 2-5 stay implement (only the
      E1 narrowing of `compound-target`/`index-assign-target` changed scope).
 
-## 11. Release-gate issue, still outstanding
+## 11. Host built-ins in programs with imports: root cause and repair (reviewer finding, PROPOSAL)
 
-`tests/v44_root_path_corruption_reproducers.sh` **FAILS** at the tip (re-run in C112): `destruct` (`declare-pattern`),
-`structarr` and `mapstruct` (`context:struct-new`). `escaped-ref` passes. The file is not passing; the failures are
-recorded on the `declare-pattern` and `context:struct-new` rows.
+Recorded from the C114 confirmation review, Part 2. **A reviewer finding marked PROPOSAL, not a ruling.** The rescan did
+not investigate this family (owner 00:08); it records the raise site and representatives (section 1.1, rank 1).
 
-## 12. Linode-only items (not run here)
+**Root cause.** `script_runner.cpp:325-339`: after a linked unit compiles, `first_module_host_op` (module_host_op.h:29)
+scans every proto of the linked program; any CallNative of a host built-in (`natives::host_builtin(id)`) refuses the
+unit with `module-host-op:<name>`. The refusal inventory uses the same scan (refusal_inventory.cpp:226).
 
-- The execute pass on the release toolchain: `make cp25r-inventory`.
-- `method:sort` comparator portability on GCC 15.2 (cp14b-sort's 234 unverified cases).
-- Sanitizer runs of the gates in section 4.
+- **What it protects: ruling R1 (owner 2026-10-21) on module read order.** The VM links a program with static imports by
+  reading every module's source before execution; legacy reads each module when its `import` executes. A host operation
+  legacy runs before or between imports could observe or change different files (`cp`/`remove` of a module, `cd`,
+  `setenv`), and the host trace order (`NIFT_TRACE_HOST`) would differ. Pinned by `tests/runtime2/module_host_order.py`;
+  `module_host_order_mutant.sh` (`-DNIFT_R1_MUTANT`) is its negative control.
+- **The refusal is general:** every proto (entry and modules), uncalled functions included
+  (`import("./m.f")` / `fn(never()) { return pwd() }` / `print(k)` is refused; legacy prints 1), read-only and
+  side-effecting ops alike, and ops placed after every import (`host-after-import` is pinned as refused although the
+  legacy order is then identical).
+- **B4b and B5 do not depend on it**: only the ordering of module reads against host side effects and trace lines is at
+  stake.
+
+**Proposed bounded repair.** Replace "any host op anywhere" with "no host-op execution can precede the last module read
+in legacy order". Admit only when both hold:
+
+1. The entry's imports form a leading block: every top-level statement before the last `import` is an `import` or a
+   call-free declaration (`fn`/struct declaration, literal or constant binding).
+2. No module's initialisation code can run a host op: module top-level statements contain no host CallNative and no
+   call (conservatively: no call other than non-host built-ins), transitively through nested imports.
+
+Everything else stays refused with `module-host-op:<name>` (dynamic and nested imports are already refused:
+`import-nested`, D-065). Read-only and side-effecting ops are treated alike (a read-only allowance alone would be unsound
+for the trace and for `cd`/env-dependent resolution).
+
+| Aspect | Proposal |
+| --- | --- |
+| Files and size | new `module_host_order.{h,cpp}` with the two checks (about 120-180 lines); `script_runner.cpp` and `refusal_inventory.cpp` call it instead of the blanket scan (one shared implementation); `module_host_op.h` keeps `first_module_host_op` for the message |
+| Tests | extend `module_host_order.py`: admitted, with identical trace, tree and output: a host op after all imports (read-only and mutating), in a function called after the imports, inside an imported module's function called after all imports, and in an uncalled function; still refused: host-before-import (top, function, loop), copy-over-module, remove-module, host-in-module-init with a later sibling import, a nested-module function called during init, and `cd` or `setenv` before an import |
+| Mutants | prefix check disabled (caught by host-before-import, copy-over-module); module-init check disabled (host-in-module-init); "calls count as safe" in the prefix (host-before-import-fn); keep the R1 mutant |
+| Must not change | the linked-unit model and module-read timing; R1's refusal wherever a host op could precede a module read; sessions, eval and the CP22/CP23 coroutine-module rules; no re-baselining |
+
+## 12. Struct refusals by root cause (reviewer finding, PROPOSAL)
+
+Recorded from the C114 confirmation review, Part 3. **A reviewer finding marked PROPOSAL, not a ruling.**
+
+| Group | Rows | Shared root |
+| --- | --- | --- |
+| A, declaration model | `struct-field-init`, `struct-after-statement`, `struct-nested`, and the declaration-validation rows (`struct-name`, `struct-redeclared`, `struct-shadows-fn`, `struct-member-clash`: move them to use time) | schemas planned up front with constant defaults (structs.cpp:78-109) |
+| B, construction in loop context | `context:struct-new` (former `struct-construction`), `context:struct-field` | legacy's L42 loop behaviour (compiler_structs.cpp:278, compiler_assign.cpp:204) |
+| C, struct identity tracking | `struct-assign`, `struct-value`, part of `struct-no-method` | single-`struct_id` binding typing (compiler_assign.cpp:140/209/281/318, compiler_structs.cpp:64/206/210) |
+| D, sessions | `presentation-struct-method:*` | session dispatch (compiler_presentation.cpp:40) |
+| E, legacy errors | `struct-private`, `struct-no-field` | raise-at-point, under the early-refusal policy |
+
+`type:element-assignment` and `type:for-source` belong with the inference work, not with structs.
+
+**Legacy facts (measured by the reviewer).**
+- Defaults are evaluated per construction, in order, with fresh values: `struct(S) { id := next() }` gives 1 then 2;
+  `xs := [1]` with `push` on one instance gives `[1,2]` and `[1]`. Defaults that reference earlier bindings or functions
+  work only when the struct is declared after them, so non-constant defaults and `struct-after-statement` are one root.
+- L42: legacy fails member access on structs inside loop bodies ("value has no member"); only construct-and-store in the
+  loop works.
+- `S().field` directly on a call result errors in legacy ("current JSON value is not an object"); use `a := S(); a.v`.
+
+**Recommendation (PROPOSAL):** CP2 = Group A + Group B limited to construction and storage in loops (about 300-400 lines
+of src, about 500 of tests and mutants; must preserve fresh per-construction defaults, initialiser order, B5 semantics).
+CP2b = Group C (about 250-350 lines; B4b struct-id soundness, B5 aliasing of instances). Group D with the B4 session
+work; Group E with the early-refusal policy. L42 needs an owner ruling: reproduce legacy's loop-context errors, or
+approve one meaning everywhere (D-040 value semantics).
+
 
 ## 13. Proposed rulings for the owner
 
-Arranged under the owner's three headings (00:08). Every item is a PROPOSAL or a question; nothing here is a ruling.
-For reference only (not rulings), the owner's provisional priorities: P0 host built-ins with imports; P1 postfix
-spelling, nested fns, `?.`/`?[]`, structs, variadics/spread, const objects; P2 export in entry files, irregular
-comparisons, indexed postfix and async forms.
+In the owner's order. Items marked settled restate a ruling; every other item is a PROPOSAL or a question.
+Provisional priorities (reference only, not rulings): P0 host built-ins with imports; P1 postfix spelling, nested fns,
+`?.`/`?[]`, structs, variadics/spread, const objects; P2 export in entry files, irregular comparisons, indexed postfix
+and async forms.
 
-### 13.1 Ordinary-scripting requirements (class (i), section 1.1)
+### 13.1 How the early-refusal policy applies
 
-1. Host built-ins in any program with an import (`module-host-op:*`, 27 rows; raise site module_host_op.h:29): require for the first VM release? (reviewer investigates the family during confirmation)
-2. Postfix spellings, nested function declarations (`statement:FnDecl`: in functions, loops and ifs), `?.`/`?[]`, const objects, variadics/spread/destructuring: require?
-3. Structs: accept the checkpoint-2 scope recommendation (section 10 item 4) and confirm `struct-no-method` and `type:element-assignment` (restored from retired) belong with the struct and inference work; `type:for-source` (an uncalled lambda over an untyped parameter) with the inference work.
-4. The remaining owner-excluded checkpoint-1 assignment forms (`a[0]++`, `print(a[0] += 5)`, `hs[0][0] = f(1)`): which checkpoint takes them, together?
-5. `export(...)` in entry files, irregular comparisons (`if({..} == {..})`), interpolation of unproven kinds, lazy built-in argument order, futures in ordinary expressions (`coro-future-flow` parents), loop-context `.length()`/`empty()`: require, or schedule after the first release?
+1. **Settled (owner 00:29, D-013):** rejecting before execution a program the VM can determine will fail is the
+   established design; earlier timing and absent earlier output are approved; case B stays B, case C is internal
+   failures and genuinely different categories only. Governs the 321 class (ii) rows (`policy:early-refusal`), for
+   errors legacy raises at the same construct. Valid constructs stay capability gaps; wrong positions are not excused.
+2. **Dead code (question).** 316 of the 321 (ii) refusals also fire in code that never runs, in programs legacy
+   completes (`fn(f()) { print(1, 2) }` never called; `if (false) { sha256("a", "b") }`; `if (x > 1) { y := "a" - 1 }`
+   with x <= 1). Not covered by 00:29, because these programs do not fail. Options, neutrally:
+   (a) refusing statically invalid code even when unreachable is an approved part of the early-refusal design
+       (precedent: compiled languages reject type errors in dead branches); or
+   (b) only provably reachable errors may refuse; dead-code cases are capability gaps.
+   Counts: fires in dead code 316; does not fire 1 (`coro-module-before-import`, flow-sensitive); `import-dynamic` in a dead
+   block is refused as `import-nested`; 3 module-initialisation rows always execute. Corpus impact: 0 corpus programs
+   for the remaining (ii) rows (the 7 legacy-completing corpus units belonged to rows C115 moved to (i)). Until this is
+   ruled, the (ii) rows stay PENDING-OWNER.
+3. **The 17 different-position rows (section 9.7):** 7 "fix: take legacy's position" (`context:struct-field`,
+   `coro-module-before-import`, `fn-called-before-declaration`, `for-missing-write`, `string-arg-type`,
+   `import-opaque:legacy-runtime-error`, `import-limit`); 10 "VM more precise" with a rationale: accept those 10?
+   (`prepared-decl-type` and `opaque:legacy-runtime-error` also need legacy's position; they moved to (i).)
 
-### 13.2 Diagnostic compatibility decisions (class (ii), section 1)
+### 13.2 The 152 capability gaps (class (i)), by feature (section 1.1)
 
-6. The two (ii) contracts: B-same-position (303 rows) and B-different-position (32). Under the provisional rule both fail
-   only because earlier side effects are lost (and, for 32, the position). Require "raise legacy's error at the point
-   legacy raises it, after its earlier output" for each contract, or approve a documented difference per contract?
-7. `fn-flags`: does D-048's rejection-before-execution cover a VM-only refusal, with the legacy change declined?
-8. `import-dynamic`: is D-037 its G2 release approval?
-9. Async self-recursion runs on the VM (prints 0) where legacy errors: ratify the CP23 review qualification
-   `qualified:legacy-await-chain-defect` (deep_chain.f, whose qualified output `1275` is pinned in `qualified` at
-   tests/runtime2/cp23/compatibility.py:9, and CP22-CLASSIFICATION.tsv); no owner ruling approves it today.
-10. Family rows. PROPOSAL (confirmation review): family rows for the pure (ii) families `builtin-arity:*`,
-    `builtin-receiver:*`, `method:*`, `callable:*`, each stating its contract; exact rows kept only for members that
-    behave differently (the (i) members `builtin-arity:keys`, `copy`, `move`, the missing built-in callables,
-    `method:sort`, `method:sort_by`; the session-only `builtin-receiver:stringify`); only after the `type:*` collision is
-    fixed; any new (i) member gets its own row. No rows are collapsed until the owner decides.
-11. Src-side inventory and naming fixes (each changes the sha256): the F12 inventory-limits fix (then retire the 16
-    F12 rows); rename `type:*` (e.g. `type:mul`); name the two message-named reasons (`async(...)`/`await(...)` "was
-    removed"); keep `method:*`/`callable:*` for unbounded user names?
+4. Host built-ins in any program with an import (27 rows): see 13.4.
+5. Postfix spellings; nested and redeclared function declarations; `?.`/`?[]`; const objects; variadics/spread/
+   destructuring; irregular comparisons; `export` in entry files: require for the first VM release?
+6. Structs (incl. the four declaration-validation rows moved to (i)): see 13.5.
+7. The owner-excluded checkpoint-1 assignment forms (`a[0]++`, `print(a[0] += 5)`, `hs[0][0] = f(1)`): schedule together.
+8. Interpolation of unproven kinds, lazy built-in argument order (incl. `slice`, `get` default), loop-context built-ins
+   (`.length()`, `empty()`, `to_int`, `%=`), futures in ordinary expressions, capacity limits, the remaining singles:
+   require, or schedule after the first release? Confirm `type:element-assignment`, `type:for-source` and
+   `struct-no-method` belong with the inference and struct work.
 
-### 13.3 Explicit deferrals from the first VM release (candidates)
+### 13.3 Session-only rows (class (iii), 3)
 
-12. Dynamic scope (`free-name`, `free-name:dynamic-caller`): out of the release contract (class X), or a blocker?
-13. `import-reinitialised`: D-041 #2 allows a temporary refusal only with a recorded removal condition; record one (a deferral), or treat it as G?
-14. CP24 project APIs on the VM (`callable:build`, `track`, `inject`, ...), comparator-sort portability (`method:sort`, Linode), capacity limits (`limit:*`), and the two session-only rows (class (iii)): defer explicitly?
-15. Family dispositions in sections 1 and 5-9 (each a PROPOSAL).
+9. `builtin-receiver:stringify`, `presentation-struct-method:*`, `session:opaque`: schedule with the B4 session work, or defer?
 
-## 14. Gates at the tip (C114)
+### 13.4 Host built-ins with imports: diagnosis and repair (section 11, reviewer PROPOSAL)
+
+10. Approve the bounded repair design (leading import block, init code free of host ops and calls; R1 kept wherever a
+    host op could precede a module read)?
+
+### 13.5 Checkpoint-2 scope (section 12, reviewer PROPOSAL; section 10 item 4)
+
+11. CP2 = Group A (declaration model) + Group B (construction and storage in loops); CP2b = Group C (identity)?
+12. L42: reproduce legacy's loop-context member errors, or approve one meaning everywhere (D-040)?
+
+### 13.6 Other items
+
+13. `fn-flags`: does D-048's rejection-before-execution cover a VM-only refusal, with the legacy change declined?
+14. `import-dynamic`: is D-037 its G2 release approval?
+15. Ratify the CP23 review qualification `qualified:legacy-await-chain-defect` (async self-recursion runs on the VM where
+    legacy errors; deep_chain.f, qualified output `1275` pinned in `qualified` at tests/runtime2/cp23/compatibility.py:9).
+16. `difference:import-depth` (class (iv)): import chains 33-63 deep run on the VM and fail in legacy; accept, or make the
+    VM fail at legacy's depth (which also fixes `import-limit`'s position)?
+17. Family rows (PROPOSAL, confirmation review): family rows for the pure (ii) families `builtin-arity:*`,
+    `builtin-receiver:*`, `method:*`, `callable:*`, each stating its contract, exact rows only for members that behave
+    differently; only after the `type:*` fix; no rows collapsed until the owner decides.
+18. Src-side fixes (each changes the sha256): the F12 inventory-limits fix (then retire the 16 F12 rows); rename `type:*`
+    (e.g. `type:mul`); name the two message-named reasons (`async(...)`/`await(...)` "was removed").
+19. Deferral candidates: dynamic scope (`free-name`, `free-name:dynamic-caller`); `import-reinitialised` (D-041 #2
+    removal condition); CP24 project APIs; comparator-sort portability (Linode); family dispositions in sections 1, 5-9.
+
+## 14. Gates at the tip (C115)
 
 | Gate | Result |
 | --- | --- |
 | `make test-runtime2-certification-guard` | PASS (historical control; classification self-test, 31 cases) |
 | `make test-rt-lint` | PASS (boundary: 0 problems in 710 files) |
 | `make test-test-integrity` | clean (700 files scanned, 0 findings) |
-| fresh `inventory.py collect` + `report --check` (C114 tsv) | **exit 3** |
+| fresh `inventory.py collect` + `report --check` (C115 tsv) | **exit 3** |
 | `python3 -B tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases: 47 legacy-equal, 47 pinned differences or refusals) |
 
 - **Inventory**: G1 PASS, 155 reasons seen (approved 8, deferred-named 17, implement 17, PENDING-OWNER 113, retired 0).
-  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen again.
+  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen again,
+  including the 7 rows retired at creation in C115.
 - **Production code**: `git diff 0c66cad6 -- src/` is empty; nift sha256 is
   `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
-- **Scratch**: probe results are kept outside the tree; the smoke extraction is deleted after use.
+- **Scratch**: all probes ran in the session scratch directory; `git status` shows only the tsv and the two docs.
 
-## 15. C112 changes per review finding
+## 15. Release-gate issue, still outstanding
+
+`tests/v44_root_path_corruption_reproducers.sh` **FAILS** at the tip (re-run in C112): `destruct` (`declare-pattern`),
+`structarr` and `mapstruct` (`context:struct-new`). `escaped-ref` passes. The file is not passing; the failures are
+recorded on the `declare-pattern` and `context:struct-new` rows.
+
+## 16. Linode-only items (not run here)
+
+- The execute pass on the release toolchain: `make cp25r-inventory`.
+- `method:sort` comparator portability on GCC 15.2 (cp14b-sort's 234 unverified cases).
+- Sanitizer runs of the gates in section 4.
+
+## 17. Change logs per review round
+
+### 17.1 C112 changes per review finding
 
 | Finding | Change |
 | --- | --- |
@@ -1904,7 +2024,7 @@ comparisons, indexed postfix and async forms.
 | L-3 | checkpoint-2 recommendation added as a PROPOSAL |
 | new | `type:*` family-syntax collision noted (row and proposal) |
 
-## 16. C113 changes per confirmation-review finding
+### 17.2 C113 changes per confirmation-review finding
 
 | Finding | Change |
 | --- | --- |
@@ -1915,7 +2035,7 @@ comparisons, indexed postfix and async forms.
 | L-3 | section 13 items 6 and 8 added |
 | L-4 | section 3.3 lists `context:assignment-error`'s filesystem-recipe case |
 
-## 17. C114 changes per confirmation-review finding
+### 17.3 C114 changes per confirmation-review finding
 
 | Finding | Change |
 | --- | --- |
@@ -1931,3 +2051,16 @@ comparisons, indexed postfix and async forms.
 | Owner 00:08 #2 | every retired, D, E1 and E2 row carries a TRACE note (reproducer, why it was a refusal, the explanation, why not independent); text dropped by C112/C113 repairs restored as previous-* notes (10 evidence segments, 41 legacy columns, 25 dispositions); the deleted `method:increment` row kept as a tsv comment and in section 9.6 |
 | Owner 00:08 #3 | completeness boundary (section 1.3) |
 | Owner 00:08 #4 | section 13 arranged under the three headings |
+
+### 17.4 C115 changes (C114 confirmation review and owner rulings 00:08, 00:29)
+
+| Item | Change |
+| --- | --- |
+| Owner 00:29 | early-refusal policy recorded in sections 1 and 13.1; 321 (ii) rows tagged `policy:early-refusal(D-013, owner 00:29)`; status unchanged pending the dead-code question |
+| 1 (P2-1) | 12 rows (ii) → (i) with the reviewer's programs (verified); all (ii) probes re-run with `zz := X`; 2 more rows → (i) from the corpus measurement (`prepared-decl-type`, `opaque:legacy-runtime-error`); split (i) 152, (ii) 321, (iii) 3, (iv) 1, D 38, E 20 |
+| 2 (P2-2) | 15-idiom statement-level rescan (section 1.3): `fn-redeclared`, `too-many-functions`, `limit:invocation-arguments`, `session:opaque` added (reachable); 7 unreached rows added as retired at creation with five-context probes |
+| 3 | dead-code measurement per (ii) row and the neutral question (13.1 item 2) |
+| 4 | section 9.7 per-row table for the 32; `type:for-source-union` probe replaced (same position); `import-limit` (iv) verified: row `difference:import-depth`, item 16 |
+| 5 | sections 11 and 12 (reviewer Parts 2 and 3, PROPOSAL); items 10-12 |
+| 6 | section 13 in the owner's order |
+| 7 | row counts reconciled (528 → 530 → 535); inventory identity recorded |
