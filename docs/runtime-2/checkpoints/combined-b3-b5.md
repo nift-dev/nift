@@ -3889,3 +3889,50 @@ owner-approved B5 semantic difference.
   800 MB), more than this machine's free disk. It and the Python 3.14 default-start-method runs
   of the three gates are for Linode.
 - No production change: `nift` is f063f1a9….
+
+## 73. Repair batch, B10: the cp14b harnesses use the configured toolchain (C85, harness)
+
+- **Cause** (triage BLOCKERS.md B10). The four cp14b harnesses that compile or link
+  (`build_sanitizer.py`, `build_drain.py`, `mutations.py`, `design_mutations.py`) had three faults:
+  - They called `g++` by name, whatever `CXX` was. The Makefile already passed
+    `NIFT_CP14B_CXX="$(CXX)"`, but only the comparator profile read it.
+  - They linked a hard-coded `.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a`. The real
+    path is `$(LIBFFI_A)`, which depends on `$(CC)`, so it differs on Linode.
+  - They took their objects from `rglob('*.o')` or from a hand-kept source list. The sanitizer's
+    list lacked `src/PackageTransaction.cpp`, hence the undefined
+    `PackageTransaction::PackageTransaction`.
+  - A failed link also hid the linker's stderr (`check=True, capture_output=True`).
+- **Fix.** The new `tests/runtime2/build_toolchain.py` reads one Makefile variable,
+  `HARNESS_TOOLCHAIN_ENV`, which sets:
+  - `NIFT_TC_CXX`, `_GUARD` (`$(PRODUCTION_GUARD)`), `_CPPFLAGS`, `_CXXFLAGS`, `_LDFLAGS` and
+    `_LIBFFI_A`;
+  - `_CLI_OBJECTS` (`$(CLI_OBJECTS)`, nift's own link set);
+  - `_RT_SOURCES` (`$(RT_VALUE_SOURCES) src/RuntimeValue.cpp`).
+
+  A harness started outside make stops and names the missing variable. Every compile and link goes
+  through `run()`, which on failure prints the command and the tool's stdout and stderr.
+- **What each harness now does:**
+  - mutations.py compiles each named mutant with nift's exact compile line plus the mutant define,
+    into the non-production `.build/cp14b/mutants`. It requires the object to differ from
+    `src/rt/<stem>.o` (the C75 check) and links nift's object list.
+  - design_mutations.py compiles its drivers as test units (no guard). It compiles mutant sources
+    as production units, with `-iquote src/rt` so a copied source still finds its `"..."` headers
+    (never `-I src/rt`).
+  - build_drain.py links nift's objects without `src/nift.o`.
+  - build_sanitizer.py compiles `$(RT_VALUE_SOURCES)` plus RuntimeValue.cpp, 255 units, which
+    include PackageTransaction.cpp and JsonFile.cpp. Production units get the guard and the
+    harness does not. It links `$(LIBFFI_A)`. Its sanitizer flags are unchanged.
+  - resources.py reports the configured compiler's version.
+- **Results** (GCC 13 locally):
+  - `make test-runtime2-cp14b-mutants`, both tiers:
+    - named mutants: 3–8 and 10 DETECTED; 1, 2 and 9 UNVERIFIED, the comparator cases this
+      profile refuses (D2);
+    - design mutants: 1–5 and 7–11 DETECTED, 6 RETIRED, 12 UNVERIFIED.
+  - `make test-runtime2-cp14b-sanitize`: the sanitizer harnesses build (they had never linked:
+    255 units), and the drain and allocation-failure witnesses run. Every functional, sort replay,
+    origins, copy and const check under ASan/UBSan PASSes or is a comparator SKIP of the same kind.
+    The 580 MB build directory was removed afterwards.
+  - A deliberately failing link (`src/rt/vm.o` alone) prints the command and the linker's
+    `undefined reference` lines.
+  - Comparator certification still needs the GCC 15.2 run on Linode (D2).
+- No production change: `nift` is f063f1a9….

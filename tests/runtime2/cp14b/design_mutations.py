@@ -4,6 +4,9 @@ import argparse,copy,hashlib,json,os,subprocess,tempfile
 from pathlib import Path
 from functional import CASES,run
 from mutations import DRAIN
+import sys as _sys,os as _os
+_sys.path.insert(0,_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),'..'))
+import build_toolchain as toolchain
 CONTROL='print([1,2].count(x=>x>0))'
 TIES='print([{\"k\":0,\"id\":1},{\"k\":0,\"id\":2}].sort_by(x=>x.k).map(x=>x.id).stringify())'
 DIRECTION='print([{\"k\":1,\"v\":2,\"id\":1},{\"k\":1,\"v\":1,\"id\":2},{\"k\":2,\"v\":1,\"id\":3}].sort_by(x=>x.k,"asc",x=>x.v,"desc").map(x=>x.id).stringify())'
@@ -100,23 +103,25 @@ def main():
     out=Path(a.out).resolve();out.mkdir(parents=True,exist_ok=True)
     intended_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     driver_hash=hashlib.sha256(Path('tests/runtime2/cp14b/design_harness.cpp').read_bytes()).hexdigest()
-    flags=['-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-Wall','-Wextra','-pedantic','-pthread']
+    # B10 (combined-b3-b5.md section 73): the Makefile's compiler and flags, and nift's own object list.
+    # The copied mutant source keeps its "..." includes resolving through -iquote src/rt (never -I src/rt).
+    flags=toolchain.cppflags()+toolchain.cxxflags()
     subprocess.run(['make','-j2','nift','.build/cp13b/nift-switch'],check=True)
-    objects=[str(f) for root in ['src','minifypp','markuppp'] for f in Path(root).rglob('*.o') if str(f)!='src/nift.o']
+    objects=toolchain.cli_objects(without_main=True)
     def build(name,stem=None,macro=0,number=0):
         driver=out/(name+'-driver.o');binary=out/name
-        subprocess.run(['g++',*flags,'-DCP14B_MUTANT_MARKER="'+name+'"','-c','tests/runtime2/cp14b/design_harness.cpp','-o',str(driver)],check=True,capture_output=True)
+        toolchain.run(toolchain.test_compile('-DCP14B_MUTANT_MARKER="'+name+'"','-c','tests/runtime2/cp14b/design_harness.cpp','-o',str(driver)),'driver compile '+name)
         linked=objects
         source_hash=None
         if stem:
             source=Path('src/rt/'+stem+'.cpp').read_text();source=inject(number,source)
             copied=out/(name+'-'+stem+'.cpp');copied.write_text(source);obj=out/(name+'.o')
-            command=['g++',*flags,*([f'-DNIFT_COLLECTION_MUTANT={macro}'] if macro else []),'-c',str(copied),'-o',str(obj)]
-            result=subprocess.run(command,capture_output=True,text=True);(out/(name+'-build.log')).write_text(result.stdout+result.stderr)
-            if result.returncode:raise RuntimeError(result.stderr)
+            command=toolchain.production_compile('-iquote','src/rt',*([f'-DNIFT_COLLECTION_MUTANT={macro}'] if macro else []),'-c',str(copied),'-o',str(obj))
+            toolchain.run(command,'mutant compile '+name,log=out/(name+'-build.log'))
             linked=[str(obj) if item=='src/rt/'+stem+'.o' else item for item in objects]
+            if linked==objects:raise RuntimeError('src/rt/'+stem+'.o is not in nift\'s object list: '+name)
             source_hash=hashlib.sha256(copied.read_bytes()).hexdigest()
-        subprocess.run(['g++','-pthread',str(driver),*linked,'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)],check=True,capture_output=True)
+        toolchain.run(toolchain.link([driver,*linked],binary),'link '+name)
         return binary,dict(intended_commit=intended_commit,driver_sha256=driver_hash,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),source_sha256=source_hash,flags=flags,macro=macro,marker=name)
     normal,normal_identity=build('control');results=[];negatives=[]
     import comparator_profile as cprof

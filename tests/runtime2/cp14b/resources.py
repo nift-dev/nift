@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Local CP14B resource/performance witnesses; no provisioning or spend."""
-import argparse,hashlib,json,os,platform,statistics,subprocess,tempfile,time
+import argparse,hashlib,json,os,platform,shlex,statistics,subprocess,tempfile,time
 from pathlib import Path
 
 def source(method,n):
@@ -28,6 +28,6 @@ def main():
         for method in ['map','filter','sort_by']:
             times={mode:[r['seconds'] for r in records if r['method']==method and r['n']==100000 and r['mode']==mode] for mode in ['0','require']}
             comparisons.append(dict(method=method,target_met=statistics.median(times['require'])<statistics.median(times['0']),legacy_median=statistics.median(times['0']),vm_median=statistics.median(times['require']),ratio=statistics.median(times['require'])/statistics.median(times['0'])))
-    report=dict(status='PASS' if all(r['pass_'] for r in records) else 'FAIL',environment=dict(platform=platform.platform(),processor=platform.processor(),cpu_count=os.cpu_count(),cpuinfo=Path('/proc/cpuinfo').read_text().split('\n\n')[0],compiler=subprocess.check_output(['g++','--version'],text=True),flags='-std=c++17 -O2 -Wall -Wextra -pedantic -pthread',clock='whole-process perf_counter_ns, including identical /usr/bin/time wrappers'),binaries={b:hashlib.sha256(Path(b).read_bytes()).hexdigest() for b in [a.nift,a.legacy]},records=records,comparisons=comparisons,limitation='Local shared machine; preliminary evidence only. Dedicated Linode comparison requires separate owner approval.')
+    report=dict(status='PASS' if all(r['pass_'] for r in records) else 'FAIL',environment=dict(platform=platform.platform(),processor=platform.processor(),cpu_count=os.cpu_count(),cpuinfo=Path('/proc/cpuinfo').read_text().split('\n\n')[0],compiler=subprocess.check_output([*shlex.split(os.environ.get('NIFT_CP14B_CXX') or 'g++'),'--version'],text=True),flags='-std=c++17 -O2 -Wall -Wextra -pedantic -pthread',clock='whole-process perf_counter_ns, including identical /usr/bin/time wrappers'),binaries={b:hashlib.sha256(Path(b).read_bytes()).hexdigest() for b in [a.nift,a.legacy]},records=records,comparisons=comparisons,limitation='Local shared machine; preliminary evidence only. Dedicated Linode comparison requires separate owner approval.')
     Path(a.output).write_text(json.dumps(report,indent=2)+'\n');return 0 if report['status']=='PASS' else 1
 if __name__=='__main__':raise SystemExit(main())

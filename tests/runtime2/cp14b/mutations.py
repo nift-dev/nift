@@ -3,6 +3,9 @@
 import argparse,hashlib,json,subprocess,tempfile
 from pathlib import Path
 from functional import APPROVED,CASES,run
+import sys as _sys,os as _os
+_sys.path.insert(0,_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),'..'))
+import build_toolchain as toolchain
 DRAIN='a:=[{"k":3},{"k":1},{"k":2}]; n:=0; fn(cmp(x,y)) { n+=1; if(n==2) { throw error("stop") }; return x.k<y.k }; try { a.sort(cmp) } catch(e) { print("CATCH"); print(a.stringify()) }; print("AFTER")'
 # B04 (owner approval 2026-11-09 17:31): the DRAIN control's VM result is the copy-sort-commit one
 # (owner ruling Q7, 2026-11-07, docs/runtime-2/compatibility.md: a failed comparator sort leaves the
@@ -40,7 +43,7 @@ MUTANTS=[
 RETIRED={11:('missing-const-guard','compiler_array_mutation','const_precedence')}
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--out',required=True);a=p.parse_args();out=Path(a.out);out.mkdir(parents=True,exist_ok=True)
-    objects=[str(p) for root in ['src','minifypp','markuppp'] for p in Path(root).rglob('*.o')]
+    objects=toolchain.cli_objects()  # B10: nift's own object list, not rglob('*.o')
     results=[]
     import comparator_profile as cprof
     prof=cprof.profile(a.nift);unverified=0
@@ -79,11 +82,15 @@ def main():
             if st.get('outcome') not in ['vm','vm-error'] or st.get('vm_executions')!=1 or st.get('legacy_executions')!=0:
                 raise RuntimeError('Normal control did not execute: '+name)
             obj=out/f'm{number}.o';binary=out/f'm{number}'
-            proc=subprocess.run(['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread',f'-DNIFT_COLLECTION_MUTANT={number}','-c',f'src/rt/{stem}.cpp','-o',str(obj)],capture_output=True,text=True)
-            (out/f'm{number}-build.log').write_text(proc.stdout+proc.stderr)
-            if proc.returncode:raise RuntimeError('Mutant compile failure: '+name+' '+proc.stderr)
+            # B10: nift's own compile line (compiler, production guard, CPPFLAGS, CXXFLAGS) plus the
+            # mutant define, into this non-production directory; the object must differ from nift's.
+            toolchain.run(toolchain.production_compile(f'-DNIFT_COLLECTION_MUTANT={number}','-c',f'src/rt/{stem}.cpp','-o',str(obj)),
+                          'mutant compile '+name,log=out/f'm{number}-build.log')
+            if obj.read_bytes()==Path(f'src/rt/{stem}.o').read_bytes():
+                raise RuntimeError(f'Mutant {number} {name} compiled to the production object src/rt/{stem}.o')
             linked=[str(obj) if o==f'src/rt/{stem}.o' else o for o in objects]
-            subprocess.run(['g++','-pthread',*linked,'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)],check=True,capture_output=True)
+            if linked==objects:raise RuntimeError(f'Mutant {number} {name}: src/rt/{stem}.o is not in nift\'s object list')
+            toolchain.run(toolchain.link(linked,binary),'mutant link '+name)
             actual=run(str(binary),'require',source,root);actual_st=actual['stats'][-1] if actual['stats'] else {}
             if number in [1,2]:
                 reason='collection boundary drain failed' if number==1 else 'out of memory (std::bad_alloc)'

@@ -196,6 +196,13 @@ $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
 # storage-level test helpers unreachable), and every production object with
 # compile-object.sh --production (no dependency in tests/).
 PRODUCTION_GUARD := -include src/build/production_tu.h
+# B10, B15 (combined-b3-b5.md sections 73 and 75): the harnesses that compile or link outside
+# make's own rules (cp14b, cp23, the sanctioned mutant builds) take the configured compiler, flags,
+# production guard, libffi archive and object lists from here (tests/runtime2/build_toolchain.py),
+# never `g++`, a hard-coded libffi directory or rglob('*.o').
+HARNESS_TOOLCHAIN_ENV = NIFT_TC_CXX="$(CXX)" NIFT_TC_GUARD="$(PRODUCTION_GUARD)" NIFT_TC_CPPFLAGS="$(CPPFLAGS)" \
+	NIFT_TC_CXXFLAGS="$(CXXFLAGS)" NIFT_TC_LDFLAGS="$(LDFLAGS)" NIFT_TC_LIBFFI_A="$(LIBFFI_A)" \
+	NIFT_TC_CLI_OBJECTS="$(CLI_OBJECTS)" NIFT_TC_RT_SOURCES="$(RT_VALUE_SOURCES) src/RuntimeValue.cpp"
 # Linode certification of 4e97e34e (items 1 and 4): the signatures are written
 # when the Makefile is read (one $(shell) at its end, NIFT_SIGNATURES), not by a
 # FORCE recipe, so `make -q`/`make -n` see an up-to-date tree as up to date; and
@@ -5089,7 +5096,7 @@ test-runtime2-cp14b-sort: $(TARGET) $(CP13B_SWITCH_NIFT)
 
 .PHONY: test-runtime2-cp14b-design-mutants
 test-runtime2-cp14b-design-mutants: $(TARGET)
-	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
+	NIFT_CP14B_CXX="$(CXX)" $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) tests/runtime2/cp14b/design_mutations.py --legacy "$(CP14B_BASE)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/design-mutants"
 
 # D-018c consumers require the independent parser even when invoked separately.
 test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-closures-s1 test-runtime2-closures-s1-mutants test-runtime2-cp14b test-runtime2-cp13b: $(TEST_DIR)/rt-parse-dump$(EXEEXT)
@@ -5125,8 +5132,8 @@ test-runtime2-cp14b-witnesses: $(TARGET) $(CP13B_SWITCH_NIFT)
 test-runtime2-cp14b-sanitize: $(TARGET)
 	@$(CP14B_LINUX_ONLY) true
 	mkdir -p "$(CP14B_EVIDENCE)"
-	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/build_sanitizer.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/san"
-	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/build_drain.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/drain"
+	NIFT_CP14B_CXX="$(CXX)" $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) tests/runtime2/cp14b/build_sanitizer.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/san"
+	NIFT_CP14B_CXX="$(CXX)" $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) tests/runtime2/cp14b/build_drain.py --out "$(CURDIR)/$(TEST_DIR)/cp14b/drain"
 	set -e; for b in cp14b-san cp14b-san-switch; do \
 	  bin="$(CURDIR)/$(TEST_DIR)/cp14b/san/$$b"; \
 	  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/functional.py --nift "$$bin" --legacy "$(CP14B_BASE)" --output "$(CP14B_EVIDENCE)/san-functional-$$b.json"; \
@@ -5137,7 +5144,7 @@ test-runtime2-cp14b-sanitize: $(TARGET)
 	done
 test-runtime2-cp14b-mutants: $(TARGET)
 	@$(CP14B_LINUX_ONLY) true
-	NIFT_CP14B_CXX="$(CXX)" $(PYTHON) tests/runtime2/cp14b/mutations.py --nift "$(CURDIR)/$(TARGET)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/mutants"
+	NIFT_CP14B_CXX="$(CXX)" $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) tests/runtime2/cp14b/mutations.py --nift "$(CURDIR)/$(TARGET)" --out "$(CURDIR)/$(TEST_DIR)/cp14b/mutants"
 	$(MAKE) test-runtime2-cp14b-design-mutants
 test-rt-vm: test-runtime2-cp14b
 test-rt-vm: test-runtime2-cp14b-sort
