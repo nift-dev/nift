@@ -1,4 +1,4 @@
-# Dead-code admission (C118, revised in C119 and C120)
+# Dead-code admission (C118, revised in C119-C121)
 
 Owner ruling 2026-11-11 02:53, D-067 #11. This ruling is a correction: Option A of rescan-post-cp1.md section 13.1 is
 withdrawn. The ruling says:
@@ -573,8 +573,16 @@ callee-named site is deferred only when the **name scan** finds no binding of th
   - **fn declarations, including nested and conditional ones.** Legacy registers a nested fn when its declaration
     executes: `fn(m()) { fn(nope()) { return 5 }` / `return 0 }` / `m()` / then `g()` calling `nope()` prints 5.
     The VM refuses it today (`callable:nope`).
-- **Struct names, and struct method names.** A free call inside a struct method resolves to the receiver's method in
-  legacy. Probe `sm.f`: `helper()` calls `nope()` from `S.run()`, `S` declares `nope`, and legacy prints 7.
+- **Struct names, struct method names and struct field names** (fields added in C121, a blocking finding of
+  REVIEW-C120). The scan covers every field of every struct, in every unit.
+  - **Methods.** A free call made from inside a struct method resolves to the receiver's method in legacy. Probe
+    `sm.f`: `helper()` calls `nope()` from `S.run()`, `S` declares the method `nope`, and legacy prints 7.
+  - **Fields.** The call resolves to a callable **field** of the receiver in the same way. Probe `sf2.f` (C121 record
+    `p10`): `fn(helper()) { return nope() }` / `struct(S) { nope := () => 7` / `fn(run()) { return helper() } }` /
+    `s := S()` / `print(s.run())`. Legacy prints 7.
+    - The VM refuses it today with `struct-field-init` (CP2 Group A), so the hole is latent. It opens once CP2 lands.
+    - The one-line spelling `print(S().run())` fails in legacy on this binary (`unknown value or malformed expression`),
+      so the test uses the binding form.
 - **Import and export names.**
 - **Host-registered callables in embedded use.** Legacy consults `host_.has_host_callable` (ParserExpression.cpp:4272;
   embed/Engine.cpp:102).
@@ -811,7 +819,7 @@ imports.
 src/rt/natives/builtin.h:159), and `os`, `arch` and `platform` are in it. A `static_assert` at builtin.h:156 guards
 appends to builtin_list.inc. Two additions:
 
-- A table-driven test (`tests/runtime2/host_set_complete.py`) lists every built-in that touches the file system, the
+- A table-driven test, `tests/runtime2/host_set_complete.py`, **proposed: not yet written or committed**. It lists every built-in that touches the file system, the
   environment, processes, the clock or the console input. The starting point is legacy's shell-completion name list
   (`nift_completion_names`, src/CLI.cpp:2786), filtered to the effectful names, with `read`, `read_all`, `read_line`,
   `run` and `cmd` added explicitly. For every such name that has a VM native, the test
@@ -966,7 +974,7 @@ programs with imports.
   - `if (false) { windows_only() }` runs.
   - These stay refused: the caller-frame shadow (`fn(h()) { return sha256("a", "b") }` called from `m()`, which binds
     `sha256`); a top-level binding, fn declaration or parameter named like the callee; a nested fn declaration
-    (`nf.f`); a conditional fn declaration; a struct method name (`sm.f`); an import or export name; a
+    (`nf.f`); a conditional fn declaration; a struct method name (`sm.f`); a struct field name (`sf2.f`, C121); an import or export name; a
     host-registered callable in an embedded engine (an embed test registers `nope`).
 - **Statement context of messages.** The reached variants of each allow-listed site run in `print(...)`, `return`,
   nested `return` and assignment. They match legacy's prefixed messages (`return: return: ...`), including the
@@ -1007,6 +1015,7 @@ programs with imports.
 | **Session deferral frozen at definition** (session units defer like scripts) | the session tests: the kind program raises at line 5 or the name program at line 3, instead of the line-2 or line-1 refusal |
 | **A builtin-arity free-function site deferred despite a binding of its name** (name certainty skipped for built-ins) | the caller-frame `sha256` shadow program, which must stay refused |
 | **The name scan misses a nested or conditional fn declaration, or a struct method name** | `nf.f`, the conditional-declaration case and `sm.f`, which must stay refused |
+| **The name scan misses a struct field** (C121) | `sf2.f`, which must stay refused (today by `struct-field-init`; after CP2 by the name scan) |
 | **`export` not exempted** in the host guard's module-init check | the admitted `export(f)` module (5.5) |
 | **An interpolation call missed in module init** | the refused `$[f()]` module (5.5) |
 | The kind-0 assertion widened to the inference internals | the existing B4b and session suites (empty arrays, pending callees) |
@@ -1018,7 +1027,7 @@ programs with imports.
   deferred site changes timing only for allow-listed sites, and only in that they now raise when reached, as legacy
   does.
 - D-013, one engine per unit: never a legacy fallback.
-- **Exit status 1, never 70,** on every deferred raise, uncaught or after a rejected future, including when allocating
+- **The ordinary error status, never 70,** on every deferred raise. That is 1 for scripts and modules; `nift eval` errors exit 2 on both engines. This applies uncaught or after a rejected future, including when allocating
   the message fails.
 - **Heap budget accounting.** The op allocates only the error value on raise. Stubs allocate nothing until called.
   Budget limits and heap statistics for units with unreached deferred sites equal those of the same unit with the
@@ -1046,6 +1055,33 @@ programs with imports.
 - the statement-context prefixes of legacy's messages (5.2);
 - the 11 built-ins where a binding of the name wins in legacy. Their free-function sites are deferred only under name
   certainty, and that must stay so if `binding-name-reserved` and `fn-name-reserved` are implemented.
+
+### 5.7a Conditions for the implementation checkpoint's own review (C121, REVIEW-C120)
+
+The final soundness review found host guard (a), including the print allowance, SOUND, and the dead-code plan SOUND
+after the struct-field fix (5.2). The implementation checkpoint's review must verify these six conditions:
+
+1. **The `is_session` gate covers every unit the session compiler builds,** including the startup file of
+   `nift -i script.f`. Test: `nift -i st.f`, where `st.f` contains an allow-listed site in dead code, keeps today's
+   refusal, and so do later lines.
+2. **A call in module init named like one of the 11 binding-wins built-ins** (`cancel`, `channel`, `deepcopy`, `map`,
+   `recv`, `send`, `set`, `sha256`, `sha256_file`, `stack`, `validate`) counts as a user call, never as a non-host
+   native, whenever that name is bound anywhere in the program (the same whole-program scan as 5.2).
+3. **`host_set_complete.py` classifies every `BuiltinId` explicitly** as host or pure, and fails on any unclassified
+   id. A new built-in therefore cannot be added without a classification.
+4. **`deferral_dependencies.py` gains contexts:**
+   - template text in a module and in an untaken `if`;
+   - fragments;
+   - the other `opaque:*` reasons;
+   - a nested import in a lambda and in a module function.
+5. **Error status:** "the ordinary error status, never 70": 1 for scripts and modules, 2 for `nift eval` errors on both
+   engines (5.7, reworded from "exit 1, never 70").
+6. **The reached-variant tests cover legacy's statement-prefixed messages** (`return: return: ...`), and the
+   empty-after-prefix messages of the 10 file-system members (`cat`, `cd`, `exists`, `is_dir`, `is_file`, `make_dir`,
+   `mkdir`, `open`, `stat`, `touch`).
+
+`host_set_complete.py` (5.5) is proposed and not yet committed. Today's committed pinned test for this plan is
+`tests/runtime2/deferral_dependencies.py`.
 
 ### 5.8 Size and coverage (revised)
 

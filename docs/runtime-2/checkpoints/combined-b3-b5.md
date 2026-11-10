@@ -7321,3 +7321,14 @@ Gates at C120:
 | `tests/runtime2/assign_family.py` | PASS (94 cases) |
 
 Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
+
+### 21. C121: final soundness review of C120 applied (docs only)
+
+REVIEW-C120 found host guard (a), including the print allowance, SOUND, and the dead-code plan SOUND after one
+blocking fix. Both C119 P1s are closed.
+
+| Finding | Change |
+| --- | --- |
+| Blocking: struct fields | the name scan covers every field of every struct in every unit (with struct names and method names); plan test `sf2.f` (legacy prints 7; the VM refuses `struct-field-init` today, latent until CP2); mutant "name scan misses a struct field" |
+| Six conditions | recorded for the implementation checkpoint's review (dead-code-admission.md 5.7a): the session gate covers the `nift -i script.f` startup file; binding-wins names in module init count as user calls; `host_set_complete.py` classifies every BuiltinId; more `deferral_dependencies.py` contexts; "the ordinary error status (eval exits 2), never 70"; statement-prefixed and empty-after-prefix messages |
+| Note | `host_set_complete.py` is proposed, not committed |
