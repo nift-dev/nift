@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Named deferrals (owner 2026-11-10 13:26, item 7; decisions.md D-066; known-limitations.md).
+"""Named deferrals (owner 2026-11-10 13:26, item 7; decisions.md D-065; owner 2026-11-11 02:53, D-067 #2;
+known-limitations.md).
 
 Each deferred construct must be refused clearly and deterministically under the VM default
 (NIFT_VM unset): exit 1, no stdout, `not compiled for the VM (<reason>)` and the "no part of it
@@ -35,6 +36,19 @@ CASES = {
                                  "callable:timer", "before\ntrue\n", False),
     "project_root() (D-053)": ({"main.f": 'print("before")\nprint(project_root() != "")\n'}, "callable:project_root",
                                "before\ntrue\n", True),
+    # D-067 #2 (owner 2026-11-11 02:53): deferred from the initial release.
+    "a[0]++ (D-067 #2a)": ({"main.f": 'print("before")\na := [1]\na[0]++\nprint(a[0])\n'}, "incdec-target",
+                           "before\n2\n", False),
+    "compound assignment as a value (D-067 #2a)": ({"main.f": 'print("before")\na := [1]\nprint(a[0] += 5)\n'},
+                                                   "expression:assignment-target", "before\n6\n", False),
+    "future stored through a nested path (D-067 #2a)": (
+        {"main.f": 'fn[async](f(x)) { return x + 1 }\nprint("before")\nhs := [[0]]\nhs[0][0] = f(1)\nprint(await hs[0][0])\n'},
+        "coro-future-flow:Assign", "before\n2\n", False),
+    "legacy dynamic scope (D-067 #2c)": (
+        {"main.f": 'fn(read_hidden()) { return hidden }\nfn(mk(hidden)) { return read_hidden() }\nprint("before")\nprint(mk(7))\n'},
+        "free-name", "before\n7\n", False),
+    "CP24 project API tracked() (D-067 #2d, D-053)": ({"main.f": 'print("before")\nprint(tracked().size() >= 0)\n'},
+                                                      "callable:tracked", "before\ntrue\n", True),
 }
 
 

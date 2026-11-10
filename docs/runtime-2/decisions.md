@@ -1069,6 +1069,10 @@ From CP12B's three-way check (nift.dev, legacy, approved semantics;
    step-2 record §6.4–6.5. No `vm.cpp` change was needed: the VM already
    passes 0 for "no room left".
 
+
+**Amendment (owner 2026-11-11 02:53, D-067 #3).** See the amendment at the end of D-048: the VM-only refusal of
+plain `@fn(...)` in script context, with legacy unchanged, is approved.
+
 ## D-048 — Script context uses scripting syntax only; `@` directives are template syntax (owner, 2026-10-20)
 
 Supersedes the "other `@` forms are not banned automatically" part of D-047 #1.
@@ -1178,6 +1182,11 @@ ownership, cleanup, cancellation and resource guarantees are unchanged.
 Inexpensive correctness fixes that benefit both engines may stay; a
 legacy-only, Linux-specific adoption mechanism does not qualify. The CP25
 removal condition now covers the legacy launcher and all of its exceptions.
+
+
+**Amendment (owner 2026-11-11 02:53, D-067 #3; also amends D-047 #1).** The VM refuses plain `@fn(...)` in
+script context while the legacy interpreter keeps accepting it, with no legacy-side change. This VM-only refusal is
+the approved behaviour (inventory row `fn-flags`, approved).
 
 ## D-049 — Package compatibility targets Runtime 2.0 (owner, 2026-10-20)
 
@@ -2046,3 +2055,61 @@ was wrong and is withdrawn.
 
 Recorded in compatibility.md ("The assignment family") and known-limitations.md; tests:
 `tests/runtime2/assign_family.py`, mutants `tests/runtime2/assign_family_mutants.py`.
+
+## D-067 — Rescan rulings: positions, deferrals, required features, dead code (owner, 2026-11-11 02:53)
+
+The owner's rulings on the post-checkpoint-1 rescan (docs/runtime-2/checkpoints/rescan-post-cp1.md, C111-C116).
+Each item is cited in the CP25-R inventory as "D-067 #n (owner 2026-11-11 02:53)". Checkpoint 1 is not reopened.
+
+1. **Diagnostic positions.** The 7 refusals that report a position other than legacy's (`context:struct-field`,
+   `coro-module-before-import`, `fn-called-before-declaration`, `for-missing-write`, `string-arg-type`,
+   `import-opaque:legacy-runtime-error`, `import-limit`) are fixed to legacy's position (status `implement`). The 10
+   "more precise" positions (`builtin-arity:deepcopy`, `coro-future-flow:ForBinding`, `coro-future-flow:Throw`,
+   `coro-module-private-async`, `interpolation:non-scalar`, `method:nope`, `non-transferable`,
+   `static-error:push-arity`, `type:member`, `type:script-return`) fall under one common diagnostic decision: a VM
+   diagnostic may point at the actual offending construct when legacy points at an enclosing statement. They become
+   approved only after an independent review verifies, for each, that the VM position identifies the actual offending
+   construct; until then they are "approved-pending-review" and stay PENDING-OWNER.
+2. **Deferred from the initial release** (status `deferred-named`, each with its refusal row and a
+   known-limitations entry):
+   a. the three assignment forms excluded from checkpoint 1: `a[0]++` (`incdec-target`), a compound assignment used as
+      a value (`expression:assignment-target`), a future stored through a nested path (`coro-future-flow:Assign`);
+   b. the three session-only refusals (`builtin-receiver:stringify`, `presentation-struct-method:*`, `session:opaque`);
+      their tests stay; an unsafe behaviour in a session would be a separate defect;
+   c. legacy dynamic scope (`free-name`, `free-name:dynamic-caller`; lexical scoping is the target, D-038);
+   d. the CP24 project and template APIs, under the existing deferral D-053 (and D-065 #5);
+   e. dynamic imports (`import-dynamic`). D-037 approves rejecting unsupported dynamic imports before execution; this
+      item records their deferral from the initial release (D-037 is not broadened).
+3. **`@fn` (amendment to D-047 #1 and D-048 #1).** The VM refuses plain `@fn(...)` in script context while the legacy
+   interpreter keeps accepting it; there is no legacy-side change. This VM-only refusal is the approved behaviour
+   (`fn-flags`, approved).
+4. **Import depth.** An import chain 33 to 63 modules deep runs on the VM, where legacy fails at depth 33 ("maximum
+   template parse depth exceeded"): approved, subject to cycle and resource safety. The VM refuses depth 64
+   (`import-limit`, kMaxModuleDepth, module_graph.h:122): a deliberate resource bound of the recursive module-graph walk
+   (rescan-post-cp1.md section 11a). Pinned by tests/runtime2/import_depth.py.
+5. **Not ratified.** Async self-recursion (`qualified:legacy-await-chain-defect`) and an import reached by two paths
+   (`import-reinitialised`) stay PENDING-OWNER, under investigation.
+6. **Sort-comparator portability** stays a mandatory Linode verification item.
+7. **Required for the initial release** (status `implement`, with a sequence slot): postfix spellings; nested function
+   declarations; documented redeclaration behaviour; `?.` / `?[]`; binding-only const objects;
+   variadics/spread/destructuring (CP3); `export`; ordinary struct functionality (CP2: declaration model and
+   construction in loops; CP2b: struct identity); and the previously approved bytes, `warn`/`err`, read-only path and
+   small-capability items ("remaining approved features").
+8. **Host-import guard.** The 27 `module-host-op:*` refusals are implement items (sequence slot 2), with the bounded
+   repair of rescan-post-cp1.md section 11 as the starting design.
+9. **Investigate first** (stay PENDING-OWNER, direction recorded per family): irregular comparisons, interpolation of
+   unproven kinds, loop-context built-ins, futures in ordinary expressions, capacity limits, and the remaining singles.
+10. **Family grouping** is approved for the uniform builtin-arity, builtin-receiver, unknown-method and
+    unknown-callable rows, evidence-preserving: each family row states its contract; the per-program rows stay, with
+    their evidence, marked "member of <family>"; exceptions with a distinct category or semantics stay separate. No row
+    is deleted.
+11. **Dead code (correction; Option A of rescan-post-cp1.md 13.1 is withdrawn).** The VM rejects unconditionally invalid
+    code even when it is unreachable: malformed syntax, malformed declarations, invalid assignment targets, and
+    constructs the language contract defines as compile-time errors. It does not reject a program because an
+    unreachable branch contains an execution-dependent error (an undefined name, an unavailable platform-specific
+    operation, a run-time type error, an unsupported host op): such an error is raised only if execution reaches it
+    (`if (false) { nope() }` / `print("success")` prints success). An unsupported VM feature in an unreachable branch
+    should ideally not refuse the program; if reached, it is an ordinary error, never a silent legacy fallback.
+    Correct platform-conditional execution is a Runtime 2.0 requirement. The 00:29 early-refusal policy (D-013)
+    applies to genuinely static errors only. The 321 class (ii) rows are reclassified under this rule
+    (docs/runtime-2/checkpoints/dead-code-admission.md).

@@ -195,7 +195,10 @@ history: 528 at C113; +2 in C114 (`type:for-source` restored, `coro-future-flow:
 | retired | 7 | 9 | 9 | 5 | 4 | 11 | 8 |
 | rows | 248 | 293 | 310 | 594 | 595 | 607 | 607 |
 
-Inventory identity: `0c66cad6` `src/`, nift sha256 `8195f1b3...`, tsv revision = the C116 commit.
+**C117 (owner rulings D-067):** approved 46, deferred-named 36, implement 76, PENDING-OWNER 443, retired 8; 609 rows
+(+2 family rows `builtin-arity:*`, `builtin-receiver:*`). Section 18 lists the changes.
+
+Inventory identity: `0c66cad6` `src/`, nift sha256 `8195f1b3...`, tsv revision = the C117 commit (C118 adds dead-code tags only).
 
 ### 2.1 Per-row classes (C115)
 
@@ -2006,17 +2009,17 @@ and async forms.
 
 | Gate | Result |
 | --- | --- |
-| `make test-runtime2-certification-guard` | PASS (historical control; classification self-test, 31 cases) |
-| `make test-rt-lint` | PASS (boundary: 0 problems in 710 files) |
-| `make test-test-integrity` | clean (700 files scanned, 0 findings) |
-| fresh `inventory.py collect` + `report --check` (C116 tsv) | **exit 3** |
-| `python3 -B tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases: 47 legacy-equal, 47 pinned differences or refusals) |
+| `make test-runtime2-certification-guard` | PASS (classification self-test, 31 cases) |
+| `make test-rt-lint` | PASS (0 problems in 710 files) |
+| `make test-test-integrity` | clean (701 files scanned, 0 findings) |
+| fresh `inventory.py collect` + `report --check` (C117 tsv) | **exit 3** |
+| `python3 -B tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases) |
+| `tests/runtime2/named_deferrals.py` | PASS (11 constructs, 5 new D-067 cases) |
+| `make test-runtime2-import-depth` (new) | PASS |
 
-- **Inventory**: G1 PASS, 155 reasons seen (approved 8, deferred-named 17, implement 17, PENDING-OWNER 113, retired 0).
-  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen.
-- **Production code**: `git diff 0c66cad6 -- src/` is empty; nift sha256 is
-  `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
-- **Scratch**: all probes ran in the session scratch directory; `git status` shows only the tsv and the two docs.
+- **Inventory (C117)**: G1 PASS, 155 reasons seen: approved 9, deferred-named 29, implement 27, PENDING-OWNER 90,
+  retired 0. Exit 3 because 90 seen reasons are still PENDING-OWNER (the intended BLOCKED state). No retired reason is seen.
+- **Production code**: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
 
 ## 15. Release-gate issue, still outstanding
 
@@ -2105,3 +2108,21 @@ as a separate issue after the inventory freezes.
 | L-3 | section 12 must-preserve list completed |
 | L-4 | the 14 reclassified rows keep their C114 ii-B tags as "Previous outcome" notes |
 | L-5 | section 13.1 option (a) stated without the precedent clause |
+
+## 18. Owner rulings 2026-11-11 02:53 (D-067), applied in C117
+
+decisions.md D-067 records the rulings; the inventory applies them (each row cites "D-067 #n (owner 2026-11-11 02:53)").
+
+| D-067 item | Applied to |
+| --- | --- |
+| #1 positions | the 7 position fixes set to `implement`; the 10 VM-more-precise positions marked approved-pending-review (still PENDING-OWNER) |
+| #2 deferrals | 19 rows `deferred-named`: `incdec-target`, `expression:assignment-target`, `coro-future-flow:Assign`; `builtin-receiver:stringify`, `presentation-struct-method:*`, `session:opaque`; `free-name`, `free-name:dynamic-caller`; the CP24 rows (`callable:build`, `build_all`, `build_names`, `inject`, `status`, `track`, `tracked`, `untrack`, `build_repair`, `opaque:template-text`; D-053); `import-dynamic` (D-037 cited, not broadened). known-limitations.md "Further deferrals"; named_deferrals.py gains 5 cases |
+| #3 `@fn` | `fn-flags` approved; amendment recorded under D-047 and D-048 |
+| #4 import depth | `difference:import-depth` approved; kMaxModuleDepth = 64 (module_graph.h:122) documented as a deliberate resource bound of the recursive graph walk (module_graph.cpp:275, introduced with the loader in CP12b f45f52d3); tests/runtime2/import_depth.py (`make test-runtime2-import-depth`) pins depth 33 running, legacy failing at 33, and depth 64 refused |
+| #5 not ratified | async self-recursion and `import-reinitialised` untouched (PENDING-OWNER) |
+| #6 | sort-comparator portability stays a mandatory Linode item (section 16) |
+| #7 required | postfix, nested fn, `fn-redeclared` (document the later-definition-wins behaviour), `?.`/`?[]`, const objects, `export`, bytes, `warn`/`err`/`read`: `implement` (remaining approved features); variadics/spread/destructuring: CP3; structs: CP2 (declaration model, construction in loops) and CP2b (`struct-assign`, `struct-value`, `struct-no-method`) |
+| #8 host-import guard | 27 `module-host-op:*` rows `implement`, sequence slot 2 |
+| #9 investigate first | irregular comparisons, interpolation, loop-context built-ins, futures in expressions, capacity limits and the remaining (i) singles: direction recorded per row, PENDING-OWNER |
+| #10 family grouping | family rows `builtin-arity:*` (123 members), `builtin-receiver:*` (77), `method:*` (40), `callable:*` (10) state their contracts; members keep their rows and evidence, marked "member of <family>"; exceptions unmarked; nothing deleted |
+| #11 dead code | Option A withdrawn; the 321 (ii) rows are reclassified in C118 (docs/runtime-2/checkpoints/dead-code-admission.md) |

@@ -35,6 +35,20 @@ platforms it prints a SKIP line.
 | Timers: `timer()` and its handle methods | `callable:timer`, `method:start`, `method:stop`, `method:elapsed`, … | `NIFT_VM=0` |
 | `project_root()` | `callable:project_root` | `NIFT_VM=0`, and project builds (the template compiler, CP24, is deferred: D-053) |
 
+**Further deferrals (owner, 2026-11-11 02:53; D-067 #2).** Deferred from the initial release; each keeps working on
+legacy and is refused before execution on the VM. `make test-runtime2-named-deferrals` pins the script-reachable ones;
+the session-only ones keep their existing tests (an unsafe session behaviour would be a separate defect).
+
+| Construct | VM refusal reason | Still works with |
+| --- | --- | --- |
+| `a[0]++` (excluded from checkpoint 1) | `incdec-target` | `NIFT_VM=0` |
+| A compound assignment used as a value: `print(a[0] += 5)` | `expression:assignment-target` | `NIFT_VM=0` |
+| A future stored through a nested path: `hs[0][0] = f(1)` | `coro-future-flow:Assign` | `NIFT_VM=0` |
+| In a session: `.stringify()` on an unproven receiver, a struct's own presentation method, opaque source | `builtin-receiver:stringify`, `presentation-struct-method:*`, `session:opaque` | `NIFT_VM=0` |
+| Legacy dynamic scope: a callee reading its caller's local | `free-name`, `free-name:dynamic-caller` | `NIFT_VM=0` (lexical scoping is the target, D-038) |
+| CP24 project and template APIs (`build`, `track`, `tracked`, `untrack`, `inject`, `status`, `build_repair`, template text in scripts) | `callable:build`, `callable:tracked`, ..., `opaque:template-text` | `NIFT_VM=0`, project builds (D-053, D-065 #5) |
+| Dynamic imports (a non-literal import path) | `import-dynamic` | rejected before execution (D-037); legacy also rejects the corpus forms ("import path must be a string expression") |
+
 ## Approved refusals (release behaviour)
 
 This construct is refused on the VM by an owner decision. It is not pending work.
@@ -42,6 +56,7 @@ This construct is refused on the VM by an owner decision. It is not pending work
 | Construct | Reason | Decision |
 | --- | --- | --- |
 | A map, set or stack as a map key or set member, lookups included | `collection-mutable-key` | D-NEXT-refsem #6 (keys, D6) |
+| Plain `@fn(...)` in a script (legacy keeps accepting it) | `fn-flags` | D-067 #3, amending D-047 #1 / D-048 #1 |
 
 ## Refusals awaiting an owner ruling
 
@@ -52,8 +67,6 @@ owner rules. (Review of C83–C99, P1-2.)
 | Construct | Reason | Why it is not approved |
 | --- | --- | --- |
 | A function named like a built-in | `fn-name-reserved` | D-009 #3 decides the opposite: user functions take precedence over built-ins. The refusal defers D-009 #3 and does not implement it. It is not the owner's 13:26 "reserved-name check" either; that item is `binding-name-reserved` (status `implement`). |
-| A name not declared in its scope (a dynamic capture dependency) | `free-name` | No owner decision text approves it; its inventory row says "release approval pending". |
-| Plain `@fn(...)`, and `@fn` flags the VM does not support, in a script | `fn-flags` | D-047 #1 and D-048 #1 approve rejecting plain `@fn` in **both** engines. Legacy keeps accepting it, so the VM-only refusal is not what was approved. |
 
 **Unapproved behavioural differences.** Some programs run on the VM but give another result than
 legacy, with no approval. They are listed, each with its gate, case, program and both outputs, in
@@ -63,7 +76,7 @@ named gate still fails on its case until the owner rules. Today there are two:
   the argument twice;
 - `named-precedence`: the VM prints `int`, legacy `function`.
 
-**Plain `@fn` in a script: an explicit legacy/VM difference.**
+**Plain `@fn` in a script: an explicit legacy/VM difference (approved by D-067 #3).**
 - D-047 and D-048 make plain `@fn(...)` invalid in script context; the canonical form is
   `fn(...)`.
 - The VM refuses it (`fn-flags`).
@@ -73,6 +86,10 @@ named gate still fails on its case until the owner rules. Today there are two:
 - Repository fixtures use `fn(...)` (D-048 #4).
 
 ## Approved semantic differences
+
+- **Import chains 33 to 63 modules deep** run on the VM; legacy fails at depth 33 ("maximum template parse depth
+  exceeded"). Approved, subject to cycle and resource safety (D-067 #4). Depth 64 is refused (`import-limit`, the
+  bounded module-graph walk). Pinned by `make test-runtime2-import-depth`.
 
 Where the VM runs a program but its result differs from legacy on purpose, the difference is
 approved and listed in [compatibility.md](compatibility.md). This list does not repeat them. The
