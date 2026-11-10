@@ -4099,3 +4099,32 @@ owner-approved B5 semantic difference.
     `compiler_coro_admit.cpp:128`; the site is now line 138. That pre-existing row was left as it
     was; the new rows name 138.
 - No production change: `nift` is f063f1a9….
+
+## 78. Repair batch, B29: the handle-string lint's one exact exception (C90, lint)
+
+- **The finding** (triage BLOCKERS.md B29): `src/rt/render.cpp:11`,
+  `return std::string("\x1fnift:callable:") + (function.is_lambda`.
+- **What it is:** an intentional exception, not a legacy handle string.
+  - It is `rt::callable_marker`, legacy's internal callable tag.
+  - It is used only for `nift eval --json` of a function value (`eval_result.cpp`). That output
+    is kept as it was by review L1 (b4-dispatch.md), and is carried for an owner decision.
+  - It names no handle: CP17's typed handles (files, commands, streams) are what the lint
+    guards.
+  - It was added on 2026-10-27 (61136086), after the lint (f561e341, 2026-10-19), and the gate
+    has failed since then.
+- **The allowlist:**
+  - `tests/runtime2/cp17/no_handle_strings.py` gains `ALLOWED`. It has one entry, keyed by the
+    repository path and the line's exact stripped text, with its reason.
+  - The general pattern and the comment rule are unchanged.
+  - An entry that matches no line in a scanned root is itself a problem, so it cannot outlive
+    its line or move to another.
+  - Each accepted line is printed with its reason.
+- **Self-test:** 11 cases. The 8 existing ones, plus three for the allowlist:
+  - the pinned line is accepted in its file;
+  - the same line in another file is flagged;
+  - a changed line in the allowlisted file is flagged.
+- **Results:**
+  - `no_handle_strings.py src/rt`: 0 problems, with one `allowed` line.
+  - A planted `"\x1fnift:file:"` in another file is still flagged.
+  - `make test-rt-handles` PASS.
+- No production change: `nift` is f063f1a9….
