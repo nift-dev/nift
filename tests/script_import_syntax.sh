@@ -27,14 +27,21 @@ EOF
 [[ "$(cd "$T/scripts" && "$NIFT" spaced.f)" == 42 ]]
 [[ "$(cd "$T/scripts" && "$NIFT" legacy.f)" == 42 ]]
 # Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): a function named like a built-in
-# (`import`) is an approved VM-default refusal (fn-name-reserved, D-009 #3). The session refuses that
+# (`import`) is refused under the VM default (fn-name-reserved). The session refuses that
 # first statement before running it and stops: nothing ran. Legacy (NIFT_VM=0) keeps the original
 # check (the import statement is not overridden by the user callable).
+# Review of C83-C99, P1-1/P1-2 (combined-b3-b5.md section 89): the refusal counts only while its
+# inventory status (classification.tsv) is approved or deferred-named; fn-name-reserved is PENDING-OWNER.
+status=$(python3 -B "$(dirname "$0")/runtime2/approved_refusal.py" status fn-name-reserved)
+case "$status" in approved|deferred-named) ;; *)
+    echo "FAIL REPL fn named import: refused with fn-name-reserved, whose inventory status is $status (only approved or deferred-named may be accepted)" >&2
+    exit 1 ;;
+esac
 rc=0
 repl=$(cd "$T/scripts" && printf '%s\n' 'fn(import(x)) { return 99 }' 'import("module.f")' 'answer()' | "$NIFT" 2>&1) || rc=$?
 if [[ $rc -ne 1 ]] || ! grep -qF 'NIFT_VM session refused: fn-name-reserved:' <<<"$repl" \
    || ! grep -qF 'note: this statement was not executed' <<<"$repl" || grep -q '42\|99' <<<"$repl"; then
-    echo "FAIL REPL fn named import: not the approved session refusal (fn-name-reserved, D-009 #3): exit $rc: $repl" >&2
+    echo "FAIL REPL fn named import: not the session refusal fn-name-reserved: exit $rc: $repl" >&2
     exit 1
 fi
 rc=0

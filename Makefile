@@ -1526,6 +1526,11 @@ test-runtime2-module-host-order-mutant: $(TARGET)
 test-runtime2-named-deferrals: $(TARGET)
 	$(PYTHON) tests/runtime2/named_deferrals.py --nift "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-named-deferrals
+# Review of C83-C99, P1-1/P2-2 (combined-b3-b5.md section 89): the refusal helpers' negative controls.
+.PHONY: test-runtime2-approved-refusal-selftest
+test-runtime2-approved-refusal-selftest: $(TARGET)
+	bash tests/runtime2/approved_refusal_selftest.sh "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-approved-refusal-selftest
 
 .PHONY: test-rt-host-sources-list
 test-rt-host-sources-list:

@@ -4473,3 +4473,66 @@ owner-approved B5 semantic difference.
   - On the local inventory: G1 PASS, 157 seen (approved 8, deferred-named 17, implement 19,
     PENDING-OWNER 113, retired 0), so `--check` exits 3.
 - No production change: `nift` is f063f1a9….
+
+## 89. Review of C83–C99, P1-1, P2-1 and P2-2: a refusal is accepted only when pinned and approved (C101, tests)
+
+- **The shared rule** (`tests/runtime2/approved_refusal.py` and `approved_refusal.sh`). A gate may
+  count a VM-default refusal as expected only if all of these hold:
+  - the gate pins that case's reason itself; it is never read from the VM's output;
+  - the reason's CP25-R status is `approved` or `deferred-named`. The status is read from
+    classification.tsv (exact row, else the `prefix:*` family row), never hard-coded;
+  - the program is refused with exactly that reason before anything runs: exit 1, no stdout, the
+    note, and statistics with 0 VM and 0 legacy executions;
+  - the legacy channel (`NIFT_VM=0`) still gives the recorded result.
+
+  A PENDING-OWNER, implement or retired reason, a reason with no row, an unpinned refused case, or a
+  different reason fails, naming the case and the reason. The hard-coded `APPROVED` table is gone.
+- **P1-1:**
+  - `tests/v410_native_dispatch_parity.py` pins five refusals:
+    - `callable:len` (two cases);
+    - `callable:to_string`;
+    - `callable:unknown`;
+    - `static-error:arity`.
+
+    The last four reasons are PENDING-OWNER (rows added in C100), so the gate now **fails on all five
+    cases**. That is expected until the owner rules; it was not softened.
+  - `tests/runtime2/cp19/eval_entry.py` pins the seven `NIFT_VM=require` units:
+    - `unresolved-name`;
+    - `opaque:legacy-runtime-error` (two);
+    - `builtin-bytes:bytes` (three);
+    - `callable:timer`.
+
+    `callable:timer` is deferred-named. The others are PENDING-OWNER or implement, so
+    test-cp19-shared-eval now **fails on six units**, naming each one.
+  - `tests/script_import_syntax.sh` (test-v43-language) checks fn-name-reserved's status the same
+    way, and now fails: the status is PENDING-OWNER (C100).
+- **P2-1:**
+  - `tests/v410_filesystem_recipe_parity.py` pins `fn-name-reserved` for its seven stat cases.
+  - `tests/v410_sort_factory_parity.py` pins `free-name` for `dynamic-capture-dependency`.
+  - Any other refused case fails, whatever its reason. Both gates now fail on these pinned reasons,
+    which are PENDING-OWNER since C100.
+- **P2-2: the legacy oracle is mandatory.**
+  - The shell helper fails without its sixth argument (the legacy stdout), and requires exit 0 with
+    exactly that output.
+  - `check()` runs the legacy channel itself. It requires a recorded `(exit, stdout[, stderr])` or a
+    judging function, and fails without one.
+- **Negative controls** (`make test-runtime2-approved-refusal-selftest`, on the test-rt-vm edge,
+  `tests/runtime2/approved_refusal_selftest.sh`):
+  - Shell, 6 controls:
+    - an approved reason with an oracle passes;
+    - a missing oracle, a wrong oracle, a PENDING-OWNER reason (`callable:len`), a reason with no
+      row, and another reason than the refusal all fail.
+  - Python, 11 controls:
+    - the positive control and a pinned accepted reason pass;
+    - a PENDING-OWNER reason, an unknown reason, an implement reason, a missing oracle, a wrong
+      oracle, a wrong pinned reason and a program that runs all fail;
+    - a case with no pin refused with an **approved** reason (`collection-mutable-key`) fails. This
+      is the control for a running case becoming refused;
+    - a case refused with an approved reason other than its pin fails.
+
+  PASS.
+- **Remaining callers:**
+  - `v48_map_set_index_smoke.sh` still accepts its two `collection-mutable-key` cases (approved,
+    D-NEXT-refsem #6), with legacy exact.
+  - The relative-import smoke now fails at its `fn-flags` pin (PENDING-OWNER).
+- No production change: `nift` is f063f1a9….

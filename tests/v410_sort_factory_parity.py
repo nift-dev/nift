@@ -22,6 +22,8 @@ contract = json.loads(Path(__file__).with_name('v410_sort_factory_cases.json').r
 # commit in the cases file), each scoped to one case and one exact change.
 # D-018 (feature-site-dx): an error raised in a try body is reported where it
 # occurs ([2,1].sort_by at column 7), not at the try statement (1:1).
+# The VM-default refusal expected per case (review of C83-C99, P2-1); any other refused case fails.
+EXPECTED_REFUSAL = {'dynamic-capture-dependency': 'free-name'}
 APPROVED = {
     'bad-key-cleanup': ('bad-key-cleanup.f:1:1: sort_by: key must be scalar',
                         'bad-key-cleanup.f:1:7: sort_by: key must be scalar'),
@@ -50,16 +52,24 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
             expected = (case['exit'], case['stdout'], case['stderr'].replace(before, after))
         actual = execute(binary)
         reason = approved_refusal.refusal_reason(actual[2])
-        if actual != expected and reason in approved_refusal.APPROVED:
-            # Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): an approved VM-default
-            # refusal (here free-name, owner ruling 2026-10-29) is pinned exactly; the recorded
-            # contract is checked on the legacy channel, NIFT_VM=0.
-            problem = approved_refusal.check([binary, str(path)], str(root), reason)
+        if actual != expected and reason is not None:
+            # Owner 2026-11-10 13:26, item 5, and review of C83-C99, P2-1 (combined-b3-b5.md sections 85
+            # and 89): a refusal counts only for a case whose reason is pinned in EXPECTED_REFUSAL and
+            # whose inventory status is approved or deferred-named; the recorded contract is checked
+            # on the legacy channel (NIFT_VM=0) by approved_refusal.check.
+            problem = approved_refusal.pinned_problem(case['name'], EXPECTED_REFUSAL, reason)
+            if problem is None:
+                problem = approved_refusal.check(
+                    case['name'], [binary, str(path)], str(root), reason,
+                    lambda q: None if (q.returncode, q.stdout, normalize_fixture_paths(q.stderr, root_aliases))
+                    == oracle else repr((q.returncode, q.stdout, q.stderr)))
             if problem:
-                raise SystemExit(f"FAIL {case['name']}: {problem}")
-            actual = execute(binary, dict(os.environ, NIFT_VM='0'))
-            print(f"PASS {case['name']}: VM default refused before execution ({reason}, "
-                  f"{approved_refusal.APPROVED[reason]}); legacy channel exact")
+                raise SystemExit(f"FAIL {problem}")
+            print(f"PASS {case['name']}: VM default refused before execution ({reason}, status "
+                  f"{approved_refusal.status(reason)}); legacy channel exact")
+            if baseline and execute(baseline) != oracle:
+                raise SystemExit(f"FAIL baseline {case['name']}")
+            continue
         if actual != expected:
             raise SystemExit(f"FAIL {case['name']}: {actual!r} != {expected!r}")
         if baseline and execute(baseline) != oracle:

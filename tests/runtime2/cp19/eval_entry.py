@@ -6,6 +6,12 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import approved_refusal  # noqa: E402
+
+
+refusal_failures = []
 
 
 def main():
@@ -106,9 +112,14 @@ def main():
 
         # Unsupported expression units select legacy BEFORE any evaluation.
         # They are never called VM coverage, and require never evaluates them.
-        for expression in ['missing', '1 +',
-                           '[3,1,2].sort()', 'bytes([65,66])', '{"nested":bytes([65])}',
-                           'timer()', 'bytes("hi")']:
+        # Review of C83-C99, P1-1 (combined-b3-b5.md section 89): each unit's refusal reason is pinned,
+        # and it counts as expected only when its CP25-R inventory status is approved or deferred-named
+        # (classification.tsv via approved_refusal.py); otherwise the case fails, naming its reason.
+        pinned = {'missing': 'unresolved-name', '1 +': 'opaque:legacy-runtime-error',
+                  '[3,1,2].sort()': 'opaque:legacy-runtime-error', 'bytes([65,66])': 'builtin-bytes:bytes',
+                  '{"nested":bytes([65])}': 'builtin-bytes:bytes', 'timer()': 'callable:timer',
+                  'bytes("hi")': 'builtin-bytes:bytes'}
+        for expression in pinned:
             expected, _ = run(['eval', expression], '0')
             actual, rows = run(['eval', expression], '1')
             assert actual == expected, (expression, expected, actual)
@@ -117,8 +128,12 @@ def main():
             refused, rows = run(['eval', expression], 'require')
             # B28 (combined-b3-b5.md section 80): the refusal wording of the VM default (0503062d,
             # "no silent legacy fallback"); it used to name NIFT_VM=require.
-            assert (refused[0] == 1 and refused[1] == '' and 'not compiled for the VM (' in refused[2]
-                    and 'note: the program was not executed: no part of it ran' in refused[2]), refused
+            assert (refused[0] == 1 and refused[1] == ''
+                    and approved_refusal.refusal_reason(refused[2]) == pinned[expression]
+                    and 'note: the program was not executed: no part of it ran' in refused[2]), (expression, refused)
+            problem = approved_refusal.acceptance_problem(repr(expression), pinned[expression])
+            if problem:
+                refusal_failures.append(problem)
             assert rows[0]['outcome'] == 'require-error', rows
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 0), rows
 
@@ -160,6 +175,10 @@ def main():
             actual, rows = run(argv, 'require')
             assert actual == expected and rows == [], (argv, actual, expected, rows)
 
+    for problem in refusal_failures:
+        print('FAIL', problem)
+    if refusal_failures:
+        sys.exit(f'FAIL CP19 expression parity/routing: {len(refusal_failures)} refusal(s) not accepted')
     print(f'PASS CP19 expression parity/routing: {len(records)} process observations')
 
 
