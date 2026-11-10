@@ -4225,3 +4225,29 @@ owner-approved B5 semantic difference.
 - **Result.** `vm_modules.py --gen 100`: PASS, 60 programs plus 100 random module programs, all on
   the VM.
 - vm_modules.py original sha256 `03e631e5db9b94a4…`. Production unchanged: f063f1a9….
+
+## 82. Owner 13:26, item 2: the relative-import fixtures use `fn(...)` (C94, tests)
+
+- **What was wrong.** `test-v46-relative-imports` failed on plain `@fn(...)` declarations in its
+  fixtures (`fn-flags`), so the fixtures never reached what they test. They were written in a
+  syntax D-047 #1 and D-048 #1 make invalid in script context.
+- **Migration** (D-048 #4).
+  - Every plain `@fn(` that opens a declaration in a script-context fixture is now `fn(`: 23 in
+    `v44_relative_import_ownership_smoke.sh` and 9 in `v46_import_worker_ownership_smoke.sh`.
+  - Flagged forms (`@fn[async]`) are not plain `@fn` and are unchanged.
+  - The two helpers imported from a template (`templates/…/helper.f`, template context) keep their
+    `@fn`.
+  - Behaviour before and after: both smokes PASS on legacy (`NIFT_VM=0`) before and after.
+- **Legacy is not changed:** the owner declined the legacy-side rejection. Legacy accepting plain
+  `@fn` in a script is therefore recorded as an explicit legacy/VM difference in
+  docs/runtime-2/known-limitations.md (section 87). The smoke pins it at its start:
+  - the VM default refuses `@fn(v()) { return 3 }` with `fn-flags` before running anything;
+  - `NIFT_VM=0` prints `3`.
+- **Status after the migration.** Under the VM default the smokes now reach their import checks.
+  - The v44 smoke stops at a package entry's delayed import inside a function (`import-nested`).
+    That is a named deferral (D-065, section 87).
+  - The v46 smoke stops at `coro-module-init-task` (D-064 #2, keep refused).
+  - So test-v46-relative-imports still fails, now on those two refusals rather than on fixture
+    syntax.
+- Original sha256: v44 smoke `596c91c6038e1958…`, v46 smoke `a1e44df7ce6fb4b2…`. Production
+  unchanged: f063f1a9….

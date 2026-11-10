@@ -35,19 +35,21 @@ make_native_symlink() {
       ;;
   esac
 }
+# Owner 2026-11-10 13:26, item 2 (combined-b3-b5.md section 82): the fixtures below use the
+# canonical script form fn(...) (D-048 #4), so they test relative-import ownership, not `@fn`.
 
 # Direct/legacy parity, nested paths, Windows separators, and no root fallback.
 mkdir -p "$t/direct/modules/nested"
 cat > "$t/direct/helper.f" <<'F'
-@fn(value()) { return "decoy" }
+fn(value()) { return "decoy" }
 export(value)
 F
 cat > "$t/direct/modules/helper.f" <<'F'
-@fn(value()) { return "owned" }
+fn(value()) { return "owned" }
 export(value)
 F
 cat > "$t/direct/modules/win.f" <<'F'
-@fn(win_value()) { return "win" }
+fn(win_value()) { return "win" }
 export(win_value)
 F
 cat > "$t/direct/modules/nested/one.f" <<'F'
@@ -55,7 +57,7 @@ cat > "$t/direct/modules/nested/one.f" <<'F'
 export(two)
 F
 cat > "$t/direct/modules/two.f" <<'F'
-@fn(two()) { return "nested" }
+fn(two()) { return "nested" }
 export(two)
 F
 cat > "$t/direct/modules/main.f" <<'F'
@@ -104,48 +106,48 @@ printf '{"name":"bare","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nift
 printf '{"dependencies":{"bare":{"source":"./bare","ref":"local"},"owner":{"source":"./owner","ref":"local"}}}\n' > "$site/manifest.json"
 printf '{"bare":{"source":"./bare","requested":"local","commit":"local"},"owner":{"source":"./owner","requested":"local","commit":"local"}}\n' > "$site/.nift/packages.lock.json"
 cat > "$site/.nift/packages/bare/src/main.f" <<'F'
-@fn(bare_value()) { return "bare-package" }
+fn(bare_value()) { return "bare-package" }
 export(bare_value)
 F
 cat > "$pkg/src/dynamic.f" <<'F'
-@fn(dynamic_value()) { return "function-owned" }
+fn(dynamic_value()) { return "function-owned" }
 export(dynamic_value)
 F
 cat > "$pkg/src/method-helper.f" <<'F'
-@fn(method_value()) { return "method-owned" }
+fn(method_value()) { return "method-owned" }
 export(method_value)
 F
 cat > "$pkg/src/lambda-helper.f" <<'F'
-@fn(lambda_value()) { return "lambda-owned" }
+fn(lambda_value()) { return "lambda-owned" }
 export(lambda_value)
 F
 cat > "$pkg/src/runtime-child.f" <<'F'
-@fn(runtime_child()) { import("./runtime-grand.f"); return runtime_grand() }
+fn(runtime_child()) { import("./runtime-grand.f"); return runtime_grand() }
 export(runtime_child)
 F
 cat > "$pkg/src/runtime-grand.f" <<'F'
-@fn(runtime_grand()) { return "runtime-transitive-owned" }
+fn(runtime_grand()) { return "runtime-transitive-owned" }
 export(runtime_grand)
 F
 cat > "$pkg/src/sub/child.f" <<'F'
-@fn(child_value()) { import("./grand.f"); return grand_value() }
+fn(child_value()) { import("./grand.f"); return grand_value() }
 export(child_value)
 F
 cat > "$pkg/src/sub/grand.f" <<'F'
-@fn(grand_value()) { return "transitive-owned" }
+fn(grand_value()) { return "transitive-owned" }
 export(grand_value)
 F
 cat > "$pkg/src/grand.f" <<'F'
-@fn(grand_value()) { return "package-root-decoy" }
+fn(grand_value()) { return "package-root-decoy" }
 export(grand_value)
 F
 cat > "$pkg/src/main.f" <<'F'
-@fn(private_callback(x)) { return "package-" + x }
+fn(private_callback(x)) { return "package-" + x }
 callback := private_callback
-@fn(load_function()) { import("./dynamic.f"); return dynamic_value() }
-@fn(load_runtime_child()) { import("./runtime-child.f"); return runtime_child() }
-@fn(traversal_escape()) { import("../../../../package-decoy.f"); return package_decoy() }
-@fn(symlink_escape()) { import("./outside-link.f"); return outside_value() }
+fn(load_function()) { import("./dynamic.f"); return dynamic_value() }
+fn(load_runtime_child()) { import("./runtime-child.f"); return runtime_child() }
+fn(traversal_escape()) { import("../../../../package-decoy.f"); return package_decoy() }
+fn(symlink_escape()) { import("./outside-link.f"); return outside_value() }
 @struct(loader) { fn(load()) { import("./method-helper.f"); return method_value() } }
 make_loader := loader()
 load_lambda := () => { import("./lambda-helper.f"); return lambda_value() }
@@ -163,9 +165,9 @@ export(child_value)
 export(bare_value)
 F
 cat > "$site/main.f" <<'F'
-@fn(private_callback(x)) { return "consumer-" + x }
-@fn(dynamic_value()) { return "consumer-dynamic" }
-@fn(grand_value()) { return "consumer-grand" }
+fn(private_callback(x)) { return "consumer-" + x }
+fn(dynamic_value()) { return "consumer-dynamic" }
+fn(grand_value()) { return "consumer-grand" }
 import("owner")
 print(load_function())
 print(load_runtime_child())
@@ -193,7 +195,7 @@ if (cd "$site" && "$NIFT_ABS" leak.f >/dev/null 2>&1); then
   exit 1
 fi
 cat > "$site/package-decoy.f" <<'F'
-@fn(package_decoy()) { return "consumer-decoy" }
+fn(package_decoy()) { return "consumer-decoy" }
 export(package_decoy)
 F
 cat > "$site/traversal.f" <<'F'
@@ -206,7 +208,7 @@ if (cd "$site" && "$NIFT_ABS" traversal.f >/dev/null 2>"$t/traversal.err"); then
 fi
 grep -F 'package-relative import escapes package root' "$t/traversal.err" >/dev/null
 cat > "$t/outside-package.f" <<'F'
-@fn(outside_value()) { return "outside" }
+fn(outside_value()) { return "outside" }
 export(outside_value)
 F
 if make_native_symlink "$t/outside-package.f" "$pkg/src/outside-link.f"; then

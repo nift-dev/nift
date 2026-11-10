@@ -16,28 +16,28 @@ printf '{"name":"alias-owner","version":"0.1.0","entry":"src/main.f"}\n' > "$sit
 printf '{"dependencies":{"alias-owner":{"source":"./alias-owner","ref":"local"},"async-owner":{"source":"./async-owner","ref":"local"},"init-worker":{"source":"./init-worker","ref":"local"},"left":{"source":"./left","ref":"local"},"right":{"source":"./right","ref":"local"},"worker":{"source":"./worker","ref":"local"}}}\n' > "$site/manifest.json"
 printf '{"alias-owner":{"source":"./alias-owner","requested":"local","commit":"local"},"async-owner":{"source":"./async-owner","requested":"local","commit":"local"},"init-worker":{"source":"./init-worker","requested":"local","commit":"local"},"left":{"source":"./left","requested":"local","commit":"local"},"right":{"source":"./right","requested":"local","commit":"local"},"worker":{"source":"./worker","requested":"local","commit":"local"}}\n' > "$site/.nift/packages.lock.json"
 cat > "$site/.nift/packages/worker/src/child.f" <<'F'
-@fn(child_value(x)) { return x }
+fn(child_value(x)) { return x }
 export(child_value)
 F
 cat > "$site/.nift/packages/worker/src/main.f" <<'F'
 counter := [0]
-@fn(worker_job(x)) {
+fn(worker_job(x)) {
   sleep(20)
   counter[0] += 1
   import("./child.f")
   return child_value(x) + counter[0]
 }
-@fn(parent_counter()) { return counter[0] }
+fn(parent_counter()) { return counter[0] }
 export(worker_job)
 export(parent_counter)
 F
 cat > "$site/.nift/packages/left/src/main.f" <<'F'
-@fn(same()) { return "left" }
+fn(same()) { return "left" }
 left_cb := same
 export(left_cb)
 F
 cat > "$site/.nift/packages/right/src/main.f" <<'F'
-@fn(same()) { return "right" }
+fn(same()) { return "right" }
 right_cb := same
 export(right_cb)
 F
@@ -53,7 +53,7 @@ export(same_name)
 F
 cat > "$site/.nift/packages/init-worker/src/main.f" <<'F'
 seed := 40
-@fn(init_thread_job()) { return seed + 2 }
+fn(init_thread_job()) { return seed + 2 }
 @fn[async](init_async_job()) { return seed + 3 }
 init_thread := thread(init_thread_job)
 init_future := init_async_job()
@@ -64,7 +64,7 @@ export(async_value)
 F
 cat > "$site/.nift/packages/alias-owner/src/child.f" <<'F'
 shared := [[0]]
-@fn(bump()) { shared[0][0] += 1; return shared[0][0] }
+fn(bump()) { shared[0][0] += 1; return shared[0][0] }
 export(shared)
 export(bump)
 F
@@ -72,13 +72,13 @@ cat > "$site/.nift/packages/alias-owner/src/main.f" <<'F'
 import("./child.f")
 alias := shared
 slot := shared[0]
-@fn(mutate()) {
+fn(mutate()) {
   bump()
   alias[0][0] += 10
   slot[0] += 100
   return [shared[0][0], alias[0][0], slot[0]]
 }
-@fn(state()) { return [shared[0][0], alias[0][0], slot[0]] }
+fn(state()) { return [shared[0][0], alias[0][0], slot[0]] }
 @fn[async](mutate_async()) { return mutate() }
 export(mutate)
 export(state)
