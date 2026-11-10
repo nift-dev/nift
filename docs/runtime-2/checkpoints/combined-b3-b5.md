@@ -4561,3 +4561,71 @@ owner-approved B5 semantic difference.
   - Both new SKIP lines are in `tests/runtime2/skip_phrases.tsv`: the printed one as `detected`, the
     docstring line as `justified`. The certification guard's phrase inventory requires that.
 - No production change: `nift` is f063f1a9….
+
+## 91. Review of C100–C102, P1-1 and P2-2: filesystem-recipe and sort-factory report every failure (C103, tests and inventory)
+
+- **Collect, then exit.** `tests/v410_filesystem_recipe_parity.py` and `tests/v410_sort_factory_parity.py`
+  no longer stop at their first failure. Each failing case prints a `FAIL <case>:` line with its
+  reason and status, or its difference. Each gate then lists them all and exits 1.
+- **Pins.** Every refused case is pinned to its actual reason:
+  - **filesystem**:
+    - `fn-name-reserved` ×7;
+    - `builtin-lazy-args:move` ×13, `builtin-arity:move` ×2;
+    - `builtin-arity:copy` ×13, `spread` ×1;
+    - pure cases: `postfix-spelling` ×49, `context:assignment-error`, `builtin-arity:split`,
+      `builtin-arity:last`, `unresolved-name`, `opaque:legacy-runtime-error`.
+  - **sort-factory**:
+    - `free-name`, `for-capture-vanishing` ×2, `callable:timer`, `import-name-clash`,
+      `method:sort_by`, `type:member`.
+
+  A pin is still accepted only by its inventory status, so each case keeps failing on it.
+  `unused-timer-observable` (`callable:timer`, deferred-named) is now accepted, with legacy exact.
+- **New inventory rows, all PENDING-OWNER:**
+  - `builtin-arity:split`: legacy `split: expected one delimiter`;
+  - `builtin-arity:last`: legacy `last: expected no arguments`;
+  - `import-name-clash`: it also appears in vm_modules' `module_private` probe.
+
+  Status counts, 246 rows:
+
+  | Status | Rows |
+  | --- | --- |
+  | approved | 44 |
+  | deferred-named | 17 |
+  | implement | 24 |
+  | PENDING-OWNER | 155 |
+  | retired | 6 |
+- **`tests/runtime2/cp25/pending_differences.tsv`** (new) lists each unapproved behavioural
+  difference, with its gate, case, program, VM and legacy output, and status PENDING-OWNER:
+  - `copy-wrong-arity`: VM `1`, legacy `1`, `2` (legacy's loop path evaluates the argument twice);
+  - `named-precedence`: VM `int`, legacy `function`.
+
+  The gates read it only to label the case. A listed case still fails. known-limitations.md
+  references it under "Refusals awaiting an owner ruling".
+- **filesystem-recipe**: FAIL, 91 cases.
+
+  | Group | Cases | Reason | Status |
+  | --- | --- | --- | --- |
+  | stat-prepared, stat-compatibility, stat-wrong-arity, stat-wrong-type, stat-first-error, named-stat-prepared, named-stat-compatibility | 7 | `fn-name-reserved` | PENDING-OWNER |
+  | move-order, move-argument-mutates-source, move-first-source-error, move-first-destination-error, move-cwd-boundary, move-unmatched-source, move-array-source, move-bad-source-array, move-second-destination-error, move-second-source-error, move-loop-location, move-index-probe-order, move-root-path-replacement | 13 | `builtin-lazy-args:move` | PENDING-OWNER |
+  | move-wrong-arity, move-spread | 2 | `builtin-arity:move` | PENDING-OWNER |
+  | copy-order, copy-argument-mutates-source, copy-first-source-error, copy-first-destination-error, copy-cwd-boundary, copy-unmatched-source, copy-array-source, copy-bad-source-array, copy-second-destination-error, copy-second-source-error, copy-loop-location, copy-index-probe-order, copy-root-path-replacement | 13 | `builtin-arity:copy` | PENDING-OWNER |
+  | copy-spread | 1 | `spread` | PENDING-OWNER |
+  | copy-wrong-arity | 1 | the unapproved difference above | PENDING-OWNER |
+  | pure #0–47 and #57 | 49 | `postfix-spelling` | implement |
+  | pure #48 | 1 | `context:assignment-error` | PENDING-OWNER |
+  | pure #52 | 1 | `builtin-arity:split` | PENDING-OWNER |
+  | pure #53 | 1 | `builtin-arity:last` | PENDING-OWNER |
+  | pure #54 | 1 | `unresolved-name` | PENDING-OWNER |
+  | pure #56 | 1 | `opaque:legacy-runtime-error` | PENDING-OWNER |
+- **sort-factory**: FAIL, 7 cases.
+
+  | Case | Reason | Status |
+  | --- | --- | --- |
+  | dynamic-capture-dependency | `free-name` | PENDING-OWNER |
+  | named-precedence | the unapproved difference above | PENDING-OWNER |
+  | root-path-growth | `for-capture-vanishing` | PENDING-OWNER |
+  | location-parent-growth-sort | `for-capture-vanishing` | PENDING-OWNER |
+  | module-ownership | `import-name-clash` | PENDING-OWNER |
+  | nested-returned-factory | `method:sort_by` | PENDING-OWNER |
+  | module-definition-error | `type:member` | PENDING-OWNER |
+- No production change: `nift` is f063f1a9….

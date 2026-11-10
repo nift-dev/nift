@@ -43,6 +43,27 @@ def load(path=CLASSIFICATION):
     return rows
 
 
+PENDING_DIFFERENCES = os.path.join(HERE, "cp25", "pending_differences.tsv")
+
+
+def pending_differences(gate, path=PENDING_DIFFERENCES):
+    """The cases of `gate` listed as unapproved VM/legacy differences (PENDING-OWNER). A listed case still
+    fails its gate; the list only lets the gate name the case as a recorded open item."""
+    cases, header = set(), None
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            cells = line.rstrip("\n").split("\t")
+            if header is None:
+                header = cells
+                continue
+            row = dict(zip(header, cells))
+            if row["gate"] == gate:
+                cases.add(row["case"])
+    return cases
+
+
 def row_for(reason, rows=None):
     """The exact row, else the family row `<prefix>:*` (as inventory.py)."""
     rows = load() if rows is None else rows

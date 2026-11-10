@@ -55,6 +55,14 @@ owner rules. (Review of C83–C99, P1-2.)
 | A name not declared in its scope (a dynamic capture dependency) | `free-name` | No owner decision text approves it; its inventory row says "release approval pending". |
 | Plain `@fn(...)`, and `@fn` flags the VM does not support, in a script | `fn-flags` | D-047 #1 and D-048 #1 approve rejecting plain `@fn` in **both** engines. Legacy keeps accepting it, so the VM-only refusal is not what was approved. |
 
+**Unapproved behavioural differences.** Some programs run on the VM but give another result than
+legacy, with no approval. They are listed, each with its gate, case, program and both outputs, in
+`tests/runtime2/cp25/pending_differences.tsv`, all PENDING-OWNER. The list approves nothing: each
+named gate still fails on its case until the owner rules. Today there are two:
+- `copy-wrong-arity`: the VM prints `1`, legacy `1` then `2`, because legacy's loop path evaluates
+  the argument twice;
+- `named-precedence`: the VM prints `int`, legacy `function`.
+
 **Plain `@fn` in a script: an explicit legacy/VM difference.**
 - D-047 and D-048 make plain `@fn(...)` invalid in script context; the canonical form is
   `fn(...)`.

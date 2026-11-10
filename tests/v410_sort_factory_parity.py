@@ -23,11 +23,27 @@ contract = json.loads(Path(__file__).with_name('v410_sort_factory_cases.json').r
 # D-018 (feature-site-dx): an error raised in a try body is reported where it
 # occurs ([2,1].sort_by at column 7), not at the try statement (1:1).
 # The VM-default refusal expected per case (review of C83-C99, P2-1); any other refused case fails.
-EXPECTED_REFUSAL = {'dynamic-capture-dependency': 'free-name'}
+EXPECTED_REFUSAL = {'dynamic-capture-dependency': 'free-name', 'root-path-growth': 'for-capture-vanishing',
+                    'unused-timer-observable': 'callable:timer', 'module-ownership': 'import-name-clash',
+                    'nested-returned-factory': 'method:sort_by', 'location-parent-growth-sort': 'for-capture-vanishing',
+                    'module-definition-error': 'type:member'}
 APPROVED = {
     'bad-key-cleanup': ('bad-key-cleanup.f:1:1: sort_by: key must be scalar',
                         'bad-key-cleanup.f:1:7: sort_by: key must be scalar'),
 }
+# Review of C100-C102, P2-2 (combined-b3-b5.md section 91): every failing case is collected and reported
+# (case, reason and status, or the difference) before the gate exits non-zero.
+failures = []
+pending = approved_refusal.pending_differences('test-v410-sort-factory-parity')
+
+
+def fail(name, text):
+    if text.startswith(name + ': '):
+        text = text[len(name) + 2:]
+    failures.append(f"{name}: {text}")
+    print(f"FAIL {name}: {text}", flush=True)
+
+
 with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
     root = Path(directory)
     root_aliases = fixture_root_aliases(root)
@@ -48,8 +64,11 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
         if case['name'] in APPROVED:
             before, after = APPROVED[case['name']]
             if case['stderr'].count(before) != 1:
-                raise SystemExit(f"FAIL {case['name']}: approved difference no longer matches the oracle")
+                fail(case['name'], 'approved difference no longer matches the oracle')
+                continue
             expected = (case['exit'], case['stdout'], case['stderr'].replace(before, after))
+        if baseline and execute(baseline) != oracle:
+            fail(case['name'], 'baseline differs from the oracle')
         actual = execute(binary)
         reason = approved_refusal.refusal_reason(actual[2])
         if actual != expected and reason is not None:
@@ -64,14 +83,18 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
                     lambda q: None if (q.returncode, q.stdout, normalize_fixture_paths(q.stderr, root_aliases))
                     == oracle else repr((q.returncode, q.stdout, q.stderr)))
             if problem:
-                raise SystemExit(f"FAIL {problem}")
+                fail(case['name'], f"{problem} [status {approved_refusal.status(reason)}]")
+                continue
             print(f"PASS {case['name']}: VM default refused before execution ({reason}, status "
                   f"{approved_refusal.status(reason)}); legacy channel exact")
-            if baseline and execute(baseline) != oracle:
-                raise SystemExit(f"FAIL baseline {case['name']}")
             continue
         if actual != expected:
-            raise SystemExit(f"FAIL {case['name']}: {actual!r} != {expected!r}")
-        if baseline and execute(baseline) != oracle:
-            raise SystemExit(f"FAIL baseline {case['name']}")
+            note = (' (unapproved VM/legacy difference, PENDING-OWNER: tests/runtime2/cp25/pending_differences.tsv)'
+                    if case['name'] in pending else '')
+            fail(case['name'], f"VM {actual!r} != recorded {expected!r}{note}")
+if failures:
+    print(f"FAIL sort/factory parity: {len(failures)} failing case(s):")
+    for f in failures:
+        print('  ' + f)
+    sys.exit(1)
 print(f"PASS {len(contract['cases'])} exact sort/factory/capture/origin contracts")
