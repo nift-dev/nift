@@ -24,7 +24,8 @@ Nift 4.x. Website builds keep the existing template renderer (D-053).
 
 The VM does not yet run the constructs below. Nothing is removed: each one keeps working on
 legacy. `make test-runtime2-named-deferrals` checks that each is refused cleanly and
-deterministically and that legacy still runs it.
+deterministically and that legacy still runs it. That gate is Linux-only (its FFI case opens `libc.so.6`); on other
+platforms it prints a SKIP line.
 
 | Construct | VM refusal reason | Still works with |
 | --- | --- | --- |

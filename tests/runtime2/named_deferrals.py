@@ -7,6 +7,10 @@ ran" note, a statistics row with no VM and no legacy execution (no silent fallba
 result on a second run. The legacy channel (NIFT_VM=0) must still run the construct: the feature
 is deferred on the VM, not removed.
 
+Linux only (review of C83-C99, L-2): the FFI case opens `libc.so.6` and the process cases run
+`echo`. On another platform the script prints a SKIP line saying so and exits 0; the gate is
+certified on the Linux host only (docs/runtime-2/known-limitations.md).
+
 usage: named_deferrals.py --nift NIFT
 """
 import argparse
@@ -51,6 +55,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
     nift = os.path.abspath(ap.parse_args().nift)
+    if not sys.platform.startswith("linux"):
+        print("SKIP named deferrals: Linux only (libc.so.6, echo); not run on %s" % sys.platform)
+        return 0
     failures = 0
     for name, (files, reason, legacy_out, project) in CASES.items():
         with tempfile.TemporaryDirectory(prefix="named-deferral-") as d:

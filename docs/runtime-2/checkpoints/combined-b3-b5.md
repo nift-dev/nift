@@ -4536,3 +4536,28 @@ owner-approved B5 semantic difference.
     D-NEXT-refsem #6), with legacy exact.
   - The relative-import smoke now fails at its `fn-flags` pin (PENDING-OWNER).
 - No production change: `nift` is f063f1a9….
+
+## 90. Review of C83–C99, the remaining Lows (C102, tests and docs)
+
+(L-1, the `retired` status, is in section 88.)
+
+- **L-3: the allowlist is pinned by line number as well.** `no_handle_strings.py` now keys its one
+  exception by path, line number and exact stripped text: `src/rt/render.cpp:11`.
+  - The self-test has 12 cases. The new one: the identical line at another line of the same file is
+    flagged.
+  - A line that moves becomes an unmatched entry, which is itself a problem.
+  - `src/rt`: 0 problems, one `allowed src/rt/render.cpp:11` line. `make test-rt-handles` PASS.
+- **L-4: the witness's process group is killed on the cap.** `unwind_mutants.py` `execute()` starts
+  each witness in its own session (`start_new_session=True`). On a timeout it sends `os.killpg`
+  SIGKILL to that group only; the group id is the child's own pid, a group the harness started.
+  Nothing is found by name, and pkill and killall are not used.
+  - Control: a child that starts a 300 s grandchild, run with a 2 s cap, returns 124 with its
+    output, and the grandchild is gone.
+  - `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants, 0 failures, 197 s.
+- **L-2: named_deferrals is Linux-only, and says so.** The libc lookup was not made portable. On a
+  non-Linux platform the script prints `SKIP named deferrals: Linux only …` and exits 0. Its
+  docstring and known-limitations.md say the gate is certified on the Linux host only.
+  `make test-runtime2-named-deferrals`: PASS, 6 constructs.
+  - Both new SKIP lines are in `tests/runtime2/skip_phrases.tsv`: the printed one as `detected`, the
+    docstring line as `justified`. The certification guard's phrase inventory requires that.
+- No production change: `nift` is f063f1a9….

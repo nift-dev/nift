@@ -39,6 +39,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -182,12 +183,24 @@ def text(x):
 
 
 def execute(cmd, cap, env=None):
-    """(returncode, output, timed_out); a timeout returns the output so far."""
+    """(returncode, output, timed_out); a timeout returns the output so far.
+
+    Review of C83-C99, L-4 (combined-b3-b5.md section 90): the witness runs in its own session, so its
+    process group is the one this harness started (its pgid is the child's pid). On the cap the whole
+    group is killed, so a python witness's nift grandchildren cannot outlive it. Only that group is
+    signalled; nothing is looked up by name."""
+    p = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         start_new_session=True)
     try:
-        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=cap)
-        return r.returncode, r.stdout + r.stderr, False
-    except subprocess.TimeoutExpired as e:
-        return 124, text(e.stdout) + text(e.stderr), True
+        out, err = p.communicate(timeout=cap)
+        return p.returncode, out + err, False
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        out, err = p.communicate()
+        return 124, text(out) + text(err), True
 
 
 class Oom:

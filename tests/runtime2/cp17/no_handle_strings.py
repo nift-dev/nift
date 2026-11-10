@@ -14,11 +14,12 @@ import sys
 
 PATTERN = re.compile(r'(\\x0*1[fF]|\\0?37|\\u001[fF]|\x1f)"?\s*"?nift')
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
-# B29 (combined-b3-b5.md section 78): exact exceptions, one code line each, pinned by path and the
-# line's stripped text; the general rule is unchanged. An entry that matches no line is a problem
+# B29 (combined-b3-b5.md section 78): exact exceptions, one code line each, pinned by path, line
+# number (review of C83-C99, L-3, section 90) and the line's stripped text; the general rule is
+# unchanged. An entry that matches no line is a problem
 # (it cannot outlive its line or move to another one).
 ALLOWED = {
-    ('src/rt/render.cpp', 'return std::string("\\x1fnift:callable:") + (function.is_lambda'):
+    ('src/rt/render.cpp', 11, 'return std::string("\\x1fnift:callable:") + (function.is_lambda'):
         'callable tag, not a handle: `nift eval --json` of a function keeps legacy\'s tag string '
         '(rt::callable_marker, eval_result.cpp; b4-dispatch.md review L1, carried for an owner decision)',
 }
@@ -47,8 +48,8 @@ def code_only(text):
     return ''.join(out)
 
 
-def allowed(path, line):
-    key = (os.path.relpath(os.path.abspath(path), REPO).replace(os.sep, '/'), line.strip())
+def allowed(path, number, line):
+    key = (os.path.relpath(os.path.abspath(path), REPO).replace(os.sep, '/'), number, line.strip())
     return key if key in ALLOWED else None
 
 
@@ -63,7 +64,7 @@ def scan(paths, used=None):
                 code = code_only(handle.read())
             for number, line in enumerate(code.split('\n'), 1):
                 if PATTERN.search(line):
-                    key = allowed(path, line)
+                    key = allowed(path, number, line)
                     if key:
                         used.add(key)
                     else:
@@ -78,15 +79,18 @@ def self_test():
     failures = [b for b in bad if not PATTERN.search(code_only(b))] + [g for g in good if PATTERN.search(code_only(g))]
     # B29: the allowlist is exact: the pinned line elsewhere, or a changed line in its file, is flagged.
     key = next(iter(ALLOWED))
-    if not allowed(os.path.join(REPO, key[0]), '    ' + key[1]):
+    if not allowed(os.path.join(REPO, key[0]), key[1], '    ' + key[2]):
         failures.append('allowlisted line not accepted: ' + key[0])
-    if allowed(os.path.join(REPO, 'src/rt/vm.cpp'), key[1]):
+    if allowed(os.path.join(REPO, 'src/rt/vm.cpp'), key[1], key[2]):
         failures.append('allowlisted line accepted in another file')
-    if allowed(os.path.join(REPO, key[0]), key[1].replace('callable:', 'file:')):
+    if allowed(os.path.join(REPO, key[0]), key[1], key[2].replace('callable:', 'file:')):
         failures.append('a changed line accepted in the allowlisted file')
+    # L-3: the same line elsewhere in the allowlisted file (a duplicate) is flagged.
+    if allowed(os.path.join(REPO, key[0]), key[1] + 7, key[2]):
+        failures.append('a duplicate of the allowlisted line accepted at another line of its file')
     for f in failures:
         print('self-test FAIL: %s' % f)
-    print('self-test: %d cases, %d failures' % (len(bad) + len(good) + 3, len(failures)))
+    print('self-test: %d cases, %d failures' % (len(bad) + len(good) + 4, len(failures)))
     return 1 if failures else 0
 
 
@@ -98,9 +102,9 @@ def main(argv):
     problems = scan(roots, used)
     covered = [k for k in ALLOWED if any(os.path.abspath(os.path.join(REPO, k[0])).startswith(os.path.abspath(r))
                                          for r in roots)]
-    problems += ['%s: allowlist entry matches no line: %s' % (k[0], k[1]) for k in covered if k not in used]
+    problems += ['%s:%d: allowlist entry matches no line: %s' % k for k in covered if k not in used]
     for k in sorted(used):
-        print('allowed %s: %s (%s)' % (k[0], k[1], ALLOWED[k]))
+        print('allowed %s:%d: %s (%s)' % (k[0], k[1], k[2], ALLOWED[k]))
     for p in problems:
         print(p)
     print('no_handle_strings: %d problem(s)' % len(problems))

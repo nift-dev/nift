@@ -174,3 +174,5 @@ tests/v44_shell_glob.sh	detected	-	echo 'SKIP v4.4 shell glob (Windows passthrou
 tests/v46_b4_cp8_embedding_abi.sh	detected	-	echo 'nm unavailable; skipping symbol-surface check' >&2
 tests/v46_resource_paths.py	detected	-	print("  (package symlink escape skipped: native symlinks unavailable)")
 tests/runtime2/b06/run.py	justified	a FAIL (exit 1), never a skip: the gate fails when the probe build is missing	print("FAIL b06: no --probe build: the comparator-sort fixtures did not run on the VM")
+tests/runtime2/named_deferrals.py	justified	a docstring line, not printed (review of C83-C99, L-2)	`echo`. On another platform the script prints a SKIP line saying so and exits 0; the gate is
+tests/runtime2/named_deferrals.py	detected	-	print("SKIP named deferrals: Linux only (libc.so.6, echo); not run on %s" % sys.platform)
