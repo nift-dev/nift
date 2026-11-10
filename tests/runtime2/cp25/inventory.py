@@ -225,6 +225,14 @@ def report(args):
         sys.stdout.write(text)
     for p in problems:
         print("INVENTORY:", p, file=sys.stderr)
+    # B17 (combined-b3-b5.md section 77): --check names every seen reason whose G2 approval is still
+    # pending (`pending ...` or `PENDING-OWNER ...`), so a pass of G1 is never read as G2 approval.
+    pending = sorted(r for r in seen if (row_for(r) or {}).get("approval", "").lower().startswith("pending"))
+    owner = [r for r in pending if (row_for(r) or {}).get("approval", "").startswith("PENDING-OWNER")]
+    if args.check:
+        print("INVENTORY: G2 approval pending for %d of %d reason(s)%s: %s" % (
+            len(pending), len(seen), " (%d PENDING-OWNER: %s)" % (len(owner), ", ".join(owner)) if owner else "",
+            ", ".join(pending)), file=sys.stderr)
     if args.check and problems:
         return 1
     return 0

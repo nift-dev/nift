@@ -4063,3 +4063,39 @@ owner-approved B5 semantic difference.
   - Every mutant is killed by its named witness.
   - The certification cap is 3600 s.
 - No production change: `nift` is f063f1a9….
+
+## 77. Repair batch, B17: the six unclassified cp25r reasons are classified (C89, inventory)
+
+- **Cause** (triage BLOCKERS.md B17). `inventory.py report --check` failed on six reasons with no
+  classification row: `coro-blocking-host:file`, `coro-blocking-host:rm`, `method:open`,
+  `method:write`, `method:save` and `method:close`. Reproduced on the local inventory
+  (`.build/cp25r-inventory`, collected from this candidate).
+- **Where they come from.** All six come from one unit, `rt-diff-corpus/async/fileops/main.f`,
+  and only in classify-all:
+  - In an async function, `f := file(name); f.open("w"); f.write(name); f.save(); f.close()`, then
+    `exists`/`rm`/`exists`.
+  - classify-all compiles with the default CompileLimits (`parallel_tasks=false`), where the
+    cooperative-only rule A1 refuses host built-ins in task code
+    (`compiler_coro_admit.cpp:138`). That gives `coro-blocking-host:file` and
+    `coro-blocking-host:rm`.
+  - Its `f` is then Null-kind (detail `Null->method:open`, and so on), and each method call is
+    refused at `compiler_call.cpp:204`, consequentially.
+  - In execute mode, and in a real run (`NIFT_VM=1`), the unit runs on the VM (`vm 1`) with legacy's
+    output, `a.txt:true:false` and `b.txt:true:false` (legacy `NIFT_VM=0`: the same).
+- **Classification.** Class H, family `F12-classify-all-switches`: the existing approved category of
+  the same unit kind's `coro-blocking-host:exists` row ("tooling: ... classify-all compiles with
+  default CompileLimits ... Fix inventory tool to apply the run-time switches"). The approval
+  column is that row's: `pending (tooling artefact: not a real-run fallback reason)`. No reason
+  needed a new category, so none is flagged PENDING-OWNER (B27).
+- **`--check` names pending approvals.** It now prints one line naming every seen reason whose G2
+  approval is still pending (`pending ...` or `PENDING-OWNER ...`), with the PENDING-OWNER ones
+  separately. A G1 pass is therefore never read as G2 approval. It does not fail on them: G2 is
+  the owner's.
+- **Results.** `report --check` on the local inventory now exits 0 (it exited 1 with the six
+  `unclassified reason` lines). It prints
+  `G2 approval pending for 135 of 157 reason(s)`, with no PENDING-OWNER rows.
+  - A fresh `make cp25r-inventory` (collect plus check) is the Linode run.
+  - The classification's own `raised_at` for `coro-blocking-host:exists` still says
+    `compiler_coro_admit.cpp:128`; the site is now line 138. That pre-existing row was left as it
+    was; the new rows name 138.
+- No production change: `nift` is f063f1a9….
