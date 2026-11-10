@@ -504,42 +504,6 @@
   "test": "tests/location_method_receiver.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/location_method_receiver/002-missing/missing.f)"
  },
  {
-  "id": "b5-smoke_v44_element_assignment_smoke_003-const_const-exit",
-  "decision": "D-NEXT-refsem-b",
-  "entry": "smoke/v44_element_assignment_smoke/003-const/const.f",
-  "source_sha256": "f08199296779c102c91e8f9585bfb9a38db628beb2d1eb951f98e323da3c2dd9",
-  "channel": "exit",
-  "old": "1",
-  "new": "0",
-  "count": 1,
-  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 const is binding-only (owner ruling Q2 option B; D-NEXT-refsem-b, b5-refsem.md section 1): an element store through a const binding runs. Legacy exit '1'; VM '0'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 28 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
-  "test": "tests/v44_element_assignment_smoke.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_element_assignment_smoke/003-const/const.f)"
- },
- {
-  "id": "b5-smoke_v44_element_assignment_smoke_003-const_const-stderr",
-  "decision": "D-NEXT-refsem-b",
-  "entry": "smoke/v44_element_assignment_smoke/003-const/const.f",
-  "source_sha256": "f08199296779c102c91e8f9585bfb9a38db628beb2d1eb951f98e323da3c2dd9",
-  "channel": "stderr",
-  "old": "error: $ROOT/const.f:2:1: cannot assign to const binding: a\n",
-  "new": "",
-  "count": 1,
-  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 const is binding-only (owner ruling Q2 option B; D-NEXT-refsem-b, b5-refsem.md section 1): an element store through a const binding runs. Legacy stderr 'error: $ROOT/const.f:2:1: cannot assign to const binding: a\\n'; VM ''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 28 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
-  "test": "tests/v44_element_assignment_smoke.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_element_assignment_smoke/003-const/const.f)"
- },
- {
-  "id": "b5-smoke_v44_element_assignment_smoke_003-const_const-combined",
-  "decision": "D-NEXT-refsem-b",
-  "entry": "smoke/v44_element_assignment_smoke/003-const/const.f",
-  "source_sha256": "f08199296779c102c91e8f9585bfb9a38db628beb2d1eb951f98e323da3c2dd9",
-  "channel": "combined",
-  "old": "error: $ROOT/const.f:2:1: cannot assign to const binding: a\n",
-  "new": "",
-  "count": 1,
-  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 const is binding-only (owner ruling Q2 option B; D-NEXT-refsem-b, b5-refsem.md section 1): an element store through a const binding runs. Legacy combined 'error: $ROOT/const.f:2:1: cannot assign to const binding: a\\n'; VM ''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 28 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
-  "test": "tests/v44_element_assignment_smoke.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_element_assignment_smoke/003-const/const.f)"
- },
- {
   "id": "b5-smoke_v44_root_path_reference_smoke_001-missing_missing-stderr",
   "decision": "D-NEXT-refsem-b",
   "entry": "smoke/v44_root_path_reference_smoke/001-missing/missing.f",
@@ -764,5 +728,53 @@
   "count": 1,
   "justification": "APPROVED owner 2026-11-10 10:10: B5 shared-reference difference, one-row exception (review: docs/runtime-2/checkpoints/combined-b3-b5.md section 70; REVIEW-C72-C78.md). Cause: B5 shared references (D-NEXT-refsem-b): mut6(a7) pushes 99 into the caller's array (line 16), visible in print(a7.stringify()) (line 17). The program's thread (line 4, tw2(3): is_dir(\".\")) is joined at line 5 before a7 exists (line 15), and its task receives only the scalar 3. Exact: stdout line '[1,2]' -> '[1,2,99]', count 1; exit and stderr must be identical (no rule for them). The sharing oracle still reports this program UNCLASSIFIED (thread()); this rule approves it. Expires when main.f or any file of the program changes (source_sha256, tree_sha256).",
   "test": "tests/runtime2/g00047_exception_controls.py (rt-diff --gen 50 --seed 3, entry gen/g00047/main.f)"
+ },
+ {
+  "id": "b5-smoke_v44_root_path_corruption_reproducers_005-escaped_escaped-stdout",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f",
+  "source_sha256": "2e26b0de0923c83b28d016e171775e444ffee544f5102b1a771544f4313db537",
+  "channel": "stdout",
+  "old": "start\n",
+  "new": "start\n1\n2\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-07 15:25 (re-review R2-3; Extraction, plan section 3, with the Q3 list 2026-11-01/02): an approved B5 semantic difference, not legacy parity. `c := b[0]` and `e := a.x[1]` hold the elements themselves, so they survive `a[\"x\"] = []` (compatibility.md, 'extracted array elements stay valid'); legacy binds locations and fails. The store compiles since checkpoint 1 (C107, combined-b3-b5.md section 95); before, the VM refused it (index-target). Legacy stdout 'start\\n'; VM 'start\\n1\\n2\\n'.",
+  "test": "tests/v44_root_path_corruption_reproducers.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f; both engines pinned there)"
+ },
+ {
+  "id": "b5-smoke_v44_root_path_corruption_reproducers_005-escaped_escaped-stderr",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f",
+  "source_sha256": "2e26b0de0923c83b28d016e171775e444ffee544f5102b1a771544f4313db537",
+  "channel": "stderr",
+  "old": "error: $ROOT/escaped.f:7:7: reference target no longer exists: c[0]\n",
+  "new": "",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-07 15:25 (re-review R2-3; Extraction, plan section 3, with the Q3 list 2026-11-01/02): an approved B5 semantic difference, not legacy parity. `c := b[0]` and `e := a.x[1]` hold the elements themselves, so they survive `a[\"x\"] = []` (compatibility.md, 'extracted array elements stay valid'); legacy binds locations and fails. The store compiles since checkpoint 1 (C107, combined-b3-b5.md section 95); before, the VM refused it (index-target). Legacy stderr 'error: $ROOT/escaped.f:7:7: reference target no longer exists: c[0]\\n'; VM ''.",
+  "test": "tests/v44_root_path_corruption_reproducers.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f; both engines pinned there)"
+ },
+ {
+  "id": "b5-smoke_v44_root_path_corruption_reproducers_005-escaped_escaped-exit",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f",
+  "source_sha256": "2e26b0de0923c83b28d016e171775e444ffee544f5102b1a771544f4313db537",
+  "channel": "exit",
+  "old": "1",
+  "new": "0",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-07 15:25 (re-review R2-3; Extraction, plan section 3, with the Q3 list 2026-11-01/02): an approved B5 semantic difference, not legacy parity. `c := b[0]` and `e := a.x[1]` hold the elements themselves, so they survive `a[\"x\"] = []` (compatibility.md, 'extracted array elements stay valid'); legacy binds locations and fails. The store compiles since checkpoint 1 (C107, combined-b3-b5.md section 95); before, the VM refused it (index-target). Legacy exit '1'; VM '0'.",
+  "test": "tests/v44_root_path_corruption_reproducers.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f; both engines pinned there)"
+ },
+ {
+  "id": "b5-smoke_v44_root_path_corruption_reproducers_005-escaped_escaped-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f",
+  "source_sha256": "2e26b0de0923c83b28d016e171775e444ffee544f5102b1a771544f4313db537",
+  "channel": "combined",
+  "old": "error: $ROOT/escaped.f:7:7: reference target no longer exists: c[0]\n",
+  "new": "1\n2\n",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-07 15:25 (re-review R2-3; Extraction, plan section 3, with the Q3 list 2026-11-01/02): an approved B5 semantic difference, not legacy parity. `c := b[0]` and `e := a.x[1]` hold the elements themselves, so they survive `a[\"x\"] = []` (compatibility.md, 'extracted array elements stay valid'); legacy binds locations and fails. The store compiles since checkpoint 1 (C107, combined-b3-b5.md section 95); before, the VM refused it (index-target). Legacy combined 'error: $ROOT/escaped.f:7:7: reference target no longer exists: c[0]\\n'; VM '1\\n2\\n'.",
+  "test": "tests/v44_root_path_corruption_reproducers.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_root_path_corruption_reproducers/005-escaped/escaped.f; both engines pinned there)"
  }
 ]

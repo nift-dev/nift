@@ -2026,3 +2026,23 @@ refusal and the legacy channel.
 
 They are recorded in the CP25-R inventory (tests/runtime2/cp25/classification.tsv, status
 `deferred-named`) and in docs/runtime-2/known-limitations.md.
+
+## D-066 — The assignment family's evaluation order (owner, 2026-11-10 16:35; checkpoint 1)
+
+The owner chose option C of combined-b3-b5.md section 94 for `o["k"] = v`, `g[i][j] = v` and
+`a[i] op= v` on the VM. H-A and D2 are the contracts; the 13:26 "value-before-key quirk" wording
+was wrong and is withdrawn.
+
+1. **A store** (`a[i] = v`, `o["k"] = v`, `g[i][j] = v`): the receiver is evaluated and
+   retained, then the value, then the keys in their established order, then the store is
+   validated and committed. The existing `a[i] = v` does not change. This is legacy's order.
+2. **A compound update** (`a[i] op= v`, `o["k"] op= v`, nested): the target is resolved and its
+   value read before the right-hand side, then the right-hand side, then the operation and the
+   commit under the mutation contract, into the container and at the key read first. The target
+   is never looked up again (D2). Legacy reads at the old key and writes at the new one: an
+   approved difference.
+3. The cycle refusals of these stores (B5, `runtime.reference_cycle`) and loop-variable writes
+   that change the iterated array (B5) are approved differences under the existing decisions.
+
+Recorded in compatibility.md ("The assignment family") and known-limitations.md; tests:
+`tests/runtime2/assign_family.py`, mutants `tests/runtime2/assign_family_mutants.py`.

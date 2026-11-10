@@ -4886,10 +4886,10 @@ the contracts:
 - `tests/runtime2/assign_family_mutants.py` (`make test-runtime2-assign-family-mutants`): 13
   mutants, each an exact edit built by `sanctioned_mutant.py`, each caught by the named case:
   - store keys before value;
-  - update rhs first, final key re-read, key not retained;
+  - update rhs first (the capture left out), final key re-read, key not retained;
   - receiver not retained;
   - partial commit before the operation;
-  - intermediate step skipped;
+  - intermediate step left out;
   - step read wording;
   - step copies its container;
   - an object store that commits a refused cycle;
@@ -4939,3 +4939,61 @@ cost +0.68 % and was replaced.
 - the kind inference merges a plain member store's value into every member of that object, so a
   later path through another member is refused;
 - the other residual refusals of section 94.
+
+## 96. Freeze of checkpoint 1 (C108, tests and docs)
+
+The freeze gates found four things. Each was fixed test-side; there is no production change, and
+`nift` is unchanged from C107.
+
+- **`b4b_types.py` mutators check.** `vm_element_path.cpp` calls the mutation protocol. Its one
+  use is SetIndex's `object_put`, which the inference already models (the Assign statement's
+  `site_store`). It is added to the classified set.
+- **Seed-1 tier (`vm_parity --rt-diff`), two items.**
+  - (a) The extracted smoke `v44_root_path_corruption_reproducers/005-escaped` now runs with B5's
+    Extraction result. That is an approved difference: owner 2026-11-07 15:25, compatibility.md
+    "extracted array elements stay valid". It was not attributable by the sharing oracle, since
+    the program has no call. It gets four exact rules (stdout, stderr, exit, combined) in
+    `b5-refsem-vm.json`. Two things changed to make that possible:
+    - the reproducer prints a first line, so that legacy's stdout is non-empty, which an exact
+      rule needs;
+    - the smoke pins both engines.
+  - (b) Three exact rules for `v44_element_assignment_smoke/003-const` had been unused since C95.
+    C95 rewrote that smoke without heredocs, so rt-diff no longer extracts the entry. The rules
+    are moved to `b5-refsem-vm-retired.json` with the reason. The const element write stays
+    pinned by the smoke and by `assign_family.py`.
+- **Certification guard phrase inventory.** C107's mutant name `store-step-skipped` read as a
+  skip message once the file was tracked: C107 fails the guard on that one line. It is renamed
+  `store-step-omitted`; the guard passes at C108.
+- **decisions.md D-066** records the owner's 16:35 ruling.
+
+**Gate results** (local; GCC 13.3; `nift` 8195f1b3…):
+
+| Gate | Result |
+| --- | --- |
+| certification guard, test-rt-lint, test-test-integrity | PASS (every commit) |
+| `make test-rt-vm`: every prerequisite target | PASS (56 min) |
+| `make test-rt-vm`: its own recipe, rerun after (a) and (b) | PASS: vm-unit 40,349 checks; seed-1 tier rt-diff 816 entries, 0 differing, 46 approved, 0 unused; vm_adversarial 39,612 programs, 0 non-approved; vm_subset, vm_subset_gen, vm_builtins and the other 22 commands |
+| `make test-rt-vm-mutants` | PASS: `[0] parity` (gen 100 seed 3) and every suite pass unmutated; 12 of 12 mutants rejected; sharing-oracle selftest and the g00047 controls pass |
+| `make test-rt-vm-sharing-oracle` | PASS, 0 of 41 checks failed (5 new probes) |
+| `make test-runtime2-assign-family` / `-mutants` | PASS, 75 cases / 13 of 13 mutants caught |
+| `make test-runtime2-b5` (production and guard-off) / `-b5-mutants` | PASS / all caught |
+| cycle refusal routes | PASS, 24 routes |
+| clone-summary negative | PASS (2 of 3 caught, as recorded in section 68) |
+| `make test-rt-builtins-guards` (callgrind) | PASS, 35 workloads, 0 guard failures; not re-baselined |
+| cp18 cow_semantics on `libnift_c.so` | PASS, 8 |
+| b5 generator gate, D2 operator generator, refsem-a, b4b-types | PASS |
+
+**Smokes.**
+- `v44_element_assignment_smoke.sh` passes.
+- `v44_root_path_corruption_reproducers.sh`: escaped-ref passes. The smoke still fails on
+  `declare-pattern` and `context:struct-new`, families outside this checkpoint.
+- `v46_import_worker_ownership_smoke.sh`: its `compound-target` case is gone. It still fails on
+  `import-collision`.
+- `v46_b4_cp7_worker_hardening.sh` stops at `import-nested` (D-065), as before.
+
+**For Linode:**
+- the sanitizer builds (ASan/UBSan nift and the san mutant configuration);
+- TSan;
+- the certification instance;
+- `make cp25r-inventory` on the release toolchain;
+- the GCC 15.2 comparator-sort profile.

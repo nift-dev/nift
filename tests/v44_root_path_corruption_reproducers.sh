@@ -116,6 +116,7 @@ else fail "forarr: build failed: $(cat "$T/build.log")"; fi
 
 # Escaped reference through object member after the parent slot is replaced.
 cat >"$T/escaped.f" <<'F'
+print("start")
 a := {"x": [[1],[2]]}
 b := a.x
 c := b[0]
@@ -127,14 +128,16 @@ F
 # Checkpoint 1 (combined-b3-b5.md section 95): `a["x"] = []` compiles on the VM. B5's Extraction rule
 # (APPROVED 2026-11-07 15:25, compatibility.md "extracted array elements stay valid"): `c` and `e`
 # are the elements themselves and survive the replacement; legacy binds locations and fails. Both
-# engines are pinned exactly, and both must stay clean under the sanitizers.
+# engines are pinned exactly, and both must stay clean under the sanitizers. (The first line gives
+# legacy's stdout a text for rt-diff's exact rules, tools/rt-diff/policies/b5-refsem-vm.json.)
 set +e
 "$NIFT" "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
 NIFT_VM=0 "$NIFT" "$T/escaped.f" >"$T/lout" 2>"$T/lerr"; lrc=$?
 set -e
-if [[ $rc -ne 0 ]] || [[ "$(cat "$T/out")" != "1
+if [[ $rc -ne 0 ]] || [[ "$(cat "$T/out")" != "start
+1
 2" ]] || [[ -s "$T/err" ]]; then fail "escaped-ref: VM exit $rc: $(cat "$T/out" "$T/err")"; fi
-if [[ $lrc -ne 1 ]] || [[ -s "$T/lout" ]] || ! grep -q 'reference target no longer exists: c\[0\]' "$T/lerr"; then
+if [[ $lrc -ne 1 ]] || [[ "$(cat "$T/lout")" != "start" ]] || ! grep -q 'escaped.f:7:7: reference target no longer exists: c\[0\]' "$T/lerr"; then
   fail "escaped-ref: legacy exit $lrc: $(cat "$T/lout" "$T/lerr")"
 fi
 

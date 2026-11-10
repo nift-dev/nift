@@ -36,7 +36,7 @@ MUTANTS = [
      [(CPATH, STORE_ROOT, "    if (!root(c, c.ast_.at(path.front()->a), target, node.b, r)) return false;\n"),
       (CPATH, STORE_KEY, "    if (!c.expr_any(path.back()->b, key) || !c.expr_any(node.b, value)) return false;\n")],
      "order_store_value_then_keys"),
-    ("compound-rhs-first", "compound: the rhs before the target is captured (D2 capture skipped)",
+    ("compound-rhs-first", "compound: the rhs before the target is captured (D2 capture left out)",
      [(CPATH, "    std::uint16_t container = r.reg, key = 0, element = 0, value = 0;\n",
        "    std::uint16_t container = r.reg, key = 0, element = 0, value = 0;\n"
        "    if (!c.expr_any(node.b, value)) return false;\n"),
@@ -57,7 +57,7 @@ MUTANTS = [
        "    c.fb_->emit(OpCode::SetIndex, container, key, value);\n    c.fb_->set_offset(node.begin);\n"
        "    switch (node.op) {")],
      "atomic_session_failures"),
-    ("store-step-skipped", "store: an intermediate step is skipped (the write goes to the receiver)",
+    ("store-step-omitted", "store: an intermediate step is left out (the write goes to the receiver)",
      [(CPATH, "        container = next;\n    }\n    std::uint16_t key = 0;",
        "        (void)next;\n    }\n    std::uint16_t key = 0;")],
      "nested_grid"),

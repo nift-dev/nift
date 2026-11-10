@@ -206,7 +206,10 @@ def mutators():
     known = {"cell.cpp", "collection_plain_sort.cpp", "collection_sort.cpp", "compiler_collection.cpp",
              "vm_array_mutation.cpp", "vm_collection_sort.cpp", "vm_keyed.cpp", "vm_ops.cpp", "vm_report.cpp",
              "vm_struct.cpp", "compiler_invocation.cpp", "session_invocation.cpp", "mutation.cpp",
-             "mutation_collection.cpp"}
+             "mutation_collection.cpp",
+             # checkpoint 1 (combined-b3-b5.md section 95): SetIndex's object store (object_put), the
+             # element store the inference models with site_store (infer_walk.cpp, Assign)
+             "vm_element_path.cpp"}
     rt = os.path.join(ROOT, "src", "rt")
     for f in sorted(os.listdir(rt)):
         if f.endswith(".cpp") and "mutation::" in open(os.path.join(rt, f)).read():
