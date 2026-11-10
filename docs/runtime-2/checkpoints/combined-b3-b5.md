@@ -3936,3 +3936,24 @@ owner-approved B5 semantic difference.
     `undefined reference` lines.
   - Comparator certification still needs the GCC 15.2 run on Linode (D2).
 - No production change: `nift` is f063f1a9….
+
+## 74. Repair batch, B14: the isolation negatives' diagnostic pattern is quote-agnostic (C86, tests)
+
+- **Cause** (triage BLOCKERS.md B14). `tests/rt/isolation/run.sh` required the text
+  `poisoned "StorageTestAccess"`, which is how GCC 13 quotes the name. GCC 15 prints
+  `src/Hooks.cpp:118:29: error: attempt to use poisoned 'StorageTestAccess'`, so seven negatives
+  that did fail as intended were reported as failing for the wrong reason.
+- **Fix.** The pattern is now
+  `poisoned [^[:alnum:]_ ]{0,3}StorageTestAccess([^[:alnum:]_]|$)`. It accepts any quote: `"`,
+  `'`, or the 3-byte `‘…’` of a UTF-8 locale, although the script runs with `LC_ALL=C`. The
+  name must still end there.
+- **A self-check of the pattern** runs first in the script, on recorded text:
+  - It must match the GCC 13 line, the GCC 15 line above and the UTF-8 form.
+  - It must not match `poisoned 'StorageTestAccessor'` or `'StorageTestAccess' was not declared`.
+  - Negative control: the old pattern fails this self-check, missing both the GCC 15 and the
+    UTF-8 lines.
+- **Results.** `make test-rt-isolation` on GCC 13: 31 PASS, including the 9 poison cases (for
+  example `n2a-annotated-definition: ... poisoned "StorageTestAccess"`). Afterwards `make -q nift`
+  returns 0. The GCC 15 run is for Linode; the recorded GCC 15 line above is covered by the
+  self-check.
+- No production change: `nift` is f063f1a9….

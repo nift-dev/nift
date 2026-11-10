@@ -41,7 +41,18 @@ case_() {
   restore_all
 }
 DEF='namespace nift::rt { struct StorageTestAccess { static void clear(Value& v) { Storage::array_mut(v).clear(); } }; }'
-POISON='poisoned "StorageTestAccess"'
+# B14 (combined-b3-b5.md section 74): quote-agnostic. GCC 13 quotes the name "...", GCC 15 '...'
+# (and a UTF-8 locale would give the 3-byte quotes); the name must still end there.
+POISON='poisoned [^[:alnum:]_ ]{0,3}StorageTestAccess([^[:alnum:]_]|$)'
+# The pattern itself, against recorded diagnostics of both compilers and two that must not match.
+for probe in 'src/Hooks.cpp:118:29: error: attempt to use poisoned "StorageTestAccess"' \
+             "src/Hooks.cpp:118:29: error: attempt to use poisoned 'StorageTestAccess'" \
+             'src/Hooks.cpp:118:29: error: attempt to use poisoned \xe2\x80\x98StorageTestAccess\xe2\x80\x99'; do
+  printf '%b\n' "$probe" | grep -Eq "$POISON" || { echo "FAIL isolation pattern: /$POISON/ misses: $probe"; fail=1; }
+done
+for probe in "error: attempt to use poisoned 'StorageTestAccessor'" "error: 'StorageTestAccess' was not declared"; do
+  printf '%s\n' "$probe" | grep -Eq "$POISON" && { echo "FAIL isolation pattern: /$POISON/ matches: $probe"; fail=1; }
+done
 
 # N1: the test header included from production by a relative path, its free
 # functions called (rc2/m-include)
