@@ -27,7 +27,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from multiprocessing import Pool
+import multiprocessing
+
+
+def Pool(*args, **kwargs):  # noqa: N802
+    # B11 (combined-b3-b5.md section 72): workers get their state through the initializer only,
+    # never by inheriting module globals, so every start method works (Python 3.14 defaults to
+    # forkserver). NIFT_MP_START_METHOD (fork, forkserver, spawn) forces one for the checks.
+    return multiprocessing.get_context(os.environ.get("NIFT_MP_START_METHOD") or None).Pool(*args, **kwargs)
 
 sys.dont_write_bytecode = True  # never leave __pycache__ in the tree
 HERE = os.path.dirname(os.path.abspath(__file__))

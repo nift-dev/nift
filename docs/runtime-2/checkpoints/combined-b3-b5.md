@@ -3852,3 +3852,40 @@ owner-approved B5 semantic difference.
   `nift/_nift.cpython-313-x86_64-linux-gnu.so`. `test-python-binding`: 28 tests OK, and
   `import nift` works. This was Python 3.13 locally; the Python 3.14 import is for Linode.
 - No production change: `nift` is f063f1a9….
+
+## 72. Repair batch, B11: Pool workers take their state explicitly (C84, harness)
+
+- **Cause** (triage BLOCKERS.md B11). Python 3.14 starts Pool workers with forkserver by default.
+  A forkserver or spawn worker imports the module afresh and does not inherit module globals set
+  in `main()`. `tests/runtime2/b4b/gen_alias.py` set `ARGS` in `main()` and its workers read it,
+  so every worker saw `ARGS = None`. Reproduced locally on Python 3.13 by forcing spawn:
+  `AttributeError: 'NoneType' object has no attribute 'nift'`.
+- **Fix** (no switch to fork). gen_alias.py passes `ARGS` through `initializer=_init,
+  initargs=(ARGS,)`.
+- **Audit of every Pool user.** These five are all of them:
+  - `b4b/fixpoint.py`, `b4b/gen_alias.py`, `b5/gen/gate.py`, `b5/gen/gen_evalorder.py` and
+    `b5/gen/gen_operators.py`.
+  - The other four already pass their state through an initializer.
+  - gate.py's job functions come from normally imported modules (gen1, gen_struct), so they pickle
+    under every start method.
+  - Each of the five now takes its Pool from `multiprocessing.get_context(NIFT_MP_START_METHOD or
+    default)`, so the checks below can force a start method. Unset, it is the interpreter's default.
+- **Results** (Python 3.13.x locally; forkserver and spawn forced through `NIFT_MP_START_METHOD`):
+  - gen_alias `--sample 60`: PASS under fork, forkserver and spawn (60 programs, 26 by the VM,
+    0 bad).
+  - gate.py (gen_struct 1911 programs, 0 bad), gen_evalorder.py (840, 0 bad) and gen_operators.py
+    (880, 0 bad): PASS under both spawn and forkserver.
+  - fixpoint.py: `--self-test` PASS under spawn. Its pool path (`run_sources`) ran 3 programs
+    under spawn and under forkserver, 0 crashed.
+  - `make test-runtime2-b4b-gen-alias` (default start method): 12600 programs, 5532 by the VM,
+    0 bad, and both negative controls PASS.
+  - `make test-runtime2-guardoff` with the default start method:
+    - every content check passed: b4b-types 6597 checks, gen_alias 1500 programs (0 bad), the
+      safety fuzz 12512 programs, the guard-off cross-check 2245 scripts (0 failures), result
+      identity;
+    - its closing repo-state check failed only on my own concurrent, uncommitted edits to other
+      files during the run (the B10 and B14 work below), not on anything the gate wrote.
+- **For Linode.** `test-runtime2-guardoff-sanitize` needs the full sanitizer object set (about
+  800 MB), more than this machine's free disk. It and the Python 3.14 default-start-method runs
+  of the three gates are for Linode.
+- No production change: `nift` is f063f1a9….

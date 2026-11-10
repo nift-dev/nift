@@ -15,7 +15,14 @@ a binary that refuses everything must not pass). Every program comes from this f
 --negative-controls runs the generator on two stub binaries (one exits 70, one refuses every
 program) and requires both runs to fail."""
 import argparse, json, os, random, re, shutil, subprocess, sys, tempfile
-from multiprocessing import Pool
+import multiprocessing
+
+
+def Pool(*args, **kwargs):  # noqa: N802
+    # B11 (combined-b3-b5.md section 72): workers get their state through the initializer only,
+    # never by inheriting module globals, so every start method works (Python 3.14 defaults to
+    # forkserver). NIFT_MP_START_METHOD (fork, forkserver, spawn) forces one for the checks.
+    return multiprocessing.get_context(os.environ.get("NIFT_MP_START_METHOD") or None).Pool(*args, **kwargs)
 
 
 def run(nift, src, mode, work):
@@ -126,6 +133,11 @@ def items():
                         out.append({"t": name, "form": form, "v": vk, "ctx": c, "obs": o, "src": src})
         # early observer: a function compiled before the store reads the slot (fnobs defined first)
     return out
+def _init(args):
+    global ARGS
+    ARGS = args
+
+
 def job(it):
     work = tempfile.mkdtemp(prefix="b4b-alias-")
     try:
@@ -166,7 +178,7 @@ def main():
         its = its[:ARGS.sample]
     bad = ran = diff = 0
     out = open(ARGS.out, "w") if ARGS.out else None
-    with Pool(2) as p:
+    with Pool(2, initializer=_init, initargs=(ARGS,)) as p:
         for res in p.imap_unordered(job, its, chunksize=8):
             ran += 0 if res["refused"] else 1
             diff += 1 if res.get("diff") else 0
