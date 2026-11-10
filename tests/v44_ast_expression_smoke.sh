@@ -18,9 +18,14 @@ nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}
 # Differential correctness of the CP16 hot path (AST-prepared while conditions
 # and simple assignment/compound/increment bodies) against the legacy evaluator.
 
+# Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run no longer
+# aborts the script at `out=$(...)` under set -e/pipefail; its exit status and first line become the
+# value check() compares, so that check FAILs by name and the later ones still run.
 run_script() {
     cat > "$t/probe.f"
-    timed 30 "$nift" "$t/probe.f" 2>&1 | head -1
+    local rc=0
+    timed 30 "$nift" "$t/probe.f" > "$t/probe.out" 2>&1 || rc=$?
+    if [ "$rc" -ne 0 ]; then echo "exit $rc: $(head -1 "$t/probe.out")"; else head -1 "$t/probe.out"; fi
 }
 
 fail=0

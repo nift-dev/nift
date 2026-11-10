@@ -5,6 +5,11 @@
 #
 # Run under ASan/UBSan/LSan for the full memory certification value.
 set -eu
+# Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): every check reports its own FAIL
+# line by name and the script goes on to the next one, exiting non-zero at the end; a refused or
+# failing run no longer aborts silently at `out=$(...)` under set -e.
+failed=0
+fail() { printf 'FAIL %s\n' "$*" >&2; failed=1; }
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) : ;; *) NIFT="$(pwd)/$NIFT" ;; esac
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -17,9 +22,9 @@ a.push([3])
 print(x[0])
 print(y[0])
 F
-out=$($NIFT "$T/destruct.f")
-[ "$out" = "1
-2" ] || { printf 'destruct: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$($NIFT "$T/destruct.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "1
+2" ] || fail "destruct: exit $rc: $out"
 
 # 2. Nested extraction then growth under a retained location.
 cat >"$T/growth.f" <<'F'
@@ -33,9 +38,9 @@ while(i < 2000) {
 print(b[0])
 print(a[2002][0])
 F
-out=$($NIFT "$T/growth.f")
-[ "$out" = "1
-1999" ] || { printf 'growth: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$($NIFT "$T/growth.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "1
+1999" ] || fail "growth: exit $rc: $out"
 
 # 3. Array of struct handles with heavy growth (handle identity must survive).
 cat >"$T/structarr.f" <<'F'
@@ -48,8 +53,8 @@ while(i < 3000) {
 }
 print(pts.size())
 F
-out=$($NIFT "$T/structarr.f")
-[ "$out" = "3000" ] || { printf 'structarr: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$($NIFT "$T/structarr.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "3000" ] || fail "structarr: exit $rc: $out"
 
 # 4. Map of struct handles with growth; identity via == and same().
 cat >"$T/mapstruct.f" <<'F'
@@ -65,9 +70,9 @@ m.set("k", p1)
 print(m.get("k") == p1)
 print(same(m.get("k"), p1))
 F
-out=$($NIFT "$T/mapstruct.f")
-[ "$out" = "true
-true" ] || { printf 'mapstruct: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$($NIFT "$T/mapstruct.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "true
+true" ] || fail "mapstruct: exit $rc: $out"
 
 # 5. @for over a map whose body mutates the map (template-path value binding
 #    must not dangle; json_bindings_ holds owned copies). Template build route.
@@ -85,8 +90,9 @@ $[m["d"] = 4]
 }
 SUM=$[s]
 E
-(cd "$D" && "$NIFT" build --all >/dev/null 2>&1) || { printf 'formap build failed\n' >&2; exit 1; }
-grep -q 'SUM=6' "$D/public/index.html" || { printf 'formap: %s\n' "$(cat "$D/public/index.html")" >&2; exit 1; }
+if (cd "$D" && "$NIFT" build --all >"$T/build.log" 2>&1); then
+  grep -q 'SUM=6' "$D/public/index.html" || fail "formap: $(cat "$D/public/index.html")"
+else fail "formap: build failed: $(cat "$T/build.log")"; fi
 
 # 6. @for over an array whose body mutates the array.
 D="$T/site6"; mkdir -p "$D/.nift" "$D/content" "$D/templates" "$D/public"
@@ -103,10 +109,9 @@ $[a.push(0)]
 }
 SUM=$[s]
 E
-(cd "$D" && "$NIFT" build --all >/dev/null 2>&1) || { printf 'forarr build failed\n' >&2; exit 1; }
-grep -q 'SUM=10' "$D/public/index.html" || { printf 'forarr: %s\n' "$(cat "$D/public/index.html")" >&2; exit 1; }
-
-echo 'PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr)'
+if (cd "$D" && "$NIFT" build --all >"$T/build.log" 2>&1); then
+  grep -q 'SUM=10' "$D/public/index.html" || fail "forarr: $(cat "$D/public/index.html")"
+else fail "forarr: build failed: $(cat "$T/build.log")"; fi
 # --- CP34 final adversarial battery (all must stay ASan-clean) ---
 
 # Escaped reference through object member after the parent slot is replaced.
@@ -122,8 +127,8 @@ F
 set +e
 "$NIFT" "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
 set -e
-[[ $rc -ne 0 ]] || { echo 'escaped-ref unexpectedly succeeded' >&2; exit 1; }
-grep -q 'reference target no longer exists' "$T/err" || { cat "$T/err" >&2; exit 1; }
+if [[ $rc -eq 0 ]]; then fail 'escaped-ref: unexpectedly succeeded'
+elif ! grep -q 'reference target no longer exists' "$T/err"; then fail "escaped-ref: $(cat "$T/err")"; fi
 
 # Reference created inside a loop scope escapes and stays live after the scope.
 cat >"$T/scope.f" <<'F'
@@ -137,8 +142,8 @@ while(i < 1) {
 }
 print(a[0][0])
 F
-out=$("$NIFT" "$T/scope.f")
-[ "$out" = "5" ] || { printf 'scope: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$("$NIFT" "$T/scope.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "5" ] || fail "scope: exit $rc: $out"
 
 # Heavy reallocation with composed locations retained.
 cat >"$T/stress.f" <<'F'
@@ -155,6 +160,8 @@ e := a[19999]
 print(c[0])
 print(e[1].k[0])
 F
-out=$("$NIFT" "$T/stress.f")
-[ "$out" = "0
-19999" ] || { printf 'stress: %s\n' "$out" >&2; exit 1; }
+rc=0; out=$("$NIFT" "$T/stress.f" 2>&1) || rc=$?
+[ "$rc" = 0 ] && [ "$out" = "0
+19999" ] || fail "stress: exit $rc: $out"
+[ "$failed" = 0 ] || { echo 'FAIL v4.4 root+path corruption reproducers' >&2; exit 1; }
+echo 'PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr, CP34 battery)'

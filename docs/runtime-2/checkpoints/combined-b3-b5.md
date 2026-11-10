@@ -4262,3 +4262,42 @@ owner-approved B5 semantic difference.
   - Legacy keeps its old `const` (`cannot assign to const binding: a`). That is the approved
     difference, so this check is for the default engine.
 - The smoke was also restructured for item 4 (section 84). Original sha256 `2d572fbd91df889e…`.
+
+## 84. Owner 13:26, item 4: nine smokes no longer abort silently (C96, tests)
+
+- Each of these smokes died at `out=$(…)` (or a bare `[[ … ]]`/`grep`) under `set -e` when a run
+  was refused, so the failing check had no FAIL line and every later check was hidden. Each failing
+  check now prints a FAIL line naming it.
+- **Report every check, exit non-zero at the end:**
+  - `v44_ast_expression_smoke.sh` (`run_script` returns `exit N: <first line>`);
+  - `v44_element_assignment_smoke.sh` (one program per check);
+  - `v44_root_path_corruption_reproducers.sh` (and its PASS line now comes last);
+  - `v46_output_smoke.sh`.
+- **Name the check, exit non-zero at it:** `v48_bytes_index_parity.sh`, `v48_comparison_parity.sh`,
+  `v48_callable_parity.sh`, `v48_map_set_index_smoke.sh` and `v48_prepared_collection_parity.sh`.
+  Their `ok()` used to die on a refused run before comparing.
+- **What they report now under the VM default** (each passes on legacy, `NIFT_VM=0`, except as
+  noted in section 83):
+  - ast: `big-int equality` (`prepared-unpreparable`);
+  - element: object member, nested grid and compound element assignment (`index-target`,
+    `index-assign-target`, `compound-target`);
+  - root path: `destruct` (`declare-pattern`), `structarr`, `mapstruct` (`context:struct-new`) and
+    `escaped-ref` (`index-target`);
+  - v46 output: all four checks (`callable:err`);
+  - v48: bytes (`builtin-bytes:bytes`), callable (`prepared-decl-type`), map-set (`callable:sorted_map`
+    after the item 5 refusals), prepared collection (`postfix-spelling`).
+
+  All of these are owner production items or inventory rows (section 86).
+- Original sha256:
+
+  | Smoke | sha256 (first 16 hex) |
+  | --- | --- |
+  | v44 ast | `2a87b033088c4e23` |
+  | v44 element | `2d572fbd91df889e` |
+  | v44 root path | `87312bde8c2a98c9` |
+  | v48 bytes | `fc04ef8bcdfa80b0` |
+  | v48 comparison | `fbc364119bb87257` |
+  | v48 callable | `eb970f17e5ae970d` |
+  | v48 map-set | `8b78c4f431751a1e` |
+  | v48 prepared collection | `823e1b8890f310a1` |
+  | v46 output | `0c476605fa6859b6` |

@@ -8,7 +8,9 @@ set -euo pipefail
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) B="$NIFT";; *) B="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-ok(){ printf '%s\n' "$2" > "$t/p.f"; out=$("$B" "$t/p.f" 2>&1); [ "$out" = "$3" ] || { echo "FAIL $1: got [$out]" >&2; exit 1; }; }
+# Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run reports
+# its check by name (it used to abort silently at `out=$(...)` under set -e).
+ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, got [$out]" >&2; exit 1; }; }
 err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then echo "FAIL $1: unexpectedly succeeded" >&2; exit 1; fi; grep -q "$3" "$t/e" || { echo "FAIL $1 missing [$3]: $(cat "$t/e")" >&2; exit 1; }; }
 
 # map.contains / get / set inside prepared while/for bodies.
