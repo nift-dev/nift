@@ -81,7 +81,7 @@ SHAPES.update({
 # Expected outcomes of the legacy probes and fixtures (directory -> outcome).
 PROBES = {
     "cycle": "import-error:cycle", "diamond": "import-reinitialised", "dynamic_path": "import-dynamic",
-    "export_collision": "import-collision", "export_copy": "binding-name-reserved", "export_missing": "module-error:export-missing",
+    "export_collision": "import-scope:collision", "export_copy": "binding-name-reserved", "export_missing": "module-error:export-missing",
     "in_block": "import-nested", "in_function": "import-nested", "missing": "import-error:missing",
     "module_bare_return": "module-bare-return", "module_error": "type:-", "module_free_unbound": "free-name",
     # module_private: the importer declares `hidden` too (refused: names stay apart).
@@ -122,6 +122,14 @@ def check(args, work, item):
     problems = [] if verdict in ("same", "approved") else [f"legacy {a[:3]!r} != vm {b[:3]!r}"]
     if not args.table and want is not None and label != want:
         problems.append(f"expected {want}, got {label}")
+    # Owner 2026-11-10 13:26, item 1 (combined-b3-b5.md section 81): the approved B4 C1 behaviour of an
+    # import-scope collision is legacy's exact error line, rejected before any part of the program runs.
+    if want == "import-scope:collision" and label == want:
+        c = run(args.nift, d, {"NIFT_VM_STATS": os.path.join(d, "stats.jsonl")})  # the VM default
+        legacy_error = [l for l in a[2].splitlines() if l.startswith(b"error: ")]
+        if (c[3].get("vm_executions"), c[3].get("legacy_executions")) != (0, 0) or c[1] != b"" or c[0] != a[0] \
+                or not legacy_error or c[2].splitlines()[:1] != legacy_error[:1]:
+            problems.append(f"import-scope:collision is not legacy's error rejected before running: {c[:3]!r}")
     return name, label if verdict != "approved" else f"{label} ({policy})", problems
 
 
@@ -272,7 +280,7 @@ def main():
 
 
 # Expected outcomes of the agreeing D-041 fixtures that are not on the VM.
-FIXTURES = {"export_clash": "import-collision", "circular": "import-error:cycle", "self_cycle": "import-error:cycle",
+FIXTURES = {"export_clash": "import-scope:collision", "circular": "import-error:cycle", "self_cycle": "import-error:cycle",
             "doc_try_import": "import-nested", "doc_math": "vm", "import_path_print": "vm",
             "import_path_read": "path-in-call-argument", "import_path_write": "alias-argument",
             "nested_chain": "import-scope"}

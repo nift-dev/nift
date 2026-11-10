@@ -4208,3 +4208,20 @@ owner-approved B5 semantic difference.
   function value having no shown form. No unapproved behavioural difference turned up in these
   gates.
 - No production change: `nift` is f063f1a9….
+
+## 81. Owner 13:26, item 1: the module-collision expectation (C93, tests)
+
+- `tests/runtime2/vm_modules.py` still expected the pre-B4 reason `import-collision` for the d041
+  fixture `export_clash` and for the probe `export_collision`.
+- Since 6f6a790d (B4 7) the VM gives the approved B4 C1 behaviour (compatibility.md; coordinator
+  2026-11-06), `import-scope:collision`: legacy's exact error line, rejected before running.
+  - Legacy prints `m runs`, then `import: export collides with existing binding: mf`, exit 1.
+  - The VM default prints the same error line and the note that no part of the program ran.
+- **Change.** Both expectations are now `import-scope:collision`. For that outcome the check also
+  runs the VM default and requires:
+  - no VM or legacy execution in its statistics;
+  - no stdout and legacy's exit status;
+  - legacy's `error:` line as the first stderr line.
+- **Result.** `vm_modules.py --gen 100`: PASS, 60 programs plus 100 random module programs, all on
+  the VM.
+- vm_modules.py original sha256 `03e631e5db9b94a4…`. Production unchanged: f063f1a9….
