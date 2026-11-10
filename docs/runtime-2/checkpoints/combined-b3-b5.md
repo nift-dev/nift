@@ -4023,3 +4023,43 @@ owner-approved B5 semantic difference.
     - The cp17 parts of test-rt-host-mutants are the routing gate above, the handle and N2 gates
       (unchanged), and the unwind gate (B22, section 76).
 - No production change: `nift` is f063f1a9….
+
+## 76. Repair batch, B22: cp17-unwind-mutants finishes in about 200 s (C88, harness)
+
+- **Why it never completed** (triage BLOCKERS.md B22): too slow, not a deadlock or a
+  non-terminating mutant.
+  - The harness copied the working tree per mutant, about 576 MB with `.build/libffi`, `rt` and
+    `pic`: 277 MB of tree, 245 MB rt and 28 MB pic.
+  - Its ignore list kept only `libffi`, `rt` and `pic` from `.build`, so the copy had no
+    `.build/obj-config`. The Makefile writes the object signature when it is read, so the first
+    `make` in each copy created `obj-config/default.flags` with a fresh mtime. Every object
+    depends on that file.
+  - Evidence: `make -n -W .build/obj-config/default.flags nift` lists 298 compiles, and
+    `make -n -W .build/obj-config/pic.flags …persistent` lists 299.
+  - So each mutant recompiled nift's objects (19 `vm` and 3 `unit` mutants, whose unit links
+    `$(RT_UNIT_OBJECTS)`) or the pic set (2 `persist`), under 3600 s inner timeouts: hours in total. Locally, a single copy is more than half the free disk.
+  - Per-mutant evidence from the new run (below): every mutant builds in 1.3 to 4.6 s.
+    - Each witness run finishes in at most 1.7 s, except the five oom `HANG` and `CHECK` mutants.
+    - Those print their witness line and stop at the unit's own 20 s hang watchdog (exit 3).
+    - None runs to the cap.
+- **Fix:**
+  - Each mutant is a sanctioned build (section 75, `sanctioned_mutant.build` with an exact text
+    edit): the mutated unit compiled with its production line and linked with the production
+    objects. That is nift for `vm`, `$(RT_UNIT_OBJECTS)` with the unit test for `unit`, and
+    `$(C_ABI_PIC)` with the persistent-allocation program for `persist`.
+  - The oom witness compiles `$(RT_HANDLE_SOURCES)` as its rule does: the control objects once,
+    then only the mutated unit per mutant, which must differ from the control object.
+  - The C75 comparison replaces the old mtime and sha provenance. The production artefacts are
+    the controls.
+  - Progress lines carry elapsed time, the mutant number and the build and witness seconds.
+  - `--cap` (default 300 s) bounds each witness run.
+- **Timeouts.** A timeout alone is never a kill. A run that reaches the cap counts as a kill only
+  if the expected witness text was already printed: the restored defect is itself a hang after
+  the CHECK line. Otherwise it is a harness failure.
+- **Stale mutants.** Five mutants named `src/rt/compiler.cpp`, but their while-loop sites moved to
+  `compiler_loops.cpp` (a43472ed). Their text is unchanged; the path is corrected.
+- **Results.** `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants, 0 failures, 201 s.
+  - The dead-binary control passes, and so does every control kind.
+  - Every mutant is killed by its named witness.
+  - The certification cap is 3600 s.
+- No production change: `nift` is f063f1a9….

@@ -5,24 +5,35 @@ teardown under persistent allocation failure (F2) and the CP17 x CP18
 allocation-failure fixes.
 
 Each mutant applies one exact textual change (which must match exactly once)
-to a private copy of the tree, rebuilds the named artefact there and requires
-the named witness to FAIL with the expected text in its output. A control copy
-with no change must PASS every witness (dead-harness control), and the program
-witness run against a missing binary must fail (dead-binary control). The copy
-keeps the source tree's build outputs, so only the mutated translation unit
-and its links are rebuilt.
+and requires the named witness to FAIL with the expected text in its output.
+A control (no change) must PASS every witness (dead-harness control), and the
+program witness run against a missing binary must fail (dead-binary control).
 
-Provenance (independent review, mutation integrity): the witness artefact,
-and for a .cpp in an object build that file's object, must be rebuilt after
-the mutation AND differ in content (sha256) from the control copy's; a
-mutation that compiles to the control's bytes is reported, never counted.
+B22 (combined-b3-b5.md section 76). This harness used to copy the working tree
+(about 576 MB with .build/libffi, rt and pic) per mutant and run `make` in the
+copy with 3600 s timeouts. The copy left out .build/obj-config, so the first
+make in it rewrote the object signature and rebuilt every object (298 for nift,
+299 for the pic set) for each of the 32 mutants: hours of compiling, never a
+deadlock, and more disk than the local machine has. Now each mutant is built
+the sanctioned way (tests/runtime2/sanctioned_mutant.py): only the mutated unit
+is compiled, with its production compile line, into .build/mutant-nift, and
+linked with the production objects; the mutant object must differ from the
+production object (the C75 check, which replaces the old mtime/sha provenance).
 
-  unit witness     tests/rt/unwind_file_release_unit.cpp (make RT unit)
-  oom witness      tests/rt/handle_close_oom.cpp
-  vm witness       tests/runtime2/cp17/unwind_handle_release.py (make nift)
-  persist:PROGRAM  tests/runtime2/cp17/handle_allocation_persistent.cpp, one program
+  unit witness     tests/rt/unwind_file_release_unit.cpp, linked with $(RT_UNIT_OBJECTS)
+  oom witness      tests/rt/handle_close_oom_unit.cpp with $(RT_HANDLE_SOURCES), compiled as its
+                   Makefile rule does (the control objects once, the mutated unit per mutant)
+  vm witness       tests/runtime2/cp17/unwind_handle_release.py against the mutant nift
+  persist:PROGRAM  tests/runtime2/cp17/handle_allocation_persistent.cpp, one program, linked with
+                   $(C_ABI_PIC)
 
-Usage: unwind_mutants.py [--keep] [--only NAME]
+Each witness run has a cap (--cap, default 300 s). A timeout alone is never a
+kill: a run that times out is a kill only when the expected witness text was
+already printed (the restored defect is itself a hang after the CHECK line);
+otherwise it is a harness failure. Progress (mutant, phase, elapsed seconds) is
+printed as it goes.
+
+Usage: unwind_mutants.py [--keep] [--only NAME] [--cap SECONDS]   (through make: test-runtime2-cp17-unwind-mutants)
 """
 import argparse
 import hashlib
@@ -30,7 +41,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -69,20 +79,21 @@ MUTANTS = [
      "    for (std::uint16_t k = 1; k < proto->nregs; ++k) if (R[k].is_heap()) { if (R[k].is(Kind::Handle)) "
      "abandon_unwound_handle(R[k]); R[k] = Value(); }", "vm", "FAIL normal-return-leak (legacy)"),
     # Compiler: a block left normally clears its registers (completed code is reported).
+    # B22: the while-loop mutants' sites moved to compiler_loops.cpp (a43472ed); the text is unchanged.
     ("no-block-handles", "src/rt/compiler_blocks.cpp", "        if (kinds(id) & kKindHandle) return true;\n", "", "vm",
      "FAIL c-block-completed-then-throw (legacy)"),
     ("no-if-clear", "src/rt/compiler.cpp", "    if (!ok) return false;\n    block_clear(body_regs);\n",
      "    if (!ok) return false;\n", "vm", "FAIL c-block-completed-then-throw (legacy)"),
     ("no-else-clear", "src/rt/compiler.cpp", "        if (other_ok) block_clear(else_regs);\n", "", "vm",
      "FAIL c-else-completed-then-throw (legacy)"),
-    ("no-while-iteration-clear", "src/rt/compiler.cpp",
+    ("no-while-iteration-clear", "src/rt/compiler_loops.cpp",
      "        const std::size_t iteration_end = fb_->here();\n        block_clear(body_regs);\n",
      "        const std::size_t iteration_end = fb_->here();\n", "vm", "FAIL c-while-throw-first (legacy)"),
-    ("continue-skips-clear", "src/rt/compiler.cpp",
+    ("continue-skips-clear", "src/rt/compiler_loops.cpp",
      "        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);",
      "        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);", "vm",
      "FAIL c-continue-throw-first (legacy)"),
-    ("no-while-break-clear", "src/rt/compiler.cpp",
+    ("no-while-break-clear", "src/rt/compiler_loops.cpp",
      "        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());\n        block_clear(body_regs);\n",
      "        for (std::size_t at : loops_.back().breaks) fb_->patch(at, fb_->here());\n", "vm",
      "FAIL c-break-then-throw (legacy)"),
@@ -107,10 +118,10 @@ MUTANTS = [
     # Independent review R2: the two while-clear mutants again, now required to
     # be killed by the pad-free structural witnesses (register-placement
     # independent), not only by the padded behavioural ones.
-    ("no-while-iteration-clear-structure", "src/rt/compiler.cpp",
+    ("no-while-iteration-clear-structure", "src/rt/compiler_loops.cpp",
      "        const std::size_t iteration_end = fb_->here();\n        block_clear(body_regs);\n",
      "        const std::size_t iteration_end = fb_->here();\n", "vm", "FAIL s-while-iteration-clear (structure)"),
-    ("continue-skips-clear-structure", "src/rt/compiler.cpp",
+    ("continue-skips-clear-structure", "src/rt/compiler_loops.cpp",
      "        for (std::size_t at : loops_.back().continues) fb_->patch(at, iteration_end);",
      "        for (std::size_t at : loops_.back().continues) fb_->patch(at, loops_.back().start);", "vm",
      "FAIL s-while-continue-reaches-clear (structure)"),
@@ -157,158 +168,160 @@ MUTANTS = [
 ]
 
 
-def run(cmd, cwd, timeout):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+sys.path.insert(0, str(ROOT / "tests" / "runtime2"))
+import build_toolchain as toolchain  # noqa: E402
+import sanctioned_mutant  # noqa: E402
+
+OOM_TEST = "tests/rt/handle_close_oom_unit.cpp"
+WITNESS_UNIT = "tests/rt/unwind_file_release_unit.cpp"
+PERSIST_TEST = "tests/runtime2/cp17/handle_allocation_persistent.cpp"
 
 
-def copy_tree(dest):
-    # Working tree plus build outputs, without .git (the copy is never committed).
-    # Only the build outputs the witnesses reuse (libffi, rt units); the
-    # sanitizer and other suites' trees would multiply disk use per mutant.
-    def ignore(directory, names):
-        if Path(directory) == ROOT:
-            return [".git"]
-        if Path(directory) == ROOT / ".build":
-            return [n for n in names if n not in ("libffi", "rt", "pic")]
-        return []
-    shutil.copytree(ROOT, dest, symlinks=True, ignore=ignore, copy_function=shutil.copy2)
+def text(x):
+    return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
 
 
-def artifact_of(kind):
+def execute(cmd, cap, env=None):
+    """(returncode, output, timed_out); a timeout returns the output so far."""
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=cap)
+        return r.returncode, r.stdout + r.stderr, False
+    except subprocess.TimeoutExpired as e:
+        return 124, text(e.stdout) + text(e.stderr), True
+
+
+class Oom:
+    """The handle-close-oom unit, built as its Makefile rule builds it: $(CXX) $(CPPFLAGS) -Itests/rt
+    $(CXXFLAGS) TEST $(RT_HANDLE_SOURCES). The control objects are compiled once; a mutant
+    recompiles only its unit, which must differ from the control object."""
+
+    def __init__(self, work):
+        self.dir = work / "oom-control"
+        self.sources = toolchain.words("NIFT_TC_RT_HANDLE_SOURCES")
+        self.objects = {}
+        for src in self.sources:
+            obj = self.dir / (src.replace("/", "_") + ".o")
+            obj.parent.mkdir(parents=True, exist_ok=True)
+            toolchain.run(toolchain.test_compile("-c", src, "-o", str(obj)), "oom control compile " + src)
+            self.objects[src] = obj
+
+    def link(self, objects, binary):
+        toolchain.run(toolchain.test_compile(OOM_TEST, *map(str, objects), "-o", str(binary)), "oom link")
+        return binary
+
+    def control(self):
+        return self.link(self.objects.values(), self.dir / "unit")
+
+    def mutant(self, folder, path, old, new):
+        if path not in self.objects:
+            raise SystemExit(f"{path} is not in RT_HANDLE_SOURCES")
+        folder.mkdir(parents=True, exist_ok=True)
+        copy = folder / Path(path).name
+        source = (ROOT / path).read_text()
+        if source.count(old) != 1:
+            raise SystemExit(f"the mutation site matches {source.count(old)} times in {path} (a stale mutant)")
+        copy.write_text(source.replace(old, new, 1))
+        obj = folder / (Path(path).name + ".o")
+        toolchain.run(toolchain.test_compile("-iquote", str(Path(path).parent), "-c", str(copy), "-o", str(obj)),
+                      "oom mutant compile " + path)
+        if obj.read_bytes() == self.objects[path].read_bytes():
+            raise SystemExit(f"the mutant object of {path} is identical to the control's (a dead mutant)")
+        return self.link([obj if s == path else o for s, o in self.objects.items()], folder / "unit")
+
+
+def build(kind, folder, edit, oom):
+    """The witness binary for `kind`, mutated by `edit` (None: the control)."""
     if kind == "oom":
-        return OOM_UNIT
+        return oom.mutant(folder, *edit) if edit else oom.control()
+    if edit is None:
+        return ROOT / {"unit": UNIT, "vm": "nift"}.get(kind, PERSIST)
     if kind == "unit":
-        return UNIT
-    return PERSIST if kind.startswith("persist") else "nift"
-
-
-def object_of(kind, path):
-    """The object the mutated .cpp compiles to in the witness's build, or None."""
-    if not path.endswith(".cpp"):
-        return None
+        return sanctioned_mutant.build(folder, edits=[edit], objects_env="NIFT_TC_RT_UNIT_OBJECTS",
+                                       unit=WITNESS_UNIT, quiet=True)
     if kind == "vm":
-        return path[:-4] + ".o"
-    if kind.startswith("persist"):
-        return ".build/pic/" + path[:-4] + ".o"
-    return None  # unit/oom binaries compile the sources directly
+        return sanctioned_mutant.build(folder, edits=[edit], quiet=True)
+    return sanctioned_mutant.build(folder, edits=[edit], config="pic", unit=PERSIST_TEST, quiet=True)
 
 
-def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
-
-
-def provenance(tree, kind, path, start, control):
-    """Proof that the mutant's own production code was compiled into the
-    witness: rebuilt after the mutation (mtime) and different from the
-    control copy's bytes (sha256). Returns the problems."""
-    problems = []
-    for rel in filter(None, (artifact_of(kind), object_of(kind, path))):
-        f = tree / rel
-        if not f.exists() or f.stat().st_mtime < start:
-            problems.append(f"{rel} not rebuilt after the mutation")
-        elif control.get(rel) is not None and sha(f) == control[rel]:
-            problems.append(f"{rel} identical to the control's (no compiled mutation)")
-    return problems
-
-
-def witness(tree, kind):
+def witness(kind, binary, cap):
     if kind in ("unit", "oom"):
-        target = UNIT if kind == "unit" else OOM_UNIT
-        build = run(["make", target], tree, 3600)
-        if build.returncode != 0:
-            return None, build.stdout[-2000:] + build.stderr[-2000:]
-        try:
-            # A killed mutant may hang after its first failed CHECK (the defect
-            # it restores is a hang); the CHECK line is the witness, the
-            # timeout only bounds the run and never counts as a kill alone.
-            result = run([str(tree / target)], tree, 120)
-        except subprocess.TimeoutExpired as e:
-            def text(x):
-                return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
-            return 124, text(e.stdout) + text(e.stderr)
-    elif kind.startswith("persist"):
-        build = run(["make", "-j2", PERSIST], tree, 3600)
-        if build.returncode != 0:
-            return None, build.stdout[-2000:] + build.stderr[-2000:]
+        return execute([str(binary)], cap)
+    if kind.startswith("persist"):
         env = dict(os.environ)
         if ":" in kind:
             env["ONLY_PROG"] = kind.split(":", 1)[1]
-        result = subprocess.run([str(tree / PERSIST)], cwd=tree, env=env, capture_output=True, text=True,
-                                timeout=1800)
-    else:
-        build = run(["make", "-j2", "nift"], tree, 3600)
-        if build.returncode != 0:
-            return None, build.stdout[-2000:] + build.stderr[-2000:]
-        result = run([sys.executable, "tests/runtime2/cp17/unwind_handle_release.py", "--nift", str(tree / "nift")],
-                     tree, 1800)
-    return result.returncode, result.stdout + result.stderr
+        return execute([str(binary)], cap, env)
+    return execute([sys.executable, "-B", "tests/runtime2/cp17/unwind_handle_release.py", "--nift", str(binary)], cap)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--only")
+    ap.add_argument("--cap", type=int, default=300, help="seconds per witness run")
     args = ap.parse_args()
-    work = Path(tempfile.mkdtemp(prefix="cp17-unwind-mutants-"))
+    os.chdir(ROOT)
+    work = ROOT / ".build" / "mutant-nift" / "cp17-unwind"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    began = time.time()
     failures = 0
+
+    def progress(message):
+        print(f"[{time.time() - began:7.1f}s] {message}", flush=True)
+
     try:
-        # Dead-binary control: the program witness must fail without a binary.
-        dead = run([sys.executable, str(ROOT / "tests/runtime2/cp17/unwind_handle_release.py"), "--nift",
-                    str(work / "missing-nift")], ROOT, 60)
+        dead = subprocess.run([sys.executable, "-B", "tests/runtime2/cp17/unwind_handle_release.py", "--nift",
+                               str(work / "missing-nift")], cwd=ROOT, capture_output=True, text=True, timeout=60)
         if dead.returncode == 0:
             print("FAIL dead-binary control: the witness passed without a binary")
             return 1
-        print("ok   dead-binary control: the witness fails without a binary")
-        control = work / "control"
-        copy_tree(control)
-        kinds = sorted({m[4] for m in MUTANTS if not args.only or m[0] == args.only})
-        for kind in kinds:
-            rc, out = witness(control, kind)
+        progress("ok   dead-binary control: the witness fails without a binary")
+        selected = [m for m in MUTANTS if not args.only or m[0] == args.only]
+        if not selected:
+            print(f"FAIL no mutant named {args.only}")
+            return 1
+        oom = Oom(work) if any(m[4] == "oom" for m in selected) else None
+        for kind in sorted({m[4] for m in selected}):
+            t = time.time()
+            rc, out, timed_out = witness(kind, build(kind, work / "control", None, oom), args.cap)
             if rc != 0:
-                print(f"FAIL control ({kind}): unmutated tree does not pass: rc={rc}\n{out[-1500:]}")
+                print(f"FAIL control ({kind}): the unmutated witness does not pass: rc={rc}"
+                      f"{' (timed out at the cap)' if timed_out else ''}\n{out[-1500:]}")
                 return 1
-            print(f"ok   control ({kind}): unmutated tree passes")
-        hashes = {}
-        for _, path, _, _, kind, _ in MUTANTS:
-            for rel in filter(None, (artifact_of(kind), object_of(kind, path))):
-                hashes[rel] = sha(control / rel)
-        shutil.rmtree(control)
-        for name, path, old, new, kind, expected in MUTANTS:
-            if args.only and name != args.only:
+            progress(f"ok   control ({kind}): passes in {time.time() - t:.1f}s")
+        for number, (name, path, old, new, kind, expected) in enumerate(selected, 1):
+            folder = work / name
+            t = time.time()
+            try:
+                binary = build(kind, folder, (path, old, new), oom)
+            except (SystemExit, RuntimeError) as e:
+                print(f"FAIL {name}: mutant did not build (a build failure is not a kill): {e}")
+                failures += 1
+                shutil.rmtree(folder, ignore_errors=True)
                 continue
-            tree = work / name
-            copy_tree(tree)
-            source = (tree / path).read_text()
-            if source.count(old) != 1:
-                print(f"FAIL {name}: mutation site matches {source.count(old)} times in {path}")
-                failures += 1
-                shutil.rmtree(tree)
-                continue
-            (tree / path).write_text(source.replace(old, new, 1))
-            start = time.time()
-            rc, out = witness(tree, kind)
-            stale = provenance(tree, kind, path, start, hashes) if rc is not None else []
-            if stale:
-                print(f"FAIL {name}: provenance: {'; '.join(stale)}")
-                failures += 1
-            elif rc is None:
-                print(f"FAIL {name}: mutant did not build (a build failure is not a kill)\n{out}")
-                failures += 1
-            elif rc == 0:
-                print(f"FAIL {name}: survived ({kind} witness passed)")
+            built = time.time() - t
+            rc, out, timed_out = witness(kind, binary, args.cap)
+            ran = time.time() - t - built
+            where = f"{number}/{len(selected)}, build {built:.1f}s, witness {ran:.1f}s"
+            if rc == 0:
+                print(f"FAIL {name}: survived ({kind} witness passed; {where})")
                 failures += 1
             elif expected not in out:
-                print(f"FAIL {name}: killed, but not by the intended witness ({expected!r} absent)\n{out[-1500:]}")
+                print(f"FAIL {name}: {'timed out at the cap' if timed_out else 'killed'}, but not by the intended "
+                      f"witness ({expected!r} absent; {where})\n{out[-1500:]}")
                 failures += 1
             else:
-                print(f"ok   {name}: killed by {kind} witness ({expected}); rebuilt from the mutated {path}")
+                how = "witness text, then the cap" if timed_out else f"rc={rc}"
+                progress(f"ok   {name}: killed by {kind} witness ({expected}; {how}; {where})")
             if not args.keep:
-                shutil.rmtree(tree)
+                shutil.rmtree(folder, ignore_errors=True)
     finally:
         if not args.keep:
             shutil.rmtree(work, ignore_errors=True)
     total = len([m for m in MUTANTS if not args.only or m[0] == args.only])
-    print(f"{'PASS' if not failures else 'FAIL'} cp17 unwind release mutants: {total} mutant(s), {failures} failure(s)")
+    print(f"{'PASS' if not failures else 'FAIL'} cp17 unwind release mutants: {total} mutant(s), {failures} failure(s) "
+          f"in {time.time() - began:.0f}s")
     return 1 if failures else 0
 
 

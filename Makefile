@@ -5490,8 +5490,11 @@ test-rt-vm: test-runtime2-cp17-tripwire
 .PHONY: test-runtime2-cp17-handle-mutants test-runtime2-cp17-unwind-mutants
 test-runtime2-cp17-handle-mutants:
 	python3 tests/runtime2/cp17/handle_mutants.py "$(CURDIR)/$(TEST_DIR)/cp17-handle-mutants"
-test-runtime2-cp17-unwind-mutants:
-	python3 tests/runtime2/cp17/unwind_mutants.py
+# B22 (combined-b3-b5.md section 76): sanctioned mutant builds (no tree copies), a cap per witness
+# run and progress output; the production artefacts are the controls.
+test-runtime2-cp17-unwind-mutants: $(TARGET) $(RT_UNIT_OBJECTS) $(RT_UNWIND_RELEASE_UNIT) $(CP17_HANDLE_ALLOC_PERSIST) $(C_ABI_PIC)
+	$(HARNESS_TOOLCHAIN_ENV) NIFT_TC_RT_UNIT_OBJECTS="$(RT_UNIT_OBJECTS)" NIFT_TC_PIC_OBJECTS="$(C_ABI_PIC)" \
+		NIFT_TC_RT_HANDLE_SOURCES="$(RT_HANDLE_SOURCES)" python3 -B tests/runtime2/cp17/unwind_mutants.py
 test-rt-host: test-rt-handles
 test-rt-host: test-rt-handles-guards
 test-rt-host: test-runtime2-cp17-handles
