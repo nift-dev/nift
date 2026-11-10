@@ -3835,3 +3835,20 @@ owner-approved B5 semantic difference.
   selftest (36) and the g00047 controls run first. The unmutated binary passes every suite, and
   12 of 12 mutants are rejected.
 - The guard, rt-lint and test-integrity pass.
+
+## 71. Repair batch (owner 2026-11-10 12:21), B08: the host source list is generated (C83, build lists)
+
+- **Cause** (triage BLOCKERS.md B08). `bindings/python/build.sh` compiles the sources named in
+  `src/rt/host-sources.txt`, a hand-kept file. The Makefile's `RT_HOST_LINK_SOURCES` uses a
+  wildcard over `src/rt/handles/*.cpp`, and the file lacked `handle_box.cpp` and
+  `table_teardown.cpp` (the latter defines `HandleTable::shutdown_noexcept`), so the extension
+  failed to load. `test-rt-host-sources-list` already compared the file with the wildcard; it was
+  failing, not missing.
+- **Fix.** New `make update-rt-host-sources` rewrites the list from the same
+  `RT_HOST_LIST_EXPECTED` the check uses, keeping the header comment and sorting the paths. The
+  file is regenerated: 40 sources, the two above added. The check's failure message now names the
+  regeneration command, so the list cannot drift silently.
+- **Results.** `test-rt-host-sources-list` OK. `python-binding` builds
+  `nift/_nift.cpython-313-x86_64-linux-gnu.so`. `test-python-binding`: 28 tests OK, and
+  `import nift` works. This was Python 3.13 locally; the Python 3.14 import is for Linode.
+- No production change: `nift` is f063f1a9….

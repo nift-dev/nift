@@ -1510,10 +1510,17 @@ test-rt-host-sources-list:
 	@expected="$$(printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort)"; \
 	actual="$$(grep -v '^#' src/rt/host-sources.txt | grep . | LC_ALL=C sort)"; \
 	if [ "$$expected" != "$$actual" ]; then \
-	  echo "src/rt/host-sources.txt is out of date:"; \
+	  echo "src/rt/host-sources.txt is out of date (regenerate: make update-rt-host-sources):"; \
 	  echo "--- expected"; printf '%s\n' "$$expected"; echo "--- listed"; printf '%s\n' "$$actual"; exit 1; \
 	fi; echo "test-rt-host-sources-list: OK"
 test: test-rt-host-sources-list
+# B08 (combined-b3-b5.md section 71): rewrite the list from the same wildcard the check uses,
+# keeping its header comment, so it is generated rather than hand-kept.
+.PHONY: update-rt-host-sources
+update-rt-host-sources:
+	@{ grep '^#' src/rt/host-sources.txt; printf '%s\n' $(RT_HOST_LIST_EXPECTED) | LC_ALL=C sort; } > src/rt/host-sources.txt.tmp
+	@mv src/rt/host-sources.txt.tmp src/rt/host-sources.txt
+	@echo "src/rt/host-sources.txt regenerated ($$(grep -vc '^#' src/rt/host-sources.txt) sources)"
 
 # ThreadSanitizer on the process tests (groups are shared with the host loop thread).
 test-rt-host-tsan:
