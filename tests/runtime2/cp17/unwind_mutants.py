@@ -182,6 +182,10 @@ def text(x):
     return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
 
 
+ESCAPED = "escaped"  # timed_out value: a descendant escaped the witness's process group
+ESCAPE_DRAIN_SECONDS = 10
+
+
 def execute(cmd, cap, env=None):
     """(returncode, output, timed_out); a timeout returns the output so far.
 
@@ -204,7 +208,20 @@ def execute(cmd, cap, env=None):
             os.killpg(p.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        out, err = p.communicate()
+        # Review of cf833f5a, Low (combined-b3-b5.md section 93): the drain after the kill is bounded too.
+        # If the pipes are still open after it, a descendant outside the group (one that called setsid())
+        # holds them: close them, reap the child, and report ESCAPED, a harness error that never counts
+        # as a kill.
+        try:
+            out, err = p.communicate(timeout=ESCAPE_DRAIN_SECONDS)
+        except subprocess.TimeoutExpired as e:
+            for pipe in (p.stdout, p.stderr):
+                try:
+                    pipe.close()
+                except OSError:
+                    pass
+            p.wait()
+            return 124, text(e.stdout) + text(e.stderr), ESCAPED
         return 124, text(out) + text(err), True
 
 
@@ -303,7 +320,7 @@ def main():
         for kind in sorted({m[4] for m in selected}):
             t = time.time()
             rc, out, timed_out = witness(kind, build(kind, work / "control", None, oom), args.cap)
-            if rc != 0:
+            if rc != 0 or timed_out == ESCAPED:
                 print(f"FAIL control ({kind}): the unmutated witness does not pass: rc={rc}"
                       f"{' (timed out at the cap)' if timed_out else ''}\n{out[-1500:]}")
                 return 1
@@ -322,7 +339,11 @@ def main():
             rc, out, timed_out = witness(kind, binary, args.cap)
             ran = time.time() - t - built
             where = f"{number}/{len(selected)}, build {built:.1f}s, witness {ran:.1f}s"
-            if rc == 0:
+            if timed_out == ESCAPED:
+                print(f"FAIL {name}: descendant escaped the witness's process group after the cap "
+                      f"(a harness error, never a kill; {where})\n{out[-1500:]}")
+                failures += 1
+            elif rc == 0:
                 print(f"FAIL {name}: survived ({kind} witness passed; {where})")
                 failures += 1
             elif expected not in out:

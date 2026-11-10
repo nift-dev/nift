@@ -4715,3 +4715,21 @@ owner-approved B5 semantic difference.
 
   `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants, 202 s.
 - No production change: `nift` is f063f1a9….
+
+## 93. Review of cf833f5a, Low: the drain after the cap is bounded (C105, tests)
+
+- **The finding.** In `unwind_mutants.execute()`, the `communicate()` that ran after the
+  process-group kill had no timeout. A descendant that had left the group (one that called
+  `setsid()`) and held the pipes open could therefore hang the harness.
+- **Fix.** That drain now has its own bound (`ESCAPE_DRAIN_SECONDS`, 10 s). If it times out:
+  - the harness closes both pipes and reaps the child;
+  - `execute()` returns the timed-out value `ESCAPED`;
+  - the mutant loop reports `FAIL <mutant>: descendant escaped the witness's process group …
+    (a harness error, never a kill)`;
+  - a control that escapes fails as well.
+- **Control.** A child that starts `setsid sleep 30` and waits, run with a 2 s cap and a 2 s drain,
+  returns `ESCAPED` after 4.0 s, and its output so far is kept. The control then killed the escaped
+  sleep by its exact PID. A child whose grandchild stays in the group still returns `True` (a
+  normal timeout).
+- **Result.** `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants.
+- No production change: `nift` is f063f1a9….
