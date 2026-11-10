@@ -1,8 +1,9 @@
-# Post-checkpoint-1 inventory rescan (C111, repaired in C112)
+# Post-checkpoint-1 inventory rescan (C111, repaired in C112 and C113)
 
 Base: frozen checkpoint-1 candidate `0c66cad6` (owner 21:30: CHECKPOINT 1 ACCEPTED). C111 (`73886c2c`) was the
 rescan; its independent review came back NOT CONFIRMED (no P1; classifications, evidence and gate counts wrong).
-C112 repairs it. nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4` is unchanged and
+C112 repaired it; its confirmation review was again NOT CONFIRMED (a session-only retirement, rows missing for
+run-time-built reason names), and C113 repairs that. nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4` is unchanged and
 `git diff 0c66cad6 -- src/` is empty. Only `tests/runtime2/cp25/classification.tsv` and the docs change. Nothing
 is approved or deferred, and no rt-diff or pending rule is touched. **Every proposed disposition is a PROPOSAL;
 the owner decides the families.**
@@ -20,45 +21,48 @@ the owner decides the families.**
 - **D rows**: every D row was re-checked: either the reviewer's sample (review L-2) or a C112 root-free probe
   (section 3.5).
 - **Static scan**: every reason literal in `src/rt` without a tsv row was triaged (section 9).
+- **C113 four-way probe rule.** Before a row stays retired or a literal is called unreachable or not reached, it is
+  probed in a script, a module import, a `nift -i` session and a function called from a loop (section 9.1, 9.3).
+- **C113 dynamic families.** Every reason family whose name is built at run time was enumerated from its emit site
+  and probed (1010 generated programs; section 9.2). A fresh C113 collect gives the same 155 seen reasons.
 
 ## 2. Summary
 
-| Class | C111 | C112 | Meaning |
-| --- | --- | --- | --- |
-| E1 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
-| E2 | 19 | 18 (+2 from N) | test or inventory artefact: 16 F12, `method:join` (F12 plus D residue), `method:increment` (generic name); from the N list `callable:prit` (test typo) and `builtin-receiver:stringify` (retired, not reproducible) |
-| A | 4 | 3 | covered by an approved ruling, not yet that behaviour |
-| Q | 0 | 1 | owner question: `fn-flags` |
-| D | 42 | 39 | derivative, with a named root |
-| G | 113 | 117 (+2) | genuine remaining capability; +2 = `incdec-target` (from the N list) and the new `method:*` family row |
-| **classified** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
-| N | 45 | 58 | newly found, unapproved: 42 of C111's 45, plus 16 from the C112 static scan |
+| Class | C111 | C112 | C113 | Meaning |
+| --- | --- | --- | --- | --- |
+| E1 | 2 | 2 | 2 | eliminated for its evidence by checkpoint 1 (C107) |
+| E2 | 19 | 18 (+2 from N) | 18 (+1 from N) | 16 F12, `method:join` (F12 plus D residue), `method:increment` (row deleted in C113: it is emitted, and `method:*` covers it); from the N list `callable:prit` |
+| A | 4 | 3 | 3 | covered by an approved ruling, not yet that behaviour |
+| Q | 0 | 1 | 1 | owner question: `fn-flags` |
+| D | 42 | 39 | 39 | derivative, with a named root |
+| G | 113 | 117 (+2) | 117 (+8) | of the 180: 117; outside: `incdec-target`, `method:*`, `builtin-receiver:stringify` (restored), `struct-no-method` and `type:element-assignment` (restored from retired), `expression:assignment-target` and `coro-future-flow:Assign` (owner-excluded checkpoint-1 forms), `callable:*` |
+| **classified** | **180** | **180** | **180** | = 157 PENDING-OWNER + 23 implement at 0c66cad6 |
+| N | 45 | 58 | 340 | 42 (C111) + 16 (C112 static scan) + 6 (confirmation P2-B) + 270 (C113 dynamic families) + 6 (C113 four-way probes) |
 
-C112 class moves: `presentation-struct-method:*` E2 (retired) → G; `struct-value`, `callable:undefined_thing`,
-`coro-module-private-async` D → G; `fn-flags` A → Q; `method:join` E2 → E2+D; `incdec-target` N → G;
-`callable:prit` N → E2; `builtin-receiver:stringify` N → E2 (retired).
+Rows by class at C113: E1 2, E2 18, A 3, Q 1, D 39, G 125, N 340 = 528 (= PENDING-OWNER 505 + implement 23).
 
-| Status | 0c66cad6 | C111 | C112 |
-| --- | --- | --- | --- |
-| approved | 44 | 44 | 44 |
-| deferred-named | 17 | 17 | 17 |
-| implement | 23 | 23 | 23 |
-| PENDING-OWNER | 157 | 200 | 217 |
-| retired | 7 | 9 | 9 |
-| rows | 248 | 293 | 310 |
+C113 class moves: `builtin-receiver:stringify` E2 (retired) → G (sessions); `struct-no-method`, `type:element-assignment`
+retired → G; `method:increment` row deleted (E2, counted in the 180).
 
-C112 status changes: `presentation-struct-method:*` retired → PENDING-OWNER; `builtin-receiver:stringify`
-PENDING-OWNER → retired; 16 new N rows and the `method:*` family row, all PENDING-OWNER.
+| Status | 0c66cad6 | C111 | C112 | C113 |
+| --- | --- | --- | --- | --- |
+| approved | 44 | 44 | 44 | 44 |
+| deferred-named | 17 | 17 | 17 | 17 |
+| implement | 23 | 23 | 23 | 23 |
+| PENDING-OWNER | 157 | 200 | 217 | 505 |
+| retired | 7 | 9 | 9 | 5 |
+| rows | 248 | 293 | 310 | 594 |
 
-### 2.1 Per-row classes (C112)
+C113 status changes: `builtin-receiver:stringify`, `struct-no-method`, `type:element-assignment` retired → PENDING-OWNER;
+`method:increment` deleted; 285 new rows, all PENDING-OWNER (8 P2-B, 270 dynamic-family, 6 four-way, `callable:*`).
+
+### 2.1 Per-row classes (C113)
 
 - **E1 (2)**
   - assign (2): `compound-target`, `index-assign-target`
-- **E2 (20)**
+- **E2 (18)**
   - f12 (16): `builtin-arity:join`, `builtin-receiver:join`, `callable:thread`, `coro-blocking-host:exists`, `coro-blocking-host:file`, `coro-blocking-host:rm`, `coro-observe:done`, `coro-observe:print`, `coro-observe:status`, `coro-struct`, `method:close`, `method:done`, `method:open`, `method:save`, `method:status`, `method:write`
   - f12+D (1): `method:join`
-  - stale (1): `method:increment`
-  - stale (retired C112) (1): `builtin-receiver:stringify`
   - test-artefact (1): `callable:prit`
 - **A (3)**
   - approved (3): `alias-argument`, `context:assignment-error`, `fn-name-reserved`
@@ -66,7 +70,7 @@ PENDING-OWNER → retired; 16 new N rows and the `method:*` family row, all PEND
   - owner-question (1): `fn-flags`
 - **D (39)**
   - derivative (39): `assign-free-name:undeclared`, `builtin-bytes:decode`, `free-name:undeclared`, `method:array_value`, `method:await`, `method:call`, `method:call_helper`, `method:call_step`, `method:catch`, `method:command`, `method:count`, `method:decode`, `method:encode`, `method:error`, `method:filter`, `method:fixed`, `method:group_by`, `method:helper`, `method:hidden`, `method:m`, `method:map`, `method:public_helper`, `method:push`, `method:q`, `method:read`, `method:secret`, `method:stringify`, `method:sum`, `method:throw`, `method:to_global`, `method:to_string`, `method:trim`, `statement:Import`, `statement:TemplateStmt`, `struct-construction`, `text-type-name`, `type:index`, `type:push`, `unresolved-name:legacy-binding`
-- **G (119)**
+- **G (125)**
   - aliasing (1): `path-in-call-argument`
   - builtins (19): `builtin-arity:copy`, `builtin-arity:move`, `builtin-bytes:bytes`, `builtin-bytes:encode`, `builtin-bytes:open_bytes`, `builtin-bytes:secure_random_bytes`, `builtin-lazy-args:move`, `builtin-lazy-args:setenv`, `builtin-lazy-args:substr`, `builtin-lazy-args:validate`, `callable:err`, `callable:minify`, `callable:module_path`, `callable:read`, `callable:secure_random_bytes`, `callable:sorted_map`, `callable:sorted_set`, `callable:warn`, `statement:Command`
   - context (8): `context:assignment-type`, `context:number-to-int`, `context:object-length`, `jump-not-last`, `prepared-decl-type`, `prepared-fn-unprepared`, `prepared-unpreparable`, `string-arg-type`
@@ -74,22 +78,40 @@ PENDING-OWNER → retired; 16 new N rows and the `method:*` family row, all PEND
   - cp24 (9): `callable:build`, `callable:build_all`, `callable:build_names`, `callable:inject`, `callable:status`, `callable:track`, `callable:tracked`, `callable:untrack`, `opaque:template-text`
   - dynscope (2): `free-name`, `free-name:dynamic-caller`
   - exports (8): `export-struct`, `import-collision`, `import-dynamic`, `import-name-clash`, `module-bare-return`, `module-host-op:cat`, `module-host-op:exists`, `statement:Export`
-  - infer (2): `interpolation:unknown-type`, `method:sort_by`
+  - infer (3): `interpolation:unknown-type`, `method:sort_by`, `type:element-assignment`
   - portability (1): `method:sort`
-  - static (33): `builtin-arity:contains`, `builtin-arity:last`, `builtin-arity:set`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:split`, `builtin-receiver:substr`, `builtin-receiver:to_string`, `coro-async-value`, `coro-module-before-import`, `coro-module-private-async`, `declare-const`, `error-result-expression`, `host-handle-flow`, `jump-outside-loop`, `non-transferable`, `number-literal`, `opaque:legacy-runtime-error`, `opaque:struct-body`, `static-error:arity`, `static-error:member-assign`, `static-error:redeclared`, `static-error:struct-arity`, `struct-private`, `type:+`, `type:<`, `type:>`, `type:compound-assignment`, `type:increment`, `type:length`, `type:member`, `type:script-return`, `type:unary`
-  - structs (5): `context:struct-new`, `presentation-struct-method:*`, `struct-after-statement`, `struct-field-init`, `struct-value`
-  - syntax (9): `binding-name-reserved`, `expression-statement`, `incdec-target`, `index-target`, `nesting-limit`, `opaque:irregular-legacy-parse`, `param-name-reserved`, `postfix-spelling`, `shebang-statement`
-  - undef (16): `assign-free-name`, `binding-shadows-fn`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`, `fn-called-before-declaration`, `method:*`, `method:nope`, `method:nosuch`, `unresolved-name`
+  - static (34): `builtin-arity:contains`, `builtin-arity:last`, `builtin-arity:set`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:split`, `builtin-receiver:stringify`, `builtin-receiver:substr`, `builtin-receiver:to_string`, `coro-async-value`, `coro-module-before-import`, `coro-module-private-async`, `declare-const`, `error-result-expression`, `host-handle-flow`, `jump-outside-loop`, `non-transferable`, `number-literal`, `opaque:legacy-runtime-error`, `opaque:struct-body`, `static-error:arity`, `static-error:member-assign`, `static-error:redeclared`, `static-error:struct-arity`, `struct-private`, `type:+`, `type:<`, `type:>`, `type:compound-assignment`, `type:increment`, `type:length`, `type:member`, `type:script-return`, `type:unary`
+  - structs (6): `context:struct-new`, `presentation-struct-method:*`, `struct-after-statement`, `struct-field-init`, `struct-no-method`, `struct-value`
+  - syntax (11): `binding-name-reserved`, `coro-future-flow:Assign`, `expression-statement`, `expression:assignment-target`, `incdec-target`, `index-target`, `nesting-limit`, `opaque:irregular-legacy-parse`, `param-name-reserved`, `postfix-spelling`, `shebang-statement`
+  - undef (17): `assign-free-name`, `binding-shadows-fn`, `callable:*`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`, `fn-called-before-declaration`, `method:*`, `method:nope`, `method:nosuch`, `unresolved-name`
   - variadic (4): `declare-pattern`, `fn-param`, `lambda-variadic`, `spread`
-- **N (58)**
+- **N (340)**
+<details><summary>N rows by family</summary>
+
   - builtins (5): `builtin-lazy-args:range`, `builtin-lazy-args:replace`, `builtin-literal-arg:validate`, `builtin-presentation-chain`, `host-literal-arg`
-  - context (6): `context:modulo-assignment`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `context:struct-field`, `for-missing-write`
+  - context (7): `context:collection-empty`, `context:modulo-assignment`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `context:struct-field`, `for-missing-write`
+  - dynamic: builtin-arity (116): `builtin-arity:arch`, `builtin-arity:atomic<bool>`, `builtin-arity:atomic<int>`, `builtin-arity:attr_escape`, `builtin-arity:cancel`, `builtin-arity:cat`, `builtin-arity:cd`, `builtin-arity:ceil`, `builtin-arity:channel`, `builtin-arity:chunk`, `builtin-arity:close`, `builtin-arity:cp`, `builtin-arity:deepcopy`, `builtin-arity:drop`, `builtin-arity:empty`, `builtin-arity:ends_with`, `builtin-arity:entries`, `builtin-arity:env`, `builtin-arity:eof`, `builtin-arity:epoch`, `builtin-arity:exists`, `builtin-arity:first`, `builtin-arity:flatten`, `builtin-arity:floor`, `builtin-arity:flush`, `builtin-arity:from_entries`, `builtin-arity:get`, `builtin-arity:getenv`, `builtin-arity:hardware_concurrency`, `builtin-arity:has`, `builtin-arity:highlight`, `builtin-arity:html_escape`, `builtin-arity:indexOf`, `builtin-arity:index_of`, `builtin-arity:is_array`, `builtin-arity:is_bool`, `builtin-arity:is_bytes`, `builtin-arity:is_collection`, `builtin-arity:is_dir`, `builtin-arity:is_enum`, `builtin-arity:is_file`, `builtin-arity:is_float`, `builtin-arity:is_function`, `builtin-arity:is_int`, `builtin-arity:is_null`, `builtin-arity:is_number`, `builtin-arity:is_object`, `builtin-arity:is_string`, `builtin-arity:is_struct`, `builtin-arity:last_index_of`, `builtin-arity:length`, `builtin-arity:lock`, `builtin-arity:locked`, `builtin-arity:ls`, `builtin-arity:make_dir`, `builtin-arity:map`, `builtin-arity:max`, `builtin-arity:merge`, `builtin-arity:merge_deep`, `builtin-arity:min`, `builtin-arity:mkdir`, `builtin-arity:modified`, `builtin-arity:mutex`, `builtin-arity:mv`, `builtin-arity:omit`, `builtin-arity:open`, `builtin-arity:os`, `builtin-arity:path`, `builtin-arity:pick`, `builtin-arity:platform`, `builtin-arity:prettify`, `builtin-arity:pwd`, `builtin-arity:range`, `builtin-arity:read`, `builtin-arity:read_all`, `builtin-arity:read_line`, `builtin-arity:recv`, `builtin-arity:remove`, `builtin-arity:replace`, `builtin-arity:revert`, `builtin-arity:rm`, `builtin-arity:round`, `builtin-arity:same`, `builtin-arity:save`, `builtin-arity:seek`, `builtin-arity:send`, `builtin-arity:setenv`, `builtin-arity:size`, `builtin-arity:sleep`, `builtin-arity:slice`, `builtin-arity:stack`, `builtin-arity:starts_with`, `builtin-arity:stat`, `builtin-arity:substr`, `builtin-arity:sum`, `builtin-arity:take`, `builtin-arity:tell`, `builtin-arity:to_double`, `builtin-arity:to_int`, `builtin-arity:to_lower`, `builtin-arity:to_string`, `builtin-arity:to_upper`, `builtin-arity:touch`, `builtin-arity:trim_end`, `builtin-arity:trim_start`, `builtin-arity:try_lock`, `builtin-arity:type`, `builtin-arity:unique`, `builtin-arity:unlock`, `builtin-arity:unsetenv`, `builtin-arity:url_encode`, `builtin-arity:validate`, `builtin-arity:values`, `builtin-arity:which`, `builtin-arity:write`, `builtin-arity:write_line`
+  - dynamic: builtin-default (1): `builtin-default:get`
+  - dynamic: builtin-lazy-args (1): `builtin-lazy-args:slice`
+  - dynamic: builtin-receiver (68): `builtin-receiver:abs`, `builtin-receiver:ceil`, `builtin-receiver:chunk`, `builtin-receiver:close`, `builtin-receiver:compare_exchange`, `builtin-receiver:contains`, `builtin-receiver:copy`, `builtin-receiver:decode`, `builtin-receiver:drop`, `builtin-receiver:encode`, `builtin-receiver:ends_with`, `builtin-receiver:entries`, `builtin-receiver:eof`, `builtin-receiver:exchange`, `builtin-receiver:exists`, `builtin-receiver:fetch_add`, `builtin-receiver:fetch_sub`, `builtin-receiver:flatten`, `builtin-receiver:floor`, `builtin-receiver:flush`, `builtin-receiver:from_entries`, `builtin-receiver:front`, `builtin-receiver:get`, `builtin-receiver:has`, `builtin-receiver:indexOf`, `builtin-receiver:last`, `builtin-receiver:last_index_of`, `builtin-receiver:load`, `builtin-receiver:lock`, `builtin-receiver:locked`, `builtin-receiver:max`, `builtin-receiver:merge`, `builtin-receiver:merge_deep`, `builtin-receiver:min`, `builtin-receiver:modified`, `builtin-receiver:move`, `builtin-receiver:omit`, `builtin-receiver:open`, `builtin-receiver:path`, `builtin-receiver:pick`, `builtin-receiver:read`, `builtin-receiver:read_all`, `builtin-receiver:read_line`, `builtin-receiver:remove`, `builtin-receiver:replace`, `builtin-receiver:revert`, `builtin-receiver:round`, `builtin-receiver:save`, `builtin-receiver:seek`, `builtin-receiver:set`, `builtin-receiver:slice`, `builtin-receiver:split`, `builtin-receiver:starts_with`, `builtin-receiver:store`, `builtin-receiver:take`, `builtin-receiver:tell`, `builtin-receiver:to_int`, `builtin-receiver:to_lower`, `builtin-receiver:top`, `builtin-receiver:trim`, `builtin-receiver:trim_end`, `builtin-receiver:trim_start`, `builtin-receiver:try_lock`, `builtin-receiver:unique`, `builtin-receiver:unlock`, `builtin-receiver:values`, `builtin-receiver:write`, `builtin-receiver:write_line`
+  - dynamic: callable (10): `callable:build_repair`, `callable:ffi_buffer`, `callable:ffi_bytes`, `callable:ffi_sizeof`, `callable:ffi_snapshot_bytes`, `callable:ffi_struct`, `callable:package_path`, `callable:page`, `callable:prique`, `callable:queue`
+  - dynamic: coro-future-flow (9): `coro-future-flow:Binary`, `coro-future-flow:CompoundAssign`, `coro-future-flow:ExprStmt`, `coro-future-flow:ForBinding`, `coro-future-flow:IncDec`, `coro-future-flow:Logical`, `coro-future-flow:Property`, `coro-future-flow:String`, `coro-future-flow:Throw`
+  - dynamic: expression (2): `expression:SafeIndex`, `expression:SafeMember`
+  - dynamic: four-way (6): `compound-operator`, `import-opaque:legacy-runtime-error`, `limit:atoms`, `limit:jump distance exceeds 16 bits`, `limit:too many registers`, `path-in-call-argument:imported`
+  - dynamic: import-opaque (4): `import-opaque:irregular-legacy-parse`, `import-opaque:nesting-limit`, `import-opaque:struct-body`, `import-opaque:template-text`
+  - dynamic: message (2): `async(callable, ...) was removed; declare an async function/lambda and call it directly`, `await(...) was removed; use 'await future' or 'await async_fn(args)'`
+  - dynamic: method (37): `method:all`, `method:any`, `method:append`, `method:cat`, `method:clear`, `method:count_by`, `method:cwd`, `method:env`, `method:file`, `method:find`, `method:find_index`, `method:group_by_each`, `method:index_by`, `method:insert`, `method:insert_after`, `method:insert_before`, `method:max_by`, `method:min_by`, `method:mv`, `method:partition`, `method:pop`, `method:prepend`, `method:read_all_bytes`, `method:read_bytes`, `method:read_val`, `method:reduce`, `method:reset`, `method:reverse`, `method:running`, `method:splice`, `method:stat`, `method:stderr`, `method:stdin`, `method:stdout`, `method:unique_by`, `method:write_bytes`, `method:write_val`
+  - dynamic: module-host-op (19): `module-host-op:arch`, `module-host-op:cd`, `module-host-op:env`, `module-host-op:epoch`, `module-host-op:hardware_concurrency`, `module-host-op:ls`, `module-host-op:make_dir`, `module-host-op:mkdir`, `module-host-op:open`, `module-host-op:os`, `module-host-op:platform`, `module-host-op:pwd`, `module-host-op:setenv`, `module-host-op:sha256_file`, `module-host-op:sleep`, `module-host-op:stat`, `module-host-op:touch`, `module-host-op:unsetenv`, `module-host-op:which`
+  - dynamic: statement (1): `statement:FnDecl`
   - exports (8): `import-limit`, `import-reinitialised`, `module-host-op:cp`, `module-host-op:file`, `module-host-op:getenv`, `module-host-op:is_dir`, `module-host-op:is_file`, `module-host-op:remove`
-  - infer (3): `builtin-arg-fault-context`, `interpolation:non-scalar`, `postfix-receiver:member`
-  - static (21): `assign-catch-binding`, `await-outside-coroutine-unit`, `builtin-arity:abs`, `builtin-arity:keys`, `builtin-arity:stringify`, `builtin-arity:trim`, `builtin-receiver:empty`, `builtin-receiver:first`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:sum`, `builtin-receiver:to_double`, `builtin-receiver:to_upper`, `coro-future-flow:method`, `coro-thread-callee`, `method:replace_once`, `push-receiver`, `static-error:push-arity`, `type:%`, `type:*`, `type:-`
+  - infer (4): `builtin-arg-fault-context`, `interpolation:non-scalar`, `postfix-receiver:member`, `type:for-source-union`
+  - static (25): `assign-catch-binding`, `await-outside-coroutine-unit`, `builtin-arity:abs`, `builtin-arity:keys`, `builtin-arity:stringify`, `builtin-arity:trim`, `builtin-receiver:empty`, `builtin-receiver:first`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:sum`, `builtin-receiver:to_double`, `builtin-receiver:to_upper`, `coro-future-flow:Call`, `coro-future-flow:method`, `coro-thread-callee`, `method:replace_once`, `push-receiver`, `static-error:push-arity`, `type:%`, `type:*`, `type:-`, `type:/`, `type:<=`, `type:>=`
   - structs (7): `struct-assign`, `struct-member-clash`, `struct-name`, `struct-nested`, `struct-no-field`, `struct-redeclared`, `struct-shadows-fn`
   - syntax (6): `comparison-chain`, `object-key`, `opaque:nesting-limit`, `param-shadows-fn`, `prefix-not-precedence`, `string-literal`
   - undef (2): `callable:stringify`, `import-scope`
+
+</details>
+
 
 Root of each D row: section 3.5.
 
@@ -111,21 +133,24 @@ consequential reason. Residual forms (`o.k += 1`; a fourth level, `o.k[0] = v`) 
   CP24 rows `callable:build`, `callable:tracked`, `callable:status`) and `v44_cp3_variadic_lambdas_smoke` ok.f
   (`mapped.join` after `lambda-variadic`). A plain `xs.join(",")` and `.join` on a lambda's result run on the VM. Not
   retirable even with the fix.
-- **`method:increment` (retired, reworded).** Its evidence copy.f runs (legacy-equal). It is one name of the generic
-  `method:<name>` family: `x := 5` / `x.increment()` still emits it (legacy: `unknown value or malformed expression:
-  x.increment()`). C112 adds a `method:*` family row (PENDING-OWNER, G undef) so any generic method name without its
-  own row is classified.
+- **`method:increment` (row deleted in C113).** Its evidence copy.f runs, but `x := 5` / `x.increment()` still emits the
+  reason in all four contexts (section 9.3). inventory.py matches an exact row before `<prefix>:*` (`row_for`, line 194),
+  so the retired row, not `method:*`, would have matched a sighting ("retired reason seen again"), contrary to C112's
+  text. Retired means "resolved or not emitted any more" (status header, review L-1); an emitted reason cannot keep that
+  status, so the row is deleted and the `method:*` family row (PENDING-OWNER) classifies it. No corpus program emits it
+  (fresh C113 collect).
 - **`callable:prit`**: a typo mutation inside test-rt-vm (an undefined callable); a test artefact, kept PENDING-OWNER
   like every undefined callable.
-- **`builtin-receiver:stringify` (retired).** C111 added it from a mis-read session probe. No program emits it:
-  `fn(f(x)) { return x.stringify() }` with 1 and `"a"`, `show(1)` in a session, and a struct in a session all run.
+- **`builtin-receiver:stringify` (restored to PENDING-OWNER, G sessions, C113).** C112 retired it after probing scripts
+  and a struct session only. `nift -i` with `f := (v) => v.stringify()` / `print(f({"a": 1}))` refuses with it; legacy
+  prints `{"a":1}`; the same lambda runs in a script, a module and a loop-called function (section 9.3).
 - **C111's retirement of `presentation-struct-method:*` was wrong**; it is restored as G (section 5.7).
 
 ### 3.3 A (3 rows)
 
 | Row | Ruling | Why still PENDING-OWNER |
 | --- | --- | --- |
-| `context:assignment-error` | D-009 #1 (owner 2026-10-17): one top-level wording in loops | the refusal defers implementing it |
+| `context:assignment-error` | D-009 #1 (owner 2026-10-17): one top-level wording in loops | the refusal defers implementing it. Gates: filesystem-recipe 1 case |
 | `fn-name-reserved` | D-009 #3: user functions take precedence | the refusal defers that change. Gates: filesystem-recipe 7, sha256 4, script_import_syntax 1 |
 | `alias-argument` | B5 shared references (D-NEXT-refsem-b, Q3 list) | aliasing is the approved semantics; the refusal predates B5 |
 
@@ -554,10 +579,10 @@ Common to every family:
   and the extracted smoke heredocs where measured.
 - **Approval**: none of these rows is approved; rulings cited are reasons, not approvals, unless stated.
 
-### 5.1 Static errors raised at the wrong point (G 33, N 21)
+### 5.1 Static errors raised at the wrong point (G 34, N 25)
 
-- **Rows**: G `builtin-arity:contains`, `builtin-arity:last`, `builtin-arity:set`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:split`, `builtin-receiver:substr`, `builtin-receiver:to_string`, `coro-async-value`, `coro-module-before-import`, `coro-module-private-async`, `declare-const`, `error-result-expression`, `host-handle-flow`, `jump-outside-loop`, `non-transferable`, `number-literal`, `opaque:legacy-runtime-error`, `opaque:struct-body`, `static-error:arity`, `static-error:member-assign`, `static-error:redeclared`, `static-error:struct-arity`, `struct-private`, `type:+`, `type:<`, `type:>`, `type:compound-assignment`, `type:increment`, `type:length`, `type:member`, `type:script-return`, `type:unary`.
-  N `assign-catch-binding`, `await-outside-coroutine-unit`, `builtin-arity:abs`, `builtin-arity:keys`, `builtin-arity:stringify`, `builtin-arity:trim`, `builtin-receiver:empty`, `builtin-receiver:first`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:sum`, `builtin-receiver:to_double`, `builtin-receiver:to_upper`, `coro-future-flow:method`, `coro-thread-callee`, `method:replace_once`, `push-receiver`, `static-error:push-arity`, `type:%`, `type:*`, `type:-`.
+- **Rows**: G `builtin-arity:contains`, `builtin-arity:last`, `builtin-arity:set`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:split`, `builtin-receiver:stringify`, `builtin-receiver:substr`, `builtin-receiver:to_string`, `coro-async-value`, `coro-module-before-import`, `coro-module-private-async`, `declare-const`, `error-result-expression`, `host-handle-flow`, `jump-outside-loop`, `non-transferable`, `number-literal`, `opaque:legacy-runtime-error`, `opaque:struct-body`, `static-error:arity`, `static-error:member-assign`, `static-error:redeclared`, `static-error:struct-arity`, `struct-private`, `type:+`, `type:<`, `type:>`, `type:compound-assignment`, `type:increment`, `type:length`, `type:member`, `type:script-return`, `type:unary`.
+  N `assign-catch-binding`, `await-outside-coroutine-unit`, `builtin-arity:abs`, `builtin-arity:keys`, `builtin-arity:stringify`, `builtin-arity:trim`, `builtin-receiver:empty`, `builtin-receiver:first`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:sum`, `builtin-receiver:to_double`, `builtin-receiver:to_upper`, `coro-future-flow:Call`, `coro-future-flow:method`, `coro-thread-callee`, `method:replace_once`, `push-receiver`, `static-error:push-arity`, `type:%`, `type:*`, `type:-`, `type:/`, `type:<=`, `type:>=`.
 - **Root cause**: the compiler can prove that legacy fails here, or the construct is outside the admitted shapes, and refuses before execution instead of raising legacy's error at the point legacy raises it.
 - **Raise sites**: `builtin-arity:*` compiler_keyed.cpp:105,196 and compiler_native_args.cpp:24; `builtin-receiver:*` compiler_dispatch.cpp:41; `type:<op>` compiler_expr.cpp:165,170; `static-error:arity` compiler_call.cpp:52; `declare-const` compiler_assign.cpp:47,151,205,278,315,331, compiler_element_path.cpp:86; `number-literal` compiler_literal_expr.cpp:58; `host-handle-flow` compiler_handles.cpp:190; `non-transferable` compiler_handles.cpp:195; `coro-async-value` compiler_coro.cpp:158; `coro-module-before-import` compiler_coro_module.cpp:32; `coro-module-private-async` compiler_coro_module.cpp:31; `static-error:push-arity` compiler_stmt_expr.cpp:27; `push-receiver` compiler_stmt_expr.cpp:22; `await-outside-coroutine-unit` compiler_coro.cpp:80; `assign-catch-binding` compiler_assign.cpp:332; `coro-future-flow:method` compiler_coro.cpp:68; `coro-thread-callee` compiler_thread.cpp:23.
 - **Representative (a legacy error with prior output)**:
@@ -612,9 +637,9 @@ print(k.size())
 - **Ordinary-scripting impact**: **not only already-failing programs** (C111 was wrong): `declare-const` refuses const objects/arrays that legacy runs (`const o := {"k": 1}` prints 1), `coro-async-value` refuses the churn smoke that legacy runs (exit 0), and `builtin-arity:keys` refuses a call legacy accepts. The rest reach only programs that fail in legacy, but the refusal is pre-execution, so legacy's prior output (e.g. `a` above) is lost.
 - **PROPOSAL**: one generic "raise legacy's error at the point" mechanism (the C25 `type:print` pattern) for the legacy-error rows; implement const aggregates, the async-value flow and legacy-accepted arities as capability work.
 
-### 5.2 Undefined names and calls (G 17, N 2)
+### 5.2 Undefined names and calls (G 18, N 2)
 
-- **Rows**: G `assign-free-name`, `binding-shadows-fn`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`, `fn-called-before-declaration`, `method:*`, `method:nope`, `method:nosuch`, `unresolved-name`, `method:*`.
+- **Rows**: G `assign-free-name`, `binding-shadows-fn`, `callable:*`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`, `fn-called-before-declaration`, `method:*`, `method:nope`, `method:nosuch`, `unresolved-name`, `method:*`.
   N `callable:stringify`, `import-scope`.
 - **Root cause**: an undefined callable, method or name is refused at compile time instead of raising legacy's error when reached.
 - **Raise sites**: `callable:<name>` compiler_thread.cpp:22 (fallback for every unbound callee); `method:<name>` compiler_call.cpp:204 (now covered by the `method:*` family row); `assign-free-name` compiler_assign.cpp:204; `fn-called-before-declaration` resolver.cpp:128; `binding-shadows-fn` compiler_assign.cpp:17; `import-scope` module_link.cpp:356.
@@ -667,10 +692,10 @@ print(helper(4))
 - **Ordinary-scripting impact**: low for correct scripts (legacy fails too), but prior output is lost; `binding-shadows-fn` (identifier gate) and `fn-called-before-declaration` can be reached by ordinary code that legacy runs in some orders.
 - **PROPOSAL**: decide with dynamic scope (section 8): if names stay statically resolved, raise `undefined callable: <n>` / `unknown value or malformed expression` at the point.
 
-### 5.3 Context-dependent legacy behaviour (G 8, N 6)
+### 5.3 Context-dependent legacy behaviour (G 8, N 7)
 
 - **Rows**: G `context:assignment-type`, `context:number-to-int`, `context:object-length`, `jump-not-last`, `prepared-decl-type`, `prepared-fn-unprepared`, `prepared-unpreparable`, `string-arg-type`.
-  N `context:modulo-assignment`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `context:struct-field`, `for-missing-write`.
+  N `context:collection-empty`, `context:modulo-assignment`, `context:negative-zero`, `context:parameter-type`, `context:string-append-type`, `context:struct-field`, `for-missing-write`.
 - **Root cause**: legacy behaviour depends on the calling context (loop or prepared code, declared binding types), so the VM refuses loop-reachable or prepared forms.
 - **Raise sites**: `context:number-to-int` compiler_call.cpp:196; `context:object-length` compiler_call.cpp:237; `prepared-decl-type` prepared.cpp:248; `prepared-fn-unprepared` prepared.cpp:330; `string-arg-type` prepared.cpp:370; `context:modulo-assignment` compiler_assign.cpp:295; `context:string-append-type` compiler_assign.cpp:300; `context:negative-zero` compiler_expr.cpp:240,318; `context:parameter-type` compiler_call.cpp:109, compiler_structs.cpp:370; `for-missing-write` compiler_loops_step.cpp:92; `context:struct-field` compiler_assign.cpp:203.
 - **Representative**:
@@ -702,9 +727,9 @@ print(s)
 - **Ordinary-scripting impact**: moderate: `.length()` on objects, `to_int` and string appends in loops are ordinary.
 - **PROPOSAL**: owner rule D-015 "consistent declarations everywhere", or implement both legacy contexts.
 
-### 5.4 Syntax and statement forms (G 9, N 6)
+### 5.4 Syntax and statement forms (G 11, N 6)
 
-- **Rows**: G `binding-name-reserved`, `expression-statement`, `incdec-target`, `index-target`, `nesting-limit`, `opaque:irregular-legacy-parse`, `param-name-reserved`, `postfix-spelling`, `shebang-statement`.
+- **Rows**: G `binding-name-reserved`, `coro-future-flow:Assign`, `expression-statement`, `expression:assignment-target`, `incdec-target`, `index-target`, `nesting-limit`, `opaque:irregular-legacy-parse`, `param-name-reserved`, `postfix-spelling`, `shebang-statement`.
   N `comparison-chain`, `object-key`, `opaque:nesting-limit`, `param-shadows-fn`, `prefix-not-precedence`, `string-literal`.
 - **Root cause**: statement and expression forms legacy accepts that the VM parser or compiler does not admit.
 - **Raise sites**: `expression-statement` compiler_stmt_expr.cpp:84; `shebang-statement` compiler.cpp:139; `postfix-spelling` compiler_rules.cpp:41; `index-target` compiler_rules.cpp:332, compiler_element_path.cpp:67,69; `incdec-target` compiler_assign.cpp:312,328; `param-name-reserved` resolver.cpp:77, compiler_closure.cpp:81; `nesting-limit` compiler.cpp:259; `opaque:nesting-limit` expr_parser.cpp:255,307,341, expr_postfix.cpp:98, statement_parser.cpp:50; `opaque:irregular-legacy-parse` (parser opaque marking); `comparison-chain` compiler_rules.cpp:309; `prefix-not-precedence` compiler_rules.cpp:298; `string-literal` compiler_literal_expr.cpp:62; `object-key` compiler_expr.cpp:344; `param-shadows-fn` compiler_unit.cpp:286; `binding-name-reserved` resolver.
@@ -825,9 +850,9 @@ print(tracked())
 - **Ordinary-scripting impact**: project scripts only, but `callable:inject` (24/0/24) also masks `map`, `filter`, `group_by`, `type:index` and `method:join` (auto.f, auto2.f).
 - **PROPOSAL**: a CP24-on-VM checkpoint.
 
-### 5.7 Structs (G 5, N 7)
+### 5.7 Structs (G 6, N 7)
 
-- **Rows**: G `context:struct-new`, `presentation-struct-method:*`, `struct-after-statement`, `struct-field-init`, `struct-value`.
+- **Rows**: G `context:struct-new`, `presentation-struct-method:*`, `struct-after-statement`, `struct-field-init`, `struct-no-method`, `struct-value`.
   N `struct-assign`, `struct-member-clash`, `struct-name`, `struct-nested`, `struct-no-field`, `struct-redeclared`, `struct-shadows-fn`.
 - **Root cause**: struct features outside the admitted subset: construction and defaults in loops, non-constant defaults, declarations after statements, reassigning struct bindings, instances as values, and presentation choice in sessions.
 - **Raise sites**: `context:struct-new` compiler_structs.cpp:278; `struct-field-init` structs.cpp:109; `struct-after-statement` structs.cpp:88; `struct-value` compiler_assign.cpp:140, compiler_structs.cpp:64; `struct-assign` compiler_assign.cpp:209; `struct-shadows-fn` structs.cpp:93; `struct-member-clash` structs.cpp:103; `struct-name` structs.cpp:91; `struct-nested` structs.cpp:78; `struct-no-field` compiler_structs.cpp:71; `struct-redeclared` structs.cpp:92; `presentation-struct-method:*` compiler_presentation.cpp.
@@ -925,10 +950,10 @@ for(row : a) { f := x => row[0]; a.push([9]); print(f(0)) }
 - **Ordinary-scripting impact**: moderate: capturing the loop element in a lambda while appending to the source is uncommon but appears in sort-factory (2) and v49-selector (1).
 - **PROPOSAL**: implement the vanishing-element capture (copy the element into the closure as legacy does); raise legacy's error for `.await()`.
 
-### 5.9 Kind inference (G 2, N 3)
+### 5.9 Kind inference (G 3, N 4)
 
-- **Rows**: G `interpolation:unknown-type`, `method:sort_by`.
-  N `builtin-arg-fault-context`, `interpolation:non-scalar`, `postfix-receiver:member`.
+- **Rows**: G `interpolation:unknown-type`, `method:sort_by`, `type:element-assignment`.
+  N `builtin-arg-fault-context`, `interpolation:non-scalar`, `postfix-receiver:member`, `type:for-source-union`.
 - **Root cause**: the compiler cannot prove a value's kind where legacy dispatches at run time.
 - **Raise sites**: `interpolation:unknown-type` compiler_interp.cpp:274; `interpolation:non-scalar` compiler_interp.cpp:275; `method:sort_by` compiler_call.cpp:204; `postfix-receiver:member` compiler_rules.cpp:53; `builtin-arg-fault-context` compiler_native_args.cpp:42.
 - **Representative**:
@@ -1237,83 +1262,84 @@ row at C111 (the review's scan found 83; this scan is wider and includes non-com
 | Disposition | Count |
 | --- | --- |
 | session-only | 30 |
-| N row added | 16 |
+| N row added | 21 |
 | not a compile refusal | 14 |
-| unreachable | 13 |
-| not reached | 13 |
+| not reached | 11 |
+| unreachable | 10 |
 | parser-shadowed | 5 |
 | consequential-only | 3 |
 | inventory refinement of `free-name` | 3 |
-| unreachable in practice | 3 |
 | eval-entry only | 2 |
 | classify-all/session only | 2 |
 | resolver-shadowed | 2 |
 | unreachable as a refusal | 2 |
+| unreachable in practice | 2 |
+| dynamic family | 1 |
 | **total** | **108** |
 
 <details><summary>All 108</summary>
 
 | Literal | Disposition |
 | --- | --- |
-| `analysis-limit:kinds` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `analysis-limit:kinds` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
 | `assign-catch-binding` | N row added (reachable; program in its evidence) |
 | `assign-target` | consequential-only (tip corpus: consequential sightings only; probes give another reason first) |
-| `await-shape` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `binary-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `await-shape` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
+| `binary-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
 | `binding-call-reserved` | resolver-shadowed: binding-name-reserved fires first; legacy errors |
 | `builtin-literal-arg:validate` | N row added (reachable; program in its evidence) |
-| `builtin-plain-arg:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `builtin-plain-arg:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `cleanup-incomplete` | not a compile refusal: an isolate-transfer, handle or process error code |
-| `compound-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `compound-operator` | N row added (C113: reached by the four-way probe, section 9.1) |
 | `context-end` | not a compile refusal: an isolate-transfer, handle or process error code |
-| `context:collection-empty` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `context:collection-empty` | N row added (C113: reached by the four-way probe, section 9.1) |
 | `context:struct-field` | N row added (reachable; program in its evidence) |
 | `coro-async-recursion` | classify-all/session only: needs parallel_tasks off (F12 default limits) or a session unit (refused as session:coroutine first) |
 | `coro-capture` | classify-all/session only: needs parallel_tasks off (F12 default limits) or a session unit (refused as session:coroutine first) |
 | `coro-future-flow:method` | N row added (reachable; program in its evidence) |
-| `coro-future-flow:type` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
-| `coro-observe:epoch` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `coro-future-flow:type` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
+| `coro-observe:epoch` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `coro-task-loop` | consequential-only (tip corpus: consequential sightings only; probes give another reason first) |
-| `coro-task-native:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
-| `coro-task-op:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
-| `coro-task-recursion` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `coro-task-native:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
+| `coro-task-op:` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
+| `coro-task-recursion` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `coro-thread-callee` | N row added (reachable; program in its evidence) |
 | `entry-out-of-range` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `eval:error-aggregate-presentation` | eval-entry only (cp19 evaluated expressions, not script or session units) |
 | `eval:quoted-callback` | eval-entry only (cp19 evaluated expressions, not script or session units) |
 | `execution-error` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `expression-nesting` | parser-shadowed: the parser's opaque:nesting-limit fires first (row added in C111) |
-| `expression:` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `expression:assignment-target` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `expression:` | dynamic family (section 9.2): rows added for SafeMember, SafeIndex, assignment-target |
+| `expression:assignment-target` | N row added (C113: reached by the four-way probe, section 9.1) |
 | `file-capture` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `free-name:before-declaration` | inventory refinement of `free-name` (globals plan names the sub-case; the runner reports free-name, which has a row) |
 | `free-name:dynamic-shadow` | inventory refinement of `free-name` (globals plan names the sub-case; the runner reports free-name, which has a row) |
 | `free-name:not-one-top-level-binding` | inventory refinement of `free-name` (globals plan names the sub-case; the runner reports free-name, which has a row) |
 | `import-limit` | N row added (reachable; program in its evidence) |
-| `import-link` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `import-outside-project` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
-| `import-parse-error` | not reached: a module parse error is reported as module-error:syntax (row exists), legacy-equal message |
+| `import-link` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
+| `import-outside-project` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
+| `import-parse-error` | not reached: a module parse error is reported as module-error:syntax (row exists), legacy-equal message [C113 four-way probe: section 9.1] |
 | `import-reinitialised` | N row added (reachable; program in its evidence) |
-| `interpolation:internal` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `interpolation:internal` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
 | `interpolation:non-scalar` | N row added (reachable; program in its evidence) |
 | `invalid-graph` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `invalid-input` | not a compile refusal: an isolate-transfer, handle or process error code |
-| `lambda-capture` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `lambda-capture` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
 | `lambda-param` | parser-shadowed: opaque:legacy-runtime-error first; legacy errors (malformed parameter list, duplicate key, invalid signature) |
-| `lambda-shape` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `limit:arguments` | unreachable in practice: capacity limit (0x7fff arguments, 0xffff atoms or lambdas) |
-| `limit:atoms` | unreachable in practice: capacity limit (0x7fff arguments, 0xffff atoms or lambdas) |
-| `limit:lambdas` | unreachable in practice: capacity limit (0x7fff arguments, 0xffff atoms or lambdas) |
+| `lambda-shape` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
+| `limit:arguments` | unreachable in practice: capacity limit (0x7fff arguments, 0xffff atoms or lambdas) [C113 four-way probe: section 9.1] |
+| `limit:atoms` | N row added (C113: reached by the four-way probe, section 9.1) |
+| `limit:lambdas` | unreachable in practice: capacity limit (0x7fff arguments, 0xffff atoms or lambdas) [C113 four-way probe: section 9.1] |
 | `limit:session-bindings` | session-only (the session compiler's contract checks) |
 | `limit:session-protos` | session-only (the session compiler's contract checks) |
-| `logical-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `method:splice` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `logical-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
+| `method:splice` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `object-duplicate-key` | parser-shadowed: opaque:legacy-runtime-error first; legacy errors (malformed parameter list, duplicate key, invalid signature) |
 | `param-duplicate` | parser-shadowed: opaque:legacy-runtime-error first; legacy errors (malformed parameter list, duplicate key, invalid signature) |
-| `param-type-unpredicted` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `param-type-unpredicted` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `parse-error` | not a compile refusal: the runner's stop reason for a parse error (legacy-identical diagnostic, CP10) |
-| `path-in-call-argument:imported` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
-| `path-in-index` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found |
+| `path-in-call-argument:imported` | N row added (C113: reached by the four-way probe, section 9.1) |
+| `path-in-index` | not reached: the probe tried ran on the VM or refused with another reason (see probe list); no script found [C113 four-way probe: section 9.1] |
 | `pipe-capture` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `postfix-receiver` | consequential-only (tip corpus: consequential sightings only; probes give another reason first) |
 | `proto-unavailable` | not a compile refusal: an isolate-transfer, handle or process error code |
@@ -1357,10 +1383,10 @@ row at C111 (the review's scan found 83; this scan is wider and includes non-com
 | `struct-redeclared` | N row added (reachable; program in its evidence) |
 | `struct-shadows-fn` | N row added (reachable; program in its evidence) |
 | `struct-this-binding` | resolver-shadowed: binding-name-reserved fires first; legacy errors |
-| `throw-expression` | unreachable as a refusal: the parse error comes first and is legacy-identical |
-| `trailing-comma` | unreachable as a refusal: the parse error comes first and is legacy-identical |
-| `unary-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
-| `unknown-effects` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) |
+| `throw-expression` | unreachable as a refusal: the parse error comes first and is legacy-identical [C113 four-way probe: section 9.1] |
+| `trailing-comma` | unreachable as a refusal: the parse error comes first and is legacy-identical [C113 four-way probe: section 9.1] |
+| `unary-operator` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
+| `unknown-effects` | unreachable: defensive or internal arm (no program found; parser/resolver guarantees the shape) [C113 four-way probe: section 9.1] |
 | `unsupported-constant` | not a compile refusal: an isolate-transfer, handle or process error code |
 | `unsupported-value` | not a compile refusal: an isolate-transfer, handle or process error code |
 
@@ -1373,6 +1399,140 @@ index inside a call argument, and an import outside a project root all ran or ga
 `future: return: await: expected future`; flagged for the owner (section 13).
 
 The N evidence of every C111 N row is now a minimal program with its exact VM reason and legacy output (in the tsv).
+
+### 9.1 C113 four-way probes of every unreachable or not-reached disposition
+
+Rule (confirmation review P2-A): a literal is called unreachable or not reached only after a probe in a script, a
+module import (the program as the imported module), a `nift -i` session and a function called from a loop. Session
+legacy exits are 0 by design (a session reports and continues). Cells: VM outcome; legacy exit.
+
+| Literal | Probe | script | module | session | loop-called fn | C113 disposition |
+| --- | --- | --- | --- | --- | --- | --- |
+| `analysis-limit:kinds` | `x := 1 / i := 0 / while (i < 3) { x = [x]; i += 1 } / print(x.stringify())` | `context:assignment-error`; legacy rc=1 | `context:assignment-error`; legacy rc=1 | `session:binding-shape-contract`; legacy rc=0 | `context:assignment-error`; legacy rc=1 | not reached (other reasons first) |
+| `await-shape` | `x := await / print(1)` | `unresolved-name`; legacy rc=1 | `unresolved-name`; legacy rc=1 | `unresolved-name`; legacy rc=0 | `prepared-decl-type`; legacy rc=1 | not reached (a bare `await` is a name) |
+| `binary-operator` | `print(1 ^ 2)` | `opaque:legacy-runtime-error`; legacy rc=1 | `import-opaque:legacy-runtime-error`; legacy rc=1 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=1 | parser-shadowed (`^` is opaque) |
+| `compound-operator` | `x := 6 / x &= 3 / print(x)` | `compound-operator`; legacy rc=1 | `compound-operator`; legacy rc=1 | runs; legacy rc=0 | `compound-operator`; legacy rc=1 | **reached: N row added** (`&=`, `\|=`, `^=`) |
+| `interpolation:internal` | `x := "" / print("$[x]") / print("")` | runs; legacy rc=0 | runs; legacy rc=0 | `interpolation:unknown-type`; legacy rc=0 | runs; legacy rc=0 | not reached (an empty string is a constant) |
+| `lambda-capture` | `i := 0 / while (i < 1) { j := i / f := () => j / print(f()) / i += 1 }` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | `prepared-decl-type`; legacy rc=0 | not reached (defensive arm) |
+| `lambda-shape` | `f := () => / print(1)` | `opaque:legacy-runtime-error`; legacy rc=0 | `import-opaque:legacy-runtime-error`; legacy rc=0 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=0 | parser-shadowed (`opaque:legacy-runtime-error`; legacy runs: row exists) |
+| `logical-operator` | `print(null ?? 1) / print(1 and 2)` | `opaque:legacy-runtime-error`; legacy rc=1 | `import-opaque:legacy-runtime-error`; legacy rc=1 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=1 | parser-shadowed |
+| `unary-operator` | `print(~1)` | `opaque:legacy-runtime-error`; legacy rc=1 | `import-opaque:legacy-runtime-error`; legacy rc=1 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=1 | parser-shadowed |
+| `unknown-effects` | `fn(f(a)) { a.sort((x, y) => x < y) / return a } / print(f([2, 1]).stringify())` | `method:sort`; legacy rc=0 | `method:sort`; legacy rc=0 | `method:sort`; legacy rc=0 | `method:sort`; legacy rc=0 | shadowed by `method:sort` (row exists) |
+| `import-link` | `import("./m.f") / print(x)` | `statement:Command`; legacy rc=0 | `statement:Command`; legacy rc=0 | `statement:Import`; legacy rc=0 | `import-nested`; legacy rc=0 | not reached (invariant: every module parses alone) |
+| `throw-expression` | `try { throw } catch(e) { print("c") }` | error: throw requires an Error expression; legacy rc=1 | `module-error:syntax`; legacy rc=1 | `session:parse`; legacy rc=0 | error: throw requires an Error expression; legacy rc=1 | unreachable as a refusal: legacy-identical parse error first |
+| `trailing-comma` | `a := [1, 2,] / print(a.size())` | error: expression cannot be empty; legacy rc=1 | `module-error:syntax`; legacy rc=1 | `session:opaque`; legacy rc=0 | error: expression cannot be empty; legacy rc=1 | unreachable as a refusal: legacy-identical parse error first |
+| `limit:arguments` | `print(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,...` | `static-error:arity`; legacy rc=1 | `static-error:arity`; legacy rc=1 | `static-error:arity`; legacy rc=0 | `static-error:arity`; legacy rc=1 | shadowed by `static-error:arity` (33000 arguments) |
+| `limit:atoms` | `o := {"k0": 0, "k1": 1, "k2": 2, "k3": 3, "k4": 4, "k5": 5, "k6": 6, "k7": 7, "k8": 8, "k9...` | `limit:atoms`; legacy rc=0 | `limit:atoms`; legacy rc=0 | `limit:atoms`; legacy rc=0 | `limit:atoms`; legacy rc=0 | **reached: N row added** (70000 keys; legacy runs) |
+| `limit:lambdas` | `f0 := () => 0 / f1 := () => 1 / f2 := () => 2 / f3 := () => 3 / f4 := () => 4 / f5 := () =...` | timeout (120 s); legacy rc=-9 | timeout (120 s); legacy rc=-9 | `binding-name-reserved`; legacy rc=-9 | timeout (120 s); legacy rc=-9 | not reached: 66000 lambdas time out on both engines; session hits `binding-name-reserved` (`f32`) |
+| `limit:too many constants` | `x := ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s1...` | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | shadowed by `limit:too many registers` (row added) |
+| `limit:too many registers` | `fn(g()) { return 1 } / print([g(), g(), g(), g(), g(), g(), g(), g(), g(), g(), g(), g(), ...` | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | `limit:too many registers`; legacy rc=0 | **reached: N row added** (legacy runs) |
+| `limit:jump distance exceeds 16 bits` | `x := 0 / if (true) { / x += 1 / x += 1 / x += 1 / x += 1 / x += 1 / x += 1 / x += 1 / x +=...` | runs; legacy rc=0 | runs; legacy rc=0 | `limit:jump distance exceeds 16 bits`; legacy rc=0 | runs; legacy rc=0 | **reached in a session: N row added** (legacy runs) |
+| `limit:too many struct types` | `struct(S0) { v := 1 } / struct(S1) { v := 1 } / struct(S2) { v := 1 } / struct(S3) { v := ...` | `type:member`; legacy rc=1 | `type:member`; legacy rc=1 | timeout (120 s); legacy rc=-9 | `struct-nested`; legacy rc=1 | not reached: 65600 structs give `type:member` / `struct-nested`; session times out |
+| `coro-future-flow:type` | `fn[async](af(x)) { return x } / x := af(1) / if (true) { x = 1 } / print(await x)` | error: cannot assign int to string binding 'x'; legacy rc=1 | `coro-module-init-task`; legacy rc=1 | `session:coroutine`; legacy rc=0 | error: cannot assign int to string binding 'x'; legacy rc=1 | not reached (legacy-equal type error first) |
+| `coro-observe:epoch` | `fn(w()) { return epoch() > 0 } / t := thread(w) / print(t.join())` | runs; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | runs; legacy rc=0 | classify-all only (F12 limits); runs on the runner |
+| `coro-task-recursion` | `fn(w(n)) { if (n == 0) { return 0 } / return w(n - 1) } / t := thread(w, 2) / print(t.join...` | runs; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | runs; legacy rc=0 | classify-all only; runs |
+| `coro-task-native:` | `fn(w()) { print("x") / return 1 } / t := thread(w) / print(t.join())` | runs; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | runs; legacy rc=0 | classify-all only; runs |
+| `coro-task-op:` | `fn(w()) { a := [1] / a.push(2) / return a.size() } / t := thread(w) / print(t.join())` | runs; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | runs; legacy rc=0 | classify-all only; runs |
+| `coro-async-recursion` | `fn[async](f(n)) { if (n == 0) { return 0 } / return await f(n - 1) } / print(await f(2))` | runs; legacy rc=1 | `coro-module-init-task`; legacy rc=1 | `session:coroutine`; legacy rc=0 | runs; legacy rc=1 | classify-all only; the VM runs where legacy errors (item 10 of section 13) |
+| `coro-capture` | `k := 2 / f := async (x) => x * k / print(await f(1))` | runs; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | `prepared-decl-type`; legacy rc=0 | classify-all or session only (`session:coroutine` first) |
+| `method:splice` | `a := [3, 1] / b := [2] / a.splice(0, 1, b.sort()) / print(a.stringify())` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | not reached; runs |
+| `param-type-unpredicted` | `fn(f(x)) { if (x > 0) { return x } / return 0 } / print(f(1)) / print(f(2.5))` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | not reached; runs |
+| `path-in-index` | `o := {"k": [0]} / a := [5] / print(a[o.k[0]])` | `opaque:legacy-runtime-error`; legacy rc=1 | `import-opaque:legacy-runtime-error`; legacy rc=1 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=0 | parser-shadowed |
+| `path-in-call-argument:imported` | `import("./m.f") / fn(id(x)) { return x } / print(id(t.k[0]))` | `path-in-call-argument:imported`; legacy rc=0 | `path-in-call-argument:imported`; legacy rc=0 | `statement:Import`; legacy rc=0 | `path-in-call-argument:imported`; legacy rc=0 | **reached: N row added** (legacy runs) |
+| `builtin-plain-arg:` | `fn(f(x)) { return "a".contains(x) } / print(f("a")) / print(f(1))` | error: contains: argument must be a string; legacy rc=1 | error: import: contains: argument must be a string; legacy rc=1 | runs; legacy rc=0 | error: contains: argument must be a string; legacy rc=1 | not reached: legacy-equal error |
+| `import-outside-project` | `import("/dev/null") / print(1)` | `import-error:missing`; legacy rc=1 | `import-error:missing`; legacy rc=1 | `statement:Import`; legacy rc=0 | `import-nested`; legacy rc=1 | not reached: `import-error:missing` (row exists) first |
+| `import-parse-error` | `import("./m.f") / print(1)` | `module-error:syntax`; legacy rc=1 | `module-error:syntax`; legacy rc=1 | `statement:Import`; legacy rc=0 | `import-nested`; legacy rc=1 | not reached: `module-error:syntax` (row exists) |
+| `opaque:deferred-translation` | `f := (x) => @fn / print(1)` | `opaque:legacy-runtime-error`; legacy rc=0 | `import-opaque:legacy-runtime-error`; legacy rc=0 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=0 | not reached: `opaque:legacy-runtime-error` / `opaque:template-text` first |
+| `context:collection-empty` | `m := map() / i := 0 / while (i < 1) { /   print(m.empty()) /   i += 1 / }` | `context:collection-empty`; legacy rc=0 | `context:collection-empty`; legacy rc=0 | `context:collection-empty`; legacy rc=0 | `context:collection-empty`; legacy rc=0 | **reached: N row added** (P2-B) |
+| `expression:assignment-target` | `a := [1] / print(a[0] += 5)` | `expression:assignment-target`; legacy rc=0 | `expression:assignment-target`; legacy rc=0 | `expression:assignment-target`; legacy rc=0 | `expression:assignment-target`; legacy rc=0 | **reached: row added** (owner-excluded checkpoint-1 form, P2-B) |
+| `coro-future-flow:Call (C112 probed as `:type`)` | `fn[async](af(x)) { return x } / fn(w(x)) { return x } / x := af(1) / if (true) { x = threa...` | `coro-future-flow:Call`; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `session:coroutine`; legacy rc=0 | `coro-future-flow:Call`; legacy rc=0 | **reached: N row added** (P2-B) |
+
+The C112 categories "session-only" (30), "not a compile refusal" (14), "inventory refinement" (3), "eval-entry only" (2)
+and the parser- or resolver-shadowed rows (7) are unchanged; the confirmation review re-sampled several of them.
+
+### 9.2 Reason families built at run time
+
+The literal scan cannot see names built by concatenation. Every such emit site in `src/rt`, its producible suffixes and
+the C113 probes (1010 generated programs, VM and legacy, script context; module host operations need imports):
+
+| Family | Emit sites | Producible suffixes (source of the enumeration) | Probed | Rows added |
+| --- | --- | --- | --- | --- |
+| `type:<op>` | compiler_expr.cpp:165,170,374; literals in compiler_*.cpp | op_name of Add..Mod, Lt..Ge (+ - * / % < <= > >=) and 11 literal names | all | 4 (P2-B) |
+| `coro-future-flow:<parent kind>` | compiler_coro.cpp:163 (and :Member, :method, :type literals) | node_kind_name of any parent of a future holder that `allowed()` rejects | 20 parent kinds | 9 + 2 (P2-B) |
+| `expression:<kind>` | compiler_expr.cpp:138 | node kinds without an arm in `expr`: SafeMember, SafeIndex, Spread, Property, StringPart, statement kinds | 9 forms | 2 |
+| `statement:<kind>` | compiler.cpp:156 | statement kinds without an arm: Block, FnDecl, StructDecl, EnumDecl, Import, Export, Command, TemplateStmt, Pattern | 7 forms | 1 |
+| `opaque:<reason>`, `import-opaque:<reason>` | script_runner.cpp:278, module_graph.cpp:326 | the 6 OpaqueReason names | 6 + 5 imported | 4 (import-opaque) + 1 four-way |
+| `builtin-arity:<name>` | compiler_native_args.cpp:25, compiler_keyed.cpp:105,196 | every built-in with fixed max (builtin_list.inc, 187 specs): max+1 and min-1 arguments | all specs | 116 |
+| `builtin-receiver:<name>` | compiler_dispatch.cpp:41,44, compiler_call.cpp:215 | every String/Array/Object/Number/Map/Set/Stack/Bool method on another kind | all specs | 68 |
+| `builtin-lazy-args:<name>`, `builtin-default:get` | compiler_native_args.cpp:33-34 | every may-fail built-in with two or more arguments, second argument a call | all specs | 1 + 1 |
+| `builtin-bytes:<name>`, `builtin-plain-arg:<name>`, `builtin-literal-arg:validate` | compiler_native_args.cpp:9,16,20 | bytes producers; unknown-kind arguments; validate | via specs | 0 (existing rows; plain-arg not reached, 9.1) |
+| `callable:<name>` | compiler_thread.cpp:22 | any unbound callee: unbounded; enumerated over legacy_names.cpp kNames (225 names) | 225 | 10 exact + `callable:*` family (absorbs 101) |
+| `method:<name>` | compiler_call.cpp:204, compiler_keyed.cpp:98,115,188,191, compiler_error.cpp:39, compiler_array_mutation.cpp:9,11, compiler_collection_lambda.cpp:8 | any method name not bound for the receiver kind: unbounded; enumerated over kMethods on string, array and object receivers | all kMethods × 3 | 37 exact; `method:*` covers the rest |
+| `module-host-op:<name>` | module_host_op.h:29 | every host built-in (HostOpen..HostSecureRandomBytes, 26) in a program with imports | 26 | 19 |
+| `limit:<codegen error>` | compiler.cpp:40 (codegen.cpp:16,48,59,92,116) | too many registers / struct types / constants, register-operand-constant, jump distance | 4 (9.1) | 2 (four-way) |
+| removed `async(...)` / `await(...)` forms | compiler_thread.cpp:19-21 (the message is the reason) | 2 | 2 | 2 |
+| `coro-blocking-host:<name>`, `coro-observe:*`, `coro-task-*:<x>` | compiler_coro_admit.cpp:131-249 | host built-ins, future ops and opcodes in tasks | 9.1 | 0: classify-all only (F12 limits); `coro-blocking-host:sha256_file` appears consequentially in the C113 collect |
+| `presentation-struct-method:<name>`, `collection-*:<name>`, `invocation-assign:<name>` | compiler_presentation.cpp:40, compiler_collection*.cpp, compiler_invocation.cpp:81 | presentation methods; collection methods; invocation names | - | 0: family rows exist |
+| refinements (`free-name:*`, `assign-free-name:*`, `unresolved-name:legacy-binding`) | refusal_inventory.cpp:65-80 | inventory sub-names of a runner reason | - | 0 (the runner reports the base reason, which has a row) |
+
+Not reachable (probed): `coro-future-flow` parents Unary, Array, Declare, If, While, Return run on the VM; Ternary,
+Index and the Coalesce form give `opaque:irregular-legacy-parse`, `type:index` and `:Call`. `expression:` Spread,
+Property, Number, Coalesce and assignment/increment expressions run or give other reasons; `statement:` Block,
+EnumDecl, StructDecl in a block, Import in a function, Pattern and `defer` give `opaque:legacy-runtime-error`,
+a legacy-identical parse error, `struct-nested`, `import-nested` or `declare-pattern` (rows exist). Every
+producible `builtin-*`, `module-host-op` and legacy-name `callable`/`method` suffix the probes reached has an exact row.
+
+**`type:*` absorbed** (before C113, no exact row): `type:/`, `type:<=`, `type:>=`, `type:for-source-union`; all
+emitted (P2-B probes), all now have rows. It absorbs no other producible reason: every op_name suffix and every
+literal `type:` name has an exact row (`type:for-source` retired, not reached; `type:element-assignment` restored).
+
+**`method:*` absorbs**: before C113 the 37 legacy method names below (all emitted, legacy errors) and `method:increment`
+(emitted). The 37 now have exact rows; `method:increment`'s retired row is deleted, so `method:*` absorbs it and any
+other identifier used as a method.
+
+**`callable:*` absorbs** the 101 legacy special names that legacy itself reports as undefined callables (emitted, legacy-equal error), and any other undeclared name:
+
+`Handover`, `OLDPWD`, `PWD`, `SHLVL`, `_`, `amplify`, `append`, `atomic`, `azure`, `bg`, `bool`, `break`, `buffer`, `callback_i64`, `catch`, `cloudflare`, `const`, `content`, `continue`, `css`, `cstr`, `defer`, `del`, `else`, `enum`, `eof`, `export`, `f32`, `f64`, `fg`, `firebase`, `first`, `flush`, `fn`, `for`, `highlight`, `html`, `i16`, `i32`, `i64`, `i8`, `if`, `immut`, `import`, `info`, `input`, `insert`, `insert_after`, `insert_before`, `jobs`, `js`, `json`, `jsx`, `lambda`, `loop`, `modified`, `name`, `netlify`, `path`, `prepend`, `prettify`, `project`, `ptr`, `read_all`, `read_all_bytes`, `read_bytes`, `read_line`, `read_val`, `render`, `replace`, `replace_once`, `return`, `revert`, `save`, `script`, `section`, `seek`, `self`, `split`, `struct`, `supabase`, `svg`, `tell`, `this`, `throw`, `title`, `try`, `u16`, `u32`, `u64`, `u8`, `unwatch`, `vercel`, `void`, `wait`, `watch`, `while`, `write`, `write_line`, `write_val`, `xml`
+
+<details><summary>The 276 dynamic-family rows added (reason; legacy on the probe)</summary>
+
+- **builtin-arity** (116): `builtin-arity:arch` (errors), `builtin-arity:atomic<bool>` (errors), `builtin-arity:atomic<int>` (errors), `builtin-arity:attr_escape` (errors), `builtin-arity:cancel` (errors), `builtin-arity:cat` (errors), `builtin-arity:cd` (errors), `builtin-arity:ceil` (errors), `builtin-arity:channel` (errors), `builtin-arity:chunk` (errors), `builtin-arity:close` (errors), `builtin-arity:cp` (errors), `builtin-arity:deepcopy` (errors), `builtin-arity:drop` (errors), `builtin-arity:empty` (errors), `builtin-arity:ends_with` (errors), `builtin-arity:entries` (errors), `builtin-arity:env` (errors), `builtin-arity:eof` (errors), `builtin-arity:epoch` (errors), `builtin-arity:exists` (errors), `builtin-arity:first` (errors), `builtin-arity:flatten` (errors), `builtin-arity:floor` (errors), `builtin-arity:flush` (errors), `builtin-arity:from_entries` (errors), `builtin-arity:get` (errors), `builtin-arity:getenv` (errors), `builtin-arity:hardware_concurrency` (errors), `builtin-arity:has` (errors), `builtin-arity:highlight` (errors), `builtin-arity:html_escape` (errors), `builtin-arity:indexOf` (errors), `builtin-arity:index_of` (errors), `builtin-arity:is_array` (errors), `builtin-arity:is_bool` (errors), `builtin-arity:is_bytes` (errors), `builtin-arity:is_collection` (errors), `builtin-arity:is_dir` (errors), `builtin-arity:is_enum` (errors), `builtin-arity:is_file` (errors), `builtin-arity:is_float` (errors), `builtin-arity:is_function` (errors), `builtin-arity:is_int` (errors), `builtin-arity:is_null` (errors), `builtin-arity:is_number` (errors), `builtin-arity:is_object` (errors), `builtin-arity:is_string` (errors), `builtin-arity:is_struct` (errors), `builtin-arity:last_index_of` (errors), `builtin-arity:length` (errors), `builtin-arity:lock` (errors), `builtin-arity:locked` (errors), `builtin-arity:ls` (errors), `builtin-arity:make_dir` (errors), `builtin-arity:map` (errors), `builtin-arity:max` (errors), `builtin-arity:merge` (errors), `builtin-arity:merge_deep` (errors), `builtin-arity:min` (errors), `builtin-arity:mkdir` (errors), `builtin-arity:modified` (errors), `builtin-arity:mutex` (errors), `builtin-arity:mv` (errors), `builtin-arity:omit` (errors), `builtin-arity:open` (errors), `builtin-arity:os` (errors), `builtin-arity:path` (errors), `builtin-arity:pick` (errors), `builtin-arity:platform` (errors), `builtin-arity:prettify` (errors), `builtin-arity:pwd` (errors), `builtin-arity:range` (errors), `builtin-arity:read` (errors), `builtin-arity:read_all` (errors), `builtin-arity:read_line` (errors), `builtin-arity:recv` (errors), `builtin-arity:remove` (errors), `builtin-arity:replace` (errors), `builtin-arity:revert` (errors), `builtin-arity:rm` (errors), `builtin-arity:round` (errors), `builtin-arity:same` (errors), `builtin-arity:save` (errors), `builtin-arity:seek` (errors), `builtin-arity:send` (errors), `builtin-arity:setenv` (errors), `builtin-arity:size` (errors), `builtin-arity:sleep` (errors), `builtin-arity:slice` (errors), `builtin-arity:stack` (errors), `builtin-arity:starts_with` (errors), `builtin-arity:stat` (errors), `builtin-arity:substr` (errors), `builtin-arity:sum` (errors), `builtin-arity:take` (errors), `builtin-arity:tell` (errors), `builtin-arity:to_double` (errors), `builtin-arity:to_int` (errors), `builtin-arity:to_lower` (errors), `builtin-arity:to_string` (errors), `builtin-arity:to_upper` (errors), `builtin-arity:touch` (errors), `builtin-arity:trim_end` (errors), `builtin-arity:trim_start` (errors), `builtin-arity:try_lock` (errors), `builtin-arity:type` (errors), `builtin-arity:unique` (errors), `builtin-arity:unlock` (errors), `builtin-arity:unsetenv` (errors), `builtin-arity:url_encode` (errors), `builtin-arity:validate` (errors), `builtin-arity:values` (errors), `builtin-arity:which` (errors), `builtin-arity:write` (errors), `builtin-arity:write_line` (errors)
+- **builtin-default** (1): `builtin-default:get` (errors)
+- **builtin-lazy-args** (1): `builtin-lazy-args:slice` (errors)
+- **builtin-receiver** (68): `builtin-receiver:abs` (errors), `builtin-receiver:ceil` (errors), `builtin-receiver:chunk` (errors), `builtin-receiver:close` (errors), `builtin-receiver:compare_exchange` (errors), `builtin-receiver:contains` (errors), `builtin-receiver:copy` (errors), `builtin-receiver:decode` (errors), `builtin-receiver:drop` (errors), `builtin-receiver:encode` (errors), `builtin-receiver:ends_with` (errors), `builtin-receiver:entries` (errors), `builtin-receiver:eof` (errors), `builtin-receiver:exchange` (errors), `builtin-receiver:exists` (errors), `builtin-receiver:fetch_add` (errors), `builtin-receiver:fetch_sub` (errors), `builtin-receiver:flatten` (errors), `builtin-receiver:floor` (errors), `builtin-receiver:flush` (errors), `builtin-receiver:from_entries` (errors), `builtin-receiver:front` (errors), `builtin-receiver:get` (errors), `builtin-receiver:has` (errors), `builtin-receiver:indexOf` (errors), `builtin-receiver:last` (errors), `builtin-receiver:last_index_of` (errors), `builtin-receiver:load` (errors), `builtin-receiver:lock` (errors), `builtin-receiver:locked` (errors), `builtin-receiver:max` (errors), `builtin-receiver:merge` (errors), `builtin-receiver:merge_deep` (errors), `builtin-receiver:min` (errors), `builtin-receiver:modified` (errors), `builtin-receiver:move` (errors), `builtin-receiver:omit` (errors), `builtin-receiver:open` (errors), `builtin-receiver:path` (errors), `builtin-receiver:pick` (errors), `builtin-receiver:read` (errors), `builtin-receiver:read_all` (errors), `builtin-receiver:read_line` (errors), `builtin-receiver:remove` (errors), `builtin-receiver:replace` (errors), `builtin-receiver:revert` (errors), `builtin-receiver:round` (errors), `builtin-receiver:save` (errors), `builtin-receiver:seek` (errors), `builtin-receiver:set` (errors), `builtin-receiver:slice` (errors), `builtin-receiver:split` (errors), `builtin-receiver:starts_with` (errors), `builtin-receiver:store` (errors), `builtin-receiver:take` (errors), `builtin-receiver:tell` (errors), `builtin-receiver:to_int` (errors), `builtin-receiver:to_lower` (errors), `builtin-receiver:top` (errors), `builtin-receiver:trim` (errors), `builtin-receiver:trim_end` (errors), `builtin-receiver:trim_start` (errors), `builtin-receiver:try_lock` (errors), `builtin-receiver:unique` (errors), `builtin-receiver:unlock` (errors), `builtin-receiver:values` (errors), `builtin-receiver:write` (errors), `builtin-receiver:write_line` (errors)
+- **callable** (10): `callable:build_repair` (errors), `callable:ffi_buffer` (errors), `callable:ffi_bytes` (errors), `callable:ffi_sizeof` (errors), `callable:ffi_snapshot_bytes` (errors), `callable:ffi_struct` (errors), `callable:package_path` (errors), `callable:page` (errors), `callable:prique` (errors), `callable:queue` (errors)
+- **coro-future-flow** (9): `coro-future-flow:Binary` (errors), `coro-future-flow:CompoundAssign` (errors), `coro-future-flow:ExprStmt` (runs), `coro-future-flow:ForBinding` (errors), `coro-future-flow:IncDec` (errors), `coro-future-flow:Logical` (runs), `coro-future-flow:Property` (runs), `coro-future-flow:String` (runs), `coro-future-flow:Throw` (errors)
+- **expression** (2): `expression:SafeIndex` (runs), `expression:SafeMember` (runs)
+- **import-opaque** (5): `import-opaque:irregular-legacy-parse` (runs), `import-opaque:legacy-runtime-error` (errors), `import-opaque:nesting-limit` (runs), `import-opaque:struct-body` (errors), `import-opaque:template-text` (runs)
+- **limit** (3): `limit:atoms` (runs), `limit:jump distance exceeds 16 bits` (runs), `limit:too many registers` (runs)
+- **message** (3): `async(callable, ...) was removed; declare an async function/lambda and call it directly` (errors), `await(...) was removed; use 'await future' or 'await async_fn(args)'` (errors), `compound-operator` (errors)
+- **method** (37): `method:all` (errors), `method:any` (errors), `method:append` (errors), `method:cat` (errors), `method:clear` (errors), `method:count_by` (errors), `method:cwd` (errors), `method:env` (errors), `method:file` (errors), `method:find` (errors), `method:find_index` (errors), `method:group_by_each` (errors), `method:index_by` (errors), `method:insert` (errors), `method:insert_after` (errors), `method:insert_before` (errors), `method:max_by` (errors), `method:min_by` (errors), `method:mv` (errors), `method:partition` (errors), `method:pop` (errors), `method:prepend` (errors), `method:read_all_bytes` (errors), `method:read_bytes` (errors), `method:read_val` (errors), `method:reduce` (errors), `method:reset` (errors), `method:reverse` (errors), `method:running` (errors), `method:splice` (errors), `method:stat` (errors), `method:stderr` (errors), `method:stdin` (errors), `method:stdout` (errors), `method:unique_by` (errors), `method:write_bytes` (errors), `method:write_val` (errors)
+- **module-host-op** (19): `module-host-op:arch` (runs), `module-host-op:cd` (errors), `module-host-op:env` (errors), `module-host-op:epoch` (runs), `module-host-op:hardware_concurrency` (runs), `module-host-op:ls` (errors), `module-host-op:make_dir` (errors), `module-host-op:mkdir` (errors), `module-host-op:open` (runs), `module-host-op:os` (runs), `module-host-op:platform` (runs), `module-host-op:pwd` (runs), `module-host-op:setenv` (runs), `module-host-op:sha256_file` (runs), `module-host-op:sleep` (errors), `module-host-op:stat` (errors), `module-host-op:touch` (runs), `module-host-op:unsetenv` (runs), `module-host-op:which` (runs)
+- **path-in-call-argument** (1): `path-in-call-argument:imported` (runs)
+- **statement** (1): `statement:FnDecl` (runs)
+
+</details>
+
+### 9.3 Retired rows under the four-way rule
+
+| Row | Probe | script | module | session | loop-called fn | C113 status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `type:print` | `fn(each(xs)) { out := []; for(x : xs) { out.push(x * 2) } return out } / print(each([1, 2,...` | error: print: value is not directly renderable; legacy rc=1 | error: import: print: value is not directly renderable; legacy rc=1 | runs; legacy rc=0 | error: print: value is not directly renderable; legacy rc=1 | stays retired (no emit site; the VM raises legacy's error) |
+| `aliasing` | `fn(g()) { a := []; a.push(1); return a } / fn(o()) { return {"a": 1} } / g() / o() / a := ...` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | `prepared-decl-type`; legacy rc=0 | stays retired (no emit site) |
+| `reference-guard:*` | `a := [[1]] / b := a[0] / b.push(2) / a[0].push(3) / print(a.stringify()) / print(b.stringi...` | `opaque:legacy-runtime-error`; legacy rc=1 | `import-opaque:legacy-runtime-error`; legacy rc=1 | `session:opaque`; legacy rc=0 | `opaque:legacy-runtime-error`; legacy rc=1 | stays retired (no emit site) |
+| `type:for-source` | `fn(f(x)) { for (e : x) { print(e) } / return 0 } / f([1, 2])` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | stays retired (site exists, not reached) |
+| `type:for-source (args)` | `for (a : args) { print(a) } / print("n")` | runs; legacy rc=0 | `import-scope:invocation-init`; legacy rc=1 | runs; legacy rc=0 | runs; legacy rc=0 | (same row) |
+| `coro-module` | `import("./m.f") / fn[async](af(x)) { return x + k } / print(await af(1))` | `coro-module-capture`; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `statement:Import`; legacy rc=0 | `coro-module-capture`; legacy rc=0 | stays retired (site exists, not reached) |
+| `coro-module (thread)` | `import("./m.f") / fn(w(x)) { return x + k } / t := thread(w, 1) / print(t.join())` | `coro-module-capture`; legacy rc=0 | `coro-module-init-task`; legacy rc=0 | `statement:Import`; legacy rc=0 | `coro-module-capture`; legacy rc=0 | (same row) |
+| `method:increment` | `x := 5 / x.increment()` | `method:increment`; legacy rc=1 | `method:increment`; legacy rc=1 | `method:increment`; legacy rc=0 | `method:increment`; legacy rc=1 | **row deleted** (emitted; `method:*` covers it) |
+| `struct-no-method` | `struct(S) { v := 1 } / s := S() / print(s.nope())` | error: struct has no method: nope; legacy rc=1 | error: import: struct has no method: nope; legacy rc=1 | runs; legacy rc=0 | `struct-no-method`; legacy rc=1 | **restored to PENDING-OWNER, G** |
+| `struct-no-method (string name)` | `struct(S) { v := 1 } / s := S() / print(s.trim())` | `struct-no-method`; legacy rc=1 | `struct-no-method`; legacy rc=1 | `struct-no-method`; legacy rc=0 | `struct-no-method`; legacy rc=1 | (same row) |
+| `type:element-assignment (variable key)` | `o := {"a": 1} / k := "a" / o[k] = 2 / print(o["a"])` | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | runs; legacy rc=0 | (same row) |
+| `type:element-assignment (mixed receiver)` | `fn(f(c)) { if (c) { return [1] } / return {"a": 1} } / x := f(true) / x[0] = 5 / print(x.s...` | `type:element-assignment`; legacy rc=0 | `type:element-assignment`; legacy rc=0 | `type:element-assignment`; legacy rc=0 | `type:element-assignment`; legacy rc=0 | **restored to PENDING-OWNER, G** |
+| `type:element-assignment (key kinds)` | `fn(k(c)) { if (c) { return 0 } / return "a" } / a := [1] / a[k(true)] = 5 / print(a[0])` | `index-target`; legacy rc=0 | `index-target`; legacy rc=0 | `index-target`; legacy rc=0 | `index-target`; legacy rc=0 | (same row) |
+| `builtin-receiver:stringify` | `f := (v) => v.stringify() / print(f({"a": 1}))` | runs; legacy rc=0 | runs; legacy rc=0 | `builtin-receiver:stringify`; legacy rc=0 | runs; legacy rc=0 | **restored to PENDING-OWNER, G (sessions)** |
+
+A fresh C113 collect sees none of the 5 retired reasons and no `method:increment`.
 
 ## 10. Src-side and scope proposals (none applied)
 
@@ -1418,29 +1578,38 @@ recorded on the `declare-pattern` and `context:struct-new` rows.
 3. `import-reinitialised` (N): D-041 #2 allows a temporary refusal only with a recorded removal condition; record one, or treat it as G?
 4. Dynamic scope (`free-name`): out of the release contract (X), or a blocker?
 5. Checkpoint-2 scope: accept the section 10 item 4 recommendation?
-6. `incdec-target` (`a[0]++`, excluded from checkpoint 1): which checkpoint takes it?
+6. The remaining owner-excluded checkpoint-1 assignment forms: `incdec-target` (`a[0]++`), `expression:assignment-target`
+   (`print(a[0] += 5)`, a compound assignment used as a value) and `coro-future-flow:Assign` (`hs[0][0] = f(1)`, a future
+   stored through a nested path): which checkpoint takes them, together?
 7. Approve the F12 inventory fix (a src change; changes the sha256), after which the 16 F12 rows can be retired?
-8. `method:*` family row: keep it (classifies generic method names as PENDING-OWNER), or require one row per name?
-9. Observation: async self-recursion runs on the VM where legacy errors (section 9); is that an accepted difference?
-10. Family dispositions in sections 5-8 (each a PROPOSAL).
+8. Rename the `*` operator's reason `type:*` (e.g. `type:mul`) so it stops acting as a family row: a src change that
+   changes the sha256, like item 7.
+9. Family rows: keep `method:*` and `callable:*` (unbounded user names classified as PENDING-OWNER), or require one row
+   per name? And accept one exact row per producible built-in suffix (section 9.2: 270 rows), or prefer family rows?
+10. Async self-recursion runs on the VM (prints 0) where legacy errors `future: return: await: expected future`. This is
+    the existing CP23 review qualification `qualified:legacy-await-chain-defect` (deep_chain.f, pinned at
+    tests/runtime2/cp23/compatibility.py:1275 and CP22-CLASSIFICATION.tsv). No owner ruling approves it: please ratify it.
+11. `type:element-assignment` and `struct-no-method` are restored from retired (C107/B4 retirements) because scripts that
+    legacy runs, or loop-called code, still emit them: confirm they belong to the inference and struct work.
+12. Family dispositions in sections 5-9 (each a PROPOSAL).
 
-## 14. Gates at the tip (C112)
+## 14. Gates at the tip (C113)
 
 | Gate | Result |
 | --- | --- |
 | `make test-runtime2-certification-guard` | PASS (historical control; classification self-test, 31 cases) |
 | `make test-rt-lint` | PASS (boundary: 0 problems in 710 files) |
 | `make test-test-integrity` | clean (700 files scanned, 0 findings) |
-| fresh `inventory.py collect` + `report --check` | **exit 3** |
+| fresh `inventory.py collect` + `report --check` (C113 tsv) | **exit 3** |
 | `python3 -B tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases: 47 legacy-equal, 47 pinned differences or refusals) |
 
 - **Inventory**: G1 PASS, 155 reasons seen (approved 8, deferred-named 17, implement 17, PENDING-OWNER 113, retired 0).
-  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen again; no N
-  row's reason is seen (the inventory corpora do not contain their programs; sessions are not in the corpora, which is
-  why `presentation-struct-method:*` could not be caught by `--check`).
+  Exit 3 because 113 seen reasons are PENDING-OWNER: the intended BLOCKED state. No retired reason is seen again, and no
+  seen reason is classified only by a family row. Sessions are not in the inventory corpora, which is why session-only
+  rows (`presentation-struct-method:*`, `builtin-receiver:stringify`) can only be caught by probes.
 - **Production code**: `git diff 0c66cad6 -- src/` is empty; nift sha256 is
   `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
-- **Scratch**: the F12 mutant (`.build/mutant-nift`), its collection and the smoke extraction were deleted.
+- **Scratch**: the smoke extraction and the F12 mutant were deleted; probe results are kept outside the tree.
 
 ## 15. C112 changes per review finding
 
@@ -1456,3 +1625,14 @@ recorded on the `declare-pattern` and `context:struct-new` rows.
 | L-1 | `fn-flags` → Q (owner question) |
 | L-3 | checkpoint-2 recommendation added as a PROPOSAL |
 | new | `type:*` family-syntax collision noted (row and proposal) |
+
+## 16. C113 changes per confirmation-review finding
+
+| Finding | Change |
+| --- | --- |
+| P2-A | `builtin-receiver:stringify` restored to PENDING-OWNER, G (sessions); four-way probe rule applied to every retired row (9) and every unreachable or not-reached literal: `struct-no-method` and `type:element-assignment` restored too; `compound-operator`, `limit:atoms`, `limit:too many registers`, `limit:jump distance exceeds 16 bits`, `path-in-call-argument:imported`, `import-opaque:legacy-runtime-error` added |
+| P2-B | 8 rows added (`type:/`, `type:<=`, `type:>=`, `type:for-source-union`, `expression:assignment-target`, `coro-future-flow:Assign`, `coro-future-flow:Call`, `context:collection-empty`); every run-time-built family enumerated and probed: 270 rows added, `callable:*` family row added, the rest recorded in section 9.2; `type:*` and `method:*` absorption listed |
+| L-1 | `method:increment` row deleted (emitted, so not retirable; `method:*` covers it) |
+| L-2 | section 13 item 10 cites `qualified:legacy-await-chain-defect` and asks for ratification |
+| L-3 | section 13 items 6 and 8 added |
+| L-4 | section 3.3 lists `context:assignment-error`'s filesystem-recipe case |
