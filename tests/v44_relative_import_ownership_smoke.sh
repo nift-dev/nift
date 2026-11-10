@@ -35,8 +35,14 @@ make_native_symlink() {
       ;;
   esac
 }
-# Owner 2026-11-10 13:26, item 2 (combined-b3-b5.md section 82): the fixtures below use the
+# Owner 2026-11-10 13:26, items 2 and 5 (combined-b3-b5.md section 81): the fixtures below use the
 # canonical script form fn(...) (D-048 #4), so they test relative-import ownership, not `@fn`.
+# Plain `@fn` in a script is pinned on its own: the VM default refuses it (fn-flags, D-047 #1 /
+# D-048 #1) before running anything, while legacy still accepts it (the owner declined the
+# legacy-side rejection: an explicit legacy/VM difference, docs/runtime-2/known-limitations.md).
+. "$(dirname "$0")/runtime2/approved_refusal.sh"
+printf '@fn(v()) { return 3 }\nprint(v())\n' > "$t/plain-at-fn.f"
+approved_refusal "$NIFT_ABS" "plain @fn in a script" fn-flags "D-047 #1 / D-048 #1" "$t/plain-at-fn.f" 3
 
 # Direct/legacy parity, nested paths, Windows separators, and no root fallback.
 mkdir -p "$t/direct/modules/nested"

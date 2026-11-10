@@ -4301,3 +4301,36 @@ owner-approved B5 semantic difference.
   | v48 map-set | `8b78c4f431751a1e` |
   | v48 prepared collection | `823e1b8890f310a1` |
   | v46 output | `0c476605fa6859b6` |
+
+## 85. Owner 13:26, item 5: gates expect the four already-approved refusals (C97, tests)
+
+- **Helpers.** `tests/runtime2/approved_refusal.py` and `approved_refusal.sh` accept only the
+  approved reasons:
+  - `fn-name-reserved` (D-009 #3);
+  - `free-name` (owner ruling 2026-10-29);
+  - `fn-flags` (D-047 #1 / D-048 #1);
+  - `collection-mutable-key` (D-NEXT-refsem #6).
+- **What they require under the VM default:**
+  - exactly that reason, `not compiled for the VM (<reason>)`;
+  - exit 1, no stdout, and the "no part of it ran" note;
+  - a statistics row with that reason and no VM or legacy execution, so nothing ran before it.
+- The recorded oracle of each case is still checked, on the legacy channel (`NIFT_VM=0`).
+- **The gates** (from GATES.tsv):
+
+  | Gate | Approved refusal | Cases |
+  | --- | --- | --- |
+  | test-v48-map-set-index | `collection-mutable-key` | its two marked/reference key cases. The gate still fails afterwards, on `callable:sorted_map`/`sorted_set` (not approved; inventory row PENDING-OWNER). |
+  | test-v410-filesystem-recipe-parity | `fn-name-reserved` | the seven `stat` rows (files must be untouched by the refused run). The gate still fails afterwards, on `move`/`copy` rows (`builtin-lazy-args:move`, `builtin-arity:copy`, …) and on the pure-string rows (`postfix-spelling`); none is approved. |
+  | test-v43-language (`tests/script_import_syntax.sh`) | `fn-name-reserved` in a session | `fn(import(x))`: the session refuses that first statement before running it ("this statement was not executed"), and legacy keeps the original check. |
+  | test-v410-sort-factory-parity | `free-name` | `dynamic-capture-dependency` |
+  | test-v45-concurrency, test-v46-relative-imports | `fn-flags` | the plain `@fn` was fixture syntax (section 82). The relative-import smoke pins the refusal itself. test-v45-concurrency's other scripts pass. |
+
+- **Found, not changed (stopped on these items, for the owner):**
+  - **Unapproved behavioural difference** in test-v410-sort-factory-parity, case
+    `named-precedence`: `fn(x()) { return 8 }; f := x => x; print(type(f(3)))`. Legacy prints
+    `function` (the named function wins over the lambda parameter), the VM prints `int` (the
+    parameter). No approval was found. The gate stops there.
+  - **Unapproved refusal** in `tests/script_import_syntax.sh` (test-v43-language). A malformed
+    bare import (`import(` with no `)`) is refused as `opaque:template-text`, where legacy reports
+    `import has no matching ')'` at the import (`malformed.f:2:5`). The check that follows aborts
+    there.

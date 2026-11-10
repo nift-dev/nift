@@ -9,7 +9,9 @@ set -euo pipefail
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) B="$NIFT";; *) B="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-ok(){ printf '%s\n' "$2" > "$t/p.f"; out=$("$B" "$t/p.f" 2>&1); [ "$out" = "$3" ] || { echo "FAIL $1: got [$out]" >&2; exit 1; }; }
+# Owner 2026-11-10 13:26, item 4 (combined-b3-b5.md section 81): a failing or refused run reports
+# its check by name (it used to abort silently at `out=$(...)` under set -e).
+ok(){ printf '%s\n' "$2" > "$t/p.f"; local rc=0; out=$("$B" "$t/p.f" 2>&1) || rc=$?; [ "$rc" = 0 ] && [ "$out" = "$3" ] || { echo "FAIL $1: exit $rc, got [$out]" >&2; exit 1; }; }
 
 # --- MAP ---------------------------------------------------------
 ok "map get/replace/contains/remove" 'm := map()
@@ -100,14 +102,18 @@ err(){ printf '%s\n' "$2" > "$t/p.f"; if "$B" "$t/p.f" >"$t/o" 2>"$t/e"; then ec
 err "map missing get errors" 'm := map()
 m.set("a", 1)
 m.get("zz")' "get: key not found"
-ok "map marked/reference key fallback" 'h := set()
+# Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): a mutable collection as a map key
+# or set member is an approved VM-default refusal (D-NEXT-refsem #6); the legacy output stays pinned.
+. "$(dirname "$0")/runtime2/approved_refusal.sh"
+refused(){ printf '%s\n' "$3" > "$t/p.f"; approved_refusal "$B" "$1" "$2" "D-NEXT-refsem #6" "$t/p.f" "$4" || exit 1; }
+refused "map marked/reference key fallback" collection-mutable-key 'h := set()
 m := map()
 m.set(h, "handle-as-key")
 print(m.get(h))
 print(m.contains(h))
 m.remove(h)
 print(m.contains(h))' $'handle-as-key\ntrue\nfalse'
-ok "set marked/reference fallback (structural equality)" 'h1 := set(); h2 := set()
+refused "set marked/reference fallback (structural equality)" collection-mutable-key 'h1 := set(); h2 := set()
 s := set()
 s.add(h1)
 print(s.contains(h1))

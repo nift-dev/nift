@@ -26,10 +26,25 @@ EOF
 [[ "$(cd "$T/scripts" && "$NIFT" bare.f)" == 42 ]]
 [[ "$(cd "$T/scripts" && "$NIFT" spaced.f)" == 42 ]]
 [[ "$(cd "$T/scripts" && "$NIFT" legacy.f)" == 42 ]]
-repl=$(cd "$T/scripts" && printf '%s\n' 'fn(import(x)) { return 99 }' 'import("module.f")' 'answer()' | "$NIFT")
-grep -q '42' <<<"$repl"
+# Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): a function named like a built-in
+# (`import`) is an approved VM-default refusal (fn-name-reserved, D-009 #3). The session refuses that
+# first statement before running it and stops: nothing ran. Legacy (NIFT_VM=0) keeps the original
+# check (the import statement is not overridden by the user callable).
+rc=0
+repl=$(cd "$T/scripts" && printf '%s\n' 'fn(import(x)) { return 99 }' 'import("module.f")' 'answer()' | "$NIFT" 2>&1) || rc=$?
+if [[ $rc -ne 1 ]] || ! grep -qF 'NIFT_VM session refused: fn-name-reserved:' <<<"$repl" \
+   || ! grep -qF 'note: this statement was not executed' <<<"$repl" || grep -q '42\|99' <<<"$repl"; then
+    echo "FAIL REPL fn named import: not the approved session refusal (fn-name-reserved, D-009 #3): exit $rc: $repl" >&2
+    exit 1
+fi
+rc=0
+repl=$(cd "$T/scripts" && printf '%s\n' 'fn(import(x)) { return 99 }' 'import("module.f")' 'answer()' | NIFT_VM=0 "$NIFT" 2>&1) || rc=$?
+if [[ $rc -ne 0 ]] || ! grep -q '42' <<<"$repl"; then
+    echo "FAIL REPL import statement (legacy channel): exit $rc: $repl" >&2
+    exit 1
+fi
 if grep -q '99' <<<"$repl"; then
-    echo 'REPL callable dispatch overrode the import statement' >&2
+    echo 'FAIL REPL callable dispatch overrode the import statement (legacy channel)' >&2
     exit 1
 fi
 

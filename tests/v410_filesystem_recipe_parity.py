@@ -1,5 +1,7 @@
 from pathlib import Path
-import subprocess,tempfile,json,os
+import subprocess,tempfile,json,os,sys
+sys.path.insert(0,str(Path(__file__).resolve().parent/'runtime2'))
+import approved_refusal
 def native_path(path):
  if os.environ.get('MSYSTEM'):
   return subprocess.check_output(['cygpath','-m',str(path)],text=True).strip()
@@ -18,9 +20,17 @@ for row in rows:
   for file,data in [('a','A'),('b','B'),('one/a','ONE'),('two/a','TWO')]: (root/file).write_text(data)
   source=row['source'].replace('<ORACLE_ROOT>',native_path(root));path=root/'case.f';path.write_text(source+'\n')
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
+  reason=approved_refusal.refusal_reason(q.stderr)
+  if reason in approved_refusal.APPROVED:
+   # Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): an approved VM-default refusal
+   # (here fn-name-reserved, D-009 #3) is pinned exactly; the recorded legacy contract is checked on
+   # the legacy channel, NIFT_VM=0, in a fresh copy of the fixture.
+   problem=approved_refusal.check([str(binary),native_path(path)],root,reason);assert problem is None,(row['name'],problem)
+   assert not [f for f in root.rglob('*') if f.is_file() and f.name!='case.f' and f.relative_to(root).as_posix() not in ('a','b','one/a','two/a')],(row['name'],'files changed by a refused program')
+   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60,env=dict(os.environ,NIFT_VM='0'))
   files={f.relative_to(root).as_posix():f.read_text() for f in root.rglob('*') if f.is_file() and f.name!='case.f'}
   actual=dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),files=files);expected={k:row[k] for k in actual};assert actual==expected,(row['name'],actual,expected)
-  print('PASS',row['name'],flush=True)
+  print('PASS',row['name'],'(VM default: approved refusal %s; legacy channel exact)'%reason if reason in approved_refusal.APPROVED else '',flush=True)
 print('PASS all',len(rows),'exact source-count/order/origin/error/file-effect contracts')
 
 rows=json.loads((p/'v410-filesystem-pure-contracts.json').read_text())
