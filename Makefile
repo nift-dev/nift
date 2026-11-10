@@ -90,6 +90,10 @@ SAN_LIBFFI_STAMP := $(SAN_LIBFFI_BUILD)/.nift-built
 SAN_LIBFFI_A := $(SAN_LIBFFI_BUILD)/install/lib/libffi.a
 SAN_LIBFFI_INCLUDE := $(SAN_LIBFFI_BUILD)/install/include
 SAN_CPPFLAGS = $(filter-out -I$(LIBFFI_INCLUDE),$(CPPFLAGS)) -I$(SAN_LIBFFI_INCLUDE)
+# B15 (combined-b3-b5.md section 75): tests/runtime2/sanctioned_mutant.py --config san builds a
+# mutant of $(SAN_TARGET) with exactly its compile line, object set and link line.
+HARNESS_SAN_TOOLCHAIN_ENV = NIFT_TC_SAN_COMPILE="$(CXX) $(PRODUCTION_GUARD) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS)" \
+	NIFT_TC_SAN_OBJECTS="$(SAN_OBJECTS)" NIFT_TC_SAN_LINK="$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS)" NIFT_TC_SAN_LIBFFI_A="$(SAN_LIBFFI_A)"
 # Lifetime sanitizer retains stack use-after-scope instrumentation. It runs the
 # targeted lifetime corpus plus the exact file/recursion boundary oracle.
 # Keep the profiles distinct: deep recursion also exercises other runtime frames.
@@ -747,8 +751,8 @@ test-runtime2-cp13b: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp13b/adversarial/mutant_build_selftest.py
 	bash tests/runtime2/cp13b/harness_selftest.sh "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp13b/nullable_error_presentation.py --nift "$(CURDIR)/$(TARGET)" --switch-nift "$(CURDIR)/$(CP13B_SWITCH_NIFT)"
-test-runtime2-cp13b-mutants: $(TARGET)
-	PYTHON="$(PYTHON)" bash tests/runtime2/cp13b/mutation_gate.sh "$(CURDIR)/$(TARGET)"
+test-runtime2-cp13b-mutants: $(TARGET) $(SAN_TARGET)
+	PYTHON="$(PYTHON)" $(HARNESS_TOOLCHAIN_ENV) $(HARNESS_SAN_TOOLCHAIN_ENV) bash tests/runtime2/cp13b/mutation_gate.sh "$(CURDIR)/$(TARGET)"
 test-rt-vm: test-runtime2-cp13b
 test-rt-vm: test-rt-source-map
 test-rt-vm: test-rt-error-oom
@@ -1442,7 +1446,7 @@ test-runtime2-cp17-handles: $(TARGET) $(RT_STREAM_GUARD_UNIT) $(RT_UNWIND_RELEAS
 	python3 tests/runtime2/cp17/unwind_handle_release.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/handle_flow_regressions.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/runtime2/cp17/resource_contracts.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
 
 # CP17 N2 R1: production incremental decision fed by observer observations.
 N2_REBUILD_UNIT := $(TEST_DIR)/rt/n2-rebuild-decision$(EXEEXT)
@@ -1478,7 +1482,7 @@ test-runtime2-cp17-n2-rebuild: $(N2_REBUILD_UNIT)
 
 .PHONY: test-runtime2-cp17-routing-mutants
 test-runtime2-cp17-routing-mutants: $(TARGET)
-	python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) python3 tests/runtime2/cp17/routing_mutants.py --nift "$(CURDIR)/$(TARGET)"
 
 .PHONY: test-runtime2-cp17-n2 test-runtime2-cp17-tripwire
 test-runtime2-cp17-n2: $(TARGET) $(RT_N2_PARITY_UNIT) $(N2_REBUILD_UNIT)
@@ -1501,16 +1505,19 @@ test-runtime2-cp16-n1: $(TARGET) $(RT_HOST_NATIVE_UNIT)
 test-rt-vm: test-runtime2-cp16-n1
 
 .PHONY: test-rt-host-mutants
-test-rt-host-mutants: $(TARGET)
-	bash tests/runtime2/host_mutants.sh "$(CURDIR)/$(TARGET)"
+# B15 (combined-b3-b5.md section 75): the unit mutants (4, 13, 15, 16) link the unit objects;
+# mutant 13 links the host-random-budget closure, computed here as its own rule computes it.
+test-rt-host-mutants: $(TARGET) $(RT_UNIT_OBJECTS)
+	objects=$$($(RT_ISOLATION_CLOSURE)) && $(HARNESS_TOOLCHAIN_ENV) NIFT_TC_RT_UNIT_OBJECTS="$(RT_UNIT_OBJECTS)" \
+		NIFT_TC_RANDOM_BUDGET_OBJECTS="$$objects" bash tests/runtime2/host_mutants.sh "$(CURDIR)/$(TARGET)"
 
 .PHONY: test-runtime2-host-memory
 test-runtime2-host-memory: $(TARGET)
 	python3 tests/runtime2/vm_host_memory.py --nift "$(CURDIR)/$(TARGET)"
 
 .PHONY: test-runtime2-module-host-order-mutant
-test-runtime2-module-host-order-mutant:
-	bash tests/runtime2/module_host_order_mutant.sh
+test-runtime2-module-host-order-mutant: $(TARGET)
+	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/module_host_order_mutant.sh
 
 .PHONY: test-rt-host-sources-list
 test-rt-host-sources-list:
@@ -4194,6 +4201,8 @@ $(RT_PARALLEL_STUBS_OBJ): tests/rt/parallel_isolation_stubs.cpp src/rt/parallel_
 RT_ISOLATION_CLOSURE = python3 -B scripts/build/link_closure.py --seed $(RT_ISOLATION_SOURCES:.cpp=.o) \
 	$(RT_ISOLATION_STUBS_OBJ) $(RT_PARALLEL_STUBS_OBJ) --candidates $(RT_UNIT_OBJECTS) \
 	--exclude $(RT_ISOLATION_FORBIDDEN)
+# B15: the host mutant 13 link (test-rt-host-mutants) computes this closure too.
+test-rt-host-mutants: $(RT_ISOLATION_STUBS_OBJ) $(RT_PARALLEL_STUBS_OBJ)
 
 # F-2 drift guard for the parallel stubs: mangled signatures, a pinned fingerprint of the
 # production definitions, and a probe whose output must be identical linked with the real
@@ -4331,13 +4340,13 @@ test-runtime2-literals-scaling: $(TARGET)
 	python3 tests/runtime2/literals/scaling.py --nift ./$(TARGET) --runs 3
 
 test-runtime2-literals-mutants: $(TARGET)
-	bash tests/runtime2/literals/negative_control.sh "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/literals/negative_control.sh "$(CURDIR)/$(TARGET)"
 
 test-runtime2-literals-f1-negative: $(TARGET)
-	bash tests/runtime2/literals/f1_negative_control.sh "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/literals/f1_negative_control.sh "$(CURDIR)/$(TARGET)"
 
 test-runtime2-literals-decimal-negative: $(TARGET)
-	bash tests/runtime2/literals/decimal_infer_negative_control.sh "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/literals/decimal_infer_negative_control.sh "$(CURDIR)/$(TARGET)"
 
 # The same suite against the ASan/UBSan build of nift (modified prepared-path
 # literal and output evaluation under the sanitizers).

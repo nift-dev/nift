@@ -65,24 +65,21 @@ def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix="cp17-routing-mutant-") as tmp:
         root = Path(tmp)
-        # Archive the frozen source tree and apply the isolated mutant.
-        (root / "mutant").mkdir()
-        archived = subprocess.run(["bash", "-c",
-                                   f"git -C '{source_root}' archive HEAD | tar -x -C '{root / 'mutant'}'"],
-                                  capture_output=True)
-        if archived.returncode != 0:
-            print("FAIL routing mutant source archive: " + archived.stderr.decode(errors="replace"))
-            return 1
-        for patch in (PATCH, PAGE_PATCH):
-            p = subprocess.run(["patch", "-p1", "-i", str(patch)], cwd=root / "mutant",
+        # B15 (combined-b3-b5.md section 75): the two patched units are compiled with nift's own
+        # compile line into .build/mutant-nift (tests/runtime2/sanctioned_mutant.py) and linked with
+        # nift's other objects; not `make nift` in an archive of HEAD. A patch that no longer applies
+        # to the current source is a harness failure (a stale mutant), never a detection.
+        mutant_dir = source_root / ".build" / "mutant-nift" / "cp17-routing"
+        built = subprocess.run([sys.executable, "-B", str(source_root / "tests/runtime2/sanctioned_mutant.py"),
+                                "--out", str(mutant_dir), "--patch", str(PATCH), "--patch", str(PAGE_PATCH)],
                                capture_output=True, text=True)
-            if p.returncode != 0:
-                print("FAIL routing mutant patch: " + p.stdout + p.stderr)
-                return 1
-        built = subprocess.run(["make", "-j2", "nift"], cwd=root / "mutant", capture_output=True)
         if built.returncode != 0:
-            print("FAIL routing mutant build: " + built.stderr.decode(errors="replace"))
+            print("FAIL routing mutant build: " + built.stdout + built.stderr)
             return 1
+        print(built.stdout.strip().splitlines()[-1])
+        (root / "mutant").mkdir()
+        shutil.copy2(mutant_dir / "nift", root / "mutant" / "nift")
+        shutil.rmtree(mutant_dir)
         for kind in ("hook", "build", "page", "template"):
             for label, binary in (("normal", Path(args.nift).resolve()), ("mutant", root / "mutant" / "nift")):
                 proj = root / (kind + "-" + label)

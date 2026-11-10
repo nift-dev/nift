@@ -1,32 +1,38 @@
 #!/usr/bin/env bash
 # CP13B Phase B mutation and stress gate (certification tier; expensive).
 #   mutation_gate.sh /abs/path/to/nift
-# Builds every E1–E8 exception mutant from a clean tree with
-# mutant_build.py, including the checked-build E2 and the ASan E7 variants,
-# and runs run.py's mutant modes against the unmutated oracle. Then it runs the
+# Builds every E1–E8 exception mutant with tests/runtime2/sanctioned_mutant.py,
+# including the checked-build E2 and the ASan E7 variants, and runs run.py's
+# mutant modes against the unmutated oracle. Then it runs the
 # 1M-catch stress and the Error lifecycle unit (whose leak probe must fail).
 # A build failure, missing binary, crash, timeout or missing statistics is a
-# gate failure, never a detection (run.py and mutant_build.py enforce this).
+# gate failure, never a detection (run.py and sanctioned_mutant.py enforce this).
 set -u -o pipefail
 ORACLE="${1:?usage: mutation_gate.sh /abs/path/to/nift}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
 PY="${PYTHON:-python3}"
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/cp13b-mutation-gate-XXXXXX")"
-trap 'rm -rf "$OUT"' EXIT
-BASE_FLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"
-ASAN_FLAGS="-std=c++17 -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all -pthread"
+# B15 (combined-b3-b5.md section 75): each mutant is built by tests/runtime2/sanctioned_mutant.py
+# (the units naming the macros, nift's own compile line, into .build/mutant-nift; every mutant
+# object differs from production; E7 ASan from the $(SAN_TARGET) object set), not by mutant_build.py's
+# `make nift` with mutant CXXFLAGS in a clean tree, which the production build guard refuses
+# (NIFT_EXC_MUTANT on src/ParserHost.o). Run through make (test-runtime2-cp13b-mutants).
+MUTANT_DIR="$ROOT/.build/mutant-nift/cp13b"
+trap 'rm -rf "$OUT" "$MUTANT_DIR"' EXIT
 fail=0
 ran=0
 
-build() {  # build <label> <mutant> <cxxflags>
-    local label=$1 n=$2 flags=$3
-    if ! CXXFLAGS="$flags" "$PY" "$HERE/mutant_build.py" --root "$ROOT" --mutant "$n" \
-            --output "$OUT/nift-$label" >"$OUT/build-$label.log" 2>&1 || [ ! -x "$OUT/nift-$label" ]; then
+build() {  # build <label> <sanctioned_mutant.py arguments...>
+    local label=$1; shift
+    if ! "$PY" -B "$ROOT/tests/runtime2/sanctioned_mutant.py" --out "$MUTANT_DIR/$label" "$@" \
+            >"$OUT/build-$label.log" 2>&1 || [ ! -x "$MUTANT_DIR/$label/nift" ]; then
         echo "FAIL CP13B mutation gate: build of mutant $label failed (gate failure, not a detection)"
         tail -20 "$OUT/build-$label.log"
         return 1
     fi
+    grep '^built mutant' "$OUT/build-$label.log"
+    cp "$MUTANT_DIR/$label/nift" "$OUT/nift-$label" && rm -rf "$MUTANT_DIR/$label"
 }
 
 check() {  # check <label> <run.py mode flag> <n>
@@ -42,11 +48,11 @@ check() {  # check <label> <run.py mode flag> <n>
 }
 
 for n in 1 2 3 4 5 6 7 8; do
-    build "$n" "$n" "$BASE_FLAGS" || { fail=1; continue; }
+    build "$n" --define=-DNIFT_EXC_MUTANT=$n || { fail=1; continue; }
     check "$n" --mutant "$n"
 done
-build 2-checked 2 "$BASE_FLAGS -DNIFT_EXC_CHECKED=1" && check 2-checked --checked-mutant 2 || fail=1
-build 7-asan 7 "$ASAN_FLAGS" && check 7-asan --asan-mutant 7 || fail=1
+build 2-checked --define=-DNIFT_EXC_MUTANT=2 --define=-DNIFT_EXC_CHECKED=1 && check 2-checked --checked-mutant 2 || fail=1
+build 7-asan --config san --define=-DNIFT_EXC_MUTANT=7 && check 7-asan --asan-mutant 7 || fail=1
 
 # 1M-catch stress (accounted heap N-invariant within the 8 MB budget) and the
 # Error lifecycle unit (normal must pass; its leak probe must be detected).

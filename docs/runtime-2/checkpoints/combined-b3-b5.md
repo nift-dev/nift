@@ -3957,3 +3957,69 @@ owner-approved B5 semantic difference.
   returns 0. The GCC 15 run is for Linode; the recorded GCC 15 line above is covered by the
   self-check.
 - No production change: `nift` is f063f1a9….
+
+## 75. Repair batch, B15: mutants build in a sanctioned non-production directory (C87, harness)
+
+- **Cause** (triage BLOCKERS.md B15). Nine gates built their mutants by running `make nift` with
+  mutant `CXXFLAGS`, in an archive of HEAD or a clean worktree. Each such build compiled every
+  object with `compile-object.sh --production`, whose guard (tooling.md 3) correctly refuses a
+  test-only switch. Example: `NIFT_EXC_MUTANT` on `src/ParserHost.o`. Some mutant patches had
+  also gone stale. Every one of those builds was also a full tree copy plus a full build.
+- **The sanctioned build, `tests/runtime2/sanctioned_mutant.py`:**
+  - It compiles only the units the mutant changes:
+    - for a define, every source of the object set that names the macro, or whose recorded
+      dependencies (`.d`) include a header naming it;
+    - for a patch or text edit, the patched files.
+  - Each uses nift's own compile line (`$(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS)`, from
+    `HARNESS_TOOLCHAIN_ENV`, C85) and goes into `.build/mutant-nift/<name>`, a non-production
+    directory.
+  - It links them with nift's other objects. Source identity is otherwise production: the working
+    tree's own sources, not an archive of HEAD.
+  - The C75 check: each mutant object is compared with the production object. An identical one is
+    not linked and is reported. If none differs, the mutant is dead and the build fails. Compiling
+    an unchanged copy of a source gives a byte-identical object (checked), so the comparison is
+    meaningful for patched copies too.
+  - A patch or edit that no longer applies is a harness failure (a stale mutant), never a detection.
+  - Three configurations:
+    - `default` (nift);
+    - `pic` (`$(C_ABI_PIC)`, adds `-fPIC`);
+    - `san` (`$(SAN_OBJECTS)` with the sanitizer compile and link lines, `HARNESS_SAN_TOOLCHAIN_ENV`).
+  - `--unit TEST.cpp` links a unit test instead of nift, with the object set named by
+    `--objects-env`.
+  - Every caller deletes its mutant directory afterwards. `provenance.json` records the sources,
+    patches, edits, objects and hashes.
+- **The nine gates:**
+  - **test-runtime2-module-host-order-mutant** (R1): PASS, 2 mutant objects; module_host_order
+    fails in 8 cases.
+  - **test-runtime2-literals-mutants**: 4/4 PASS. **test-runtime2-literals-f1-negative**: PASS
+    (15 F1 failures).
+  - **test-runtime2-literals-decimal-negative**: PASS (6 silent divergences).
+    - The old mutant deleted a `v.is(Kind::Decimal)` line from `infer.cpp`. That code moved to
+      `infer_number.cpp` (dcdea681) as an `if` plus its `return`.
+    - The mutant is now `tests/runtime2/literals/mutants/decimal-infer.patch`, which removes that
+      branch.
+  - **test-runtime2-cp13b-mutants** (EXC): E1–E8 and the checked E2 build and are detected (9 of
+    10 checks), and stress and lifecycle PASS.
+    - E7 under ASan is built from `$(SAN_OBJECTS)` (`--config san`); the target now depends on
+      `$(SAN_TARGET)`.
+    - The full sanitizer object set (about 800 MB) does not fit this machine, so the E7 ASan
+      check is **for Linode**.
+  - **test-runtime2-cp17-routing-mutants** and **test-runtime2-cp17-handles**: PASS. The routing
+    patches called `run_script_on_vm(source, path, exit)`, a stale signature (the
+    `ParserScript.cpp:342` error). They now pass the command and arguments
+    (`std::string(), std::vector<std::string>()`), and the mutant reaches the VM selector in all
+    four kinds.
+  - **test-cp23-mutants**: PASS, 10 real mutations, 120 controls rejected.
+    - Its "build failure output-publication" on Linode was the hard-coded `g++` and libffi path
+      (as in B10). It now uses `build_toolchain`, compiles each mutated copy under its source's
+      own basename with `-iquote`, requires the object to differ from production, and deletes the
+      mutant binary and object once recorded.
+  - **test-rt-host-mutants**, the host part (`host_mutants.sh`): 13 behavioural mutants (1–9 and
+    11–14), the M10 formula control and N2 15/16 all PASS.
+    - It used 16 full builds before; each is now a sanctioned build.
+    - Unit mutants 4, 15 and 16 link `$(RT_UNIT_OBJECTS)`. Mutant 13 links the host-random-budget
+      closure, computed as its rule computes it; stub objects without a source are linked unchanged.
+    - The N2 rebuild-decision witness keeps its existing private rule; its products are removed.
+    - The cp17 parts of test-rt-host-mutants are the routing gate above, the handle and N2 gates
+      (unchanged), and the unwind gate (B22, section 76).
+- No production change: `nift` is f063f1a9….

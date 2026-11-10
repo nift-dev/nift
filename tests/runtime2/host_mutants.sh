@@ -2,32 +2,40 @@
 # CP16 host-builtin negative controls: each mutant must fail the VM host suite
 # (or, for the dependency-recording mutant, the native observer unit). A build
 # failure is a harness failure, never a successful detection.
+# B15 (combined-b3-b5.md section 75): each mutant is built by tests/runtime2/sanctioned_mutant.py
+# (only the units the define changes, nift's own compile line, into .build/mutant-nift; every
+# mutant object differs from production), linked as nift or as the unit test named, not by
+# `make nift` with mutant CXXFLAGS in an archive of HEAD (16 full builds), which the production
+# build guard refuses. Run through make (test-rt-host-mutants), after nift and the unit objects.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 ORACLE=${1:-"$ROOT/nift"}
 TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-
-for mutant in 1 2 3 5; do
-    BUILD="$TMP/m$mutant"
-    mkdir -p "$BUILD"
-    git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-    if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-        CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
-        >"$TMP/build-$mutant.log" 2>&1; then
-        echo "FAIL host mutant $mutant: build failed (harness failure)" >&2
-        tail -20 "$TMP/build-$mutant.log" >&2
+MUTANTS="$ROOT/.build/mutant-nift/host"
+trap 'rm -rf "$TMP" "$MUTANTS" "$ROOT"/.build/rt/n2-rebuild-mutants/1[56] "$ROOT"/.build/rt/n2-rebuild-decision-m1[56]' EXIT
+# mutant N [sanctioned_mutant.py arguments]: build mutant N into $MUTANTS/mN (BUILD)
+mutant() {
+    local n=$1; shift
+    BUILD="$MUTANTS/m$n"
+    if ! python3 -B "$ROOT/tests/runtime2/sanctioned_mutant.py" --out "$BUILD" --define=-DNIFT_HOST_MUTANT=$n "$@" \
+        >"$TMP/build-$n.log" 2>&1; then
+        echo "FAIL host mutant $n: build failed (harness failure)" >&2
+        tail -20 "$TMP/build-$n.log" >&2
         exit 1
     fi
+    grep '^built mutant' "$TMP/build-$n.log"
+}
+
+for mutant in 1 2 3 5; do
+    mutant $mutant
     if [ "$mutant" = "3" ]; then
-        if ! python3 "$BUILD/tests/runtime2/host_m3_order.py" --nift "$BUILD/nift" --oracle "$ORACLE"             >"$TMP/test-$mutant.log" 2>&1; then
+        if ! python3 "$ROOT/tests/runtime2/host_m3_order.py" --nift "$BUILD/nift" --oracle "$ORACLE"             >"$TMP/test-$mutant.log" 2>&1; then
             echo "FAIL host mutant 3: deterministic M3 ordering witness failed" >&2
             cat "$TMP/test-$mutant.log" >&2
             exit 1
         fi
         echo "PASS host mutant 3: deterministic sorted-ls witness rejected the mutant"
-        if NIFT_M3_TEST_SORTED=1 python3 "$BUILD/tests/runtime2/host_m3_order.py" \
+        if NIFT_M3_TEST_SORTED=1 python3 "$ROOT/tests/runtime2/host_m3_order.py" \
             --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-3-sorted.log" 2>&1; then
             echo "FAIL host mutant 3: sorted-order control was accepted as established" >&2
             cat "$TMP/test-3-sorted.log" >&2
@@ -41,7 +49,7 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         echo "PASS host mutant 3: unestablished sorted-order witness is rejected"
         continue
     fi
-    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-$mutant.log" 2>&1; then
+    if env TMPDIR=/tmp python3 "$ROOT/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: vm_host tests passed (mutant not caught)" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
@@ -49,54 +57,24 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
     echo "PASS host mutant $mutant: vm_host tests rejected the mutant"
 done
 
-BUILD="$TMP/m4"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" -j"${JOBS:-4}" .build/rt/host-native-unit \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=4" \
-    >"$TMP/build-4.log" 2>&1; then
-    echo "FAIL host mutant 4: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-4.log" >&2
-    exit 1
-fi
-if "$BUILD/.build/rt/host-native-unit" >"$TMP/test-4.log" 2>&1; then
+mutant 4 --objects-env NIFT_TC_RT_UNIT_OBJECTS --unit tests/rt/host_observer_native.cpp
+if "$BUILD/unit" >"$TMP/test-4.log" 2>&1; then
     echo "FAIL host mutant 4: observer test passed (mutant not caught)" >&2
     cat "$TMP/test-4.log" >&2
     exit 1
 fi
 echo "PASS host mutant 4: observer test rejected the mutant"
 
-BUILD="$TMP/m6"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=6" \
-    >"$TMP/build-6.log" 2>&1; then
-    echo "FAIL host mutant 6: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-6.log" >&2
-    exit 1
-fi
-if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-6.log" 2>&1; then
+mutant 6
+if env TMPDIR=/tmp python3 "$ROOT/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-6.log" 2>&1; then
     echo "FAIL host mutant 6: memory test passed (mutant not caught)" >&2
     cat "$TMP/test-6.log" >&2
     exit 1
 fi
 echo "PASS host mutant 6: late open budget check rejected"
 
-BUILD="$TMP/m7"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=7" \
-    >"$TMP/build-7.log" 2>&1; then
-    echo "FAIL host mutant 7: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-7.log" >&2
-    exit 1
-fi
-if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-7.log" 2>&1; then
+mutant 7
+if env TMPDIR=/tmp python3 "$ROOT/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-7.log" 2>&1; then
     echo "FAIL host mutant 7: memory test passed (mutant not caught)" >&2
     cat "$TMP/test-7.log" >&2
     exit 1
@@ -104,18 +82,8 @@ fi
 echo "PASS host mutant 7: unbounded glob traversal rejected"
 
 for mutant in 8 9 10 12; do
-    BUILD="$TMP/m$mutant"
-    mkdir -p "$BUILD"
-    git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-    if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-        CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
-        >"$TMP/build-$mutant.log" 2>&1; then
-        echo "FAIL host mutant $mutant: build failed (harness failure)" >&2
-        tail -20 "$TMP/build-$mutant.log" >&2
-        exit 1
-    fi
-    if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
+    mutant $mutant
+    if env TMPDIR=/tmp python3 "$ROOT/tests/runtime2/vm_host_memory.py" --nift "$BUILD/nift" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL host mutant $mutant: memory test passed (mutant not caught)" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
@@ -137,36 +105,16 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         echo "PASS host mutant $mutant: memory test rejected the mutant"
     fi
 done
-BUILD="$TMP/m11"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=11" \
-    >"$TMP/build-11.log" 2>&1; then
-    echo "FAIL host mutant 11: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-11.log" >&2
-    exit 1
-fi
-if env TMPDIR=/tmp python3 "$BUILD/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-11.log" 2>&1; then
+mutant 11
+if env TMPDIR=/tmp python3 "$ROOT/tests/runtime2/vm_host.py" --nift "$BUILD/nift" --oracle "$ORACLE" >"$TMP/test-11.log" 2>&1; then
     echo "FAIL host mutant 11: vm_host tests passed (mutant not caught)" >&2
     cat "$TMP/test-11.log" >&2
     exit 1
 fi
 echo "PASS host mutant 11: symlink parity tests rejected the mutant"
 # M13: secure_random_bytes checks the budget only after allocating its buffer.
-BUILD="$TMP/m13"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" .build/rt/host-random-budget \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=13" \
-    >"$TMP/build-13.log" 2>&1; then
-    echo "FAIL host mutant 13: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-13.log" >&2
-    exit 1
-fi
-if "$BUILD/.build/rt/host-random-budget" >"$TMP/test-13.log" 2>&1; then
+mutant 13 --objects-env NIFT_TC_RANDOM_BUDGET_OBJECTS --unit tests/rt/host_random_budget.cpp
+if "$BUILD/unit" >"$TMP/test-13.log" 2>&1; then
     echo "FAIL host mutant 13: random budget test passed (mutant not caught)" >&2
     cat "$TMP/test-13.log" >&2
     exit 1
@@ -186,19 +134,9 @@ if ! python3 "$ROOT/tests/runtime2/cp16_n1.py" --nift "$ORACLE" >"$TMP/n1-baseli
     cat "$TMP/n1-baseline.log" >&2
     exit 1
 fi
-BUILD="$TMP/m14"
-mkdir -p "$BUILD"
-git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-if ! make -C "$BUILD" -j"${JOBS:-4}" nift \
-    CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=14" \
-    >"$TMP/build-14.log" 2>&1; then
-    echo "FAIL host mutant 14: build failed (harness failure)" >&2
-    tail -20 "$TMP/build-14.log" >&2
-    exit 1
-fi
+mutant 14
 set +e
-python3 "$BUILD/tests/runtime2/cp16_n1.py" --nift "$BUILD/nift" --expect-mutant >"$TMP/test-14.log" 2>&1
+python3 "$ROOT/tests/runtime2/cp16_n1.py" --nift "$BUILD/nift" --expect-mutant >"$TMP/test-14.log" 2>&1
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then
@@ -217,18 +155,8 @@ echo "PASS host negative controls: 13 behavioural mutants rejected (1-9, 11-14);
 # N2: cp source-read and mv source-absence observations. The host-native unit
 # has the direct observer checks; the mutant must make that unit fail.
 for mutant in 15 16; do
-    BUILD="$TMP/m$mutant"
-    mkdir -p "$BUILD"
-    git -C "$ROOT" archive HEAD | tar -x -C "$BUILD"
-rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
-    if ! make -C "$BUILD" -j"${JOBS:-4}" .build/rt/host-native-unit \
-        CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_HOST_MUTANT=$mutant" \
-        >"$TMP/build-$mutant.log" 2>&1; then
-        echo "FAIL N2 mutant $mutant: build failed (harness failure)" >&2
-        tail -20 "$TMP/build-$mutant.log" >&2
-        exit 1
-    fi
-    if "$BUILD/.build/rt/host-native-unit" >"$TMP/test-$mutant.log" 2>&1; then
+    mutant $mutant --objects-env NIFT_TC_RT_UNIT_OBJECTS --unit tests/rt/host_observer_native.cpp
+    if "$BUILD/unit" >"$TMP/test-$mutant.log" 2>&1; then
         echo "FAIL N2 mutant $mutant: observer checks passed (mutant not caught)" >&2
         cat "$TMP/test-$mutant.log" >&2
         exit 1
@@ -240,12 +168,14 @@ rm -rf "$BUILD/.build" "$BUILD/nift"; find "$BUILD" -name '*.o' -delete
         exit 1
     fi
     echo "PASS N2 mutant $mutant: host observer checks rejected the mutant"
-    if ! make -C "$BUILD" -j"${JOBS:-4}" N2_REBUILD_MUTANT=$mutant         ".build/rt/n2-rebuild-decision-m$mutant" >"$TMP/rebuild-$mutant-build.log" 2>&1; then
+    # The rebuild-decision witness has its own private mutant rule (Makefile, N2_REBUILD_MUTANT_DIR).
+    if ! make -C "$ROOT" N2_REBUILD_MUTANT=$mutant ".build/rt/n2-rebuild-decision-m$mutant" \
+        >"$TMP/rebuild-$mutant-build.log" 2>&1; then
         echo "FAIL N2 mutant $mutant: rebuild-decision build failed (harness failure)" >&2
         tail -20 "$TMP/rebuild-$mutant-build.log" >&2
         exit 1
     fi
-    if ! NIFT_N2_MUTANT=$mutant "$BUILD/.build/rt/n2-rebuild-decision-m$mutant" \
+    if ! NIFT_N2_MUTANT=$mutant "$ROOT/.build/rt/n2-rebuild-decision-m$mutant" \
         >"$TMP/rebuild-$mutant.log" 2>&1; then
         echo "FAIL N2 mutant $mutant: rebuild-decision witness rejected the intended mutant" >&2
         cat "$TMP/rebuild-$mutant.log" >&2

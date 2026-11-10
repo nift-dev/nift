@@ -25,7 +25,7 @@ test-cp23-cp19-combined: $(TARGET) $(CP13B_SWITCH_NIFT)
 	$(PYTHON) tests/runtime2/cp23/cp19_combined.py --nift "$(CURDIR)/$(TARGET)" --switch "$(CURDIR)/$(CP13B_SWITCH_NIFT)" \
 	  --output "$(TEST_DIR)/cp23-cp19-combined.json"
 test-cp23-mutants: $(TEST_DIR)/rt/cp23-ownership-unit $(TEST_DIR)/rt/cp23-parallel-unit
-	$(PYTHON) tests/runtime2/cp23/mutations.py --evidence "$(TEST_DIR)/cp23-mutants-evidence"
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) tests/runtime2/cp23/mutations.py --evidence "$(TEST_DIR)/cp23-mutants-evidence"
 test-cp23-allocation: $(TEST_DIR)/rt/cp23-allocation-unit
 	@set -e; for mode in awaited unawaited cancelled cycle; do for p in "" --persistent; do \
 	  $(PYTHON) tests/runtime2/cp23/allocation.py --binary "$(TEST_DIR)/rt/cp23-allocation-unit" --mode $$mode $$p \

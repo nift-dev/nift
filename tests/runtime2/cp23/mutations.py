@@ -4,6 +4,8 @@ assertion failure and a completed suite. Signals, dead binaries, build failures
 and timeouts are harness failures, never mutation detections."""
 import argparse,hashlib,json,pathlib,subprocess,sys
 ROOT=pathlib.Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(ROOT/'tests/runtime2'))
+import build_toolchain as toolchain
 parser=argparse.ArgumentParser();parser.add_argument('--evidence',type=pathlib.Path,required=True);args=parser.parse_args();args.evidence.mkdir(parents=True,exist_ok=True)
 def run(cmd,timeout=120):
  return subprocess.run(cmd,cwd=ROOT,capture_output=True,text=True,timeout=timeout)
@@ -36,11 +38,18 @@ for name,source,old,new,signature in mutants:
  folder=ROOT/'.build/cp23-mutants'/name;folder.mkdir(parents=True,exist_ok=True)
  text=(ROOT/source).read_text()
  if text.count(old)!=1:raise SystemExit('ambiguous mutation '+name)
- altered=folder/'mutated.cpp';altered.write_text(text.replace(old,new));obj=folder/'mutated.o';binary=folder/'unit'
- commands=[['g++','-Isrc','-Iinclude','-std=c++17','-O2','-pthread','-c',str(altered),'-o',str(obj)],['g++','-Isrc','-Iinclude','-Itests/rt','-std=c++17','-O2','-pthread',('tests/runtime2/cp23/'+unit_for(name).replace('-','_')+'_unit.cpp'),*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl','.build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a','-o',str(binary)]]
+ altered=folder/pathlib.Path(source).name;altered.write_text(text.replace(old,new));obj=folder/'mutated.o';binary=folder/'unit'
+ # B15 (combined-b3-b5.md section 75): nift's compile line for the mutated unit (into this
+ # non-production folder; -iquote keeps its "..." includes) and the test-unit line for the link,
+ # from the Makefile (tests/runtime2/build_toolchain.py), not `g++` and a hard-coded libffi path.
+ # The mutant object must differ from the production one (the C75 check).
+ if source[:-4]+'.o' not in objects:raise SystemExit('not in the CP23 object set: '+source)
+ commands=[toolchain.production_compile('-iquote',str(pathlib.Path(source).parent),'-c',str(altered),'-o',str(obj)),
+           toolchain.test_compile('tests/runtime2/cp23/'+unit_for(name).replace('-','_')+'_unit.cpp',*[p for p in objects if p!=source[:-4]+'.o'],str(obj),'-ldl',toolchain.libffi_a(),'-o',str(binary))]
  for cmd in commands:
   p=run(cmd);(args.evidence/(name+'-build.log')).open('a').write(p.stdout+p.stderr)
-  if p.returncode:raise SystemExit('build failure '+name)
+  if p.returncode:sys.stderr.write(p.stdout+p.stderr);raise SystemExit('build failure '+name)
+ if obj.read_bytes()==(ROOT/(source[:-4]+'.o')).read_bytes():raise SystemExit('mutant object identical to production: '+name)
  p=run([str(binary)]);output=p.stdout+p.stderr;(args.evidence/(name+'.log')).write_text(output)
  # The atom witness embeds a newline before the diagnostic closing bracket.
  was_detected=detected(name,signature,p.returncode,output)
@@ -48,6 +57,7 @@ for name,source,old,new,signature in mutants:
  results.append(row);(args.evidence/'results.json').write_text(json.dumps(results,indent=2)+'\n')
  if not was_detected:raise SystemExit('not detected '+name)
  print('DETECTED',name,flush=True)
+ binary.unlink();obj.unlink()  # B15: mutant products are removed once recorded
 controls=[]
 rejected_normal=run([str(ROOT/'.build/rt/cp23-rejected-wait-unit')])
 rejected_normal_output=rejected_normal.stdout+rejected_normal.stderr

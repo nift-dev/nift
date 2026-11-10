@@ -12,7 +12,7 @@
 +    // Independent review sabotage: force the actual protected script through
 +    // the existing VM selector, without implementing a production page path.
 +    int routed_exit = 0;
-+    if (nift::rt::run_script_on_vm(source, source_path, routed_exit)) {
++    if (nift::rt::run_script_on_vm(source, source_path, std::string(), std::vector<std::string>(), routed_exit)) {
 +        RenderResult routed;
 +        routed.ok = routed_exit == 0;
 +        if (!routed.ok) routed.error.message = "review routing mutant: actual hook VM selection refused";
