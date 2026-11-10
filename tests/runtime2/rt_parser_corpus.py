@@ -111,7 +111,10 @@ NORMALISE_POS = re.compile(r"(\.f):(\d+):\d+")
 
 def run_nift(nift, workdir, script):
     env = {"PATH": os.environ.get("PATH", ""), "HOME": os.path.join(workdir, ".home"), "LANG": "C", "LC_ALL": "C",
-           "TZ": "UTC", "TMPDIR": os.path.join(workdir, ".tmp")}
+           "TZ": "UTC", "TMPDIR": os.path.join(workdir, ".tmp"),
+           # B28 (combined-b3-b5.md section 80): the paren oracle compares legacy runs (NIFT_VM=0;
+           # before the VM default, 0503062d, an unset NIFT_VM meant legacy).
+           "NIFT_VM": "0"}
     os.makedirs(env["HOME"], exist_ok=True)
     os.makedirs(env["TMPDIR"], exist_ok=True)
     try:

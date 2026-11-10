@@ -4179,3 +4179,32 @@ owner-approved B5 semantic difference.
   - The other four families' full runs are long and were not repeated here. Their edit is the same
     line, which can only add a failure; they run in certification.
 - Production source: comments only. `nift` is f063f1a9… before and after.
+
+## 80. Repair batch, B28: stale legacy-path expectations re-derived for the VM default (C92, tests)
+
+**Method** (owner-approved B28):
+- No golden file was regenerated; every recorded oracle is kept as it was.
+- An expectation recorded from legacy is now checked on the **legacy channel** (`NIFT_VM=0`). Before
+  the VM default (0503062d), an unset `NIFT_VM` meant legacy.
+- Where a gate also checks the VM default, only an approved difference is accepted, and it is pinned
+  exactly. Every other difference still fails.
+- The frozen originals are the HEAD versions; their sha256 are recorded below.
+
+**Results, per gate** (local, GCC 13). The originals were at 51f15127.
+
+| Gate | Cause | Correction | Result | Original sha256 (first 16 hex) |
+| --- | --- | --- | --- | --- |
+| test-v410-object-member-guard, -callback-overlay-guard, -glob-relative-guard, -glob-prefix-guard, test-v48-callback-guard, test-v49-glob-key-guard | They count legacy internals (object-member scans, callback overlays and the prepared cache, glob paths and keys). Under the VM default their programs never reach those paths, so the counters are 0. | `NIFT_VM=0` in the six recipes (Makefile comment at `OBJECT_LOOKUP_GUARD`). Each fails without it and passes with it. | 6 PASS | Makefile recipes |
+| test-v410-native-dispatch-parity | The 15 recorded results are legacy's. Under the VM default, 5 are refused before execution. | Exact on the legacy channel. Under the VM default, each case must equal the recorded result or be a refusal before execution: exit 1, no stdout, and the refusal's own lines. | PASS: 10 equal, 5 refused | `568024dcddc42199` |
+| test-cp19-shared-eval | `NIFT_VM=require` refusals used to name `NIFT_VM=require`. The VM-default wording (0503062d) gives the refusal and "no part of it ran". | Assert exit 1, no stdout, `not compiled for the VM (`, and the note. | PASS | eval_entry.py `3310af1d4d5b7d48` |
+| test-cp19-expression-development; test-cp19-r1 (its review matrix) | A function value: legacy prints its internal callable tag; the VM gives `eval: opaque runtime value is not serializable` (exit 2). This is the approved B4 behaviour (b4-dispatch.md 6, owner: no internal tag). | Accepted only where legacy's output holds the callable tag and the VM's is exactly that error, with the same effects (marker). | PASS (165 observations; 135-observation matrix) | expressions_complete.py `5082c6ab4897a13a`, check_review_matrix.py `86eb03f06ad23438` |
+| test-rt-parser, test-rt-parser-asan | Since a5179308 (CP23), rt parses the removed call form `await(...)` as a call of `await`, and the compiler refuses it with legacy's message. The unit expected `Opaque [legacy-runtime-error]`. The corpus's legacy runs and the negative gate's legacy oracle ran the VM default. | The unit expects the call shape. The paren oracle and the negative gate run legacy (`NIFT_VM=0`). The negative gate accepts a regular `await(...)` only when the VM default refuses it before running, with that message. | test-rt-parser PASS (unit; negative gate 0 failures; paren oracle 0 divergent); test-rt-parser-asan PASS | parser_unit.cpp `6bf018d25a957e1c`, rt_parser_corpus.py `ed209468bb440232`, rt_parser_negative.py `5407ec38d1a5fa00` |
+| test-runtime2-diagnostics | The baseline corpus is "what legacy prints today", but it ran the VM default (31 FAIL). | Without `--vm`, the runner sets `NIFT_VM=0`. | baseline 89 cases, 0 fail; changes/old 34, 0 fail; changes/new 34, 0 fail; codes_check 0 problems | run.sh `5b7e1ac692e57c0f` |
+| test-runtime2-vm-corpus | The goldens are legacy's (124 FAIL lines under the VM default). | `NIFT_VM=0`. `NIFT_VM_CORPUS_EXPECT=r2` still runs the default engine against the intended Runtime 2.0 goldens. | PASS, 180 scripts | vm_corpus.sh `7b3cb3cfad6bb2ae` |
+| test-runtime2-prevalidate-gate | | fixed in C73 | | |
+| test-rt-builtins-probe | | fixed in C68 | | |
+
+- The approved differences used are exactly two: the VM-default refusal before execution, and a
+  function value having no shown form. No unapproved behavioural difference turned up in these
+  gates.
+- No production change: `nift` is f063f1a9….

@@ -47,6 +47,21 @@ SHAPE_ERRORS = re.compile(
     r"keys must be double-quoted|expected 'key: value'|empty member|missing value for key|"
     r"declaration requires an identifier|assignment requires an identifier")
 
+REMOVED_AWAIT = "await(...) was removed; use 'await future' or 'await async_fn(args)'"
+
+
+def vm_refuses_removed_await(nift, path):
+    """The VM default refuses the program with legacy's removed-await message before running it."""
+    work = os.path.dirname(path)
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": work, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
+           "TMPDIR": work}
+    r = subprocess.run([nift, os.path.basename(path)], cwd=work, env=env, capture_output=True,
+                       stdin=subprocess.DEVNULL, timeout=30)
+    err = r.stderr.decode("utf-8", "replace")
+    return (r.returncode == 1 and not r.stdout and "not compiled for the VM (" + REMOVED_AWAIT + ")" in err
+            and "no part of it ran" in err)
+
+
 UNBOUND_NAME = re.compile(r"unknown value or malformed expression: [A-Za-z_][A-Za-z0-9_]*\s*$")
 
 PRELUDE = """a := 3
@@ -188,7 +203,7 @@ def rt_check(dump, files):
 def run_legacy(nift, path):
     work = os.path.dirname(path)
     env = {"PATH": os.environ.get("PATH", ""), "HOME": work, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
-           "TMPDIR": work}
+           "TMPDIR": work, "NIFT_VM": "0"}  # B28 (combined-b3-b5.md section 80): the legacy oracle
     try:
         r = subprocess.run([nift, os.path.basename(path)], cwd=work, env=env, capture_output=True,
                            stdin=subprocess.DEVNULL, timeout=30)
@@ -255,6 +270,11 @@ def main():
             m = SHAPE_ERRORS.search(err)
             if m and UNBOUND_NAME.search(err):
                 m = None  # an unbound name is reported with the same message: a value error
+            if m and REMOVED_AWAIT in err and vm_refuses_removed_await(nift, path):
+                # B28 (combined-b3-b5.md section 80): since a5179308 (CP23) rt parses the removed call
+                # form `await(...)` as a call of `await`, and the compiler refuses it with legacy's own
+                # message before anything runs (compiler_thread.cpp), so it never runs on the VM.
+                m = None
             if m:
                 return "legacy shape error: " + err.strip().splitlines()[-1].replace(os.path.dirname(path) + "/", "")
             if kinds[path] == "expr":

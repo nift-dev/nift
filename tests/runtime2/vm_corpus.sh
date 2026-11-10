@@ -18,6 +18,11 @@ W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 # LANG or shared working copy).
 # NIFT_VM_CORPUS_EXPECT=r2 compares against the intended Runtime 2.0 goldens
 # (<name>.r2.stdout/.r2.stderr/.r2.exit, D-009) where they exist.
+# B28 (combined-b3-b5.md section 80): the goldens are legacy's, so legacy runs them (NIFT_VM=0;
+# before the VM default, 0503062d, an unset NIFT_VM meant legacy). NIFT_VM_CORPUS_EXPECT=r2 runs
+# the default engine against the intended Runtime 2.0 goldens.
+engine=(NIFT_VM=0)
+[ "${NIFT_VM_CORPUS_EXPECT:-}" = r2 ] && engine=()
 for dir in "$HERE"/vm-corpus/*/ "$HERE"/semantics/; do
   name="$(basename "$dir")"
   for f in "$dir"*.f; do
@@ -25,7 +30,7 @@ for dir in "$HERE"/vm-corpus/*/ "$HERE"/semantics/; do
     rm -rf "$W/$name" "$W/home" "$W/tmp"; mkdir -p "$W/$name" "$W/home" "$W/tmp"
     (cd "$dir" && find . -type f ! -name '*.stdout' ! -name '*.stderr' ! -name '*.exit' -exec cp --parents {} "$W/$name/" \;)
     real="$(cd "$W/$name" && pwd -P)"
-    ( cd "$W/$name" && env -i PATH="$PATH" HOME="$W/home" TMPDIR="$W/tmp" LANG=C LC_ALL=C TZ=UTC \
+    ( cd "$W/$name" && env -i PATH="$PATH" HOME="$W/home" TMPDIR="$W/tmp" LANG=C LC_ALL=C TZ=UTC "${engine[@]}" \
         timeout 20 "$NIFT" "$b.f" >"$W/out" 2>"$W/err" </dev/null; echo $? >"$W/exit" )
     for s in out err; do sed -i "s#$real#\$ROOT#g; s#$W/$name#\$ROOT#g" "$W/$s"; done
     for k in out:stdout err:stderr exit:exit; do

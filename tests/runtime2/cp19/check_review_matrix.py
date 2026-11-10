@@ -20,7 +20,13 @@ for name in names:
         vm, legacy = stat['vm_executions'], stat['legacy_executions']
         assert vm + legacy <= 1, row
         if mode == '1' or (mode == 'require' and vm):
-            assert all(row[k] == baseline[k] for k in ['exit','stdout','stderr','marker']), (baseline,row)
+            # B28 (combined-b3-b5.md section 80): the one approved difference. A function has no shown
+            # form on the VM (b4-dispatch.md 6, owner: no internal tag): where legacy prints its internal
+            # callable tag, the VM gives stringify's ordinary error, with the same effects (marker).
+            tagged = '\\u001fnift:callable:' in baseline['stdout'] or '\x1fnift:callable:' in baseline['stdout']
+            approved = (tagged and vm and (row['exit'], row['stdout'], row['stderr']) ==
+                        (2, '', 'eval: opaque runtime value is not serializable\n') and row['marker'] == baseline['marker'])
+            assert approved or all(row[k] == baseline[k] for k in ['exit','stdout','stderr','marker']), (baseline,row)
             if vm:
                 assert stat['outcome'] in ['vm','vm-error'], row
             else:

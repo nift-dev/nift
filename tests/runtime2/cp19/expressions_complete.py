@@ -53,7 +53,12 @@ for expression in expressions:
             assert len(rows) == 1, row
             s = rows[0]
             if mode in ['1','require']:
-                assert (p.returncode,p.stdout,p.stderr) == baseline, (baseline,row)
+                # B28 (combined-b3-b5.md section 80): the one approved difference. A function has no
+                # shown form on the VM (b4-dispatch.md 6, owner: no internal tag): where legacy prints
+                # its internal callable tag, the VM gives stringify's ordinary error.
+                tagged = '\x1fnift:callable:' in baseline[1] or '\\u001fnift:callable:' in baseline[1]
+                if not (tagged and (p.returncode,p.stdout,p.stderr) == (2,'','eval: opaque runtime value is not serializable\n')):
+                    assert (p.returncode,p.stdout,p.stderr) == baseline, (baseline,row)
                 assert s['vm_executions'] == 1 and s['legacy_executions'] == 0, row
                 assert s['outcome'] in ['vm','vm-error'], row
             else:

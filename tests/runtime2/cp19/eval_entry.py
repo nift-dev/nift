@@ -115,7 +115,10 @@ def main():
             assert len(rows) == 1 and rows[0]['outcome'] == 'fallback', rows
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 1), rows
             refused, rows = run(['eval', expression], 'require')
-            assert refused[0] == 1 and 'NIFT_VM=require' in refused[2], refused
+            # B28 (combined-b3-b5.md section 80): the refusal wording of the VM default (0503062d,
+            # "no silent legacy fallback"); it used to name NIFT_VM=require.
+            assert (refused[0] == 1 and refused[1] == '' and 'not compiled for the VM (' in refused[2]
+                    and 'note: the program was not executed: no part of it ran' in refused[2]), refused
             assert rows[0]['outcome'] == 'require-error', rows
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 0), rows
 

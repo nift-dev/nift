@@ -2470,7 +2470,7 @@ $(LAMBDA_CACHE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TES
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LDLIBS) -o $@
 
 test-v48-callback-guard: $(LAMBDA_CACHE_GUARD)
-	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v48_callback_guard.py
+	NIFT_VM=0 NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v48_callback_guard.py
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh
@@ -3814,7 +3814,7 @@ $(GLOB_KEY_GUARD): $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_D
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHostHelpers.o $(LDLIBS) -o $@
 .PHONY: test-v49-glob-key-guard
 test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
-	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py
+	NIFT_VM=0 NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py
 
 JSON_PREFLIGHT_GUARD := $(TEST_DIR)/nift-json-preflight-guard$(EXEEXT)
 $(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp src/RuntimeValue.h src/RuntimeJson.h
@@ -3863,6 +3863,9 @@ $(TEST_DIR)/object-lookup/RuntimeValue.o: src/RuntimeValue.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_OBJECT_LOOKUP_STATS -MMD -MP -c $< -o $@
 
 -include $(TEST_DIR)/object-lookup/RuntimeValue.d
+# B28 (combined-b3-b5.md section 80): the legacy-engine guards (object-member scans, callback
+# overlays and the prepared cache, glob paths and keys) count legacy internals, so they run the legacy
+# channel, NIFT_VM=0; under the VM default their programs never reach those paths (counters 0).
 OBJECT_LOOKUP_GUARD := $(TEST_DIR)/nift-object-lookup-guard$(EXEEXT)
 $(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_DIR)/object-lookup/RuntimeValue.o $(LIBFFI_A)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
@@ -3870,7 +3873,7 @@ $(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_D
 
 .PHONY: test-v410-object-member-guard
 test-v410-object-member-guard: $(OBJECT_LOOKUP_GUARD)
-	python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
+	NIFT_VM=0 python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
 
 test: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
 
@@ -3891,7 +3894,7 @@ $(GLOB_RELATIVE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TE
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-relative-guard test-v410-glob-parity
 test-v410-glob-relative-guard: $(GLOB_RELATIVE_GUARD)
-	NIFT="$(CURDIR)/$(GLOB_RELATIVE_GUARD)" python3 tests/v410_glob_relative_guard.py
+	NIFT_VM=0 NIFT="$(CURDIR)/$(GLOB_RELATIVE_GUARD)" python3 tests/v410_glob_relative_guard.py
 test-v410-glob-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_glob_parity.py
 test: test-v410-glob-relative-guard test-v410-glob-parity
@@ -3914,7 +3917,7 @@ test: test-v410-callback-overlay-parity
 
 .PHONY: test-v410-callback-overlay-guard
 test-v410-callback-overlay-guard: $(LAMBDA_CACHE_GUARD)
-	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v410_callback_overlay_guard.py
+	NIFT_VM=0 NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v410_callback_overlay_guard.py
 
 test: test-v410-callback-overlay-guard
 
@@ -3932,7 +3935,7 @@ $(GLOB_PREFIX_GUARD): $(filter-out src/ParserHostHelpers.o src/ParserExpression.
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHostHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHostHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LDLIBS) -o $@
 .PHONY: test-v410-glob-prefix-guard test-v410-glob-prefix-parity
 test-v410-glob-prefix-guard: $(GLOB_PREFIX_GUARD)
-	NIFT_PREFIX_STATS=$(abspath $(GLOB_PREFIX_GUARD)) $(PYTHON) tests/v410_glob_prefix_guard.py
+	NIFT_VM=0 NIFT_PREFIX_STATS=$(abspath $(GLOB_PREFIX_GUARD)) $(PYTHON) tests/v410_glob_prefix_guard.py
 test-v410-glob-prefix-parity: $(TARGET)
 	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_glob_prefix_parity.py
 test: test-v410-glob-prefix-guard test-v410-glob-prefix-parity

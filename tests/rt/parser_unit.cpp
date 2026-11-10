@@ -152,7 +152,10 @@ void review_findings() {
     // D1/D2 await
     contains("print(await f() + 1)", irr);
     contains("x := await f() * 2", irr);
-    contains("print(await(f()))", lre);
+    // B28 (combined-b3-b5.md section 80): since a5179308 (CP23) the removed call form `await(...)`
+    // parses as a call of the name `await`; the compiler refuses it with legacy's run-time message
+    // (compiler_thread.cpp), so it is still never run on the VM.
+    contains("print(await(f()))", "Ident @6..11 `await`");
     contains("x := await\tf()", lre);
     contains("await := 1", "Opaque");
     contains("print(1 + await f())", "Await");

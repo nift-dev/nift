@@ -94,7 +94,9 @@ pass=0; fail=0; changed=0; superseded=0; n=0
 run_env() {  # run_env DIR CMD...
   local dir="$1"; shift
   local vmenv=()
-  if [ "$VM" = 1 ]; then vmenv=(NIFT_VM=1 NIFT_VM_STATS="$W/stats.jsonl"); fi
+  # B28 (combined-b3-b5.md section 80): without --vm the corpus is legacy's, so legacy runs it
+  # (NIFT_VM=0); before the VM default (0503062d) an unset NIFT_VM meant legacy.
+  if [ "$VM" = 1 ]; then vmenv=(NIFT_VM=1 NIFT_VM_STATS="$W/stats.jsonl"); else vmenv=(NIFT_VM=0); fi
   ( cd "$dir" && env -i PATH="$PATH" HOME="$W/home" TMPDIR="$W/tmp" LANG=C LC_ALL=C TZ=UTC "${vmenv[@]}" \
       timeout 20 "$@" >"$W/out" 2>"$W/err" </dev/null; echo $? >"$W/exit" )
 }
