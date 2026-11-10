@@ -36,14 +36,23 @@ deterministically and that legacy still runs it.
 
 ## Approved refusals (release behaviour)
 
-These constructs are refused on the VM by an owner ruling. They are not pending work.
+This construct is refused on the VM by an owner decision. It is not pending work.
 
 | Construct | Reason | Decision |
 | --- | --- | --- |
-| A function named like a built-in | `fn-name-reserved` | D-009 #3 |
-| A name not declared in its scope (a dynamic capture dependency) | `free-name` | owner ruling 2026-10-29 (keep refused) |
-| Plain `@fn(...)`, and `@fn` flags the VM does not support, in a script | `fn-flags` | D-047 #1, D-048 #1 |
-| A map, set or stack as a map key or set member, lookups included | `collection-mutable-key` | D-NEXT-refsem #6 |
+| A map, set or stack as a map key or set member, lookups included | `collection-mutable-key` | D-NEXT-refsem #6 (keys, D6) |
+
+## Refusals awaiting an owner ruling
+
+These are refused on the VM today, but no owner decision approves the refusal as release
+behaviour. Their inventory status is `PENDING-OWNER`, and the gates that meet them fail until the
+owner rules. (Review of C83–C99, P1-2.)
+
+| Construct | Reason | Why it is not approved |
+| --- | --- | --- |
+| A function named like a built-in | `fn-name-reserved` | D-009 #3 decides the opposite: user functions take precedence over built-ins. The refusal defers D-009 #3 and does not implement it. It is not the owner's 13:26 "reserved-name check" either; that item is `binding-name-reserved` (status `implement`). |
+| A name not declared in its scope (a dynamic capture dependency) | `free-name` | No owner decision text approves it; its inventory row says "release approval pending". |
+| Plain `@fn(...)`, and `@fn` flags the VM does not support, in a script | `fn-flags` | D-047 #1 and D-048 #1 approve rejecting plain `@fn` in **both** engines. Legacy keeps accepting it, so the VM-only refusal is not what was approved. |
 
 **Plain `@fn` in a script: an explicit legacy/VM difference.**
 - D-047 and D-048 make plain `@fn(...)` invalid in script context; the canonical form is
@@ -78,6 +87,7 @@ column is one of:
 - `approved`: an owner ruling, cited;
 - `deferred-named`: the deferrals above;
 - `implement`: approved for implementation before release;
-- `PENDING-OWNER`: not yet adjudicated, so a release blocker.
+- `PENDING-OWNER`: not yet adjudicated, so a release blocker;
+- `retired`: a reason that is resolved or no longer emitted (it counts as none of the above).
 
 An inventory row never implies approval.

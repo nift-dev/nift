@@ -24,7 +24,8 @@ report joins both with the committed classification
 legacy behaviour, disposition, G2 approval, evidence. --check fails when a
 reason seen on the corpora has no classification row (G1), or a row names an
 unknown class or status. The `status` column (approved, deferred-named,
-implement, PENDING-OWNER; owner 2026-11-10 13:26) says where each reason stands
+implement, PENDING-OWNER; owner 2026-11-10 13:26; and retired for a resolved or
+no longer emitted reason, which counts as none of them) says where each reason stands
 for G2: --check reports every status, and exits 3 when a seen reason is still
 PENDING-OWNER (a release blocker), after G1 has passed.
 """
@@ -41,7 +42,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rt-vm"))
-STATUSES = ("approved", "deferred-named", "implement", "PENDING-OWNER")
+STATUSES = ("approved", "deferred-named", "implement", "PENDING-OWNER", "retired")
 CLASSES = {"M": "missing VM capability", "A": "compiler/admission limitation",
            "I": "intentional semantic refusal", "T": "deferred CP24", "P": "portability",
            "H": "test harness/fixture", "X": "outside release contract"}
@@ -251,6 +252,10 @@ def report(args):
                   file=sys.stderr)
     if args.check and problems:
         return 1
+    if args.check and by_status.get("retired"):
+        # A retired reason (resolved, not emitted any more) that is seen again is not a pass either.
+        print("INVENTORY: BLOCKED: retired reason(s) seen again: %s" % ", ".join(by_status["retired"]), file=sys.stderr)
+        return 3
     if args.check and owner:
         return 3
     return 0

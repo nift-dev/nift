@@ -4427,3 +4427,49 @@ owner-approved B5 semantic difference.
 
   It also requires the legacy channel to run the construct. Result: PASS, 6 constructs.
 - Every deferred construct is currently refused cleanly. None needed reporting.
+
+## 88. Review of C83–C99, P1-2 and L-1: no inventory row is approved without an approval (C100, inventory and docs)
+
+- **The review's finding** (REVIEW-C83-C99, P1-2). Four rows had status `approved` although their
+  citations do not approve the refusal. known-limitations.md repeated one of them as an "approved
+  refusal".
+- **Now PENDING-OWNER, with the reason in the `approval` cell (the old text is kept after "Was:"):**
+  - **`fn-name-reserved`.**
+    - D-009 #3 decides that lexical bindings and user functions take precedence over built-ins:
+      the opposite of the refusal. The refusal therefore defers D-009 #3; it does not implement it.
+    - It is also not the owner's 13:26 "reserved-name check". The B25–B27 scope analysis that the
+      13:26 list answers names that item `binding-name-reserved` ("small (raise at point)",
+      implement), already status `implement`. It lists `fn-name-reserved` separately, as the D-009
+      #3 case.
+    - So the row is PENDING-OWNER, not `implement`.
+  - **`free-name`:** "release approval pending". There is no free-name ruling text in decisions.md;
+    D-009 #8 covers only free-name warnings.
+  - **`fn-flags`:** D-047 #1 and D-048 #1 approve rejecting plain `@fn` in both engines. Legacy keeps
+    accepting it (the owner declined the legacy side), so the VM-only refusal is not what was
+    approved.
+  - **`unresolved-name:legacy-binding`:** its remaining members are pending.
+- **L-1: a `retired` status.** The six resolved or no-longer-emitted rows (type:print, aliasing,
+  reference-guard:*, struct-no-method, type:for-source, coro-module) are now `retired`, so they no
+  longer count as approved.
+  - `inventory.py` accepts `retired`.
+  - `--check` blocks (exit 3) if a retired reason is seen again.
+- **New rows (P1-1):** `callable:to_string` and `callable:unknown`, both PENDING-OWNER. They are
+  seen in test-v410-native-dispatch-parity and had no row.
+- **docs/runtime-2/known-limitations.md:**
+  - "Approved refusals" now lists only `collection-mutable-key` (D-NEXT-refsem #6, keys D6).
+  - A new section, "Refusals awaiting an owner ruling", gives the three others, each with why it is
+    not approved.
+- **Status counts:**
+
+  | Status | Rows |
+  | --- | --- |
+  | approved | 44 |
+  | deferred-named | 17 |
+  | implement | 24 |
+  | PENDING-OWNER | 152 |
+  | retired | 6 |
+
+  The total is 243 rows.
+  - On the local inventory: G1 PASS, 157 seen (approved 8, deferred-named 17, implement 19,
+    PENDING-OWNER 113, retired 0), so `--check` exits 3.
+- No production change: `nift` is f063f1a9….
