@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117 and D-068 in C122; reviews applied in C119-C121; tsv, docs and pinned tests only)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117 and D-068 in C122; reviews applied in C119-C121; slot 1 in C123)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -6960,19 +6960,19 @@ Each retired row's probes were run under `NIFT_VM=classify-all` (non-consequenti
 | `free-name:legacy-binding` | free-name:legacy-binding | free-name:legacy-binding | statement:FnDecl | statement:FnDecl | statement:FnDecl | **un-retired: D** |
 
 
-### 10. Src-side and scope proposals (none applied)
+### 10. Src-side and scope proposals (items 1, 3 and 3a applied in slot 1, section 23; the rest not applied)
 
-1. **F12, inventory limits (corrected).** In `src/rt/refusal_inventory.cpp`, add `#include "rt/compiler_coro_admit.h"`
+1. **F12, inventory limits (corrected; APPLIED in slot 1, section 23).** In `src/rt/refusal_inventory.cpp`, add `#include "rt/compiler_coro_admit.h"`
    and, after `CompileLimits limits;` (line 163), `cooperative_switches(limits);` as `script_runner.cpp:311` does. C112
    built and collected it in a scratch mutant: 16 of the 17 F12 reasons are no longer seen; `method:join` keeps 9
    non-consequential sightings (section 3.2), so it is not retirable. The fix also unmasks `coro-async-value` (+1) and
    `binding-name-reserved` (+1), both of which have rows, and drops one approved `method:get` sighting. It changes
    nift's sha256 (the file is linked into nift).
 2. **Nesting names.** Name the parser and compiler limits distinctly (e.g. `parse-nesting-limit`, `compile-nesting-limit`).
-3. **`type:*` name collision.** The `*` operator's reason `type:*` is also the inventory's family-row syntax, so its row
+3. **`type:*` name collision (APPLIED in slot 1 as `type:mul`, section 23).** The `*` operator's reason `type:*` is also the inventory's family-row syntax, so its row
    acts as the fallback for every unlisted `type:<op>` reason (still PENDING-OWNER, never an approval). Rename the
    emitter's reason (e.g. `type:mul`).
-3a. **Reasons that are messages.** `async(callable, ...) was removed; ...` and `await(...) was removed; ...` (compiler_thread.cpp:19-21)
+3a. **Reasons that are messages (APPLIED in slot 1 for `async(...)`/`await(...)` as `removed-builtin:async`/`:await`; `non-transferable` not approved, unchanged).** `async(callable, ...) was removed; ...` and `await(...) was removed; ...` (compiler_thread.cpp:19-21)
    are refusals whose reason string is the error text. PROPOSAL: name them (e.g. `removed-async-call`, `removed-await-call`)
    and keep the text as the message; a src change with the `type:*` rename (sha256 changes). C119 (position review
    Low): `non-transferable` is the same case; its emitted reason is the long message ("non-transferable resource: cannot
@@ -7381,3 +7381,101 @@ Gates at C122:
 | `make test-runtime2-precise-positions` (new) | PASS (5 rows) |
 
 Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
+
+### 23. Slot 1: inventory-infrastructure corrections (C123; production checkpoint)
+
+Owner 2026-11-11 05:41 (D-068 #11): slot 1 is authorised with exactly the approved scope (a), (b) and (c).
+Program semantics do not change. The only user-visible change is the reason id in three refusal texts.
+
+**(a) The inventory tool compiles with a real run's settings.**
+- `src/rt/refusal_inventory.cpp` includes `rt/compiler_coro_admit.h` and calls `cooperative_switches(limits)` (through
+  `run_path_switches`) after the link, as `script_runner.cpp:311` does after its link.
+  - The call site is after the link block, not immediately after `CompileLimits limits;`, because
+    `cooperative_switches` reads `limits.link`. Under default settings both positions behave the same.
+  - The call is in a short helper because rt-lint caps function length at 150 lines.
+- **Retired with a TRACE citing slot 1 (18 rows):**
+  - the 16 F12 rows: `callable:thread`, `method:done`, `method:status`, `builtin-arity:join`,
+    `builtin-receiver:join`, `coro-blocking-host:exists`/`file`/`rm`, `method:open`/`write`/`save`/`close`,
+    `coro-observe:done`/`print`/`status`, `coro-struct`;
+  - `coro-collection-callback`, which the corrected tool no longer emits on its probe (the reverted mutant does);
+  - `coro-main-cell`, emitted only when parallel tasks are off, so neither the corrected tool nor the runner can emit it.
+- **`method:join` stays E2+D, PENDING-OWNER.** Its 9 remaining sightings are classified in its row under their real
+  families: auto.f and auto2.f are CP24 (`callable:build`/`status`/`project_root`, deferred-named), and ok.f is
+  `lambda-variadic` (implement, slot 6).
+- **Accounted:**
+  - `coro-async-value` +1 (churn.f, unmasked);
+  - `binding-name-reserved` +1 (method-module.f, consequential before);
+  - `method:get` -1 (mutex.f, an F12 artefact; the row stays approved).
+  - Execute-mode fallbacks are unchanged.
+- **Negative control:** `NIFT_INVENTORY_LIMITS_MUTANT` (`.build/nift-inventory-limits-mutant`), tested by
+  `tests/runtime2/inventory_limits.py` (`make test-runtime2-inventory-limits`, in `test-rt-vm`). The mutant lists the
+  15 F12 reasons again on 5 probes, and the classification gate fails with "retired reason(s) seen again" for the 14
+  retired ones.
+
+**(b) `type:*` is renamed `type:mul`.**
+- The reason is built by `op_type_reason` (src/rt/ast.cpp), used at the three compiler_expr.cpp sites.
+- `refusal_text.cpp` maps `type:mul` to the unchanged text "(*)".
+- `type:*` is no longer a row. The tsv row is renamed `type:mul`.
+- `inventory.py` falls back to a family row only for the four D-067 #10 families (`FAMILIES`). An unlisted
+  `type:<op>` reason fails G1, tested by `tests/runtime2/cp25/inventory_families.py`, whose `--mutant` re-adds the
+  generic fallback and is caught by `unlisted-type-reason`.
+- References updated by substituting only that string:
+  - tests/runtime2/cp19/session_refusal_cli.py;
+  - tests/runtime2/cp19/widening_error_boundary.py;
+  - tests/runtime2/certify-fingerprints/test-rt-vm.txt (3 occurrences).
+- No rt-diff rule or golden names it.
+- **Left unchanged on purpose:**
+  - historical evidence (docs/runtime-2/evidence/**, earlier checkpoint documents and the C111-C122 evidence text in
+    the tsv), which records what earlier binaries emitted;
+  - `type:*` used as family notation in prose ("type:*, context:*").
+
+**(c) The message-shaped reasons get stable ids:** `removed-builtin:async` and `removed-builtin:await`
+(compiler_thread.cpp).
+- The tsv rows are renamed, and tests/runtime2/rt_parser_negative.py now checks the VM refusal by the new id. Legacy's
+  own message is unchanged.
+- `non-transferable` and the nesting-emitter rename are not changed (not approved).
+
+**User-visible change, exact (pinned by `tests/runtime2/reason_ids.py`, `make test-runtime2-reason-ids`).** The
+program's directory is shown as `./`:
+
+| Program | Before | After |
+| --- | --- | --- |
+| `print("a" * 1)` | `error: ./main.f:1:7: not compiled for the VM (type:*): an operation whose operand types the VM cannot prove (*) is not supported by the Runtime 2.0 VM yet` | `error: ./main.f:1:7: not compiled for the VM (type:mul): an operation whose operand types the VM cannot prove (*) is not supported by the Runtime 2.0 VM yet` |
+| the same in `nift -i` | `error: <stdin>:1:7: NIFT_VM session refused: type:*: an operation ... (*) is not supported by the Runtime 2.0 VM yet` | `error: <stdin>:1:7: NIFT_VM session refused: type:mul: an operation ... (*) is not supported by the Runtime 2.0 VM yet` |
+| `x := async(f)` | `error: ./main.f:2:6: not compiled for the VM (async(callable, ...) was removed; declare an async function/lambda and call it directly): a language feature is not supported by the Runtime 2.0 VM yet` | `error: ./main.f:2:6: not compiled for the VM (removed-builtin:async): a language feature is not supported by the Runtime 2.0 VM yet` |
+| `x := await(f())` | `error: ./main.f:2:6: not compiled for the VM (await(...) was removed; use 'await future' or 'await async_fn(args)'): a language feature is not supported by the Runtime 2.0 VM yet` | `error: ./main.f:2:6: not compiled for the VM (removed-builtin:await): a language feature is not supported by the Runtime 2.0 VM yet` |
+
+The note lines, stdout, exit status 1 and legacy's messages are unchanged. NIFT_VM_STATS records the new ids.
+
+**Mutant controls:**
+
+| Control | Mutant | Caught by |
+| --- | --- | --- |
+| (a) | `-DNIFT_INVENTORY_LIMITS_MUTANT` on refusal_inventory.o | `inventory_limits.py --mutant`: the probes and the classification gate |
+| (b) | `-DNIFT_REASON_ID_MUTANT=1` on ast.o (old `type:*`) | `reason_ids.py --mutant type-mul`: `type-mul-script`, `type-mul-session` |
+| (b) | the generic family fallback re-added (inventory.py copy) | `inventory_families.py --mutant`: `unlisted-type-reason` |
+| (c) | `-DNIFT_REASON_ID_MUTANT=2` on compiler_thread.o | `reason_ids.py --mutant removed-builtin`: `removed-builtin-async`, `removed-builtin-await` |
+
+All changes are compile-time or inventory-only, outside hot paths (no VM opcode, native or runtime function changed).
+
+**Inventory after slot 1:** 609 rows: approved 51, deferred-named 36, implement 76, PENDING-OWNER 420, retired 26 (+18).
+
+Freeze gates (C123, every gate run, failures collected):
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS (0 problems; boundary 0 in 710 files) |
+| `make test-test-integrity` | clean |
+| `make -k test-rt-vm` (vm-unit, parity seed 1 with rt-diff, adversarial 39612 programs, the new slot-1 targets, inventory mutant gates) | PASS (rc 0, 61 min) |
+| `make -k test-rt-vm-mutants` ([0] parity) | PASS |
+| `make test-rt-vm-sharing-oracle` (selftest) | PASS |
+| `make test-runtime2-b5`, `make test-runtime2-b5-mutants` | PASS, PASS |
+| cycle routes | PASS (24 routes) |
+| assign_family | PASS (94 cases) |
+| named_deferrals, import_depth, deferral_dependencies | PASS |
+| inventory-links, inventory-host-mutant, inventory-limits (+ mutant), reason-ids (+ 2 mutants), inventory families (+ mutant) | PASS |
+| fresh `inventory.py collect` + `report --check` | **exit 3** (intended BLOCKED state): G1 PASS, 138 reasons seen: approved 10, deferred-named 29, implement 27, PENDING-OWNER 72, retired 0 |
+| `make test-rt-builtins-guards` (callgrind) | PASS: 35 workloads, 0 guard failures |
+
+nift sha256 at the freeze: `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495` (changed from 8195f1b3..., as approved for slot 1).

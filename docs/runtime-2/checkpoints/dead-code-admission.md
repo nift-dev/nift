@@ -167,7 +167,7 @@ The X rows excluded from deferral for dynamic scope are covered in 1.3.
 | `import-opaque:legacy-runtime-error` | malformed source in an imported module (`1 ^ 2` is not an operator) |
 | `number-literal` | a malformed literal (an integer outside the signed 64-bit range) |
 | `assign-catch-binding` | an invalid assignment target: the catch binding is immutable (V4.6-BATCH-4-RECOVERABLE-ERROR-DESIGN.md) |
-| `async(callable, ...) was removed; ...`, `await(...) was removed; ...` | removed syntax (CP18 public syntax refinement, V4.5-NATIVE-RUNTIME-SHELL.md) |
+| `async(callable, ...) was removed; ...`, `await(...) was removed; ...` (since slot 1: `removed-builtin:async`, `removed-builtin:await`) | removed syntax (CP18 public syntax refinement, V4.5-NATIVE-RUNTIME-SHELL.md) |
 | `text-type-name` | a malformed expression (`x := await` with no operand) |
 | `jump-outside-loop` | `break`/`continue` outside a loop is malformed by placement. **No contract text calls it a compile-time error, so the owner must rule (1.5).** |
 

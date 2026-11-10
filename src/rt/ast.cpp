@@ -57,6 +57,14 @@ const char* op_name(Op op) {
     return names[static_cast<int>(op)];
 }
 
+std::string op_type_reason(Op op) {
+#if defined(NIFT_REASON_ID_MUTANT) && NIFT_REASON_ID_MUTANT == 1  // test-only: the old spelling `type:*`
+    return std::string("type:") + op_name(op);
+#else
+    return op == Op::Mul ? std::string("type:mul") : std::string("type:") + op_name(op);
+#endif
+}
+
 const char* opaque_reason_name(OpaqueReason reason) {
     static const char* const names[] = {
         "", "legacy-runtime-error", "irregular-legacy-parse", "template-text", "struct-body", "deferred-translation",

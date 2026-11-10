@@ -162,12 +162,12 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
                     (widened(l) || widened(r) || node.begin < session_->unit_begin);
-                if (!numeric_guard) return fail(node, std::string("type:") + op_name(node.op));
+                if (!numeric_guard) return fail(node, op_type_reason(node.op));
             }
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
             if (!ordering_kinds_ok(l, r) && !unknown_defers(l | r))
-                return fail(node, std::string("type:") + op_name(node.op));
+                return fail(node, op_type_reason(node.op));
             break;
         default: break;
     }
@@ -371,7 +371,7 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
         const bool ordering = node.op != Op::Eq && node.op != Op::Ne;
         if (ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)) &&
             !unknown_defers(kinds(node.a) | kinds(node.b)))
-            return fail(node, std::string("type:") + op_name(node.op));
+            return fail(node, op_type_reason(node.op));
         std::uint16_t left = 0, right = 0;
 #if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 2
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;

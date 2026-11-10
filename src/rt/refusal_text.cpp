@@ -24,6 +24,7 @@ constexpr Family kFamilies[] = {
     {"builtin-bytes:", "bytes values with `%()`"},
     {"builtin-receiver:", "`%()` on this kind of receiver"},
     {"builtin-arity:", "`%()` with this number of arguments"},
+    {"type:mul", "an operation whose operand types the VM cannot prove (*)"},  // slot 1: was type:*
     {"type:", "an operation whose operand types the VM cannot prove (%)"},
     {"static-error:", "a statically certain program error the VM does not reproduce yet (%)"},
     {"statement:Command", "a shell command line inside a script"},

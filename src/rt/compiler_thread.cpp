@@ -13,12 +13,20 @@ namespace nift::rt::detail {
 // the right arity are checked by the VM at runtime, where legacy reports them.
 bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
-    // CP23 compatibility: the old public library call spellings stay removed,
-    // with legacy's diagnostic (not an opaque parse fallback).
+    // CP23 compatibility: the old public library call spellings stay removed
+    // (a refusal, not an opaque parse fallback). Slot 1 (D-068 #11): stable
+    // reason ids instead of legacy's message text.
+#if defined(NIFT_REASON_ID_MUTANT) && NIFT_REASON_ID_MUTANT == 2  // test-only: the old message-shaped ids
     if (name == "async")  // rt-lint: allow-string-compare compile time
         return fail(node, "async(callable, ...) was removed; declare an async function/lambda and call it directly");
     if (name == "await")  // rt-lint: allow-string-compare compile time
         return fail(node, "await(...) was removed; use 'await future' or 'await async_fn(args)'");
+#else
+    if (name == "async")  // rt-lint: allow-string-compare compile time
+        return fail(node, "removed-builtin:async");
+    if (name == "await")  // rt-lint: allow-string-compare compile time
+        return fail(node, "removed-builtin:await");
+#endif
     if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));
     if (node.count == 0) return fail(node, "coro-thread-callee");
     const NodeId* args = ast_.list(node);

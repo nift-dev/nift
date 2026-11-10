@@ -43,6 +43,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rt-vm"))
 STATUSES = ("approved", "deferred-named", "implement", "PENDING-OWNER", "retired")
+# Family grouping (owner 2026-11-11 02:53, D-067 #10): only these four reason families have a family row
+# `<prefix>:*` that classifies an unlisted member. Every other reason needs its own exact row; an unlisted
+# `type:<op>` (or any other) reason fails G1 (slot 1, D-068 #11: `type:*` is no longer a family row).
+FAMILIES = ("builtin-arity", "builtin-receiver", "method", "callable")
 CLASSES = {"M": "missing VM capability", "A": "compiler/admission limitation",
            "I": "intentional semantic refusal", "T": "deferred CP24", "P": "portability",
            "H": "test harness/fixture", "X": "outside release contract"}
@@ -191,10 +195,11 @@ def report(args):
     seen = set(full) | set(fallback)
 
     def row_for(reason):
-        """An exact row, else the family row `<prefix>:*` (e.g. `method:*`)."""
+        """An exact row, else the family row `<prefix>:*` of an approved family (FAMILIES)."""
         if reason in cls:
             return cls[reason]
-        return cls.get(reason.split(":")[0] + ":*") if ":" in reason else None
+        prefix = reason.split(":")[0]
+        return cls.get(prefix + ":*") if ":" in reason and prefix in FAMILIES else None
 
     problems = []
     for reason in sorted(seen):

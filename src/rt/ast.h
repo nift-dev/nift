@@ -126,6 +126,9 @@ private:
 
 const char* node_kind_name(NodeKind kind);
 const char* op_name(Op op);
+// The refusal reason `type:<op>` of an operand-kind refusal of a binary or ordering operator.
+// Slot 1 (D-068 #11): multiplication is `type:mul`, because `type:*` is the inventory's family-row syntax.
+std::string op_type_reason(Op op);
 const char* opaque_reason_name(OpaqueReason reason);
 
 // S-expression dump for tests and inspection, one node per line.

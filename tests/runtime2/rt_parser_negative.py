@@ -48,17 +48,20 @@ SHAPE_ERRORS = re.compile(
     r"declaration requires an identifier|assignment requires an identifier")
 
 REMOVED_AWAIT = "await(...) was removed; use 'await future' or 'await async_fn(args)'"
+# Slot 1 (D-068 #11): the VM's refusal reason for the removed call form is a stable id; legacy's
+# message (REMOVED_AWAIT) is unchanged.
+REMOVED_AWAIT_REASON = "removed-builtin:await"
 
 
 def vm_refuses_removed_await(nift, path):
-    """The VM default refuses the program with legacy's removed-await message before running it."""
+    """The VM default refuses the removed-await program (reason removed-builtin:await) before running it."""
     work = os.path.dirname(path)
     env = {"PATH": os.environ.get("PATH", ""), "HOME": work, "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
            "TMPDIR": work}
     r = subprocess.run([nift, os.path.basename(path)], cwd=work, env=env, capture_output=True,
                        stdin=subprocess.DEVNULL, timeout=30)
     err = r.stderr.decode("utf-8", "replace")
-    return (r.returncode == 1 and not r.stdout and "not compiled for the VM (" + REMOVED_AWAIT + ")" in err
+    return (r.returncode == 1 and not r.stdout and "not compiled for the VM (" + REMOVED_AWAIT_REASON + ")" in err
             and "no part of it ran" in err)
 
 
@@ -272,8 +275,8 @@ def main():
                 m = None  # an unbound name is reported with the same message: a value error
             if m and REMOVED_AWAIT in err and vm_refuses_removed_await(nift, path):
                 # B28 (combined-b3-b5.md section 80): since a5179308 (CP23) rt parses the removed call
-                # form `await(...)` as a call of `await`, and the compiler refuses it with legacy's own
-                # message before anything runs (compiler_thread.cpp), so it never runs on the VM.
+                # form `await(...)` as a call of `await`, and the compiler refuses it before anything runs
+                # (compiler_thread.cpp; reason removed-builtin:await since slot 1), so it never runs on the VM.
                 m = None
             if m:
                 return "legacy shape error: " + err.strip().splitlines()[-1].replace(os.path.dirname(path) + "/", "")

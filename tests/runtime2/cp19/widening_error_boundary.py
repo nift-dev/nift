@@ -37,7 +37,7 @@ for case,source in cases.items():
     assert (r.returncode,r.stdout,r.stderr)==baseline,row
     assert len(counters)>=3 and all(x['outcome'] in ('vm','vm-error') and x['vm_executions']==1 and x['legacy_executions']==0 for x in counters),row
    else:
-    assert len(counters)>=3 and counters[1]['outcome']=='require-error' and counters[1]['reason']=='type:*',row
+    assert len(counters)>=3 and counters[1]['outcome']=='require-error' and counters[1]['reason']=='type:mul',row
     assert counters[1]['vm_executions']==0 and all(x['legacy_executions']==0 for x in counters),row
     assert 'MUTATED' not in r.stdout,row
 print('PASS retained-reader numeric guard and legacy channels' if a.expect=='guard' else 'VERIFIED former refusal boundary; no feature acceptance claimed')

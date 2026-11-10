@@ -5,7 +5,7 @@ from tty_session import run_tty
 ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--out',type=Path,required=True);a=ap.parse_args()
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
- ('literal-type-refusal','x:=5\nprint("FORBIDDEN");1*"bad"\nx\nexit\n','5\n','type:*'),
+ ('literal-type-refusal','x:=5\nprint("FORBIDDEN");1*"bad"\nx\nexit\n','5\n','type:mul'),
  ('loop-nested-compilation-atomicity','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")};bytes([65])\na.stringify()\nexit\n','[[1]]\n','builtin-bytes:bytes'),
  # D-NEXT-refsem #1 (review round 2): the closure pushes into its captured array
  # directly (it pushed through a loop binding over a nested array,

@@ -2,6 +2,7 @@
 #include "rt/session_invocation.h"
 
 #include "rt/compiler.h"
+#include "rt/compiler_coro_admit.h"
 #include "rt/globals.h"
 #include "rt/legacy_names.h"
 #include "rt/module_host_op.h"
@@ -95,6 +96,17 @@ struct MappedSource {
     std::uint32_t offset = 0;
 };
 
+// Slot 1 (D-068 #11; owner 2026-11-11 05:41): the same compile settings as a real script run
+// (script_runner.cpp: cooperative_switches after the link), so classify-all does not list
+// refusals that only the default CompileLimits produce (the F12 rows).
+void run_path_switches(CompileLimits& limits) {
+#ifndef NIFT_INVENTORY_LIMITS_MUTANT  // test-only negative control (tests/runtime2/inventory_limits.py)
+    cooperative_switches(limits);
+#else
+    (void)limits;
+#endif
+}
+
 } // namespace
 
 RefusalInventory inventory_refusals(std::string_view source, const std::filesystem::path& source_path,
@@ -177,8 +189,9 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
         unit_source = link.text;
         unit_root = relinked.root;
         limits.module_names = link.module_names;
-        limits.link = &link;  // classify-all sees coro-module-init-task / -capture (no switches: not coro-module)
+        limits.link = &link;  // classify-all sees coro-module-init-task / -capture
     }
+    run_path_switches(limits);
     Ast& ast = link.linked ? *linked_ast : entry;
     const auto map_linked = [&](std::uint32_t offset) -> MappedSource {
         if (!link.linked) return {source, {}, offset};

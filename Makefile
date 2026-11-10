@@ -4431,6 +4431,50 @@ $(INVENTORY_HOST_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJE
 test-runtime2-inventory-host-mutant: $(TARGET) $(INVENTORY_HOST_MUTANT_BIN)
 	bash tests/runtime2/inventory_host_mutant.sh "$(CURDIR)/$(TARGET)" "$(CURDIR)/$(INVENTORY_HOST_MUTANT_BIN)"
 test-rt-vm: test-runtime2-inventory-host-mutant
+
+# Slot 1 (D-068 #11, owner 2026-11-11 05:41): inventory-infrastructure corrections and their controls.
+# (a) classify-all compiles with the run path's switches (cooperative_switches); the mutant reverts it.
+INVENTORY_LIMITS_MUTANT_BIN := $(TEST_DIR)/nift-inventory-limits-mutant$(EXEEXT)
+INVENTORY_LIMITS_MUTANT_OBJECT := $(TEST_DIR)/inventory-limits-mutant/refusal_inventory.o
+$(INVENTORY_LIMITS_MUTANT_OBJECT): src/rt/refusal_inventory.cpp src/rt/compiler_coro_admit.h $(RT_VALUE_HEADERS)
+	mkdir -p "$(TEST_DIR)/inventory-limits-mutant"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_INVENTORY_LIMITS_MUTANT=1 -c $< -o $@
+$(INVENTORY_LIMITS_MUTANT_BIN): $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_LIMITS_MUTANT_OBJECT) $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/refusal_inventory.o,$(CLI_OBJECTS)) $(INVENTORY_LIMITS_MUTANT_OBJECT) \
+		$(LDLIBS) -o $@
+.PHONY: test-runtime2-inventory-limits
+test-runtime2-inventory-limits: $(TARGET) $(INVENTORY_LIMITS_MUTANT_BIN)
+	$(PYTHON) tests/runtime2/inventory_limits.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/inventory_limits.py --nift "$(CURDIR)/$(INVENTORY_LIMITS_MUTANT_BIN)" --mutant
+test-rt-vm: test-runtime2-inventory-limits
+# (b) `type:mul` and (c) `removed-builtin:async`/`:await`: the exact user-visible refusal texts, and the
+# mutants that restore the old ids (1: `type:*`, ast.cpp; 2: the message-shaped ids,
+# compiler_thread.cpp).
+REASON_ID_MUTANT_BIN_1 := $(TEST_DIR)/reason-id-mutant/1/nift$(EXEEXT)
+REASON_ID_MUTANT_BIN_2 := $(TEST_DIR)/reason-id-mutant/2/nift$(EXEEXT)
+$(TEST_DIR)/reason-id-mutant/1/ast.o: src/rt/ast.cpp src/rt/ast.h
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_REASON_ID_MUTANT=1 -c $< -o $@
+$(TEST_DIR)/reason-id-mutant/2/compiler_thread.o: src/rt/compiler_thread.cpp $(RT_VALUE_HEADERS)
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_REASON_ID_MUTANT=2 -c $< -o $@
+$(REASON_ID_MUTANT_BIN_1): $(filter-out src/rt/ast.o,$(CLI_OBJECTS)) $(TEST_DIR)/reason-id-mutant/1/ast.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/ast.o,$(CLI_OBJECTS)) $(TEST_DIR)/reason-id-mutant/1/ast.o \
+		$(LDLIBS) -o $@
+$(REASON_ID_MUTANT_BIN_2): $(filter-out src/rt/compiler_thread.o,$(CLI_OBJECTS)) $(TEST_DIR)/reason-id-mutant/2/compiler_thread.o $(LIBFFI_A)
+	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/rt/compiler_thread.o,$(CLI_OBJECTS)) $(TEST_DIR)/reason-id-mutant/2/compiler_thread.o \
+		$(LDLIBS) -o $@
+.PHONY: test-runtime2-reason-ids
+test-runtime2-reason-ids: $(TARGET) $(REASON_ID_MUTANT_BIN_1) $(REASON_ID_MUTANT_BIN_2)
+	$(PYTHON) tests/runtime2/reason_ids.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/reason_ids.py --nift "$(CURDIR)/$(REASON_ID_MUTANT_BIN_1)" --mutant type-mul
+	$(PYTHON) tests/runtime2/reason_ids.py --nift "$(CURDIR)/$(REASON_ID_MUTANT_BIN_2)" --mutant removed-builtin
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant
+test-rt-vm: test-runtime2-reason-ids
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
 CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
 $(TEST_DIR)/cp20-mutants/%/CLI.o: src/CLI.cpp src/shell/CommandDispatch.h src/shell/Spawn.h
