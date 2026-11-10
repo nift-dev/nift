@@ -4733,3 +4733,71 @@ owner-approved B5 semantic difference.
   normal timeout).
 - **Result.** `make test-runtime2-cp17-unwind-mutants`: PASS, 32 mutants.
 - No production change: `nift` is f063f1a9….
+
+## 94. Production checkpoint 1, the assignment family: inventory and scope (STOPPED before src/, awaiting a ruling)
+
+No production change: `nift` is f063f1a9…. Probes: `scratchpad/cp1/` (VM default and
+`NIFT_VM=0`, this binary).
+
+- **Refusal reasons covering the family** (all status `implement`, owner 13:26):
+  - `index-target` (compiler_rules.cpp `element_target_ok`): a key that is not a plain name or an
+    unsigned integer literal, so `o["k"] = v` and `o["new"] = v`;
+  - `index-assign-target` (compiler_assign.cpp, Index branch): a receiver that is not a plain
+    name, so `grid[1][0] = 7`, `o["k"][1] = 9`, `g[r][1] = …` in loops;
+  - `type:element-assignment` (same branch): a receiver not proved an array, or a key not proved a
+    number, so `o[k] = v` with a variable key;
+  - `compound-target` (compiler_assign.cpp `compound_assign`): any non-name target, so
+    `a[0] += 10`, `o["k"] += 10`, `g[1][0] += 7`, and the same for `-= *= /= %=`.
+- **In scope (proposed):**
+  - element store on an array or object receiver, with a key that is a plain name, an unsigned
+    integer literal, or a string literal without `.`;
+  - the same at nesting depth 2 and 3, arrays and objects mixed (`g[i][j]`, `o["k"][1]`,
+    `o["a"]["b"]`), at top level, in functions, closures, loops, and sessions;
+  - compound `+= -= *= /= %=` on those targets.
+- **Out of scope (unchanged, still refused):**
+  - `o.k = v` and `o.k += v`: legacy's error "member assignment requires a struct instance"
+    (`static-error:member-assign`, PENDING-OWNER);
+  - a target whose text contains `.` (`o["a.b"] = 1`, `a[o.k] = 1`, `a[1.0] = 1`): legacy reads
+    it as a member path and fails (the `index-target` F1 half; the row stays, narrowed);
+  - computed keys (`a[i + 1][0] = v`) and increments on elements (`a[0]++`, postfix spelling);
+  - struct field targets (struct rules), struct defaults, loop admission of struct
+    construction, big integers, destructuring, bytes, imported-name rebinding.
+- **Legacy behaviour observed** (all of it is what the VM would have to match, or differ from by
+  an approved rule):
+
+  | Program | Legacy |
+  | --- | --- |
+  | `o["k"] = 5`, `o["new"] = 1` | `{"k":5}`, `{"new":1}` |
+  | `grid[1][0] = 7`, `o["k"][1] = 9` | `[[1,2],[7,4]]`, `{"k":[1,9]}` |
+  | `a[0] += 10; a[1] -= 1`, `o["k"] += 10`, `g[1][0] += 7` | `[11,1]`, `{"k":11}`, `[[1,2],[10,4]]` |
+  | `a[i] = f()`, `f` sets `i = 1` | `[1,5]`: value, then index (VM today: the same) |
+  | `g[i][i] = f()`, `f` sets `i = 1` | `[[1,2],[3,5]]`: value, then both indices |
+  | `o[k] = f()`, `f` sets `k = "b"` | `{"a":1,"b":5}`: value, then key |
+  | `a[i] += f()`, `f` sets `i = 1` (`a = [1,2]`) | `[1,6]`: reads `a[0]`, stores at `a[1]` |
+  | `g[5][0] = 7` | `1:15: index out of range: 5` |
+  | `g[0][0] = 7` on `[1,2]` | `assignment index does not address an array or object: 0` |
+  | `o["b"]["c"] = 7`, missing `b` | `object has no member: b` |
+  | `a["x"] = 7` / `o[0] = 7` | `assignment index does not address an array or object: "x"` / `: 0` |
+  | `a[0] += "x"` / `a[0] += 1` on `["s"]` | `arithmetic operators require numeric operands` |
+  | `a[3] += 1` on `[1]` | `JSON array index 3 is out of range in 'a[3]'` (the read's text) |
+  | `o["a"] %= 2` on `1.5` | `modulo requires integer-valued operands` |
+  | `a[0] = a`, `g[0][0] = g`, `o["k"] = o` | accepted silently (a copy); VM: `runtime.reference_cycle` |
+  | `for (e : arr) { e["k"] = 9 }` | `arr` unchanged (VM, B5: the element changes, as `e[0] = 7` today) |
+
+- **Blocking question (evaluation order).** The checkpoint brief requires the key or index to be
+  captured before the right-hand side, and not legacy's value-before-key order. The recorded
+  contract says the opposite for the already-admitted form:
+  - section 2's table and compatibility.md ("an element store evaluates its value before its
+    index", `b[i] = g()` row: legacy-equal);
+  - the `index-target` inventory row ("implement with that order", value before key);
+  - the shipped VM: `a[i] = f()` gives `[1,5]`, legacy-equal, pinned by `b5/evalorder`.
+
+  Three ways forward; the owner chooses:
+  - **A.** Key first everywhere, `a[i] = v` included. One order, D2's left to right. This changes
+    an admitted legacy-equal output: the `b5/evalorder` value-before-index fixtures become
+    approved differences.
+  - **B.** Key first only for the new forms. `a[i] = g()` and `a[i][j] = g()` would then use
+    different orders.
+  - **C.** Legacy's order for the new stores (value, then every key), matching section 2. Compound
+    targets still cannot follow legacy (it reads at the old index and writes at the new one), so
+    they would use D2's left to right.
