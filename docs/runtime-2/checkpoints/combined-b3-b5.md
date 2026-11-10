@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117; C117/C118 review applied in C119; tsv and docs only)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117; reviews applied in C119-C120; tsv, docs and pinned tests only)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -7284,5 +7284,40 @@ Gates at C119 (tsv revision of this commit, pinned binary):
 | `tests/runtime2/named_deferrals.py --nift $PWD/nift` | PASS (11 constructs, 0 failures) |
 | `make test-runtime2-import-depth` | PASS |
 | `tests/runtime2/assign_family.py --nift $PWD/nift` | PASS (94 cases) |
+
+Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
+
+### 20. C120: review of C119 applied (tsv, docs and one pinned test)
+
+The C119 re-review found the plan SOUND WITH CHANGES, with two P1s. The name-certainty option is sound with
+conditions, and host guard (a) is sound with small changes. docs/runtime-2/checkpoints/dead-code-admission.md is
+revised.
+
+| Finding | Change |
+| --- | --- |
+| P1-1 sessions | session units never defer a kind- or name-dependent site (argued against routing through the session re-check); session tests (kind and name programs) and the mutant "session deferral frozen"; the C119 "decides independently" wording corrected |
+| P1-2 built-in precedence | name certainty for every callee-named site, including the 57 allow-listed builtin-arity free-function members; legacy precedence probed per member in four binding forms: the binding wins for 11 (`cancel`, `channel`, `deepcopy`, `map`, `recv`, `send`, `set`, `sha256`, `sha256_file`, `stack`, `validate`), the built-in wins for 50, and 62 have no free form; recorded per row ("C120 precedence"); the hole is hidden today only by `binding-name-reserved`, `fn-name-reserved` and `param-name-reserved` |
+| P2-1 kind certainty | defined per site: the set is non-empty, has no Unknown and no Bottom, and no member is admitted by the operation (Number = Int\|Frac, File/Stream = Handle\|bit) |
+| P2-2 Bottom | `kKindBottom = 1u << 24`, distinct from the 12 existing `kinds == 0` uses (audit table); the assertion is scoped to the admission and deferral entry points |
+| P2-3 | 5.1(2) qualified by the approved semantic differences (B5 parameter mutation example) |
+| Name certainty | extended to `callable:*` (11 rows ALLOW-LISTED under name certainty); scan coverage list (every unit and binding form, nested and conditional fn declarations, struct methods, imports and exports, the embed host registry; sessions excluded); dependency on four whole-program refusals pinned by the new `tests/runtime2/deferral_dependencies.py` (`make test-runtime2-deferral-dependencies`, in `test-rt-vm`); the owner's `if (false) { nope() }` example works under the plan |
+| Host guard (a) | restated as the proposed slot-2 design: leading import block; call-free module init with `export`/`import` exempt and non-host, callback-free natives allowed; "call" defined; transitive; a complete host set with a test; tests and mutants; about 150-220 src lines |
+| Mutants | five added (session deferral frozen, builtin-arity deferred despite a binding, name scan misses a nested or conditional fn or a struct method, export not exempted, interpolation call missed in init), plus a kind-0 assertion mutant |
+| Coverage | X (ii) 260 of 280, X + L-defer 284 of 309; 7 of the 11 refused platform patterns fixed, 8 with host guard (a) |
+
+Statuses unchanged: 609 rows, approved 51, deferred-named 36, implement 76, PENDING-OWNER 438, retired 8.
+
+Gates at C120:
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS (31 cases) |
+| `make test-rt-lint` | PASS (0 problems in 710 files) |
+| `make test-test-integrity` | clean (702 files, 0 findings) |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 155 reasons seen: approved 11, deferred-named 29, implement 27, PENDING-OWNER 88, retired 0 |
+| `tests/runtime2/named_deferrals.py` | PASS (11 constructs) |
+| `make test-runtime2-import-depth` | PASS |
+| `make test-runtime2-deferral-dependencies` (new) | PASS (5 whole-program refusals) |
+| `tests/runtime2/assign_family.py` | PASS (94 cases) |
 
 Production code: `git diff 0c66cad6 -- src/` is empty; nift sha256 `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.

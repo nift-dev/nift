@@ -1,4 +1,4 @@
-# Dead-code admission (C118, revised in C119)
+# Dead-code admission (C118, revised in C119 and C120)
 
 Owner ruling 2026-11-11 02:53, D-067 #11. This ruling is a correction: Option A of rescan-post-cp1.md section 13.1 is
 withdrawn. The ruling says:
@@ -28,10 +28,28 @@ the changes that review required:
 - deferred sites are mapped into the inventory;
 - the host-guard options, the S departure and the extended must-not-change and mutant lists are written up.
 
+The C119 revision was re-reviewed in REVIEW-C119: the plan is **sound with changes**, with two P1 holes. The
+name-certainty option is sound with conditions, and host guard (a) is sound with small changes. C120 makes these changes:
+
+- **Sessions (P1-1):** session units never defer a kind- or name-dependent site (5.2, "Sessions").
+- **Name certainty for every callee-named site (P1-2):** this includes the 119 builtin-arity free-function sites. The
+  legacy precedence of each built-in against a binding of its name is recorded (5.2, "Name certainty").
+- **Name certainty is extended to `callable:*`** with the full coverage list. This makes the owner's
+  `if (false) { nope() }` / `print("success")` work under the plan (3, 5.8).
+- **Kind certainty is defined per site** ("no member of the operand set is admitted by the operation"), not by a bit
+  count (5.1).
+- **Bottom is separated from the existing uses of kind 0**, and the assertion is scoped (5.3).
+- **5.1(2) is qualified** by the approved semantic differences.
+- **Host guard (a) is restated as the proposed slot-2 design:** `export`/`import` are exempt, "call" is defined, the
+  check is transitive, and the host set is kept complete (5.5).
+- **Five more mutants** (5.7).
+- **A new pinned test,** `tests/runtime2/deferral_dependencies.py` (`make test-runtime2-deferral-dependencies`). It
+  fails if any of the whole-program refusals the name scan depends on stops refusing.
+
 Inventory identity:
 
 - `src/` is at `0c66cad6`, and the nift sha256 is `8195f1b34f91d018e336451153aa55bf0e05d590f9acfcd0dffa566ba35834e4`.
-- The tsv revision is the C119 commit.
+- The tsv revision is the C120 commit.
 - Probes ran on that binary, both with the VM default and with `NIFT_VM=0`, in the session scratch directory.
 
 ## 1. Classification of the class (ii) rows, and the mixed kind-based rows
@@ -151,10 +169,10 @@ signed 64-bit range") and its class S are compatible:
 
 | Family | Rows | Deferral (section 5) |
 | --- | --- | --- |
-| `builtin-arity:*` members | 123 | allow-listed: 119 (order probed); 4 keep the refusal (`cp`, `mv`, `rm`, `same`: order not probed) |
+| `builtin-arity:*` members | 123 | allow-listed: 119 (order probed): 62 method-only, and 57 free-function members **under name certainty** (C120); 4 keep the refusal (`cp`, `mv`, `rm`, `same`: order not probed) |
 | `builtin-receiver:*` members | 77 | allow-listed: 77 |
 | `method:*` (family row and members) | 41 | allow-listed: 41 |
-| `callable:*` (family row and members) | 11 | **excluded: dynamic scope (1.3)** |
+| `callable:*` (family row and members) | 11 | C119: excluded (dynamic scope, 1.3); **C120: allow-listed under name certainty** (5.2) |
 | `assign-free-name` | 1 | **excluded: dynamic scope (1.3)** |
 | static checks (`static-error:arity`, `struct-arity`, `member-assign`, `push-arity`) | 4 | allow-listed: 4 |
 | struct use (`struct-no-field`, `struct-private`) | 2 | allow-listed: 2 |
@@ -165,7 +183,7 @@ signed 64-bit range") and its class S are compatible:
 | handle flow (`host-handle-flow`, `non-transferable`) | 2 | keep the refusal (handle-flow analysis, 5.6; `non-transferable` is refused first as `host-handle-flow`) |
 | `error-result-expression` | 1 | keep the refusal (refused first as `interpolation:unknown-type`) |
 | name resolution (`fn-called-before-declaration`, `import-scope`) | 2 | keep the refusal (name resolution and order; D-067 #2c not decided) |
-| **total** | **280** | **allow-listed 249**, refusal kept 31 (12 dynamic scope, 4 arity order not probed, 15 other) |
+| **total** | **280** | **allow-listed 260** (C120; 249 in C119), refusal kept 20 (`assign-free-name`, 4 arity order not probed, 15 other) |
 
 **Measured today (C115, unchanged binary).** Before the C119 reclassification, 316 of the 321 refusals also fired in
 an `if (false)` branch, where legacy completes the program. The exceptions:
@@ -197,6 +215,21 @@ caller. These sites therefore **keep the refusal**, reachable or not:
   `free-name:legacy-binding`. These are (i), D or deferred-named, and are marked so that no later plan defers them.
 
 Each of these 17 rows carries "deferral-excluded (C119, review P2-1)" in its tsv disposition.
+
+**C120: name certainty for callees.** Dynamic scope can supply a name only if some frame binds it. So a callee whose
+name is bound **nowhere** in the program cannot resolve through a caller's frame. Legacy then raises
+`undefined callable: <name>` whenever the call executes; the review's probes of `exit`, `assert`, `len`,
+`to_string`, `stringify` and `nope` all give that message.
+
+The `callable:*` family row and its 10 members are therefore no longer excluded outright. Each is deferred only under
+the name-certainty condition of 5.2, and never in a session unit. The tsv marks them "ALLOW-LISTED under name
+certainty (C120 plan)".
+
+`assign-free-name`, `assign-free-name:undeclared` and the `free-name*` rows stay excluded. The extension covers callees
+only; assignments and reads are not part of it.
+
+The same condition now also applies to the builtin-arity **free-function** sites, because legacy lets a binding shadow
+some built-ins (5.2).
 
 ### 1.4 Position review (D-067 #1)
 
@@ -309,8 +342,8 @@ Built-ins and behaviours that differ by OS, in both engines:
 
 | Program (the non-Linux branch never runs) | Legacy | VM today | After the C119 plan |
 | --- | --- | --- | --- |
-| `if (os() == "windows") { windows_only() } else { print("linux") }` | `linux` | refused, `callable:windows_only` | **still refused** (`callable:*` is excluded for dynamic scope, 1.3) |
-| `if (false) { nope() }` / `print("success")` | `success` | refused, `callable:nope` | **still refused** (same reason) |
+| `if (os() == "windows") { windows_only() } else { print("linux") }` | `linux` | refused, `callable:windows_only` | **runs (C120)**, under name certainty: `windows_only` is bound nowhere in the program |
+| `if (false) { nope() }` / `print("success")` | `success` | refused, `callable:nope` | **runs (C120)**: prints `success` (name certainty) |
 | windows branch `r := run("cmd", "/c", "ver")` | `posix` | refused, `callable:run` | still refused (deferred-named) |
 | windows branch `ffi_open("kernel32.dll")` | `posix` | refused, `callable:ffi_open` | still refused (deferred-named) |
 | windows branch `x := "a" - 1` | `posix` | refused, `type:-` | runs (single-kind `type:-`) |
@@ -325,10 +358,25 @@ Built-ins and behaviours that differ by OS, in both engines:
 
 Today, 11 of the 15 patterns are refused on Linux, although the code that would fail is never reached.
 
-**The owner's own example** (`if (false) { nope() }`) is **not** fixed by the C119 plan. `nope` is an unbound callee,
-and legacy would resolve it through a caller's frame if it were called from one (1.3). Fixing it needs the
-dynamic-scope decision (D-067 #2c), or an owner ruling that a callee bound in no unit of the program may be deferred
-(section 7, item 3). That item is the name-certainty condition of 5.2 applied to `callable:*`.
+**The owner's own example under the C120 plan.** The program is `if (false) { nope() }` / `print("success")`.
+
+1. **The name scan (5.2).** It walks every unit of the program (here, only the entry), at every depth, taken or not.
+   It finds no variable, parameter, lambda, catch, for or destructuring binding, no fn declaration, no struct or
+   struct method, and no import or export named `nope`. The program is not a session unit, and no host-registered
+   callable `nope` exists (the CLI registers none).
+2. **The site.** `callable:nope` is on the allow-list under name certainty, with the order class "no argument
+   evaluated" and the message `undefined callable: nope`.
+3. **Compilation.** The call compiles to the deferred op. Its result kind is `{Bottom}`. The `if (false)` body is
+   never executed.
+4. **Execution.** `print("success")` runs and prints `success`, the same as legacy (rc 0).
+5. **The reached variant.** `if (true) { nope() }` raises `undefined callable: nope` at 1:14 with exit 1, as legacy does
+   at the same construct.
+6. **The negative controls stay refused**, because the scan finds the name:
+   - `fn(m()) { fn(nope()) { return 5 }` / `return 0 }` / `m()` / `print(g())`, where g calls `nope()`. Legacy prints 5,
+     because it registers the nested fn at run time. This is probe `nf.f` in the C120 record.
+   - A free function `helper()` that calls `nope()` from inside a struct method of a struct declaring `nope`. Legacy
+     prints 7 (probe `sm.f`).
+   - Any session unit.
 
 ## 4. Impact
 
@@ -418,20 +466,52 @@ The review offered two designs for kind-based sites:
    exactly the union capability that makes these rows class (i) (1.1). It is feature work under the (i) rows. It needs
    its own implement decision per operator, conformance tests against legacy for each kind combination, and the
    inference changes. It is not a bounded dead-code change, and it is not covered by D-067 #11.
-2. **(b) changes nothing for any program legacy runs on a reachable path.** At a kind-certain site, the single kind is
-   the run-time kind on every execution that reaches the site, so legacy raises there whenever the site executes. The
-   rows' single-kind probes record legacy's message and position. Union sites keep the refusal: no behaviour changes,
-   and the union gap stays visible as a class (i) row.
+2. **(b) changes nothing for any program legacy runs on a reachable path, up to the approved semantic differences.**
+   At a kind-certain site, every kind the operand can have at run time is one the operation rejects, so legacy raises
+   there whenever the site executes. The rows' single-kind probes record legacy's message and position. Union sites
+   keep the refusal: no behaviour changes, and the union gap stays visible as a class (i) row.
+
+   **The qualification (review P2-3).** Kind certainty is computed under VM semantics. Where an approved VM semantic
+   difference changes a value's kind or contents compared with legacy, a site can be kind-certain on the VM while
+   legacy errors earlier or elsewhere, or the reverse. These differences predate the plan; the plan adds none.
+   - **Example (B5 parameter mutation):** `o := {"a": 1}` / `fn(add(p)) { p["k"] = 5 }` / `add(o)` / `print(o.k)`. The
+     VM prints `5`. Legacy errors with `value has no member: k`, because its parameter is a copy.
+   - The parity matrix (5.7) therefore compares against legacy **under the VM's approved semantics**: a case whose
+     legacy outcome differs only through an approved difference (B5 aliasing and parameter mutation, D-009 #3, the
+     async self-recursion qualification, `difference:import-depth`) is pinned as that difference, not counted as a
+     deferral failure.
 3. **(b) is the bounded subset of (a).** If the owner later approves union support for an operator (an implement
    item), that operator's site moves from "refuse on union" to "perform on union", and the deferred raise of (b)
    becomes the failing branch of that op. Nothing in (b) needs to be undone.
 
-**Kind-certain** means all of the following:
+**Kind-certain is decided per site** (review P2-1, replacing C119's "exactly one kind bit"). For each operand of the
+site, take its inferred kind set S. The site is kind-certain when all of the following hold:
 
-- The operand's inferred kind set is exactly one kind bit.
-- It is not `Unknown`.
-- It does not contain `Bottom` (5.3).
-- It is not derived from a name that legacy could resolve through dynamic scope (1.3).
+- Every S is non-empty.
+- No S contains `Unknown` or `Bottom` (5.3).
+- **No member of S is admitted by the operation.** For a multi-operand site, no combination of members is admitted.
+  So legacy errors for every run-time kind the operand can have.
+- No S is derived from a name that legacy could resolve through dynamic scope (1.3).
+
+A bit count is the wrong test because several kinds span more than one bit (infer.h:45-63):
+
+- `kKindNumber` is `Int|Frac`.
+- `kKindFile` and `kKindStream` are `Handle|bit`.
+
+Examples:
+
+| Site | Operand sets | Kind-certain? |
+| --- | --- | --- |
+| `"a" - n`, n a Number | {String} and {Int, Frac} | **yes**: `-` admits only number with number |
+| `v - 1`, v ∈ {String, Array} | | **yes** |
+| `v - 1`, v ∈ {String, Int} | | **no**: Int with Int is admitted; this is the union sub-case, refused |
+| `"a" < 1` | | yes |
+| `v < "b"`, v ∈ {Int, String} | | no: String with String is admitted |
+| `f.length()`, f a File | {Handle\|file bit} | **yes**: `length` admits no handle kind |
+| `x.length()`, x ∈ {String, Int} | | no |
+
+The tests (5.7) include Int|Frac operands (`"a" - n` with n assigned both 1 and 1.5) and handle operands (`File`,
+`Stream`).
 - For receiver sites, the receiver is not a struct kind whose schema could supply the member or method. For example,
   `method:*` on a struct receiver stays with the struct rows.
 
@@ -463,16 +543,124 @@ The compiler already has the raise-at-point primitive used by the CP25 correctio
 
    Every other site, and every site of a reason not on the list, keeps `fail()` unchanged. Membership is a lookup,
    never a default.
-3. **Name certainty** applies to the callee-named sites: `static-error:arity`, the L-defer callables and the
-   call-local (i) built-ins. It holds when the callee name is bound to no variable, parameter, function or import
-   anywhere in the program, across all units. In that case no caller frame can supply it, and legacy's built-in or
-   top-level resolution is the only one. Otherwise the site keeps the refusal. (`callable:*` stays excluded whatever
-   this check says, unless the owner rules otherwise, section 7.)
+3. **Name certainty** (C120; the full rule is in "Name certainty" below). It applies to **every callee-named site**:
+   - the `builtin-arity` **free-function** sites;
+   - `callable:*`;
+   - `static-error:arity`;
+   - the L-defer callables;
+   - the call-local (i) built-ins.
+
+   It holds when the callee name is bound nowhere in the program. Method forms on a value receiver are not
+   callee-named and need no name certainty. Sessions never defer (see "Sessions" below).
 4. **Function granularity for declaration-level (i) refusals** that the resolver raises today (`fn-param` variadics,
    `lambda-variadic`): the function or lambda compiles as a stub whose body is the deferred op. Declaring or creating
    it is free; only a call raises.
 5. **Class (ii) rows only, plus the single-kind sub-case of the 19 mixed rows.** S and L-lang sites, the 1.3 exclusions
    and every 5.6 item keep the refusal.
+
+**Name certainty (C120; review P1-2 and section 2).** Dynamic scope can only supply a name that some frame binds. A
+callee-named site is deferred only when the **name scan** finds no binding of the callee's name. The scan covers:
+
+- **Every unit** of the linked program: the entry and every imported module, transitively. Eval units compiled by
+  `compile_eval_program` are whole programs and are scanned as such.
+- **Every binding form, at any depth, taken or not**, including code in untaken branches and uncalled functions:
+  - variables;
+  - parameters;
+  - lambda parameters;
+  - catch bindings;
+  - `for` bindings;
+  - destructuring bindings;
+  - **fn declarations, including nested and conditional ones.** Legacy registers a nested fn when its declaration
+    executes: `fn(m()) { fn(nope()) { return 5 }` / `return 0 }` / `m()` / then `g()` calling `nope()` prints 5.
+    The VM refuses it today (`callable:nope`).
+- **Struct names, and struct method names.** A free call inside a struct method resolves to the receiver's method in
+  legacy. Probe `sm.f`: `helper()` calls `nope()` from `S.run()`, `S` declares `nope`, and legacy prints 7.
+- **Import and export names.**
+- **Host-registered callables in embedded use.** Legacy consults `host_.has_host_callable` (ParserExpression.cpp:4272;
+  embed/Engine.cpp:102).
+  - The CLI registers none.
+  - An embedding engine must pass its registry to the scan; a registered name counts as bound.
+  - An engine that cannot do so turns name certainty off.
+- **Names created at run time by `run` or `cmd`: none.** They start separate processes and cannot bind names in this
+  one.
+
+**The dependency (a must-not-change item, 5.7).** The scan sees every binding only while every construct that could
+bind a name invisibly to the VM stays a whole-program refusal, even in dead code:
+
+- template text and fragments (`opaque:template-text`);
+- opaque or irregular parses (`opaque:irregular-legacy-parse` and the other `opaque:*`);
+- nested imports (`import-nested`);
+- dynamic imports (`import-dynamic`). A deferred `import-dynamic` would raise and never bind, so that one is safe
+  either way.
+
+`tests/runtime2/deferral_dependencies.py` (added in C120; `make test-runtime2-deferral-dependencies`, part of
+`test-rt-vm`) pins that each of these still refuses a dead-code program that legacy completes. It fails as soon as one
+stops refusing. The scan must be extended before that refusal is lifted.
+
+**Messages.** Legacy's undefined-callable message has exceptions: `inject`, `validate`, `copy` and `deepcopy` never
+give `undefined callable` (ParserExpression.cpp:4273). The L-defer built-ins have their own legacy errors when legacy
+cannot run them (`page: expected one page name`, `inject: source is not readable`). The VM's "not supported" message
+for them is VM-defined, because legacy runs them.
+
+**Built-in precedence against a binding of the same name.** This was probed in legacy for every builtin-arity member,
+in four forms, with a wrong argument count:
+
+- a caller-frame binding (`fn(h()) { return N(...) }` called from `m()`, which binds `N := (...) => "shadow"`);
+- a top-level binding;
+- `fn(N(...))`;
+- a parameter named N.
+
+| Free-function members | Legacy | Members |
+| --- | --- | --- |
+| 11 | **the binding wins** in all four forms (prints `shadow`) | `cancel`, `channel`, `deepcopy`, `map`, `recv`, `send`, `set`, `sha256`, `sha256_file`, `stack`, `validate` |
+| 50 | **the built-in wins** in all four forms (legacy raises its own error although the name is bound) | `arch`, `attr_escape`, `cat`, `cd`, `close`, `cp`, `env`, `epoch`, `exists`, `getenv`, `hardware_concurrency`, `html_escape`, the 15 `is_*` (including `is_dir` and `is_file`), `ls`, `make_dir`, `max`, `min`, `mkdir`, `mutex`, `mv`, `open`, `os`, `platform`, `pwd`, `range`, `remove`, `rm`, `same`, `setenv`, `sleep`, `stat`, `touch`, `type`, `unsetenv`, `url_encode`, `which` |
+| 62 | no free-function site (method form only, or not a bindable name: `atomic<bool>`, `atomic<int>`) | the rest |
+
+Each member row records its result: "C120 precedence" in the tsv disposition. The probe record is `rescan/p9/prec.json`.
+
+- **The hole is currently hidden.** For the 11 binding-wins members, the VM today refuses the shadowing program
+  anyway, with `binding-name-reserved`, `fn-name-reserved` or `param-name-reserved`, except for `cancel`, `channel`,
+  `recv` and `send`, where the VM already lets the binding win, as legacy does. But `binding-name-reserved` has status
+  `implement`, and `fn-name-reserved` cites D-009 #3 (user functions take precedence). Once those are implemented, a
+  deferred `sha256(...)` free-function site called through a caller's binding would raise where legacy prints the
+  binding's result. Name certainty closes the hole whatever those rows become.
+- **The rule is applied uniformly** to all 57 allow-listed free-form members, including the 50 where the built-in
+  wins. That is conservative. The precedence record would allow the condition to be dropped for those 50 later, by a
+  separate decision.
+- **The enclosing statement affects legacy's message.** Inside `return`, legacy prefixes the error
+  (`return: return: is_int: expected one value`). For `cat`, `cd`, `exists`, `is_dir`, `is_file`, `make_dir`, `mkdir`,
+  `open`, `stat` and `touch`, the message after the prefix is empty, while the top-level form says
+  `unknown value or malformed expression: ...`. The reached-variant tests must cover the statement context: `print`,
+  `return`, nested `return`, and assignment.
+
+**Sessions (review P1-1). Choice: session units never defer a kind- or name-dependent site.** In a session unit (a
+`nift -i` line, or any unit compiled against a session's accumulated state), every allow-listed site keeps today's
+refusal. This holds for every site, because every allow-listed site depends on a kind or a name.
+
+The alternative is to route the deferral decisions through the existing session re-check of earlier functions. That
+re-check already refuses an earlier function "in earlier input ... of the unit that defined it" when a later line
+widens a kind (`data[0].length()` variant). It is rejected for three reasons:
+
+1. **Name certainty cannot be established in a session at all.** Any later line can bind any name
+   (`fn(g()) { return nope() }`, then `fn(nope()) { return 5 }`, then `print(g())`: legacy prints 5). A re-check
+   would have to record every deferred callee name and test every binding of every later line against it. That is a
+   new session-wide invariant with its own failure modes (lines already executed, functions already called).
+2. **The kind re-check exists, but it is a refusal mechanism.** The deferral would have to be re-validated, and
+   possibly withdrawn, after the earlier line has run, then re-surfaced as a refusal of the later line. Since the
+   outcome on any change is a refusal anyway, the deferral saves only the dead-code case in interactive input, where
+   dead code is rare.
+3. **"Never defer" is one check at the allow-list lookup** (`unit.is_session()`) and needs no new session state. It is
+   trivially sound: sessions behave exactly as today. It also leaves D-067 #11 satisfied for scripts, modules and
+   eval units, which is where platform-dispatch code lives. Extending deferral to sessions later, through the
+   re-check, is possible as its own item.
+
+The two review programs are the session tests (5.7):
+
+- **The kind program:** `data := ["ab"]` / `fn(g()) { return data[0] - 1 }` / `print("defined")` / `data[0] = 2` /
+  `print(g())` / `print("end")`. Legacy prints `defined`, `1`, `end`. The VM keeps refusing line 2 with `type:-`
+  (probed, C120 record `p9/s/k.in`), and must never raise at line 5.
+- **The name program:** `fn(g()) { return nope() }` / `fn(nope()) { return 5 }` / `print(g())`. Legacy prints 5.
+  The VM keeps refusing line 1 with `callable:nope` (`p9/s/n.in`).
 
 **Per-site evaluation order and message (review P2-2), as measured in legacy.** In each probe program, `g(x)` prints
 `g` and `rr(x)` prints `r`. The evidence programs are in the C119 probe record (session scratch, `rescan/p7/r5.json`,
@@ -480,8 +668,8 @@ The compiler already has the raise-at-point primitive used by the CP25 correctio
 
 | Site (rows) | Legacy order before the error | Legacy message (template) | Evidence | Allow-list |
 | --- | --- | --- | --- | --- |
-| `builtin-arity:*` free function (`sha256(g(1), g(1))`) | **no argument** evaluated | `<name>: expected ...` (per member; 33 quirk messages kept verbatim) | prints nothing, then `sha256: expected one string or bytes value` | yes, the 119 members probed (`order_family.json`: 119 error-before-args) |
-| `builtin-arity:*` method form (`rr("a").trim(g(1))`) | the receiver, then the error; no argument | `<name>: expected no arguments` | prints `r`, then the error | yes (same 119) |
+| `builtin-arity:*` free function (`sha256(g(1), g(1))`) | **no argument** evaluated | `<name>: expected ...` (per member; 33 quirk messages kept verbatim; legacy prefixes the enclosing statement, e.g. `return: return: is_int: expected one value` inside nested returns) | prints nothing, then `sha256: expected one string or bytes value` | yes, the 57 free-form members probed (`order_family.json`), **only under name certainty** (C120, review P1-2) |
+| `builtin-arity:*` method form (`rr("a").trim(g(1))`) | the receiver, then the error; no argument | `<name>: expected no arguments` | prints `r`, then the error | yes, the 62 method-only members (no name certainty needed) |
 | `builtin-arity:cp`, `mv`, `rm`, `same` | not probed | | | **no**: they keep the refusal |
 | `builtin-receiver:*` (`rr(5).index_of(g(1))`) | the receiver, then the error; no argument | `<name>: unsupported for this value` | `r`, then the error; 21 members with arguments probed error-before-args, 56 take no arguments | yes, 77 (single-kind receiver; unions already run) |
 | `method:*` unknown method, binding receiver (`x.nope(g(1), g(2))`) | the receiver binding, then the error; no argument | `unknown value or malformed expression: <source text>` | prints nothing, then the error | yes, 41, **binding or plain-expression receivers only**. With a call receiver (`rr("a").nope(...)`), the VM today refuses `opaque:legacy-runtime-error` first, so that form stays refused |
@@ -509,7 +697,7 @@ The compiler already has the raise-at-point primitive used by the CP25 correctio
 | `coro-future-flow:CompoundAssign` | the right-hand side, then the error | `arithmetic operators require numeric operands` | `fu += g(1)`: `g`, then the error | yes, single-kind (future) |
 | `non-transferable` | the arguments, then the error | `thread: argument contains a non-transferable resource` | `g`, then the error; the VM refuses `host-handle-flow` first | **no** (5.6) |
 | `error-result-expression` | the callee | `print: parameter expression must resolve to a scalar value` | `h`, then the error; the VM refuses `interpolation:unknown-type` first | **no** |
-| `callable:*` (`abs(g(1), g(2))`) | no argument | `undefined callable: <name>` | prints nothing, then the error | **no** (dynamic scope, 1.3) |
+| `callable:*` (`abs(g(1), g(2))`) | no argument | `undefined callable: <name>` (never for `inject`, `validate`, `copy`, `deepcopy`: ParserExpression.cpp:4273) | prints nothing, then the error | **yes, under name certainty** (C120); excluded otherwise (1.3) |
 | L-defer callables, call-local (i) built-ins | no argument (the VM's own error) | `<construct> is not supported by the Runtime 2.0 VM` | VM-defined: legacy runs these | yes, under name certainty |
 
 The tsv rows carry the order class in the per-row evidence or the family row. The allow-list file is generated from
@@ -522,8 +710,33 @@ with 70.
 
 ### 5.3 Bottom kind (review P2-3)
 
-- A new kind bit, `kKindBottom`, distinct from every value kind, marks "this expression never produces a value: it
-  raises". The empty set 0 stays invalid: an assertion in the kind join and in the admission checks rejects 0.
+- A new kind bit, `kKindBottom = 1u << 24`, marks "this expression never produces a value: it raises".
+  - It is distinct from every value kind, from `Unknown` (bit 10), and from the handle and coroutine bits (11-23,
+    infer.h).
+  - Like the handle bits, it lies outside `kKindAll`, so no generic value operation admits it.
+- **Kind 0 keeps its existing meanings (review P2-2).** Bottom is not kind 0, and kind 0 is not made invalid. The
+  existing `kinds == 0` tests in src/rt are listed below. None of them may see Bottom as a substitute for its own
+  meaning:
+
+  | Site | Existing meaning of kind 0 | With Bottom |
+  | --- | --- | --- |
+  | infer_types.cpp:186-187 | an empty shape (empty array element, no fields) for shape equality | `{Bottom}` is not empty; a shape holding Bottom is compared as non-empty (conservative: may refuse, never admits more) |
+  | infer_collection.cpp:11, 68 | an empty-tuple or empty element ("stored nothing") | not reached by pure Bottom: an array or object literal with a `{Bottom}` element raises before construction, so the literal itself is `{Bottom}` (strictness rule below) |
+  | session_shape.cpp:16 | the element of an empty array in a session global | sessions never defer (5.2), so no Bottom here; asserted |
+  | infer_callable.cpp:46 | a pending callee (B4b 8) | a `{Bottom}` callee is a trap site, decided before the pending test |
+  | infer.cpp:314, 378 | session bottom arguments, session empty callee | sessions never defer; asserted |
+  | builtin_bind.cpp:11, 45 | `Receiver::None`, "never executed" parameter | a `{Bottom}` receiver is a trap site, decided before binding |
+  | op_admission.cpp:149 | no admission (refuse) for 0 or Unknown | `{Bottom}` is tested **before** the mask tests (`(k & ~kKindCollection) == 0` and the like) and yields the trap |
+  | infer_for.cpp:24 | a missing value kind becomes Unknown | a `{Bottom}` source is a trap site |
+
+- **The assertion is scoped.** "No operand kind is 0 or mixes Bottom with a value kind" is asserted only at the entry
+  of the admission and deferral decisions: `op_admission`, builtin receiver binding, and the deferral precondition
+  check. It does not cover the inference internals above, where 0 legitimately means empty or pending.
+- **The audit is part of the checkpoint.** Every `kinds == 0` and `kinds & ~mask` test that can now see a
+  Bottom-carrying set is listed in the checkpoint and given a test.
+- **Strictness rule.** An expression that unconditionally evaluates a `{Bottom}` subexpression (an operand, argument,
+  receiver, literal element or callee) is itself `{Bottom}`. Only a join of control-flow paths (conditional,
+  branch-assigned binding, `try`/`catch` binding) drops Bottom.
 - Kind rules:
   - A deferred op's result is `{Bottom}`.
   - `join(Bottom, K) = K` for any K that has a value kind, because the Bottom path never delivers a value.
@@ -559,48 +772,142 @@ Today the R1 guard refuses any host op in a program with imports. It uses `first
 at script_runner.cpp:325-339. So `import("./m.f")`, then `if (os() == "windows") { print(pwd()) }`, is refused. This
 conflicts with the platform-dispatch requirement (D-067 #11). The slot-2 repair (D-067 #8) is the place to decide.
 
-**Option (a): the slot-2 repair also admits host ops in uncalled functions and untaken branches.**
+**Option (a), the proposed slot-2 design (C120, revised per REVIEW-C119 section 3).** The slot-2 repair also admits
+host ops in uncalled functions and untaken branches. It replaces the per-proto scan with an order condition checked on
+the syntax of the linked program.
 
-The repair rule (rescan-post-cp1.md section 11) admits a program with imports if both conditions hold:
+A program with static imports is admitted when both conditions hold.
 
-1. Every import of the entry is in its **leading import block**: the imports are the first statements, before any
-   other statement.
-2. The **initialisation code of every module** in the graph contains no host op and no call.
+**E, the entry's leading import block.** Every top-level statement of the entry before its last `import(...)` is itself
+an `import(...)`. This is stricter than the section 11 proposal, which also allowed call-free declarations before the
+imports.
+
+**M, call-free and host-free module initialisation, transitively.** For **every module in the import graph**
+(followed from the entry through every module's own imports, diamonds included; the VM refuses
+`import-reinitialised` anyway), the module's initialisation code contains:
+
+- no host op, and
+- **no call**, where:
+  - **Initialisation code** means the module's top-level statements, and the expressions they evaluate, at any
+    nesting. The bodies of `fn` declarations, struct methods and lambdas are not included: they run only when called,
+    and calling one is itself a call.
+  - **A call** is any call node anywhere in that code:
+    - user-function, lambda and method calls;
+    - calls inside `$[...]` interpolation;
+    - calls inside template text (refused anyway, `opaque:template-text`);
+    - calls inside object and array literals;
+    - struct construction (`S(...)`, which runs field initialisers);
+    - any built-in that receives a callable (`[1].map(f)`, `sort_by`, `thread(f)`), because it runs user code.
+  - **Exempt:** the `import(...)` and `export(...)` statement forms. Every module uses `export(f)` in call syntax, and
+    without this exemption (a) would admit nothing.
+  - **Allowed (the optional item, included):** CallNative of a **non-host** built-in that receives no callable, such
+    as `print`, `abs`, string and collection methods, and `to_string`. Such a built-in performs no host operation and
+    runs no user code, so it cannot be "a host op before a module read". This is the allowance the section 11 proposal
+    already had. It is included because module initialisation commonly computes constants and prints banners, and
+    refusing those would leave most real modules outside (a). The allowance is sound only if the host set is complete
+    (next item), and the completeness test is its precondition.
+
+**H, a complete host set.** Today the host set is the contiguous block `HostOpen .. StreamEof` (`natives::host_builtin`,
+src/rt/natives/builtin.h:159), and `os`, `arch` and `platform` are in it. A `static_assert` at builtin.h:156 guards
+appends to builtin_list.inc. Two additions:
+
+- A table-driven test (`tests/runtime2/host_set_complete.py`) lists every built-in that touches the file system, the
+  environment, processes, the clock or the console input. The starting point is legacy's shell-completion name list
+  (`nift_completion_names`, src/CLI.cpp:2786), filtered to the effectful names, with `read`, `read_all`, `read_line`,
+  `run` and `cmd` added explicitly. For every such name that has a VM native, the test
+  asserts that the native lies in the host block. Future `read`, `run` and `cmd` natives fail the test until they join
+  the block.
+- The `static_assert` comment names that test.
 
 *Soundness argument: no host op can run before the last module read.*
 
-- Module reads happen at load. Under condition 1, the entry's imports are processed, and every module is read and
-  initialised, before the first non-import statement of the entry executes.
-- Under condition 2, module initialisation itself executes no host op. It also calls no function that could execute
-  one.
-- So the first point at which any host op can execute is after the leading block completes. That is after the last
-  module read, wherever the host op sits:
+- Module reads happen at load. The review's legacy probes confirm that legacy reads no module lazily or a second time
+  after entry execution starts:
+  - `cp("m2.f", "m.f")` after the leading imports overwrites the module, and `v()` still returns 1;
+  - the same holds in `thread(v)`.
+- Under E, the entry executes nothing but imports until every module is read and initialised.
+- Under M, initialisation runs no host op, and no user code that could run one: no call, apart from the two exempt
+  forms and non-host, callback-free natives. Under H, "non-host" is accurate.
+- So the first host op of the program can execute only after the leading block completes. That is after the last
+  module read, wherever the op sits:
   - a called function;
   - an uncalled function;
   - a taken or untaken branch;
   - a lambda;
-  - a method body.
-- No later module read exists: imports outside the leading block violate condition 1, and dynamic imports are
-  refused (`import-nested`, `import-dynamic`).
-- The R1 property ("host ops observe the same file system state as in legacy, because all module reads precede them")
-  therefore holds for every host op in the program. That includes host ops in code that never runs, for which the
-  property is vacuous.
-- No reachability or effect analysis is needed. The guard's per-proto scan is replaced by two syntactic checks: the
-  leading block, and the absence of host ops and calls in module init code. Uncalled and untaken host ops become
-  admissible.
-- Programs that fail either condition keep today's conservative refusal.
+  - a method body;
+  - a module function called after the imports.
+- No later module read exists: imports outside the leading block violate E, and nested and dynamic imports are refused
+  (`import-nested`, `import-dynamic`).
+- The R1 property (host ops observe the same file system state and trace order as in legacy) therefore holds for
+  every host op. For code that never runs it holds vacuously.
+- No reachability or effect analysis is needed.
+- The coroutine-module rules (CP22/CP23) are unchanged, because nothing precedes the leading block.
+- Low (review): with no calls in init, an error-order difference (a missing later module against an earlier module's
+  init error) is pre-existing linker behaviour, not introduced here.
+- Programs that fail E, M or H keep today's refusal, `module-host-op:<name>`, with a note naming the failed condition.
+
+**Tests** (extending `tests/runtime2/module_host_order.py`). Each admitted case must match legacy's output, file tree
+and `NIFT_TRACE_HOST` trace.
+
+Admitted:
+
+- a host op after all imports (read-only and mutating);
+- a host op in a function called after the imports;
+- a host op in an imported module's function called after the imports;
+- a host op in an uncalled function;
+- **a host op in an untaken branch;**
+- **an `os()`-guarded branch** (`import("./m.f")` / `if (os() == "windows") { print(pwd()) }`, prints `linux`);
+- **a lambda containing a host op, created after the imports**;
+- **a module whose init is `fn(f()) { ... }` / `export(f)`** (admitted: `export` is exempt);
+- a module whose init calls `print` and `abs` (admitted: the optional item);
+- a diamond import (`a` and `b` both import `c`).
+
+Refused:
+
+- host-before-import (top level, in a function called before an import, in a loop);
+- copy-over-module and remove-module before an import;
+- host-in-module-init with a later sibling import;
+- a nested-module function called during init;
+- **a call inside `$[...]` interpolation in module init** (`x := "$[f()]"`);
+- a call inside an object literal in init;
+- struct construction in init;
+- a callback built-in in init (`[1].map(f)`);
+- `cd` or `setenv` before an import;
+- a declaration before the first import in the entry (E).
+
+**Mutants:**
+
+| Mutant | Killed by |
+| --- | --- |
+| The prefix check (E) disabled | host-before-import, copy-over-module |
+| The module-init check (M) disabled | host-in-module-init |
+| "Calls count as safe" in init | the nested-module-function-during-init case |
+| **`export` not exempted** | the admitted `export(f)` module |
+| **An interpolation call missed in init** | the `$[f()]` refused case |
+| Not transitive (only direct imports checked) | host-in-module-init of a second-level module |
+| Callback natives counted as non-host calls | the `[1].map(f)` refused case |
+| A host native outside the host block | `host_set_complete.py` |
+| The existing R1 mutant (`-DNIFT_R1_MUTANT`) | kept |
+
+**Size:**
+
+- src: about **150-220 lines**:
+  - new `module_host_order.{h,cpp}` (E, the init walker with the call definition, the transitive graph walk, the
+    non-host callback-free predicate);
+  - about 20 lines in `script_runner.cpp` and `refusal_inventory.cpp`, which call it instead of the blanket scan (one
+    shared implementation);
+  - `module_host_op.h` keeps `first_module_host_op` for the message.
+- tests: about 350-450 lines.
+- This is essentially the section 11 estimate (120-180), plus the call definition and the host-set test.
 
 What it covers:
 
 - the platform-dispatch pattern after imports;
-- the 27 `module-host-op:*` rows in the usual layout (imports first).
+- the 27 `module-host-op:*` rows in the usual layout (imports first; module init free of calls apart from
+  `export`/`import` and non-host natives).
 
-What it does not cover:
-
-- host ops in module initialisation code;
-- imports after other statements.
-
-Both stay refused, with a diagnostic naming the condition.
+What it does not cover: host ops or user calls in module initialisation, and imports after other statements. Both stay
+refused.
 
 **Option (b): the owner accepts the gap.**
 
@@ -616,7 +923,9 @@ programs with imports.
 ### 5.6 Not in the bounded plan (each needs a separate owner decision)
 
 - **Union operations:** the union sub-cases of the 19 mixed rows (5.1 option (a)), as class (i) implement items.
-- **Dynamic scope:** `callable:*`, `free-name:*`, `assign-free-name` (1.3; D-067 #2c).
+- **Dynamic scope:** `free-name:*` and `assign-free-name` (1.3; D-067 #2c). Since C120, `callable:*` is deferred under
+  name certainty only; any callee whose name is bound somewhere keeps the refusal.
+- **Session units:** no deferral at all (5.2, "Sessions").
 - **Effect or reachability analysis:** coroutine admission scans (`coro-*` over protos), handle-flow analysis
   (`host-handle-flow`, `non-transferable`), capacity limits. The host-import guard is item 5.5, not this.
 - **Flow-sensitive inference:** binding-type conflicts (`context:assignment-*`, `for-missing-write`,
@@ -647,7 +956,26 @@ programs with imports.
 - **The union guard.** Each mixed row's union program stays refused with the row's reason.
 - **Inference non-poisoning.** The same unit, with and without the dead branch, gives the same kinds for reachable
   code.
-- **Bottom.** No kind 0 is reachable (assertion), and a `{Bottom}` operand compiles to the trap.
+- **Bottom.** At the admission and deferral entry points, no operand kind is 0 or mixes Bottom with a value kind (the
+  scoped assertion, 5.3). A `{Bottom}` operand compiles to the trap. The existing kind-0 uses keep their behaviour:
+  empty arrays, pending callees, session bottom arguments and `Receiver::None` give the same results as today.
+- **Kind certainty per site.** `"a" - n` with n ∈ {Int, Frac} is deferred. `v - 1` with v ∈ {String, Int} stays
+  refused. Handle operands (`File`, `Stream`) under `length` and `+` are deferred.
+- **Name certainty** (5.2):
+  - `if (false) { nope() }` / `print("success")` prints `success`.
+  - `if (false) { windows_only() }` runs.
+  - These stay refused: the caller-frame shadow (`fn(h()) { return sha256("a", "b") }` called from `m()`, which binds
+    `sha256`); a top-level binding, fn declaration or parameter named like the callee; a nested fn declaration
+    (`nf.f`); a conditional fn declaration; a struct method name (`sm.f`); an import or export name; a
+    host-registered callable in an embedded engine (an embed test registers `nope`).
+- **Statement context of messages.** The reached variants of each allow-listed site run in `print(...)`, `return`,
+  nested `return` and assignment. They match legacy's prefixed messages (`return: return: ...`), including the
+  empty-message quirk of the ten file-system built-ins.
+- **Sessions:** the kind and name programs of 5.2 keep today's refusal on line 2 and line 1 respectively, and neither
+  ever raises at its later line.
+- **Dependencies:** `tests/runtime2/deferral_dependencies.py` (in place since C120).
+- **Approved differences:** the parity matrix pins cases whose legacy outcome differs only through an approved
+  difference (5.1(2)) as that difference.
 - **Inventory mapping** (5.4).
 - **The allow-list against the tsv.** Every listed reason has a row whose disposition names it allow-listed. No
   excluded (1.3) or S row is listed.
@@ -669,13 +997,19 @@ programs with imports.
 | Bottom is treated as the empty set (checks pass vacuously) | the Bottom test: a `{Bottom}`-operand site is admitted as generic code, and the kind-0 assertion fires |
 | The kind-certainty check is removed (a union operand is deferred and raises unconditionally) | the union guard: the union program must stay refused, not raise at run time |
 | Evaluation order swapped (arguments evaluated before an arity or callee error, or operands skipped) | the reached variants' prefix markers |
-| A dynamic-scope callee is deferred (`callable:*`, `assign-free-name`) | the exclusion test: the 1.3 programs stay refused |
+| A dynamic-scope callee is deferred although its name is bound in some frame, or an `assign-free-name` site is deferred | the exclusion test: the 1.3 programs stay refused |
 | Wrong position | the reached variants' position check |
 | Catchability flipped | `try`/`catch` parity |
 | A deferred site is dropped from classify-all or from the inventory mapping | the 5.4 test |
 | An S row is deferred instead of refused | the S matrix: every 1.5 program stays refused in every dead-code context |
 | Allow-list default-on (an unlisted reason is deferred) | the allow-list test: an unlisted site in dead code stays refused |
 | The async raise aborts the scheduler instead of rejecting the future | the coroutine test |
+| **Session deferral frozen at definition** (session units defer like scripts) | the session tests: the kind program raises at line 5 or the name program at line 3, instead of the line-2 or line-1 refusal |
+| **A builtin-arity free-function site deferred despite a binding of its name** (name certainty skipped for built-ins) | the caller-frame `sha256` shadow program, which must stay refused |
+| **The name scan misses a nested or conditional fn declaration, or a struct method name** | `nf.f`, the conditional-declaration case and `sm.f`, which must stay refused |
+| **`export` not exempted** in the host guard's module-init check | the admitted `export(f)` module (5.5) |
+| **An interpolation call missed in module init** | the refused `$[f()]` module (5.5) |
+| The kind-0 assertion widened to the inference internals | the existing B4b and session suites (empty arrays, pending callees) |
 
 **Must not change:**
 
@@ -689,9 +1023,15 @@ programs with imports.
 - **Heap budget accounting.** The op allocates only the error value on raise. Stubs allocate nothing until called.
   Budget limits and heap statistics for units with unreached deferred sites equal those of the same unit with the
   sites removed.
-- **Sessions and eval.** Each compile unit (a session line, an `eval` unit) decides its deferred sites independently.
-  No deferred state, Bottom kind or allow-list decision leaks between units or between eval calls. A deferred site
-  reached in a later session line raises in that line.
+- **Sessions and eval** (corrected in C120, review P1-1). Session units never defer: every allow-listed site in a
+  session line keeps today's refusal, and the existing re-check of earlier functions is unchanged. An `eval` unit
+  (`compile_eval_program`) is a whole program: it decides its deferred sites itself, with the name scan over that
+  unit. No deferred state, Bottom kind or allow-list decision leaks between eval calls. (C119 wrote that "each session
+  line decides its deferred sites independently". That was wrong: a later line can widen a kind or bind a name that an
+  earlier line's function depends on.)
+- **The name-scan dependency** (5.2). Template text and fragments, opaque parses, nested imports and dynamic imports
+  stay whole-program refusals, in dead code too, until the name scan is extended to them. This is pinned by
+  `tests/runtime2/deferral_dependencies.py`.
 - **Coroutines.** A raise inside an async body rejects that future (CP22 L1/L4).
 - B4b/B5 contracts (stores, ownership, cycles, atomic commit) and R1.
 - No re-baselining.
@@ -702,7 +1042,10 @@ programs with imports.
   which must be reproduced verbatim;
 - catchability classes;
 - loop-context paths where legacy's message differs (prepared loops);
-- the method-form receiver evaluation when the receiver is itself a refused construct.
+- the method-form receiver evaluation when the receiver is itself a refused construct;
+- the statement-context prefixes of legacy's messages (5.2);
+- the 11 built-ins where a binding of the name wins in legacy. Their free-function sites are deferred only under name
+  certainty, and that must stay so if `binding-name-reserved` and `fn-name-reserved` are implemented.
 
 ### 5.8 Size and coverage (revised)
 
@@ -717,29 +1060,52 @@ programs with imports.
   `compiler_stmt_expr.cpp` and `compiler_thread.cpp` (the thread callee);
 - `resolver.cpp`: variadic stubs;
 - `refusal_inventory.cpp`: `deferred:` records;
+- `name_scan.{h,cpp}` (new): the whole-program name scan of 5.2, including nested and conditional fn declarations,
+  struct methods, imports and exports, and the embed registry hook;
+- `script_runner.cpp` and the session compiler: the `is_session` gate;
 - `tests/runtime2/cp25/inventory.py`: `reason_key`.
 
-The estimate is **about 400-600 lines of src** (C118 estimated 500-800, with fewer sites now). The tests and mutants
-are about 1000-1200 lines: the dead-code matrix, the union guards and the order prefixes per site.
+The estimate is **about 550-800 lines of src**. C119 estimated 400-600; the name scan adds about 120-180 and the
+session gate about 10. The tests and mutants are about 1300-1500 lines: the dead-code matrix, the union guards, the
+order prefixes and statement contexts per site, and the name-scan and session cases. The host-guard (a) work is slot 2's
+(5.5) and is not included.
 
 **Coverage of the X and L-defer set:**
 
 | Set | Rows | Deferred by the plan | Kept refused |
 | --- | --- | --- | --- |
-| X (ii) | 280 | **249** (89%) | 31: 12 dynamic scope, 4 arity members not probed, 15 inference, coroutine scans, handle flow, name resolution or order not probed |
+| X (ii) | 280 | **260** (93%): 249 as in C119, plus the 11 `callable:*` rows under name certainty | 20: `assign-free-name` (dynamic scope), 4 arity members not probed, 15 inference, coroutine scans, handle flow, name resolution or order not probed |
 | X single-kind sub-cases of the mixed (i) rows | 19 | **15** (the 16 `type:<op>` rows less `for-source-union`) | 4: order not probed |
 | L-defer | 10 | 9 callables under name certainty; `import-dynamic` only if nested imports in dead code are separately made admissible (today `import-nested` fires first) | 1 |
-| **X + L-defer, total** | **309** | **273** (88%) | 36 |
+| **X + L-defer, total** | **309** | **284** (92%) | 25 |
 
-C118 claimed about 284 of 299 X rows plus the 10 L-defer rows. The C119 plan covers less because of the dynamic-scope
-exclusion, the union restriction and the allow-list.
+Of the 260 X (ii) rows, **the following are deferred only under name certainty**:
+
+- the 57 allow-listed builtin-arity free-function members (their 62 method-only members need no name certainty);
+- the 11 `callable:*` rows;
+- `static-error:arity`.
+
+The 9 L-defer callables are also deferred only under name certainty. In session units nothing is deferred.
+
+C118 claimed about 284 of 299 X rows plus the 10 L-defer rows. C119 covered 273 of 309. C120 restores 11 rows by
+extending name certainty to `callable:*`, while adding the name condition to the builtin-arity free forms.
 
 The call-local class (i) families are also covered, for their unreachable occurrences: missing built-ins (under name
 certainty), lazy arguments, the arities legacy accepts, `sort`/`sort_by`, `?.`/`?[]`, statement forms and variadic
 stubs.
 
-Of the platform patterns in section 3, the plan fixes 5. The owner's `nope()` example and `windows_only()` stay
-refused (1.3). `module-host-op` depends on 5.5.
+**Platform patterns.** Section 3 lists 11 patterns refused today. The C120 plan fixes 7 of them:
+
+- **the owner's `if (false) { nope() }` / `print("success")`, which now prints `success`;**
+- `windows_only()`;
+- `"a" - 1`;
+- `sha256("a", "b")`;
+- `s.win_only()`;
+- the variadic lambda;
+- `secure_random_bytes`.
+
+With host guard (a) in slot 2, the `pwd()` after an import also runs, which makes 8. Three stay refused: `run` and
+`ffi_open` (deferred-named, D-065), and the ternary spelling.
 
 ## 6. Place in the owner's sequence
 
@@ -764,16 +1130,22 @@ The checkpoint is gated on an independent review of this revision.
 1. **`jump-outside-loop`:** confirm S (a deliberate departure from legacy, 1.5), or move it to X.
 2. **Approve the S departure as a whole** (1.5): legacy accepts all 10 S constructs in dead code, and the VM keeps
    refusing them.
-3. **The dynamic-scope exclusion** (1.3) stays until D-067 #2c is decided. Optionally, rule that a callee bound in no
-   unit of the program may be deferred (name certainty, 5.2 item 3). That would fix the owner's own `nope()` example.
-4. **Approve design (b)** (5.1-5.4): kind-certain, allow-listed deferral, a Bottom kind and inventory mapping. The
+3. **Name certainty** (5.2): approve deferring a callee-named site (`callable:*`, the builtin-arity free forms,
+   `static-error:arity`, the L-defer callables) when the whole-program scan finds no binding of the name. This is what
+   makes the owner's own `nope()` example print `success`. Without it, `callable:*` stays excluded (1.3), the
+   builtin-arity free forms must also be excluded (P1-2), and coverage falls to 206 of 309. Reads and assignments
+   of free names (`free-name:*`, `assign-free-name`) stay excluded until D-067 #2c is decided.
+4. **Sessions:** confirm that session units never defer (5.2). Extending deferral to sessions through the re-check is
+   a later item.
+5. **Approve design (b)** (5.1-5.4): kind-certain, allow-listed deferral, a Bottom kind and inventory mapping. The
    union operations (5.1 (a)) are class (i) implement items, to be decided per operator.
-5. **Host-import guard:** option (a) (the slot-2 repair covers uncalled and untaken host ops, 5.5) or option (b) (accept
-   the gap).
-6. **The 5 mixed rows with a verified position** (1.4: `ForBinding`, `Throw`, `interpolation:non-scalar`,
-   `type:member`, `type:script-return`): confirm that the position approval applies to their single-kind sub-case,
-   while the union sub-case stays a capability gap.
-7. **Decide separately on each 5.6 item**, or defer them.
-8. **The checkpoint's place:** its own checkpoint after slot 2 (recommended, 6).
-9. **The slot label of the D-067 #7 required features** (review of C117, P2). This is raised by the coordinator and is
+6. **Host-import guard:** option (a), the proposed slot-2 design (5.5: the leading import block; call-free module init
+   with `export`/`import` exempt and non-host, callback-free natives allowed; transitive; a complete host set), or
+   option (b) (accept the gap).
+7. **The 5 mixed rows with a verified position** (1.4: `ForBinding`, `Throw`, `interpolation:non-scalar`,
+   `type:member`, `type:script-return`): confirm that D-067 #1 covers the single-kind sub-case of these rows. The
+   union sub-case stays a capability gap, so the rows stay PENDING-OWNER.
+8. **Decide separately on each 5.6 item**, or defer them.
+9. **The checkpoint's place:** its own checkpoint after slot 2 (recommended, 6).
+10. **The slot label of the D-067 #7 required features** (review of C117, P2). This is raised by the coordinator and is
    not changed here.
