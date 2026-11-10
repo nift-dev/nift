@@ -23,8 +23,10 @@ report joins both with the committed classification
 (tests/runtime2/cp25/classification.tsv): reason, class (M A I T P H X),
 legacy behaviour, disposition, G2 approval, evidence. --check fails when a
 reason seen on the corpora has no classification row (G1), or a row names an
-unknown class. It does not decide G2: the `approval` column records the
-owner's ruling for each fallback reason, and `pending` is reported as such.
+unknown class or status. The `status` column (approved, deferred-named,
+implement, PENDING-OWNER; owner 2026-11-10 13:26) says where each reason stands
+for G2: --check reports every status, and exits 3 when a seen reason is still
+PENDING-OWNER (a release blocker), after G1 has passed.
 """
 import argparse
 import collections
@@ -39,6 +41,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rt-vm"))
+STATUSES = ("approved", "deferred-named", "implement", "PENDING-OWNER")
 CLASSES = {"M": "missing VM capability", "A": "compiler/admission limitation",
            "I": "intentional semantic refusal", "T": "deferred CP24", "P": "portability",
            "H": "test harness/fixture", "X": "outside release contract"}
@@ -225,16 +228,31 @@ def report(args):
         sys.stdout.write(text)
     for p in problems:
         print("INVENTORY:", p, file=sys.stderr)
-    # B17 (combined-b3-b5.md section 77): --check names every seen reason whose G2 approval is still
-    # pending (`pending ...` or `PENDING-OWNER ...`), so a pass of G1 is never read as G2 approval.
-    pending = sorted(r for r in seen if (row_for(r) or {}).get("approval", "").lower().startswith("pending"))
-    owner = [r for r in pending if (row_for(r) or {}).get("approval", "").startswith("PENDING-OWNER")]
+    # Owner 2026-11-10 13:26, item 6 (combined-b3-b5.md section 81): every row has a status, and a row
+    # never implies approval by itself. G1 (every seen reason has a row with a valid status) and the
+    # release state are reported separately: a PENDING-OWNER reason is a release blocker, so --check
+    # fails on it (exit 3) even when G1 passes.
+    for reason in sorted(seen):
+        row = row_for(reason)
+        if row is not None and row.get("status") not in STATUSES:
+            problems.append("invalid status %r for %s (one of %s)" % (row.get("status"), reason, ", ".join(STATUSES)))
+    by_status = collections.defaultdict(list)
+    for reason in sorted(seen):
+        by_status[(row_for(reason) or {}).get("status", "?")].append(reason)
+    owner = by_status.get("PENDING-OWNER", [])
     if args.check:
-        print("INVENTORY: G2 approval pending for %d of %d reason(s)%s: %s" % (
-            len(pending), len(seen), " (%d PENDING-OWNER: %s)" % (len(owner), ", ".join(owner)) if owner else "",
-            ", ".join(pending)), file=sys.stderr)
+        print("INVENTORY: G1 %s: %d reason(s) seen, %s" % (
+            "FAIL" if problems else "PASS", len(seen),
+            ", ".join("%s %d" % (k, len(by_status.get(k, []))) for k in STATUSES)), file=sys.stderr)
+        for status in ("deferred-named", "implement"):
+            print("INVENTORY: %s: %s" % (status, ", ".join(by_status.get(status, [])) or "none"), file=sys.stderr)
+        if owner:
+            print("INVENTORY: BLOCKED: %d PENDING-OWNER reason(s), not adjudicated: %s" % (len(owner), ", ".join(owner)),
+                  file=sys.stderr)
     if args.check and problems:
         return 1
+    if args.check and owner:
+        return 3
     return 0
 
 

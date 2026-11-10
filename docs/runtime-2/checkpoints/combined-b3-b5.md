@@ -4334,3 +4334,61 @@ owner-approved B5 semantic difference.
     bare import (`import(` with no `)`) is refused as `opaque:template-text`, where legacy reports
     `import has no matching ')'` at the import (`malformed.f:2:5`). The check that follows aborts
     there.
+
+## 86. Owner 13:26, item 6: the CP25-R inventory has a row and a status for every seen reason (C98, inventory)
+
+- **Missing rows.**
+  - Sources searched for refusal reasons seen on the release gates:
+    - the candidate's Linode gate logs (`not compiled for the VM (…)` and session refusals, 79
+      distinct reasons);
+    - the B25–B27 scope list;
+    - today's local reruns.
+  - Of the 95 reasons seen, **30 had no row** (exact, or a `prefix:*` family row). The scope's 11
+    are all among them.
+  - All 30 are added. Each row's legacy column names what the gate log shows, or says it was not
+    recorded there. Its evidence column names the gate.
+- **A `status` column on every row.** The four values:
+  - `approved`: an owner or coordinator ruling cited in `approval`;
+  - `deferred-named`: D-065, section 87;
+  - `implement`: approved for implementation before release, from the owner's production list of
+    13:26;
+  - `PENDING-OWNER`.
+- **How existing rows were mapped:**
+  - the five named deferrals → `deferred-named`;
+  - the four refusals of section 85 → `approved`;
+  - the production list → `implement`. Those reasons: index-target, index-assign-target,
+    compound-target, type:element-assignment, struct-field-init, context:struct-new,
+    prepared-unpreparable, declare-pattern, the bytes reasons, warn, err, postfix-spelling,
+    path-in-call-argument, binding-name-reserved, import-collision, read and number-literal.
+  - an `approval` citing a ruling (not "pending", "release approval pending" or "implementation
+    pending") → `approved`;
+  - everything else → `PENDING-OWNER`. A row never implies approval: an earlier `pending`
+    approval, a class H tooling row, and "owner ruling … release approval pending" all count as
+    PENDING-OWNER.
+- **Totals:** 241 rows. approved 54, deferred-named 17, implement 24, PENDING-OWNER 146.
+- **`inventory.py report --check`** reports G1 and the release state separately.
+  - It fails (exit 1) on an unclassified reason, an unknown class, or a status outside the four.
+  - Otherwise it prints `G1 PASS` with the count per status, the `deferred-named` and `implement`
+    reasons, and `BLOCKED: N PENDING-OWNER reason(s)` with their names.
+  - It then exits 3 while any seen reason is PENDING-OWNER. A G1 pass is never read as a release
+    pass.
+  - On the local inventory (`.build/cp25r-inventory`, collected from this candidate): G1 PASS with
+    157 reasons seen (approved 11, deferred-named 17, implement 19, PENDING-OWNER 110), exit 3.
+  - The 30 new rows are mostly from other gates, so they are not all in this inventory's 157.
+  - `make cp25r-inventory` (collect plus check) is the Linode run.
+- **Newly found, PENDING-OWNER (25):**
+  - binding-shadows-fn;
+  - builtin-arity:copy, builtin-arity:move, builtin-lazy-args:move;
+  - builtin-arity:sha256, builtin-arity:sha256_file;
+  - builtin-lazy-args:setenv, builtin-lazy-args:substr, builtin-lazy-args:validate,
+    builtin-receiver:substr;
+  - callable:assert, callable:len, callable:nosuch, method:nosuch;
+  - callable:module_path, callable:sorted_map, callable:sorted_set;
+  - context:number-to-int, context:object-length;
+  - for-capture-vanishing, host-handle-flow;
+  - method:sort (the comparator profile; seen on the Linode GCC 15.2 run);
+  - nesting-limit, text-type-name, type:>.
+- **Newly found, implement (5):** builtin-bytes:secure_random_bytes, callable:secure_random_bytes,
+  number-literal, prepared-unpreparable, type:element-assignment.
+- The full PENDING-OWNER list (146, the 25 above included) is the `status` column of
+  `tests/runtime2/cp25/classification.tsv`.
