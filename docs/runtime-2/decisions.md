@@ -2254,6 +2254,11 @@ attachments (0a4e481b: "Both decisions confirmed"; 1d728bb0: "Struct-to-async: e
    unreachable"); the example outside it is `if (false) { nope() }` / `print("success")`, which "must remain eligible
    for deferred error handling under the approved Slot 3 design. The inventory should distinguish these categories
    explicitly."
+   **Note (owner 2026-11-11 14:23, attachment bbd6a7a0; C127 accepted).** All ten rows have semantic approval under
+   D-068. Eight are `approved`. Two keep `implement`: `number-literal` ("diagnostic wording work remains") and
+   `import-opaque:legacy-runtime-error` ("error-position work remains"). They "retain their implementation status
+   because their diagnostic corrections are incomplete, not because their underlying early-refusal semantics are
+   unapproved." "Do not mark unfinished work complete merely to match the literal wording of the earlier approval."
 2. **Struct-to-async transfer: already approved.** "ALREADY APPROVED under D-NEXT-refsem #5, dated 2026-11-01. Close
    the inventory row as an existing approved semantic difference. Do not create a new approval. Retain the
    independent investigation and compatibility evidence. The recursive transfer-safety requirements for future
