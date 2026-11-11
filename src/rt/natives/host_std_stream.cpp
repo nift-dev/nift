@@ -54,11 +54,16 @@ bool std_stream_target(const std::filesystem::path& path) {
 // device: other character devices (terminals, /dev/kmsg, printers) keep the refusal.
 bool null_device(const std::filesystem::path& path) {
 #if defined(_WIN32)
-    return _wcsicmp(path.filename().wstring().c_str(), L"NUL") == 0;
+    // C139c L-b (uncompiled; unverified until Windows CI): no handle is opened. Win32 path normalization resolves the
+    // reserved device name to \\.\NUL; a literal file named NUL (made through a \\?\ path) is not normalized, so it
+    // keeps the refusal. Where normalization does not map the name, the refusal applies (the safe direction).
+    wchar_t full[MAX_PATH];
+    const DWORD n = GetFullPathNameW(path.wstring().c_str(), MAX_PATH, full, nullptr);
+    return n > 0 && n < MAX_PATH && _wcsicmp(full, L"\\\\.\\NUL") == 0;
 #else
     struct stat target{}, null{};
     return ::stat(path.c_str(), &target) == 0 && ::stat("/dev/null", &null) == 0 && S_ISCHR(target.st_mode) &&
-           target.st_rdev == null.st_rdev;
+           S_ISCHR(null.st_mode) && target.st_rdev == null.st_rdev;  // C139c L-a: /dev/null itself a char device
 #endif
 }
 

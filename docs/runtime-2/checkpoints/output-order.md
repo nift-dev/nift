@@ -136,3 +136,21 @@ C139a gates: nift sha256 `e028b964a2300d0a34b067aa0f5641a9c35c4eb1ee9f28d85b5252
   missing path, by `stat` only.
 
 C139b gates: nift sha256 `8729ccc2a8ffcf2cdf807a352e3b17060c45d386a92614ccb057ba5ae92d177b`: test-rt-lint and test-test-integrity PASS; test-runtime2-output-order PASS (49/49, the null-device unit, mutants 5 of 5 caught); test-runtime2-safety and its mutants PASS.
+
+## 6. C139c: the C139b review's records fix and hardening
+
+- R1: the approved-difference row `difference:worker-std-stream-refused` cited a test that does not exist
+  (`worker-chardev-refused`); it now cites the unit-level coverage, tests/rt/null_device_unit.cpp (section 5).
+- L-a: POSIX `null_device()` also requires `/dev/null` itself to be a character device (`S_ISCHR(null.st_mode)`)
+  before comparing `st_rdev`.
+- L-b: Windows `null_device()` no longer matches the file name `NUL` (a literal file named NUL made through a `\\?\`
+  path could pass it, and the worker exemption would then allow truncating a redirect target). It opens no handle:
+  `GetFullPathNameW` must normalize the path to the device `\\.\NUL`; a `\\?\` path is not normalized, so it keeps the
+  refusal, and wherever normalization does not map the reserved name the refusal applies (the safe direction).
+  **Uncompiled; unverified until Windows CI.**
+- Unit test: a scratch symlink to `/dev/null` (only the link is created, in scratch) is the null device (true).
+
+
+C139c gates: nift sha256 `2109124730b8ee01c57494267a923d60a17a6c4a91c8480c3a2a6096e4dd65d9`: test-rt-lint and test-test-integrity PASS;
+test-runtime2-output-order PASS (49/49, the null-device unit 0 failures with the symlink case, mutants 5 of 5
+caught); test-runtime2-safety and its mutants PASS.
