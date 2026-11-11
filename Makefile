@@ -1560,6 +1560,10 @@ test-rt-vm: test-runtime2-legacy-name-registration
 .PHONY: test-runtime2-output-order
 test-runtime2-output-order: $(TARGET)
 	$(PYTHON) -B tests/runtime2/output_order.py --nift "$(CURDIR)/$(TARGET)"
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) tests/rt/null_device_unit.cpp src/rt/natives/host_std_stream.o \
+		-o "$(TEST_DIR)/null-device-unit"
+	"$(TEST_DIR)/null-device-unit" "$(TEST_DIR)/null-device-unit.tmp"
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 

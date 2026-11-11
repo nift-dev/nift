@@ -10,7 +10,6 @@
 #include <windows.h>
 #else
 #include <sys/stat.h>
-#include <unistd.h>
 #endif
 
 namespace nift::rt::natives {
@@ -50,19 +49,16 @@ bool std_stream_target(const std::filesystem::path& path) {
 #endif
 }
 
-// REVIEW-C139 C2: a std stream that is a character device but no terminal (/dev/null; NUL on Windows) discards
-// what is written: a worker handle on it cannot lose or reorder output, so the worker refusal does not apply.
-bool discarding_device(const std::filesystem::path& path) {
+// REVIEW-C139 C2 (narrowed in C139b): the null device (/dev/null; NUL on Windows) discards what is written, so a
+// worker handle on it cannot lose or reorder output: the worker refusal does not apply to it. Only the null
+// device: other character devices (terminals, /dev/kmsg, printers) keep the refusal.
+bool null_device(const std::filesystem::path& path) {
 #if defined(_WIN32)
     return _wcsicmp(path.filename().wstring().c_str(), L"NUL") == 0;
 #else
-    struct stat target{};
-    if (::stat(path.c_str(), &target) != 0 || !S_ISCHR(target.st_mode)) return false;
-    struct stat fd{};
-    for (int n : {1, 2})
-        if (::fstat(n, &fd) == 0 && fd.st_dev == target.st_dev && fd.st_ino == target.st_ino && ::isatty(n))
-            return false;
-    return true;
+    struct stat target{}, null{};
+    return ::stat(path.c_str(), &target) == 0 && ::stat("/dev/null", &null) == 0 && S_ISCHR(target.st_mode) &&
+           target.st_rdev == null.st_rdev;
 #endif
 }
 
@@ -71,7 +67,7 @@ bool std_stream_open(const Context& context, const std::filesystem::path& path, 
     std_target = std_stream_target(path);
     if (!std_target) return true;
 #if !(defined(NIFT_OUTPUT_ORDER_MUTANT) && NIFT_OUTPUT_ORDER_MUTANT == 3)  // test-only: no worker refusal
-    if (context.in_worker && !discarding_device(path)) {
+    if (context.in_worker && !null_device(path)) {
         error = std::string(name) + ": a thread() or async() task cannot open the process's standard output or error";
         if (context.host.error_code)
             *context.host.error_code = name == "open" ? "io.open_failed" : "stream.open_failed";

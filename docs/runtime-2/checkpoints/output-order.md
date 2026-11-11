@@ -41,8 +41,9 @@ the `save()` checkpoint (D-077 #5 item 3); this checkpoint never calls `save()` 
   `ofstream: a thread() or async() task cannot open the process's standard output or error` (`stream.open_failed`;
   `open: ...` with `io.open_failed`). Worker `print`, `cat` and ordinary file I/O are unaffected. Recorded as the
   approved difference `difference:worker-std-stream-refused`. Exact scope (C139a, REVIEW-C139 C2, confirmed by a
-  run with stdout on /dev/null: the C139 VM refused what legacy opens): a std stream that is a character device but
-  not a terminal (`/dev/null`; `NUL` on Windows) is exempt, since nothing written there can be lost or reordered.
+  run with stdout on /dev/null: the C139 VM refused what legacy opens; narrowed in C139b): the null device
+  (`/dev/null`, compared by `st_rdev`; `NUL` on Windows) is exempt, since nothing written there can be lost or
+  reordered. Every other character device (a terminal, `/dev/kmsg`, a printer) keeps the refusal.
 - **Not done (by design):** no global unbuffering, no per-print flush, no flush for unrelated files, no destructive
   path replacement, no change to `save()`.
 
@@ -120,3 +121,18 @@ P1 entry marked implemented, awaiting review.
 The suite has 49 cases; 5 mutants.
 
 C139a gates: nift sha256 `e028b964a2300d0a34b067aa0f5641a9c35c4eb1ee9f28d85b52528b56c08df6`: test-rt-lint, test-test-integrity PASS; test-runtime2-output-order PASS (49/49, mutants 5 of 5 caught); test-runtime2-safety and its mutants PASS; one uninterrupted `make test-rt-vm` PASS. The C139 host, cp16-n1, rt-vm-mutants, callgrind and host-deps results are unaffected by these changes (the identity, worker gate and two mutant switches only) and were not re-run.
+
+## 5. C139b: review of C139a applied (one Low)
+
+- The worker exemption is narrowed to the null device: POSIX `S_ISCHR` and `st_rdev` equal to `stat("/dev/null")`;
+  Windows `NUL`. C139a exempted every non-terminal character device, which would also have exempted `/dev/kmsg`,
+  printers and similar devices, where written data is not discarded. Comments and the approved-difference row say
+  "null device".
+- Tests: `worker-devnull` is kept. An end-to-end case for a worker opening a non-null, non-terminal character std
+  stream needs nift's stdout on such a device; the only candidates here are a pseudo-terminal (which needs opening
+  /dev/ptmx from the harness) or a real device, so the case is covered at unit level instead:
+  tests/rt/null_device_unit.cpp (run by `make test-runtime2-output-order`) checks `null_device()` is true for
+  `/dev/null` and false for `/dev/zero` (a non-null character device), `/dev/tty`, a regular scratch file and a
+  missing path, by `stat` only.
+
+C139b gates: nift sha256 `8729ccc2a8ffcf2cdf807a352e3b17060c45d386a92614ccb057ba5ae92d177b`: test-rt-lint and test-test-integrity PASS; test-runtime2-output-order PASS (49/49, the null-device unit, mutants 5 of 5 caught); test-runtime2-safety and its mutants PASS.

@@ -19,6 +19,9 @@ struct Context;
 // CI). A path that does not exist is not a std stream.
 bool std_stream_target(const std::filesystem::path& path);
 
+// The null device (/dev/null by st_rdev; NUL on Windows): the only std stream a worker may open (C139b).
+bool null_device(const std::filesystem::path& path);
+
 // Before opening `path` (an output stream, or file().open, which reads it): when it is a std stream, publish the
 // program's pending output, or, in a thread() or async() task, refuse (D-073 #2): returns false with `error` set and
 // the caller returns Recoverable; nothing is opened or truncated. `std_target` records the identity for the handle.
