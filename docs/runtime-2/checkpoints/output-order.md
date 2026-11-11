@@ -26,8 +26,8 @@ the `save()` checkpoint (D-077 #5 item 3); this checkpoint never calls `save()` 
   `/proc/self/fd/1`, a user symlink, and the redirect target under its own name all match; another file on the same
   filesystem does not. The path is never opened (a FIFO cannot block), and the check runs before the open truncates or
   reads. Windows: `CON` and `CONOUT$`, or `GetFileInformationByHandle` (volume serial and file index) against
-  `GetStdHandle(STD_OUTPUT_HANDLE / STD_ERROR_HANDLE)` on a handle opened with no access rights. **Windows is coded
-  and CI-verified only; legacy's Windows behaviour has not been measured.**
+  `GetStdHandle(STD_OUTPUT_HANDLE / STD_ERROR_HANDLE)` on a handle opened with no access rights. **Windows is coded but
+  uncompiled; unverified until Windows CI; legacy's Windows behaviour has not been measured.**
 - **Boundaries**, only for a handle whose path is a std stream (a flag recorded at open):
   - before `ofstream(path)` (which truncates) and before `file(path).open(mode)` (which reads the target);
   - before each stream `write` / `write_line`, `flush` and `close`, and before `file().save()`;
@@ -40,7 +40,9 @@ the `save()` checkpoint (D-077 #5 item 3); this checkpoint never calls `save()` 
   (`ofstream`, `file().open`) is refused before anything is opened or truncated, with a catchable error:
   `ofstream: a thread() or async() task cannot open the process's standard output or error` (`stream.open_failed`;
   `open: ...` with `io.open_failed`). Worker `print`, `cat` and ordinary file I/O are unaffected. Recorded as the
-  approved difference `difference:worker-std-stream-refused`.
+  approved difference `difference:worker-std-stream-refused`. Exact scope (C139a, REVIEW-C139 C2, confirmed by a
+  run with stdout on /dev/null: the C139 VM refused what legacy opens): a std stream that is a character device but
+  not a terminal (`/dev/null`; `NUL` on Windows) is exempt, since nothing written there can be lost or reordered.
 - **Not done (by design):** no global unbuffering, no per-print flush, no flush for unrelated files, no destructive
   path replacement, no change to `save()`.
 
@@ -101,3 +103,20 @@ nift sha256 `cb820a494cb3a77f22853fe9923645988b9570b08035d60e87849d07e4e64cb6`; 
 test-runtime2-output-order (in test-rt-vm). Records: tsv `defect:print-cat-output-order` implement ->
 implemented-awaiting-review; new row `difference:worker-std-stream-refused` (approved, D-073 #2); known-limitations.md
 P1 entry marked implemented, awaiting review.
+
+## 4. C139a: review of C139 applied (REVIEW-C139-OUTPUT-ORDER: accept with conditions)
+
+- **C1 (test gap).** Two reviewer mutants survived the 46 cases. New pipe/file/2>&1 cases: `write-print-close`
+  (`print(1)` / write `S` / `print("P")` / `close` / `print(2)`: legacy and VM `1\nP\nS\n2\n`) and
+  `print-large-write` (`print("P")` then a 32 KiB write, larger than the stream buffer). New mutants
+  `NIFT_OUTPUT_ORDER_MUTANT=4` (no publish before `close`) and `=5` (no publish before `write`), each caught by its
+  case. Every publication boundary of a std-stream handle now has a mutant.
+- **C2 (narrowness).** Confirmed by running it (stdout on /dev/null: legacy opened `/dev/null` in a worker; the C139
+  VM refused it). A std stream that is a non-terminal character device is now exempt from the worker refusal; test
+  `worker-devnull` (stdout /dev/null, the result in a scratch file, legacy-equal). The approved-difference text
+  states the exact scope.
+- **C3.** The Windows identity code is "uncompiled; unverified until Windows CI" (section 1 and the header comment).
+
+The suite has 49 cases; 5 mutants.
+
+C139a gates: nift sha256 `e028b964a2300d0a34b067aa0f5641a9c35c4eb1ee9f28d85b52528b56c08df6`: test-rt-lint, test-test-integrity PASS; test-runtime2-output-order PASS (49/49, mutants 5 of 5 caught); test-runtime2-safety and its mutants PASS; one uninterrupted `make test-rt-vm` PASS. The C139 host, cp16-n1, rt-vm-mutants, callgrind and host-deps results are unaffected by these changes (the identity, worker gate and two mutant switches only) and were not re-run.

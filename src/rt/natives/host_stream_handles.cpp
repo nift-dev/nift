@@ -221,7 +221,9 @@ Status stream_write(const Context& context, const Value* args, std::uint32_t arg
     if (argc != 2) { error = "write: expected one value"; return Status::Error; }
     std::string data;
     if (!render_arg(args[1], data)) { error = "write: value is not directly renderable"; return Status::Error; }
+#if !(defined(NIFT_OUTPUT_ORDER_MUTANT) && NIFT_OUTPUT_ORDER_MUTANT == 5)  // test-only: no publish before write
     if (stream->std_stream) context.publish_output();  // D-073 #3: a write may overflow into the descriptor
+#endif
     stream->output->write(data.data(), static_cast<std::streamsize>(data.size()));
     if (!*stream->output) {
         error = "write: output failure";
@@ -275,7 +277,9 @@ Status stream_close(const Context& context, const Value* args, std::uint32_t arg
         return status;
     }
     if (!no_args(argc, "close", error)) return Status::Error;
+#if !(defined(NIFT_OUTPUT_ORDER_MUTANT) && NIFT_OUTPUT_ORDER_MUTANT == 4)  // test-only: no publish before close
     if (stream->open && stream->std_stream) context.publish_output();
+#endif
     if (stream->open) {
         if (stream->output) {
             stream->output->flush();

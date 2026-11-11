@@ -10,6 +10,7 @@
 #include <windows.h>
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace nift::rt::natives {
@@ -49,19 +50,35 @@ bool std_stream_target(const std::filesystem::path& path) {
 #endif
 }
 
+// REVIEW-C139 C2: a std stream that is a character device but no terminal (/dev/null; NUL on Windows) discards
+// what is written: a worker handle on it cannot lose or reorder output, so the worker refusal does not apply.
+bool discarding_device(const std::filesystem::path& path) {
+#if defined(_WIN32)
+    return _wcsicmp(path.filename().wstring().c_str(), L"NUL") == 0;
+#else
+    struct stat target{};
+    if (::stat(path.c_str(), &target) != 0 || !S_ISCHR(target.st_mode)) return false;
+    struct stat fd{};
+    for (int n : {1, 2})
+        if (::fstat(n, &fd) == 0 && fd.st_dev == target.st_dev && fd.st_ino == target.st_ino && ::isatty(n))
+            return false;
+    return true;
+#endif
+}
+
 bool std_stream_open(const Context& context, const std::filesystem::path& path, std::string_view name,
                      bool& std_target, std::string& error) {
     std_target = std_stream_target(path);
     if (!std_target) return true;
 #if !(defined(NIFT_OUTPUT_ORDER_MUTANT) && NIFT_OUTPUT_ORDER_MUTANT == 3)  // test-only: no worker refusal
-    if (context.in_worker) {
+    if (context.in_worker && !discarding_device(path)) {
         error = std::string(name) + ": a thread() or async() task cannot open the process's standard output or error";
         if (context.host.error_code)
             *context.host.error_code = name == "open" ? "io.open_failed" : "stream.open_failed";
         return false;
     }
 #endif
-    context.publish_output();
+    if (!context.in_worker) context.publish_output();
     return true;
 }
 

@@ -8,6 +8,7 @@ in scratch directories only, with the child's stdout redirected by this harness:
   file     stdout is the scratch file o.txt (`> o.txt`)
   append   o.txt already holds `PRE\\n` (`>> o.txt`)
   merged   stderr joins the stdout pipe (`2>&1`)
+  devnull  stdout is /dev/null (the worker-devnull case; its result is a scratch file)
 
 and compares exact bytes: stdout (or o.txt), stderr (scratch path removed), the exit status, and every other scratch
 file. The handle cases open `/dev/fd/1`, `/proc/self/fd/1` (Linux), a scratch symlink to `/dev/fd/1`, or the redirect
@@ -19,7 +20,8 @@ oracle; legacy's are recorded only.
 
   output_order.py --nift NIFT [--only SUBSTR]
   output_order.py --mutants        NIFT_OUTPUT_ORDER_MUTANT=1 (cat bypasses the VM output), =2 (no std-stream
-                                   identity) and =3 (no worker refusal), built by sanctioned_mutant.py, must each fail
+                                   identity), =3 (no worker refusal), =4 (no publish before close) and =5 (no publish
+                                   before write), built by sanctioned_mutant.py, must each fail
                                    the cases named in MUTANTS; the mutant directories are deleted afterwards.
 """
 import argparse
@@ -71,6 +73,17 @@ CASES = {
                            MODES),
     "cat-then-error": ('print(1)\ncat("a.txt")\nprint(1 / 0)\n', MODES),
     "print-then-error": ('print(1)\nprint(2)\nprint(1 / 0)\n', MODES),
+    # REVIEW-C139 C1: a pending print before close() and before a write that bypasses the stream buffer
+    "write-print-close": ('print(1)\nw := ofstream("/dev/fd/1")\nw.write("S\\n")\nprint("P")\nw.close()\nprint(2)\n',
+                          ("pipe", "file", "merged")),
+    "print-large-write": ('print(1)\nw := ofstream("/dev/fd/1")\nprint("P")\nbig := "%s"\nw.write(big + big + big + big)\n'
+                          'w.close()\nprint(2)\n' % ("x" * 8192), ("pipe", "file", "merged")),
+    # REVIEW-C139 C2: with nift's stdout on /dev/null (a character device, no terminal), a worker may open it
+    # (nothing can be lost or reordered); the result is written to an ordinary scratch file.
+    "worker-devnull": ('fn(w()) {\n  r := ofstream("res.txt")\n  try {\n    s := ofstream("/dev/null")\n'
+                       '    s.write("S\\n")\n    s.close()\n    r.write("opened\\n")\n  } catch (e) {\n'
+                       '    r.write("refused\\n")\n  }\n  r.close()\n  return 1\n}\nt := thread(w)\nprint(t.join())\n',
+                       ("devnull",)),
     # stderr handle under 2>&1
     "stderr-write-close": ('print(1)\ne := ofstream("/dev/fd/2")\ne.write("E\\n")\ne.close()\nprint(2)\n', MODES),
     # reads of the program's own output (the redirect target by name)
@@ -113,6 +126,8 @@ MUTANTS = {
     1: ["print-cat-print", "cat-module", "cat-binary"],
     2: ["write-close-fd", "write-flush-fd", "read-own-open", "read-own-cat"],
     3: ["worker-std-stream", "async-std-stream", "worker-std-stream-name", "worker-file-open"],
+    4: ["write-print-close"],  # no publish before close() (REVIEW-C139 C1)
+    5: ["print-large-write"],  # no publish before write() (REVIEW-C139 C1)
 }
 
 
@@ -129,7 +144,11 @@ def run(nift, src, mode, vm):
         os.symlink("/dev/fd/1", os.path.join(d, "out-link"))
         env = {"PATH": "/usr/bin:/bin", "HOME": d, "LANG": "C", "NIFT_VM": "require" if vm else "0"}
         out_path = os.path.join(d, "o.txt")
-        if mode in ("file", "append"):
+        if mode == "devnull":  # the child's stdout only; this harness never writes a device itself
+            p = subprocess.run(["timeout", "60", nift, "main.f"], cwd=d, env=env, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
+            stdout = b""
+        elif mode in ("file", "append"):
             with open(out_path, "wb") as f:
                 f.write(b"PRE\n" if mode == "append" else b"")
             with open(out_path, "ab" if mode == "append" else "r+b") as out:

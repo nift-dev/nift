@@ -15,8 +15,8 @@ struct Context;
 // True when `path` names the same object as file descriptor 1 or 2 (any alias: /dev/stdout, /dev/fd/1,
 // /proc/self/fd/1, a symlink, the redirect target under its own name). POSIX: stat(path), following links,
 // against fstat(1) and fstat(2) (st_dev, st_ino); the path is never opened, so a FIFO cannot block. Windows: the
-// console names CON and CONOUT$, or the file identity against GetStdHandle (CI-verified only). A path that does not
-// exist is not a std stream.
+// console names CON and CONOUT$, or the file identity against GetStdHandle (uncompiled; unverified until Windows
+// CI). A path that does not exist is not a std stream.
 bool std_stream_target(const std::filesystem::path& path);
 
 // Before opening `path` (an output stream, or file().open, which reads it): when it is a std stream, publish the
