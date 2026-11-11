@@ -15,6 +15,7 @@ struct FileResource {
     std::size_t cursor = 0;
     bool open = false, dirty = false, existed_at_open = false;
     bool saved_is_working = false;
+    bool std_stream = false;  // its path names the process's stdout or stderr (output-order repair)
     void prepare_mutation() {
         if (saved_is_working) { saved = working; saved_is_working = false; }
     }
@@ -36,6 +37,7 @@ struct StreamResource {
     std::filesystem::path path;
     bool open = false;
     bool closed = false;
+    bool std_stream = false;  // an output stream to the process's stdout or stderr (output-order repair)
 };
 
 } // namespace nift::rt::handles

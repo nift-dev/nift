@@ -221,6 +221,7 @@ Status stream_write(const Context& context, const Value* args, std::uint32_t arg
     if (argc != 2) { error = "write: expected one value"; return Status::Error; }
     std::string data;
     if (!render_arg(args[1], data)) { error = "write: value is not directly renderable"; return Status::Error; }
+    if (stream->std_stream) context.publish_output();  // D-073 #3: a write may overflow into the descriptor
     stream->output->write(data.data(), static_cast<std::streamsize>(data.size()));
     if (!*stream->output) {
         error = "write: output failure";
@@ -250,6 +251,7 @@ Status stream_flush(const Context& context, const Value* args, std::uint32_t arg
         error = "flush: stream is not open for writing";
         return Status::Error;
     }
+    if (stream->std_stream) context.publish_output();
     stream->output->flush();
     if (!*stream->output) {
         error = "flush: output failure";
@@ -273,6 +275,7 @@ Status stream_close(const Context& context, const Value* args, std::uint32_t arg
         return status;
     }
     if (!no_args(argc, "close", error)) return Status::Error;
+    if (stream->open && stream->std_stream) context.publish_output();
     if (stream->open) {
         if (stream->output) {
             stream->output->flush();
@@ -301,6 +304,14 @@ Status stream_close(const Context& context, const Value* args, std::uint32_t arg
 
 handles::CleanupOutcome cleanup_stream(handles::CleanupEvent& event) {
     auto stream = std::static_pointer_cast<StreamResource>(event.resource);
+    if (stream && stream->open && stream->std_stream && stream->output) {
+        // Output-order repair: legacy flushes an unclosed std-stream stream at process exit, after the program's
+        // output and its error message; the runner releases it then (release_std_stream_tail).
+        hold_std_stream(std::move(stream->output));
+        stream->open = false;
+        stream->closed = true;
+        return handles::CleanupOutcome::completed();
+    }
     if (stream && stream->open) {
         if (stream->output) {
             stream->output->flush();

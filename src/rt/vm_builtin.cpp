@@ -1,5 +1,6 @@
 #include "rt/vm_builtin.h"
 #include "rt/parallel_task.h"
+#include "rt/vm_coro.h"
 #include <atomic>
 
 #include "FileSystem.h"
@@ -153,6 +154,8 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.host.error_code = &context.host_error_code;  // N1: per-call Host code
     context.handles =
         handles::HandleAccess{&handle_table_, handle_context_open_ ? handle_context_ : handles::kDetached};
+    context.vm = this; context.emit = &Vm::native_emit; context.publish = &Vm::native_publish;  // output order
+    context.in_worker = options_.current_task != nullptr || (coro_ && coro_->current != 0);
     if (spec.id >= natives::BuiltinId::SharedMutex && spec.id <= natives::BuiltinId::AtomicCompareExchange) {
         context.protos = transfer_map_;
         context.task = options_.current_task;

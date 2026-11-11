@@ -1555,6 +1555,13 @@ test-runtime2-legacy-name-registration: $(TARGET)
 	$(PYTHON) -B tests/runtime2/legacy_name_registration.py --nift "$(CURDIR)/$(TARGET)"
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/legacy_name_registration.py --mutants
 test-rt-vm: test-runtime2-legacy-name-registration
+# Output-order repair (D-072 #1, D-073 #2-#3, D-077 #5 item 1): cat in program order, std-stream handles published
+# at their boundaries, the worker refusal; exact bytes against legacy, and the three negative controls.
+.PHONY: test-runtime2-output-order
+test-runtime2-output-order: $(TARGET)
+	$(PYTHON) -B tests/runtime2/output_order.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
+test-rt-vm: test-runtime2-output-order
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.

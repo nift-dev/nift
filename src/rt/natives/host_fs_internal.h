@@ -4,6 +4,7 @@
 // resolved paths legacy uses.
 #include "rt/natives/host_util.h"
 #include "rt/natives/host_fs_stream.h"
+#include "rt/natives/host_std_stream.h"
 #include "FileSystem.h"
 #include "ParserHostHelpers.h"
 #include "Proc.h"
@@ -192,6 +193,7 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
                          host_error("runtime.invalid_operation", std::string(name) + ": path is a directory"), error);
     }
     std::string data;
+    if (std_stream_target(call.target().path)) context.publish_output();  // a read of our own output (D-073 #3)
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
     std::error_code size_error;
     if (fs::is_regular_file(call.target().path, size_error)) {
@@ -228,8 +230,7 @@ inline Status read_source(const Context& context, const Value* args, std::uint32
         out = make_bytes(std::vector<std::uint8_t>(data.begin(), data.end()));
     } else if (cat) {
         if (finish_host(call, size, obs, error) != Status::Ok) return Status::Error;
-        if (!data.empty()) std::fwrite(data.data(), 1, data.size(), stdout);
-        std::fflush(stdout);
+        emit_program_output(context, data);  // D-072 #1: program output, in program order
         out = Value::null();
     } else {
         if (finish_host(call, size, obs, error) != Status::Ok) return Status::Error;

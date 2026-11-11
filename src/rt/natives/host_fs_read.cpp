@@ -23,6 +23,7 @@ Status host_sha256_file(const Context& context, const Value* args, std::uint32_t
     HostCall call(context.host, host::HostOp::ReadBytes, "sha256_file");
     if (resolve_arg(context, call, args, argc, 0, "sha256_file", error) != Status::Ok) return Status::Error;
     if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
+    if (std_stream_target(call.target().path)) context.publish_output();  // a read of our own output (D-073 #3)
     const auto result = nift::crypto::sha256_file(call.target().path);
     switch (result.status) {
         case nift::crypto::Sha256FileStatus::Ok: break;

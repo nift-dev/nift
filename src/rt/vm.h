@@ -311,8 +311,8 @@ private:
     bool builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault);  // CP14 built-ins
     bool struct_op(const Instr& in, const Note* note, Value* R, const Value* K, Fault& fault,
                    const Proto* proto);  // vm_struct.cpp
-    void flush_if_needed(std::string& output);
-    void drain_parallel_output(std::string& output);
+    void flush_if_needed(std::string& output); void drain_parallel_output(std::string& output);
+    static void native_emit(void* vm, std::string_view bytes); static void native_publish(void* vm);  // output order
     void finish_run(VmResult& result, std::string& output);
     bool in_loop_path(const Instr* pc) const;
     void note_large(const Instr* pc, Fault& fault);

@@ -44,6 +44,7 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
     call.adopt(file->path);
     if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
     if (!file->dirty) { call.succeed(); out = Value::null(); return Status::Ok; }
+    if (file->std_stream) context.publish_output();  // D-073 #3 (save()'s replacement of the target is F-save's)
     std::error_code ec;
     const auto parent = file->path.parent_path();
     if (!parent.empty() && !fs::exists(parent, ec)) {

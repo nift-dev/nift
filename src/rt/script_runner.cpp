@@ -14,6 +14,7 @@
 #include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
+#include "rt/natives/host_std_stream.h"
 #include "rt/opcodes.h"
 #include "rt/parser.h"
 #include "rt/refusal_text.h"
@@ -373,7 +374,9 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     stats.execute_us = micros(t2, Clock::now());
     if (result.coro) stats.coro_json = coro_stats_json(result);
     write_stdout(output, nullptr);
-    return finish_run(source, source_path, link, result, returned, stats, eval, exit_code);
+    const bool ok = finish_run(source, source_path, link, result, returned, stats, eval, exit_code);
+    natives::release_std_stream_tail();  // after the output and the error message, as legacy at exit (D-073 #3)
+    return ok;
 }
 
 } // namespace

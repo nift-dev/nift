@@ -45,9 +45,10 @@ Status ofstream_factory(const Context& context, const Value* args, std::uint32_t
     fs::path path;
     Status status = Status::Ok;
     if (!resolve_path(context, "ofstream", args[0], path, error, status)) return status;
+    bool std_target = false;  // D-073 #2-#3: before the open truncates; the path is only stat()ed
+    if (!std_stream_open(context, path, "ofstream", std_target, error)) return Status::Recoverable;
     auto stream = std::make_shared<StreamResource>();
-    stream->kind = StreamResource::Kind::Output;
-    stream->path = path;
+    stream->kind = StreamResource::Kind::Output; stream->path = path; stream->std_stream = std_target;
     stream->output = std::make_shared<std::ofstream>(path, std::ios::binary | std::ios::trunc);
     if (!*stream->output) {
         error = "stream.open_failed: cannot open path";
@@ -94,6 +95,8 @@ Status file_open(const Context& context, const Value* args, std::uint32_t argc, 
         call.fail(host::HostStatus::Fatal, host_error("runtime.invalid_operation", error));
         return Status::Error;
     }
+    bool std_target = false;  // D-073 #2-#3: before the read
+    if (exists && !std_stream_open(context, file->path, "open", std_target, error)) return Status::Recoverable;
     std::string data;
     if (exists) {
         std::string read_error;
@@ -118,7 +121,7 @@ Status file_open(const Context& context, const Value* args, std::uint32_t argc, 
     obs.bytes = data;
     obs.open_mode = mode;
     if (call.succeed(mode, obs) != host::HostStatus::Ok) return Status::Error;
-    file->mode = mode;
+    file->mode = mode; file->std_stream = std_target;
     file->existed_at_open = exists;
     if (mode == "w") {
         file->saved = std::move(data);
@@ -149,11 +152,8 @@ Status file_close(const Context& context, const Value* args, std::uint32_t argc,
     if (!file->open) { error = "close: file is not open"; return Status::Error; }
     if (file->dirty) { error = "close: file has unsaved changes; save() or revert() first"; return Status::Error; }
     file->open = false;
-    file->mode.clear();
-    file->working.clear();
-    file->saved.clear();
-    file->saved_is_working = false;
-    file->cursor = 0;
+    file->mode.clear(); file->working.clear(); file->saved.clear();
+    file->saved_is_working = false; file->cursor = 0;
     // Owner 2026-11-10 (decisions.md D-039 amendment): close() ends the buffer, not the file()
     // value: path(), exists() and open() work after it; other methods: "<m>: file is not open".
 #if defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 5  // mutant 5: D-039 for file() again

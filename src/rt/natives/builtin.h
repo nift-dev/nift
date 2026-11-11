@@ -64,6 +64,14 @@ struct Context {
     // N1: the code of the failing HostCall in this call (empty when the native
     // has no HostCall, e.g. validate's schema.rejected).
     std::string host_error_code;
+    // Output-order repair (D-072 #1, D-073 #3): the VM's output sink for natives that write program output (cat),
+    // publication of the VM's pending output before an operation on the process's own stdout or stderr, and whether
+    // the call runs in a worker (a thread() or async() task), which may not open a std-stream handle.
+    void* vm = nullptr;
+    void (*emit)(void* vm, std::string_view bytes) = nullptr;
+    void (*publish)(void* vm) = nullptr;
+    bool in_worker = false;
+    void publish_output() const { if (publish) publish(vm); }
     // Natives that build results proportional to more than their inputs check
     // the budget every kBudgetStride items.
     static constexpr std::size_t kBudgetStride = 1024;
