@@ -2445,7 +2445,7 @@ Gates at C124:
 The full test-rt-vm is not re-run (src unchanged).
 ## 25. C125: status changes under D-069 #4 (owner 2026-11-11 11:07, attachment aa18728e)
 
-Every status change of C125, with its citation. 265 rows changed. Each changed row's tsv disposition carries the same citation and keeps its slot.
+Every status change of C125 as corrected in C126, with its citation. 263 rows changed (C125 had 265: it also changed the family rows `method:*` and `callable:*`, which C126 reverts, review of C125 R1). Each changed row's tsv disposition carries the same citation and keeps its slot.
 
 **Status vocabulary (D-069 #4)**
 
@@ -2463,13 +2463,14 @@ Also: every row, seen or not, must carry a valid status, otherwise G1 fails (exi
 - **No row is marked implemented because it is scheduled.**
 - **Negative controls** are in `tests/runtime2/cp25/inventory_families.py`:
   - `status-accepted-seen`, `status-awaiting-unseen`, `status-accepted-unseen`, `status-invalid-unseen`;
-  - `--mutant status`, which drops the two new checks and is caught by `status-accepted-seen` and `status-awaiting-unseen`.
+  - `--mutant status`, which drops the two new checks and is caught by `status-accepted-seen` and `status-awaiting-unseen`;
+  - `--mutant validity` (C126), which drops the every-row-has-a-valid-status check and is caught by `status-invalid-unseen`.
 
 **Changes**
 
-- PENDING-OWNER -> implement, D-068 #1 (dead-code plan), slot 3 (246 rows): `builtin-arg-fault-context`, `builtin-arity:abs`, `builtin-arity:arch`, `builtin-arity:atomic<bool>`, `builtin-arity:atomic<int>`, `builtin-arity:attr_escape`, `builtin-arity:cancel`, `builtin-arity:cat`, `builtin-arity:cd`, `builtin-arity:ceil`, `builtin-arity:channel`, `builtin-arity:chunk`, `builtin-arity:close`, `builtin-arity:contains`, `builtin-arity:drop`, `builtin-arity:empty`, `builtin-arity:ends_with`, `builtin-arity:env`, `builtin-arity:eof`, `builtin-arity:epoch`, `builtin-arity:exists`, `builtin-arity:first`, `builtin-arity:flatten`, `builtin-arity:floor`, `builtin-arity:flush`, `builtin-arity:from_entries`, `builtin-arity:get`, `builtin-arity:getenv`, `builtin-arity:hardware_concurrency`, `builtin-arity:has`, `builtin-arity:highlight`, `builtin-arity:html_escape`, `builtin-arity:indexOf`, `builtin-arity:index_of`, `builtin-arity:is_array`, `builtin-arity:is_bool`, `builtin-arity:is_bytes`, `builtin-arity:is_collection`, `builtin-arity:is_dir`, `builtin-arity:is_enum`, `builtin-arity:is_file`, `builtin-arity:is_float`, `builtin-arity:is_function`, `builtin-arity:is_int`, `builtin-arity:is_null`, `builtin-arity:is_number`, `builtin-arity:is_object`, `builtin-arity:is_string`, `builtin-arity:is_struct`, `builtin-arity:last`, `builtin-arity:last_index_of`, `builtin-arity:length`, `builtin-arity:lock`, `builtin-arity:locked`, `builtin-arity:ls`, `builtin-arity:make_dir`, `builtin-arity:map`, `builtin-arity:max`, `builtin-arity:merge`, `builtin-arity:merge_deep`, `builtin-arity:min`, `builtin-arity:mkdir`, `builtin-arity:modified`, `builtin-arity:mutex`, `builtin-arity:omit`, `builtin-arity:open`, `builtin-arity:os`, `builtin-arity:path`, `builtin-arity:pick`, `builtin-arity:platform`, `builtin-arity:prettify`, `builtin-arity:pwd`, `builtin-arity:range`, `builtin-arity:read`, `builtin-arity:read_all`, `builtin-arity:read_line`, `builtin-arity:recv`, `builtin-arity:remove`, `builtin-arity:replace`, `builtin-arity:revert`, `builtin-arity:round`, `builtin-arity:save`, `builtin-arity:seek`, `builtin-arity:send`, `builtin-arity:set`, `builtin-arity:setenv`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:size`, `builtin-arity:sleep`, `builtin-arity:slice`, `builtin-arity:split`, `builtin-arity:stack`, `builtin-arity:starts_with`, `builtin-arity:stat`, `builtin-arity:stringify`, `builtin-arity:substr`, `builtin-arity:sum`, `builtin-arity:take`, `builtin-arity:tell`, `builtin-arity:to_double`, `builtin-arity:to_int`, `builtin-arity:to_lower`, `builtin-arity:to_string`, `builtin-arity:to_upper`, `builtin-arity:touch`, `builtin-arity:trim`, `builtin-arity:trim_end`, `builtin-arity:trim_start`, `builtin-arity:try_lock`, `builtin-arity:type`, `builtin-arity:unique`, `builtin-arity:unlock`, `builtin-arity:unsetenv`, `builtin-arity:url_encode`, `builtin-arity:validate`, `builtin-arity:which`, `builtin-arity:write`, `builtin-arity:write_line`, `builtin-receiver:abs`, `builtin-receiver:ceil`, `builtin-receiver:chunk`, `builtin-receiver:close`, `builtin-receiver:compare_exchange`, `builtin-receiver:contains`, `builtin-receiver:copy`, `builtin-receiver:decode`, `builtin-receiver:drop`, `builtin-receiver:empty`, `builtin-receiver:encode`, `builtin-receiver:ends_with`, `builtin-receiver:entries`, `builtin-receiver:eof`, `builtin-receiver:exchange`, `builtin-receiver:exists`, `builtin-receiver:fetch_add`, `builtin-receiver:fetch_sub`, `builtin-receiver:first`, `builtin-receiver:flatten`, `builtin-receiver:floor`, `builtin-receiver:flush`, `builtin-receiver:from_entries`, `builtin-receiver:front`, `builtin-receiver:get`, `builtin-receiver:has`, `builtin-receiver:indexOf`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:last`, `builtin-receiver:last_index_of`, `builtin-receiver:load`, `builtin-receiver:lock`, `builtin-receiver:locked`, `builtin-receiver:max`, `builtin-receiver:merge`, `builtin-receiver:merge_deep`, `builtin-receiver:min`, `builtin-receiver:modified`, `builtin-receiver:move`, `builtin-receiver:omit`, `builtin-receiver:open`, `builtin-receiver:path`, `builtin-receiver:pick`, `builtin-receiver:read`, `builtin-receiver:read_all`, `builtin-receiver:read_line`, `builtin-receiver:remove`, `builtin-receiver:replace`, `builtin-receiver:revert`, `builtin-receiver:round`, `builtin-receiver:save`, `builtin-receiver:seek`, `builtin-receiver:set`, `builtin-receiver:slice`, `builtin-receiver:split`, `builtin-receiver:starts_with`, `builtin-receiver:store`, `builtin-receiver:substr`, `builtin-receiver:sum`, `builtin-receiver:take`, `builtin-receiver:tell`, `builtin-receiver:to_double`, `builtin-receiver:to_int`, `builtin-receiver:to_lower`, `builtin-receiver:to_string`, `builtin-receiver:to_upper`, `builtin-receiver:top`, `builtin-receiver:trim`, `builtin-receiver:trim_end`, `builtin-receiver:trim_start`, `builtin-receiver:try_lock`, `builtin-receiver:unique`, `builtin-receiver:unlock`, `builtin-receiver:values`, `builtin-receiver:write`, `builtin-receiver:write_line`, `compound-operator`, `coro-future-flow:CompoundAssign`, `coro-thread-callee`, `expression-statement`, `method:*`, `method:all`, `method:any`, `method:append`, `method:cat`, `method:clear`, `method:count_by`, `method:cwd`, `method:env`, `method:file`, `method:find`, `method:find_index`, `method:group_by_each`, `method:index_by`, `method:insert`, `method:insert_after`, `method:insert_before`, `method:max_by`, `method:min_by`, `method:mv`, `method:nosuch`, `method:partition`, `method:pop`, `method:prepend`, `method:read_all_bytes`, `method:read_bytes`, `method:read_val`, `method:reduce`, `method:replace_once`, `method:reset`, `method:reverse`, `method:running`, `method:splice`, `method:stat`, `method:stderr`, `method:stdin`, `method:stdout`, `method:unique_by`, `method:write_bytes`, `method:write_val`, `push-receiver`, `static-error:arity`, `static-error:member-assign`, `static-error:struct-arity`, `struct-no-field`, `struct-private`
+- PENDING-OWNER -> implement, D-068 #1 (dead-code plan), slot 3 (245 rows): `builtin-arg-fault-context`, `builtin-arity:abs`, `builtin-arity:arch`, `builtin-arity:atomic<bool>`, `builtin-arity:atomic<int>`, `builtin-arity:attr_escape`, `builtin-arity:cancel`, `builtin-arity:cat`, `builtin-arity:cd`, `builtin-arity:ceil`, `builtin-arity:channel`, `builtin-arity:chunk`, `builtin-arity:close`, `builtin-arity:contains`, `builtin-arity:drop`, `builtin-arity:empty`, `builtin-arity:ends_with`, `builtin-arity:env`, `builtin-arity:eof`, `builtin-arity:epoch`, `builtin-arity:exists`, `builtin-arity:first`, `builtin-arity:flatten`, `builtin-arity:floor`, `builtin-arity:flush`, `builtin-arity:from_entries`, `builtin-arity:get`, `builtin-arity:getenv`, `builtin-arity:hardware_concurrency`, `builtin-arity:has`, `builtin-arity:highlight`, `builtin-arity:html_escape`, `builtin-arity:indexOf`, `builtin-arity:index_of`, `builtin-arity:is_array`, `builtin-arity:is_bool`, `builtin-arity:is_bytes`, `builtin-arity:is_collection`, `builtin-arity:is_dir`, `builtin-arity:is_enum`, `builtin-arity:is_file`, `builtin-arity:is_float`, `builtin-arity:is_function`, `builtin-arity:is_int`, `builtin-arity:is_null`, `builtin-arity:is_number`, `builtin-arity:is_object`, `builtin-arity:is_string`, `builtin-arity:is_struct`, `builtin-arity:last`, `builtin-arity:last_index_of`, `builtin-arity:length`, `builtin-arity:lock`, `builtin-arity:locked`, `builtin-arity:ls`, `builtin-arity:make_dir`, `builtin-arity:map`, `builtin-arity:max`, `builtin-arity:merge`, `builtin-arity:merge_deep`, `builtin-arity:min`, `builtin-arity:mkdir`, `builtin-arity:modified`, `builtin-arity:mutex`, `builtin-arity:omit`, `builtin-arity:open`, `builtin-arity:os`, `builtin-arity:path`, `builtin-arity:pick`, `builtin-arity:platform`, `builtin-arity:prettify`, `builtin-arity:pwd`, `builtin-arity:range`, `builtin-arity:read`, `builtin-arity:read_all`, `builtin-arity:read_line`, `builtin-arity:recv`, `builtin-arity:remove`, `builtin-arity:replace`, `builtin-arity:revert`, `builtin-arity:round`, `builtin-arity:save`, `builtin-arity:seek`, `builtin-arity:send`, `builtin-arity:set`, `builtin-arity:setenv`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:size`, `builtin-arity:sleep`, `builtin-arity:slice`, `builtin-arity:split`, `builtin-arity:stack`, `builtin-arity:starts_with`, `builtin-arity:stat`, `builtin-arity:stringify`, `builtin-arity:substr`, `builtin-arity:sum`, `builtin-arity:take`, `builtin-arity:tell`, `builtin-arity:to_double`, `builtin-arity:to_int`, `builtin-arity:to_lower`, `builtin-arity:to_string`, `builtin-arity:to_upper`, `builtin-arity:touch`, `builtin-arity:trim`, `builtin-arity:trim_end`, `builtin-arity:trim_start`, `builtin-arity:try_lock`, `builtin-arity:type`, `builtin-arity:unique`, `builtin-arity:unlock`, `builtin-arity:unsetenv`, `builtin-arity:url_encode`, `builtin-arity:validate`, `builtin-arity:which`, `builtin-arity:write`, `builtin-arity:write_line`, `builtin-receiver:abs`, `builtin-receiver:ceil`, `builtin-receiver:chunk`, `builtin-receiver:close`, `builtin-receiver:compare_exchange`, `builtin-receiver:contains`, `builtin-receiver:copy`, `builtin-receiver:decode`, `builtin-receiver:drop`, `builtin-receiver:empty`, `builtin-receiver:encode`, `builtin-receiver:ends_with`, `builtin-receiver:entries`, `builtin-receiver:eof`, `builtin-receiver:exchange`, `builtin-receiver:exists`, `builtin-receiver:fetch_add`, `builtin-receiver:fetch_sub`, `builtin-receiver:first`, `builtin-receiver:flatten`, `builtin-receiver:floor`, `builtin-receiver:flush`, `builtin-receiver:from_entries`, `builtin-receiver:front`, `builtin-receiver:get`, `builtin-receiver:has`, `builtin-receiver:indexOf`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:last`, `builtin-receiver:last_index_of`, `builtin-receiver:load`, `builtin-receiver:lock`, `builtin-receiver:locked`, `builtin-receiver:max`, `builtin-receiver:merge`, `builtin-receiver:merge_deep`, `builtin-receiver:min`, `builtin-receiver:modified`, `builtin-receiver:move`, `builtin-receiver:omit`, `builtin-receiver:open`, `builtin-receiver:path`, `builtin-receiver:pick`, `builtin-receiver:read`, `builtin-receiver:read_all`, `builtin-receiver:read_line`, `builtin-receiver:remove`, `builtin-receiver:replace`, `builtin-receiver:revert`, `builtin-receiver:round`, `builtin-receiver:save`, `builtin-receiver:seek`, `builtin-receiver:set`, `builtin-receiver:slice`, `builtin-receiver:split`, `builtin-receiver:starts_with`, `builtin-receiver:store`, `builtin-receiver:substr`, `builtin-receiver:sum`, `builtin-receiver:take`, `builtin-receiver:tell`, `builtin-receiver:to_double`, `builtin-receiver:to_int`, `builtin-receiver:to_lower`, `builtin-receiver:to_string`, `builtin-receiver:to_upper`, `builtin-receiver:top`, `builtin-receiver:trim`, `builtin-receiver:trim_end`, `builtin-receiver:trim_start`, `builtin-receiver:try_lock`, `builtin-receiver:unique`, `builtin-receiver:unlock`, `builtin-receiver:values`, `builtin-receiver:write`, `builtin-receiver:write_line`, `compound-operator`, `coro-future-flow:CompoundAssign`, `coro-thread-callee`, `expression-statement`, `method:all`, `method:any`, `method:append`, `method:cat`, `method:clear`, `method:count_by`, `method:cwd`, `method:env`, `method:file`, `method:find`, `method:find_index`, `method:group_by_each`, `method:index_by`, `method:insert`, `method:insert_after`, `method:insert_before`, `method:max_by`, `method:min_by`, `method:mv`, `method:nosuch`, `method:partition`, `method:pop`, `method:prepend`, `method:read_all_bytes`, `method:read_bytes`, `method:read_val`, `method:reduce`, `method:replace_once`, `method:reset`, `method:reverse`, `method:running`, `method:splice`, `method:stat`, `method:stderr`, `method:stdin`, `method:stdout`, `method:unique_by`, `method:write_bytes`, `method:write_val`, `push-receiver`, `static-error:arity`, `static-error:member-assign`, `static-error:struct-arity`, `struct-no-field`, `struct-private`
 - PENDING-OWNER -> implement, D-068 #1 and #3 (L-defer callable), slot 3 (7 rows): `callable:ffi_buffer`, `callable:ffi_bytes`, `callable:ffi_sizeof`, `callable:ffi_snapshot_bytes`, `callable:ffi_struct`, `callable:package_path`, `callable:page`
-- PENDING-OWNER -> implement, D-068 #3 (undefined-call deferral under full name certainty), slot 3 (11 rows): `callable:*`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:stringify`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`
+- PENDING-OWNER -> implement, D-068 #3 (undefined-call deferral under full name certainty), slot 3 (10 rows): `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:stringify`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`
 - retired -> PENDING-OWNER, D-069 #2 (1 rows): `builtin-arity:join`
 
 **Added:** `difference:async-struct-argument`, PENDING-OWNER (D-069 #6; see section 26).
@@ -2488,8 +2489,14 @@ Also: every row, seen or not, must carry a valid status, otherwise G1 fails (exi
   record is `tests/runtime2/cp23/CP22-CLASSIFICATION.tsv` `deep_chain.f`, `qualified:legacy-await-chain-defect`,
   under a different vocabulary. Unchanged and listed; the condition (the async-memory safety checkpoint) comes
   first.
-- **The family rows `builtin-arity:*` and `builtin-receiver:*`** (PENDING-OWNER). They classify unlisted members.
-  Their listed members are changed individually. Unchanged.
+- **The four family rows `builtin-arity:*`, `builtin-receiver:*`, `method:*`, `callable:*`** stay PENDING-OWNER.
+  A family row classifies every unlisted member through the family fallback, and D-068 #1 and #3 approve only the
+  listed, reviewed members. Those members are changed individually and keep their slot-3 notes.
+  - **Correction (C126).** C125 had changed `method:*` and `callable:*` to `implement`, and this list wrongly said that
+    the family rows were unchanged. C126 reverts both.
+  - **Control.** `inventory_families.py` `family-member-blocks`: an unlisted `callable:` or `method:` reason
+    classified only through its PENDING-OWNER family row blocks. `real-tsv-family-rows`: the four family rows in the
+    committed tsv are PENDING-OWNER.
 - **The D-067 #7 required features and the slot-2 and slot-7 rows** were already `implement` (C117, C122). No change.
 - **The slot-6 items** were already `implement`: the CP3 rows `fn-param`, `lambda-variadic`, `spread`,
   `declare-pattern`, and `number-literal`. Their slot labels (CP3, 13:26) are kept. No change.
@@ -2500,8 +2507,8 @@ Also: every row, seen or not, must carry a valid status, otherwise G1 fails (exi
 
 **Counts after C125**
 
-610 rows: approved 51, deferred-named 36, implement 340, implemented-awaiting-review 0, implemented-accepted 0,
-PENDING-OWNER 158, retired 25.
+610 rows: approved 51, deferred-named 36, implement 338, implemented-awaiting-review 0, implemented-accepted 0,
+PENDING-OWNER 160, retired 25 (C126; C125 had implement 340 and PENDING-OWNER 158 before the family-row revert).
 
 ## 26. C125: D-069 applied (tsv, docs and tests only)
 
@@ -2558,6 +2565,10 @@ These conditions are also recorded on the `struct-field-init` row.
 - The remaining mentions are historical or family notation, and are left unchanged on purpose:
   - docs/runtime-2/checkpoints/cp12-engine-selection.md:186, cp12b-coverage-inventory.md, cp13-diagnostics-design.md
     and cp14-builtins-design.md: family notation or historical counts;
+  - docs/runtime-2/checkpoints/b0-safety.md:152: family notation (added in C126);
+  - the historical evidence and disposition text inside tests/runtime2/cp25/classification.tsv (C111-C122 probe
+    outputs that record the old id as the binary emitted it, for example "VM type:*" in the type:mul,
+    for-source-union and earlier rows) (added in C126);
   - docs/runtime-2/evidence/**: frozen evidence;
   - decisions.md D-068 #12: describes the rename;
   - this file's sections before 23: historical;
@@ -2582,3 +2593,38 @@ Gates at C125:
 Compared with C124 (138 seen, implement 27, PENDING-OWNER 72), 10 seen reasons move from PENDING-OWNER to implement
 (section 25). The same 138 reasons are seen. `builtin-arity:join` is not seen on the corpora: it is session-only.
 `git diff 4ff6c100 -- src/` is empty; the nift sha256 is unchanged.
+
+## 27. C126: review of C125 applied (tsv, docs and tests only)
+
+The review of C125 (REJECT, three fixes) is applied. src/ is unchanged since 4ff6c100; the nift sha256 is
+`78027d95...e1b495`.
+
+| Finding | Change |
+| --- | --- |
+| R1 family rows | `method:*` and `callable:*` reverted implement -> PENDING-OWNER. A family row never approves unlisted members; the listed members keep `implement` and their slot-3 notes. §25 corrected. New controls: `family-member-blocks` and `real-tsv-family-rows` (inventory_families.py) |
+| R2 `builtin-arity:join` | class H -> A and family F12-classify-all-switches -> F22-rescan-dynamic (sessions), as `session:opaque`: an admission limitation of the session path, since the script compiler admits the same call and runs it. Explained in the row; status PENDING-OWNER, outcome E2 session-only, reproducer and legacy comparison unchanged |
+| R3 D-069 | rewritten from the owner's attachment (aa18728e) with the owner's own wording: #3 (testing still required, failures reported accurately, complete evidence kept), #6 (the full investigation list, "Do not treat successful execution as proof of safety", "Escalate any demonstrated safety defect", "Do not alter production semantics without a separate decision"), and governance (the Linode and cross-platform gates stay mandatory; no integration, push, tag or release without explicit approval). #4 no longer claims that the D-067 #7, slot-2, slot-6 and slot-7 rows changed in C125 |
+| Low: L-defer | the 7 L-defer callables' dispositions say that only the dead-code deferral is approved, not the missing built-in |
+| Low: validity | `inventory_families.py --mutant validity` drops the every-row-has-a-valid-status check; caught by `status-invalid-unseen` |
+| Low: `type:*` list | §26 lists b0-safety.md:152 and the historical tsv text |
+
+The S rows' statuses are untouched; that is the owner's call.
+
+Gates at C126:
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS |
+| `make test-test-integrity` | clean |
+| inventory_families.py (11 cases) | PASS |
+| inventory_families.py `--mutant family`, `--mutant status`, `--mutant validity` | caught, caught, caught |
+| `make test-runtime2-reason-ids` (it runs the families suite and all three mutants) | PASS |
+| `make test-runtime2-inventory-limits` (and its mutant) | PASS |
+| `make test-runtime2-inventory-links` | PASS |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 138 reasons seen: approved 10, deferred-named 29, implement 37, implemented-awaiting-review 0, implemented-accepted 0, PENDING-OWNER 62, retired 0 |
+| `make -q` | exit 0, before and after |
+
+The seen counts are the same as C125. No seen reason is classified through a family fallback, so reverting the two
+family rows changes no seen count. `git diff 4ff6c100 -- src/` is empty, and the nift sha256 is unchanged.
+

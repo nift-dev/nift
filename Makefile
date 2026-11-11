@@ -4475,6 +4475,7 @@ test-runtime2-reason-ids: $(TARGET) $(REASON_ID_MUTANT_BIN_1) $(REASON_ID_MUTANT
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant family
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant status
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant validity
 test-rt-vm: test-runtime2-reason-ids
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
 CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))

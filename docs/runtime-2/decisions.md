@@ -2188,28 +2188,55 @@ numbering.
 ## D-069 — Slot 1 accepted; status vocabulary; three findings (owner, 2026-11-11 11:07, attachment aa18728e)
 
 The owner's ruling on the slot-1 freeze (4ff6c100, nift sha256 `78027d95...e1b495`). Each item is cited in the CP25-R
-inventory as "D-069 #n (owner 2026-11-11 11:07, attachment aa18728e)". The item titles are the owner's; the scope of
-each, as the integrator's brief of the same ruling states it, follows. Production is not reopened.
+inventory as "D-069 #n (owner 2026-11-11 11:07, attachment aa18728e)". Quotations are from the attachment
+(`aa18728e-attachment.txt`, its decision table, its detailed sections and its "Forwardable ruling"); C126 replaced
+C125's paraphrase with them (review of C125, R3).
 
-1. **Accept slot 1.** Slot 1 (D-068 #12: (a), (b), (c)) is accepted at 4ff6c100 with the binary
-   `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495`. Slot 2 starts after C125 is reviewed.
-2. **Restore `builtin-arity:join`.** retired -> PENDING-OWNER, class E2, session-only: the v45_threads handle-transfer
-   program under `nift -i` is refused at `<stdin>:2:24`, while legacy and the VM script both print 7/7. It is a
-   separate interactive thread-operation finding, not one of the session-presentation deferrals of D-067 #2b.
-3. **`NIFT_VM_COOPERATIVE_THREADS` is test-only.** It is not a supported runtime setting. The 8 rows that only that
-   switch emits stay retired; their test-mode gate coverage is recorded per row.
-4. **Implementation statuses.** Five distinct statuses: approved-not-implemented, implemented-awaiting-review,
-   implemented-accepted, approved deferral, pending owner. Rows the owner explicitly approved for implementation
-   (D-067 #7 required features; D-068 slots 2, 3 and 7; the slot-6 items) go from PENDING-OWNER to approved-not-
-   implemented, each citing its decision and keeping its slot. No row is marked implemented because it is scheduled.
-   Deferrals, genuinely pending rows, the 10 S rows and the 19 mixed (i) rows are not changed by this item.
-5. **Do not rewrite historical `type:*` evidence.** Frozen evidence, checksums and historical text stay as they are; a
-   documented mapping states that historical `type:*` (the multiplication refusal) is `type:mul` from slot 1 (C123).
-   Current docs and tests use `type:mul`.
-6. **Struct-to-async finding.** A new PENDING-OWNER row of class (iv) (the VM accepts what legacy rejects): NOT
-   approved; under investigation. Production semantics do not change.
+1. **Accept slot 1.** "ACCEPT, subject to correcting the inventory record." "Accept Slot 1 at commit `4ff6c100`.
+   Production binary SHA-256: `78027d95…e1b495`. The independently reviewed production changes and C124
+   test/documentation repairs are accepted. One inventory correction remains mandatory before Slot 2 starts. Do not
+   reopen the production implementation."
+2. **`builtin-arity:join`.** "YES — session-only, pending." "Restore this row from retired to pending, class E2. The
+   refusal is reachable during ordinary `nift -i` execution, while the equivalent VM script succeeds. Preserve the
+   reproducer and legacy comparison. Do not automatically apply the existing session-presentation deferrals. This is
+   a separate interactive thread-operation finding." ("This is a different capability: thread joining and argument
+   handling in interactive sessions.")
+3. **Cooperative threads.** "YES — retain the eight retirements." "Confirm `NIFT_VM_COOPERATIVE_THREADS` as a test-only
+   switch, not a supported public runtime setting. The eight rows that appear exclusively under this switch may
+   remain retired from the ordinary capability inventory. Retain their complete evidence and coverage in relevant
+   test-mode gates." "However, they should retain their evidence and remain covered by the applicable test-mode
+   gates. **Retired from user-facing capability decisions does not mean exempt from testing.** If tests using that
+   switch fail, they must still be reported accurately."
+4. **Inventory implementation statuses.** "YES, where implementation was explicitly authorised." "Change rows
+   explicitly approved for implementation from PENDING to IMPLEMENT. Distinguish approved-but-not-implemented,
+   implemented-awaiting-review and accepted. Do not change deferrals or genuinely pending decisions. Preserve the
+   owner-decision references and checkpoint assignments." The five statuses to keep separate: "Approved for
+   implementation, not yet implemented. Implemented, awaiting review. Implemented and accepted. Approved deferral.
+   Pending owner decision." "Do not mark a capability implemented merely because its checkpoint has been scheduled."
+   *Applied (C125, corrected in C126):* only rows still PENDING-OWNER whose implementation an owner ruling explicitly
+   authorises changed: the slot-3 dead-code members (D-068 #1, #3) and the 7 L-defer callables (dead-code deferral
+   only). The D-067 #7 required features and the slot-2, slot-6 and slot-7 rows were already `implement` before C125
+   (C117, C122) and did not change. The family rows `method:*` and `callable:*` stay PENDING-OWNER (C126).
+5. **Historical refusal identifiers.** "NO — preserve historical evidence." "Do not modify frozen evidence containing
+   `type:*`. Retain historical checksums and original text. Add a documented mapping from the historical
+   multiplication refusal `type:*` to the current `type:mul`. Use the current name in present-day documentation and
+   tests."
+6. **Struct-to-async transfer.** "YES — new pending compatibility/safety finding." "Add a new pending inventory and
+   release-audit finding. The VM accepts a struct transfer that legacy rejects as non-transferable. Do not approve
+   this difference yet. Investigate ownership, copying/sharing, mutable fields, opaque handles, aliases, concurrent
+   access and resource lifetime. Determine whether this is an intentional safe semantic improvement or an unsound
+   transfer. Escalate any demonstrated safety defect. Do not alter production semantics without a separate
+   decision." The review is to establish: "Whether the struct is copied, shared or transferred. Whether its fields
+   can contain mutable references or opaque handles. Whether the receiving task can observe or mutate data owned by
+   the caller. Whether the operation respects B2/B5 mutation and ownership contracts. Whether the behaviour is
+   deterministic under concurrent execution." "**Do not treat successful execution as proof of safety.**" "This
+   investigation can proceed independently of Slot 2, but any unsafe transfer finding must be escalated."
+
+**Governance (the attachment's "Next").** "Slot 1 is accepted; Slot 2 (the reviewed host-import guard) may start after
+the required bookkeeping correction. Maintain the sequential implementation, freeze, independent-review and
+owner-acceptance workflow. Outstanding Linode and cross-platform gates remain mandatory. No integration, push, tag or
+release without explicit approval." Slot 1 production is not reopened.
 
 Mapping onto the inventory vocabulary (tests/runtime2/cp25/inventory.py): approved-not-implemented = `implement`;
 implemented-awaiting-review = `implemented-awaiting-review`; implemented-accepted = `implemented-accepted`; approved
 deferral = `deferred-named`; pending owner = `PENDING-OWNER` (`approved` and `retired` keep their meanings).
-
