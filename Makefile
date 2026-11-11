@@ -5716,6 +5716,13 @@ include tests/runtime2/cp23/certification.mk
 # from the candidate binary, `--check` fails on an unclassified reason), and the
 # refusal contract of the D-077 #1 post-certification deferrals (post_cert_refusals.py:
 # a refusal-contract pass, not evidence that the deferred capabilities work).
+# D-077 #4: the platform subset table (tests/runtime2/platform_subset.py; docs/runtime-2/platform-subsets.md):
+# every exclusion has a concrete reason and every test-rt-vm suite is listed. The dispatch-only
+# runtime2-cross-platform workflow runs the subset itself on Linux, macOS and Windows.
+.PHONY: test-runtime2-platform-subset-table
+test-runtime2-platform-subset-table:
+	$(PYTHON) tests/runtime2/platform_subset.py --check
+test-rt-vm: test-runtime2-platform-subset-table
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
