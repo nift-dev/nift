@@ -17,6 +17,20 @@ The VM is the default scripting engine. A program that uses a construct the VM d
 
 Such a program is never run on legacy automatically (no silent fallback).
 
+### Reason identifiers renamed in slot 1 (owner 2026-11-11 05:41 and 11:07; D-068 #12, D-069 #5)
+
+The `<reason>` in the refusal text is a stable identifier. Slot 1 (C123) renamed three of them; nothing else in the
+refusal text changed. Historical evidence, checksums and older records keep the old spelling and are not rewritten.
+
+| Current id (from slot 1, C123) | Historical id (before C123) | Refusal |
+| --- | --- | --- |
+| `type:mul` | `type:*` | the multiplication operator on operand kinds the VM cannot prove (text "(*)" unchanged) |
+| `removed-builtin:async` | `async(callable, ...) was removed; declare an async function/lambda and call it directly` | the removed `async(...)` call form |
+| `removed-builtin:await` | `await(...) was removed; use 'await future' or 'await async_fn(args)'` | the removed `await(...)` call form |
+
+`type:*` in a historical record means the multiplication refusal, not a family of `type:` reasons. Pinned by
+`tests/runtime2/reason_ids.py`.
+
 The legacy interpreter remains available: with `NIFT_VM=0`, these constructs run as they did in
 Nift 4.x. Website builds keep the existing template renderer (D-053).
 
@@ -135,3 +149,12 @@ column is one of:
 - `retired`: a reason that is resolved or no longer emitted (it counts as none of the above).
 
 An inventory row never implies approval.
+
+## Release-audit items
+
+Findings that are not release blockers by themselves but must be decided in the release audit.
+
+| Item | Status | Record |
+| --- | --- | --- |
+| A struct instance passed to an async function: `struct(P) { v := 1 }` / `fn[async](af(p)) { return p.v }` / `print(await af(P()))` prints 1 on the VM; legacy errors "async function argument contains a non-transferable resource" (class iv) | NOT approved; under investigation (D-069 #6). The investigation found SAFE-IMPROVEMENT, no safety defect; the behaviour appears covered by the earlier approval D-NEXT-refsem #5 ("Struct instances cross too"), which the owner is to confirm | tsv row `difference:async-struct-argument`; rescan-post-cp1.md section 26 |
+

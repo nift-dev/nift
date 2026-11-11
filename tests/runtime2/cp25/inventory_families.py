@@ -15,11 +15,20 @@ classification, so the real tsv is not involved:
   type-mul-exact         `type:mul` with its exact row: G1 passes
   real-tsv-type-rows     the committed tsv has no `type:*` row and has a `type:mul` row
 
---mutant re-adds the generic family fallback (any `<prefix>:*`) to a scratch copy of inventory.py and
-runs the same cases against it: the negative control. The suite must then fail, on the named case
-unlisted-type-reason (a `type:*` row in the temporary classification would classify `type:zzz`).
+The status cases (owner 2026-11-11 11:07, decisions.md D-069 #4: the five implementation statuses):
 
-usage: inventory_families.py [--mutant]
+  status-accepted-seen     an `implemented-accepted` reason seen again: --check blocks (exit 3)
+  status-awaiting-unseen   an `implemented-awaiting-review` row, not seen: --check still blocks (exit 3)
+  status-accepted-unseen   an `implemented-accepted` row, not seen, the seen reason approved: exit 0
+  status-invalid-unseen    an unseen row with an unknown status (`implemented`): G1 fails (exit 1)
+
+--mutant family re-adds the generic family fallback (any `<prefix>:*`) to a scratch copy of inventory.py
+and runs the same cases against it: the negative control. The suite must then fail, on the named case
+unlisted-type-reason (a `type:*` row in the temporary classification would classify `type:zzz`).
+--mutant status drops the two implemented-status checks from the copy: the suite must then fail on
+exactly status-accepted-seen and status-awaiting-unseen. A bare --mutant means family.
+
+usage: inventory_families.py [--mutant [family|status]]
 """
 import argparse
 import json
@@ -38,9 +47,12 @@ EXACT = '''        prefix = reason.split(":")[0]
 '''
 GENERIC = '''        return cls.get(reason.split(":")[0] + ":*") if ":" in reason else None
 '''
+STATUS_CHECKS = ['    if args.check and by_status.get("implemented-accepted"):\n', "    if args.check and awaiting:\n"]
 
 
 def row(reason, status="PENDING-OWNER"):
+    if isinstance(reason, tuple):
+        reason, status = reason
     return "\t".join([reason, "A", "F-test", "legacy", "disposition", "approval", "evidence", "", status]) + "\n"
 
 
@@ -73,6 +85,21 @@ def cases(inventory):
         rc, err = report(inventory, os.path.join(work, "d"), ["type:mul"], ["type:mul"])
         if "G1 PASS" not in err:
             failures.append(("type-mul-exact", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "e"), ["type:mul"], [("type:mul", "implemented-accepted")])
+        if rc != 3 or "implemented-accepted reason(s) seen again: type:mul" not in err:
+            failures.append(("status-accepted-seen", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "f"), ["type:mul"],
+                         [("type:mul", "approved"), ("type:div", "implemented-awaiting-review")])
+        if rc != 3 or "implemented, awaiting review: type:div" not in err:
+            failures.append(("status-awaiting-unseen", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "g"), ["type:mul"],
+                         [("type:mul", "approved"), ("type:div", "implemented-accepted")])
+        if rc != 0 or "G1 PASS" not in err:
+            failures.append(("status-accepted-unseen", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "h"), ["type:mul"],
+                         [("type:mul", "approved"), ("type:div", "implemented")])
+        if rc != 1 or "invalid status 'implemented' for row type:div" not in err:
+            failures.append(("status-invalid-unseen", "rc %d %r" % (rc, err[-300:])))
     reasons = [l.split("\t", 1)[0] for l in open(TSV) if not l.startswith("#")]
     if "type:*" in reasons or "type:mul" not in reasons:
         failures.append(("real-tsv-type-rows", "type:* present %s, type:mul present %s" %
@@ -82,34 +109,44 @@ def cases(inventory):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mutant", action="store_true")
+    ap.add_argument("--mutant", nargs="?", const="family", choices=["family", "status"])
     a = ap.parse_args()
     if not a.mutant:
         failures = cases(INVENTORY)
         for name, why in failures:
             print("FAIL inventory families: %s: %s" % (name, why))
-        print("%s inventory families: 5 cases (family rows only for the four D-067 #10 families)" %
+        print("%s inventory families: 9 cases (family rows only for the four D-067 #10 families; the D-069 #4 statuses)" %
               ("FAIL" if failures else "PASS"))
         return 1 if failures else 0
     text = open(INVENTORY).read()
-    if text.count(EXACT) != 1:
-        print("FAIL inventory families mutant: harness: the exact-family code is not in inventory.py (stale mutant)")
-        return 1
+    if a.mutant == "family":
+        if text.count(EXACT) != 1:
+            print("FAIL inventory families mutant: harness: the exact-family code is not in inventory.py (stale mutant)")
+            return 1
+        mutated, expected = text.replace(EXACT, GENERIC), ["unlisted-type-reason"]
+    else:
+        if any(text.count(c) != 1 for c in STATUS_CHECKS):
+            print("FAIL inventory families status mutant: harness: the status checks are not in inventory.py (stale)")
+            return 1
+        mutated = text
+        for c in STATUS_CHECKS:
+            mutated = mutated.replace(c, "    if False:\n")
+        expected = ["status-accepted-seen", "status-awaiting-unseen"]
     with tempfile.TemporaryDirectory(prefix="inv-families-mutant-") as work:
         # Same depth below a root as tests/runtime2/cp25/ (inventory.py computes REPO = parents[2]).
         copy = os.path.join(work, "tests", "runtime2", "cp25", "inventory.py")
         os.makedirs(os.path.dirname(copy))
         with open(copy, "w") as f:
-            f.write(text.replace(EXACT, GENERIC))
+            f.write(mutated)
         failures = cases(copy)
     if any("Traceback" in why for _, why in failures):
         print("FAIL inventory families mutant: harness: the mutant copy crashed (not a detection): %r" % failures)
         return 1
     names = sorted(n for n, _ in failures)
-    if names != ["unlisted-type-reason"]:
-        print("FAIL inventory families mutant: expected only unlisted-type-reason to fail, got %s" % (names or "none"))
+    if names != expected:
+        print("FAIL inventory families mutant %s: expected only %s to fail, got %s" % (a.mutant, expected, names or "none"))
         return 1
-    print("PASS inventory families mutant: a generic family fallback is caught by unlisted-type-reason")
+    print("PASS inventory families mutant %s: caught by %s" % (a.mutant, ", ".join(expected)))
     return 0
 
 

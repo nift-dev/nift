@@ -2443,4 +2443,142 @@ Gates at C124:
 
 `git diff dda4a0c8 -- src/` is empty; nift sha256 `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495` (unchanged).
 The full test-rt-vm is not re-run (src unchanged).
+## 25. C125: status changes under D-069 #4 (owner 2026-11-11 11:07, attachment aa18728e)
 
+Every status change of C125, with its citation. 265 rows changed. Each changed row's tsv disposition carries the same citation and keeps its slot.
+
+**Status vocabulary (D-069 #4)**
+
+| Owner status | Inventory status | `--check` |
+| --- | --- | --- |
+| approved-not-implemented | `implement` | not a blocker by itself (as before) |
+| implemented-awaiting-review | `implemented-awaiting-review` (new) | blocks (exit 3) whether or not the reason is seen: the implementation is not accepted yet |
+| implemented-accepted | `implemented-accepted` (new) | blocks (exit 3) if the reason is seen again, like a retired reason; otherwise passes |
+| approved deferral | `deferred-named` | not a blocker (as before) |
+| pending owner | `PENDING-OWNER` | blocks (exit 3) when seen (as before) |
+
+Also: every row, seen or not, must carry a valid status, otherwise G1 fails (exit 1). `approved` and `retired` keep their meanings.
+
+- **No row has a new status yet.** Slot 1 implemented no capability rows.
+- **No row is marked implemented because it is scheduled.**
+- **Negative controls** are in `tests/runtime2/cp25/inventory_families.py`:
+  - `status-accepted-seen`, `status-awaiting-unseen`, `status-accepted-unseen`, `status-invalid-unseen`;
+  - `--mutant status`, which drops the two new checks and is caught by `status-accepted-seen` and `status-awaiting-unseen`.
+
+**Changes**
+
+- PENDING-OWNER -> implement, D-068 #1 (dead-code plan), slot 3 (246 rows): `builtin-arg-fault-context`, `builtin-arity:abs`, `builtin-arity:arch`, `builtin-arity:atomic<bool>`, `builtin-arity:atomic<int>`, `builtin-arity:attr_escape`, `builtin-arity:cancel`, `builtin-arity:cat`, `builtin-arity:cd`, `builtin-arity:ceil`, `builtin-arity:channel`, `builtin-arity:chunk`, `builtin-arity:close`, `builtin-arity:contains`, `builtin-arity:drop`, `builtin-arity:empty`, `builtin-arity:ends_with`, `builtin-arity:env`, `builtin-arity:eof`, `builtin-arity:epoch`, `builtin-arity:exists`, `builtin-arity:first`, `builtin-arity:flatten`, `builtin-arity:floor`, `builtin-arity:flush`, `builtin-arity:from_entries`, `builtin-arity:get`, `builtin-arity:getenv`, `builtin-arity:hardware_concurrency`, `builtin-arity:has`, `builtin-arity:highlight`, `builtin-arity:html_escape`, `builtin-arity:indexOf`, `builtin-arity:index_of`, `builtin-arity:is_array`, `builtin-arity:is_bool`, `builtin-arity:is_bytes`, `builtin-arity:is_collection`, `builtin-arity:is_dir`, `builtin-arity:is_enum`, `builtin-arity:is_file`, `builtin-arity:is_float`, `builtin-arity:is_function`, `builtin-arity:is_int`, `builtin-arity:is_null`, `builtin-arity:is_number`, `builtin-arity:is_object`, `builtin-arity:is_string`, `builtin-arity:is_struct`, `builtin-arity:last`, `builtin-arity:last_index_of`, `builtin-arity:length`, `builtin-arity:lock`, `builtin-arity:locked`, `builtin-arity:ls`, `builtin-arity:make_dir`, `builtin-arity:map`, `builtin-arity:max`, `builtin-arity:merge`, `builtin-arity:merge_deep`, `builtin-arity:min`, `builtin-arity:mkdir`, `builtin-arity:modified`, `builtin-arity:mutex`, `builtin-arity:omit`, `builtin-arity:open`, `builtin-arity:os`, `builtin-arity:path`, `builtin-arity:pick`, `builtin-arity:platform`, `builtin-arity:prettify`, `builtin-arity:pwd`, `builtin-arity:range`, `builtin-arity:read`, `builtin-arity:read_all`, `builtin-arity:read_line`, `builtin-arity:recv`, `builtin-arity:remove`, `builtin-arity:replace`, `builtin-arity:revert`, `builtin-arity:round`, `builtin-arity:save`, `builtin-arity:seek`, `builtin-arity:send`, `builtin-arity:set`, `builtin-arity:setenv`, `builtin-arity:sha256`, `builtin-arity:sha256_file`, `builtin-arity:size`, `builtin-arity:sleep`, `builtin-arity:slice`, `builtin-arity:split`, `builtin-arity:stack`, `builtin-arity:starts_with`, `builtin-arity:stat`, `builtin-arity:stringify`, `builtin-arity:substr`, `builtin-arity:sum`, `builtin-arity:take`, `builtin-arity:tell`, `builtin-arity:to_double`, `builtin-arity:to_int`, `builtin-arity:to_lower`, `builtin-arity:to_string`, `builtin-arity:to_upper`, `builtin-arity:touch`, `builtin-arity:trim`, `builtin-arity:trim_end`, `builtin-arity:trim_start`, `builtin-arity:try_lock`, `builtin-arity:type`, `builtin-arity:unique`, `builtin-arity:unlock`, `builtin-arity:unsetenv`, `builtin-arity:url_encode`, `builtin-arity:validate`, `builtin-arity:which`, `builtin-arity:write`, `builtin-arity:write_line`, `builtin-receiver:abs`, `builtin-receiver:ceil`, `builtin-receiver:chunk`, `builtin-receiver:close`, `builtin-receiver:compare_exchange`, `builtin-receiver:contains`, `builtin-receiver:copy`, `builtin-receiver:decode`, `builtin-receiver:drop`, `builtin-receiver:empty`, `builtin-receiver:encode`, `builtin-receiver:ends_with`, `builtin-receiver:entries`, `builtin-receiver:eof`, `builtin-receiver:exchange`, `builtin-receiver:exists`, `builtin-receiver:fetch_add`, `builtin-receiver:fetch_sub`, `builtin-receiver:first`, `builtin-receiver:flatten`, `builtin-receiver:floor`, `builtin-receiver:flush`, `builtin-receiver:from_entries`, `builtin-receiver:front`, `builtin-receiver:get`, `builtin-receiver:has`, `builtin-receiver:indexOf`, `builtin-receiver:index_of`, `builtin-receiver:keys`, `builtin-receiver:last`, `builtin-receiver:last_index_of`, `builtin-receiver:load`, `builtin-receiver:lock`, `builtin-receiver:locked`, `builtin-receiver:max`, `builtin-receiver:merge`, `builtin-receiver:merge_deep`, `builtin-receiver:min`, `builtin-receiver:modified`, `builtin-receiver:move`, `builtin-receiver:omit`, `builtin-receiver:open`, `builtin-receiver:path`, `builtin-receiver:pick`, `builtin-receiver:read`, `builtin-receiver:read_all`, `builtin-receiver:read_line`, `builtin-receiver:remove`, `builtin-receiver:replace`, `builtin-receiver:revert`, `builtin-receiver:round`, `builtin-receiver:save`, `builtin-receiver:seek`, `builtin-receiver:set`, `builtin-receiver:slice`, `builtin-receiver:split`, `builtin-receiver:starts_with`, `builtin-receiver:store`, `builtin-receiver:substr`, `builtin-receiver:sum`, `builtin-receiver:take`, `builtin-receiver:tell`, `builtin-receiver:to_double`, `builtin-receiver:to_int`, `builtin-receiver:to_lower`, `builtin-receiver:to_string`, `builtin-receiver:to_upper`, `builtin-receiver:top`, `builtin-receiver:trim`, `builtin-receiver:trim_end`, `builtin-receiver:trim_start`, `builtin-receiver:try_lock`, `builtin-receiver:unique`, `builtin-receiver:unlock`, `builtin-receiver:values`, `builtin-receiver:write`, `builtin-receiver:write_line`, `compound-operator`, `coro-future-flow:CompoundAssign`, `coro-thread-callee`, `expression-statement`, `method:*`, `method:all`, `method:any`, `method:append`, `method:cat`, `method:clear`, `method:count_by`, `method:cwd`, `method:env`, `method:file`, `method:find`, `method:find_index`, `method:group_by_each`, `method:index_by`, `method:insert`, `method:insert_after`, `method:insert_before`, `method:max_by`, `method:min_by`, `method:mv`, `method:nosuch`, `method:partition`, `method:pop`, `method:prepend`, `method:read_all_bytes`, `method:read_bytes`, `method:read_val`, `method:reduce`, `method:replace_once`, `method:reset`, `method:reverse`, `method:running`, `method:splice`, `method:stat`, `method:stderr`, `method:stdin`, `method:stdout`, `method:unique_by`, `method:write_bytes`, `method:write_val`, `push-receiver`, `static-error:arity`, `static-error:member-assign`, `static-error:struct-arity`, `struct-no-field`, `struct-private`
+- PENDING-OWNER -> implement, D-068 #1 and #3 (L-defer callable), slot 3 (7 rows): `callable:ffi_buffer`, `callable:ffi_bytes`, `callable:ffi_sizeof`, `callable:ffi_snapshot_bytes`, `callable:ffi_struct`, `callable:package_path`, `callable:page`
+- PENDING-OWNER -> implement, D-068 #3 (undefined-call deferral under full name certainty), slot 3 (11 rows): `callable:*`, `callable:assert`, `callable:exit`, `callable:len`, `callable:nope`, `callable:nosuch`, `callable:stringify`, `callable:to_string`, `callable:undefined_fn`, `callable:undefined_thing`, `callable:unknown`
+- retired -> PENDING-OWNER, D-069 #2 (1 rows): `builtin-arity:join`
+
+**Added:** `difference:async-struct-argument`, PENDING-OWNER (D-069 #6; see section 26).
+
+**Not changed, and why**
+
+- **The 19 mixed (i) rows** (D-068 #6: they stay class (i) and are never narrowed). This includes the 5 rows whose precise
+  positions are approved for the certain-type case (D-068 #7): those are positions, not implementations, and the
+  rows stay PENDING-OWNER because of the union gap.
+- **The 10 S rows** (8 PENDING-OWNER and 2 implement). No ruling approves implementing them; D-068 #5 keeps them
+  rejected.
+- **`import-reinitialised`.** D-068 #10 records initialise-once as the intended semantics, but says that "a
+  bounded VM correction is still to be investigated; the row stays PENDING-OWNER". There is no explicit
+  implementation approval to cite, so it is listed here for the owner.
+- **Async self-recursion** (D-068 #9: conditional, safety checkpoint first). It has no row in this tsv: its
+  record is `tests/runtime2/cp23/CP22-CLASSIFICATION.tsv` `deep_chain.f`, `qualified:legacy-await-chain-defect`,
+  under a different vocabulary. Unchanged and listed; the condition (the async-memory safety checkpoint) comes
+  first.
+- **The family rows `builtin-arity:*` and `builtin-receiver:*`** (PENDING-OWNER). They classify unlisted members.
+  Their listed members are changed individually. Unchanged.
+- **The D-067 #7 required features and the slot-2 and slot-7 rows** were already `implement` (C117, C122). No change.
+- **The slot-6 items** were already `implement`: the CP3 rows `fn-param`, `lambda-variadic`, `spread`,
+  `declare-pattern`, and `number-literal`. Their slot labels (CP3, 13:26) are kept. No change.
+- **Rows already `approved`** that are also on the slot-3 allow-list (`method:nope`, `static-error:push-arity`,
+  `builtin-arity:deepcopy`) keep `approved`.
+- **Every remaining PENDING-OWNER row** is genuinely pending: D-067 #9 investigate-first, dynamic scope, not
+  allow-listed, consequential, or E/D artefacts.
+
+**Counts after C125**
+
+610 rows: approved 51, deferred-named 36, implement 340, implemented-awaiting-review 0, implemented-accepted 0,
+PENDING-OWNER 158, retired 25.
+
+## 26. C125: D-069 applied (tsv, docs and tests only)
+
+decisions.md D-069 records the ruling (owner 2026-11-11 11:07, attachment aa18728e). Production is not reopened:
+`git diff 4ff6c100 -- src/` is empty, and the nift sha256 is `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495`.
+
+| D-069 item | Applied |
+| --- | --- |
+| #1 accept slot 1 | recorded |
+| #2 `builtin-arity:join` | retired -> PENDING-OWNER, class E2, session-only. Reproducer kept: handle-transfer under `nift -i` is refused at `<stdin>:2:24`; legacy prints 7/7; the VM script prints 7/7. Not attached to the session-presentation deferrals |
+| #3 switch test-only | the 8 switch-only rows stay retired, each with the owner's confirmation and its test-mode gate coverage (below) |
+| #4 statuses | section 25 |
+| #5 `type:*` | the mapping is in known-limitations.md, "Reason identifiers renamed in slot 1"; historical evidence is untouched; the one present-tense table in dead-code-admission.md now says `type:mul` |
+| #6 struct-to-async | new row `difference:async-struct-argument` (class iv, PENDING-OWNER, NOT approved), and a known-limitations.md "Release-audit items" entry |
+
+**Test-mode gate coverage of the 8 switch-only rows (D-069 #3)**
+
+| Row | Gates that cover it under `NIFT_VM_COOPERATIVE_THREADS=1` |
+| --- | --- |
+| `coro-observe:done` | coro unit test (tests/rt/coro_unit.cpp:102, `make test-runtime2-cp22`, in test-rt-vm); CP22 mutant witness 13 (`r_obs_done_default.f` under A5_ON; `test-runtime2-cp22-mutants`, a certify target); inventory_limits.py |
+| `coro-observe:status` | CP22 mutant witness 13 (`r_obs_status_default.f`; certify target) and inventory_limits.py only: no test-rt-vm gate pins it under the switch |
+| `coro-observe:print` | coro unit test (coro_unit.cpp:100); CP22 witness 13 (`r_obs_print_default.f`); inventory_limits.py |
+| `coro-blocking-host:exists` | `test-runtime2-cp22 --mode refuse` with the switches (`r_ca_blocking_host.f`, `tr_exists.f`); inventory_limits.py |
+| `coro-blocking-host:file` | `test-runtime2-cp22 --mode refuse` (`r_int_cp17_task_file.f`, `r_int_cp17_main_file.f`); inventory_limits.py |
+| `coro-struct` | `test-runtime2-cp22 --mode refuse` (`r_struct.f`); b3_structs.py cooperative case (`test-runtime2-b3`); not in inventory_limits.py |
+| `coro-collection-callback` | `test-runtime2-cp22 --mode refuse` (`r_collection.f`); inventory_limits.py |
+| `coro-main-cell` | `test-runtime2-cp22 --mode refuse` (`r_main_cell.f`); not in inventory_limits.py |
+
+**Struct-to-async (D-069 #6, with the coordinator's addendum)**
+
+- The row stays PENDING-OWNER and is NOT approved.
+- The investigation (session scratch `review-ha/INVESTIGATE-STRUCT-ASYNC.md`) found SAFE-IMPROVEMENT and no safety
+  defect.
+- The earlier approval is decisions.md D-NEXT-refsem #5 ("Struct instances cross too (legacy refuses)") together
+  with compatibility.md. The owner is to confirm that D-NEXT-refsem #5 covers this; it is not a new difference.
+- Key convention: class (iv) rows are keyed `difference:<name>`, as `difference:import-depth` is.
+
+**CP2 review conditions (slot 4, `struct-field-init`; from the investigation's item 6)**
+
+Once struct fields can hold handles:
+
+1. A struct holding a file handle, passed to async and to thread: it is refused, or gives an error at await or
+   join; never a silent share.
+2. A struct holding a mutex: shared, with its identity kept.
+3. A struct holding a collection or a lambda: copied.
+4. A failed transfer that is never awaited.
+5. Whether the static `host-handle-flow` check sees through struct fields.
+
+These conditions are also recorded on the `struct-field-init` row.
+
+**Present-tense docs still saying `type:*`**
+
+- None for the multiplication reason after this change. The dead-code-admission.md table is fixed.
+- The remaining mentions are historical or family notation, and are left unchanged on purpose:
+  - docs/runtime-2/checkpoints/cp12-engine-selection.md:186, cp12b-coverage-inventory.md, cp13-diagnostics-design.md
+    and cp14-builtins-design.md: family notation or historical counts;
+  - docs/runtime-2/evidence/**: frozen evidence;
+  - decisions.md D-068 #12: describes the rename;
+  - this file's sections before 23: historical;
+  - tests/runtime2/cp25/differential.sh:43: a comment using family notation;
+  - tests that pin the old spelling on purpose: reason_ids.py (before texts) and inventory_families.py
+    (`old-type-star-spelling`).
+
+Gates at C125:
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS |
+| `make test-test-integrity` | clean |
+| inventory_families.py (9 cases), `--mutant family`, `--mutant status` | PASS, caught, caught |
+| `make test-runtime2-reason-ids` | PASS |
+| `make test-runtime2-inventory-limits` (and its mutant) | PASS |
+| `make test-runtime2-inventory-links` | PASS |
+| fresh `inventory.py collect` + `report --check` | **exit 3** (BLOCKED, intended): G1 PASS, 138 reasons seen: approved 10, deferred-named 29, implement 37, implemented-awaiting-review 0, implemented-accepted 0, PENDING-OWNER 62, retired 0 |
+| `make -q` | exit 0, before and after |
+
+Compared with C124 (138 seen, implement 27, PENDING-OWNER 72), 10 seen reasons move from PENDING-OWNER to implement
+(section 25). The same 138 reasons are seen. `builtin-arity:join` is not seen on the corpora: it is session-only.
+`git diff 4ff6c100 -- src/` is empty; the nift sha256 is unchanged.

@@ -2185,3 +2185,31 @@ import-identity tests; and #12, the slot-1 scope. The owner's attachment numbers
 record (its #9 is the slot-1 scope and its #11 the `import-reinitialised` item); the tsv cites this record's
 numbering.
 
+## D-069 — Slot 1 accepted; status vocabulary; three findings (owner, 2026-11-11 11:07, attachment aa18728e)
+
+The owner's ruling on the slot-1 freeze (4ff6c100, nift sha256 `78027d95...e1b495`). Each item is cited in the CP25-R
+inventory as "D-069 #n (owner 2026-11-11 11:07, attachment aa18728e)". The item titles are the owner's; the scope of
+each, as the integrator's brief of the same ruling states it, follows. Production is not reopened.
+
+1. **Accept slot 1.** Slot 1 (D-068 #12: (a), (b), (c)) is accepted at 4ff6c100 with the binary
+   `78027d9565d719f4ab95ad26d0fed460a795f69958eb0dcca3548f47f9e1b495`. Slot 2 starts after C125 is reviewed.
+2. **Restore `builtin-arity:join`.** retired -> PENDING-OWNER, class E2, session-only: the v45_threads handle-transfer
+   program under `nift -i` is refused at `<stdin>:2:24`, while legacy and the VM script both print 7/7. It is a
+   separate interactive thread-operation finding, not one of the session-presentation deferrals of D-067 #2b.
+3. **`NIFT_VM_COOPERATIVE_THREADS` is test-only.** It is not a supported runtime setting. The 8 rows that only that
+   switch emits stay retired; their test-mode gate coverage is recorded per row.
+4. **Implementation statuses.** Five distinct statuses: approved-not-implemented, implemented-awaiting-review,
+   implemented-accepted, approved deferral, pending owner. Rows the owner explicitly approved for implementation
+   (D-067 #7 required features; D-068 slots 2, 3 and 7; the slot-6 items) go from PENDING-OWNER to approved-not-
+   implemented, each citing its decision and keeping its slot. No row is marked implemented because it is scheduled.
+   Deferrals, genuinely pending rows, the 10 S rows and the 19 mixed (i) rows are not changed by this item.
+5. **Do not rewrite historical `type:*` evidence.** Frozen evidence, checksums and historical text stay as they are; a
+   documented mapping states that historical `type:*` (the multiplication refusal) is `type:mul` from slot 1 (C123).
+   Current docs and tests use `type:mul`.
+6. **Struct-to-async finding.** A new PENDING-OWNER row of class (iv) (the VM accepts what legacy rejects): NOT
+   approved; under investigation. Production semantics do not change.
+
+Mapping onto the inventory vocabulary (tests/runtime2/cp25/inventory.py): approved-not-implemented = `implement`;
+implemented-awaiting-review = `implemented-awaiting-review`; implemented-accepted = `implemented-accepted`; approved
+deferral = `deferred-named`; pending owner = `PENDING-OWNER` (`approved` and `retired` keep their meanings).
+

@@ -28,6 +28,17 @@ implement, PENDING-OWNER; owner 2026-11-10 13:26; and retired for a resolved or
 no longer emitted reason, which counts as none of them) says where each reason stands
 for G2: --check reports every status, and exits 3 when a seen reason is still
 PENDING-OWNER (a release blocker), after G1 has passed.
+
+The owner's five implementation statuses (2026-11-11 11:07, decisions.md D-069 #4) map onto this
+vocabulary: approved-not-implemented = `implement`; implemented-awaiting-review =
+`implemented-awaiting-review`; implemented-accepted = `implemented-accepted`; approved deferral =
+`deferred-named`; pending owner = `PENDING-OWNER`. A row is never marked implemented because it is
+scheduled. --check treats them so:
+  implemented-awaiting-review  a release blocker whether or not the reason is seen (exit 3): the
+                               implementation is not accepted yet;
+  implemented-accepted         the capability is implemented and accepted, so the refusal must not be
+                               emitted any more: seen again, it blocks (exit 3), like a retired reason.
+Every row of the classification must carry one of STATUSES (G1, exit 1), seen or not.
 """
 import argparse
 import collections
@@ -42,7 +53,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rt-vm"))
-STATUSES = ("approved", "deferred-named", "implement", "PENDING-OWNER", "retired")
+STATUSES = ("approved", "deferred-named", "implement", "implemented-awaiting-review", "implemented-accepted",
+            "PENDING-OWNER", "retired")
 # Family grouping (owner 2026-11-11 02:53, D-067 #10): only these four reason families have a family row
 # `<prefix>:*` that classifies an unlisted member. Every other reason needs its own exact row; an unlisted
 # `type:<op>` (or any other) reason fails G1 (slot 1, D-068 #11: `type:*` is no longer a family row).
@@ -242,6 +254,12 @@ def report(args):
         row = row_for(reason)
         if row is not None and row.get("status") not in STATUSES:
             problems.append("invalid status %r for %s (one of %s)" % (row.get("status"), reason, ", ".join(STATUSES)))
+    for reason, row in sorted(cls.items()):  # D-069 #4: every row, seen or not, has a valid status
+        if reason not in seen and row.get("status") not in STATUSES:
+            p = "invalid status %r for row %s (one of %s)" % (row.get("status"), reason, ", ".join(STATUSES))
+            problems.append(p)
+            print("INVENTORY:", p, file=sys.stderr)
+    awaiting = sorted(r for r, row in cls.items() if row.get("status") == "implemented-awaiting-review")
     by_status = collections.defaultdict(list)
     for reason in sorted(seen):
         by_status[(row_for(reason) or {}).get("status", "?")].append(reason)
@@ -257,9 +275,20 @@ def report(args):
                   file=sys.stderr)
     if args.check and problems:
         return 1
+    blocked = False
     if args.check and by_status.get("retired"):
         # A retired reason (resolved, not emitted any more) that is seen again is not a pass either.
         print("INVENTORY: BLOCKED: retired reason(s) seen again: %s" % ", ".join(by_status["retired"]), file=sys.stderr)
+        blocked = True
+    if args.check and by_status.get("implemented-accepted"):
+        print("INVENTORY: BLOCKED: implemented-accepted reason(s) seen again: %s" %
+              ", ".join(by_status["implemented-accepted"]), file=sys.stderr)
+        blocked = True
+    if args.check and awaiting:
+        print("INVENTORY: BLOCKED: %d row(s) implemented, awaiting review: %s" % (len(awaiting), ", ".join(awaiting)),
+              file=sys.stderr)
+        blocked = True
+    if blocked:
         return 3
     if args.check and owner:
         return 3

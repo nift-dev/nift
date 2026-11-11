@@ -4473,7 +4473,8 @@ test-runtime2-reason-ids: $(TARGET) $(REASON_ID_MUTANT_BIN_1) $(REASON_ID_MUTANT
 	$(PYTHON) tests/runtime2/reason_ids.py --nift "$(CURDIR)/$(REASON_ID_MUTANT_BIN_1)" --mutant type-mul
 	$(PYTHON) tests/runtime2/reason_ids.py --nift "$(CURDIR)/$(REASON_ID_MUTANT_BIN_2)" --mutant removed-builtin
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py
-	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant family
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant status
 test-rt-vm: test-runtime2-reason-ids
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
 CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))

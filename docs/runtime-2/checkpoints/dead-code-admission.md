@@ -96,7 +96,7 @@ Both programs and both outputs are recorded in each row's evidence column.
 | Row | Union sub-case (legacy, VM refuses with the row's reason) | Single-kind sub-case (legacy) |
 | --- | --- | --- |
 | `type:+` | `v + 1`, v ∈ {array, number}, is 2: prints `3` | error |
-| `type:-`, `type:*`, `type:/`, `type:%` | v ∈ {string, number}, is 2: `1`, `2`, `2`, `0` | error (`arithmetic operators require numeric operands`) |
+| `type:-`, `type:mul` (`type:*` before slot 1), `type:/`, `type:%` | v ∈ {string, number}, is 2: `1`, `2`, `2`, `0` | error (`arithmetic operators require numeric operands`) |
 | `type:<`, `type:<=`, `type:>`, `type:>=` | `false`, `false`, `true`, `true` | error (`ordering comparisons require ...`) |
 | `type:unary` | `-v`: `-2` | error |
 | `type:increment` | `v++`: `3` | error (`increment/decrement requires a numeric lvalue`) |
