@@ -2410,7 +2410,69 @@ Quotations are from attachment 21eb1a83, section "Forwardable decisions for Clau
    and dependency observations, or thread/async restrictions. Migration: "Maintain a complete manifest of actual
    call-site changes. Preserve historical certification evidence." Website: "Do not clone, fetch, reset or modify the
    website checkout during the runtime implementation."
-   **Schedule (not started):** "Finish the remaining Slot 3 work. Then complete and independently review: 1.
+   **Schedule correction (C138; D-076 and D-077 #5):** L6 now comes after the output-order repair, the async
+   recursion memory-safety repair and the `save()` repair, and before the certification freeze; the remaining slot 3
+   families are deferred until after the first certification (D-076), so L6 no longer waits for them. The original
+   D-075 text, superseded on this point: **Schedule (not started):** "Finish the remaining Slot 3 work. Then complete and independently review: 1.
    Output-order repair. 2. `save()` filesystem-safety repair. 3. L6 `native::` migration. Proceed to the struct
    checkpoints afterward. Every production checkpoint requires its own freeze, independent review and owner
    acceptance. No integration, push, tag or release without explicit owner approval."
+
+## D-076 — Certification priority reset (owner, 2026-11-12, attachment 3d29daee)
+
+Quotations are from attachment 3d29daee, section "What I'd tell Claude".
+
+- "Do not begin additional language-feature checkpoints merely because they were previously approved for the
+  eventual Runtime 2.0 release. Those approvals remain recorded, but their scheduling is deferred pending a
+  certification-baseline decision. Preserve all existing work and decisions. Do not revert accepted checkpoints."
+- Proposed certification scope: "Finish the current Slot 3 tranche and its required review/record corrections.
+  Prioritise demonstrated correctness and safety defects: The output-order/data-loss defect. The `save()` special-file
+  safety defect. Any confirmed uncontrolled async memory-exhaustion defect. Any remaining genuine P0 safety or
+  soundness issues. Do not automatically extend Slot 3 into the remaining deferred-error families. Do not start L6
+  `native::`, struct expansion, postfix, nested-function, variadic, destructuring or other ordinary-language
+  checkpoints before the first certification baseline." (D-077 #5 then places L6 before the freeze.)
+- Certification baseline: "Consolidated Linux certification using B21 durable evidence. Mandatory GCC 15.2 safety,
+  sanitizer and mutation gates. Windows and macOS CI. Website-build performance comparison against v4.12.0. A full
+  report of unsupported capabilities and approved differences. Keep PASS, FAILED, NOT RUN, INCONSISTENT and APPROVED
+  DEFERRAL distinct. Do not silently convert refused mandatory functionality into a passing gate."
+- "Certification does not automatically authorise public release." "Do not launch Linode or incur costs without
+  explicit owner approval. Do not integrate, push, tag or release without explicit approval."
+
+## D-077 — Certification readiness decisions (owner, 2026-11-12, attachment 83af45ff)
+
+Quotations are from attachment 83af45ff, section "Forwardable decisions for Claude". "The D-076
+certification-priority reset remains in force."
+
+1. **Pending refusal inventory: APPROVED WITH CONDITIONS.** "Approve marking reasons covered by D-076 and previous
+   explicit deferrals as: DEFERRED — POST-CERTIFICATION IMPLEMENTATION. Reconcile the 59 pending reasons individually
+   against their actual capability and decision references. Do not approve blanket catch-all reasons or conceal new
+   unsupported behaviour. Any reason involving a demonstrated safety defect, incorrect result, internal failure or
+   unapproved semantic difference remains open." "A complete inventory containing approved deferrals may pass its
+   completeness gate. That must not be represented as proof that deferred capabilities execute successfully." (The
+   reconciliation is done by a separate preparation agent; C138 does not touch those rows.)
+2. **Async recursion: MANDATORY BEFORE CERTIFICATION.** "Insert a bounded async task-memory safety checkpoint
+   immediately after the output-order repair. The demonstrated 100 MB budget growing to 1.56 GB and terminating with
+   exit 70 is unacceptable. [...] A depth limit must not be presented as comprehensive memory accounting unless the
+   evidence establishes that guarantee. Stop if the repair requires broad scheduler or coroutine restructuring. No
+   performance re-baselining."
+3. **Host-dependency suite: TEST CONTRACT REPAIR APPROVED.** "Do not simply change all 24 failures into expected
+   refusals. Classify each according to its intended invariant. Supported operations must execute and verify their
+   original correctness or safety contract. Explicitly deferred operations may be tested for their exact refusal
+   behaviour, with the underlying capability still recorded as deferred. Safety invariants must not lose coverage
+   merely because their original test used deferred syntax. Preserve frozen historical evidence and provide a
+   before/after classification of all 24 cases. Require independent review of the test changes and effective negative
+   controls. Do not mark unresolved mandatory coverage as PASS."
+4. **FreeBSD and Windows.** "Exclude FreeBSD from the first certification baseline. [...] Approve writing the exact
+   Windows VM test subset into the repository now. Document supported tests, exclusions and their reasons. Do the same
+   for macOS where platform-specific exclusions apply. Required first-certification platforms: Linux, macOS and
+   Windows. No blanket platform skips."
+5. **Pre-certification implementation order.** "1. Output-order and standard-stream data-loss repair. 2. Async
+   recursion memory-safety repair. 3. `save()` special-file and symlink safety. 4. L6 `native::` Option B. 5. Frozen
+   cross-platform certification candidate. [...] All other approved feature implementation remains deferred until
+   after the first certification baseline."
+6. **Certification preparation.** "Prepare the durable B21 Linux campaign [...] Prepare the Windows/macOS workflows,
+   but do not push or trigger them yet. [...] Linode provisioning, local integration into `runtime-2`, remote push,
+   CI execution, tagging and release each require the applicable explicit owner approval." Stopping rule (section
+   "One thing I would change"): "Once the four approved repairs are accepted, freeze the candidate and run
+   certification. Any newly discovered issue must be demonstrated to block correctness, safety or certification
+   integrity before it can expand the pre-certification implementation scope."
