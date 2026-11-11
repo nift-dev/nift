@@ -22,6 +22,8 @@ syntactic contexts:
      holding a callee, function, method, binding or keyword name (DISPATCH_VARS)
   4. brace lists consisting only of string literals  name sets (native_heads,
      reserved_binding_name, the is_* predicate loop, keyword sets, ...)
+  5. brace lists of wrapped literals, {std::string("NAME"), ...}   the collection
+     constructors (D-073 #5: `sorted_set`)
 plus the evaluator's statement keywords and script bindings (KEYWORDS).
 """
 import glob
@@ -45,6 +47,10 @@ PATTERNS = [
 ]
 BRACE_LIST = re.compile(r'\{\s*("(?:[^"\\]|\\.)*"\s*(?:,\s*"(?:[^"\\]|\\.)*"\s*)+)\}')
 LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
+# 5. brace lists of wrapped literals, `{std::string("stack"), std::string("sorted_set")}` (ParserExpression.cpp's
+#    collection constructors; D-073 #5: `sorted_set` was missing because pattern 4 needs bare literals).
+WRAPPED = r'[A-Za-z_][\w:<>]*\(\s*"(?:[^"\\]|\\.)*"\s*\)'
+WRAPPED_LIST = re.compile(r'\{\s*((?:' + WRAPPED + r'\s*,\s*)+' + WRAPPED + r')\s*\}')
 KEYWORDS = """fn struct enum import export return throw try catch if else while for break continue const immut
 true false null this self lambda async await content input script args inject defer""".split()
 
@@ -79,7 +85,7 @@ def extract():
             text = strip_comments(open(path, encoding="utf-8", errors="replace").read())
             for regex in PATTERNS:
                 names.update(regex.findall(text))
-            for match in BRACE_LIST.finditer(text):
+            for match in list(BRACE_LIST.finditer(text)) + list(WRAPPED_LIST.finditer(text)):
                 for literal in LITERAL.findall(match.group(1)):
                     if re.fullmatch(ID, literal):
                         names.add(literal)
@@ -155,6 +161,9 @@ def render(names):
     table(lines, "kWords", extract_words())
     lines += ["", "} // namespace", "",
               "bool legacy_special_name(std::string_view name) {",
+              "#if defined(NIFT_LEGACY_NAMES_MUTANT) && NIFT_LEGACY_NAMES_MUTANT == 1  // test-only: sorted_set unregistered",
+              '    if (name == "sorted_set") return false;  // rt-lint: allow-string-compare test-only mutant',
+              "#endif",
               "    return std::binary_search(std::begin(kNames), std::end(kNames), name);", "}", "",
               "std::size_t legacy_special_name_count() { return std::size(kNames); }", "",
               "bool legacy_special_method(std::string_view name) {",

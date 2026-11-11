@@ -94,9 +94,9 @@ def cases():
             files, stdin = handle_case(form, ["v := [" + ctor + "]"], '"x$[v.stringify()]"')
             add("h_%s_interp_stringify_%s" % (h, form), files, stdin)
         # json_stringify is not a script built-in on either engine. Since slot 3 (C134) the call is reached and raises
-        # `undefined callable: json_stringify`. For channel() the transcript differs from legacy through a difference
-        # that existed before slot 3: legacy has no script channel() (it raises `undefined callable: channel` at 2:7),
-        # the VM implements it (review of C134, F5; for the owner to classify).
+        # `undefined callable: json_stringify`. For channel() legacy cannot be the oracle: legacy has no script
+        # channel() (it raises `undefined callable: channel` at 2:7), and the VM's channel() is an approved VM-only
+        # built-in (D-073 #6, owner 2026-11-11 22:23). That case has the explicit VM oracle VM_ORACLES below.
         add("h_%s_json_stringify" % h, {"p.f": 'print("b")\nv := [%s]\nprint(json_stringify(v))\n' % ctor})
         # a handle reached through an imprecise path: a parameter, a map get, a loop element
         add("h_%s_param" % h, {"p.f": 'fn(show(x)) { return [x].stringify() }\nprint("b")\nprint(show(1))\n'
@@ -276,6 +276,15 @@ def check_invariants(name, files, r, fail):
     return kind
 
 
+# Explicit VM-specific correctness oracles (exact bytes and exit status) for cases legacy cannot run: checked on every
+# run, --update included, so a reviewed transcript cannot drift. D-073 #6: only the VM-only channel() difference is
+# approved; the rest of the case must be exactly this.
+VM_ORACLES = {
+    "h_channel_json_stringify": {"exit": 1, "stderr": "error: p.f:3:7: undefined callable: json_stringify\n",
+                                 "stdout": "b\n"},
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -300,6 +309,8 @@ def main():
             r = run(nift, name, files, stdin, argv, "require", work)
             kinds[check_invariants(name, files, r, fail)] += 1
             got[name] = r
+            if name in VM_ORACLES and VM_ORACLES[name] != r:
+                fail("%s: differs from its VM oracle:\n  want %r\n  got  %r" % (name, VM_ORACLES[name], r))
             if legacy:
                 lr = run(nift, name, files, stdin, argv, "0", work)
                 if lr != r:

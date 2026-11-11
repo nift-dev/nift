@@ -1548,6 +1548,13 @@ test-rt-vm: test-runtime2-deadcode-admission
 test-runtime2-deadcode-admission-mutants: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/deadcode_admission_mutants.py
 test-rt-vm: test-runtime2-deadcode-admission-mutants
+# D-073 #5 (owner 2026-11-11 22:23): a user declaration named like the legacy built-in sorted_set keeps legacy's
+# built-in precedence (refused), with the registration-removed mutant.
+.PHONY: test-runtime2-legacy-name-registration
+test-runtime2-legacy-name-registration: $(TARGET)
+	$(PYTHON) -B tests/runtime2/legacy_name_registration.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/legacy_name_registration.py --mutants
+test-rt-vm: test-runtime2-legacy-name-registration
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.

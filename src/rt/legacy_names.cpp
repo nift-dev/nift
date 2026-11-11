@@ -28,10 +28,11 @@ constexpr std::string_view kNames[] = {
     "prettify", "print", "prique", "project", "project_root", "ptr", "pwd", "queue", "range", "read", "read_all",
     "read_all_bytes", "read_bytes", "read_line", "read_val", "remove", "render", "replace", "replace_once", "return",
     "revert", "rm", "run", "same", "save", "script", "section", "secure_random_bytes", "seek", "self", "set",
-    "setenv", "sha256", "sha256_file", "sleep", "sorted_map", "split", "stack", "stat", "status", "stringify",
-    "struct", "supabase", "svg", "tell", "this", "thread", "throw", "timer", "title", "touch", "track", "tracked",
-    "true", "try", "type", "u16", "u32", "u64", "u8", "unsetenv", "untrack", "unwatch", "url_encode", "validate",
-    "vercel", "void", "wait", "warn", "watch", "which", "while", "write", "write_line", "write_val", "xml",
+    "setenv", "sha256", "sha256_file", "sleep", "sorted_map", "sorted_set", "split", "stack", "stat", "status",
+    "stringify", "struct", "supabase", "svg", "tell", "this", "thread", "throw", "timer", "title", "touch", "track",
+    "tracked", "true", "try", "type", "u16", "u32", "u64", "u8", "unsetenv", "untrack", "unwatch", "url_encode",
+    "validate", "vercel", "void", "wait", "warn", "watch", "which", "while", "write", "write_line", "write_val",
+    "xml",
 };
 
 constexpr std::string_view kMethods[] = {
@@ -264,6 +265,9 @@ constexpr std::string_view kWords[] = {
 } // namespace
 
 bool legacy_special_name(std::string_view name) {
+#if defined(NIFT_LEGACY_NAMES_MUTANT) && NIFT_LEGACY_NAMES_MUTANT == 1  // test-only: sorted_set unregistered
+    if (name == "sorted_set") return false;  // rt-lint: allow-string-compare test-only mutant
+#endif
     return std::binary_search(std::begin(kNames), std::end(kNames), name);
 }
 

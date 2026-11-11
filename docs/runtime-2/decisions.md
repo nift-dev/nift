@@ -2358,3 +2358,33 @@ e3c9cee8, section "Forwardable owner decisions", unless marked otherwise.
    perform the bounded output-order repair. Keep the trace investigation read-only. Maintain the existing
    release-blocker inventory, performance guards and required Linode/cross-platform certification. No integration,
    push, tag or release without explicit owner approval."
+
+## D-073 — /dev/stdout restored; worker standard streams; output-order design; L6 investigation; sorted_set; channel() (owner, 2026-11-11 22:23, attachment 5ca07c68)
+
+Quotations are from attachment 5ca07c68, section "Forwardable decisions for Claude". Items 1-4 belong to other
+workstreams and are recorded here only; C136 applies #5 and #6.
+
+1. **Restore `/dev/stdout`: APPROVED.** "Authorise restoring `/dev/stdout` to its expected symlink targeting
+   `/proc/self/fd/1`, but only inside the verified isolated work environment. [...] Verify the restored symlink and
+   rerun all affected gates. Invalidate any post-damage evidence that depended on `/dev/stdout`. [...] Separately
+   investigate `save()` replacing symlinks or special filesystem targets. Classify it provisionally as P1 filesystem
+   safety until the actual risks are established. Do not change production filesystem semantics under that
+   investigation." (The coordinator restored and verified it at 22:23; this implementer did not touch it.)
+2. **Worker standard-stream handles: APPROVED** (a narrow, explicit refusal in `thread()` and `async()`; for the
+   output-order checkpoint).
+3. **Output-order repair: APPROVED** ("approximately 120-160 production lines and 450-550 test lines"; "Keep this
+   checkpoint after Slot 3 acceptance.").
+4. **L6 `native::`:** read-only investigation only ("Do not implement L6 yet.").
+5. **`sorted_set`: APPROVED FOR REPAIR.** "Fix the missing legacy built-in name in the current Slot 3 tranche or a
+   narrow follow-up before tranche acceptance. Preserve the established built-in precedence contract. Add regression
+   and mutation controls, and audit the relevant built-in-name inventory for similar omissions. Do not broaden
+   name-resolution architecture."
+6. **`channel()`: APPROVED DIFFERENCE.** "Approve the existing Runtime 2.0 `channel()` built-in as an intentional
+   VM-only capability. Record the compatibility difference narrowly. Do not waive the surrounding channel safety
+   tests. Where legacy cannot execute the operation, use explicit VM-specific correctness expectations. Keep
+   unrelated differences as failures."
+7. **Slot 3 status.** "C135 remains under independent re-review. The first undefined-callables tranche is not accepted
+   yet. The broader Slot 3 deferred-error work remains incomplete. Resolve the soundness findings and invalidated
+   host-test evidence before seeking acceptance."
+8. **Governance.** "No new production implementation checkpoint may start before the current checkpoint's required
+   review and owner acceptance. [...] No integration, push, tag or release without explicit approval."

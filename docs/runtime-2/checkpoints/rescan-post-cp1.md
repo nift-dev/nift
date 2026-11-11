@@ -3161,3 +3161,70 @@ not run in C134. They ran in C135, which found the expectation below.
 | File and case | Old | New | Why | Legacy evidence |
 | --- | --- | --- | --- | --- |
 | vm_inventory.py `for-and-try` | certain reasons `{method:zap, callable:nothere}` | `{method:zap, deferred:callable:nothere}` | slot 3, 5.4: with `method:zap` masked, `nothere()` is certain and compiles to a deferred raise, recorded as `deferred:callable:nothere` (non-consequential) | the program is still refused at `method:zap` 2:9 under the VM default; legacy fails there too (`unknown value or malformed expression: i.zap()`) |
+
+### 32.8 C136: D-073 #5 and #6 applied inside the first tranche
+
+Owner ruling 2026-11-11 22:23 (decisions.md D-073, attachment 5ca07c68). No other scope: the remaining slot-3
+families and the output-order repair are not started.
+
+**`sorted_set` (D-073 #5).**
+- Before C136, legacy_names.py did not extract `sorted_set`: ParserExpression.cpp:3851 lists the collection
+  constructors as `{std::string("stack"), std::string("queue"), ..., std::string("sorted_set")}`, and pattern 4 matches
+  only brace lists of bare literals (`sorted_map` was found elsewhere). The VM therefore compiled a user
+  `fn(sorted_set())`, a `sorted_set := () => 9` binding or a parameter named `sorted_set` as the user's callable
+  (printing `9`), where legacy's built-in wins (it returns a sorted set: `print: value is not directly renderable`,
+  exit 1). This predates slot 3.
+- Fix: legacy_names.py pattern 5, brace lists of wrapped literals (`{T("NAME"), ...}`); the generated
+  legacy_special_name now has 208 names. Legacy's precedence is kept the way it is for every special name: the three
+  programs are refused before they run (`fn-name-reserved` 1:1, `binding-name-reserved` 1:1, `param-name-reserved`
+  1:6), exactly as `sorted_map`. A struct field named `sorted_set` and a struct method called as `s.sorted_set()` are
+  member names, not affected, and run legacy-equal (`2`, `9`).
+- Tests: tests/runtime2/legacy_name_registration.py (`make test-runtime2-legacy-name-registration`, in test-rt-vm):
+  the five forms, legacy's exact bytes recorded and checked, the VM's refusal reason and position or its legacy-equal
+  bytes. Mutant NIFT_LEGACY_NAMES_MUTANT=1 (the registration removed, emitted by the generator) is caught by the
+  three refused forms.
+- **Audit of the built-in-name inventory.** Method: every identifier-shaped literal word of the legacy sources
+  (`legacy_known_word`, 1514 words) that is not in legacy_special_name (1309 words, excluding `__` names) was called
+  with no argument on legacy (`x := NAME()` / `print("z")`, `NIFT_VM=0`, in scratch, stdin closed): a name legacy
+  does not know raises `undefined callable: NAME`, and any other result marks a name legacy dispatches. Result: 1 of
+  1309, `sorted_set`, fixed above. Pattern 5 applied to the legacy sources also adds only `sorted_set`. No other
+  omission was found. (A built-in legacy dispatches only through text built at run time, not a literal, would escape
+  both methods; the legacy sources' only such construction is the `__nift_*` temporaries, which `__` covers.)
+
+**`channel()` (D-073 #6).**
+- New tsv row `difference:vm-only-channel`, `approved`, narrow: the VM's Runtime 2.0 `channel()` built-in, which
+  legacy scripts do not have (`v := channel()`: legacy `undefined callable: channel` 1:6; the VM runs).
+- The safety test is not waived: `h_channel_json_stringify` has an explicit VM-specific oracle in
+  tests/runtime2/safety/safety.py (`VM_ORACLES`: exit 1, stdout `b\n`, stderr
+  `error: p.f:3:7: undefined callable: json_stringify\n`), checked on every run including `--update`; any other
+  difference stays a failure.
+
+C136 gates:
+
+nift sha256 `4bb09e9ec5385da5017a2f0914d331bc2d4440f4071aa2942f611041c0b909c4`. `/dev/stdout` was restored by the
+coordinator at 22:23 (a symlink to /proc/self/fd/1); every gate below started after that, and each run recorded
+`/dev/stdout` as a symbolic link. These runs replace every gate result invalidated by the 19:12-22:23 damage.
+
+| Gate | Result |
+| --- | --- |
+| test-rt-lint, test-test-integrity, legacy_names.py --check | PASS |
+| deadcode_admission.py, its 12 mutants | PASS, 63/63; 12 of 12 caught |
+| test-runtime2-legacy-name-registration | PASS, 5/5; the registration mutant is caught by the three refused forms |
+| test-runtime2-safety, test-runtime2-safety-mutants | PASS (1163 cases; `h_channel_json_stringify` against its VM oracle) |
+| test-rt-builtins-guards (callgrind) | PASS, 35 workloads, 0 guard failures |
+| test-runtime2-host-deps | **FAILED** (exit 2): the same 24 known refusals, identical to the C129 run after normalising paths and durations |
+| test-rt-host (re-run) | PASS: host-process-unit 10002 checks, 0 failures |
+| test-rt-host-mutants (re-run) | PASS: cp17 handle mutants 46, 0 survived |
+| test-runtime2-cp16-n1 (re-run) | PASS |
+| test-rt-vm-mutants (re-run) | PASS: 12 mutants, 12 rejected |
+| `make test-rt-vm`, one uninterrupted run (no `-k`) | PASS, its whole recipe included (vm_inventory 14 cases, cp12b_inventory selftest last) |
+| fresh inventory collect + `report --check` | exit 3 (expected): G1 PASS, 137 reasons seen: approved 14, deferred-named 29, implement 32, implemented-awaiting-review 3, PENDING-OWNER 59; blocked by the 59 PENDING-OWNER reasons and the 6 awaiting-review rows |
+
+Changed tests (C136):
+
+| File and case | Old | New | Why | Evidence |
+| --- | --- | --- | --- | --- |
+| safety/safety.py `h_channel_json_stringify` | the reviewed transcript in expected.json only | the same bytes, also pinned by `VM_ORACLES` (checked on every run, `--update` included) | D-073 #6: explicit VM-specific oracle where legacy cannot run `channel()` | expected.json unchanged |
+| tests/runtime2/legacy_name_registration.py (new) | none | 5 cases and 1 mutant | D-073 #5 | legacy bytes recorded per case |
+
+No test case, mutant or target was deleted; the Makefile gains test-runtime2-legacy-name-registration (in test-rt-vm).
