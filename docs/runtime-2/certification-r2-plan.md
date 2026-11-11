@@ -9,6 +9,10 @@ The plan builds on certification.md (tiers, `make certify`, classifications, the
 checkpoints/combined-b3-b5.md section 36 (B21: evidence outside every tree, durable per gate, identities kept apart).
 It also uses the readiness report CERT-READINESS-2026-11-12 (integrator scratch).
 
+**Current status:** see certification-readiness-r2.md (D-078). It counts 50 deferred-post-cert, 30 implement and 11 open
+inventory reasons, and records host-deps as FAILED with 6 outstanding cases. Gates 9 and 11 below are therefore
+FAILED today.
+
 ## 0. Preconditions: the frozen candidate
 
 The order is D-077 #5:
