@@ -1,0 +1,27 @@
+# The 24 host-deps FAIL lines before the D-077 #3 repair: C136 4bb09e9e (review s3/c136/hd.txt; identical to C129 s2/freeze),
+# path-normalised by the reviewer. Historical evidence; the committed certify fingerprint
+# tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt (C26 run, 33 FAILs, contains all 24) is unchanged.
+FAIL open_bytes: file of exactly the limit is read whole error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL open_bytes: empty file error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL open_bytes one byte over: fatal open_bytes limit error (exit 1) error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL read_line: line of exactly the limit error:  not compiled for the VM (type:length): an operation whose operand types the VM cannot prove (length) is not supported by the Runtime 2.0 VM yet
+FAIL open_bytes(/dev/zero): fatal open_bytes limit error (exit 1) error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL open_bytes(/dev/full): fatal open_bytes limit error (exit 1) error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL ifstream(/dev/zero).read_all_bytes: fatal read_all_bytes limit error (exit 1) error:  not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+FAIL ifstream(/dev/zero).read_bytes(huge): fatal read_bytes limit error (exit 1) error:  not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+FAIL ifstream(/dev/zero) >> token: fatal extraction limit error (exit 1) error:  not compiled for the VM (statement:Command): a shell command line inside a script is not supported by the Runtime 2.0 VM yet
+FAIL ifstream(/dev/zero).read_val: fatal read_val limit error (exit 1) error:  not compiled for the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+FAIL read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed) ): this flow of host handles is not supported by the Runtime 2.0 VM yet
+FAIL FIFO whose writer never stops (open_bytes): fatal open_bytes limit error (exit 1) error:  not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet
+FAIL run(): capture of exactly the limit error:  not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL run(): capture one byte over: fatal run limit error (exit 1) error:  not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL cmd().run(): capture of N MiB: fatal run limit error (exit 1) error:  not compiled for the VM (callable:cmd): the call `cmd()` is not supported by the Runtime 2.0 VM yet
+FAIL read(): stdin line of exactly the limit error:  not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+FAIL read(): stdin line one byte over is a limit error error:  not compiled for the VM (callable:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+FAIL read(): endless stdin (/dev/zero) stops at the limit ble:read): the call `read()` is not supported by the Runtime 2.0 VM yet
+FAIL run(yes) never ends: fatal run limit error (exit 1, Ns) lable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL run(head -c 150000000 /dev/zero): fatal run limit error (exit 1, Ns) lable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL cmd(yes).pipe(cat).run(): fatal run limit error (exit 1, Ns) lable:cmd): the call `cmd()` is not supported by the Runtime 2.0 VM yet
+FAIL run(sh -c 'yes; touch marker') kills the descendant: fatal run limit error (exit 1, Ns) lable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL stderr capture of an endless producer: fatal run limit error (exit 1, Ns) lable:run): the call `run()` is not supported by the Runtime 2.0 VM yet
+FAIL default limit: open_bytes(/dev/zero) stops at 1073741824 bytes s values with `open_bytes()` is not supported by the Runtime 2.0 VM yet

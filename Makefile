@@ -2760,7 +2760,10 @@ test: test-sha256
 # absence and unreadable paths), file().copy/move without project-root
 # containment, bounded whole reads (NIFT_READ_LIMIT, fatal limit error). See
 # docs/runtime-2/checkpoints/feature-host-deps.md. read_limit.py runs its
-# memory cases under RLIMIT_AS.
+# memory cases under RLIMIT_AS. D-077 #3: deferred capabilities run their limit
+# invariants on the legacy channel plus a VM refusal contract; unapproved refusals
+# stay FAILED; read_limit_contract_controls.py are the negative controls
+# (docs/runtime-2/host-deps-test-contract.md).
 READ_LIMIT_UNIT := $(TEST_DIR)/read-limit-unit$(EXEEXT)
 $(READ_LIMIT_UNIT): tests/read_limit_unit.cpp src/ReadLimit.h
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
@@ -2773,6 +2776,7 @@ test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/build_write_ownership.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_controls.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_contract_controls.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
 test: test-runtime2-host-deps
 
