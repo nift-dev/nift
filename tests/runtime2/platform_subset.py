@@ -17,8 +17,9 @@ just a platform name); every test script of `make test-rt-vm`'s recipe is in the
 left out silently); every script the table names exists.
 
 The run: each included command runs from the repository root with its placeholders filled ({nift}, {build}, {exe},
-{py}); its exit status decides PASS or FAIL. A unit binary that was not built is a FAIL, not a skip. Exit 1 if any
-included entry failed.
+{py}); its exit status decides PASS or FAIL, and an entry that exits 0 but prints `SKIP` or `NOT RUN` lines is
+PARTIAL, not PASS (review L3). A unit binary that was not built is a FAIL, not a skip. Exit 1 if any included entry
+failed, else 2 if any was PARTIAL.
 """
 import argparse
 import os
@@ -28,6 +29,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SKIP_LINE = re.compile(r"^\s*(?:SKIP|NOT RUN)\b")
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 PLATFORMS = ("linux", "macos", "windows")
 
@@ -263,7 +265,7 @@ def main():
     if not a.platform or (not a.list and not a.nift):
         ap.error("--platform and --nift are required to run")
     a.nift = os.path.abspath(a.nift) if a.nift else "NIFT"
-    failed, ran, excluded = [], 0, 0
+    failed, partial, ran, excluded = [], [], 0, 0
     only = set(a.only.split(",")) if a.only else None
     for eid, area, cmd, excl, _note in ENTRIES:
         if only is not None and eid not in only:
@@ -286,16 +288,33 @@ def main():
                 failed.append(eid)
                 continue
         env = dict(os.environ, NIFT_BIN=a.nift, PYTHONDONTWRITEBYTECODE="1")
-        rc = subprocess.run(argv, cwd=REPO, env=env).returncode
-        print("%s %s (exit %d)" % ("PASS" if rc == 0 else "FAIL", eid, rc), flush=True)
+        # Review L3: an entry that exits 0 but skipped part of itself (`SKIP` / `NOT RUN` lines, as certify counts
+        # them) is PARTIAL, never PASS. Its output is passed through unchanged.
+        proc = subprocess.Popen(argv, cwd=REPO, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        skipped = 0
+        for raw in proc.stdout:
+            text = raw.decode(errors="replace")
+            sys.stdout.write(text)
+            skipped += bool(SKIP_LINE.match(text))
+        rc = proc.wait()
+        sys.stdout.flush()
         ran += 1
         if rc != 0:
+            print("FAIL %s (exit %d)" % (eid, rc), flush=True)
             failed.append(eid)
+        elif skipped:
+            print("PARTIAL %s (exit 0, %d SKIP/NOT RUN line(s): not a pass)" % (eid, skipped), flush=True)
+            partial.append(eid)
+        else:
+            print("PASS %s (exit 0)" % eid, flush=True)
     if a.list:
         return 0
-    print("platform subset %s: %d run, %d excluded with a recorded reason, %d failed%s" %
-          (a.platform, ran, excluded, len(failed), (": " + ", ".join(failed)) if failed else ""))
-    return 1 if failed else 0
+    print("platform subset %s: %d run, %d excluded with a recorded reason, %d failed%s, %d partial%s" %
+          (a.platform, ran, excluded, len(failed), (": " + ", ".join(failed)) if failed else "",
+           len(partial), (": " + ", ".join(partial)) if partial else ""))
+    if failed:
+        return 1
+    return 2 if partial else 0
 
 
 if __name__ == "__main__":

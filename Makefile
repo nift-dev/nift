@@ -2777,6 +2777,7 @@ test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/build_write_ownership.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_controls.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_contract_controls.py
+	python3 -B tests/runtime2/read_limit_names_selftest.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
 test: test-runtime2-host-deps
 
@@ -5727,7 +5728,8 @@ test-rt-vm: test-runtime2-platform-subset-table
 test-cp25r: $(TARGET)
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
-	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control root
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control position
 cp25r-inventory: $(TARGET)
 	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
 	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \

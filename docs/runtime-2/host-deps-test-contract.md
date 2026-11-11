@@ -27,8 +27,8 @@ the invariant it is meant to test:
 
   Each such case runs twice:
   - **On the legacy channel (`NIFT_VM=0`).** This is the supported path that keeps the capability, and the read-limit
-    invariant still lives there. The case keeps its original program and assertions; its name carries
-    ` [legacy channel, NIFT_VM=0]`.
+    invariant still lives there. The case keeps its original program and assertions; its name is the original
+    name prefixed with `[legacy channel, NIFT_VM=0] `.
   - **As a VM refusal contract.** Every script the case ran is re-run under the VM default. It must:
     - exit with status 1;
     - print nothing on stdout;
@@ -37,7 +37,7 @@ the invariant it is meant to test:
       `case.f:L:C: not compiled for the VM (<reason>): <text>`.
 
     L:C is computed from the program text (the callee's position), never read from the VM's output. The case name
-    carries `[VM default: refusal contract, <reason> deferred (<decision>)]`.
+    is the original name prefixed with `[VM refusal contract, <reason>] `; the decision is printed in the summary.
 
   The summary prints `DEFERRED capabilities, checked only as VM refusal contracts (not evidence that they work on the
   VM)` with a count per reason. A clean run ends with "all read-limit checks passed (named deferred capabilities:
@@ -127,16 +127,39 @@ that is not seen on the corpora.
   - An owner decision is needed: approve, defer by name, or implement.
 - **`s >> t` is refused as `statement:Command`.** The VM classifies a stream-extraction statement as a shell command
   line. Whatever the decision on `statement:Command`, this looks like a misclassification worth its own row.
-- **Certify fingerprints.** `tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt` is historical. It is a
-  C26 run with 33 FAILs that contains the 24. It is **unchanged**; the new evidence is added beside it, in
-  `docs/runtime-2/evidence/host-deps-d077/`.
-  - New PASS names do not affect certify.
-  - A new failing name, such as a refusal contract that stops passing, is not in the approved case-ID table
-    (`scripts/certify_fingerprints.py` READ_LIMIT_TABLE). It is therefore UNMAPPED and blocks. That is intended.
-  - Against the weekend/r2 baseline, the gate's FAIL set shrinks from 24 to 6. How certify classifies a shrunken
-    baseline failure set must be checked on the first campaign.
+- **Certify fingerprints and case IDs.** `tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt` is
+  historical: a C26 run with 33 FAILs that contains the 24. It is **unchanged**; the new evidence is added beside it,
+  in `docs/runtime-2/evidence/host-deps-d077/`.
+  - **Correction (review F-P2-1, condition C4).** The first version of this page said that a new failing name was
+    UNMAPPED in the approved case-ID table. That was wrong. `scripts/certify_fingerprints.py` matches a table entry
+    on a name *prefix followed by a space*, so the original suffix tags (`… [legacy channel, NIFT_VM=0]`,
+    `… [VM default: refusal contract, …]`, `… (printed, measured by the harness)`) mapped onto the **original**
+    case IDs.
+  - **Fix: the tags are now prefixes**, and the two VM-equivalent cases carry `[VM equivalent form] `. A tagged line
+    starts with `[`:
+    - no entry with fixed leading text matches it;
+    - an entry that starts with a name group captures the tag, so the case ID differs from the original's;
+    - the remaining tagged lines map to no entry and are UNMAPPED, which blocks on its own text.
+  - **`tests/runtime2/read_limit_names_selftest.py`** proves this on the real table, in `test-runtime2-host-deps`.
+    It takes every case name of the recorded run and checks it in the legacy-channel form and in each
+    refusal-contract form. It requires that none is ambiguous, none maps to an original ID, and the forms of one case
+    never share an ID. As a negative control, the old suffix form must collide (it does, for all 130 names).
+    Without `scripts/` (a sparse checkout) the selftest is NOT RUN (exit 2).
+  - **Against the weekend/r2 baseline** the FAIL set is 6 instead of 24, so certify's `report_class` (equal
+    fingerprints required) gives **FAILED-NEW**, not FAILED-BASELINE, until the 6 are ruled on. That is the honest
+    result.
 - **The `implement` status of `builtin-bytes:open_bytes` and `callable:read` is a judgement call.** They are not
   individually named deferrals; they are treated as deferred under D-077 #5 ("All other approved feature
   implementation remains deferred until after the first certification baseline"). If the owner rules otherwise,
   their 10 cases return to FAILED: replace their `deferred(...)` wrappers with the original VM-default cases plus
   `legacy_channel(...)`, as is already done for the unapproved group. That is a small test change.
+
+## Open owner questions (review conditions)
+
+- **C3.** An explicit owner line deferring `open_bytes()` and `read()` by name until after the first certification,
+  or their 10 cases revert to FAILED (see the previous note).
+- **C5.** How the 18 refusal-contract cases are reported as APPROVED DEFERRAL. certify has no such class: once the 6
+  unapproved refusals are resolved, the gate classifies PASSED. The certification report must therefore take the
+  deferral count from read_limit.py's `DEFERRED capabilities, checked only as VM refusal contracts …` line (per
+  reason: open_bytes 7, run 6, cmd 2, read 3) and from the inventory, and list them under "named deferred
+  capabilities", never under passing functionality. The proposed rule is in certification-r2-plan.md, section 3.

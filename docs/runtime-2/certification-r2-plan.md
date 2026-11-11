@@ -77,7 +77,7 @@ rulings in section 3 as they stand today.
 | 11 | host-deps (`test-runtime2-host-deps`) | read-limit unit, host_deps.py, freedom and ownership scripts, read_limit_controls, read_limit_contract_controls, read_limit.py | Linode (the device cases run there, never in the sandbox) | **FAILED today**: 6 unapproved refusals. PASS once the owner rules on host-handle-flow, statement:Command and type:length. Its 18 deferred cases count as APPROVED DEFERRAL |
 | 12 | Async recursion bound (D-077 #2, new checkpoint) | no growth past the configured limit; controlled error; no exit 70, abort or kill; un-awaited tasks bounded; bounded recursion works; async() and thread(); mutants | Linode (memory) and local (small) | PASS required, with the CP23 qualification `qualified:legacy-await-chain-defect` closed. A depth cap is not reported as comprehensive accounting |
 | 13 | Output order and std streams (D-077 #5, step 1) | the repair's own suite: pipe, file and 2>&1 bytes; threads and async; >64 KiB; handles; failure paths; mutants | Linode, local; **Windows identity code: CI only** | PASS required |
-| 14 | `save()` special targets (D-074 #1) | the repair's suite; scratch-only fixtures | Linode | PASS required |
+| 14 | `save()` special targets (D-073 #1; D-077 #5 step 3) | the repair's suite; scratch-only fixtures | Linode | PASS required |
 | 15 | L6 `native::` (D-075 #2) | its suite and migration manifest | Linode, local | PASS required |
 | 16 | Comparator sort | B04 comparator expectations; F6 (lambda-relative position) checked on GCC 15.2 | Linode only | PASS, or a named release blocker (F5 portability: release blocker, not a certification blocker; D-077 keeps it on the limitations list) |
 | 17 | Linode-only verification items | B03 memory-c1 24 × 20; B12 valgrind; B13 PTY/SIGINT; B20 root-only; B22 cp17-unwind-mutants within the cap; B23/B24 reruns; U1 (the 190 gates after test-build-reuse now run on an untouched tree); test-build-reuse runtime under its 7,200 s cap (B21 item 6) | Linode | PASS each; any non-deterministic result is INCONSISTENT and blocks (zero-flakiness rule) |
@@ -85,7 +85,7 @@ rulings in section 3 as they stand today.
 | 19 | Bindings | Go, Node, Python, .NET (`test-bindings`, exclusive) | Linode | PASS |
 | 20 | Root-only and unprivileged reruns | `--unprivileged-user tester` | Linode | SKIPPED-ENVIRONMENTAL resolved by the rerun, never PASS by itself |
 | 21 | Regression suite (`nift-regression-suite` `runtime-2`) | `run-contract.sh <nift>` | Linode or local; CI `runtime2-regression-suite.yml` on the push | v4.12.0 environment failures are FAILED-BASELINE. **The 4 contract scripts with `cat`/`ls`/`touch` refuse after L6 Option B**: owner decision to migrate the suite or run those 4 with `NIFT_VM=0`. FAILED until decided |
-| 22 | Cross-platform CI | checkpoint-10, v44, test-integrity, gate6ar-ffi, gate6b-bytes and **runtime2-cross-platform** (new, dispatch-only; platform-subsets.md) | CI only, after an approved push and dispatch | NOT RUN until approved. Windows and macOS are certified for the documented subset only |
+| 22 | Cross-platform CI | checkpoint-10, v44, test-integrity, gate6ar-ffi, gate6b-bytes and **runtime2-cross-platform** (new, dispatch-only; platform-subsets.md) | CI only, after an approved push and dispatch | NOT RUN until approved. Windows and macOS are certified for the documented subset only. **The corpus differential (`vm_parity`), `host_deps` and read-limit enforcement (`read_limit.py`, its controls) are certified on Linux only, and on macOS only where the subset includes them** (vm_parity and host_deps yes, read_limit no): a headline limitation of the Windows and macOS claims. A subset entry that skips part of itself is PARTIAL, not PASS |
 | 23 | Fuzzing | `nightly-deep.yml` (dispatch): parser fuzz with sanitizers | CI | owner decision. Recommended once on the frozen tip; NOT RUN otherwise (tier 4) |
 | 24 | FreeBSD | — | — | **Out of the first certification** (D-077 #4): a separate qualification after the baseline. Reported as "not certified in this baseline" |
 
@@ -109,9 +109,22 @@ It also lists, on its own line, the `implement` rows: approved and not implement
 says "all supported functionality passes". Its inventory line reads "Inventory complete, with named deferred
 capabilities".
 
+**Refusal-contract gates (proposal for review condition C5; owner to confirm).** certify has no APPROVED DEFERRAL
+class. A gate whose only deferred content is refusal contracts classifies PASSED: host-deps once its 6 unapproved
+refusals are resolved, and `test-cp25r`'s `post_cert_refusals.py`. The report therefore:
+- keeps the gate's PASS;
+- separately counts each deferred capability as APPROVED DEFERRAL, from the harness's own lines:
+  - read_limit.py's `DEFERRED capabilities, checked only as VM refusal contracts …` (per reason);
+  - `post_cert_refusals.py`'s count;
+  - the inventory's deferred-named and deferred-post-cert lists;
+- never adds a deferred capability to the supported or passing totals.
+
 ## 4. Known limitations to carry into the report
 
-These come from known-limitations.md and the readiness report:
+These come from known-limitations.md, the readiness report and the review of this preparation:
+- **Platform scope (review L4).** The VM-vs-legacy corpus differential (`vm_parity`), `host_deps` and read-limit
+  enforcement are certified on Linux only, and on macOS only where the platform subset includes them. Windows
+  excludes all three.
 - The async self-recursion qualification stays until gate 12 passes.
 - The trace order (D-072 #2, P2).
 - Heap-budget stops are shown as "NIFT_VM internal failure" (P2).
@@ -138,7 +151,10 @@ per-instance cap of US$3, PRIOR_USD, and deletion on any setup or build failure.
 
 ## 6. Order of approvals (each separate)
 
-1. The owner rulings needed for gates 9, 11 and 21 (section 2).
+1. The owner rulings needed for gates 9, 11 and 21 (section 2). Also the review conditions:
+   - C2: D-077 #5 covering the four judgement-call inventory rows;
+   - C3: open_bytes() and read() deferred by name;
+   - C5: the refusal-contract reporting rule in section 3.
 2. The Linode launch for the campaign.
 3. The Linode launch for the benchmark.
 4. Integration into local `runtime-2` (a fast-forward from `1512579f`, unless a merge commit is wanted).

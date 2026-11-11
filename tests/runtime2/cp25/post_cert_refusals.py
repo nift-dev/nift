@@ -15,10 +15,12 @@ that it works. Units come from the shared corpora as inventory.py names them: vm
 (docs/evidence/cp410-competitiveness/probes) and smoke/ (heredoc scripts extracted with tools/rt-diff/extract_smoke.py).
 A unit whose corpus is not present is NOT RUN, and the suite fails (exit 2), never passes.
 
---negative-control alters, in memory, every entry's recorded root and representative diagnostic (the position's column
-plus one): every entry must then fail, which shows that the contract detects a changed refusal.
+--negative-control MODE alters, in memory, every entry, and every entry must then fail:
+  root      the recorded root of every scoped unit (the refusal reason changed);
+  position  only the representative diagnostic's column, plus one (review L5: position sensitivity on its own);
+  both      both at once.
 
-usage: post_cert_refusals.py --nift BIN [--deferrals FILE] [--negative-control]
+usage: post_cert_refusals.py --nift BIN [--deferrals FILE] [--negative-control root|position|both]
 """
 import argparse
 import json
@@ -85,16 +87,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
     ap.add_argument("--deferrals", default=os.path.join(HERE, "post_cert_deferrals.tsv"))
-    ap.add_argument("--negative-control", action="store_true")
+    ap.add_argument("--negative-control", nargs="?", const="both", choices=["root", "position", "both"])
     a = ap.parse_args()
     nift = os.path.abspath(a.nift)
     rows = load(a.deferrals)
     if a.negative_control:
         import re
         for row in rows:
-            row["scope"] = [(u, "negative-control-root") for u, _ in row["scope"]]
-            row["refusal"] = re.sub(r":([0-9]+):([0-9]+): not compiled",
-                                    lambda m: ":%s:%d: not compiled" % (m.group(1), int(m.group(2)) + 1), row["refusal"], count=1)
+            if a.negative_control in ("root", "both"):
+                row["scope"] = [(u, "negative-control-root") for u, _ in row["scope"]]
+            if a.negative_control in ("position", "both"):
+                row["refusal"] = re.sub(r":([0-9]+):([0-9]+): not compiled",
+                                        lambda m: ":%s:%d: not compiled" % (m.group(1), int(m.group(2)) + 1),
+                                        row["refusal"], count=1)
     failures, not_run, checked = [], [], 0
     with tempfile.TemporaryDirectory(prefix="post-cert-refusals-") as scratch:
         smoke = os.path.join(scratch, "smoke")
@@ -127,8 +132,7 @@ def main():
         if missed or not_run:
             print("FAIL post-cert refusals negative control: not detected for %s; not run %d" % (missed, len(not_run)))
             return 1
-        print("PASS post-cert refusals negative control: every one of %d entries fails with an altered root and "
-              "diagnostic position" % len(rows))
+        print("PASS post-cert refusals negative control (%s): every one of %d entries fails" % (a.negative_control, len(rows)))
         return 0
     for f in failures:
         print("FAIL post-cert refusals: %s" % f)

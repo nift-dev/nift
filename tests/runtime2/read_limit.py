@@ -62,7 +62,16 @@ DEFERRED = {
     "callable:cmd": ("D-065 #2: run() and cmd() deferred from the initial release",
                      "the call `cmd()` is not supported by the Runtime 2.0 VM yet", "cmd("),
 }
-LEGACY_CHANNEL = " [legacy channel, NIFT_VM=0]"
+# Case-name tags (review of the cert-prep work, C4 / F-P2-1): a tag is a PREFIX, never a suffix. certify's case-ID
+# table (scripts/certify_fingerprints.py READ_LIMIT_TABLE) matches a name prefix followed by a space, so a suffixed
+# name would map onto the original case's ID. Every tagged name starts with "[": no table entry with fixed leading
+# text matches it, and an entry that starts with a name group captures the tag, so a tagged case never shares an ID
+# with an original one (tests/runtime2/read_limit_names_selftest.py proves it on the real table).
+LEGACY_CHANNEL = "[legacy channel, NIFT_VM=0] "
+REFUSAL_CONTRACT = "[VM refusal contract, %s] "
+VM_EQUIVALENT = "[VM equivalent form] "
+EQUIVALENT_NAMES = ("read_line: line of exactly the limit, printed and measured by the harness",
+                    "read(limit/2) x 16 from /dev/zero (8 x limit streamed)")
 # The channel state: `legacy` routes run() to NIFT_VM=0 and suffixes check names; `record` collects the
 # scripts run before each check (a refusal contract re-runs them under the VM default).
 CHANNEL = {"legacy": False, "record": None, "pending": []}
@@ -77,7 +86,7 @@ def not_run_case(name, why):
 
 def check(name, condition, detail=""):
     if CHANNEL["legacy"]:
-        name += LEGACY_CHANNEL
+        name = LEGACY_CHANNEL + name
     if CHANNEL["record"] is not None and CHANNEL["pending"]:
         CHANNEL["record"].append((name, CHANNEL["pending"]))
         CHANNEL["pending"] = []
@@ -159,7 +168,7 @@ def limit_error(proc, operation, limit=LIMIT):
 
 def legacy_channel(body):
     """Runs body's cases on the legacy channel (NIFT_VM=0): the supported path of a capability the VM default
-    refuses. Their names carry LEGACY_CHANNEL."""
+    refuses. Their names start with LEGACY_CHANNEL."""
     CHANNEL.update(legacy=True, record=None, pending=[])
     try:
         body()
@@ -186,7 +195,7 @@ def refusal_contract(name, reason, proc, script):
     ok = (proc.returncode == 1 and proc.stdout == "" and first.endswith(want) and
           "the program was not executed: no part of it ran" in proc.stderr)
     deferred_cases[reason] += 1
-    check("%s [VM default: refusal contract, %s deferred (%s)]" % (name, reason, decision), ok,
+    check(REFUSAL_CONTRACT % reason + name, ok,
           "want %r; got exit %d stdout %r first %r" % (want, proc.returncode, proc.stdout[:80], first))
 
 
@@ -202,7 +211,8 @@ def deferred(reason, body):
     for name, scripts in recorded:
         for s in scripts:
             proc = run(s["script"], s["cwd"], limit=s["limit"], address_space=s["address_space"], env_extra=s["env_extra"])
-            refusal_contract(name.replace(LEGACY_CHANNEL, ""), reason, proc, s["script"])
+            refusal_contract(name[len(LEGACY_CHANNEL):] if name.startswith(LEGACY_CHANNEL) else name, reason, proc,
+                             s["script"])
 
 
 def main():
@@ -279,7 +289,7 @@ def cases(work, address_space, rss_bound):
     # PENDING-OWNER). The same invariant through a form the VM supports: the line is printed and measured here.
     proc = run('s := ifstream("%s")\nprint(s.read_line())\nprint(s.read_line())\nclose(s)\n' % (work / "line-exact.txt"),
                work, limit=small)
-    check("read_line: line of exactly the limit (printed, measured by the harness)",
+    check(VM_EQUIVALENT + EQUIVALENT_NAMES[0],
           proc.returncode == 0 and proc.stdout.split("\n")[:2] == ["b" * small, "next"], (proc.stdout + proc.stderr)[-300:])
     legacy_channel(lambda: check("read_line: line of exactly the limit",
                                  run('s := ifstream("%s")\nprint(s.read_line().length())\nprint(s.read_line())\nclose(s)\n'
@@ -317,7 +327,7 @@ def cases(work, address_space, rss_bound):
     # streaming invariant through the VM-supported read(n) as well.
     proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
-    check("read(limit/2) x 16 from /dev/zero (8 x limit streamed)",
+    check(VM_EQUIVALENT + EQUIVALENT_NAMES[1],
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
 
     def unapproved_on_legacy():
@@ -474,7 +484,7 @@ def default_limit(work):
     # needs no memory; the invariant runs on the legacy channel, and only where 4 GiB are available.
     refusal_contract(name, "builtin-bytes:open_bytes", run(script, work, limit=None), script)
     if available < 4 * (1 << 30):
-        not_run_case(name + LEGACY_CHANNEL, "MemAvailable %d MiB < 4096" % (available // MiB))
+        not_run_case(LEGACY_CHANNEL + name, "MemAvailable %d MiB < 4096" % (available // MiB))
         return
     vm_peak, _ = baseline_vm()
     gib = 1 << 30

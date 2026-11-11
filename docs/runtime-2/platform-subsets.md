@@ -25,6 +25,8 @@ Owner, 2026-11-12 04:25 (D-077 #4):
   reached by `certify-targets`. Without that target the guard fails (negative control run).
 - **What a run prints.** `platform_subset.py --platform P --nift BIN` runs every included entry and prints PASS or
   FAIL. It prints **EXCLUDED** with the reason for every excluded entry: an exclusion is never counted as a pass.
+  An entry that exits 0 but prints `SKIP` or `NOT RUN` lines (for example vm_subset's RSS check without `os.wait4`
+  on Windows) is **PARTIAL**, not PASS. The run exits 2 when nothing failed but something was partial (review L3).
   A unit binary that was not built is a FAIL, not a skip.
 - **The workflow.** `.github/workflows/runtime2-cross-platform.yml` is dispatch-only, not pushed and not triggered.
   On each of ubuntu-latest, macos-latest and windows-latest (MSYS2 UCRT64) it:
@@ -40,6 +42,16 @@ Owner, 2026-11-12 04:25 (D-077 #4):
   `fcntl`/`termios`, `/proc`, `/dev/zero`, shebang fakes, `ulimit`, GNU `timeout`). None of them has run on Windows
   or macOS for this candidate. A failure there is a certification finding, to be classified like any other: it is
   never turned into an exclusion without a recorded reason and review.
+
+## Platform scope of the strongest Linux evidence (review L4)
+
+The VM-vs-legacy corpus differential (`vm_parity`), `host_deps` and read-limit enforcement (`read_limit.py`,
+`read_limit_controls.py`) are **certified on Linux only, and on macOS only where this subset includes them**:
+- macOS: `vm_parity` and `host_deps` yes; the read-limit suites no;
+- Windows: none of the three.
+
+The Windows and macOS certification claims must carry this as a headline limitation. On Windows the per-suite VM
+entries below cover the VM, but not the corpus differential itself.
 
 ## Counts
 

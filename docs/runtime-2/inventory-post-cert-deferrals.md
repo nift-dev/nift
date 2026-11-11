@@ -12,6 +12,34 @@ refusal. A reason that shows a safety defect, a wrong result, an internal failur
 difference stays open, and so does a catch-all or generic reason that could conceal future failures. The owner is
 deferring implementation, not approving the refusal as language behaviour.
 
+### The D-076 defer table (verbatim; review condition C1)
+
+Several rows cite "D-076 (legacy quirks)" or "D-076 (legacy parser compatibility quirks)". The D-076 entry in
+decisions.md (C138 `c59c2e17`) quotes only the scope paragraph. The defer table is in the owner's attachment
+**3d29daee**, section "What I'd defer", quoted verbatim below. The integrator will record it in decisions.md at
+integration; this page does not edit decisions.md.
+
+> This is where I'd reverse some of my recent recommendations.
+>
+> | Work | Revised recommendation |
+> |---|---|
+> | `native::` migration | **After first certification** |
+> | Struct defaults and type tracking | After first certification |
+> | Postfix spelling | After first certification |
+> | Nested functions | After first certification |
+> | Variadics and destructuring | After first certification |
+> | Safe-access operators | After first certification |
+> | Remaining dead-code admission families | After first certification |
+> | Legacy parser compatibility quirks | Defer |
+> | Session-only improvements | Defer |
+
+The decision log reads "Legacy parser compatibility quirks" as "legacy quirks".
+- **Rows covered by the attachment's own wording:** `opaque:irregular-legacy-parse` and `method:q`.
+- **Rows with an explicit earlier deferral:** `context:assignment-*`, `jump-not-last`, `prepared-*` and
+  `fn-name-reserved` are context and precedence quirks, not parser quirks. Their deferral rests on D-014 (class 2:
+  "preserved (or refused, falling back) until a recorded compatibility change replaces it") and D-018 ("the VM
+  refuses the construct before execution … recorded for later checkpoints"). D-076 confirms the schedule only.
+
 ## Inventory representation
 
 - **New status `deferred-post-cert`.** `deferred-named` was not reused. It means a deferral *from the initial release*
@@ -146,6 +174,24 @@ the `docs/evidence/cp410-competitiveness/probes` corpus:
 - **`shebang-statement` is kept open, not deferred.** The v4.4 smoke asserts it as a feature, and it is not clearly a
   "legacy parser compatibility quirk".
 
+### Why `free-name:undeclared` is deferred while `unresolved-name` is not (review Low)
+
+Both are generic in name, but their scope differs.
+
+**`free-name:undeclared`:**
+- It is a refinement of `free-name` (legacy dynamic scope, deferred-named under D-067 #2c). Its scope is exactly two
+  units: `semantics/loop_callee_error_location.f`, whose real run is refused as `prepared-decl-type`, and
+  `semantics/toplevel_callee_error_location.f`, refused as `free-name`.
+- On both, legacy also errors ("unknown value or malformed expression").
+- Any sighting in another unit, or a change of either root, blocks `--check`.
+
+**`unresolved-name`:**
+- It is the resolver's catch-all for any name the VM cannot resolve.
+- Its sightings have unrelated causes: an `eval` expression (`values.eval`), an undeclared assignment, and a missing
+  import binding (`bad-import.f`).
+- There is no single deferred capability to cite. Deferring it would record a capability that does not exist, even
+  with a scope.
+
 ### Rows that stay open: decisions the owner needs
 
 - **Mixed type rows: `type:+`, `type:<`, `type:compound-assignment`, `type:increment`, `type:unary`, `type:length`,
@@ -160,6 +206,14 @@ the `docs/evidence/cp410-competitiveness/probes` corpus:
   - `statement:Command` is also one of the host-deps 24.
 - **`method:sort_by`.** It has a recorded non-masked sighting in the sort-factory gate, so deferring the reason would
   conceal that gap.
+
+## Open owner questions (review conditions)
+
+- **C1.** Record attachment 3d29daee's defer table in decisions.md (integrator, at integration; quoted above).
+- **C2.** One line from the owner confirming that D-077 #5's general clause ("All other approved feature
+  implementation remains deferred until after the first certification baseline") covers the four judgement-call
+  rows: `alias-argument`, `type:push`, `method:push` and `fn-name-reserved`. Without it they return to
+  PENDING-OWNER: change their status back, and drop their entries from `post_cert_deferrals.tsv`.
 
 ## Not in the 59
 
