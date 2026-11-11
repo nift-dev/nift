@@ -17,7 +17,7 @@ attachments 3d29daee and 83af45ff).
 | implemented-accepted | 3 |
 | PENDING-OWNER | **11** |
 
-`--check` exits 3. The inventory gate reads **"Inventory incomplete: 11 open reasons"**:
+`--check` exits 3 and prints `INVENTORY: BLOCKED: 11 PENDING-OWNER reason(s), not adjudicated: …` (exit 3). The report classifies this as **Inventory incomplete: 11 open reasons**:
 - `callable:minify`
 - `coro-async-value`
 - `method:catch`, `method:error`, `method:throw`
@@ -60,6 +60,11 @@ These stay OPEN (D-078 #3). None was converted to make the gate green.
   - `root`: 50 of 50 detected;
   - `position`: 50 of 50 detected;
   - `unlisted-position`: 11 of 11 pinned entries detected.
+
+**Dependency (review L2).** The pinned sightings (`@L:C` in a scope) are enforced **only** by
+`post_cert_refusals.py`; `inventory.py --check` strips the positions and checks units and roots only. So
+`make cp25r-inventory` now runs `post_cert_refusals.py` before `--check`, and `test-cp25r` runs it as well; neither
+inventory gate runs without it.
 
 Note: the sections below describe the D-077 #1 reconciliation as it was first made (40 and 19). The table above is current.
 

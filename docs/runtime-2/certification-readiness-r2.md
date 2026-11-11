@@ -10,7 +10,7 @@ The report follows D-077 and D-078 (owner 2026-11-12, attachments 83af45ff and 2
 ## 1. Headline
 
 - **Not ready to certify. The four approved production checkpoints are not done** (section 6).
-- **The inventory gate does not complete: "Inventory incomplete: 11 open reasons"** (section 3).
+- **The inventory gate does not complete.** The tool prints `INVENTORY: BLOCKED: 11 PENDING-OWNER reason(s), not adjudicated: …` (exit 3). This report classifies that as **"Inventory incomplete: 11 open reasons"** (section 3).
 - **`test-runtime2-host-deps` is FAILED, with 6 outstanding cases** (section 4).
 - **The mandatory sanitizer, mutation, toolchain, cross-platform and performance gates are NOT RUN.**
 - **Deferrals do not change any of this.** A deferral never turns a failed mandatory execution test into a PASS
@@ -49,7 +49,7 @@ exactly once:
 and `read()`, are now named deferrals (D-078 #2). They appear only there, with their implementation approval kept as
 history, so 30 remain `implement`.
 
-**Inventory status: "Inventory incomplete: 11 open reasons"** (D-078 #3: they stay OPEN, and none was converted):
+**Inventory status.** Tool output: `INVENTORY: BLOCKED: 11 PENDING-OWNER reason(s), not adjudicated: …` (exit 3). Report classification: **Inventory incomplete: 11 open reasons** (D-078 #3: they stay OPEN, and none was converted):
 1. `callable:minify`: no deferral names it.
 2. `coro-async-value`: coroutine capability, not deferred.
 3. `method:catch`: masked by `opaque:legacy-runtime-error`.
@@ -99,6 +99,11 @@ inventory-post-cert-deferrals.md.
   union-kind sighting in a scoped unit fails the contract. A sighting in any other unit blocks `--check`.
 - These count as DEFERRED, not PASS.
 
+**Dependency (review L2).** The pinned sightings (`@L:C` in a scope) are enforced **only** by
+`post_cert_refusals.py`; `inventory.py --check` strips the positions and checks units and roots only. So
+`make cp25r-inventory` now runs `post_cert_refusals.py` before `--check`, and `test-cp25r` runs it as well; neither
+inventory gate runs without it.
+
 ## 4. Host-dependency suite: FAILED
 
 `make test-runtime2-host-deps` is **FAILED**. Its 6 outstanding cases stay FAILED (D-078 #4):
@@ -109,7 +114,7 @@ inventory-post-cert-deferrals.md.
 | ifstream(/dev/zero).read_bytes(huge) | host-handle-flow | stream byte read (F-HD1) |
 | read_bytes(limit/2) x 16 from /dev/zero | host-handle-flow | stream byte read (F-HD1) |
 | ifstream(/dev/zero) >> token | statement:Command | stream extraction. **F-HD2:** a `>>` statement is classified as a shell command |
-| ifstream(/dev/zero).read_val | host-handle-flow | value read; classification not established |
+| ifstream(/dev/zero).read_val | host-handle-flow | value read, refused by the same generic host-handle-flow fallback as the F-HD1 byte reads; whether it belongs under F-HD1 is not established |
 | read_line: line of exactly the limit | type:length | union-kind `.length()`; outside the pinned D-078 #3 deferral |
 
 - **F-HD1 and F-HD2 are recorded as findings.** Correcting either reason ID needs a production diagnostic change,
@@ -140,7 +145,7 @@ inventory-post-cert-deferrals.md.
 | Gate | Class now | Evidence or reason |
 |---|---|---|
 | `make test-rt-vm` | PASS (local, C136 binary; the source is unchanged at C137) | uninterrupted run, rc 0 (REVIEW-C136-SLOT3). It must be re-run on the frozen candidate |
-| CP25-R inventory (`cp25r-inventory`) | **FAILED** | "Inventory incomplete: 11 open reasons" |
+| CP25-R inventory (`cp25r-inventory`) | **FAILED** | tool: `BLOCKED: 11 PENDING-OWNER reason(s)`, exit 3. Classified as: Inventory incomplete, 11 open reasons |
 | D-077 #1 refusal contracts (`test-cp25r`, the post_cert_refusals part) | PASS (a refusal contract; the capabilities are DEFERRED) | section 3 |
 | `test-runtime2-host-deps` | **FAILED** | 6 outstanding cases (section 4) |
 | `test-runtime2-read-limit-mutants` | NOT RUN | needs a build (Linux campaign) |

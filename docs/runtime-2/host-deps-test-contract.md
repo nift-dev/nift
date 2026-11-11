@@ -14,7 +14,7 @@ prints them as `OUTSTANDING` lines, each with the reason the VM emits and the op
 | ifstream(/dev/zero).read_bytes(huge) | host-handle-flow | stream byte read; F-HD1 |
 | read_bytes(limit/2) x 16 from /dev/zero | host-handle-flow | stream byte read in a loop; F-HD1 |
 | ifstream(/dev/zero) >> token | statement:Command | stream extraction; **finding F-HD2** |
-| ifstream(/dev/zero).read_val | host-handle-flow | stream value read, not a byte read: classification not established |
+| ifstream(/dev/zero).read_val | host-handle-flow | stream value read, not a byte read; refused by the same generic host-handle-flow fallback as the F-HD1 byte reads; classification not established |
 | read_line: line of exactly the limit | type:length | `.length()` on a string-or-null result. The D-078 #3 union deferral is pinned to its corpus sightings and does not cover this case; D-078 #4 keeps it open |
 
 **The two misclassifications (D-078 #4).** Both are corrected in the records only, which the owner allowed: in the

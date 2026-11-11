@@ -5732,7 +5732,10 @@ test-cp25r: $(TARGET)
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control root
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control position
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control unlisted-position
+# D-078 review L2: the deferrals' pinned sightings are enforced only by post_cert_refusals.py (--check strips
+# positions), so the inventory gate never runs --check without it.
 cp25r-inventory: $(TARGET)
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
 	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \
 	  --markdown "$(TEST_DIR)/cp25r-inventory/INVENTORY.md" --check

@@ -156,7 +156,9 @@ def main():
         tested = [r for r in rows if a.negative_control != "unlisted-position" or r["reason"] in pinned]
         missed = [r["reason"] for r in tested if not any(f.startswith(r["reason"] + ": ") for f in failures)]
         if missed or not_run:
-            print("FAIL post-cert refusals negative control: not detected for %s; not run %d" % (missed, len(not_run)))
+            print("FAIL post-cert refusals negative control: %s; %d scoped unit(s) not run (corpus missing)%s" % (
+                ("not detected for " + ", ".join(missed)) if missed else "every entry detected",
+                len(not_run), (": " + "; ".join(not_run)) if not_run else ""))
             return 1
         print("PASS post-cert refusals negative control (%s): every one of %d entries fails" % (a.negative_control, len(tested)))
         return 0
