@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129; D-071 in C130-C131)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129; D-071 in C130-C132; D-072 in C133)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -8068,3 +8068,16 @@ approved 14, deferred-named 29, implement 35, implemented-awaiting-review 0, imp
 retired 0. It is blocked only by the 59 PENDING-OWNER reasons; the awaiting-review block is gone.
 `module-host-op:cat` (seen once, the E form in workspaces/script-outside) moves from implement to approved (35 and 14).
 `make test-runtime2-reason-ids` (including inventory_families.py and its three mutants) passes.
+
+### 31. C133: owner rulings 2026-11-11 18:00 (D-072) applied (records only: tsv, docs)
+
+decisions.md D-072 quotes attachment e3c9cee8. No src or test change in this commit.
+
+| D-072 item | Applied |
+| --- | --- |
+| #3 host guard, all 27 operations | Every `module-host-op:*` row cites the family-level, context-specific approval: unsafe execution before the last import or during module startup is an approved refusal; safe post-import execution is supported and tested; unreachable branches belong to slot 3; a new host operation needs an explicit effect classification; safe post-import refusals are not approved. The 20 rows keep `implemented-accepted` (the safe context) with the unsafe-context disposition added; the 7 rows keep `approved` (the unsafe context) and now cite the family approval. Per-operation evidence and tests (module_host_order.py, including C131's seven post-import cases) are unchanged. |
+| #1 cat output order | New row `defect:print-cat-output-order`, P1 release blocker, not an approved difference, status `implement`, scheduled for a bounded repair checkpoint right after slot 3. Reproducer: a.txt `hello` (no newline); `print(1)` / `cat("a.txt")` / `print(2)` to a pipe: legacy stdout bytes `1\nhello2\n`, VM `hello1\n2\n`. |
+| #2 file trace order | New row `difference:file-open-read-trace-order`, P2, under read-only investigation, `PENDING-OWNER`, not approved. |
+| #4 C130 | Accepted, subject to the wording correction, which is C132 (08c8f206). C131's tests are kept. |
+
+The two new rows are not refusal reasons, so they are never seen on the corpora; they carry a valid status (G1).

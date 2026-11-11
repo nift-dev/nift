@@ -2323,3 +2323,38 @@ otherwise. The review is REVIEW-C129-SLOT2 (verdict ACCEPT).
 5. **Verification and governance.** "Freeze and independently review Slot 3 before seeking owner acceptance.
    Preserve the outstanding Linode, Windows/macOS and v4.12.0 performance requirements. No integration, push, tag or
    release without explicit owner approval."
+
+## D-072 — The cat output order (P1), the file trace order (P2), the host guard for all 27 operations (owner, 2026-11-11 18:00, attachment e3c9cee8)
+
+Each item is cited in the CP25-R inventory as "D-072 #n (owner 2026-11-11 18:00)". Quotations are from attachment
+e3c9cee8, section "Forwardable owner decisions", unless marked otherwise.
+
+1. **`cat` output ordering: P1 RELEASE BLOCKER.** "Classify the VM's incorrect `print`/`cat` output ordering as a
+   genuine correctness defect. Do not approve it as a semantic difference. Schedule a separate, bounded production
+   repair checkpoint immediately after Slot 3 is accepted. Do not interrupt or expand the current Slot 3
+   implementation. The required invariant is that output operations targeting the same logical stream preserve program
+   execution order. Investigate the buffering mechanism and other direct-output host operations. A bounded
+   flush-before-direct-write correction is acceptable if independently verified. Do not disable VM output buffering
+   globally. Require exact-byte legacy comparisons for piped and file-redirected output, mixed output operations,
+   functions, loops, imports and failure paths. Include an effective deliberately broken build that restores the
+   original ordering defect. Preserve existing performance thresholds; no re-baselining." (Section 1 also requires
+   tests for "Multiple consecutive `cat` calls" and "Error paths where buffered output must still be preserved", and
+   "I'd want the implementer to verify the buffering mechanism before changing it.")
+2. **File-open/read trace order: P2 INVESTIGATION.** "Record a separate P2 finding. Determine whether the discrepancy
+   reflects instrumentation order or actual OS-operation order. Establish whether it changes observable file
+   behaviour, errors or permissions. Do not approve the difference yet. Escalate to a correctness defect if actual
+   file operations are incorrectly ordered. No production changes are authorised under this investigation."
+3. **Host-import guard: ALL 27 OPERATIONS.** "Extend the previously approved context-specific module read-order
+   restriction to all 27 identified host operations. This is a family-level approval of the unsafe execution context,
+   not blanket approval of refusing these operations everywhere. Preserve the Slot 2 effect classification: Unsafe
+   execution before the last import: approved refusal. Unsafe execution during module startup: approved refusal. Safe
+   execution after imports: supported and tested. Unreachable branches: governed by Slot 3's approved deferred-error
+   semantics. Newly introduced host operations: require explicit effect classification. Retain the per-operation
+   evidence and regression tests. Do not mark safe post-import refusals as approved."
+4. **C130/C131.** "Accept the independent review of C130, subject to the queued narrow wording correction concerning
+   the scratch Slot 1 rebuild and its unrecorded fingerprint. Retain C131's seven post-import regression tests. Keep
+   historical evidence unchanged." (The wording correction is C132, 08c8f206.)
+5. **Workflow.** "Continue Slot 3 without scope expansion. After Slot 3's independent review and owner acceptance,
+   perform the bounded output-order repair. Keep the trace investigation read-only. Maintain the existing
+   release-blocker inventory, performance guards and required Linode/cross-platform certification. No integration,
+   push, tag or release without explicit owner approval."
