@@ -4503,6 +4503,9 @@ test-runtime2-reason-ids: $(TARGET) $(REASON_ID_MUTANT_BIN_1) $(REASON_ID_MUTANT
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant status
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant validity
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant deferred
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant scope
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant drift
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant entry
 test-rt-vm: test-runtime2-reason-ids
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
 CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
@@ -5706,10 +5709,14 @@ test-runtime2-cp23-tsan: $(addprefix $(TEST_DIR)/rt-tsan/,$(CP23_TSAN_UNITS))
 include tests/runtime2/cp23/certification.mk
 # CP25-R (D-057) legacy/VM differentials for corrected refusal families (G3), and
 # the classified refusal inventory (G1; not a certification edge: regenerated
-# from the candidate binary, `--check` fails on an unclassified reason).
+# from the candidate binary, `--check` fails on an unclassified reason), and the
+# refusal contract of the D-077 #1 post-certification deferrals (post_cert_refusals.py:
+# a refusal-contract pass, not evidence that the deferred capabilities work).
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control
 cp25r-inventory: $(TARGET)
 	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
 	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \

@@ -34,16 +34,34 @@ The deferred-site cases (REVIEW-C136-SLOT3 F-A: a slot-3 `deferred:<reason>` rec
   deferred-needs-row             a deferred site with no row: G1 fails (exit 1)
   deferred-pending-blocks        a deferred site of a PENDING-OWNER row: --check blocks (exit 3)
 
+The D-077 #1 cases (owner 2026-11-12 04:25: DEFERRED — POST-CERTIFICATION IMPLEMENTATION, status
+`deferred-post-cert`, each with a post_cert_deferrals.tsv entry and a unit scope):
+
+  postcert-complete           a deferred-post-cert reason seen in its scoped unit with its recorded root: exit 0, the
+                              report says "Inventory complete, with named deferred capabilities" and lists it as a
+                              named deferred capability, never "all supported functionality passes"
+  postcert-outside-scope      the same reason seen in a unit outside the scope: --check blocks (exit 3)
+  postcert-root-drift         the scoped unit's real run refuses with another reason than the recorded root: blocks (exit 3)
+  postcert-missing-entry      a deferred-post-cert row with no deferral entry: G1 fails (exit 1)
+  postcert-entry-without-row  a deferral entry whose row is not deferred-post-cert: G1 fails (exit 1)
+  postcert-pending-blocks     a deferred-post-cert reason in scope next to a PENDING-OWNER reason: exit 3, and the
+                              completeness wording is not printed
+  real-tsv-post-cert          the committed tsv and post_cert_deferrals.tsv agree (every deferred-post-cert row has an
+                              entry citing D-077 #1), and the refusal gates (approved_refusal.py/.sh) do not accept
+                              deferred-post-cert: a refusal-contract pass of a deferred capability is not a pass
+
 --mutant family re-adds the generic family fallback (any `<prefix>:*`) to a scratch copy of inventory.py
 and runs the same cases against it: the negative control. The suite must then fail, on the named case
 unlisted-type-reason (a `type:*` row in the temporary classification would classify `type:zzz`).
 --mutant status drops the two implemented-status checks from the copy: the suite must then fail on
 exactly status-accepted-seen, status-awaiting-unseen and accepted-refusal-still-blocks. --mutant validity drops the check that every
 unseen row has a valid status: the suite must then fail on exactly status-invalid-unseen. --mutant deferred drops the
-deferred-site filter: the suite must then fail on exactly deferred-accepted-not-seen and deferred-retired-not-seen. A bare
---mutant means family.
+deferred-site filter: the suite must then fail on exactly deferred-accepted-not-seen and deferred-retired-not-seen.
+--mutant scope drops the D-077 scope check (fails exactly postcert-outside-scope), --mutant drift the root check (fails
+exactly postcert-root-drift), --mutant entry the deferral-entry requirement (fails exactly postcert-missing-entry). A
+bare --mutant means family.
 
-usage: inventory_families.py [--mutant [family|status|validity|deferred]]
+usage: inventory_families.py [--mutant [family|status|validity|deferred|scope|drift|entry]]
 """
 import argparse
 import json
@@ -64,6 +82,11 @@ GENERIC = '''        return cls.get(reason.split(":")[0] + ":*") if ":" in reaso
 '''
 DEFERRED_FILTER = "        by_status[status] = [r for r in by_status.get(status, []) if r in refused]\n"
 VALIDITY_CHECK = "        if reason not in seen and row.get(\"status\") not in STATUSES:\n"
+SCOPE_CHECK = "            if u not in scope:\n"
+DRIFT_CHECK = "            elif scope.get(u) not in unit_reasons.get(u, ()):\n"
+ENTRY_CHECK = "            if missing:\n"
+DEFERRALS = os.path.join(HERE, "post_cert_deferrals.tsv")
+COMPLETE = "Inventory complete, with named deferred capabilities"
 STATUS_CHECKS = ['    if args.check and by_status.get("implemented-accepted"):\n', "    if args.check and awaiting:\n"]
 
 
@@ -73,18 +96,28 @@ def row(reason, status="PENDING-OWNER"):
     return "\t".join([reason, "A", "F-test", "legacy", "disposition", "approval", "evidence", "", status]) + "\n"
 
 
-def report(inventory, work, seen, rows):
+def report(inventory, work, seen, rows, deferrals=(), execute=()):
+    """deferrals: (reason, scope) pairs for post_cert_deferrals.tsv; execute: (entry, [fallback reasons]) pairs."""
     d = os.path.join(work, "collect")
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "classify-all.jsonl"), "w") as f:
         f.write(json.dumps({"id": "unit|main.f", "reasons": [{"reason": r} for r in seen]}) + "\n")
-    open(os.path.join(d, "execute.jsonl"), "w").close()
+    with open(os.path.join(d, "execute.jsonl"), "w") as f:
+        for entry, reasons in execute:
+            f.write(json.dumps({"corpus": "t", "entry": entry, "rc": None, "executions": [
+                {"outcome": "fallback", "reason": r, "path": "main.f"} for r in reasons]}) + "\n")
     tsv = os.path.join(work, "classification.tsv")
     with open(tsv, "w") as f:
         f.write(HEADER + "".join(row(r) for r in rows))
+    dtsv = os.path.join(work, "post_cert_deferrals.tsv")
+    with open(dtsv, "w") as f:
+        f.write("reason\tcapability\tdecision\tscope\trefusal\n")
+        for reason, scope in deferrals:
+            f.write("\t".join([reason, "a test capability", "D-077 #1 (test)", scope, "program t; first diagnostic: x"]) + "\n")
+    md = os.path.join(work, "out.md")
     p = subprocess.run([sys.executable, "-B", inventory, "report", d, "--classification", tsv, "--check",
-                        "--markdown", os.path.join(work, "out.md")], capture_output=True, text=True, timeout=120)
-    return p.returncode, p.stderr
+                        "--deferrals", dtsv, "--markdown", md], capture_output=True, text=True, timeout=120)
+    return p.returncode, p.stderr + (open(md).read() if os.path.exists(md) else "")
 
 
 def cases(inventory):
@@ -141,6 +174,42 @@ def cases(inventory):
         rc, err = report(inventory, os.path.join(work, "m"), ["deferred:type:mul"], [("type:mul", "PENDING-OWNER")])
         if rc != 3 or "PENDING-OWNER reason(s), not adjudicated: type:mul" not in err:
             failures.append(("deferred-pending-blocks", "rc %d %r" % (rc, err[-300:])))
+        # D-077 #1: deferred-post-cert, its entry and its unit scope.
+        pc, unit = ("type:mul", "deferred-post-cert"), [("unit", ["type:mul"])]
+        rc, err = report(inventory, os.path.join(work, "n"), ["type:mul"], [pc], [("type:mul", "unit>type:mul")], unit)
+        if rc != 0 or COMPLETE not in err or "all supported functionality passes" in err.lower() \
+                or "## Named deferred capabilities" not in err or "deferred-post-cert 1" not in err:
+            failures.append(("postcert-complete", "rc %d %r" % (rc, err[-400:])))
+        rc, err = report(inventory, os.path.join(work, "o"), ["type:mul"], [pc], [("type:mul", "other>type:mul")], unit)
+        if rc != 3 or "seen outside their recorded scope: type:mul (unit)" not in err or COMPLETE in err:
+            failures.append(("postcert-outside-scope", "rc %d %r" % (rc, err[-400:])))
+        rc, err = report(inventory, os.path.join(work, "p"), ["type:mul"], [pc], [("type:mul", "unit>struct-field-init")],
+                         unit)
+        if rc != 3 or "scope drift" not in err or "recorded struct-field-init" not in err:
+            failures.append(("postcert-root-drift", "rc %d %r" % (rc, err[-400:])))
+        rc, err = report(inventory, os.path.join(work, "q"), ["type:mul"], [pc], [], unit)
+        if rc != 1 or "deferred-post-cert row type:mul has no complete deferral entry" not in err:
+            failures.append(("postcert-missing-entry", "rc %d %r" % (rc, err[-400:])))
+        rc, err = report(inventory, os.path.join(work, "r"), ["type:mul"], [("type:mul", "approved")],
+                         [("type:mul", "unit>type:mul")], unit)
+        if rc != 1 or "deferral entry type:mul names a row whose status is 'approved'" not in err:
+            failures.append(("postcert-entry-without-row", "rc %d %r" % (rc, err[-400:])))
+        rc, err = report(inventory, os.path.join(work, "s"), ["type:mul", "type:div"], [pc, "type:div"],
+                         [("type:mul", "unit>type:mul")], [("unit", ["type:mul", "type:div"])])
+        if rc != 3 or "PENDING-OWNER reason(s), not adjudicated: type:div" not in err or COMPLETE in err:
+            failures.append(("postcert-pending-blocks", "rc %d %r" % (rc, err[-400:])))
+    real = []
+    entries = {l.split("\t", 1)[0] for l in open(DEFERRALS) if not l.startswith("#") and "\t" in l} - {"reason"}
+    for l in open(TSV):
+        cells = l.rstrip("\n").split("\t")
+        if not l.startswith("#") and len(cells) > 8 and cells[8] == "deferred-post-cert":
+            if cells[0] not in entries or "D-077 #1" not in cells[5]:
+                real.append(cells[0])
+    rows_pc = {l.split("\t", 1)[0] for l in open(TSV) if not l.startswith("#") and l.rstrip("\n").endswith("\tdeferred-post-cert")}
+    gates = open(os.path.join(HERE, "..", "approved_refusal.py")).read() + open(os.path.join(HERE, "..", "approved_refusal.sh")).read()
+    if real or entries != rows_pc or "deferred-post-cert" in gates:
+        failures.append(("real-tsv-post-cert", "rows without entry or D-077 #1 %s; entries without row %s; refusal gates "
+                         "mention deferred-post-cert %s" % (real, sorted(entries - rows_pc), "deferred-post-cert" in gates)))
     status = {}
     for l in open(TSV):
         if not l.startswith("#") and "\t" in l:
@@ -158,13 +227,14 @@ def cases(inventory):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mutant", nargs="?", const="family", choices=["family", "status", "validity", "deferred"])
+    ap.add_argument("--mutant", nargs="?", const="family",
+                    choices=["family", "status", "validity", "deferred", "scope", "drift", "entry"])
     a = ap.parse_args()
     if not a.mutant:
         failures = cases(INVENTORY)
         for name, why in failures:
             print("FAIL inventory families: %s: %s" % (name, why))
-        print("%s inventory families: 16 cases (family rows only for the four D-067 #10 families, never approving unlisted members; the D-069 #4 statuses)" %
+        print("%s inventory families: 23 cases (family rows only for the four D-067 #10 families, never approving unlisted members; the D-069 #4 statuses; the D-077 #1 post-certification deferrals)" %
               ("FAIL" if failures else "PASS"))
         return 1 if failures else 0
     text = open(INVENTORY).read()
@@ -179,6 +249,15 @@ def main():
             return 1
         mutated = text.replace(DEFERRED_FILTER, "        pass\n")
         expected = ["deferred-accepted-not-seen", "deferred-retired-not-seen"]
+    elif a.mutant in ("scope", "drift", "entry"):
+        anchor, expected = {"scope": (SCOPE_CHECK, ["postcert-outside-scope"]),
+                            "drift": (DRIFT_CHECK, ["postcert-root-drift"]),
+                            "entry": (ENTRY_CHECK, ["postcert-missing-entry"])}[a.mutant]
+        if text.count(anchor) != 1:
+            print("FAIL inventory families %s mutant: harness: the D-077 check is not in inventory.py (stale)" % a.mutant)
+            return 1
+        mutated = text.replace(anchor, anchor[:len(anchor) - len(anchor.lstrip())] +
+                               ("elif False:\n" if anchor.lstrip().startswith("elif") else "if False:\n"))
     elif a.mutant == "validity":
         if text.count(VALIDITY_CHECK) != 1:
             print("FAIL inventory families validity mutant: harness: the row-status check is not in inventory.py (stale)")
