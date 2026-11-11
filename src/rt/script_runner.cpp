@@ -10,7 +10,7 @@
 #include "rt/heap_account.h"
 #include "rt/legacy_bridge.h"
 #include "rt/link_diagnostic.h"
-#include "rt/module_host_op.h"
+#include "rt/module_host_order.h"
 #include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/natives/builtin.h"
@@ -324,12 +324,13 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
     }
     // R1 (owner, 2026-10-21): linking reads all modules before execution.
     // A host operation before/between imports could observe different files.
-    // Until imports run in place, scan every proto and refuse linked host built-ins.
+    // Slot 2 (D-068 #2): admitted when none can run before the last module
+    // read (rt/module_host_order.h); otherwise refused at its first host op.
 #if !defined(NIFT_R1_MUTANT)  // test-only negative control (tests/runtime2/module_host_order_mutant.sh)
     if (link.linked) {
         std::string host_reason;
         std::uint32_t host_offset = 0; bool host_positioned = false;
-        if (first_module_host_op(*compiled.program, host_reason, host_offset, &host_positioned)) {
+        if (host_order_refusal(*compiled.program, link, ast, parsed.root, host_reason, host_offset, &host_positioned)) {
             stats.reason = host_reason;
             locate_linked(host_offset, host_positioned);  // the host op's recorded instruction offset
             return not_compiled(stats, mode, report_path, exit_code);

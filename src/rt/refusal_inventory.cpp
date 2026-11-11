@@ -5,7 +5,7 @@
 #include "rt/compiler_coro_admit.h"
 #include "rt/globals.h"
 #include "rt/legacy_names.h"
-#include "rt/module_host_op.h"
+#include "rt/module_host_order.h"
 #include "rt/module_link.h"
 #include "rt/parser.h"
 #include "rt/refusal_mask.h"
@@ -236,7 +236,7 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
 #if !defined(NIFT_R1_MUTANT) && !defined(NIFT_INVENTORY_HOST_MUTANT)  // the latter: test-only control
             std::string host_reason;
             std::uint32_t host_offset = 0;
-            if (link.linked && first_module_host_op(*compiled.program, host_reason, host_offset))
+            if (host_order_refusal(*compiled.program, link, entry, parsed.root, host_reason, host_offset))
                 record_linked(std::move(host_reason), host_offset, false, {});
 #endif
             break;

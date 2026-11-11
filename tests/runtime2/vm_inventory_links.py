@@ -108,11 +108,13 @@ CASES = [
         "name": "module-callable",
         "files": {
             "main.f": 'import("m.nft")\nprint(mf())\n',
-            "m.nft": 'fn(mf()) {\n  return getenv("X")\n}\nexport(mf)\n',
+            "m.nft": 'fn(mf()) {\n  return getenv("X")\n}\nv0 := mf()\nexport(mf)\n',
         },
         # CP16 compiles getenv as a host native; R1 then refuses the linked
-        # unit (rt/module_host_op.h). The case still checks that item 0 is the
-        # module's call, with module provenance, not the module function name.
+        # unit (rt/module_host_op.h): since slot 2 (rt/module_host_order.h) only
+        # because the module's initialisation calls mf (v0 := mf()). The case
+        # still checks that item 0 is the module's call, with module
+        # provenance, not the module function name.
         "first": "module-host-op:getenv",
         "certain": {"module-host-op:getenv"},
         "complete": True,
@@ -120,6 +122,16 @@ CASES = [
         "item0_line": 2,
         "item0_column": 10,
         "module_paths": {"m.nft"},
+    },
+    {
+        # Slot 2 (D-068 #2): the same host op, called only after the leading
+        # imports, is admitted by both the runner and the inventory.
+        "name": "module-callable-after-imports",
+        "files": {
+            "main.f": 'import("m.nft")\nprint(mf())\n',
+            "m.nft": 'fn(mf()) {\n  return getenv("X")\n}\nexport(mf)\n',
+        },
+        "compiled": True,
     },
     {
         "name": "call-binding-later-compiled",

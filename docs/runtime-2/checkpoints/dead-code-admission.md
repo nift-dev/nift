@@ -810,6 +810,8 @@ Today the R1 guard refuses any host op in a program with imports. It uses `first
 at script_runner.cpp:325-339. So `import("./m.f")`, then `if (os() == "windows") { print(pwd()) }`, is refused. This
 conflicts with the platform-dispatch requirement (D-067 #11). The slot-2 repair (D-067 #8) is the place to decide.
 
+**Implemented in slot 2 (C129, rescan-post-cp1.md section 29):** `src/rt/module_host_order.{h,cpp}`; the module-init check is done on the compiled main proto (the linker splices module code in place), with the 11 binding-wins names checked against the linked text.
+
 **Option (a), the proposed slot-2 design (C120, revised per REVIEW-C119 section 3).** The slot-2 repair also admits
 host ops in uncalled functions and untaken branches. It replaces the per-proto scan with an order condition checked on
 the syntax of the linked program.

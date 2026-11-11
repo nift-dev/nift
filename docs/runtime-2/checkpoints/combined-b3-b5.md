@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127; reviews in C119-C121; slot 1 in C123-C124)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -7774,3 +7774,254 @@ Gates at C127 (records only):
 
 The 3 S rows seen on the corpora (`static-error:redeclared`, `jump-outside-loop`, `opaque:struct-body`) move from
 PENDING-OWNER to approved (62 -> 59, 10 -> 13). No src change; the nift sha256 is unchanged.
+
+### 29. Slot 2: the host-import guard, Option A (C129; production checkpoint)
+
+Owner authority:
+- 2026-11-11 05:41, D-068 #2, attachment 1120cc1e ("2. Host guard — OPTION A APPROVED");
+- the reviewed design, dead-code-admission.md 5.5 and section 11 above (SOUND, REVIEW-C120);
+- D-069 and D-070 #4: effects, not names; indirect user code is not pure.
+
+Slot 3, structs and sessions are untouched. Legacy is unchanged.
+
+#### 29.1 Design as implemented
+
+The new code is `src/rt/module_host_order.{h,cpp}`. It is called once per linked unit, through
+`host_order_refusal`, by both `run_unit` (script_runner.cpp) and the refusal inventory (refusal_inventory.cpp).
+
+A linked unit containing a host op is admitted when both conditions hold:
+
+- **E: a strict leading import block.** Every top-level statement of the entry before its last import is an import
+  (or a comment). This is checked on the entry AST.
+- **M: module initialisation, across the whole graph, is free of host ops and calls.**
+  - The linker splices every module, transitively, in place of its import. Module initialisation is therefore the
+    main proto up to its last instruction located in a module (`LinkedUnit::locate`), and E guarantees that nothing
+    of the entry runs before it.
+  - In that range only explicitly safe operations are allowed (`init_safe`, a switch whose default refuses). Refused:
+    - calls (`Call`, `CallValue`, `CallValueAny`), which includes calls in `$[...]` interpolation, in literals and
+      in method calls;
+    - struct construction (`NewStruct`, `StructAdd`);
+    - callbacks (`CollectionSort`, `CollectionStep`, `CollectionCall`: `map`, `filter`, `sort_by` with a lambda or
+      comparator);
+    - tasks and futures (`Spawn`, `Await`, `FutureOp`, `Sleep`, `TaskEnd`), atomics, session operations, and any
+      future opcode.
+  - `CallNative` is allowed only for `print` (presentation) and for built-ins classified **Pure**. Host and Shared
+    are refused.
+  - A Pure call of one of the 11 binding-wins built-ins (`map`, `set`, `stack`, `send`, `recv`, `cancel`,
+    `channel`, `deepcopy`, `validate`, `sha256`, `sha256_file`) is a user call, and is refused, when the linked text
+    uses the name other than as a plain call: a binding, a parameter, or `fn(name(`. This is review condition C2.
+  - `import`/`export` are not calls. The linker splices imports and blanks a module's exports
+    (module_link.cpp:121), so neither compiles to an instruction.
+- **Unknown effects are refused.** The opcode switch refuses unlisted operations, and `builtin_effect` returns
+  `Unclassified` (refused) for an id it does not list.
+- **Effects, not names (D-070 #4).** No native invokes user code. A struct's own `to_string`/`stringify` method
+  compiles to a `Call` (probed: `s.to_string()` and `s.stringify()` on a struct declaring it). A struct cannot exist in
+  module initialisation, because construction and calls are refused there, so neither presentation nor printing can
+  reach user code. The ambiguous case is already refused before execution (`presentation-struct-method:*`).
+- **Permanent classification (review condition C3).** `builtin_effect` classifies all 186 `BuiltinId`s explicitly:
+  Pure 105, Host 62 (exactly the R1 block HostOpen..StreamEof), Shared 19. `tests/runtime2/host_set_complete.py`
+  enumerates `builtin_list.inc` and fails on any unclassified, duplicate or unknown id, on a Host class that differs
+  from `natives::host_builtin`, on an effectful name or File/Stream method not classified Host, and on a
+  synchronisation built-in classified Pure. Its `--mutant` appends an unclassified built-in and must be caught.
+- **Refusal text and position are unchanged.** A refused unit gets the same `module-host-op:<name>` reason, at its
+  first host op, as before.
+
+**Size:** `module_host_order.cpp` 189 lines (of which 39 are the explicit 186-id classification table),
+`module_host_order.h` 39 lines, script_runner.cpp and refusal_inventory.cpp +6/-5. About 235 lines in all: slightly
+above the 150-220 estimate, because of the permanent classification table the owner required. There is no new
+compiler architecture.
+
+#### 29.2 The 27 `module-host-op:*` rows, before and after
+
+Each row's own evidence program was run (C129 probe, scratch `s2/rows/after.json`).
+
+| Row | Before (78027d95) | After | Status |
+| --- | --- | --- | --- |
+| `module-host-op:cat` | refused | **still refused**, same text and position (E: `cat`, `exists` and `ls` run before the import (workspaces/script-outside)) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:exists` | refused | **still refused**, same text and position (M: `exists` in the module's initialisation) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:cp` | refused | **still refused**, same text and position (E: `cp` runs before the import) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:is_file` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:remove` | refused | **still refused**, same text and position (E: `remove` runs before the import) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:file` | refused | **still refused**, same text and position (M: `file()` in the module's initialisation) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:getenv` | refused | **still refused**, same text and position (M: `getenv` in the module's initialisation) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:is_dir` | refused | **still refused**, same text and position (M: `is_dir` in the module's initialisation) | `implement` (unchanged): a design refusal; the same call after the leading imports now runs, legacy-equal |
+| `module-host-op:open` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:sha256_file` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:stat` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:ls` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:pwd` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:cd` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:touch` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:mkdir` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:make_dir` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:which` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:env` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+| `module-host-op:setenv` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:unsetenv` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:os` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:arch` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:platform` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:hardware_concurrency` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal) | `implemented-awaiting-review` |
+| `module-host-op:epoch` | refused before execution | runs on the VM (outcome vm, exit 0; legacy exit 0; output equal except the clock value) | `implemented-awaiting-review` |
+| `module-host-op:sleep` | refused before execution | runs on the VM (outcome vm-error, exit 1; legacy exit 1; output equal) | `implemented-awaiting-review` |
+
+**Totals:** 20 rows run (`implemented-awaiting-review`); 7 keep their refusal by the approved design (`implement`).
+- Of those 7, 3 fail E (a host op before the import) and 4 fail M (a host op in module initialisation).
+- Every one of the 7 ops now runs legacy-equal when called after the leading imports (C129 probes).
+
+The 20 rows' reasons can still be emitted by programs that run the op before an import or in module initialisation;
+those programs remain refused by design.
+
+**Platform patterns (dead-code-admission.md 3 and 5.8):** `import("./m.f")` then `if (os() == "windows") {
+print(pwd()) } else { ... }` now runs (`os-guarded-branch`). The other patterns depend on slot 3.
+
+#### 29.3 Controls
+
+The guard's mutants are `NIFT_HOST_ORDER_MUTANT=N`, built by tests/runtime2/sanctioned_mutant.py
+(`make test-runtime2-module-host-order-mutants`, in test-rt-vm).
+
+| Mutant | Caught by (tests/runtime2/module_host_order.py) |
+| --- | --- |
+| 1 no leading-import-block check (E) | `host-before-empty-module`, `declaration-before-import` |
+| 2 no module-initialisation check (M) | `env-in-module-init`, `host-in-nested-module-init` (transitive), `callback-host-in-init` |
+| 3 calls and struct construction count as safe | `call-in-module-init`, `interpolation-call-in-init`, `struct-presentation-in-init`, `struct-stringify-method-in-init` |
+| 4 callbacks count as safe | `comparator-in-init` (`sort_by` with a lambda in module init) |
+| 5 no shadowing check for the binding-wins built-ins | `shadowed-builtin-in-init` (classify-all, so it is independent of `param-name-reserved`; its pair `unshadowed-builtin-in-init` is admitted) |
+| `-DNIFT_R1_MUTANT` (existing: no R1 refusal) | 19 failing cases (`make test-runtime2-module-host-order-mutant`) |
+| an appended unclassified built-in | `host_set_complete.py --mutant` |
+| `NIFT_INVENTORY_HOST_MUTANT` (existing) | vm_inventory_links.py `module-callable` (now with a call in module initialisation) |
+
+Cases that do not depend on a mutant:
+- **Admitted, legacy-equal output, trace and tree:**
+  - `host-after-import`, `host-in-nested-module-fn`, `host-in-uncalled-fn`, `host-in-untaken-branch`;
+  - `os-guarded-branch`, `lambda-after-import`, `module-exports-host-fn`;
+  - `module-init-print-pure` (print, a string method and an unshadowed `sha256` in module initialisation);
+  - `cwd-change-after-import`, `nested-import-clean`.
+- **Refused:**
+  - `host-before-import-untaken` (`if (false) { cd("..") }` before the import) and `host-before-import-taken`
+    (`setenv` in a taken branch). These are refused by both E and M.
+  - The diamond (`diamond-import`) is refused before the guard as `import-reinitialised` (D-041 #2, D-068 #10). No
+    guard mutant applies to it.
+
+#### 29.4 User-visible changes (before -> after)
+
+- **Programs with imports that were refused with `not compiled for the VM (module-host-op:<name>)` now run, with
+  legacy-equal output.** This applies when the entry's imports come first and module initialisation runs no host op
+  and no call: the 20 rows above, the admitted cases in 29.3, and corpus units (section 29.5).
+- **No refusal text or position changed.** Every program that stays refused gets the same reason, the same position
+  and the same notes.
+- **No internal errors.** Every probe exits 0, or exits 1 with legacy's own error.
+
+#### 29.5 Freeze gates and inventory
+
+Every gate was run on the slot-2 binary (nift sha256 `fff2376cff6b2d70902781254f9fc3c0ea67ba149980810559f81565773bf2ec`).
+Failures were collected rather than stopping the run.
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS: 0 problems in 712 files |
+| `make test-test-integrity` | PASS |
+| `make test-rt-vm` | PASS (now includes `test-runtime2-module-host-order-mutants` and `test-runtime2-host-set-complete`) |
+| `make test-rt-vm-mutants` | PASS: 12 mutants, 12 rejected |
+| sharing oracle, b5, b5 mutants | PASS |
+| cycle routes, assign family, named deferrals, import depth, deferral dependencies | PASS |
+| inventory links, inventory host mutant, inventory limits, reason ids | PASS |
+| `make test-rt-host` | PASS |
+| `make test-runtime2-cp16-n1` | PASS |
+| `make test-rt-builtins-guards` | PASS: 35 workloads, 0 guard failures |
+| `module_host_order.py` | PASS: 33 of 33 |
+| `make test-runtime2-module-host-order-mutants` | PASS: 5 of 5 mutants caught by their named cases |
+| `make test-runtime2-module-host-order-mutant` (R1) | PASS |
+| `make test-runtime2-host-set-complete` | PASS: 186 built-ins classified; the mutant is caught |
+| `make test-rt-host-mutants` | PASS after the harness fix below (exit 0; cp17 handle mutants 46, 0 survived; host negative controls 13 rejected) |
+| `make test-runtime2-host-deps` | **exit 2, not caused by slot 2** (see below) |
+| `inventory.py collect` + `report --check` | **exit 3** (expected): G1 PASS, 137 reasons seen: approved 13, deferred-named 29, implement 36, PENDING-OWNER 59; blocked by the 59 PENDING-OWNER reasons and by the 20 `implemented-awaiting-review` rows |
+
+**host-deps (exit 2).** The failures are all in `read_limit.py`: 24 cases, each a VM-default refusal of a feature
+outside slot 2:
+- `builtin-bytes:open_bytes`;
+- `callable:run`, `callable:cmd` and `callable:read`;
+- `host-handle-flow`, `statement:Command` and `type:length`.
+
+None of them involves a module or an import. For example:
+- `FAIL open_bytes: file of exactly the limit is read whole error: ...not compiled for the VM (builtin-bytes:open_bytes)`
+- `FAIL run(yes) never ends: fatal run limit error ... (callable:run): the call run() is not supported by the Runtime 2.0 VM yet`
+
+The same 24 failures, with identical output, occur on the base binary 78027d95 (the two runs were diffed). The gate
+is in `EXPECTED_BASELINE` (scripts/certify_fingerprints.py), and its recorded fingerprint
+(tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt) has 33 failures; these 24 are a subset of them.
+Making the gate pass would mean implementing bytes, process and stdin built-ins on the VM, which is outside slot 2.
+**Owner ruling needed:** the owner's rule is no freeze while host-deps fails, and this failure predates slot 2.
+
+**rt-host-mutants (first run exit 2; fixed).** The failing case was:
+
+```
+AssertionError: reentrant-not-detected
+make: *** [Makefile:5591: test-runtime2-cp17-handle-mutants] Error 1
+```
+
+This is a harness failure, not a surviving mutant. `handle_mutants.py` asserts that each mutant's pattern is present in
+the source. C57 (15407788) rewrote the hook-scope check in src/rt/handles/table.cpp to
+`if (s->table_ == this) return true;`, so the old pattern `if (t == this) return true;` no longer matched. Slot 2 does
+not touch that file, and the base binary fails in the same way. The mutant was retargeted to the current line with
+the same mutation. The gate then gave 46 mutants and 0 survived; `reentrant-not-detected` was KILLED.
+
+**Inventory.** There are 137 reasons seen (138 before). `module-host-op:exists` is no longer seen (implement 37 -> 36).
+- Its only corpus unit is rt-diff-corpus/scripts/trace-coverage/main.f: `import("mod.f")` first, and mod.f only declares
+  and exports a function. Under the guard the unit's host ops no longer give a refusal reason.
+- The unit is still refused, at its next reason `callable:cmd` (main.f 17:6, `cmd("true").run()`).
+- The user-visible refusal is unchanged: the base binary also reports `callable:cmd` at 17:6, since the inventory
+  lists every reason but the runner reports the first, and nothing runs.
+- The other 26 rows' seen counts are unchanged. The 20 rows marked `implemented-awaiting-review` are not seen on the
+  corpora (their evidence is probe-only), and they block `--check` as intended.
+
+#### 29.6 Changed tests (audit)
+
+Every changed expectation is listed below. No test case, mutant or Makefile target was deleted: every old case name in
+module_host_order.py (11), vm_inventory_links.py (23) and cp17/handle_mutants.py (46) is still present, and the
+Makefile diff only adds lines.
+
+| File and case | Old expectation | New expectation | Why | Legacy-equal evidence |
+| --- | --- | --- | --- | --- |
+| module_host_order.py `host-after-import` | `module-host-op:exists` | `vm` | Admitted under D-068 #2: the import comes first, and the module's initialisation is `x := 1`, `export(x)` | The case compares VM and legacy output, trace and tree: equal |
+| module_host_order.py `host-in-nested-module-fn` | `module-host-op:is_file` | `vm` | Admitted under D-068 #2: the host op is inside a function body, called only after the imports; nested initialisation is clean | Output, trace and tree equal |
+| vm_inventory_links.py `module-callable` | first reason `module-host-op:getenv`, item 0 at m.nft 2:10 | unchanged | Rewrite that keeps coverage: m.nft now calls `v0 := mf()` in its initialisation, so the unit is still refused, and the case still checks item 0's module provenance | n/a (still refused) |
+| vm_inventory_links.py `module-callable-after-imports` (new) | — | `compiled: True` | The original program (no call in module initialisation) is admitted by both the runner and the inventory | runs legacy-equal (the slot-2 probes) |
+| cp17/handle_mutants.py `reentrant-not-detected` | pattern `if (t == this) return true;` | `if (s->table_ == this) return true;` | Stale pattern since C57; same mutation retargeted | n/a (mutant KILLED) |
+
+The other 31 module_host_order.py cases are new. `NIFT_INVENTORY_HOST_MUTANT` (inventory_host_mutant) is unchanged.
+
+**No previously prohibited unsafe host op became executable.** A host op becomes executable only if no host op and
+no call can run before the last module read. That is exactly the R1 read-order contract, which the original
+refusal protected. Two pieces of evidence:
+- Every program that runs a host op before or during module loading is still refused, with the same text and
+  position: the 7 rows that stay refused (29.2), and the refused cases in 29.3.
+- Each of the 5 guard mutants makes such a program run, and the gate catches each one.
+
+**Preserved coverage, by area:**
+- **Module-startup effects:**
+  - `env-in-module-init` (setenv), `host-in-nested-module-init`;
+  - the 4 M rows (file, getenv, is_dir, exists);
+  - inventory `module-callable`.
+- **Indirect user code:**
+  - `call-in-module-init`, `interpolation-call-in-init`;
+  - `callback-host-in-init` (map), `comparator-in-init` (sort_by);
+  - `struct-presentation-in-init`, `struct-stringify-method-in-init`.
+- **Transitive imports:** `host-in-nested-module-init` (mutant 2), `nested-import-clean` and `diamond-import`
+  (`import-reinitialised`).
+- **Shadowed built-ins:** `shadowed-builtin-in-init` (mutant 5, classify-all), with its pair
+  `unshadowed-builtin-in-init`.
+- **cwd/env changes before or between imports:**
+  - `host-before-import-untaken` (cd) and `host-before-import-taken` (setenv);
+  - `env-in-module-init`, `declaration-before-import`;
+  - the 3 E rows (cp, remove, cat).
+  A host op between two imports is before the last import, so E refuses it.
+
+**Admitted cwd/env changes after the imports cannot affect a later import.**
+- Every import is top-level with a literal path. Nested imports are refused (`import-nested`, module_scan.cpp:80),
+  and so are dynamic ones (`import-dynamic`, module_graph.cpp:217).
+- The whole graph is resolved and read at link time, before execution. Imports cannot appear after the leading
+  block, because E requires every import to come before any other statement.
+- So a `cd`/`setenv` after the imports runs after every module read, as it does in legacy. `cwd-change-after-import`
+  checks this, with output, trace and tree equal to legacy.

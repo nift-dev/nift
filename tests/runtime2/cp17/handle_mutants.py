@@ -51,7 +51,9 @@ M=[
  ("close-ignores-in-flight","src/rt/handles/table_contexts.cpp","return !c || (c->in_flight == 0 && c->obligations == 0);","return !c || c->obligations == 0;"),
  ("closer-takeover","src/rt/handles/context_tree.cpp","        if (child->second.state == ContextState::Closing) elsewhere.push_back(*it);  // another close owns it\n        else collect(","        collect("),
  ("close-elsewhere-no-wait","src/rt/handles/table_contexts.cpp","        idle_.wait(lock, [&] { return contexts_.find(id) == nullptr; });\n",""),
- ("reentrant-not-detected","src/rt/handles/table.cpp","        if (t == this) return true;","        if (t == this) return false;"),
+ # C129 (slot-2 freeze): C57 (15407788, B03) moved the hook-scope check to a HookScope list; the mutation is the same
+ # (the table's own hook is not detected as re-entrant), retargeted at the current line.
+ ("reentrant-not-detected","src/rt/handles/table.cpp","if (s->table_ == this) return true;","if (s->table_ == this) return false;"),
  ("invalid-cause-accepted","src/rt/handles/table.cpp","        return HandleStatus::InvalidCause;  // the other causes","        if (false) return HandleStatus::InvalidCause;  // the other causes"),
  ("sync-failure-no-defaults","src/rt/handles/table.cpp","            *failure = make_failure(base, state, CleanupOutcome(outcome));","            *failure = CleanupFailure{base.handle, base.kind, base.owner, base.reason, base.cause, state, {}, outcome.code, outcome.message};"),
  ("transfer-keeps-by-default","src/rt/handles/table.h","TransferPolicy policy = TransferPolicy::ReclaimOnRefusal);","TransferPolicy policy = TransferPolicy::KeepOnRefusal);"),

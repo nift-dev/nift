@@ -1529,6 +1529,16 @@ test-runtime2-host-memory: $(TARGET)
 .PHONY: test-runtime2-module-host-order-mutant
 test-runtime2-module-host-order-mutant: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/module_host_order_mutant.sh
+# Slot 2 (owner 2026-11-11 05:41, D-068 #2): the host-import guard's negative controls and its permanent
+# built-in effect classification (src/rt/module_host_order.cpp).
+.PHONY: test-runtime2-module-host-order-mutants test-runtime2-host-set-complete
+test-runtime2-module-host-order-mutants: $(TARGET)
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/module_host_order_mutants.py
+test-rt-vm: test-runtime2-module-host-order-mutants
+test-runtime2-host-set-complete:
+	$(PYTHON) -B tests/runtime2/host_set_complete.py
+	$(PYTHON) -B tests/runtime2/host_set_complete.py --mutant
+test-rt-vm: test-runtime2-host-set-complete
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.
