@@ -1741,8 +1741,8 @@
  },
  "h_channel_json_stringify": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (callable:json_stringify): the call `json_stringify()` is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:7: undefined callable: json_stringify\n",
+  "stdout": "b\n"
  },
  "h_channel_loop": {
   "exit": 1,
@@ -2631,8 +2631,8 @@
  },
  "h_mutex_json_stringify": {
   "exit": 1,
-  "stderr": "error: p.f:3:7: not compiled for the VM (callable:json_stringify): the call `json_stringify()` is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
-  "stdout": ""
+  "stderr": "error: p.f:3:7: undefined callable: json_stringify\n",
+  "stdout": "b\n"
  },
  "h_mutex_loop": {
   "exit": 1,

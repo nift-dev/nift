@@ -66,8 +66,11 @@ CLASSES = {"M": "missing VM capability", "A": "compiler/admission limitation",
 
 def reason_key(reason):
     """Group reasons as the classification does: the reason text up to the
-    first space (`callable:cmd`, `type:print`, `static-error:arity`)."""
-    return (reason or "").split(" ")[0]
+    first space (`callable:cmd`, `type:print`, `static-error:arity`). A deferred site (slot 3,
+    dead-code-admission.md 5.4: `deferred:<reason>`, recorded by classify-all for a site compiled to a
+    raise) maps to its reason's row, so the row's status applies to it as to a refusal."""
+    key = (reason or "").split(" ")[0]
+    return key[len("deferred:"):] if key.startswith("deferred:") else key
 
 
 def collect_classify_all(nift, out, seed):
@@ -189,10 +192,13 @@ def report(args):
     cls = load_classification(args.classification)
     full = collections.defaultdict(set)      # reason -> units (classify-all, non-consequential)
     conseq = collections.defaultdict(set)
+    deferred = collections.defaultdict(set)  # slot 3: reason -> units with a deferred site of it (5.4)
     for line in open(os.path.join(d, "classify-all.jsonl")):
         r = json.loads(line)
         for it in r.get("reasons") or []:
             (conseq if it.get("consequential") else full)[reason_key(it["reason"])].add(r["id"])
+            if (it.get("reason") or "").startswith("deferred:") and not it.get("consequential"):
+                deferred[reason_key(it["reason"])].add(r["id"])
     fallback = collections.defaultdict(set)  # reason -> entries leaving the VM (execute)
     entries = fb_entries = 0
     for line in open(os.path.join(d, "execute.jsonl")):
@@ -236,6 +242,9 @@ def report(args):
             "## Fallback entries by reason", ""]
     for reason in sorted(fallback, key=lambda r: (-len(fallback[r]), r)):
         out.append("- `%s`: %s" % (reason, ", ".join(sorted(fallback[reason]))))
+    if deferred:  # never fallback entries: the unit runs on the VM and raises only if the site is reached
+        out += ["", "## Deferred sites (slot 3; the row's status applies)", ""]
+        out += ["- `%s`: %d unit(s): %s" % (r, len(u), ", ".join(sorted(u))) for r, u in sorted(deferred.items())]
     if conseq:
         out += ["", "Consequential classify-all reasons (may be spurious, not classified): " +
                 ", ".join("`%s` %d" % (r, len(u)) for r, u in sorted(conseq.items()) if r not in full)]

@@ -27,6 +27,7 @@ bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uin
     if (name == "await")  // rt-lint: allow-string-compare compile time
         return fail(node, "removed-builtin:await");
 #endif
+    if (name != "thread" && deferred_call(node, name, dst)) return builder_ok();  // slot 3: raised when reached
     if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));
     if (node.count == 0) return fail(node, "coro-thread-callee");
     const NodeId* args = ast_.list(node);

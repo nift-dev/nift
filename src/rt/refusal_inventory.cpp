@@ -229,10 +229,10 @@ RefusalInventory inventory_refusals(std::string_view source, const std::filesyst
         const CompileResult compiled = compile_unit(ast, unit_root, limits);
         ++inventory.rounds;
         if (compiled.program) {
-            // R1: run_unit refuses a linked unit that can call a host
-            // built-in after it compiles (rt/module_host_op.h); the inventory
-            // reports the same first reason. The unit compiled, so there are
-            // no later compile blockers: the inventory stays complete.
+            for (const auto& site : compiled.deferred) record_linked("deferred:" + site.first, site.second, false, {});
+            // Slot 3 (5.4): each deferred site, non-consequential. R1: run_unit refuses a linked unit that can call
+            // a host built-in after it compiles (rt/module_host_order.h); the inventory reports the same first
+            // reason. The unit compiled, so there are no later compile blockers: the inventory stays complete.
 #if !defined(NIFT_R1_MUTANT) && !defined(NIFT_INVENTORY_HOST_MUTANT)  // the latter: test-only control
             std::string host_reason;
             std::uint32_t host_offset = 0;

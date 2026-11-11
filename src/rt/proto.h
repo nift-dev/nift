@@ -52,6 +52,7 @@ struct Note {
     bool session_inspection = false;
     bool session_numeric_return = false;  // cold SessionNumeric reporting only
     bool assign_path = false;  // GetIndex: a step of an assignment path (vm_element_path.h)
+    bool deferred_raise = false;  // slot 3: an Undefined raise at a deferred site (legacy's caller return: prefixes)
 };
 
 class SourceMap;

@@ -31,6 +31,16 @@ struct CompileResult {
     // (a node, a parse error); false for a limit or a whole-unit refusal,
     // whose offset is then just the unit's start (never shown as a position).
     bool positioned = false;
+    // Slot 3: sites compiled to a deferred raise (reason, offset); classify-all lists them as `deferred:<reason>`.
+    std::vector<std::pair<std::string, std::uint32_t>> deferred;
+};
+
+// Slot 3 (rt/compiler_deferred.h): a unit's deferred sites (reason, offset), its name-scan results and the
+// return statement whose value is compiling.
+struct DeferredSites {
+    std::vector<std::pair<std::string, std::uint32_t>> sites;
+    std::unordered_map<std::string_view, bool> unbound;
+    std::uint32_t return_statement = 0;
 };
 
 // `root` must be the Program node of a successful parse_script.

@@ -87,7 +87,11 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             in_lambda = in_lambda || (frame.closure != nullptr && frame.closure->is_lambda);
             if (frame.return_call) ++error_returns;
         }
-        if (uncaught_error) {
+        const Note* raised = note_at(proto, pc);
+#if defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 6  // test-only: callers' return: prefixes dropped
+        raised = nullptr;
+#endif
+        if (uncaught_error || (raised != nullptr && raised->deferred_raise)) {  // slot 3: deferred raise
             for (std::size_t k = 0; k < error_returns; ++k) result.message = "return: " + result.message;
         } else if (return_call && in_lambda && result.message.rfind("return: ", 0) != 0) {
             result.message = "return: " + result.message;

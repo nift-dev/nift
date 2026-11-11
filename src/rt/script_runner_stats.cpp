@@ -31,7 +31,8 @@ void report(const Stats& s) {
     line << "{\"nift_vm\":1,\"outcome\":\"" << s.outcome << "\",\"reason\":\"" << json_escape(s.reason)
          << "\",\"line\":" << s.line << ",\"column\":" << s.column << ",\"parse_us\":" << s.parse_us
          << ",\"compile_us\":" << s.compile_us << ",\"execute_us\":" << s.execute_us << ",\"protos\":" << s.protos
-         << ",\"instructions\":" << s.instructions << ",\"source_bytes\":" << s.source_bytes
+         << ",\"instructions\":" << s.instructions << ",\"deferred\":" << s.deferred
+         << ",\"source_bytes\":" << s.source_bytes
          << ",\"beyond_legacy_depth\":" << (s.beyond_legacy_depth ? "true" : "false")
          << ",\"vm_executions\":" << s.executions << ",\"legacy_executions\":" << s.legacy_executions
          << ",\"large_numbers\":" << s.large_numbers << ",\"large_in_loop_path\":" << s.large_in_loop_path

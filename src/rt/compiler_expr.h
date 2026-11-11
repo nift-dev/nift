@@ -34,7 +34,7 @@ public:
     // kKindUnknown (something the compiler refuses anyway) is never treated as acceptable (review CP12 round 1, D1).
     // A unit whose refusal involved it is compiled a second time in probe mode, where Unknown defers as before, only
     // to report the underlying refusal reason; the probe's program is discarded even if it compiles (compiler.cpp).
-    bool unknown_hit() const { return unknown_hit_; }
+    bool unknown_hit() const { return unknown_hit_; } const DeferredSites& deferred() const { return deferred_; }
     void probe_unknown() { probe_ = true; }
     void set_session(SessionCompileContext* session, const std::vector<InvocationBinding>* invocation = nullptr);
     void expression_result() { expression_result_ = true; }
@@ -393,7 +393,7 @@ private:
     bool in_function_ = false, in_lambda_ = false;
     int depth_ = 0;
     static constexpr int kMaxExpressionNesting = 48;
-    std::string reason_;
+    std::string reason_; DeferredSites deferred_; bool deferred_call(const Node&, std::string_view, std::uint16_t);
     std::uint32_t offset_ = 0; bool positioned_ = false;  // positioned_: offset_ recorded by fail()
 };
 

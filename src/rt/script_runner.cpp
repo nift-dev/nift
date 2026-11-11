@@ -339,6 +339,7 @@ bool run_unit(const std::string& source, const std::filesystem::path& source_pat
 #endif
     stats.protos = compiled.program->protos.size();
     for (const auto& proto : compiled.program->protos) stats.instructions += proto->code.size();
+    stats.deferred = compiled.deferred.size();
     if (mode == VmMode::Classify || mode == VmMode::ClassifyAll) {
         stats.outcome = "compiled";
         report(stats);

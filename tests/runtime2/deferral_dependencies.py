@@ -29,6 +29,24 @@ CASES = [
     ("nested import in an untaken branch", 'if (false) { import("./m.f") }\nprint("n")\n', "import-nested"),
     ("nested import in an uncalled function", 'fn(u()) { import("./m.f") }\nprint("n")\n', "import-nested"),
     ("dynamic import", 'p := "./m.f"\nimport(p)\nprint("n")\n', "import-dynamic"),
+    # Slot 3 (5.7a condition 4, REVIEW-C120): more contexts, each with an optional second unit t.f.
+    ("template text in an untaken if", 'if (false) {\n  <b>$[nope()]</b>\n}\nprint("n")\n',
+     "opaque:legacy-runtime-error"),
+    ("template text in a module", 'import("./t.f")\nprint("n")\n', "import-opaque:template-text",
+     'f := () => { <b>$[nope()]</b> }\nk := 1\nexport(k)\n'),
+    ("a fragment", '@fragment(card(text)){<b>$[text]</b>}\nprint("n")\n', "opaque:template-text"),
+    ("a fragment in an untaken if", 'if (false) {\n  @fragment(card(text)){<b>$[text]</b>}\n}\nprint("n")\n',
+     "opaque:template-text"),
+    ("struct body (opaque) in an untaken if",
+     'if (false) {\n  struct(S) {\n    fn[async](m()) {\n      return 1\n    }\n  }\n}\nprint("n")\n',
+     "opaque:struct-body"),
+    ("legacy run-time parse (opaque) in an untaken if", 'if (false) {\n  a := [1]\n  print(a [0])\n}\nprint("n")\n',
+     "opaque:legacy-runtime-error"),
+    ("nesting beyond the parser (opaque) in an untaken if", 'if (false) {\n  print(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\n}\nprint("n")\n',
+     "opaque:nesting-limit"),
+    ("nested import in an uncalled lambda", 'f := () => {\n  import("./m.f")\n}\nprint("n")\n', "import-nested"),
+    ("nested import in an uncalled module function", 'import("./t.f")\nprint("n")\n', "import-nested",
+     'fn(u()) {\n  import("./m.f")\n}\nk := 1\nexport(k)\n'),
 ]
 
 
@@ -46,12 +64,15 @@ def main():
     ap.add_argument("--nift", required=True)
     nift = os.path.abspath(ap.parse_args().nift)
     failures = []
-    for name, src, reason in CASES:
+    for name, src, reason, *extra in CASES:
         with tempfile.TemporaryDirectory(prefix="deferral-deps-") as d:
             with open(os.path.join(d, "m.f"), "w") as f:
                 f.write(MODULE)
             with open(os.path.join(d, "main.f"), "w") as f:
                 f.write(src)
+            if extra:
+                with open(os.path.join(d, "t.f"), "w") as f:
+                    f.write(extra[0])
             rc, out, err = run(nift, d, False)
             if (rc, out) != (1, "") or ("not compiled for the VM (%s)" % reason) not in err:
                 failures.append("%s: VM exit %d stdout %r stderr %r (expected a whole-program refusal, %s)" %

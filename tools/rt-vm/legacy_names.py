@@ -86,6 +86,41 @@ def extract():
     return sorted(names)
 
 
+# Slot 3 (dead-code-admission.md 5.2): a call to a name that is no function, binding or built-in is deferred
+# (raised as legacy's `undefined callable`) only if legacy cannot know the name. Legacy dispatches a callee by
+# comparing its text with a literal: the whole literal is the name (`"sorted_set"`, in any list, which the
+# patterns above miss), or the name starts the literal followed by `(`, `.`, `[` or a space, or the name is
+# followed by `(` anywhere in it (`"x.join("`). Every such word of any string literal in the legacy sources
+# (src/*.cpp, src/*.h, src/shell/*) counts, and so does any name starting with `__` (legacy's rfind("__")).
+WORD_SOURCES = ["src/*.cpp", "src/*.h", "src/shell/*.cpp", "src/shell/*.h"]
+
+
+def extract_words():
+    words = set(KEYWORDS)
+    for pattern in WORD_SOURCES:
+        for path in sorted(glob.glob(os.path.join(REPO, pattern))):
+            text = strip_comments(open(path, encoding="utf-8", errors="replace").read())
+            for literal in LITERAL.findall(text):
+                if re.fullmatch(ID, literal):
+                    words.add(literal)
+                words.update(re.findall("(" + ID + r")\(", literal))
+                words.update(re.findall("^(" + ID + r")[.\[ ]", literal))
+    return sorted(words)
+
+
+def table(lines, name, items):
+    lines.append("constexpr std::string_view %s[] = {" % name)
+    row = "   "
+    for n in sorted(items, key=lambda x: x.encode()):
+        item = ' "%s",' % n
+        if len(row) + len(item) > 118:
+            lines.append(row)
+            row = "   "
+        row += item
+    lines.append(row)
+    lines.append("};")
+
+
 def extract_methods():
     text = strip_comments(open(os.path.join(REPO, "src/ParserExpression.cpp"), encoding="utf-8").read())
     return sorted(set(re.findall(r'\bmethod\s*==\s*"(' + ID + r')"', text)))
@@ -116,12 +151,17 @@ def render(names):
             row = "   "
         row += item
     lines.append(row)
-    lines += ["};", "", "} // namespace", "",
+    lines += ["};", ""]
+    table(lines, "kWords", extract_words())
+    lines += ["", "} // namespace", "",
               "bool legacy_special_name(std::string_view name) {",
               "    return std::binary_search(std::begin(kNames), std::end(kNames), name);", "}", "",
               "std::size_t legacy_special_name_count() { return std::size(kNames); }", "",
               "bool legacy_special_method(std::string_view name) {",
               "    return std::binary_search(std::begin(kMethods), std::end(kMethods), name);", "}", "",
+              "bool legacy_known_word(std::string_view name) {",
+              '    return name.rfind("__", 0) == 0 || std::binary_search(std::begin(kWords), std::end(kWords), name);',
+              "}", "",
               "} // namespace nift::rt", ""]
     return "\n".join(lines)
 
@@ -136,7 +176,8 @@ def main():
         if current != text:
             print("legacy_names: src/rt/legacy_names.cpp is stale; run tools/rt-vm/legacy_names.py --write")
             return 1
-        print("legacy_names: %d names and %d method heads, up to date" % (len(extract()), len(extract_methods())))
+        print("legacy_names: %d names, %d method heads and %d literal words, up to date" %
+              (len(extract()), len(extract_methods()), len(extract_words())))
         return 0
     sys.stdout.write(text)
     return 0

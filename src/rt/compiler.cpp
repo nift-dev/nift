@@ -237,7 +237,10 @@ bool UnitCompiler::return_statement(const Node& node) {
     fb_->set_flags(static_cast<std::uint8_t>(saved_flags | (real_return ? kInstrReturnCall : 0)));
     const std::uint32_t saved_return_offset = return_read_offset_;
     if (in_lambda_) return_read_offset_ = node.begin;
+    const std::uint32_t saved_statement = deferred_.return_statement;
+    deferred_.return_statement = node.begin;  // slot 3: legacy reports an error in the value at the statement
     const bool value_ok = temp(value) && expr_to(node.a, value);
+    deferred_.return_statement = saved_statement;
     return_read_offset_ = saved_return_offset;
     fb_->set_flags(saved_flags);
     if (!value_ok) return false;
@@ -364,6 +367,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
             if (shape != kinds.binding_shapes.end()) symbol.structure = session_shape(shape->second);
         }
     if (limits.session) record_session_history(ast, kinds, *limits.session, *program);
+    result.deferred = compiler.deferred().sites;
     result.program = std::move(program);
     return result;
 }

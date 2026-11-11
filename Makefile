@@ -1539,6 +1539,15 @@ test-runtime2-host-set-complete:
 	$(PYTHON) -B tests/runtime2/host_set_complete.py
 	$(PYTHON) -B tests/runtime2/host_set_complete.py --mutant
 test-rt-vm: test-runtime2-host-set-complete
+# Slot 3 (owner 2026-11-11 05:41, D-068 #1 and #3; D-071 #4): dead-code admission of undefined callables under
+# name certainty (src/rt/compiler_deferred.cpp, src/rt/name_scan.cpp) and its negative controls.
+.PHONY: test-runtime2-deadcode-admission test-runtime2-deadcode-admission-mutants
+test-runtime2-deadcode-admission: $(TARGET)
+	$(PYTHON) -B tests/runtime2/deadcode_admission.py --nift "$(CURDIR)/$(TARGET)"
+test-rt-vm: test-runtime2-deadcode-admission
+test-runtime2-deadcode-admission-mutants: $(TARGET)
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/deadcode_admission_mutants.py
+test-rt-vm: test-runtime2-deadcode-admission-mutants
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.

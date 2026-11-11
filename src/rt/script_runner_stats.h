@@ -20,6 +20,7 @@ struct Stats {
     bool positioned = false;
     double parse_us = 0, compile_us = 0, execute_us = 0;
     std::size_t protos = 0, instructions = 0, source_bytes = 0;
+    std::size_t deferred = 0;  // slot 3: sites compiled to a deferred raise (dead-code-admission.md 5.4)
     bool beyond_legacy_depth = false;
     int executions = 0;         // times the unit started executing on the VM (0 or 1)
     int legacy_executions = 0;  // 1 when the unit was handed to legacy (before anything executed)
