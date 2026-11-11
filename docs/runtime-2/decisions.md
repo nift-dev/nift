@@ -2240,3 +2240,43 @@ release without explicit approval." Slot 1 production is not reopened.
 Mapping onto the inventory vocabulary (tests/runtime2/cp25/inventory.py): approved-not-implemented = `implement`;
 implemented-awaiting-review = `implemented-awaiting-review`; implemented-accepted = `implemented-accepted`; approved
 deferral = `deferred-named`; pending owner = `PENDING-OWNER` (`approved` and `retired` keep their meanings).
+
+## D-070 — Static-error rows approved; struct-to-async closed under D-NEXT-refsem #5 (owner, 2026-11-11 11:49, attachments 1d728bb0 and 0a4e481b)
+
+Each item is cited in the CP25-R inventory as "D-070 #n (owner 2026-11-11 11:49)". Quotations are from the two
+attachments (0a4e481b: "Both decisions confirmed"; 1d728bb0: "Struct-to-async: existing approval confirmed").
+
+1. **Ten statically invalid constructs (the S rows): approved.** "APPROVE changing all ten rows to `approved`, citing
+   D-068 and the 05:41 owner ruling. These are inherently invalid constructs that may be rejected before execution,
+   even when unreachable. This approval does not cover execution-dependent errors or valid operations that the VM
+   cannot yet compile. Preserve the distinction established for Slot 3 dead-code admission." The example of an S
+   construct is `if (false) { break }` ("A `break` outside a lexically enclosing loop is invalid even when
+   unreachable"); the example outside it is `if (false) { nope() }` / `print("success")`, which "must remain eligible
+   for deferred error handling under the approved Slot 3 design. The inventory should distinguish these categories
+   explicitly."
+2. **Struct-to-async transfer: already approved.** "ALREADY APPROVED under D-NEXT-refsem #5, dated 2026-11-01. Close
+   the inventory row as an existing approved semantic difference. Do not create a new approval. Retain the
+   independent investigation and compatibility evidence. The recursive transfer-safety requirements for future
+   struct field types remain mandatory during the struct checkpoints." (1d728bb0: "Close the new inventory row as
+   ALREADY APPROVED, citing D-NEXT-refsem #5 and the existing compatibility record. Retain the investigation
+   evidence. Do not create a new semantic exception or modify production code. Preserve the existing approval's
+   scope." "This is not a new exception or an expansion of the previous approval.")
+3. **Checkpoint 2 transfer requirements (mandatory).** "When struct fields gain support for additional value types,
+   verify transfer safety recursively. Tests must cover structs containing: File and stream handles. Mutexes.
+   Mutable collections. Lambdas and captured references. Other nested structs. Test both `async()` and `thread()`
+   where applicable. A non-transferable nested value must not become transferable merely because it is wrapped in a
+   struct. Failed transfers must not partially publish or partially transfer the object. Preserve the established
+   B2/B5 ownership and reference semantics. The expanded field-type support must not silently broaden D-NEXT-refsem
+   #5 to unsafe transfers." ("A failed nested transfer must not partially publish the struct or transfer some fields
+   before discovering a prohibited handle. The failure should be atomic with respect to the transfer operation."
+   "Also preserve the approved distinction between copying values across task boundaries and sharing mutable
+   references within an execution context.")
+4. **Slot 2.** "Continue the authorised host-import guard implementation. Ensure built-ins that can invoke user code
+   indirectly are not classified as pure. Preserve the reviewed read-order guarantees, explicit built-in
+   classification and effective negative controls. No additional production scope is authorised." ("The guard must
+   classify that operation according to its possible effects, not merely its name. The existing tests for shadowed
+   built-ins and indirect user calls should establish this.")
+5. **Workflow.** "Apply the two inventory status corrections as records-only work. Continue Slot 2 through freeze,
+   independent review and owner acceptance before starting Slot 3. No integration, push, tag or release without
+   explicit approval."
+

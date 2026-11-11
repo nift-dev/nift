@@ -38,6 +38,8 @@ withdrawn. The ruling says:
   6 big-int conditions, destructuring and variadics, 7 ordinary-language coverage, 8 remaining bounded capabilities,
   then the async-memory safety checkpoint, then certification.
 
+**D-070 #1 (owner 2026-11-11 11:49):** the 10 S rows are approved: they cover constructs that are inherently invalid even when unreachable (`if (false) { break }` with no enclosing loop), not execution-dependent errors (`if (false) { nope() }` / `print("success")` stays eligible for the slot-3 deferral) and not valid operations the VM cannot yet compile.
+
 Section 7's owner items 1-7 and 9 are therefore decided. Item 8 (each 5.6 item) stays open. Item 10 (the D-067 #7
 slot label) is decided for the slot-7 rows only; the other "remaining approved features" rows keep their label.
 

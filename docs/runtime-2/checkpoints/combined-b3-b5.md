@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 applied in C117, D-068 in C122, D-069 in C125-C126; reviews applied in C119-C121; slot 1 in C123-C124)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127; reviews in C119-C121; slot 1 in C123-C124)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -7744,3 +7744,33 @@ Gates at C126:
 
 The seen counts are the same as C125. No seen reason is classified through a family fallback, so reverting the two
 family rows changes no seen count. `git diff 4ff6c100 -- src/` is empty, and the nift sha256 is unchanged.
+
+### 28. C127: owner rulings 2026-11-11 11:49 (D-070) applied (records only: tsv, docs)
+
+decisions.md D-070 quotes attachments 0a4e481b and 1d728bb0. This commit is separate from every slot-2 production
+commit: src/ is unchanged, and the nift sha256 is `78027d95...e1b495`.
+
+| D-070 item | Applied |
+| --- | --- |
+| #1 S rows | the 8 PENDING-OWNER S rows -> `approved`, citing D-068 #5 and the 05:41 ruling: `static-error:redeclared`, `jump-outside-loop`, `opaque:struct-body`, `import-opaque:struct-body`, `text-type-name`, `assign-catch-binding`, `removed-builtin:async`, `removed-builtin:await`. The other 2 S rows (`number-literal`, `import-opaque:legacy-runtime-error`) record the S approval but stay `implement`: each also carries an approved implementation item (legacy wording; legacy position) that is not done yet. Each S row states the scope; the tsv legend distinguishes S from the slot-3 deferrable categories (X, L-defer) and from class (i) |
+| #2 struct-to-async | `difference:async-struct-argument` PENDING-OWNER -> `approved`, closed as an existing approved difference (D-NEXT-refsem #5, 2026-11-01; compatibility.md:38). No new approval, scope unchanged, investigation retained; known-limitations.md release-audit entry updated |
+| #3 CP2 | mandatory recursive transfer-safety requirements on `struct-field-init`, with the five conditions of section 26: file and stream handles, mutexes, mutable collections, lambdas and captured references, nested structs; both async() and thread(); wrapping in a struct never makes a value transferable; failed transfers atomic (no partial publish or field transfer); B2/B5 preserved; D-NEXT-refsem #5 not broadened |
+| #4, #5 | slot 2 continues (effects, not names; indirect user calls are not pure); workflow unchanged |
+
+**Counts:** 610 rows: approved 60, deferred-named 36, implement 338, implemented-awaiting-review 0, implemented-accepted 0,
+PENDING-OWNER 151, retired 25.
+
+Gates at C127 (records only):
+
+| Gate | Result |
+| --- | --- |
+| `make test-runtime2-certification-guard` | PASS |
+| `make test-rt-lint` | PASS |
+| `make test-test-integrity` | clean |
+| inventory_families.py, and `--mutant family`, `status`, `validity` | PASS; all 3 mutants caught |
+| `make test-runtime2-inventory-links` | PASS |
+| fresh `inventory.py collect` + `report --check` | **exit 3**: G1 PASS, 138 reasons seen: approved 13, deferred-named 29, implement 37, implemented-awaiting-review 0, implemented-accepted 0, PENDING-OWNER 59, retired 0 |
+| `make -q` | exit 0, before and after |
+
+The 3 S rows seen on the corpora (`static-error:redeclared`, `jump-outside-loop`, `opaque:struct-body`) move from
+PENDING-OWNER to approved (62 -> 59, 10 -> 13). No src change; the nift sha256 is unchanged.
