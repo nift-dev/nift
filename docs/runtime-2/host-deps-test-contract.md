@@ -141,8 +141,10 @@ that is not seen on the corpora.
     - an entry that starts with a name group captures the tag, so the case ID differs from the original's;
     - the remaining tagged lines map to no entry and are UNMAPPED, which blocks on its own text.
   - **`tests/runtime2/read_limit_names_selftest.py`** proves this on the real table, in `test-runtime2-host-deps`.
-    It takes every case name of the recorded run and checks it in the legacy-channel form and in each
-    refusal-contract form. It requires that none is ambiguous, none maps to an original ID, and the forms of one case
+    It takes every case name of the recorded run and has read_limit.py's own `check()` (legacy channel) and
+    `refusal_contract()` print each tagged form, so no name is hand-built. It then maps each FAIL line with certify's
+    own `certify_fingerprints.fingerprint()` (review L-a). Mutating `check()` or `refusal_contract()` back to the
+    suffix form makes it fail (shown). It requires that none is ambiguous, none maps to an original ID, and the forms of one case
     never share an ID. As a negative control, the old suffix form must collide (it does, for all 130 names).
     Without `scripts/` (a sparse checkout) the selftest is NOT RUN (exit 2).
   - **Against the weekend/r2 baseline** the FAIL set is 6 instead of 24, so certify's `report_class` (equal

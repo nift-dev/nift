@@ -6,9 +6,10 @@ READ_LIMIT_TABLE: an entry matches a prefix of the line that is followed by a sp
 name ("<name> [legacy channel]") would therefore map onto the original case's ID, so a failing legacy-channel or
 refusal-contract case could stand in for, or collide with, the original VM case in a baseline comparison.
 
-read_limit.py puts every tag first (LEGACY_CHANNEL, REFUSAL_CONTRACT, VM_EQUIVALENT). This selftest runs the real
-table on every case name of the recorded post-repair run (docs/runtime-2/evidence/host-deps-d077/), rewritten into
-each tagged form:
+read_limit.py puts every tag first (LEGACY_CHANNEL, REFUSAL_CONTRACT, VM_EQUIVALENT). This selftest takes every case name of the
+recorded post-repair run (docs/runtime-2/evidence/host-deps-d077/), has read_limit.py's own check() and
+refusal_contract() print it in each tagged form (review L-a: the names come from the code path the suite uses), and
+maps each FAIL line with certify's own fingerprint function (certify_fingerprints.fingerprint):
   - no tagged line maps to more than one entry (it would be UNMAPPED as ambiguous);
   - no tagged line maps to the ID of an untagged (original) case;
   - the legacy-channel and refusal-contract forms of one case never share an ID;
@@ -37,15 +38,38 @@ def main():
     import certify_fingerprints as F  # noqa: E402
     import read_limit as rl  # noqa: E402
 
-    def ident(rest):
-        hits = [(k, m) for k, rx in F.SPECS["test-runtime2-host-deps"].table for m in [rx.match(rest)]
-                if m and (m.end() == len(rest) or rest[m.end()] == " ")]
-        if len(hits) > 1:
-            return ("AMBIGUOUS", tuple(k for k, _ in hits))
-        if not hits:
-            return None
-        k, m = hits[0]
-        return (k, tuple(sorted((n, v) for n, v in m.groupdict().items() if n != "exit")))
+    import contextlib  # noqa: E402
+    import io  # noqa: E402
+    import types  # noqa: E402
+
+    def ident(fail_line):
+        """certify's own case ID for one FAIL line of read_limit.py (certify_fingerprints.fingerprint)."""
+        fp = F.fingerprint("test-runtime2-host-deps", "NIFT_BIN=x python3 tests/runtime2/read_limit.py\n" + fail_line + "\n")
+        (step, cid, kind, _exit, detail), = fp["cases"].keys()
+        if cid == "UNMAPPED":
+            n = re.search(r"\((\d+) table entries match\)$", detail)
+            return ("AMBIGUOUS",) if n and int(n.group(1)) > 1 else None
+        return cid
+
+    def emitted(call):
+        """The FAIL line read_limit.py's own check() path prints for `call` (review L-a: no hand-built names)."""
+        buf, before = io.StringIO(), len(rl.failures)
+        with contextlib.redirect_stdout(buf):
+            call()
+        del rl.failures[before:]
+        return next(l for l in buf.getvalue().splitlines() if l.startswith("FAIL "))
+
+    def legacy(name):
+        rl.CHANNEL.update(legacy=True, record=None, pending=[])
+        try:
+            return emitted(lambda: rl.check(name, False, "detail"))
+        finally:
+            rl.CHANNEL.update(legacy=False, record=None, pending=[])
+
+    def contract(name, reason):
+        token = rl.DEFERRED[reason][2]
+        fake = types.SimpleNamespace(returncode=0, stdout="ran", stderr="")
+        return emitted(lambda: rl.refusal_contract(name, reason, fake, "x := %s1)\n" % token))
 
     originals = set()
     for line in open(LOG):
@@ -58,16 +82,16 @@ def main():
         if name.startswith("[") or "printed, measured" in name or name.startswith("read(limit/2)"):
             continue
         originals.add(name)
-    original_ids = {ident(n) for n in originals} - {None}
+    original_ids = {ident(emitted(lambda n=n: rl.check(n, False, "detail"))) for n in originals} - {None}
     failures, mapped, unmapped = [], 0, 0
     for name in sorted(originals):
-        forms = {"legacy": rl.LEGACY_CHANNEL + name}
-        forms.update({"contract " + r: rl.REFUSAL_CONTRACT % r + name for r in rl.DEFERRED})
+        forms = {"legacy": legacy(name)}
+        forms.update({"contract " + r: contract(name, r) for r in rl.DEFERRED})
         ids = {}
         for kind, line in forms.items():
             i = ident(line)
-            if i and i[0] == "AMBIGUOUS":
-                failures.append("%s maps to several entries %s" % (line, i[1]))
+            if i == ("AMBIGUOUS",):
+                failures.append("%s maps to several entries" % line)
             elif i in original_ids:
                 failures.append("%s maps onto an original case ID %s" % (line, i))
             elif i:
@@ -78,11 +102,11 @@ def main():
         if len(set(ids.values())) != len(ids):
             failures.append("tagged forms of %r share an ID: %s" % (name, ids))
     for name in rl.EQUIVALENT_NAMES:
-        i = ident(rl.VM_EQUIVALENT + name)
-        if i and (i[0] == "AMBIGUOUS" or i in original_ids):
+        i = ident(emitted(lambda n=name: rl.check(rl.VM_EQUIVALENT + n, False, "detail")))
+        if i and (i == ("AMBIGUOUS",) or i in original_ids):
             failures.append("%s%s collides: %s" % (rl.VM_EQUIVALENT, name, i))
     # Negative control: the suffix form of 2026-11-12 (P2) maps onto original IDs.
-    collided = sum(1 for n in originals if ident(n + OLD_SUFFIXES[0]) in original_ids)
+    collided = sum(1 for n in originals if ident("FAIL %s%s detail" % (n, OLD_SUFFIXES[0])) in original_ids)
     if not collided:
         failures.append("negative control: the old suffix form collided with no original ID (the check is vacuous)")
     for f in failures:

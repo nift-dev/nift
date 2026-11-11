@@ -17,8 +17,9 @@ just a platform name); every test script of `make test-rt-vm`'s recipe is in the
 left out silently); every script the table names exists.
 
 The run: each included command runs from the repository root with its placeholders filled ({nift}, {build}, {exe},
-{py}); its exit status decides PASS or FAIL, and an entry that exits 0 but prints `SKIP` or `NOT RUN` lines is
-PARTIAL, not PASS (review L3). A unit binary that was not built is a FAIL, not a skip. Exit 1 if any included entry
+{py}); its exit status decides PASS or FAIL. An entry that exits 0 is PARTIAL, not PASS, when it printed a skip that
+certify's own classifier (scripts/certify.py skipped_assertions) counts as required and that EXPECTED_SKIPS does not
+list for that platform and entry (review L3, N1); design-boundary lines are NOTEs. --selftest checks this. A unit binary that was not built is a FAIL, not a skip. Exit 1 if any included entry
 failed, else 2 if any was PARTIAL.
 """
 import argparse
@@ -27,9 +28,10 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SKIP_LINE = re.compile(r"^\s*(?:SKIP|NOT RUN)\b")
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 PLATFORMS = ("linux", "macos", "windows")
 
@@ -135,7 +137,10 @@ ENTRIES = [
      "{py} tests/runtime2/cp23/compatibility.py --nift {nift} --output {build}/cp23-compatibility.json", {}, ""),
     ("coro_module", "core semantics", "{py} tests/runtime2/coro_module/coro_module.py --nift {nift}", {}, ""),
     # --- language surface, admission, diagnostics --------------------------------------------------------------
-    ("named_deferrals", "core semantics", "{py} tests/runtime2/named_deferrals.py --nift {nift}", {}, ""),
+    ("named_deferrals", "core semantics", "{py} tests/runtime2/named_deferrals.py --nift {nift}",
+     {p: "%s: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` "
+         "executable) and on any other platform prints one SKIP line and exits 0 without checking anything" % n
+      for p, n in (("macos", "macOS"), ("windows", "Windows"))}, ""),
     ("deadcode_admission", "core semantics", "{py} -B tests/runtime2/deadcode_admission.py --nift {nift}", {}, ""),
     ("args_cmd", "core semantics", "{py} tests/runtime2/args_cmd/args_cmd.py --nift {nift}", {},
      "creates one symlink: windows-latest runs as an administrator, so os.symlink works there"),
@@ -192,6 +197,19 @@ MAKE_TARGETS = [
     ("test-runtime2-kind-bits", "compiler/execution", {}, ""),
     ("test-rt-source-map", "compiler/execution", {}, ""),
 ]
+# Review N1: environmental skips expected on a platform, per entry: (regex on the skip line, reason). A skip line
+# is classified by certify's own classifier (scripts/certify.py skipped_assertions: SKIP_MARKERS, ZERO_SKIPS,
+# KNOWN_CONDITIONAL). A line it marks not required (a documented design boundary or another platform's message) is a
+# NOTE; a required skip listed here for this platform and entry is an EXPECTED SKIP; any other skip makes the entry
+# PARTIAL (an unexpected skip), never PASS. docs/runtime-2/platform-subsets.md lists these.
+EXPECTED_SKIPS = {
+    ("macos", "file_copy_move_freedom"): [
+        (r"^SKIP cross-device move \(/dev/shm missing or on the same filesystem\)$",
+         "Darwin has no /dev/shm: the cross-device move cases need a second (tmpfs) filesystem")],
+    ("macos", "build_write_ownership"): [
+        (r"^SKIP cross-device move cases \(/dev/shm missing or on the same filesystem\)$",
+         "Darwin has no /dev/shm: the cross-device move cases need a second (tmpfs) filesystem")],
+}
 BUILDS = ["{build}/rt/vm-unit{exe}", "{build}/rt/vm-globals-unit{exe}", "{build}/rt/vm-modules-unit{exe}",
           "{build}/rt/vm-prepared-parse{exe}", "{build}/rt-parse-dump{exe}", "{build}/rt-parser-unit{exe}",
           "{build}/rt-legacy-oracle{exe}"]
@@ -202,8 +220,44 @@ def fill(cmd, a):
                       py=shlex.quote(sys.executable))
 
 
+def skip_classifier():
+    """certify's own skip classification (scripts/certify.py), not a copy of it. certify imports `pwd` at module level
+    and the classifier does not use it, so a stand-in module is installed where `pwd` does not exist (Windows)."""
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    try:
+        import pwd  # noqa: F401
+    except ImportError:
+        sys.modules["pwd"] = types.ModuleType("pwd")
+    import certify  # noqa: E402
+    return certify.skipped_assertions
+
+
+def classify(platform, eid, rc, text, skipped_assertions):
+    """(status, notes): FAIL on a non-zero exit; else PARTIAL on any unexpected skip; else PASS. notes lists every
+    skip line with its class (NOTE design boundary, EXPECTED SKIP, UNEXPECTED SKIP)."""
+    notes, unexpected = [], 0
+    expected = EXPECTED_SKIPS.get((platform, eid), [])
+    for line, requirement, required in skipped_assertions(text):
+        if required is not True:
+            notes.append("NOTE %s: %s (%s)" % (eid, line, requirement))
+        elif any(re.search(rx, line) for rx, _ in expected):
+            notes.append("EXPECTED SKIP %s on %s: %s" % (eid, platform, line))
+        else:
+            unexpected += 1
+            notes.append("UNEXPECTED SKIP %s: %s (%s)" % (eid, line, requirement))
+    if rc != 0:
+        return "FAIL", notes
+    return ("PARTIAL" if unexpected else "PASS"), notes
+
+
 def check(makefile):
     problems = []
+    for (plat, eid), rows in EXPECTED_SKIPS.items():
+        entry = next((e for e in ENTRIES if e[0] == eid), None)
+        if plat not in PLATFORMS or entry is None or plat in entry[3]:
+            problems.append("expected skip for %s on %s: no such entry run on that platform" % (eid, plat))
+        if any(len(why) < 25 for _, why in rows):
+            problems.append("expected skip for %s on %s has no concrete reason" % (eid, plat))
     ids = [e[0] for e in ENTRIES]
     if len(ids) != len(set(ids)):
         problems.append("duplicate ids")
@@ -251,7 +305,10 @@ def main():
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--makefile", default=os.path.join(REPO, "Makefile"))
     ap.add_argument("--only", help="comma-separated entry ids (debugging; the certified run takes the whole table)")
+    ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        return selftest()
     if a.markdown:
         sys.stdout.write(markdown())
         return 0
@@ -265,9 +322,14 @@ def main():
     if not a.platform or (not a.list and not a.nift):
         ap.error("--platform and --nift are required to run")
     a.nift = os.path.abspath(a.nift) if a.nift else "NIFT"
+    return run_table(ENTRIES, a)
+
+
+def run_table(entries, a):
+    skipped_assertions = None if a.list else skip_classifier()
     failed, partial, ran, excluded = [], [], 0, 0
     only = set(a.only.split(",")) if a.only else None
-    for eid, area, cmd, excl, _note in ENTRIES:
+    for eid, area, cmd, excl, _note in entries:
         if only is not None and eid not in only:
             continue
         if a.platform in excl:
@@ -288,25 +350,25 @@ def main():
                 failed.append(eid)
                 continue
         env = dict(os.environ, NIFT_BIN=a.nift, PYTHONDONTWRITEBYTECODE="1")
-        # Review L3: an entry that exits 0 but skipped part of itself (`SKIP` / `NOT RUN` lines, as certify counts
-        # them) is PARTIAL, never PASS. Its output is passed through unchanged.
+        # Review L3/N1: an entry that exits 0 with an unexpected skip (certify's classification) is PARTIAL, never
+        # PASS. Its output is passed through unchanged.
         proc = subprocess.Popen(argv, cwd=REPO, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        skipped = 0
+        out = []
         for raw in proc.stdout:
             text = raw.decode(errors="replace")
             sys.stdout.write(text)
-            skipped += bool(SKIP_LINE.match(text))
+            out.append(text)
         rc = proc.wait()
         sys.stdout.flush()
         ran += 1
-        if rc != 0:
-            print("FAIL %s (exit %d)" % (eid, rc), flush=True)
+        status, notes = classify(a.platform, eid, rc, "".join(out), skipped_assertions)
+        for n in notes:
+            print(n)
+        print("%s %s (exit %d)" % (status, eid, rc), flush=True)
+        if status == "FAIL":
             failed.append(eid)
-        elif skipped:
-            print("PARTIAL %s (exit 0, %d SKIP/NOT RUN line(s): not a pass)" % (eid, skipped), flush=True)
+        elif status == "PARTIAL":
             partial.append(eid)
-        else:
-            print("PASS %s (exit 0)" % eid, flush=True)
     if a.list:
         return 0
     print("platform subset %s: %d run, %d excluded with a recorded reason, %d failed%s, %d partial%s" %
@@ -315,6 +377,40 @@ def main():
     if failed:
         return 1
     return 2 if partial else 0
+
+
+def selftest():
+    """Review N1: the run's classification, on certify's real classifier (needs scripts/certify.py)."""
+    sa = skip_classifier()
+    failures = []
+
+    def expect(what, got, want):
+        if got != want:
+            failures.append("%s: got %s, want %s" % (what, got, want))
+    boundary = "SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract"
+    expect("design-boundary line", classify("linux", "host_deps", 0, "PASS a\n%s\n" % boundary, sa)[0], "PASS")
+    for line in ("SKIP something unknown", "SKIPPED - IPv4 unavailable here", "skipped: frobnicate case",
+                 "ok 3 # SKIP no tty", "NOT RUN read_line on a directory"):
+        expect("skip line %r" % line, classify("linux", "vm_golden", 0, "PASS a\n%s\n" % line, sa)[0], "PARTIAL")
+    expect("zero-skip summary", classify("linux", "vm_golden", 0, "ran 5, 0 skipped\n", sa)[0], "PASS")
+    shm = "SKIP cross-device move (/dev/shm missing or on the same filesystem)"
+    expect("expected skip on macOS", classify("macos", "file_copy_move_freedom", 0, shm + "\n", sa)[0], "PASS")
+    expect("same skip on Linux", classify("linux", "file_copy_move_freedom", 0, shm + "\n", sa)[0], "PARTIAL")
+    expect("failure wins", classify("macos", "file_copy_move_freedom", 1, shm + "\n", sa)[0], "FAIL")
+    # An excluded entry is reported and never run: its command would create a marker.
+    with tempfile.TemporaryDirectory(prefix="platform-subset-selftest-") as d:
+        marker = os.path.join(d, "ran")
+        cmd = "{py} -c \"open(%r, 'w').close()\"" % marker
+        entries = [("excluded-probe", "t", cmd, {"macos": "macOS: a probe excluded to prove that it never runs"}, ""),
+                   ("included-probe", "t", "{py} -c \"print('ok')\"", {}, "")]
+        a = types.SimpleNamespace(platform="macos", nift="/bin/true", build=".build", list=False, only=None)
+        rc = run_table(entries, a)
+        expect("excluded entry run", os.path.exists(marker), False)
+        expect("run with only an excluded and a passing entry", rc, 0)
+    for f in failures:
+        print("FAIL platform subset selftest:", f)
+    print("%s platform subset selftest: %d check(s)" % ("FAIL" if failures else "PASS", 12))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

@@ -25,8 +25,32 @@ Owner, 2026-11-12 04:25 (D-077 #4):
   reached by `certify-targets`. Without that target the guard fails (negative control run).
 - **What a run prints.** `platform_subset.py --platform P --nift BIN` runs every included entry and prints PASS or
   FAIL. It prints **EXCLUDED** with the reason for every excluded entry: an exclusion is never counted as a pass.
-  An entry that exits 0 but prints `SKIP` or `NOT RUN` lines (for example vm_subset's RSS check without `os.wait4`
-  on Windows) is **PARTIAL**, not PASS. The run exits 2 when nothing failed but something was partial (review L3).
+- **How skips are classified (review L3, N1).** The runner classifies every skip line with **certify's own
+  classifier** (`scripts/certify.py` `skipped_assertions`: `SKIP_MARKERS`, `ZERO_SKIPS`, `KNOWN_CONDITIONAL`), the
+  same one the Linux campaign uses. It is imported, not copied. On Windows a stand-in `pwd` module is installed,
+  because certify imports `pwd` and the classifier does not use it. The classes:
+  - **NOTE:** a line certify marks as not required. Examples are the documented design boundary that host_deps.py
+    always prints (`SKIP [modified] edit during streaming is outside the v4.12 modified-mode contract`) and another
+    platform's own message. These are not skips.
+  - **EXPECTED SKIP:** a required skip that this page lists for that platform and entry (below).
+  - **UNEXPECTED SKIP:** any other skip line, including `SKIPPED`, lowercase `skipped`, TAP `# SKIP`, `NOT RUN` and
+    `UNVERIFIED`. It makes an entry that exits 0 **PARTIAL**, not PASS, and the run exits 2 when nothing failed.
+  - So PARTIAL means "an unexpected skip".
+  - Silent internal skips cannot be seen by any runner. The known ones are vm_subset's RSS check without
+    `os.wait4` and vm_adversarial's flock no-op where `fcntl` is missing, both on Windows. They are noted in the
+    table.
+- **Whole-suite self-skips are exclusions.** A suite that skips itself entirely on a platform is excluded there with
+  its reason, rather than run and counted: named_deferrals on macOS and Windows.
+- **`platform_subset.py --selftest`** (in `test-runtime2-platform-subset-table`) checks the classification on
+  certify's real classifier:
+  - a design-boundary line is not PARTIAL;
+  - `SKIP`, `SKIPPED`, lowercase, TAP `# SKIP` and `NOT RUN` lines are PARTIAL;
+  - a `0 skipped` summary is not;
+  - an expected macOS skip is PASS on macOS and PARTIAL on Linux;
+  - a failing exit stays FAIL;
+  - an excluded entry is never run.
+
+  Mutating the not-required branch, or the exclusion check, makes the selftest fail (shown).
   A unit binary that was not built is a FAIL, not a skip.
 - **The workflow.** `.github/workflows/runtime2-cross-platform.yml` is dispatch-only, not pushed and not triggered.
   On each of ubuntu-latest, macos-latest and windows-latest (MSYS2 UCRT64) it:
@@ -58,8 +82,22 @@ entries below cover the VM, but not the corpus differential itself.
 | Platform | Entries run | Excluded, with a reason |
 |---|---:|---:|
 | Linux | 89 | 0 |
-| macOS | 87 | 2 (read_limit, read_limit_controls: /proc and RLIMIT_AS) |
-| Windows | 72 | 17 (listed in the table) |
+| macOS | 86 | 3 (read_limit, read_limit_controls: /proc and RLIMIT_AS; named_deferrals: Linux-only programs) |
+| Windows | 71 | 18 (listed in the table) |
+
+### Expected environmental skips (EXPECTED_SKIPS)
+
+Each one is the exact line, matched per platform and entry. Any other skip is PARTIAL.
+
+| Platform | Entry | Expected skip line | Reason |
+|---|---|---|---|
+| macOS | file_copy_move_freedom | `SKIP cross-device move (/dev/shm missing or on the same filesystem)` | Darwin has no /dev/shm: the cross-device move cases need a second (tmpfs) filesystem |
+| macOS | build_write_ownership | `SKIP cross-device move cases (/dev/shm missing or on the same filesystem)` | same |
+| Linux | — | none: hosted ubuntu runners are not root, and they have /dev/shm (tmpfs), git, cc and GNU time | |
+| Windows | — | none: the entries that print environmental skips (vm_host, vm_host_memory, packages, host_deps, the ulimit scripts) are excluded there | |
+
+A skip the platforms turn out to need beyond these (for example the GNU `/usr/bin/time` options in vm_host_memory on
+macOS) shows up as PARTIAL or FAIL on the first dispatch. It is then classified explicitly, never absorbed.
 
 Plus the 4 make targets on all three platforms.
 
@@ -127,7 +165,7 @@ Plus the 4 make targets on all three platforms.
 | `cp22-print_order` | core semantics | run | run | run | the output-order repair adds Windows std-stream identity code: CI-verified only |
 | `cp23-compatibility` | core semantics | run | run | run |  |
 | `coro_module` | core semantics | run | run | run |  |
-| `named_deferrals` | core semantics | run | run | run |  |
+| `named_deferrals` | core semantics | run | **excluded**: macOS: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything | **excluded**: Windows: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything |  |
 | `deadcode_admission` | core semantics | run | run | run |  |
 | `args_cmd` | core semantics | run | run | run | creates one symlink: windows-latest runs as an administrator, so os.symlink works there |
 | `import_depth` | core semantics | run | run | run |  |

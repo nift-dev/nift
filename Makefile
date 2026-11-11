@@ -5723,6 +5723,7 @@ include tests/runtime2/cp23/certification.mk
 .PHONY: test-runtime2-platform-subset-table
 test-runtime2-platform-subset-table:
 	$(PYTHON) tests/runtime2/platform_subset.py --check
+	$(PYTHON) -B tests/runtime2/platform_subset.py --selftest
 test-rt-vm: test-runtime2-platform-subset-table
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
