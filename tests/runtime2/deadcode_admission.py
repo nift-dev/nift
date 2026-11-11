@@ -30,6 +30,13 @@ STRUCT_METHOD = ('fn(helper()) {\n  return nope()\n}\nstruct(S) {\n  v := 1\n  f
                  '  fn(run()) {\n    return helper()\n  }\n}\ns := S()\nprint(s.run())\n')
 STRUCT_FIELD = ('fn(helper()) {\n  if (false) {\n    nope()\n  }\n  return 3\n}\nstruct(S) {\n  nope := 1\n'
                 '  fn(run()) {\n    return helper()\n  }\n}\ns := S()\nprint(s.run())\n')
+HEADS = {"space": "fn( nope())", "tab": "fn(\tnope())", "newline": "fn(\n    nope())"}
+STRUCT_METHOD_HEAD = ('fn(helper()) {\n  return nope()\n}\nstruct(S) {\n  k := 1\n  %s {\n    return 7\n  }\n'
+                      '  fn(run()) {\n    return helper()\n  }\n}\ns := S()\nprint(s.run())\n')
+TOP_HEAD = '%s {\n  return 5\n}\nif (false) {\n  nope()\n}\nprint(nope())\n'
+NESTED_HEAD = ('fn(m()) {\n  %s {\n    return 5\n  }\n  return 0\n}\nfn(g2()) {\n  return nope()\n}\nm()\n'
+               'print(g2())\n')
+COND_HEAD = 'if (true) {\n  %s {\n    return 5\n  }\n}\nfn(g2()) {\n  return nope()\n}\nprint(g2())\n'
 M_DEAD = 'fn(mf(c)) {\n  if (c) {\n    nope()\n  }\n  return 2\n}\nexport(mf)\n'
 ASYNC = 'fn[async](af(c)) {\n  if (c) {\n    nope()\n  }\n  return 1\n}\n'
 
@@ -77,6 +84,13 @@ CASES = {
                                     'print(m(() => 7))\n'}, "callable:nope"),
     "struct-method-name": ({"main.f": STRUCT_METHOD}, "callable:nope"),
     "struct-field-name": ({"main.f": STRUCT_FIELD}, "callable:nope"),  # review P1-N
+    # Review of C134, F1: a declaration head with whitespace (space, tab, newline) before the name. Legacy prints 7
+    # for each struct form; the VM must keep the refusal. The top-level forms compile as functions (legacy-equal);
+    # the nested and conditional forms are refused earlier (statement:FnDecl), whatever the scan says.
+    **{"struct-method-%s" % k: ({"main.f": STRUCT_METHOD_HEAD % h}, "callable:nope") for k, h in HEADS.items()},
+    **{"top-decl-%s" % k: ({"main.f": TOP_HEAD % h}, "vm") for k, h in HEADS.items()},
+    **{"nested-decl-%s" % k: ({"main.f": NESTED_HEAD % h}, "statement:FnDecl") for k, h in HEADS.items()},
+    **{"cond-decl-%s" % k: ({"main.f": COND_HEAD % h}, "statement:FnDecl") for k, h in HEADS.items()},
     # An imported binding is an ordinary binding: the call compiles as a call of it (no deferral involved).
     "module-binding": ({"m.nft": 'nope := 1\nexport(nope)\n',
                         "main.f": 'import("m.nft")\nif (false) {\n  nope()\n}\nprint("x")\n'}, "vm"),
@@ -114,6 +128,10 @@ MUTANTS = {
     "deadcode-6": ["reach-nested-return", "reach-caller-return", "reach-module-return"],
     "name-scan-1": ["struct-method-name"],
     "name-scan-2": ["struct-field-name"],
+    "name-scan-3": ["struct-method-space", "struct-method-tab", "struct-method-newline"],  # review of C134, F1/F3
+    "deadcode-7": ["legacy-known-name"],  # the legacy-known-name exclusion removed
+    "deadcode-8": ["argument-lambda"],  # the inert-argument check removed
+    "deadcode-9": ["return-in-loop"],  # the return-in-loop exclusion removed
 }
 
 

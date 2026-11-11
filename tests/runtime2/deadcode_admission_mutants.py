@@ -9,7 +9,10 @@ case named for it:
   deadcode-1   no deferral (today's refusal, also "raised at compile time")   deadcode-2   sessions defer
   deadcode-3   name certainty skipped                                         deadcode-4   the raise does nothing
   deadcode-5   arguments evaluated before the raise                           deadcode-6   callers' return: dropped
+  deadcode-7   legacy-known names deferred                                 deadcode-8   any argument deferred
+  deadcode-9   return values in loop-evaluator code deferred
   name-scan-1  fn/method declaration heads missed     name-scan-2  assignments missed (struct fields, P1-N)
+  name-scan-3  only the exact-text heads of C134 (`fn(`, `fn (`, `](`; review of C134, F1)
 
 A mutant build failure is a harness failure, never a detection. Run through make
 (test-runtime2-deadcode-admission-mutants) after `make nift`; each mutant directory is deleted afterwards.

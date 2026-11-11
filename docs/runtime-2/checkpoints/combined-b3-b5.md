@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129; D-071 in C130-C132; D-072 in C133; slot 3 in C134)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129; D-071 in C130-C132; D-072 in C133; slot 3 in C134-C135)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -8226,3 +8226,55 @@ changed to match behaviour seen after 19:12 (the one changed expectation, safety
 
 **Gates that ran after 19:12 and may touch `/dev/stdout`** (to re-run): test-rt-host, test-rt-host-mutants,
 test-runtime2-cp16-n1, and, conservatively, test-rt-vm-mutants (it was running at 19:12) and test-runtime2-host-deps.
+
+#### 32.7 C135: review of C134 applied (REVIEW-C134-SLOT3: accept with conditions)
+
+- **F1 (P1, fixed).** `declaration_head` matched only the exact text `fn(`, `fn (` and `](`. A struct method written
+  `fn( nope())`, `fn(<tab>nope())` or `fn(<newline>    nope())` was read as unbound, so a free call of `nope` was
+  deferred. With `fn(helper()) { return nope() }` / `struct(S) { k := 1` / `fn( nope()) { return 7 }` /
+  `fn(run()) { return helper() } }` / `s := S()` / `print(s.run())`, the VM raised `return: return: undefined
+  callable: nope` (exit 1) where legacy prints `7`.
+  - The head is now found by skipping any whitespace, newlines included, between the name and `(`, and between `(`
+    and `fn` or `]` (`fn (`, `fn\t(`, `fn [async] (`). A `/` next to the head (a comment) also counts as a head
+    (over-broad on purpose).
+  - The other exact-text tests in name_scan.cpp were audited. The member test (`.` immediately before the name) and
+    the call test (`(` immediately after it) only fail towards a binding when whitespace intervenes, so they can only
+    over-scan: `s. nope()` is read as a plain call (no binding either way), and `nope (` counts as a binding.
+  - Tests: `struct-method-{space,tab,newline}` stay refused (`callable:nope`); `top-decl-*` run legacy-equal (stdout,
+    stderr and exit status compared byte for byte); `nested-decl-*` and `cond-decl-*` stay refused by
+    `statement:FnDecl`, as before.
+- **F3 (mutants added).** name-scan-3 (the exact-text heads of C134) is caught by the three struct-method cases.
+  deadcode-7 (legacy-known names deferred) is caught by `legacy-known-name`, deadcode-8 (any argument deferred) by
+  `argument-lambda`, and deadcode-9 (loop-code return values deferred) by `return-in-loop`. 12 of 12 are caught;
+  deadcode_admission.py has 63 cases.
+- **F4 (wording).** 6 rows are implemented-awaiting-review (`callable:nope`, `undefined_fn`, `undefined_thing`,
+  `assert`, `len`, `nosuch`), 3 of them seen in the corpus (`nope`, `undefined_fn`, `undefined_thing`, as deferred
+  sites); `--check` counts the seen ones (`implemented-awaiting-review 3`) and blocks on all 6.
+- **F5.** `h_channel_json_stringify` is recorded as differing from legacy through a difference that existed before
+  slot 3 (the VM-only `channel()`); the safety case's comment cites it. For the owner to classify.
+- **F2 (not fixed, by instruction).** `sorted_set` is missing from the special-name table (`kNames`); this predates
+  slot 3 and needs an owner decision. The slot-3 deferral is not affected (`legacy_known_word` covers it).
+
+C135 gates (nift sha256 `1f7abb63e749fac8fbd02ec984d79552c80c8e5c17f2353546ad836a09e3ef4d`; `/dev/stdout` is still a
+regular file in this sandbox, so test-rt-host, test-rt-host-mutants and cp16-n1 stay invalid and were not re-run):
+
+| Gate | Result |
+| --- | --- |
+| test-rt-lint, test-test-integrity, legacy_names.py --check | PASS |
+| deadcode_admission.py | PASS, 63/63 |
+| test-runtime2-deadcode-admission-mutants | PASS, 12 of 12 caught |
+| test-runtime2-safety, test-runtime2-safety-mutants | PASS (1163 cases) |
+| test-rt-builtins-guards (callgrind) | PASS, 35 workloads, 0 guard failures |
+| test-runtime2-host-deps | **FAILED** (exit 2): the same 24 known refusals, identical to the C129 run after normalising paths and durations |
+| fresh inventory collect + `report --check` | exit 3 (expected): G1 PASS, 137 reasons seen: approved 14, deferred-named 29, implement 32, implemented-awaiting-review 3, PENDING-OWNER 59; blocked by the 59 PENDING-OWNER reasons and the 6 awaiting-review rows |
+| `make -k test-rt-vm` | PASS after one expectation change: every prerequisite passed and the recipe ran up to `vm_inventory.py`, which failed one case (below); after the change, `vm_inventory.py` (14 cases) and the remaining recipe lines (vm_chain, vm_modules, module_host_order, vm_structs, vm_globals, semantics_modules, semantics-structs, modules_d041, cp12b_inventory selftest) pass, run from the same recipe text |
+
+**Correction to the C134 gate record (32.6).** C134's `make -k test-rt-vm` reported only the safety failures, but
+under `-k` a failed prerequisite skips the target's own recipe, so the recipe lines (including `vm_inventory.py`) did
+not run in C134. They ran in C135, which found the expectation below.
+
+**Changed expectation (C135):**
+
+| File and case | Old | New | Why | Legacy evidence |
+| --- | --- | --- | --- | --- |
+| vm_inventory.py `for-and-try` | certain reasons `{method:zap, callable:nothere}` | `{method:zap, deferred:callable:nothere}` | slot 3, 5.4: with `method:zap` masked, `nothere()` is certain and compiles to a deferred raise, recorded as `deferred:callable:nothere` (non-consequential) | the program is still refused at `method:zap` 2:9 under the VM default; legacy fails there too (`unknown value or malformed expression: i.zap()`) |

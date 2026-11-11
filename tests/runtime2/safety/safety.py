@@ -93,7 +93,10 @@ def cases():
             add("h_%s_interp_%s" % (h, form), files, stdin)
             files, stdin = handle_case(form, ["v := [" + ctor + "]"], '"x$[v.stringify()]"')
             add("h_%s_interp_stringify_%s" % (h, form), files, stdin)
-        # json_stringify is not a script built-in on either engine
+        # json_stringify is not a script built-in on either engine. Since slot 3 (C134) the call is reached and raises
+        # `undefined callable: json_stringify`. For channel() the transcript differs from legacy through a difference
+        # that existed before slot 3: legacy has no script channel() (it raises `undefined callable: channel` at 2:7),
+        # the VM implements it (review of C134, F5; for the owner to classify).
         add("h_%s_json_stringify" % h, {"p.f": 'print("b")\nv := [%s]\nprint(json_stringify(v))\n' % ctor})
         # a handle reached through an imprecise path: a parameter, a map get, a loop element
         add("h_%s_param" % h, {"p.f": 'fn(show(x)) { return [x].stringify() }\nprint("b")\nprint(show(1))\n'

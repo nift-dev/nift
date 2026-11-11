@@ -52,14 +52,20 @@ bool UnitCompiler::deferred_call(const Node& node, std::string_view name, std::u
     // the legacy sources, legacy_names.py) may not be an undefined callable there: legacy may run it or raise its
     // own error, so it keeps the refusal (the L-defer rows among them). Broad on purpose: missing a built-in would
     // raise where legacy runs; an extra word only costs coverage.
+#if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 7)  // test-only: legacy-known names deferred
     if (legacy_special_name(name) || legacy_known_word(name)) return false;
+#endif
 #if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 3)  // test-only: name certainty skipped
     auto known = deferred_.unbound.find(name);
     if (known == deferred_.unbound.end())
         known = deferred_.unbound.emplace(name, name_unbound(ast_.source(), name)).first;
     if (!known->second) return false;  // dynamic scope could supply it (1.3): keep the refusal
 #endif
+#if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 8)  // test-only: any argument deferred
     if (!inert_arguments(ast_, node)) return false;
+#else
+    static_cast<void>(&inert_arguments);
+#endif
     deferred_.sites.emplace_back("callable:" + std::string(name), node.begin);
     // Legacy's report (5.2): never catchable, after the output of every earlier statement. Inside a return
     // value legacy reports the return statement with a `return: ` prefix; each calling frame whose own return
@@ -67,7 +73,9 @@ bool UnitCompiler::deferred_call(const Node& node, std::string_view name, std::u
     const bool in_return = (fb_->flags() & kInstrReturnCall) != 0;
     // In loop-evaluator code legacy reports a return value's error at the call, unprefixed, and its callers'
     // prefixes there are not established: keep the refusal for a return value in such code.
+#if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 9)  // test-only: loop-code return values deferred
     if (in_return && loop_reachable()) return false;
+#endif
     fb_->set_offset(in_return ? deferred_.return_statement : site(node));
     std::string message = std::string(in_return ? "return: " : "") + "undefined callable: " + std::string(name);
 #if defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 5  // test-only: arguments evaluated before the raise
