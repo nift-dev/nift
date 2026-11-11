@@ -136,6 +136,16 @@ refused. This is a checkpoint-1 limitation of the incomplete kind inference, not
 (owner 20:11): it stays with the inference work for the inventory rescan; mixed operand kinds of a compound update are refused (`type:compound-assignment`). A future
 stored through a path stays refused (`coro-future-flow:Assign`).
 
+## Legacy-equal behaviour kept on purpose (D-079)
+
+- **Opening a file that is also the process's own output destination** (`ofstream("o.txt")` or `file("o.txt")`
+  when stdout or stderr is redirected to `o.txt`, including under `>>`) keeps legacy's open/truncate behaviour:
+  existing content can be lost and earlier output can be overwritten. This is legacy-equal and intentionally
+  unchanged (D-079, owner 2026-11-12). The output-order checkpoint (C139) only publishes pending output in program
+  order before such an operation; it does not change what the operation does. The `save()` safety checkpoint (D-077 #5
+  item 3) covers special targets only (FIFOs, devices, sockets, symlinks to non-regular files) and must not change
+  ordinary file-open semantics.
+
 ## Other refusals
 
 Every other refusal reason the release gates see is listed, with its status, in the CP25-R

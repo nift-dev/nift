@@ -2476,3 +2476,25 @@ certification-priority reset remains in force."
    "One thing I would change"): "Once the four approved repairs are accepted, freeze the candidate and run
    certification. Any newly discovered issue must be demonstrated to block correctness, safety or certification
    integrity before it can expand the pre-certification implementation scope."
+
+## D-079 — Output-order checkpoint accepted; same-destination file opens stay legacy-equal; C140 requirements (owner, 2026-11-12)
+
+1. **Output order accepted.** C139, C139a and C139b are accepted as the completed output-order checkpoint (21b525e9,
+   nift 8729ccc2...d177b). The narrow C139b reviewer confirmation is still pending; if it finds a substantive defect,
+   the checkpoint reopens.
+2. **Same-destination opens: legacy-equal, unchanged.** Opening a file that is also the process's own output
+   destination keeps legacy's open/truncate behaviour, including under `>>`: existing content can be lost, and earlier
+   output can be overwritten. This is legacy-equal and intentionally unchanged. `save()` safety covers special
+   targets only and must not change ordinary file-open semantics. Recorded in known-limitations.md.
+3. **C140 (async recursion memory safety) requirements.** The write-up answers with evidence: why the old snapshot
+   retained so much memory and why the corrected lifetime is sound (base image keepalive, function-map renumbering,
+   no dangling references after the parent isolate ends); whether recursive async/thread calls create real OS
+   threads; which resource is exhausted at depth 1000 and the exact failing call; how the limit is enforced before
+   that exhaustion (no arbitrary depth cap; a bound justified by real scheduler/thread resources is acceptable,
+   existing accounting preferred; any fixed per-thread overhead charged is measured and documented, not guessed);
+   that the error is an ordinary, catchable `limit.exceeded` with exit 1 on every failure path (enqueue failure,
+   worker-start failure, execution failure); that failed creation and unwinding release everything (reservation,
+   task, handle, thread); and that the memory budget is enforced independently of the thread protection, with a test
+   where the budget, not the thread bound, trips first. Awaited and un-awaited paths, for async() and thread(); the
+   mutant plan M1-M5 plus the un-awaited-release mutant; callgrind 35/35 with no re-baselining; the full gates. The
+   result is not to be described as comprehensive memory enforcement.
