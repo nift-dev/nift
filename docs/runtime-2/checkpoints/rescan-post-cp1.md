@@ -2925,10 +2925,26 @@ push, tag or release.
 | #3 handle mutant | A Low test-quality item in known-limitations.md "Release-audit items": `reentrant-not-detected` (and `limit-setting-ignored`) are detected by the 120-second timeout; before release, verify a deterministic timeout, reliable completion of the unmodified build, and causal attribution; improve the diagnostic if practical. |
 | #4 slot 3 | Authorised; starts at C131 from the reviewed plan (dead-code-admission.md at c15807c0). |
 
-**Coverage of (b), the safe context.** The rows' own safe-context form is pinned by tests for `exists`
-(module_host_order.py `host-after-import`, `module-exports-host-fn`, `cwd-change-after-import`) and `getenv`
-(vm_inventory_links.py `module-callable-after-imports`). For `cat`, `cp`, `remove`, `file` and `is_dir` the evidence
-is the C129 probes and the review's spot checks (cp and rm of a module after the imports), not a committed test.
+**Coverage of (b), the safe context: committed in C131 (tests only).** module_host_order.py now has one
+post-import case per operation (`post-import-cat`, `-cp`, `-remove`, `-file`, `-is_dir`, `-getenv`, `-exists`), each
+required to run on the VM and to equal legacy in exit status, stdout, stderr, NIFT_TRACE_HOST trace and file tree. Each
+operation also has a refused unsafe-context sibling, which must be refused before effects under `NIFT_VM=require`:
+- `cat-before-import`, `file-in-module-init`, `is_dir-in-module-init`, `getenv-in-module-init` (new in C131);
+- `copy-over-module` (cp) and `remove-module` (remove), both existing;
+- `host-before-import-top` and `host-in-module-init` (exists), both existing.
+
+The suite has 44 cases (42 plus the 2 classify cases), all passing on fff2376c. The 5 guard mutants and the R1 mutant
+are still caught. The getenv case is also covered by vm_inventory_links.py `module-callable-after-imports`.
+
+**Two pre-existing VM differences found while writing the C131 cases.** Neither involves an import, so slot 2 cannot
+cause them; they are reported to the owner, and the cases avoid them:
+- **`cat` output order.** `print(1)` / `cat("a.txt")` / `print(2)`, with stdout a pipe: legacy prints `1`, `hello2`; the
+  VM prints `hello1`, `2`. `cat` writes to stdio stdout and flushes (host_fs_internal.h, read_source), ahead of the
+  VM's own print output. `post-import-cat` has no print before its `cat`, and `post-import-cp` checks with `exists`
+  instead of `cat`.
+- **Read-mode handle trace order.** `f := file("a.txt")` / `f.open("r")` / `f.close()`: legacy traces `open` then
+  `read`, the VM traces `read` then `open`. Output is equal. Write mode traces equal, so `post-import-file` uses write
+  mode.
 
 **Inventory** (fresh `collect` on the pinned binary, then `report --check`): exit 3, G1 PASS, 137 reasons seen:
 approved 14, deferred-named 29, implement 35, implemented-awaiting-review 0, implemented-accepted 0, PENDING-OWNER 59,

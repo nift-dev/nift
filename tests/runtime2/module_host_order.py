@@ -109,6 +109,36 @@ CASES = {
     # Slot 2 (D-068 #2): admitted, legacy-equal (before slot 2 both were refused, module-host-op:is_file and
     # module-host-op:exists).
     "host-after-import": ({"m.nft": M, "main.f": 'import("m.nft")\nprint(exists("a.txt"))\nprint(x)\n'}, "vm"),
+    # D-071 #2 (owner 2026-11-11 17:11): the seven operations whose unsafe-context refusal is approved. Each runs,
+    # legacy-equal, after a strict leading import block (post-import-*); each has a refused unsafe-context sibling
+    # here (cat, file, is_dir, getenv below; cp: copy-over-module; remove: remove-module; exists: host-before-import-top
+    # and host-in-module-init). A refusal of a post-import-* case would be a guard defect not covered by the approval.
+    # cat writes to stdout directly; no print precedes it here (see the C131 note in rescan-post-cp1.md section 30).
+    "post-import-cat": ({"m.nft": M, "a.txt": "hello", "main.f": 'import("m.nft")\nprint(cat("a.txt"))\nprint(x)\n'},
+                        "vm"),
+    "post-import-cp": ({"m.nft": M, "m2.nft": 'x := 2\nexport(x)\n',
+                        "main.f": 'import("m.nft")\ncp("m2.nft", "m.nft")\nprint(x)\nprint(exists("m.nft"))\n'}, "vm"),
+    "post-import-remove": ({"m.nft": M, "main.f": 'import("m.nft")\nremove("m.nft")\nprint(x)\nprint(exists("m.nft"))\n'},
+                           "vm"),
+    # Write mode: a read-mode handle's trace order (open, read) differs between the engines with or without an
+    # import (a pre-existing difference outside slot 2, reported at C131), so it would not test the guard.
+    "post-import-file": ({"m.nft": M,
+                          "main.f": 'import("m.nft")\nf := file("b.txt")\nf.open("w")\nf.write("alpha")\nf.save()\n'
+                                    'f.close()\nprint(x)\n'}, "vm"),
+    "post-import-is_dir": ({"m.nft": M, "sub/t.txt": "t",
+                            "main.f": 'import("m.nft")\nprint(is_dir("sub"))\nprint(is_dir("m.nft"))\nprint(x)\n'}, "vm"),
+    "post-import-getenv": ({"m.nft": M, "main.f": 'import("m.nft")\nprint(getenv("HOME") != "")\n'
+                                                  'print(getenv("NIFT_R1_UNSET_VAR"))\nprint(x)\n'}, "vm"),
+    "post-import-exists": ({"m.nft": M, "a.txt": "hello",
+                            "main.f": 'import("m.nft")\nprint(exists("a.txt"))\nprint(exists("b.txt"))\nprint(x)\n'}, "vm"),
+    "cat-before-import": ({"m.nft": M, "a.txt": "hello", "main.f": 'print(cat("a.txt"))\nimport("m.nft")\nprint(x)\n'},
+                          "module-host-op:cat"),
+    "file-in-module-init": ({"m.nft": 'f := file("a.txt")\nk := 1\nexport(k)\n', "a.txt": "hello",
+                             "main.f": 'import("m.nft")\nprint(k)\n'}, "module-host-op:file"),
+    "is_dir-in-module-init": ({"m.nft": 'd := is_dir(".")\nexport(d)\n', "main.f": 'import("m.nft")\nprint(d)\n'},
+                              "module-host-op:is_dir"),
+    "getenv-in-module-init": ({"m.nft": 'h := getenv("HOME")\nk := 1\nexport(k)\n', "main.f": 'import("m.nft")\nprint(k)\n'},
+                              "module-host-op:getenv"),
     # Controls: the same host op without an import, and an import without a
     # host op, still run on the VM.
     "host-no-import": ({"main.f": 'print(exists("a.txt"))\n'}, "vm"),
