@@ -4,6 +4,65 @@ Records and tests only; no production change. Prepared on branch `prep/cert-r2` 
 independent review. decisions.md is not edited here: the D-076 and D-077 entries are recorded by C138 (`c59c2e17`,
 attachments 3d29daee and 83af45ff).
 
+## D-078 update (owner 2026-11-12, attachment 2ea1c509)
+
+**Status after D-078:** 137 reasons seen.
+
+| Status | Count |
+|---|---:|
+| approved | 14 |
+| deferred-named | 29 |
+| deferred-post-cert | **50** |
+| implement | 30 |
+| implemented-accepted | 3 |
+| PENDING-OWNER | **11** |
+
+`--check` exits 3. The inventory gate reads **"Inventory incomplete: 11 open reasons"**:
+- `callable:minify`
+- `coro-async-value`
+- `method:catch`, `method:error`, `method:throw`
+- `method:sort_by`
+- `method:to_string`
+- `opaque:legacy-runtime-error`
+- `shebang-statement`
+- `statement:Command`
+- `unresolved-name`
+
+These stay OPEN (D-078 #3). None was converted to make the gate green.
+
+**What D-078 changed:**
+- **#1: four rows approved by name, citing D-077 and D-078.** These are `alias-argument`, `type:push`, `method:push` and `fn-name-reserved`.
+  - Each keeps its reproducer and history: the `was:` chain in the approval column, and the refusal column of `post_cert_deferrals.tsv`.
+  - `type:push`, `method:push` and `alias-argument` are **pinned to their exact classify-all sightings**:
+    - `type:push`: `review_d6_alias_argument.f` at 1:12;
+    - `method:push`: `p.f` at 5:1, `reference.f` at 4:1, and `review_d6_alias_argument.f` at 1:12.
+  - **How an unlisted push refusal is caught:**
+    - a new sighting in a scoped unit fails `post_cert_refusals.py`;
+    - a sighting in any other unit blocks `inventory.py --check` (scope).
+  - The negative control `--negative-control unlisted-position` drops one pinned sighting per pinned unit. All 11 pinned entries then fail.
+- **#2: `builtin-bytes:open_bytes` and `callable:read` move from `implement` to `deferred-post-cert`.**
+  - They now appear once, under the named deferrals.
+  - The original implementation approval is kept in the approval column as history.
+  - Their refused and supported forms are recorded in `post_cert_deferrals.tsv`.
+  - The B01 coverage that stays executing is listed in host-deps-test-contract.md.
+- **#3: the 8 union-kind operand rows become `deferred-post-cert`, narrowly.**
+  - The rows are `type:+`, `type:<`, `type:compound-assignment`, `type:increment`, `type:unary`, `type:length`, `type:script-return` and `type:index`.
+  - The deferral covers only safe admission refusal before execution. It does not cover wrong execution, unsound narrowing, internal errors, safety defects, or a new refusal family.
+  - Each is pinned to its exact sightings.
+  - The history (D-068 #6/#7, then "stays open" under D-077 #1) is kept.
+- **#5: every deferred-post-cert entry carries a `report_class`:**
+  - **DEFERRED – COMPATIBILITY (16):** `alias-argument`, `assign-free-name`, `assign-free-name:undeclared`, `context:assignment-error`, `context:assignment-type`, `coro-future-flow:Member`, `method:await`, `error-result-expression`, `fn-name-reserved`, `free-name:undeclared`, `jump-not-last`, `method:q`, `opaque:irregular-legacy-parse`, `prepared-decl-type`, `prepared-fn-unprepared`, `type:push`.
+  - **DEFERRED – IMPLEMENTATION (34):** all the others.
+
+**Refusal contracts on the pinned C137 binary:**
+- `post_cert_refusals.py`: PASS, 50 reasons, 94 scoped units.
+- Negative controls:
+  - `root`: 50 of 50 detected;
+  - `position`: 50 of 50 detected;
+  - `unlisted-position`: 11 of 11 pinned entries detected.
+
+Note: the sections below describe the D-077 #1 reconciliation as it was first made (40 and 19). The table above is current.
+
 ## Ruling applied
 
 D-077 #1 (owner 2026-11-12 04:25): a reason covered by D-076 or an earlier explicit deferral may be recorded as

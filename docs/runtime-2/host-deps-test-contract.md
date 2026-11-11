@@ -3,6 +3,76 @@
 This is a tests-only change; no production code changed. It was prepared on `prep/cert-r2` (base C137 `040a6726`)
 for independent review, as D-077 #3 requires ("Require independent review of the test changes").
 
+## D-078 update (owner 2026-11-12, attachment 2ea1c509): status of the suite
+
+**`test-runtime2-host-deps` is FAILED**, with six outstanding cases (D-078 #4: no blanket deferral). read_limit.py
+prints them as `OUTSTANDING` lines, each with the reason the VM emits and the operation it actually refuses.
+
+| Case | Emitted reason | Operation and classification |
+|---|---|---|
+| ifstream(/dev/zero).read_all_bytes | host-handle-flow | stream byte read; **finding F-HD1** |
+| ifstream(/dev/zero).read_bytes(huge) | host-handle-flow | stream byte read; F-HD1 |
+| read_bytes(limit/2) x 16 from /dev/zero | host-handle-flow | stream byte read in a loop; F-HD1 |
+| ifstream(/dev/zero) >> token | statement:Command | stream extraction; **finding F-HD2** |
+| ifstream(/dev/zero).read_val | host-handle-flow | stream value read, not a byte read: classification not established |
+| read_line: line of exactly the limit | type:length | `.length()` on a string-or-null result. The D-078 #3 union deferral is pinned to its corpus sightings and does not cover this case; D-078 #4 keeps it open |
+
+**The two misclassifications (D-078 #4).** Both are corrected in the records only, which the owner allowed: in the
+`OUTSTANDING` table here and in read_limit.py, and in the `host-handle-flow` and `statement:Command` rows of
+classification.tsv. **Neither reason ID can be corrected without a production diagnostic change, so both stay as
+findings.** Neither behaviour is approved, and all six cases remain FAILED.
+- **F-HD1.** The VM refuses `s.read_bytes(n)` and `s.read_all_bytes()` on a plain `ifstream` under `host-handle-flow`,
+  even though no handle flows anywhere. Probed: `s := ifstream("d.txt")` / `x := s.read_bytes(4)` gives
+  `c.f:2:6 … (host-handle-flow)`. The ID names the compiler's generic fallback, not the operation. The correction
+  needs an operation-specific reason ID: a production change, not made here.
+- **F-HD2.** The VM refuses a `>>` statement as `statement:Command` (a shell command line): `s >> t`, and per the review
+  also `x >> 1` on a number. Legacy performs stream extraction for `s >> t`. The correction needs a parser or
+  diagnostic change: a production change, not made here.
+
+The count does not match the owner's wording. D-078 #4 speaks of "two misclassifications" and "the other four".
+The evidence ties the two misclassifications to four of the six cases (F-HD1: 3, F-HD2: 1), leaving two that are
+classified separately. All six stay FAILED either way.
+
+### open_bytes() and read(): named deferrals for the 10 cases (D-078 #2)
+
+These forms were probed on the pinned C137 binary and are recorded in `post_cert_deferrals.tsv`.
+
+**`read()`, the free function that reads one stdin line.**
+- **Refused** in every VM-default form probed:
+  - as a statement, an assignment or a call argument;
+  - in a function body or an uncalled function;
+  - in an unreachable `if (false)` branch;
+  - in an interactive session (`NIFT_VM session refused: callable:read`).
+- **Supported on the VM:** the stream methods on `ifstream`, including `ifstream("/dev/stdin")`. Probed: `read_line()`
+  and `read(3)` return the stdin line.
+- `read()` itself runs on the legacy channel.
+
+**`open_bytes()`.**
+- **Refused** in every VM-default form probed: assignment, argument, function body, uncalled function and unreachable
+  branch.
+- **Supported on the VM:** `open()`, `file().open()`, `ifstream` `read_all()`, `read_line()` and `read(n)`, `cat()` and
+  `sha256_file()`.
+- `open_bytes()` itself runs on the legacy channel.
+
+**History.** Both were approved for implementation (owner 2026-11-10 13:26 implement list; D-067 #7, "previously
+approved bytes … small-capability items"). They were status `implement` until D-078 #2 scheduled VM support after
+the first certification. Both histories are kept in classification.tsv.
+
+### B01 safety coverage that keeps executing through supported VM paths (D-078 #2 condition)
+
+| Guarantee | Tests that still prove it on the VM default |
+|---|---|
+| **Read limits** (exact limit read whole; one byte over is a fatal, uncatchable limit error) | read_limit_controls.py A (`open`, `file().open`, `ifstream` `read_all`, `read_line`, at 1000 bytes, below one 64 KiB chunk); read_limit.py: `open` and `file().open` exact and over, `ifstream read_all` and `read_line` exact and over, `open`/`cat`/`file().open(r,w)` on /dev/zero and /dev/full, FIFO exact and over, `NIFT_READ_LIMIT` parsing (1K, 2MiB, 1g, 4096, 3m, and the rejected values), the page build that hits the limit; read_limit_contract_controls.py (`open`, `read_all`: limit error, and detection of a removed limit); the C++ unit `read-limit-unit` (src/ReadLimit.h) |
+| **Bounded allocations** (RLIMIT_AS = baseline + 1.5 × limit; peak RSS ≤ baseline + limit + slack; never `std::bad_alloc`) | read_limit_controls.py B (40 MiB + 12345: /dev/zero, a FIFO one byte over, a sparse file 3 × the limit, never exit 70); read_limit.py: every `exceed()` case's peak-RSS check, and `open()` of a regular file 3 × the limit |
+| **Streaming reads** (larger than the limit, bounded per read) | read_limit.py: the `read_line` loop over a file 3 × the limit; `sha256_file` of a file 3 × the limit; the new VM `read(limit/2)` × 16 from /dev/zero; `ifstream(/dev/zero).read(huge)`; read_limit_controls.py C (paced short reads: a FIFO crossing the limit chunk by chunk) and D (`read(n)` counts the bytes read, not `n`) |
+| **Memory budget and mutation controls** | read_limit_mutants.sh (8 mutants of the VM read natives: each must fail read_limit_controls.py; Linux campaign); vm_host_memory.py (`test-runtime2-host-memory`: VM host reads under `NIFT_VM_HEAP_BUDGET`, with peak trackers); the `test-rt-value` heap-budget and OOM units |
+
+**What was run here:**
+- read_limit_controls.py: PASS, on the pinned binary, earlier in this preparation.
+- read_limit_contract_controls.py: 34 of 34 PASS, now.
+- read_limit_mutants.sh and the full read_limit.py were not run here. They need a build, device cases and disk. They
+  are Linux-campaign gates.
+
 ## Ruling applied
 
 D-077 #3 (owner 2026-11-12 04:25) rejects a blanket change of the 24 to expected refusals. Each case is classified by

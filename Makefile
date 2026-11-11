@@ -5731,6 +5731,7 @@ test-cp25r: $(TARGET)
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control root
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control position
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control unlisted-position
 cp25r-inventory: $(TARGET)
 	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
 	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \

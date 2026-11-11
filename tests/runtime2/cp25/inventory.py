@@ -225,7 +225,7 @@ def load_deferrals(path):
         for item in (row.get("scope") or "").split(";"):
             unit, _, root = item.strip().partition(">")
             if unit.strip():
-                scope[unit.strip()] = root.strip()
+                scope[unit.strip()] = root.split("@")[0].strip()  # `@L:C,...`: pinned sightings (post_cert_refusals.py)
         row["scope"] = scope
         rows[row.get("reason", "")] = row
     return rows

@@ -17,8 +17,7 @@ assert that peak RSS stays within baseline + limit + slack (the coordinator's
 D-077 #3 (owner 2026-11-12 04:25): the test contract distinguishes approved refusals from read-limit
 failures, case by case (docs/runtime-2/host-deps-test-contract.md has the table of the 24):
   - a case of a capability whose VM refusal is an owner decision (DEFERRED below: run()/cmd(), D-065 #2;
-    open_bytes() and read(), approved for implementation and scheduled after the first certification
-    baseline, D-077 #5) runs its original program and assertions on the legacy channel (NIFT_VM=0, the
+    open_bytes() and read(), named deferrals by D-078 #2, earlier approved for implementation) runs its original program and assertions on the legacy channel (NIFT_VM=0, the
     supported path that keeps the capability: the read-limit invariant), and a refusal contract under the
     VM default: exit 1 before any part runs, the exact documented diagnostic at the callee's position. A
     refusal-contract pass is not evidence that the capability works on the VM; the summary counts it as
@@ -53,9 +52,9 @@ failures = []
 not_run = []
 # D-077 #3: reason -> (decision, the documented refusal text, the callee token the diagnostic points at)
 DEFERRED = {
-    "builtin-bytes:open_bytes": ("D-077 #5: approved, implementation after the first certification baseline",
+    "builtin-bytes:open_bytes": ("D-078 #2: named deferral; VM support after the first certification (approved for implementation before)",
                                  "bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet", "open_bytes("),
-    "callable:read": ("D-077 #5: approved, implementation after the first certification baseline",
+    "callable:read": ("D-078 #2: named deferral; VM support after the first certification (approved for implementation before)",
                       "the call `read()` is not supported by the Runtime 2.0 VM yet", "read("),
     "callable:run": ("D-065 #2: run() and cmd() deferred from the initial release",
                      "the call `run()` is not supported by the Runtime 2.0 VM yet", "run("),
@@ -76,6 +75,26 @@ EQUIVALENT_NAMES = ("read_line: line of exactly the limit, printed and measured 
 # scripts run before each check (a refusal contract re-runs them under the VM default).
 CHANNEL = {"legacy": False, "record": None, "pending": []}
 deferred_cases = collections.Counter()
+# D-078 #4 (owner 2026-11-12, attachment 2ea1c509): no blanket deferral. The cases below keep their original VM-default
+# check and stay FAILED. This records, per case, the refusal reason the VM emits and the operation actually refused;
+# where review evidence shows that the reason misnames the operation, that is a finding about a production diagnostic
+# (not changed here), and the case is still FAILED. docs/runtime-2/host-deps-test-contract.md has the evidence.
+OUTSTANDING = [
+    ("ifstream(/dev/zero).read_all_bytes", "host-handle-flow",
+     "stream byte read (read_all_bytes); finding F-HD1: refused through the generic host-handle-flow fallback, whose ID "
+     "names the compiler mechanism, not the operation"),
+    ("ifstream(/dev/zero).read_bytes(huge)", "host-handle-flow", "stream byte read (read_bytes); finding F-HD1"),
+    ("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)", "host-handle-flow",
+     "stream byte read (read_bytes) in a loop; finding F-HD1"),
+    ("ifstream(/dev/zero) >> token", "statement:Command",
+     "stream extraction `s >> t`; finding F-HD2: the VM classifies a `>>` statement (also `x >> 1` on a number) as a "
+     "shell command line, while legacy performs stream extraction"),
+    ("ifstream(/dev/zero).read_val", "host-handle-flow",
+     "stream value read (read_val), not a byte read: classification not established, stays open"),
+    ("read_line: line of exactly the limit", "type:length",
+     "`.length()` on read_line()'s string-or-null result (a union-kind operand); the D-078 #3 deferral is pinned to its "
+     "corpus sightings and does not cover this case, which D-078 #4 keeps open"),
+]
 
 
 def not_run_case(name, why):
@@ -232,6 +251,10 @@ def main():
     if deferred_note:
         print("DEFERRED capabilities, checked only as VM refusal contracts (not evidence that they work on the VM): " +
               deferred_note)
+    print("")  # a blank line: certify collects the lines under a FAIL line up to the next blank line
+    for name, reason, operation in OUTSTANDING:
+        print("OUTSTANDING (FAILED unless it passed above; D-078 #4): %s: emitted reason %s; operation: %s" %
+              (name, reason, operation))
     if failures:
         print("%d failure(s)" % len(failures))
         return 1
@@ -270,7 +293,7 @@ def cases(work, address_space, rss_bound):
         check("%s: empty file" % op, proc.returncode == 0 and proc.stdout.strip() == "0", proc.stdout + proc.stderr)
         exceed("%s one byte over" % op, op, 'x := %s' % (expr % (work / "over.bin")), work, address_space, rss_bound, small)
     whole_reads("open", 'open("%s").length()')
-    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-077 #5).
+    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-078 #2).
     deferred("builtin-bytes:open_bytes", lambda: whole_reads("open_bytes", 'open_bytes("%s").length()'))
     proc = run('f := file("%s")\nf.open("r")\nprint(f.read_all().length())\nf.close()\n' % (work / "exact.bin"), work, limit=small)
     check("file().open: exact limit", proc.returncode == 0 and proc.stdout.strip() == str(small), proc.stdout + proc.stderr)
@@ -401,7 +424,7 @@ def cases(work, address_space, rss_bound):
         not_run_case("process capture", "no head")
 
     stream_errors(work)
-    # D-077 #3: read() is refused by the VM default (callable:read, D-077 #5).
+    # D-077 #3: read() is refused by the VM default (callable:read, D-078 #2).
     deferred("callable:read", lambda: stdin_read(work, address_space, rss_bound))
     capture_cases(work, address_space, rss_bound)
 
@@ -457,7 +480,7 @@ def fifo_cases(work, address_space, rss_bound):
     exceed("FIFO: one byte over", "open", 'x := open("%s")' % fifo, work, address_space, rss_bound, small)
     thread.join(10)
     thread = writer(0, forever=True)
-    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-077 #5). The refusal contract
+    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-078 #2). The refusal contract
     # never opens the FIFO (no part of the program runs), so only the legacy run needs a writer.
     deferred("builtin-bytes:open_bytes", lambda: exceed("FIFO whose writer never stops (open_bytes)", "open_bytes",
                                                         'x := open_bytes("%s")' % fifo, work, address_space, rss_bound))
@@ -480,7 +503,7 @@ def default_limit(work):
         pass
     name = "default limit: open_bytes(/dev/zero) stops at 1073741824 bytes"
     script = 'x := open_bytes("/dev/zero")\n'
-    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-077 #5): the refusal contract
+    # D-077 #3: open_bytes() is refused by the VM default (builtin-bytes:open_bytes, D-078 #2): the refusal contract
     # needs no memory; the invariant runs on the legacy channel, and only where 4 GiB are available.
     refusal_contract(name, "builtin-bytes:open_bytes", run(script, work, limit=None), script)
     if available < 4 * (1 << 30):
