@@ -5113,7 +5113,7 @@ compatibility.md and known-limitations.md cite that ruling. These are no longer 
 - No inference change.
 - Counts, 248 rows: approved 44, deferred-named 17, implement 23, PENDING-OWNER 157, retired 7.
 
-## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129)
+## 99. Post-checkpoint-1 inventory rescan (C111; repaired in C112-C116; owner rulings D-067 in C117, D-068 in C122, D-069 in C125-C126, D-070 in C127-C128; reviews in C119-C121; slot 1 in C123-C124; slot 2 in C129; D-071 in C130)
 
 This section mirrors `docs/runtime-2/checkpoints/rescan-post-cp1.md`; subsection numbers follow that file.
 
@@ -8025,3 +8025,30 @@ refusal protected. Two pieces of evidence:
   block, because E requires every import to come before any other statement.
 - So a `cd`/`setenv` after the imports runs after every module read, as it does in legacy. `cwd-change-after-import`
   checks this, with output, trace and tree equal to legacy.
+
+
+### 30. C130: owner rulings 2026-11-11 17:11 (D-071) applied (records only: tsv, docs)
+
+decisions.md D-071 quotes attachment 29e9426f ("SLOT 2: ACCEPTED WITH RECORDED QUALIFICATIONS"); the review is
+REVIEW-C129-SLOT2 (ACCEPT). This commit has no src or test change, so the nift sha256 stays
+`fff2376cff6b2d70902781254f9fc3c0ea67ba149980810559f81565773bf2ec`. The acceptance does not authorise integration,
+push, tag or release.
+
+| D-071 item | Applied |
+| --- | --- |
+| #0 slot 2 accepted at d79d556a | The 20 admitted `module-host-op:*` rows: `implemented-awaiting-review` -> `implemented-accepted` (approval column cites D-071 #0). Their unsafe-context refusals are still emitted under R1; D-071 #2 names only the seven below, so a corpus program that emits one of these 20 in an unsafe context blocks `--check` (seen again) and needs adjudication. None is seen on the corpora. |
+| #2 the seven restricted operations | `cat`, `cp`, `remove` (E) and `file`, `getenv`, `is_dir`, `exists` (M): `implement` -> `approved`, with a context-specific disposition in each row: (a) the unsafe context (before the last import, or in module initialisation) is approved as the R1 read-order restriction (owner 2026-10-21, module_host_op.h:2-6; kept by D-068 #2); (b) safe post-import execution is implemented and accepted, and a refusal there is a guard defect not covered by the approval; (c) unreachable branches belong to slot 3. One reason id covers both contexts, because the guard emits the reason only in the unsafe context (the refusal text is not changed in a records-only commit), so the rows are not split. |
+| #1 host-deps | Recorded as **FAILED** (not PASS, not an approved deferral) in known-limitations.md "Release-audit items", with the 24 refusals under their capability groups: `builtin-bytes:open_bytes` 7, `callable:run` 6, `callable:cmd` 2, `callable:read` 3, `host-handle-flow` 4, `statement:Command` 1, `type:length` 1. All 24 are in the recorded fingerprint (certify-fingerprints/test-runtime2-host-deps.txt). The C129 freeze compared a scratch build of 78027d95 (identical); that build was deleted at cleanup, so the review could not reproduce the baseline. |
+| #3 handle mutant | A Low test-quality item in known-limitations.md "Release-audit items": `reentrant-not-detected` (and `limit-setting-ignored`) are detected by the 120-second timeout; before release, verify a deterministic timeout, reliable completion of the unmodified build, and causal attribution; improve the diagnostic if practical. |
+| #4 slot 3 | Authorised; starts at C131 from the reviewed plan (dead-code-admission.md at c15807c0). |
+
+**Coverage of (b), the safe context.** The rows' own safe-context form is pinned by tests for `exists`
+(module_host_order.py `host-after-import`, `module-exports-host-fn`, `cwd-change-after-import`) and `getenv`
+(vm_inventory_links.py `module-callable-after-imports`). For `cat`, `cp`, `remove`, `file` and `is_dir` the evidence
+is the C129 probes and the review's spot checks (cp and rm of a module after the imports), not a committed test.
+
+**Inventory** (fresh `collect` on the pinned binary, then `report --check`): exit 3, G1 PASS, 137 reasons seen:
+approved 14, deferred-named 29, implement 35, implemented-awaiting-review 0, implemented-accepted 0, PENDING-OWNER 59,
+retired 0. It is blocked only by the 59 PENDING-OWNER reasons; the awaiting-review block is gone.
+`module-host-op:cat` (seen once, the E form in workspaces/script-outside) moves from implement to approved (35 and 14).
+`make test-runtime2-reason-ids` (including inventory_families.py and its three mutants) passes.

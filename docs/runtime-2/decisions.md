@@ -2285,3 +2285,41 @@ attachments (0a4e481b: "Both decisions confirmed"; 1d728bb0: "Struct-to-async: e
    independent review and owner acceptance before starting Slot 3. No integration, push, tag or release without
    explicit approval."
 
+## D-071 — Slot 2 accepted; host-deps, the seven restricted host operations, the handle mutant; slot 3 authorised (owner, 2026-11-11 17:11, attachment 29e9426f)
+
+Each item is cited in the CP25-R inventory as "D-071 #n (owner 2026-11-11 17:11)". Quotations are from attachment
+29e9426f ("SLOT 2: ACCEPTED WITH RECORDED QUALIFICATIONS"), section "Forwardable decisions for Claude", unless marked
+otherwise. The review is REVIEW-C129-SLOT2 (verdict ACCEPT).
+
+0. **Slot 2: ACCEPTED.** "Accept Slot 2 at commit `d79d556a`. Production binary SHA-256: `fff2376c…73bf2ec`. The
+   independently reviewed host-import guard is accepted. This approval covers the frozen production implementation
+   and reviewed test changes. It does not authorise integration, push, tag or release."
+1. **Host-dependency suite.** "Approve checkpoint acceptance despite the 24 known unrelated refusals. The failing
+   programs contain no imports, and the Slot 2 guard cannot apply to them. Preserve the 24 failures under their
+   existing capability groups. Do not classify the host-dependency suite as PASS or treat the failures as approved
+   release deferrals. Record that fresh baseline reproduction was unavailable because the Slot 1 binary was not
+   present. These failures remain subject to final release qualification." (Section 1: "**Do not mark the
+   host-dependency suite PASS.**" "The affected cases must remain on the consolidated certification inventory.")
+2. **Seven restricted host operations.** "Approve the existing module read-order restrictions for: `cp`, `remove`,
+   `cat`, `file`, `getenv`, `is_dir`, `exists`. The approval applies to unsafe execution before or during module
+   loading. It does not approve refusing those operations in contexts where Slot 2 now safely supports them. Record
+   the unsafe-context restriction as approved and the reviewed safe execution capability as implemented and
+   accepted. Split inventory rows or use context-specific dispositions where necessary. Do not conceal unrelated
+   refusals behind these approvals." (Section 2: "**Do not use a blanket `approved` status that could conceal a new
+   refusal in an otherwise safe context.**" "In an unreachable branch: Governed by the separate Slot 3 dead-code
+   contract.")
+3. **File-handle mutation control.** "Accept the repaired negative control for checkpoint purposes. Retain a Low
+   test-quality finding because the mutant is detected by a 120-second deadlock timeout rather than a specific
+   assertion. Before release, verify deterministic timeout behaviour, reliable completion of the unmodified build
+   and causal attribution to the mutant. Improve the diagnostic if practical, without starting another broad harness
+   campaign."
+4. **Slot 3: AUTHORISED.** "Begin the previously approved dead-code admission checkpoint using the independently
+   reviewed plan at `c15807c0`. Preserve its six review conditions, full name-resolution checks, struct-field
+   callable handling, built-in shadowing rules and conservative behaviour for uncertain types. Execution-dependent
+   errors in unreachable code must not trigger whole-program refusal where the approved analysis establishes safe
+   deferral. Inherently static errors remain early errors. Interactive sessions retain their existing admission
+   policy for this checkpoint. Use effective mutation controls and precise regression tests. Stop if implementation
+   requires broad compiler restructuring or violates the approved soundness assumptions."
+5. **Verification and governance.** "Freeze and independently review Slot 3 before seeking owner acceptance.
+   Preserve the outstanding Linode, Windows/macOS and v4.12.0 performance requirements. No integration, push, tag or
+   release without explicit owner approval."
