@@ -2388,3 +2388,29 @@ workstreams and are recorded here only; C136 applies #5 and #6.
    host-test evidence before seeking acceptance."
 8. **Governance.** "No new production implementation checkpoint may start before the current checkpoint's required
    review and owner acceptance. [...] No integration, push, tag or release without explicit approval."
+
+## D-075 — Slot 3 undefined-callables tranche accepted; L6 Option B approved and scheduled (owner, 2026-11-12 01:27, attachment 21eb1a83)
+
+Quotations are from attachment 21eb1a83, section "Forwardable decisions for Claude".
+
+1. **Slot 3 undefined-callables tranche: ACCEPTED.** "Accept C136 (`e640f808`), production binary SHA-256
+   `4bb09e9e…41c0b909c4`. This acceptance covers the independently reviewed undefined-callables tranche only. It does
+   not close all of Slot 3. The remaining deferred-error families remain outstanding. Approve C137 as a separately
+   verified records-and-tests correction, provided the runtime binary remains unchanged and inventory coverage is
+   preserved. Retain the 24 host-dependency failures as open release-gate findings."
+2. **L6 `native::`: OPTION B APPROVED** for exactly `cat`, `cp`, `mv`, `rm`, `ls`, `mkdir` and `touch`: "Introduce
+   their `native::` qualified forms. Remove their unqualified native built-in bindings from VM-default execution. Do
+   not remove unrelated unqualified built-ins." "Function calls must never implicitly launch external executables."
+   "User-defined functions with the seven names must remain possible." "Add the seven qualified calls to both VM and
+   legacy. Preserve legacy's existing unqualified native functions so it remains a stable historical oracle. Record
+   the VM-only removal of unqualified native bindings as an explicit Runtime 2.0 breaking change. Do not introduce
+   runtime namespace objects or a general namespace system. Use bounded compile-time qualification resolving to
+   existing native IDs." Qualification must not bypass module-import effect restrictions, admission and
+   name-resolution rules, ownership or transfer restrictions, file read limits or memory accounting, host-call tracing
+   and dependency observations, or thread/async restrictions. Migration: "Maintain a complete manifest of actual
+   call-site changes. Preserve historical certification evidence." Website: "Do not clone, fetch, reset or modify the
+   website checkout during the runtime implementation."
+   **Schedule (not started):** "Finish the remaining Slot 3 work. Then complete and independently review: 1.
+   Output-order repair. 2. `save()` filesystem-safety repair. 3. L6 `native::` migration. Proceed to the struct
+   checkpoints afterward. Every production checkpoint requires its own freeze, independent review and owner
+   acceptance. No integration, push, tag or release without explicit owner approval."

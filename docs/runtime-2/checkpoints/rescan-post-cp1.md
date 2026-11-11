@@ -3228,3 +3228,32 @@ Changed tests (C136):
 | tests/runtime2/legacy_name_registration.py (new) | none | 5 cases and 1 mutant | D-073 #5 | legacy bytes recorded per case |
 
 No test case, mutant or target was deleted; the Makefile gains test-runtime2-legacy-name-registration (in test-rt-vm).
+
+### 32.9 C137: tranche accepted (D-075 #1); records and tests only
+
+decisions.md D-075 quotes attachment 21eb1a83. The undefined-callables tranche is accepted at C136 e640f808 (nift
+`4bb09e9e…41c0b909c4`); slot 3 is not closed, and the remaining families stay outstanding. L6 Option B (D-075 #2) is
+recorded and scheduled after the remaining slot 3 work, the output-order repair and the `save()` checkpoint; it is not
+started. The 24 host-deps failures stay open as release-gate findings (known-limitations.md).
+
+- **Rows:** `callable:nope`, `undefined_fn`, `undefined_thing`, `assert`, `len`, `nosuch`: implemented-awaiting-review
+  -> `implemented-accepted` (D-075 #1). `callable:prit` stays PENDING-OWNER.
+- **REVIEW-C136-SLOT3 F-A (inventory mechanics).** `inventory.py report` counted the non-consequential `deferred:`
+  site records as seen reasons, so flipping the rows made `--check` report `implemented-accepted reason(s) seen
+  again: callable:nope, callable:undefined_fn, callable:undefined_thing` (reproduced with the C136 inventory.py
+  against the flipped tsv). A deferred site is not a refusal: the unit runs on the VM. The retired and
+  implemented-accepted checks now count only reasons seen as a refusal (classify-all non-deferred records and
+  execute fallbacks). Deferred sites still need a row (G1), keep their row's status for PENDING-OWNER, and stay listed
+  in the report's deferred-site section.
+- **Tests (inventory_families.py, 16 cases):** `deferred-accepted-not-seen` and `deferred-retired-not-seen` (fail
+  without the fix), `accepted-refusal-still-blocks` (a real refusal of an implemented-accepted reason next to its
+  deferred site still blocks), `deferred-needs-row`, `deferred-pending-blocks`. New mutant `--mutant deferred` (the
+  filter removed) is caught by exactly the two not-seen cases; `--mutant status` is now also caught by
+  `accepted-refusal-still-blocks`. The Makefile runs the new mutant in test-runtime2-reason-ids.
+- **Inventory `--check`** (one fresh collect on 4bb09e9e, three reports): before (C136 inventory.py and tsv): exit 3,
+  G1 PASS, implemented-awaiting-review 3, blocked by 59 PENDING-OWNER and the 6 awaiting-review rows; the flipped tsv
+  with the C136 inventory.py: exit 3, blocked also by `implemented-accepted reason(s) seen again` for the 3 deferred
+  rows; after (C137): exit 3, G1 PASS, 137 reasons seen: approved 14, deferred-named 29, implement 32,
+  implemented-awaiting-review 0, implemented-accepted 3, PENDING-OWNER 59, retired 0; blocked only by the 59
+  PENDING-OWNER reasons.
+- No src change; the nift sha256 is unchanged.

@@ -193,12 +193,15 @@ def report(args):
     full = collections.defaultdict(set)      # reason -> units (classify-all, non-consequential)
     conseq = collections.defaultdict(set)
     deferred = collections.defaultdict(set)  # slot 3: reason -> units with a deferred site of it (5.4)
+    refused = set()  # reasons seen as a refusal (not only as a deferred site): REVIEW-C136-SLOT3 F-A
     for line in open(os.path.join(d, "classify-all.jsonl")):
         r = json.loads(line)
         for it in r.get("reasons") or []:
             (conseq if it.get("consequential") else full)[reason_key(it["reason"])].add(r["id"])
             if (it.get("reason") or "").startswith("deferred:") and not it.get("consequential"):
                 deferred[reason_key(it["reason"])].add(r["id"])
+            elif not it.get("consequential"):
+                refused.add(reason_key(it["reason"]))
     fallback = collections.defaultdict(set)  # reason -> entries leaving the VM (execute)
     entries = fb_entries = 0
     for line in open(os.path.join(d, "execute.jsonl")):
@@ -211,6 +214,7 @@ def report(args):
                 fallback[reason_key(e["reason"])].add(r["entry"])
         fb_entries += left
     seen = set(full) | set(fallback)
+    refused |= set(fallback)
 
     def row_for(reason):
         """An exact row, else the family row `<prefix>:*` of an approved family (FAMILIES)."""
@@ -285,6 +289,11 @@ def report(args):
     if args.check and problems:
         return 1
     blocked = False
+    # REVIEW-C136-SLOT3 F-A: a deferred site is not a refusal (the unit runs on the VM), so a retired or
+    # implemented-accepted reason is "seen again" only as a refusal. Deferred sites still need a row (G1), keep their
+    # row's status for PENDING-OWNER, and are listed in the report's deferred-site section.
+    for status in ("retired", "implemented-accepted"):
+        by_status[status] = [r for r in by_status.get(status, []) if r in refused]
     if args.check and by_status.get("retired"):
         # A retired reason (resolved, not emitted any more) that is seen again is not a pass either.
         print("INVENTORY: BLOCKED: retired reason(s) seen again: %s" % ", ".join(by_status["retired"]), file=sys.stderr)

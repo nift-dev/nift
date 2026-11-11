@@ -26,15 +26,24 @@ The status cases (owner 2026-11-11 11:07, decisions.md D-069 #4: the five implem
   status-accepted-unseen   an `implemented-accepted` row, not seen, the seen reason approved: exit 0
   status-invalid-unseen    an unseen row with an unknown status (`implemented`): G1 fails (exit 1)
 
+The deferred-site cases (REVIEW-C136-SLOT3 F-A: a slot-3 `deferred:<reason>` record is not a refusal):
+
+  deferred-accepted-not-seen     an implemented-accepted row seen only as a deferred site: exit 0
+  deferred-retired-not-seen      a retired row seen only as a deferred site: exit 0
+  accepted-refusal-still-blocks  the same row seen as a deferred site and as a refusal: --check blocks (exit 3)
+  deferred-needs-row             a deferred site with no row: G1 fails (exit 1)
+  deferred-pending-blocks        a deferred site of a PENDING-OWNER row: --check blocks (exit 3)
+
 --mutant family re-adds the generic family fallback (any `<prefix>:*`) to a scratch copy of inventory.py
 and runs the same cases against it: the negative control. The suite must then fail, on the named case
 unlisted-type-reason (a `type:*` row in the temporary classification would classify `type:zzz`).
 --mutant status drops the two implemented-status checks from the copy: the suite must then fail on
-exactly status-accepted-seen and status-awaiting-unseen. --mutant validity drops the check that every
-unseen row has a valid status: the suite must then fail on exactly status-invalid-unseen. A bare
+exactly status-accepted-seen, status-awaiting-unseen and accepted-refusal-still-blocks. --mutant validity drops the check that every
+unseen row has a valid status: the suite must then fail on exactly status-invalid-unseen. --mutant deferred drops the
+deferred-site filter: the suite must then fail on exactly deferred-accepted-not-seen and deferred-retired-not-seen. A bare
 --mutant means family.
 
-usage: inventory_families.py [--mutant [family|status|validity]]
+usage: inventory_families.py [--mutant [family|status|validity|deferred]]
 """
 import argparse
 import json
@@ -53,6 +62,7 @@ EXACT = '''        prefix = reason.split(":")[0]
 '''
 GENERIC = '''        return cls.get(reason.split(":")[0] + ":*") if ":" in reason else None
 '''
+DEFERRED_FILTER = "        by_status[status] = [r for r in by_status.get(status, []) if r in refused]\n"
 VALIDITY_CHECK = "        if reason not in seen and row.get(\"status\") not in STATUSES:\n"
 STATUS_CHECKS = ['    if args.check and by_status.get("implemented-accepted"):\n', "    if args.check and awaiting:\n"]
 
@@ -113,6 +123,24 @@ def cases(inventory):
                          [("type:mul", "approved"), ("type:div", "implemented")])
         if rc != 1 or "invalid status 'implemented' for row type:div" not in err:
             failures.append(("status-invalid-unseen", "rc %d %r" % (rc, err[-300:])))
+        # REVIEW-C136-SLOT3 F-A: a slot-3 deferred site (`deferred:<reason>`, the unit runs on the VM) is not a
+        # refusal: an implemented-accepted or retired row seen only that way does not block; a real refusal does.
+        rc, err = report(inventory, os.path.join(work, "i"), ["deferred:type:mul"], [("type:mul", "implemented-accepted")])
+        if rc != 0 or "G1 PASS" not in err or "seen again" in err:
+            failures.append(("deferred-accepted-not-seen", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "j"), ["deferred:type:mul"], [("type:mul", "retired")])
+        if rc != 0 or "G1 PASS" not in err or "seen again" in err:
+            failures.append(("deferred-retired-not-seen", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "k"), ["deferred:type:mul", "type:mul"],
+                         [("type:mul", "implemented-accepted")])
+        if rc != 3 or "implemented-accepted reason(s) seen again: type:mul" not in err:
+            failures.append(("accepted-refusal-still-blocks", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "l"), ["deferred:type:zzz"], ["type:mul"])
+        if rc != 1 or "unclassified reason: type:zzz" not in err:
+            failures.append(("deferred-needs-row", "rc %d %r" % (rc, err[-300:])))
+        rc, err = report(inventory, os.path.join(work, "m"), ["deferred:type:mul"], [("type:mul", "PENDING-OWNER")])
+        if rc != 3 or "PENDING-OWNER reason(s), not adjudicated: type:mul" not in err:
+            failures.append(("deferred-pending-blocks", "rc %d %r" % (rc, err[-300:])))
     status = {}
     for l in open(TSV):
         if not l.startswith("#") and "\t" in l:
@@ -130,13 +158,13 @@ def cases(inventory):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mutant", nargs="?", const="family", choices=["family", "status", "validity"])
+    ap.add_argument("--mutant", nargs="?", const="family", choices=["family", "status", "validity", "deferred"])
     a = ap.parse_args()
     if not a.mutant:
         failures = cases(INVENTORY)
         for name, why in failures:
             print("FAIL inventory families: %s: %s" % (name, why))
-        print("%s inventory families: 11 cases (family rows only for the four D-067 #10 families, never approving unlisted members; the D-069 #4 statuses)" %
+        print("%s inventory families: 16 cases (family rows only for the four D-067 #10 families, never approving unlisted members; the D-069 #4 statuses)" %
               ("FAIL" if failures else "PASS"))
         return 1 if failures else 0
     text = open(INVENTORY).read()
@@ -145,6 +173,12 @@ def main():
             print("FAIL inventory families mutant: harness: the exact-family code is not in inventory.py (stale mutant)")
             return 1
         mutated, expected = text.replace(EXACT, GENERIC), ["unlisted-type-reason"]
+    elif a.mutant == "deferred":
+        if text.count(DEFERRED_FILTER) != 1:
+            print("FAIL inventory families deferred mutant: harness: the deferred-site filter is not in inventory.py (stale)")
+            return 1
+        mutated = text.replace(DEFERRED_FILTER, "        pass\n")
+        expected = ["deferred-accepted-not-seen", "deferred-retired-not-seen"]
     elif a.mutant == "validity":
         if text.count(VALIDITY_CHECK) != 1:
             print("FAIL inventory families validity mutant: harness: the row-status check is not in inventory.py (stale)")
@@ -158,7 +192,7 @@ def main():
         mutated = text
         for c in STATUS_CHECKS:
             mutated = mutated.replace(c, "    if False:\n")
-        expected = ["status-accepted-seen", "status-awaiting-unseen"]
+        expected = ["accepted-refusal-still-blocks", "status-accepted-seen", "status-awaiting-unseen"]
     with tempfile.TemporaryDirectory(prefix="inv-families-mutant-") as work:
         # Same depth below a root as tests/runtime2/cp25/ (inventory.py computes REPO = parents[2]).
         copy = os.path.join(work, "tests", "runtime2", "cp25", "inventory.py")
