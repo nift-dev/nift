@@ -17,14 +17,16 @@ const std::uint16_t* atom_operand(const Instr& in) {
 }
 bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map,
                               IsolateTaskInput& input, std::shared_ptr<const Program>& metadata,
-                              std::string& error) {
+                              std::string& error, std::size_t first) {
     std::unordered_set<std::uint16_t> used_atoms;
+    if (first > source.protos.size()) { error = "invalid snapshot range"; return false; }
+    const std::size_t count = source.protos.size() - first;
     auto copy = std::make_shared<Program>();
     copy->has_collection_boundaries = source.has_collection_boundaries;
     copy->has_coroutines = source.has_coroutines;
     std::unordered_map<const Proto*, std::size_t> indices;
-    for (std::size_t i = 0; i < source.protos.size(); ++i) {
-        indices.emplace(source.protos[i].get(), i);
+    for (std::size_t i = 0; i < count; ++i) {
+        indices.emplace(source.protos[first + i].get(), i);
         copy->protos.push_back(std::make_unique<Proto>());
     }
     // The flattened constants array is local and unpublished: nothing outside
@@ -36,15 +38,22 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
     // `constants` happens before encode(); the reserved capacity means no
     // push_back reallocates, so the heap tally make_array recorded stays exact.
     std::size_t constant_total = 0;
-    for (const auto& proto : source.protos) constant_total += proto->constants.size();
+    for (std::size_t i = 0; i < count; ++i) constant_total += source.protos[first + i]->constants.size();
     build::ArrayBulk constant_builder(constant_total);
     bool holds_identity = false;
-    for (std::size_t i = 0; i < source.protos.size(); ++i) {
-        const auto& src = *source.protos[i]; auto& dst = *copy->protos[i];
+    for (std::size_t i = 0; i < count; ++i) {
+        const auto& src = *source.protos[first + i]; auto& dst = *copy->protos[i];
         dst.name = src.name; dst.is_async = src.is_async;
         dst.nparams = src.nparams; dst.nregs = src.nregs;
         dst.collection_expression_view = src.collection_expression_view;
         dst.code = src.code; dst.offsets = src.offsets;
+        for (auto& in : dst.code)  // a nested isolate's own wrapper offset, undone (fix (c))
+            if (first != 0 && proto_operand(in.op)) {
+                if (in.b < first) { error = "proto operand is out of range"; return false; }
+#if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 4)  // test-only: the offset off by one
+                in.b = static_cast<std::uint16_t>(in.b - first);
+#endif
+            }
         for (const auto& in : src.code) if (auto operand = atom_operand(in)) used_atoms.insert(*operand);
         dst.notes = src.notes; dst.note_table = src.note_table;
         // B3: struct descriptors by value (never the source isolate's objects);

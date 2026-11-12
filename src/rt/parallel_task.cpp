@@ -103,6 +103,11 @@ bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::st
     // Admission is bounded independently of CPU slots. Saturation is an
     // explicit refusal; blocking workers release CPU permits.
     if (active_ >= capacity_) { error = "parallel task admission limit exceeded"; return false; }
+    // C140 (b): every unfinished isolate's charge counts against the root heap budget, awaited or not.
+    const std::size_t budget = record->options.heap_budget, charge = record->reserved_bytes;
+    if (charge > budget || reserved_ > budget - charge) {
+        record->failure_code = "limit.exceeded"; error = "parallel task memory budget exceeded"; return false;
+    }
     queue_.push_back(record);
     bool admitted = false;
     try {
@@ -113,6 +118,9 @@ bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::st
     } catch (...) {
         queue_.pop_back(); if (admitted) --active_; throw;
     }
+#if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 1)  // test-only: no charge
+    reserved_ += charge;
+#endif
     cv_.notify_all();
     return true;
 }
@@ -142,9 +150,13 @@ void ParallelRuntime::execute_record(std::shared_ptr<ParallelTaskRecord> record,
           record->failure_reason = StopReason::Internal; }
         notify_parallel_wait_states(record); record->cv.notify_all();
     }
+    std::size_t charge = record->reserved_bytes;
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 2  // test-only: completion keeps the charge
+    charge = 0;
+#endif
     record.reset();
     shared_collect();
-    { std::lock_guard<std::mutex> lock(mutex_); --active_; if (owns_cpu) --computing_; }
+    { std::lock_guard<std::mutex> lock(mutex_); --active_; if (owns_cpu) --computing_; release_locked(charge); }
     if (owns_cpu) resume_cv_.notify_one();
     cv_.notify_all();
 }
@@ -196,7 +208,11 @@ void ParallelRuntime::resume_worker(ParallelWaitKind kind) {
     --resuming_; --blocked_; ++computing_;
 }
 ParallelBlock::ParallelBlock(ParallelWaitKind kind) : runtime_(running_pool), kind_(kind) {
-    if (runtime_ && !runtime_->block_worker(kind_)) { admitted_ = false; runtime_ = nullptr; }
+    try { if (runtime_ && !runtime_->block_worker(kind_)) { admitted_ = false; runtime_ = nullptr; } }
+    catch (const std::system_error&) {  // C140 (a): no worker thread for a blocking wait: refused like the capacity
+        if (kThreadFailureInternal || kind_ != ParallelWaitKind::Blocking) throw;
+        admitted_ = false; exhausted_ = true; runtime_ = nullptr;
+    }
 }
 ParallelBlock::~ParallelBlock() { if (runtime_) runtime_->resume_worker(kind_); }
 bool ParallelRuntime::try_acquire(std::string& error) {
@@ -218,6 +234,9 @@ bool ParallelRuntime::cancel_queued(const std::shared_ptr<ParallelTaskRecord>& r
         auto at = std::find(queue_.begin(), queue_.end(), record);
         if (at == queue_.end()) return false;
         queue_.erase(at); --active_;
+#if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 6)  // test-only: un-awaited cancel keeps it
+        release_locked(record->reserved_bytes);
+#endif
     }
     {
         std::lock_guard<std::mutex> lock(record->mutex);
@@ -291,6 +310,11 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     IsolateTaskOutcome outcome;
     if (!task_cancelled(record)) {
         try { outcome = execute_isolate_task(*record->program, record->input, record->options); }
+        catch (const std::system_error&) {  // C140 (a): no worker thread for a timer or cleanup wait
+            outcome.status = IsolateTaskStatus::ExecutionError; outcome.result.code = "limit.exceeded";
+            outcome.result.reason = kThreadFailureInternal ? StopReason::Internal : StopReason::Error;
+            outcome.result.message = kParallelResourcesExhausted;
+        }
         catch (const std::exception& e) {
             outcome.status = IsolateTaskStatus::ExecutionError;
             outcome.result.reason = StopReason::Internal;
@@ -302,6 +326,7 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
         outcome.result.message = "task cancelled";
         outcome.result.code = "runtime.cancelled";
     }
+    note_parallel_limit(*record, outcome.result);
     if (record->output_root && record->options.parallel_output)
         record->options.parallel_output->drain(outcome.output);
     record->options.current_task.reset();  // the worker Vm is gone; no self-reference may survive

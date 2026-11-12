@@ -31,10 +31,26 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     const std::uint16_t argc = static_cast<std::uint16_t>(in.c & 0x7fffu);
     const auto index = coro.proto_index.find(callee);
     if (index == coro.proto_index.end()) return internal(fault, "spawn proto");
+    // Async-recursion fix (c): in an isolate, slot 0 is its `<isolate-task>` wrapper (no transfer wire) and the
+    // global window is the wrapper's registers. A child gets the original program and the original globals (the
+    // wrapper's first `globals` registers), so nesting does not stack wrappers, constants and slots per level.
+    std::uint32_t wire = 0;
+    const std::size_t first = coro.parallel_map->index_of(vm.program_.protos.front().get(), wire) ? 0 : 1;
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 5  // test-only: the wrapped image again
+    const std::size_t skip = 0;
+    static_cast<void>(first);
+#else
+    const std::size_t skip = first;
+#endif
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 7  // test-only: wrapper registers seeded too
     const std::size_t g = coro.globals;
+#else
+    const std::size_t g = skip != 0 ? vm.program_.protos[1]->nregs : coro.globals;
+#endif
     std::vector<Value> globals(g);
     std::vector<std::uint8_t> ready(g, 0);
     for (std::uint16_t slot : coro.snapshot[index->second]) {
+        if (slot >= g) continue;
         if (slot < vm.stack_.size()) globals[slot] = vm.stack_[slot];
         if (slot < vm.global_ready_.size()) ready[slot] = vm.global_ready_[slot];
     }
@@ -67,11 +83,11 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
         R[in.a] = future_value;
         return vm.memory_ok(fault);
     }
-    if (!snapshot_isolate_program(vm.program_, *coro.parallel_map, record->input, record->program, error)) {
+    if (!snapshot_isolate_program(vm.program_, *coro.parallel_map, record->input, record->program, error, skip)) {
         mark_failed(record, error); R[in.a] = future_value;
         return vm.memory_ok(fault);
     }
-    record->input.entry_proto = index->second;
+    record->input.entry_proto = static_cast<std::uint32_t>(index->second - skip);
     record->input.argc = argc;
     record->input.global_ready = std::move(ready);
     record->input.proto_map = record->proto_map.get();
@@ -91,6 +107,10 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->options.parallel = coro.parallel;
     record->options.program_keepalive = record->program;
     const bool started = start_parallel_task(record, error);
+    if (!started && record->failure_code == "limit.exceeded" && record->failure_reason == StopReason::Error) {
+        fault.code = "limit.exceeded"; fault.catchable = false;  // C140: fatal at the spawn, awaited or not
+        return raise(fault, StopReason::Error, error);
+    }
     if (!started) {
         mark_failed(record, std::move(error));
     } else {
@@ -296,7 +316,7 @@ bool Vm::Coro::wait_parallel(Vm& vm, std::uint64_t observed, Fault& fault) {
     ParallelBlock blocked;
     if (!blocked.admitted()) {
         fault.code = "limit.exceeded"; fault.catchable = false;
-        return raise(fault, StopReason::Error, "parallel blocking wait limit exceeded");
+        return raise(fault, StopReason::Error, blocked.refusal());
     }
     lock.lock();
     if (coro.timers.empty()) {

@@ -160,6 +160,32 @@ column is one of:
 
 An inventory row never implies approval.
 
+## Parallel task memory and threads (C140; D-077 #2)
+
+`async` and `thread()` tasks run in isolates on worker threads. Their limits are ordinary errors (exit 1, code
+`limit.exceeded`, not catchable, like every other `limit.exceeded`), never an internal failure. The two new ones are
+reported at the refused spawn (or the wait that could not block), awaited or not, with one `future: ` or `thread: `
+prefix per awaiting level above it:
+
+| Limit | Message |
+| --- | --- |
+| The unfinished tasks of a run together hold more than the heap budget (`NIFT_VM_HEAP_BUDGET`, default 1 GiB) in charges: each task's bootstrap bytes (its arguments and shared variables, the program's constants and code) plus 64 KiB | `parallel task memory budget exceeded` |
+| The operating system refuses a worker thread | `parallel task resources exhausted` |
+| More than 1024 nested blocked waits (existing, unchanged) | `parallel blocking wait limit exceeded` |
+| More than 16,384 unfinished tasks (existing, unchanged) | `parallel task admission limit exceeded` |
+
+**This is not comprehensive memory accounting.** Each task's own live heap is bounded by its own copy of the
+budget, not pooled with the others: the worst case is (live tasks) x (per-task budget) + the charged bytes, where the
+charges bound the number of live tasks. Thread stack address space is not charged: when it runs out (for example
+under an address-space limit) the run stops with `parallel task resources exhausted` (a `malloc` failing first is
+an internal failure, as before). The number of tasks that can be unfinished at once is floor(budget / c), with c =
+64 KiB + the task's bootstrap bytes (about 73 KB for a small program: 14,651 tasks under the default budget; before
+C140 the admission capacity, 16,384, was the only bound). A budget or thread failure in a task nobody awaits still
+ends the run, after the rest of the program, with exit 1; an ordinary error of such a task is ignored, as before.
+Deep recursion through `async`/`thread()` is also slow beyond a few hundred
+levels (about 60 s at depth 1000; the scheduler wakes every blocked level on each completion). Details:
+[checkpoints/async-memory.md](checkpoints/async-memory.md).
+
 ## Release-audit items
 
 Findings that are not release blockers by themselves but must be decided in the release audit.

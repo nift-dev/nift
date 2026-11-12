@@ -1,0 +1,304 @@
+# Async recursion memory safety (C140; production checkpoint)
+
+Owner authority:
+- D-077 #2 (2026-11-12): "Insert a bounded async task-memory safety checkpoint immediately after the output-order
+  repair. The demonstrated 100 MB budget growing to 1.56 GB and terminating with exit 70 is unacceptable. [...] A depth
+  limit must not be presented as comprehensive memory accounting unless the evidence establishes that guarantee. Stop
+  if the repair requires broad scheduler or coroutine restructuring. No performance re-baselining."
+- D-077 #5: item 2 of the pre-certification production order.
+- The coordinator's approval of the design (DESIGN-ASYNC-RECURSION.md, scratch): (a), (b), and the nested-snapshot
+  fix (c) "include (c) in C140", with the tests and mutants listed in section 4.
+- D-079 #3 (2026-11-12): the seven questions answered in section 3. The coordinator's correction (Option C), confirmed
+  by D-080: the new limit errors are the same uncatchable form as every other `limit.exceeded` (the host table keeps
+  the code fatal; legacy's thread exhaustion is not catchable either); the existing admission and 1024 blocked-wait
+  contracts are unchanged; a budget or thread-creation failure in an un-awaited, detached or abandoned task still ends
+  the run (exit 1); an ordinary failure of an un-awaited task keeps the established semantics.
+
+## 1. The defect
+
+`fn[async](f(n)) { if (n == 0) { return 0 }; x := await f(n - 1); return x + n }` / `print(await f(D))`. Every
+level is a parallel task: a new isolate on its own worker thread, its parent blocked in `wait_parallel`.
+
+- **Per-level growth (fixed by (c)).** An isolate's program is a clone whose proto 0 is its `<isolate-task>` wrapper
+  (constants = globals + arguments + the function; registers = globals + arguments + 1) and whose proto operands
+  (`Call`, `Spawn`, `LoadFunction`, `Closure`) are shifted by one. A nested spawn snapshotted that clone, wrapper
+  included, and seeded its whole register window as shared variables, so every level added a wrapper, its constants
+  and two global slots: protos grew k + 2, constants k^2 + 2. Summed copied constants: 6.1 MB at depth 30, 45.7 MB at
+  depth 60. Peak RSS was quadratic (275 MB at depth 100 before (c)).
+- **No runtime-wide bound (fixed by (b)).** Heap accounting is per thread (heap_account.cpp), so each isolate had
+  its own budget and nothing bounded their sum.
+- **Exit 70 (fixed by (a)).** A worker thread that could not be created threw `std::system_error`, mapped to Internal
+  in `start_parallel_task` ("cannot enqueue parallel task: ...") and in `run_parallel_task` ("parallel task execution
+  failed: ..."): "NIFT_VM internal failure", exit 70.
+
+## 2. What is implemented
+
+- **(c) Nested snapshot** (isolate_snapshot.cpp, vm_coro_parallel.cpp, isolate_task.{h,cpp}). A spawn inside an
+  isolate detects its wrapper (proto 0 has no transfer wire) and snapshots the program from proto 1 on, undoing the
+  wrapper's operand shift (`proto_operand`, shared with `remap_code`); the entry index is shifted back the same way.
+  Only the original shared variables are seeded: the first `nregs` registers of the original main (proto 1), never
+  the wrapper's argument and function registers. The image a child receives is the original program at every depth.
+- **(b) Runtime-wide accounting** (parallel_task.{h,cpp}, parallel_task_start.cpp). At admission (the single
+  choke point, `start_parallel_task` -> `ParallelRuntime::submit`, under the runtime mutex) each task is charged its
+  bootstrap bytes (seed graph + constants graph storage + program image: protos, code and offsets) plus
+  `kIsolateOverhead` = 64 KiB. The sum of every unfinished task's charge, in the whole runtime (all nesting levels,
+  async and thread(), awaited or not), may not exceed the root heap budget (`NIFT_VM_HEAP_BUDGET`, default 1 GiB). A
+  refused task is never charged (the charge is added only after it is queued). The charge is released when the task
+  completes (`execute_record`, also for a timer helper's nested run) or when an un-awaited task is cancelled before it
+  runs (`cancel_queued`, the teardown of its parent).
+- **(a) Controlled failure** (parallel_task_start.{h,cpp}, parallel_task.{h,cpp}, vm_coro_parallel.cpp,
+  vm_builtin.cpp). `std::system_error` from creating a worker thread is `limit.exceeded` with the text `parallel task
+  resources exhausted`, never Internal: at the spawn (`submit`), at a blocking wait (`ParallelBlock`, refused like the
+  blocking capacity, at the waiting instruction), and at a timer or cleanup wait (`run_parallel_task`, the task fails).
+  A spawn refused by the budget or for want of a thread raises the fatal error **at the spawn**, awaited or not (so an
+  un-awaited refused spawn is never silently dropped). Any other exception keeps its Internal mapping. The existing
+  admission refusal (`parallel task admission limit exceeded`, a failed future) is unchanged.
+- **(d) Un-awaited limit failures end the run** (parallel_task.h, parallel_task_start.{h,cpp}, parallel_task.cpp,
+  vm_coro_run.cpp). When any task, at any depth, fails with the budget refusal or `parallel task resources exhausted`
+  (`note_parallel_limit`, at the task's completion), its runtime records the first such failure; the root, after its
+  teardown has waited for every task (`wait_idle`), ends the run with it if the run had otherwise succeeded: exit 1,
+  `limit.exceeded`, the failing task's message and position. An awaited failure already reaches the root through the
+  await; this covers a task nobody awaits (an abandoned `async` call, a detached `thread()`, a parent that returned
+  without awaiting). An ordinary error of an un-awaited task keeps the established semantics (ignored).
+
+## 3. The owner's questions (D-079 #3), with evidence
+
+1. **Why the old snapshot retained so much memory; why the corrected lifetime is sound.**
+   - Retention (section 1, measured with instrumentation in the design investigation): each nested spawn snapshotted
+     its own clone, wrapper included, and seeded the wrapper's registers, so the image and the seed grew every level
+     (protos k + 2, constants k^2 + 2, two global slots per level; 6.1 MB of copied constants at depth 30, 45.7 MB at
+     60). Every level's image stayed alive for as long as that level was pending, so the total was quadratic.
+   - Now: the per-isolate charge is exactly (D + 1) x c at depths 1, 2, 20 and 21 (`charge-constant-*`): the image and
+     the seed are the same at every depth; RSS is linear (9 MB at depth 10, 22 MB at 200, 80 MB at 1000).
+   - **Keepalive.** A child's image is a new `Program` built by `snapshot_isolate_program` on the spawning thread:
+     code, offsets, notes, struct descriptors and names copied by value, constants and seeds encoded as TransferGraph
+     wire data, atoms by text; `start_parallel_task` refuses a snapshot whose metadata holds any Value. The record
+     owns the image (`program`, `options.program_keepalive`); the child's own clone is owned by the child's Vm
+     (`execute_isolate_task`, `options.program_keepalive = clone`). Nothing in the image or the wire data points
+     into the parent's clone or heap.
+   - **Renumbering.** A clone shifts proto operands by +1 for its wrapper (`remap_code`); a nested snapshot shifts them
+     back by `first` (= 1) and the entry by the same amount, so a child's image is numbered exactly like the root
+     program. Function values cross as wire indices: every isolate's `CloneTransferMap` maps its clone's protos to the
+     root's wire indices (`proto_wires`, recorded at the snapshot), the wrapper having none, so a function passed at
+     any depth decodes to the same function. Pinned by exact values against legacy (`functions-*`, `exact-*`) and by
+     M4 (an off-by-one gives another value with exit 0).
+   - **No dangling references after the parent ends.** A parent isolate may finish (and free its clone and heap)
+     while its child runs (an un-awaited child; or the child is cancelled at the parent's teardown). The child holds
+     only its record's image, its decoded copies in its own heap and its own clone; the result travels back as wire
+     data in the record, decoded by whoever awaits it. `release-unawaited` ends parents with children queued; the
+     ASan/TSan gates of test-rt-vm-mutants and the cp23 ownership tests run over the same paths.
+2. **Real OS threads.** Yes: each pending await level blocks a worker thread (`wait_parallel` -> `ParallelBlock`),
+   and the pool starts a compensating worker for every blocked one (`ensure_worker_locked`; at most 8 CPU permits +
+   1024 blocked). gdb at depth 1100: 1027 threads (543 in `resume_worker`, 266 in `worker_loop`, 217 in
+   `wait_parallel`). Each thread reserves an 8 MiB stack (ulimit -s 8192): address space, little RSS.
+3. **What is exhausted at depth 1000.** Under the default settings, nothing: depth 1000 prints 500500 (about 60 s,
+   79 MB RSS; also under `NIFT_VM_HEAP_BUDGET=100000000`, 64 s, 79 MB), and depth 1024 prints 524800 (53 s, 80 MB).
+   Depth 1025 needs 1025 blocked waits and is refused by the existing pool cap, `parallel blocking wait limit
+   exceeded` (75 s, exit 1). Under an address-space limit the thread stacks run out first. Confirmed with gdb
+   `catch throw` in scratch under prlimit:
+   - depth 600 under 2 GB: `Vm::Coro::wait_parallel` -> `ParallelBlock::ParallelBlock` ->
+     `ParallelRuntime::block_worker` -> `ensure_worker_locked` -> `std::thread` -> `std::__throw_system_error`
+     (EAGAIN), on a worker in `execute_isolate_task` / `run_parallel_task`. Before C140 this reached the
+     `run_parallel_task` catch: `NIFT_VM internal failure: parallel task execution failed: Resource temporarily
+     unavailable`, exit 70. Now `ParallelBlock` refuses the wait: exit 1 (`threads-*`).
+   - a single `thread()` under 20 MB: `Vm::Coro::spawn_parallel` -> `start_parallel_task` -> `ParallelRuntime::submit`
+     -> `ensure_worker_locked` -> `std::thread`: before C140 `cannot enqueue parallel task: ...` (Internal); now exit
+     1 at the spawn (`enqueue-*`).
+4. **How the limit is enforced before that exhaustion.** No depth cap. Two bounds, both from existing mechanisms:
+   the heap budget, now charged runtime-wide by (b), and the pool's existing blocking capacity (1024 nested blocked
+   waits, `kBlockedCapacity`), which bounds the threads. The fixed charge, 64 KiB, is measured: after (c), RSS grows
+   about 65 KB per nested level (9 MB at depth 10, 22 MB at 200: (22 - 9) MB / 190 = 68 KB); the measured per-isolate
+   charge including the bootstrap bytes is c = 73,164 bytes (async) and 71,553 (thread()). **Thread stack address
+   space is not reserved or charged**: exhaustion under an address-space limit is not prevented; (a) turns it into a
+   controlled exit 1.
+5. **The error.** An ordinary `limit.exceeded` error, exit 1, an exact documented message, never exit 70, on every
+   path: the budget refusal and a failed thread at the spawn (enqueue), at a blocking wait (worker start), and at a
+   timer/cleanup wait (execution). Like every other `limit.exceeded` in this VM (the heap budget, the admission and
+   blocking capacities; host table `{"limit.exceeded", Limit, false}`) and like legacy's thread exhaustion, it is
+   **not catchable** (Option C). Exact forms (section 4, `pin-*`):
+   - awaited, async: `error: main.f:5:14: future: (x levels) parallel task memory budget exceeded` (the spawn site in
+     the deepest isolate; one `future: ` per awaiting level);
+   - awaited, thread(): `error: main.f:5:8: thread: (x levels) parallel task memory budget exceeded`;
+   - un-awaited, async or thread(): `error: main.f:8:3: parallel task memory budget exceeded` (at the spawn);
+   - thread exhaustion: `error: main.f:5:8: future: ... parallel task resources exhausted` (the await that could not
+     block) or `main.f:5:14: future: ...` (the spawn that could not start a worker; which comes first depends on
+     scheduling), and for an un-awaited spawn `error: main.f:5:1: parallel task resources exhausted`;
+   - `try`/`catch` around the await does not catch it (`pin-not-catchable`).
+   - un-awaited: a refused spawn is raised at the spawn (`pin-unawaited-*`); a task nobody awaits whose own spawn or
+     wait fails ends the run after the rest of the program: `main done` then `error: main.f:8:5: parallel task memory
+     budget exceeded`, exit 1 (`abandoned-async`, `abandoned-thread`), or `main done` then `error: main.f:5:8:
+     ... parallel task resources exhausted`, exit 1 (`abandoned-deep-*`). Never exit 0 with the failure dropped
+     (M8 drops it and is caught).
+   - An ordinary failure of an un-awaited task (`1 / 0`) is ignored, exit 0, by the established rule
+     (cp22-coroutines.md L7, "Unawaited failure | Ignored; exit status unaffected"), on both engines
+     (`ordinary-unawaited-async`, `ordinary-unawaited-thread`, compared with legacy).
+   - Not covered: under an address-space limit a `malloc` can fail before a thread start does (glibc reserves a 64
+     MiB arena of address space per thread); that is `std::bad_alloc`, an internal failure by the existing policy
+     (exit 70; observed 4 times in 6 runs of an abandoned thread() recursion of depth 400 under 1 GB, gdb:
+     `spawn_parallel` -> `parallel_live.push_back`). C140 does not change it; the thread-exhaustion tests run with
+     `MALLOC_ARENA_MAX=1` so that the thread start is what fails.
+6. **Release on failure and unwinding.** A refused spawn is never charged (the charge is added only after the record
+   is queued and its worker started), never queued (`submit` pops it and restores `active_` when the worker start
+   throws, so no partially published task remains: the record's weak entry in `records_` expires with it), and its
+   record and future are dropped with the raising frame; the error is fatal, so nothing continues with a leaked task. Charges are released at completion and at
+   cancellation before the run ends (`wait_idle` at the root's teardown); M2 and M6 show both releases are needed
+   (`release-completion`, `release-unawaited`). A failed thread start restores the pool counters (`block_worker`'s
+   catch) and creates no thread. Nothing hangs: every test runs under a timeout. A parent cannot continue after a
+   refused spawn (the refusal is fatal to that isolate, and its awaiting parent fails in turn), so the case "a
+   refused spawn inside a parent that keeps running" cannot occur.
+7. **The budget is enforced independently of the thread bound.** `derived-depth-*` (budget 50.5 c: depth 49 runs,
+   depth 50 is refused by the budget, 51 isolates, far below 1024 threads), `width-*`, `pin-*` and `abandoned-*`
+   (10.5 c: the 11th live task is refused, awaited or not), and `capacity` (sleeping tasks hold no thread: the budget
+   alone bounds them, section 6). Un-awaited tasks are charged exactly like awaited ones, so they cannot exceed the
+   budget either.
+
+## 4. Diagnostics (stable; known-limitations.md)
+
+| Situation | Message | Code | Exit |
+| --- | --- | --- | --- |
+| A spawn would exceed the root heap budget | `parallel task memory budget exceeded` | `limit.exceeded` | 1 |
+| A worker thread cannot be created | `parallel task resources exhausted` | `limit.exceeded` | 1 |
+| More than 1024 nested blocked waits (existing, unchanged) | `parallel blocking wait limit exceeded` | `limit.exceeded` | 1 |
+| More than 16,384 unfinished tasks (existing, unchanged; a failed future) | `parallel task admission limit exceeded` | | 1 |
+
+Not catchable. Raised at the refused spawn (or the wait that could not block), with one `future: ` or `thread: `
+prefix per awaiting level above it.
+
+**Not comprehensive.** Each isolate's own live heap is still bounded by its own copy of the budget (thread-local
+accounting), not pooled. The worst case is (live isolates) x (per-isolate budget) + the charged bytes, where (b)
+bounds the number of live isolates by budget / charge. Thread stack address space is not charged. Pooling per-isolate
+heaps would make heap accounting shared across threads, the restructuring D-077 #2 says to stop for.
+
+## 5. Tests (`make test-runtime2-async-memory`, in `test-rt-vm`; tests/runtime2/async_memory.py)
+
+Every run: scratch directory, `NIFT_VM=require`, a hard timeout and RLIMIT_AS (8 GiB; 1 GiB for the thread cases;
+12-40 MB for the enqueue sweep). Async results are compared with legacy running the same program made synchronous
+(legacy refuses an awaited async self-call: rescan-post-cp1.md section 13); thread() results with legacy directly.
+31 cases:
+
+- **Function values across nesting** (depth 4 and 5): `functions-async`, `functions-thread` (a top-level function, a
+  function defined after the recursive one, one passed as an argument and called in the deepest task, one held in a
+  shared variable, and an imported module function, at every level); `exact-async`, `exact-thread` (neighbouring
+  functions of equal arity, so an index off by one gives another value with exit 0).
+- **Shared variables**: `shared-async`, `shared-thread`: the deepest task sees exactly the original shared variables
+  (integer, string, array, float, and one assigned after the function), and its own arguments.
+- **Constant snapshot**: `charge-constant-async`, `charge-constant-thread`. B(D), the least `NIFT_VM_HEAP_BUDGET`
+  under which depth D (D + 1 live isolates) succeeds, is found by bisection (every failing probe must be the budget
+  refusal). It must equal (D + 1) x c exactly at D = 1, 2, 20 and 21, with c = B(2) - B(1): a snapshot that grows by
+  one byte per level (a wrapper image, a wrapper register) fails. This uses only the existing budget variable; no new
+  instrumentation. Measured on this host: c = 73,164 bytes (async), 71,553 (thread()).
+- **Derived depth**: `derived-depth-async`, `derived-depth-thread`: under the budget 50.5 c, the derived maximum
+  depth floor(budget / c) - 1 = 49 gives the exact sum and depth 50 is refused with the documented message.
+- **Default budget**: `default-depth`: depth 300 still gives 45150 (unchanged). Derived maximum under the default
+  budget: the accounting allows floor(2^30 / c) - 1 = 14,674; the existing blocking capacity (1024 nested blocked
+  waits; depth D blocks levels D..1) bounds it first, so the maximum depth is 1024 (verified once, outside the gate:
+  section 3 item 3).
+- **Release**: `release-completion` (200 sequential awaited tasks under a budget of 3 charges);
+  `release-unawaited` (one CPU permit; 5 parents each spawn 4 children without awaiting them and are cancelled while
+  the children are still queued, so the children are cancelled un-run; then 8 tasks must fit at once under 12
+  charges).
+- **Exact refusals** under 10.5 charges: `pin-awaited-async`, `pin-awaited-thread` (depth 40: exactly 10 prefixes,
+  the spawn site), `width-async`, `width-thread` (40 awaited sleeping tasks, at the 11th spawn),
+  `pin-unawaited-async`, `pin-unawaited-thread` (40 un-awaited sleeping tasks: at the 11th spawn, nothing printed
+  after it), `pin-not-catchable` (the same inside `try`/`catch`).
+- **Thread exhaustion** (a): `threads-async`, `threads-thread`: depth 400 under a 1 GiB address space: exit 1 at the
+  await that could not block or at the spawn that could not start a worker (either, by scheduling), only prefixes
+  before `parallel task resources exhausted`. `enqueue-async`,
+  `enqueue-thread` (with `MALLOC_ARENA_MAX=1`, see section 3 item 5): an un-awaited spawn under 12-40 MB of address space: each run either completes or is refused at
+  the spawn with the exact message (exit 1), and the refusal is reached at least once; no exit 70.
+  Not exercised by a test: a timer or cleanup wait without a thread (sleeping tasks did not start extra workers in
+  probes up to 60 tasks); the code maps it the same way and M3 covers its mapping together with the others.
+- **Un-awaited**: `abandoned-async`, `abandoned-thread` (budget), `abandoned-deep-async`, `abandoned-deep-thread`
+  (threads), `ordinary-unawaited-async`, `ordinary-unawaited-thread` (L7, against legacy).
+- **Capacity**: `capacity`: for the pinned sleeper program, B(200) = 200 x B(1) exactly; it prints c and
+  floor(2^30 / c).
+
+Mutants (`--mutants`, `NIFT_ASYNC_MEMORY_MUTANT`, built by sanctioned_mutant.py), each must fail the named cases:
+
+| Mutant | Change | Caught by |
+| --- | --- | --- |
+| M1 | no charge | derived-depth-async, width-async, width-thread, pin-unawaited-async, pin-unawaited-thread |
+| M2 | completion keeps the charge | release-completion |
+| M3 | thread-creation failure mapped to Internal again (all three sites) | threads-async, threads-thread, enqueue-async, enqueue-thread (exit 70) |
+| M4 | nested proto operand off by one | exact-async, exact-thread (by value: exit 0 with 703267, not 23577), functions-async, functions-thread |
+| M5 | the wrapped image snapshotted again | charge-constant-async, charge-constant-thread |
+| M6 | an un-awaited task cancelled before it runs keeps its charge | release-unawaited |
+| M7 | wrapper registers seeded as shared variables | charge-constant-async, charge-constant-thread |
+| M8 | an un-awaited task's budget or thread failure not recorded | abandoned-async, abandoned-thread, abandoned-deep-async, abandoned-deep-thread |
+
+## 6. Behaviour changes
+
+- Exit 70 (`NIFT_VM internal failure: parallel task execution failed: Resource temporarily unavailable`, or
+  `cannot enqueue parallel task: ...`) becomes exit 1, `limit.exceeded`, `parallel task resources exhausted`. Legacy
+  reports its thread exhaustion as an ordinary uncatchable error, exit 1 (depth 400 under 1 GB: `thread: ... Resource
+  temporarily unavailable`): towards legacy.
+- **Capacity.** A new refusal: the unfinished tasks of one run may hold at most the root heap budget in charges.
+  The number is exact and deterministic: floor(budget / c), where c = 65,536 + the task's bootstrap bytes (its seed
+  graph, and the whole program's constants graph and image), so it depends on the size of the program. The pinned
+  workload (`SLEEPERS` in async_memory.py): c = 73,287 bytes, B(k) = k x c exactly (k = 1, 200, 1000, 2000
+  measured), so floor(2^30 / 73,287) = **14,651** tasks under the default budget; verified once at the default
+  budget (9 s sleeps): 14,651 tasks run (exit 0, 72 s, 261 MB RSS), the 14,652nd spawn is refused at its spawn
+  (`capd.f:8:11: parallel task memory budget exceeded`, exit 1). A larger program charges more per task: the
+  17,000-sleeper probe adm.f (a try/catch loop after the spawns) charges about 83.8 KB, and 12,810 of its tasks were
+  admitted (counted with an intermediate build of the same accounting that counted the refusals); with this build
+  its 12,811th spawn is refused, `adm.f:8:11`, exit 1 (21 s, 377 MB RSS). Spawning is slow at that width (most of
+  the 72 s is the spawn loop); not changed here.
+  Before (C139c binary): the admission capacity, 16,384 unfinished tasks, then `error: adm.f:1:1: future: parallel
+  task admission limit exceeded` at the first await of a refused future, exit 1. The CP22 10,000-sleeper workload
+  still fits (tests/runtime2/cp23/admission.py). Under a small `NIFT_VM_HEAP_BUDGET` correspondingly fewer tasks run.
+  Legacy on the 17,000-task program grew to about 6 GB and was killed by signal 9 after 9.4 s (one observation, not
+  repeated: the shared container's OOM killer).
+- **Un-awaited tasks.** A budget or thread-creation failure in a task nobody awaits now ends the run with exit 1 after
+  the rest of the program (section 2 (d)); before C140 such a task could only fail by thread exhaustion, as an
+  internal failure (exit 70) or, for an un-awaited task, ignored under L7. An ordinary un-awaited failure stays
+  ignored (L7).
+- **Positions.** The new refusals are reported at the refused spawn (or at the wait), with one prefix per awaiting
+  level, instead of the `1:1` that a failed future without an offset gives (the admission refusal keeps `1:1`).
+- The earlier claim "depth 300 -> 45150" is unchanged under the default budget (and now costs 29 MB, not quadratic
+  memory). Under `NIFT_VM_HEAP_BUDGET=100000000` (the owner's demonstration) depth 1000 completes with 500500 at 79 MB
+  RSS in 64 s (before: growth past 1.5 GB, then exit 70 or SIGKILL); the accounting allows about 1,365 levels there,
+  so the blocking capacity (1024) is again the first bound.
+- No existing test expectation changes; the admission and blocking-capacity refusals are untouched (their messages,
+  codes, catchability and positions).
+
+## 7. Not changed (scheduler; reported, not repaired)
+
+Wall time is superlinear in depth: 1.7 s at depth 300, 7.9 s at 500, 20 s at 700, about 60 s at 1000 (1024: 53 s;
+1025 refused after 75 s; 1100 after 87 s). All isolates of a run share the root's `ParallelWait`
+(`run_parallel_task` gives a child the parent's wait state), so every completion wakes every blocked ancestor, each
+of which then competes in `resume_worker` for a CPU permit. Repairing that changes the scheduler's wait structure,
+outside this checkpoint (D-077 #2 stop condition). Memory is bounded meanwhile: RSS is linear, about 80 MB at depth
+1000.
+
+## 8. Size
+
+Production source (`git diff --numstat`, split by part):
+
+| Part | Files | Added | Removed | Of the added: test-only mutant switches |
+| --- | --- | --- | --- | --- |
+| (a) controlled failure | parallel_task_start.{h,cpp} (catch), parallel_task.{h,cpp} (ParallelBlock, run_parallel_task), vm_coro_parallel.cpp (raise at the spawn, the wait), vm_builtin.cpp | 34 | 4 | 5 (M3) |
+| (b) accounting | parallel_task.h, parallel_task.cpp (submit, execute_record, cancel_queued), parallel_task_start.cpp (charge) | 30 | 1 | 7 (M1, M2, M6) |
+| (c) nested snapshot | isolate_snapshot.cpp, isolate_task.h, isolate_task.cpp, vm_coro_parallel.cpp | 47 | 21 | 11 (M4, M5, M7) |
+| (d) un-awaited limit failures end the run (D-080) | parallel_task.h (note_limit, take_limit), parallel_task_start.{h,cpp} (note_parallel_limit), parallel_task.cpp, vm_coro_run.cpp | 38 | 1 | 2 (M8) |
+| Total | 11 files | 149 | 27 | 25 |
+
+149 added, net 122: an overrun against the 40-80 line plan (the design note's own estimate was 60-95, the
+coordinator's threshold about 120), reported to the owner; (d) is the D-080 requirement. The D-079 records are a
+separate commit (4bcb2ef6).
+
+## 9. Gates (run from scratch after the second container restart, in five groups; nift sha256
+`e642c5d24986aea8e395be29112a35f1aa801e07096663730b86d37d46c0267f`)
+
+- Group 1: test-rt-lint PASS; test-test-integrity PASS; test-runtime2-async-memory PASS (31/31, mutants 8 of 8
+  caught); test-runtime2-output-order PASS; test-runtime2-safety PASS; test-runtime2-safety-mutants PASS;
+  test-runtime2-host-deps **FAILED** (exit 2, the same 24 FAILs as the C129 baseline after normalizing scratch paths
+  and timings); test-rt-builtins-guards PASS (callgrind, 35 workloads, 0 guard failures, no re-baselining); CP25-R
+  inventory collect PASS, `--check` BLOCKED (exit 3: the 59 PENDING-OWNER reasons and the
+  `defect:print-cat-output-order` row awaiting review, both unchanged by C140).
+- Group 2: test-rt-host PASS; test-runtime2-cp16-n1 PASS.
+- Group 3: test-rt-vm-mutants PASS (`make -k`, no failing target).
+- Group 4: test-rt-vm PASS.
+- Group 5: test-rt-host-mutants PASS.
+
+Changed-test audit: one new harness (tests/runtime2/async_memory.py) and one new Makefile target
+(`test-runtime2-async-memory`, a prerequisite of `test-rt-vm`); no existing test or expectation is changed.

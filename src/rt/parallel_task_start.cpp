@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <exception>
 #include <new>
+#include <system_error>
 
 // Source-thread task snapshot and admission validation.
 namespace nift::rt {
@@ -28,6 +29,24 @@ bool finite_timer_body(const Proto& proto) {
     }
     return true;
 }
+std::size_t image_bytes(const Program& program) {
+    std::size_t bytes = 0;
+    for (const auto& p : program.protos)
+        bytes += sizeof(Proto) + p->code.size() * sizeof(Instr) + p->offsets.size() * sizeof(p->offsets[0]);
+    return bytes;
+}
+}
+
+void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result) {
+    const auto ends = [&](const std::string& tail) {
+        return result.message.size() >= tail.size() &&
+               result.message.compare(result.message.size() - tail.size(), tail.size(), tail) == 0;
+    };
+#if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 8)  // test-only: an un-awaited failure dropped
+    if (result.reason == StopReason::Error && result.code == "limit.exceeded" &&  // rt-lint: allow-string-compare
+        (ends("parallel task memory budget exceeded") || ends(kParallelResourcesExhausted)))
+        if (auto runtime = record.runtime.lock()) runtime->note_limit(result.message, result.offset);
+#endif
 }
 
 bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string& error) {
@@ -92,8 +111,15 @@ bool start_parallel_task(std::shared_ptr<ParallelTaskRecord> record, std::string
         for (const auto& atom : record->input.atom_names)
             if (!charge(atom.second.size()) || !charge(256)) record->timer_help_safe = false;
     }
+    record->reserved_bytes = ParallelRuntime::kIsolateOverhead + record->input.seed_graph.storage_bytes() +
+        record->input.constants_graph.storage_bytes() + image_bytes(*record->program);
     try { return runtime->submit(record, error); }
     catch (const std::bad_alloc&) { throw; }
+    catch (const std::system_error&) {  // C140 (a): no worker thread: a resource limit, not an internal failure
+        record->failure_code = "limit.exceeded";
+        if (kThreadFailureInternal) record->failure_reason = StopReason::Internal;
+        error = kParallelResourcesExhausted; return false;
+    }
     catch (const std::exception& failure) {
         record->failure_reason = StopReason::Internal;
         error = std::string("cannot enqueue parallel task: ") + failure.what(); return false;

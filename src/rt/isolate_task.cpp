@@ -82,19 +82,12 @@ IsolateTaskStatus transfer_status(TransferStatus status, bool constant) {
 
 bool remap_code(Proto& clone, const std::size_t proto_count, std::string& error) {
     for (Instr& in : clone.code) {
-        switch (in.op) {
-            case OpCode::Call:
-            case OpCode::Spawn:
-            case OpCode::LoadFunction:
-            case OpCode::Closure:
-                if (in.b >= proto_count) {
-                    error = "proto operand is out of range";
-                    return false;
-                }
-                in.b = static_cast<std::uint16_t>(in.b + 1u);
-                break;
-            default: break;
+        if (!proto_operand(in.op)) continue;
+        if (in.b >= proto_count) {
+            error = "proto operand is out of range";
+            return false;
         }
+        in.b = static_cast<std::uint16_t>(in.b + 1u);
     }
     return true;
 }

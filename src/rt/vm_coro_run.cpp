@@ -214,7 +214,15 @@ void Vm::coro_teardown(VmResult& result) {
     coro.last_result = Value();
     if (!coro.tasks.empty()) coro.tasks.front().future = Value();  // main's internal accounting future
     if (coro.trace) nift::trace::detail::context() = label;
-    if (coro.parallel && !options_.current_task) coro.parallel->wait_idle();
+    if (coro.parallel && !options_.current_task) {
+        coro.parallel->wait_idle();
+        std::string limit;
+        std::uint32_t offset = 0;  // C140: an un-awaited task's budget or thread failure still ends the run
+        if (result.reason == StopReason::None && coro.parallel->take_limit(limit, offset)) {
+            result.reason = StopReason::Error; result.message = limit; result.code = "limit.exceeded";
+            result.catchable = false; result.offset = result.main_offset = offset;
+        }
+    }
     result.coro = true;
     result.coro_spawned = coro.spawned;
     result.coro_switches = coro.switches;

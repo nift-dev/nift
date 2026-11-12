@@ -1567,6 +1567,13 @@ test-runtime2-output-order: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 
+# C140 (D-077 #5 item 2): async recursion memory safety, with its eight mutants (tests/runtime2/async_memory.py).
+.PHONY: test-runtime2-async-memory
+test-runtime2-async-memory: $(TARGET)
+	$(PYTHON) -B tests/runtime2/async_memory.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --mutants
+test-rt-vm: test-runtime2-async-memory
+
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.
 .PHONY: test-runtime2-named-deferrals

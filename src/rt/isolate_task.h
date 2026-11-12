@@ -65,9 +65,17 @@ struct IsolateTaskOutcome {
     bool has_error_value = false;
 };
 
+// The opcodes whose b operand is a proto index: an isolate clone shifts it by its wrapper slot (remap_code), and a
+// nested snapshot shifts it back (snapshot_isolate_program with `first`).
+inline bool proto_operand(OpCode op) {
+    return op == OpCode::Call || op == OpCode::Spawn || op == OpCode::LoadFunction || op == OpCode::Closure;
+}
+
+// `first`: the number of leading protos left out. A nested isolate leaves out its `<isolate-task>` wrapper (slot 0),
+// so the image it hands on is the original program, not a growing chain of wrappers (async-recursion fix (c)).
 bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map,
                               IsolateTaskInput& input, std::shared_ptr<const Program>& metadata,
-                              std::string& error);
+                              std::string& error, std::size_t first = 0);
 
 IsolateTaskOutcome execute_isolate_task(const Program& program, const IsolateTaskInput& input,
                                        VmOptions options = VmOptions());

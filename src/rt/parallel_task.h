@@ -9,6 +9,7 @@
 #include "rt/proto.h"
 #include "rt/shared_gc.h"
 
+#include <algorithm>
 #include <condition_variable>
 #include <chrono>
 #include <deque>
@@ -67,6 +68,7 @@ struct ParallelTaskRecord {
     // Completion claims the cancellation decision under mutex before encoding.
     bool completion_started = false;
     bool timer_help_safe = false; // immutable after admission; finite nonblocking bytecode only
+    std::size_t reserved_bytes = 0;  // C140 (b): bootstrap bytes + kIsolateOverhead, held from admission to completion
     // CP23 transfer identity: a process-unique id, never a heap/FutureObject
     // pointer. TransferGraph carries it so another isolate can reference the
     // same completion record.
@@ -125,6 +127,8 @@ public:
     static constexpr std::size_t kTaskCapacity = 16384;
     static constexpr std::size_t kBlockedCapacity = 1024;
     static constexpr std::size_t kTimerWorkerCapacity = 64;
+    // C140 (b): fixed per-isolate charge (VM state and worker stack touched; about 65 KB measured per nested level).
+    static constexpr std::size_t kIsolateOverhead = std::size_t(64) << 10;
     explicit ParallelRuntime(std::size_t limit, std::size_t task_capacity = kTaskCapacity,
                              std::size_t blocking_capacity = kBlockedCapacity);
     ~ParallelRuntime();
@@ -146,10 +150,20 @@ public:
     // Only used at a timer suspension: bounded nested dispatch retains every
     // isolate on its owning OS thread and never adds a CPU execution permit.
     static bool help_timer(std::chrono::steady_clock::time_point deadline);
+    // C140: the first budget or thread-creation failure of any task, awaited or not; the run ends with it (exit 1).
+    void note_limit(const std::string& message, std::uint32_t offset) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!limit_failed_) { limit_failed_ = true; limit_message_ = message; limit_offset_ = offset; }
+    }
+    bool take_limit(std::string& message, std::uint32_t& offset) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        message = limit_message_; offset = limit_offset_; return limit_failed_;
+    }
 private:
     void worker_loop();
     void execute_record(std::shared_ptr<ParallelTaskRecord> record, bool owns_cpu);
     void ensure_worker_locked();
+    void release_locked(std::size_t charge) noexcept { reserved_ -= std::min(reserved_, charge); }
     mutable std::mutex mutex_;
     std::condition_variable cv_;
     std::condition_variable resume_cv_;
@@ -158,6 +172,10 @@ private:
     std::vector<std::weak_ptr<ParallelTaskRecord>> records_;
     std::size_t active_ = 0, computing_ = 0, blocked_ = 0, resuming_ = 0;
     std::size_t native_blocked_ = 0, transient_blocked_ = 0;
+    std::size_t reserved_ = 0;  // C140 (b): runtime-wide sum of admitted records' reserved_bytes
+    bool limit_failed_ = false;
+    std::string limit_message_;
+    std::uint32_t limit_offset_ = 0;
     std::size_t blocking_capacity_ = kBlockedCapacity;
     std::size_t limit_ = 8, capacity_ = kTaskCapacity;
     bool stopping_ = false;
@@ -170,12 +188,16 @@ public:
     explicit ParallelBlock(ParallelWaitKind kind = ParallelWaitKind::Blocking);
     ~ParallelBlock();
     bool admitted() const noexcept { return admitted_; }
+    // The refusal when not admitted: the capacity, or (C140 (a)) no worker thread could be created.
+    const char* refusal() const noexcept {
+        return exhausted_ ? kParallelResourcesExhausted : "parallel blocking wait limit exceeded";
+    }
     ParallelBlock(const ParallelBlock&) = delete;
     ParallelBlock& operator=(const ParallelBlock&) = delete;
 private:
     ParallelRuntime* runtime_ = nullptr;
     ParallelWaitKind kind_;
-    bool admitted_ = true;
+    bool admitted_ = true, exhausted_ = false;
 };
 
 // Stable transfer identity of a record. Assigns one on first use under the

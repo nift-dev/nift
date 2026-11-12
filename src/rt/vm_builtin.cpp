@@ -176,7 +176,7 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
         ParallelBlock blocked;
         if (!blocked.admitted()) {
             fault.code = "limit.exceeded"; fault.catchable = false;
-            return raise(fault, StopReason::Error, "parallel blocking wait limit exceeded");
+            return raise(fault, StopReason::Error, blocked.refusal());
         }
         status = natives::call_builtin(spec, context, &R[in.a], argc, out, message);
     } else status = natives::call_builtin(spec, context, &R[in.a], argc, out, message);
