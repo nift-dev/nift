@@ -226,6 +226,16 @@ int Vm::Coro::next(Vm& vm, Value*& R, const Value*& K, const Proto*& proto, std:
                 coro.clear_parallel_await(coro.current);
                 if (!coro.tasks[coro.current].body_done)
                     load(vm, coro.current, R, K, proto, base, pc);
+#if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 9)  // test-only: no position
+                else if (!coro.parallel_live.empty()) {  // C140a: waiting only for un-awaited children: at a spawn
+                    const auto& child = *coro.parallel_live.front();
+                    if (child.spawn_proto < vm.program_.protos.size() &&
+                        child.spawn_instr < vm.program_.protos[child.spawn_proto]->code.size()) {
+                        proto = vm.program_.protos[child.spawn_proto].get();
+                        pc = proto->code.data() + child.spawn_instr;
+                    }
+                }
+#endif
                 return 0;
             }
             continue;

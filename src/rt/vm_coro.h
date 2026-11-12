@@ -144,6 +144,9 @@ struct Vm::Coro {
     static bool spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
                                const Value& function, Value* R, Fault& fault,
                                bool thread);
+    static bool create_parallel(Vm& vm, const Instr& in, const Proto* callee,
+                               const Value& function, Value* R, Fault& fault,
+                               bool thread);  // C140a: spawn_parallel's body
     // Settlement of completed records: structured child counts, waiters, stats.
     bool reap_parallel(Vm& vm, Fault& fault);
     void reap_foreign(Vm& vm);

@@ -18,10 +18,14 @@ is also the check that a nested snapshot does not grow (no wrapper image, no wra
   async_memory.py --mutants   NIFT_ASYNC_MEMORY_MUTANT=1 (no charge), 2 (completion keeps the charge), 3 (the
                               Internal mapping of a thread-creation failure), 4 (proto operand off by one), 5 (the
                               wrapped image snapshotted again), 6 (an un-awaited cancelled task keeps its charge) and
-                              7 (wrapper registers seeded as shared variables) and 8 (an un-awaited task's limit
-                              failure dropped), built by sanctioned_mutant.py, must
+                              7 (wrapper registers seeded as shared variables), 8 (an un-awaited task's limit
+                              failure dropped), 9 (no spawn position for a failed wait on un-awaited children) and
+                              10 (a completed task's charge released twice) and 11 (std::bad_alloc creating a
+                              task mapped to Internal again, with the fault-injection hook), built by sanctioned_mutant.py, must
                               each fail the cases named in MUTANTS; the mutant directories are deleted afterwards.
 """
+# The fault-injection build (NIFT_ASYNC_MEMORY_MUTANT=12, sanctioned_mutant.py) is made for the alloc-* and
+# timer-wait-thread cases and deleted afterwards; run through make (HARNESS_TOOLCHAIN_ENV).
 import argparse
 import os
 import resource
@@ -210,6 +214,29 @@ ORDINARY_THREAD = 'fn(bad()) {\n  x := 1 / 0\n  return x\n}\nt := thread(bad)\np
 # Pinned capacity workload: the least budget for k sleeping tasks is exactly k * c.
 SLEEPERS = ('fn[async](z(i)) {\n  sleep(500)\n  return i\n}\nhs := []\ni := 0\nwhile (i < %d) {\n  hs.push(z(i))\n'
             '  i += 1\n}\nprint("spawned")\n')
+# C140a F1: a detached recursion whose parents return without awaiting or joining: a parent then waits only for its
+# un-awaited child, and a failed wait there must still be reported at the child's spawn (it reported 1:1 before:
+# 4 of 8 frozen-binary runs of the thread() form). Nondeterministic which of the spawn and that wait fails first, so
+# the case repeats and every run must give the spawn's position.
+DETACHED = 'fn[async](w(n)) {\n  if (n == 0) { return 0 }\n  w(n - 1)\n  return 1\n}\nw(400)\nprint("main done")\n'
+DETACHED_THREAD = ('fn(w(n)) {\n  if (n == 0) { return 0 }\n  t := thread(w, n - 1)\n  return 1\n}\nt := thread(w, 400)\n'
+                   'print("main done")\n')
+# C140a F2: a released charge must be exactly the one charged. One live sleeper, one awaited 1 ms task, then three
+# more sleepers under 3.5 charges: the 4th live task (the third sleeper after the await) is refused.
+RELEASE = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nb := z(3000)\nx := await z(1)\nc1 := z(3000)\n'
+           'c2 := z(3000)\nc3 := z(3000)\nprint("all live")\n')
+# C140a F3 (D-081): std::bad_alloc while a task is created (the spawn/start path, the enqueue/submit path) is the
+# ordinary limit, at the spawn, with nothing published. Exercised deterministically by the test-only fault-injection
+# build (NIFT_ASYNC_MEMORY_MUTANT=12, never production: parallel_task_start.h), in the default environment.
+ALLOC = 'fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nprint("before")\nx := await z(1)\nprint("after")\n'
+# The 2nd creation (inside an abandoned task) fails; the root then needs 3 live sleepers under 3.5 charges: a charge
+# or a listed task left behind by the failed creation would refuse the third (or hang the end of the run).
+ALLOC_ROLLBACK = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nfn[async](d()) {\n  y := z(1)\n  return 0\n}\nd()\n'
+                  'sleep(300)\nc1 := z(600)\nc2 := z(600)\nc3 := z(600)\nprint("all live")\n')
+# C140a F8: a timer wait in a thread() task that cannot start a compensating worker (std::system_error).
+TIMER = ('fn(z(ms)) {\n  sleep(ms)\n  return ms\n}\nprint("before")\nt := thread(z, 50)\nx := t.join()\n'
+         'print("after")\n')
+HOOK = {}
 CAUGHT = ('fn[async](f(n)) {\n  if (n == 0) {\n    return 0\n  }\n  x := await f(n - 1)\n  return x + n\n}\n'
           'try {\n  x := await f(40)\n  print(x)\n} catch (e) {\n  print("caught")\n}\nprint("after")\n')
 
@@ -413,13 +440,94 @@ def case_capacity(nift):
     return problems
 
 
-def case_enqueue(nift, src, where):
+TERMINATE = (-6, "", "terminate called after throwing an instance of 'std::system_error'\n"
+                    "  what():  Resource temporarily unavailable\n")
+
+
+def case_detached(nift, src, where, runs=12):
+    """Every run must give the spawn's position. The one other outcome accepted is the known, pre-existing,
+    unrepaired std::terminate of a cleanup wait that cannot start a worker (async-memory.md section 10, F8): it is
+    counted and printed, never treated as a pass of the position check (at least 6 runs must report the position)."""
+    problems = []
+    positioned = terminated = 0
+    for _ in range(runs):
+        got = run(nift, src, env=ONE_ARENA, as_bytes=1 << 30)
+        if got == (1, "main done\n", "error: main.f:%s: %s\n" % (where, MESSAGE_THREADS)):
+            positioned += 1
+        elif got == TERMINATE:
+            terminated += 1
+        else:
+            problems.append("%r" % (got,))
+    if terminated:
+        print("    known residual: %d of %d runs ended in the cleanup-wait std::terminate (exit 134)" % (terminated, runs))
+    if positioned < runs // 2:
+        problems.append("only %d of %d runs reported the position" % (positioned, runs))
+    return problems
+
+
+def case_release(nift):
+    problems = []
+    one = least_budget(nift, RELEASE.split("x := await")[0] + 'print("all live")\n', problems)
+    if one is None:
+        return problems
+    got = run(nift, RELEASE, env={"NIFT_VM_HEAP_BUDGET": str(3 * one + one // 2)}, timeout=30)
+    want = (1, "", "error: main.f:9:7: " + MESSAGE_BUDGET + "\n")
+    return [] if got == want else ["want %r, got %r" % (want, got)]
+
+
+def case_alloc(nift, site, rollback=False):
+    hook = HOOK.get("binary")
+    if not hook:
+        return ["no fault-injection build"]
+    fault = {"NIFT_TEST_PARALLEL_BAD_ALLOC": "%s:%d" % (site, 2 if rollback else 1)}
+    if not rollback:
+        got = run(hook, ALLOC, env=fault)
+        want = (1, "before\n", "error: main.f:6:12: %s\n" % MESSAGE_THREADS)
+        return [] if got == want else ["want %r, got %r" % (want, got)]
+    problems = []
+    three = least_budget(hook, ALLOC_ROLLBACK, problems)  # no fault: the peak is the three sleepers, 3 c
+    if three is None:
+        return problems
+    fault["NIFT_VM_HEAP_BUDGET"] = str(three + three // 6)
+    got = run(hook, ALLOC_ROLLBACK, env=fault, timeout=30)
+    want = (1, "all live\n", "error: main.f:6:8: %s\n" % MESSAGE_THREADS)
+    return [] if got == want else ["budget 3.5 c: want %r, got %r" % (want, got)]
+
+
+def case_timer(nift):
+    hook = HOOK.get("binary")
+    if not hook:
+        return ["no fault-injection build"]
+    got = run(hook, TIMER, env={"NIFT_TEST_PARALLEL_BAD_ALLOC": "timer:1"})
+    want = (1, "before\n", "error: main.f:6:6: thread: %s\n" % MESSAGE_THREADS)
+    return [] if got == want else ["want %r, got %r" % (want, got)]
+
+
+def build_hook(n):
+    out = os.path.join(ROOT, ".build", "mutant-nift", "async-memory-%d" % n)
+    b = subprocess.run([sys.executable, "-B", os.path.join(HERE, "sanctioned_mutant.py"), "--out", out,
+                        "--define=-DNIFT_ASYNC_MEMORY_MUTANT=%d" % n], capture_output=True, text=True)
+    return out, (b.stderr[-400:] or b.stdout[-400:]) if b.returncode != 0 else ""
+
+
+def case_default_env(nift):
+    """F3: without MALLOC_ARENA_MAX, at the configurations shown deterministic here: the first worker thread of a run
+    (nothing else allocates per thread yet), and an awaited async recursion of depth 400 under 1 GiB."""
+    problems = case_enqueue(nift, ENQUEUE_THREAD, "5:6", env={})
+    for _ in range(3):
+        got = run(nift, REC % 400, as_bytes=1 << 30)
+        if got[0] != 1 or not got[2].rstrip("\n").endswith(MESSAGE_THREADS) or "internal" in got[2]:
+            problems.append("depth 400 under 1 GiB, default environment: %r" % (got,))
+    return problems
+
+
+def case_enqueue(nift, src, where, env=None):
     """The first worker thread cannot be created (address space just above the process's own): the spawn itself
     is refused, at the spawn, exit 1; never exit 70, never a silent loss. Swept: the window depends on the host."""
     seen = set()
     problems = []
     for mb in range(12, 41, 2):
-        got = run(nift, src, env=ONE_ARENA, as_bytes=mb * 1000 * 1000, timeout=30)
+        got = run(nift, src, env=ONE_ARENA if env is None else env, as_bytes=mb * 1000 * 1000, timeout=30)
         if got == (0, "before\nafter\n", ""):
             seen.add("ran")
         elif got == (1, "before\n", "error: main.f:%s: %s\n" % (where, MESSAGE_THREADS)):
@@ -466,6 +574,15 @@ CASES = {
     "ordinary-unawaited-async": lambda n: case_ordinary(n, ORDINARY),
     "ordinary-unawaited-thread": lambda n: case_ordinary(n, ORDINARY_THREAD),
     "capacity": case_capacity,
+    "detached-async": lambda n: case_detached(n, DETACHED, "3:3"),
+    "detached-thread": lambda n: case_detached(n, DETACHED_THREAD, "3:8"),
+    "release-exact": case_release,
+    "threads-default-environment": case_default_env,
+    "alloc-start": lambda n: case_alloc(n, "start"),
+    "alloc-submit": lambda n: case_alloc(n, "submit"),
+    "alloc-rollback-start": lambda n: case_alloc(n, "start", True),
+    "alloc-rollback-submit": lambda n: case_alloc(n, "submit", True),
+    "timer-wait-thread": case_timer,
     "enqueue-async": lambda n: case_enqueue(n, ENQUEUE, "5:1"),
     "enqueue-thread": lambda n: case_enqueue(n, ENQUEUE_THREAD, "5:6"),
 }
@@ -479,6 +596,9 @@ MUTANTS = {
     6: ["release-unawaited"],
     7: ["charge-constant-async", "charge-constant-thread"],
     8: ["abandoned-async", "abandoned-thread", "abandoned-deep-async", "abandoned-deep-thread"],
+    9: ["detached-async", "detached-thread"],
+    10: ["release-exact", "release-completion"],
+    11: ["alloc-start", "alloc-submit", "alloc-rollback-start", "alloc-rollback-submit"],
 }
 
 
@@ -511,6 +631,7 @@ def mutants():
                 print("FAIL async-memory mutant %d: harness: build failed: %s" % (n, b.stderr[-400:] or b.stdout[-400:]))
                 bad += 1
                 continue
+            HOOK["binary"] = os.path.join(out, "nift") if n == 11 else None  # 11 keeps the fault-injection hook
             failing = []
             for name in expected:
                 failing += check(os.path.join(out, "nift"), name)
@@ -536,7 +657,15 @@ def main():
     args = ap.parse_args()
     if args.mutants:
         return mutants()
-    return 1 if check(os.path.abspath(args.nift), args.only) else 0
+    out, error = build_hook(12)  # the fault-injection build of these sources (test-only; deleted afterwards)
+    try:
+        if error:
+            print("FAIL async-memory: harness: fault-injection build failed: %s" % error)
+            return 1
+        HOOK["binary"] = os.path.join(out, "nift")
+        return 1 if check(os.path.abspath(args.nift), args.only) else 0
+    finally:
+        shutil.rmtree(out, ignore_errors=True)
 
 
 if __name__ == "__main__":

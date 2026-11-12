@@ -114,6 +114,7 @@ bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::st
         records_.erase(std::remove_if(records_.begin(), records_.end(),
                        [](const auto& p) { return p.expired(); }), records_.end());
         records_.push_back(record); ++active_; admitted = true;
+        NIFT_INJECT_BAD_ALLOC("submit");
         ensure_worker_locked();
     } catch (...) {
         queue_.pop_back(); if (admitted) --active_; throw;
@@ -150,13 +151,11 @@ void ParallelRuntime::execute_record(std::shared_ptr<ParallelTaskRecord> record,
           record->failure_reason = StopReason::Internal; }
         notify_parallel_wait_states(record); record->cv.notify_all();
     }
-    std::size_t charge = record->reserved_bytes;
-#if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 2  // test-only: completion keeps the charge
-    charge = 0;
-#endif
+    const std::size_t charge = record->reserved_bytes;
     record.reset();
     shared_collect();
-    { std::lock_guard<std::mutex> lock(mutex_); --active_; if (owns_cpu) --computing_; release_locked(charge); }
+    { std::lock_guard<std::mutex> lock(mutex_); --active_; if (owns_cpu) --computing_;
+      for (int n = 0; n < kCompletionReleases; ++n) release_locked(charge); }
     if (owns_cpu) resume_cv_.notify_one();
     cv_.notify_all();
 }
@@ -190,7 +189,7 @@ bool ParallelRuntime::block_worker(ParallelWaitKind kind) {
     if (native && native_blocked_ == blocking_capacity_) return false;
     --computing_; ++blocked_;
     if (native) ++native_blocked_; else ++transient_blocked_;
-    try { ensure_worker_locked(); }
+    try { NIFT_INJECT_WAIT(kind); ensure_worker_locked(); }
     catch (...) {
         ++computing_; --blocked_;
         if (native) --native_blocked_; else --transient_blocked_;
@@ -313,7 +312,7 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
         catch (const std::system_error&) {  // C140 (a): no worker thread for a timer or cleanup wait
             outcome.status = IsolateTaskStatus::ExecutionError; outcome.result.code = "limit.exceeded";
             outcome.result.reason = kThreadFailureInternal ? StopReason::Internal : StopReason::Error;
-            outcome.result.message = kParallelResourcesExhausted;
+            outcome.result.message = kParallelResourcesExhausted; outcome.result.offset = record->spawn_offset;
         }
         catch (const std::exception& e) {
             outcome.status = IsolateTaskStatus::ExecutionError;

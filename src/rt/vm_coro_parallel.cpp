@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <new>
 #include <utility>
 
 // rt-lint: cold-file CP23 parallel task bridge, once per spawn/await/reap
@@ -24,7 +25,17 @@ void mark_failed(const std::shared_ptr<ParallelTaskRecord>& record, std::string 
 
 } // namespace
 
-bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
+bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee, const Value& function, Value* R,
+                              Fault& fault, bool thread) {
+    try { return create_parallel(vm, in, callee, function, R, fault, thread); }
+    catch (const std::bad_alloc&) {  // C140a F3 (D-081): creating the task ran out of memory; nothing was published
+        if (kAllocFailureInternal) throw;
+        fault.code = "limit.exceeded"; fault.catchable = false;
+        return raise(fault, StopReason::Error, kParallelResourcesExhausted);
+    }
+}
+
+bool Vm::Coro::create_parallel(Vm& vm, const Instr& in, const Proto* callee,
                                const Value& function, Value* R, Fault& fault,
                                bool thread) {
     Coro& coro = *vm.coro_;
@@ -63,6 +74,14 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->wait_states.push_back(coro.parallel_wait);
     parallel_task_identity(record);
     if (coro.trace) record->label = nift::trace::child_label(thread ? "thread" : "async");
+    for (std::size_t i = 0; i < vm.program_.protos.size(); ++i) {  // C140a: where it was spawned (cold, per spawn)
+        const auto& code = vm.program_.protos[i]->code;
+        if (&in >= code.data() && &in < code.data() + code.size()) {
+            record->spawn_proto = static_cast<std::uint32_t>(i);
+            record->spawn_instr = static_cast<std::uint32_t>(&in - code.data());
+            record->spawn_offset = vm.program_.protos[i]->offsets[record->spawn_instr];
+        }
+    }
     auto* future = new FutureObject();
     future->collect_parallel = shared_collect;
     future->thread = thread;
@@ -106,7 +125,19 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->options.cooperative_tasks = false;
     record->options.parallel = coro.parallel;
     record->options.program_keepalive = record->program;
-    const bool started = start_parallel_task(record, error);
+    bool started = false;
+    std::size_t listed = 0;  // C140a F3: listed before the start (nothing throws after it); unlisted unless started
+    const auto unlist = [&] {
+        if (listed > 1) coro.parallel_output.pop_back();
+        if (listed > 0) coro.parallel_live.pop_back();
+    };
+    try {
+        coro.parallel_live.push_back(record); ++listed;
+        coro.parallel_output.push_back(record); ++listed;
+        NIFT_INJECT_BAD_ALLOC("start");
+        started = start_parallel_task(record, error);
+    } catch (...) { unlist(); throw; }
+    if (!started) unlist();
     if (!started && record->failure_code == "limit.exceeded" && record->failure_reason == StopReason::Error) {
         fault.code = "limit.exceeded"; fault.catchable = false;  // C140: fatal at the spawn, awaited or not
         return raise(fault, StopReason::Error, error);
@@ -115,8 +146,6 @@ bool Vm::Coro::spawn_parallel(Vm& vm, const Instr& in, const Proto* callee,
         mark_failed(record, std::move(error));
     } else {
         ++coro.tasks[coro.current].children;
-        coro.parallel_live.push_back(record);
-        coro.parallel_output.push_back(record);
         ++coro.spawned;
         if (++coro.live > coro.live_peak) coro.live_peak = coro.live;
     }

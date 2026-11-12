@@ -174,11 +174,19 @@ prefix per awaiting level above it:
 | More than 1024 nested blocked waits (existing, unchanged) | `parallel blocking wait limit exceeded` |
 | More than 16,384 unfinished tasks (existing, unchanged) | `parallel task admission limit exceeded` |
 
+**A configured heap budget is not a process-wide RSS limit, and C140 is not comprehensive global memory
+enforcement.** Each task's heap has its own budget (pre-existing): six tasks that each build a 16 MiB string reached
+173 MB of RSS under `NIFT_VM_HEAP_BUDGET=50000000` (review of C140). The controlled failures below are those the VM
+can observe; a process killed by the operating system (the OOM killer, a signal) before an allocation returns is
+outside any user-space guarantee. A thread-creation failure during the cleanup of a task (its cancellation, or the
+end of a task whose wait for a child was refused) still ends the process abnormally (`std::terminate`, exit 134;
+checkpoints/async-memory.md section 10, F8; not repaired).
+
 **This is not comprehensive memory accounting.** Each task's own live heap is bounded by its own copy of the
 budget, not pooled with the others: the worst case is (live tasks) x (per-task budget) + the charged bytes, where the
 charges bound the number of live tasks. Thread stack address space is not charged: when it runs out (for example
-under an address-space limit) the run stops with `parallel task resources exhausted` (a `malloc` failing first is
-an internal failure, as before). The number of tasks that can be unfinished at once is floor(budget / c), with c =
+under an address-space limit) the run stops with `parallel task resources exhausted`, also when an allocation fails
+while a task is being created (C140a, D-081); an allocation failure anywhere else is still an internal failure. The number of tasks that can be unfinished at once is floor(budget / c), with c =
 64 KiB + the task's bootstrap bytes (about 73 KB for a small program: 14,651 tasks under the default budget; before
 C140 the admission capacity, 16,384, was the only bound). A budget or thread failure in a task nobody awaits still
 ends the run, after the rest of the program, with exit 1; an ordinary error of such a task is ignored, as before.

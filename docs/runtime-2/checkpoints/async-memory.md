@@ -24,7 +24,7 @@ level is a parallel task: a new isolate on its own worker thread, its parent blo
   (`Call`, `Spawn`, `LoadFunction`, `Closure`) are shifted by one. A nested spawn snapshotted that clone, wrapper
   included, and seeded its whole register window as shared variables, so every level added a wrapper, its constants
   and two global slots: protos grew k + 2, constants k^2 + 2. Summed copied constants: 6.1 MB at depth 30, 45.7 MB at
-  depth 60. Peak RSS was quadratic (275 MB at depth 100 before (c)).
+  depth 60. Peak RSS grew cubically (275 MB at depth 100 before (c); "quadratic" until C140a, F6, section 10).
 - **No runtime-wide bound (fixed by (b)).** Heap accounting is per thread (heap_account.cpp), so each isolate had
   its own budget and nothing bounded their sum.
 - **Exit 70 (fixed by (a)).** A worker thread that could not be created threw `std::system_error`, mapped to Internal
@@ -67,7 +67,8 @@ level is a parallel task: a new isolate on its own worker thread, its parent blo
    - Retention (section 1, measured with instrumentation in the design investigation): each nested spawn snapshotted
      its own clone, wrapper included, and seeded the wrapper's registers, so the image and the seed grew every level
      (protos k + 2, constants k^2 + 2, two global slots per level; 6.1 MB of copied constants at depth 30, 45.7 MB at
-     60). Every level's image stayed alive for as long as that level was pending, so the total was quadratic.
+     60). Every level's image stayed alive for as long as that level was pending, so the total was cubic, O(D^3)
+     (corrected in C140a, F6).
    - Now: the per-isolate charge is exactly (D + 1) x c at depths 1, 2, 20 and 21 (`charge-constant-*`): the image and
      the seed are the same at every depth; RSS is linear (9 MB at depth 10, 22 MB at 200, 80 MB at 1000).
    - **Keepalive.** A child's image is a new `Program` built by `snapshot_isolate_program` on the spawning thread:
@@ -254,7 +255,7 @@ Mutants (`--mutants`, `NIFT_ASYNC_MEMORY_MUTANT`, built by sanctioned_mutant.py)
   ignored (L7).
 - **Positions.** The new refusals are reported at the refused spawn (or at the wait), with one prefix per awaiting
   level, instead of the `1:1` that a failed future without an offset gives (the admission refusal keeps `1:1`).
-- The earlier claim "depth 300 -> 45150" is unchanged under the default budget (and now costs 29 MB, not quadratic
+- The earlier claim "depth 300 -> 45150" is unchanged under the default budget (and now costs 29 MB, not cubic
   memory). Under `NIFT_VM_HEAP_BUDGET=100000000` (the owner's demonstration) depth 1000 completes with 500500 at 79 MB
   RSS in 64 s (before: growth past 1.5 GB, then exit 70 or SIGKILL); the accounting allows about 1,365 levels there,
   so the blocking capacity (1024) is again the first bound.
@@ -302,3 +303,81 @@ separate commit (4bcb2ef6).
 
 Changed-test audit: one new harness (tests/runtime2/async_memory.py) and one new Makefile target
 (`test-runtime2-async-memory`, a prerequisite of `test-rt-vm`); no existing test or expectation is changed.
+
+## 10. C140a (review REVIEW-C140-ASYNC-MEMORY, D-081)
+
+Sections 1-9 are the C140 evidence as committed in 3759f481 (only the word "quadratic" is corrected to "cubic",
+F6). C140a changes:
+
+- **F1 (fabricated position).** A detached recursion whose parents return without awaiting or joining
+  (`fn(w(n)) { if (n == 0) { return 0 }; t := thread(w, n - 1); return 1 }` / `t := thread(w, 400)`, 1 GiB address
+  space) reported `ab.f:1:1` in 4 of 8 runs of the frozen binary (3:8 otherwise). Cause, found with per-site probe
+  messages: a parent whose body is done waits only for its un-awaited child (`Coro::next` -> `wait_parallel`); when
+  that wait cannot start a worker the refusal is raised with no current instruction (offset 0). Now the task records
+  its spawning instruction (`spawn_proto`, `spawn_instr`, `spawn_offset`), and such a refusal is reported at the
+  oldest live child's spawn. Tests `detached-async` (3:3) and `detached-thread` (3:8), 12 runs each, every run must
+  give the spawn's position; which of the spawn and that wait fails first is scheduling-dependent, so the frozen
+  binary fails the case with probability about 1 - 0.5^12 per run of it rather than always; mutant M9 (the position
+  fix removed) is caught. The same record field gives a timer/cleanup-wait failure the task's spawn position (F8).
+- **F2 (over-release).** `release_locked` no longer clamps: a release larger than the reserved total aborts (it would
+  be a defect of ours). Test `release-exact` (the reviewer's reproducer: one live 3 s sleeper, one awaited 1 ms task,
+  three more sleepers under 3.5 charges: the third, the 4th live task, is refused at 9:7). Mutant M10 releases a
+  completed task's charge twice and is caught (`release-exact`, `release-completion`: the abort); with the old clamp
+  the same double release would have admitted the 4th task, which `release-exact` detects too.
+- **F3 (D-081, Option B).** `std::bad_alloc` while a task is created is the ordinary limit `parallel task resources
+  exhausted` (`limit.exceeded`, exit 1, not catchable), raised at the spawn, at exactly the two creation boundaries:
+  the spawn/start path (`Coro::spawn_parallel` wraps the whole creation, `create_parallel`: record, future, seed and
+  snapshot, the `parallel_live`/`parallel_output` entries and `start_parallel_task`) and the enqueue/submit path
+  (`ParallelRuntime::submit`, which already rolls back its queue entry and `active_`; `start_parallel_task` rethrows
+  to the spawn). Rollback is the thread-failure rollback: the two lists get their entries **before** the start (so
+  nothing can throw after a task is published) and lose them again unless it started; a task is charged only after a
+  successful submit; the record and future die with the frame. Everywhere else `std::bad_alloc` stays Internal.
+  - Real address-space evidence: the abandoned thread() recursion of depth 400 under 1 GB (un4.f), which gave exit
+    70 (`parallel_live.push_back`, then `snapshot_isolate_program`, both on the spawn path, gdb) in 9 of 16 runs
+    before F3, gave exit 1 at the spawn in 16 of 16 after it. Not a gate case: not deterministic.
+  - Deterministic tests, default environment (no `MALLOC_ARENA_MAX`): a **test-only fault-injection build**
+    (`NIFT_ASYNC_MEMORY_MUTANT=12`, made by sanctioned_mutant.py for the run and deleted after it) throws
+    `std::bad_alloc` at the n-th pass through "start" or "submit" (`NIFT_TEST_PARALLEL_BAD_ALLOC`). It is compiled
+    only under a `*MUTANT*` define, which the production build guard refuses, so the production binary has no hook
+    (its strings contain no `NIFT_TEST_PARALLEL_BAD_ALLOC`; the macros expand to `static_cast<void>(0)`).
+    `alloc-start`, `alloc-submit`: `before`, then `error: main.f:6:12: parallel task resources exhausted`, exit 1.
+    `alloc-rollback-start`, `alloc-rollback-submit`: the failed creation is inside an abandoned task; the root then
+    needs three live sleepers under 3.5 charges (a leaked charge or a listed task would refuse the third or hang
+    the end): `all live`, then the noted failure at 6:8, exit 1. Mutant M11 (the conversion removed, hook kept, the
+    frozen behaviour) gives `NIFT_VM internal failure: out of memory (std::bad_alloc)`, exit 70, and is caught.
+  - `threads-default-environment`: thread exhaustion without `MALLOC_ARENA_MAX`, at configurations shown
+    deterministic here (15 of 15 runs each): the first worker of a run under 12-40 MB, and an awaited async
+    recursion of depth 400 under 1 GiB: exit 1, the exact message, never 70.
+- **F8 (timer/cleanup waits).** `timer-wait-thread`: with the fault-injection build, the timer wait of a sleeping
+  thread() task cannot start a worker (`timer:1`, `std::system_error`): `before`, then `error: main.f:6:6: thread:
+  parallel task resources exhausted` (the task's spawn), exit 1; this exercises the `run_parallel_task` catch end
+  to end (M3 maps it to Internal as well). **The cleanup wait is a new finding, not repaired:** it runs in
+  `Vm::coro_abort_parallel`, which is `noexcept`, so a thread-creation failure there ends the process with
+  `std::terminate` (exit 134), on the frozen binary as well (the same rethrow).
+  - Reached with injection (`cleanup:1`: a task cancelled while its child is busy; 5 of 5 runs exit 134), and
+    without injection by `detached-async` in the first C140a gate run (1 of 12 runs: after F1's position fix the
+    parent's refused wait raises, and its teardown then waits for the still-running child).
+  - Tried and withdrawn in C140a: letting the cleanup wait keep its block without a spare worker. It avoids the
+    terminate but can deadlock: `cancel_queued` removes only the task's own queued children, queued grandchildren
+    need a worker, and with every worker blocked and no thread to be had nothing runs them (`detached-thread` hung
+    once, 1 of 12 runs, in the gate run of that version). A safe repair needs the scheduler to fail queued work when
+    no worker can be started, outside this bounded checkpoint (D-077 #2 stop condition). Recorded for the owner.
+  - `detached-async` and `detached-thread` therefore accept that terminate as a counted, printed residual; at least
+    half of their runs must give the position, and every other outcome fails.
+
+**What stays outside any guarantee.** The controlled failures are the ones the VM can observe: a thread start that
+fails, an allocation that throws at a creation boundary. A process killed by the operating system (the OOM killer,
+a signal) before an allocation returns is outside any user-space guarantee. A configured heap budget is not a
+process-wide RSS limit (known-limitations.md).
+
+C140a production source (`git diff 3759f481 --numstat src`, split by finding; the test-only lines are the
+mutant and fault-injection switches):
+
+| Finding | Files | Added | Removed | Of the added: test-only |
+| --- | --- | --- | --- | --- |
+| F1 position | parallel_task.h (2), vm_coro_parallel.cpp (7), vm_coro.cpp (10) | 19 | 0 | 2 (M9) |
+| F2 over-release | parallel_task.h (5/2), parallel_task.cpp (3/5), parallel_task_start.h (8) | 16 | 7 | 7 (M2, M10) |
+| F3 bad_alloc | vm_coro_parallel.cpp (25/4), vm_coro.h (3), parallel_task.cpp (1), parallel_task_start.h (34) | 63 | 4 | 36 (fault hook, M11) |
+| F8 timer wait | parallel_task.cpp (hook call in block_worker 1/1, spawn position 1/1), vm_coro_parallel.cpp (1) | 3 | 2 | 1 (hook call) |
+| Total | 6 files | 101 | 13 | 46 |
+

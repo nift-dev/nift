@@ -9,7 +9,7 @@
 #include "rt/proto.h"
 #include "rt/shared_gc.h"
 
-#include <algorithm>
+#include <cstdlib>
 #include <condition_variable>
 #include <chrono>
 #include <deque>
@@ -62,6 +62,8 @@ struct ParallelTaskRecord {
     bool failure_catchable = false;
     StopReason failure_reason = StopReason::Error;
     std::uint32_t failure_offset = 0;
+    // C140a: the spawning instruction in the parent's program (proto index, instruction index), for a position
+    std::uint32_t spawn_proto = 0xffffffffu, spawn_instr = 0, spawn_offset = 0;
     bool failure_error_origin = false;
     bool failure_in_loop_path = false;
     bool cancelled = false;
@@ -163,7 +165,10 @@ private:
     void worker_loop();
     void execute_record(std::shared_ptr<ParallelTaskRecord> record, bool owns_cpu);
     void ensure_worker_locked();
-    void release_locked(std::size_t charge) noexcept { reserved_ -= std::min(reserved_, charge); }
+    void release_locked(std::size_t charge) noexcept {  // C140a: an over-release is our defect: fail loudly
+        if (charge > reserved_) std::abort();
+        reserved_ -= charge;
+    }
     mutable std::mutex mutex_;
     std::condition_variable cv_;
     std::condition_variable resume_cv_;
