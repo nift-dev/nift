@@ -315,10 +315,12 @@ F6). C140a changes:
   messages: a parent whose body is done waits only for its un-awaited child (`Coro::next` -> `wait_parallel`); when
   that wait cannot start a worker the refusal is raised with no current instruction (offset 0). Now the task records
   its spawning instruction (`spawn_proto`, `spawn_instr`, `spawn_offset`), and such a refusal is reported at the
-  oldest live child's spawn. Tests `detached-async` (3:3) and `detached-thread` (3:8), 12 runs each, every run must
-  give the spawn's position; which of the spawn and that wait fails first is scheduling-dependent, so the frozen
-  binary fails the case with probability about 1 - 0.5^12 per run of it rather than always; mutant M9 (the position
-  fix removed) is caught. The same record field gives a timer/cleanup-wait failure the task's spawn position (F8).
+  oldest live child's spawn. The same record field gives a timer/cleanup-wait failure the task's spawn position (F8).
+  *Tests (corrected in C140b, D1/T1; section 11):* `detached-async` and `detached-thread` are deterministic: the
+  fault-injection build refuses exactly that wait (`wait:1`), and every run must report the child's spawn (6:3,
+  6:8); M9 (the position fix removed) reports 1:1 in every run and is caught every time. The real-limit detached
+  recursion is no longer a gate case: its position failure was scheduling-dependent (the reviewer measured about
+  23% of runs on M9, not the 50% assumed here before).
 - **F2 (over-release).** `release_locked` no longer clamps: a release larger than the reserved total aborts (it would
   be a defect of ours). Test `release-exact` (the reviewer's reproducer: one live 3 s sleeper, one awaited 1 ms task,
   three more sleepers under 3.5 charges: the third, the 4th live task, is refused at 9:7). Mutant M10 releases a
@@ -328,7 +330,8 @@ F6). C140a changes:
   exhausted` (`limit.exceeded`, exit 1, not catchable), raised at the spawn, at exactly the two creation boundaries:
   the spawn/start path (`Coro::spawn_parallel` wraps the whole creation, `create_parallel`: record, future, seed and
   snapshot, the `parallel_live`/`parallel_output` entries and `start_parallel_task`) and the enqueue/submit path
-  (`ParallelRuntime::submit`, which already rolls back its queue entry and `active_`; `start_parallel_task` rethrows
+  (`ParallelRuntime::submit`, which already rolls back its queue entry and `active_`; the spawn/start path also
+  covers the transfer encoding of the task's arguments, confirmed under D-081 by D-082; `start_parallel_task` rethrows
   to the spawn). Rollback is the thread-failure rollback: the two lists get their entries **before** the start (so
   nothing can throw after a task is published) and lose them again unless it started; a task is charged only after a
   successful submit; the record and future die with the frame. Everywhere else `std::bad_alloc` stays Internal.
@@ -362,8 +365,8 @@ F6). C140a changes:
     need a worker, and with every worker blocked and no thread to be had nothing runs them (`detached-thread` hung
     once, 1 of 12 runs, in the gate run of that version). A safe repair needs the scheduler to fail queued work when
     no worker can be started, outside this bounded checkpoint (D-077 #2 stop condition). Recorded for the owner.
-  - `detached-async` and `detached-thread` therefore accept that terminate as a counted, printed residual; at least
-    half of their runs must give the position, and every other outcome fails.
+  - (C140b: the tolerance that `detached-async`/`detached-thread` had for this terminate is removed; R1 is now a
+    P1 safety defect with its own deterministic reproducer, section 11.)
 
 **What stays outside any guarantee.** The controlled failures are the ones the VM can observe: a thread start that
 fails, an allocation that throws at a creation boundary. A process killed by the operating system (the OOM killer,
@@ -380,4 +383,45 @@ mutant and fault-injection switches):
 | F3 bad_alloc | vm_coro_parallel.cpp (25/4), vm_coro.h (3), parallel_task.cpp (1), parallel_task_start.h (34) | 63 | 4 | 36 (fault hook, M11) |
 | F8 timer wait | parallel_task.cpp (hook call in block_worker 1/1, spawn position 1/1), vm_coro_parallel.cpp (1) | 3 | 2 | 1 (hook call) |
 | Total | 6 files | 101 | 13 | 46 |
+
+## 11. C140b (review REVIEW-C140A-ASYNC-MEMORY; owner D-082): tests and records only
+
+No production change: `nift` is byte-identical to C140a (sha256 `0895a234adc48478e82d5a1531b55a43540ea91961c50f86b849e9c4e52d9cd2`).
+The only source edits are inside the test-only fault-injection block of `parallel_task_start.h` (compiled only
+under `NIFT_ASYNC_MEMORY_MUTANT` 9, 11 or 12, which the production build guard refuses): a named `wait` site (a
+worker's Blocking wait; it was the unused "-"), several comma-separated sites per run (`wait:1,cleanup:1`), and the
+hook in mutant 9's build.
+
+- **T1/D1 (F1 tests).** `detached-async` / `detached-thread`: the parent `w(1)` spawns `w(0)` (which sleeps 300 ms),
+  returns and waits only for it; `wait:1` refuses that first worker Blocking wait. Expected in every run (3 each):
+  `main done`, then `error: main.f:6:3: parallel task resources exhausted` (`6:8` for thread()), exit 1. M9 gives
+  `1:1` in every run (5 of 5 for each form) and is caught deterministically. No probabilistic acceptance remains in
+  any gate case; the real-limit detached recursion is not run by the suite.
+- **R1: P1 safety defect (D-082), known and outstanding.** A thread-creation failure in the cleanup wait of a task's
+  teardown (`ParallelBlock(Cleanup)` in the `noexcept` `Vm::coro_abort_parallel`) ends the process with
+  `std::terminate`, exit 134, no Nift message.
+  - Evidence: reachable without injection under an address-space limit; the reviewer measured about 2 in roughly 300
+    real-limit detached-recursion runs (da.f 1 of 72 at 1 GiB with `MALLOC_ARENA_MAX=1`, ab.f 1 of 16 at 512 MB);
+    the first C140a gate run hit it once. Pre-existing: the same rethrow at 932ff5e2 (C139c) and 3759f481.
+  - Deterministic reproducer (`known-defect-r1`, fault-injection build, `NIFT_TEST_PARALLEL_BAD_ALLOC=cleanup:1`):
+    the program `R1` in tests/runtime2/async_memory.py: a parent awaits a child that signals `ready` and then runs 12
+    long string replacements (an 8 MiB string); the root cancels the parent after `ready`; the parent's teardown
+    reaches the cleanup wait while the child is still inside a native call. 50 of 50 runs exit 134 here, 25 + 25 run
+    concurrently. (The reviewer's own cleanup programs did not reach the wait because their child finished on
+    cancellation before the parent's teardown looked; this child cannot.)
+  - Reporting: the case runs on every suite run; when every run (3) ends in the terminate it prints
+    `FAILED (known, outstanding) known-defect-r1: KNOWN DEFECT R1 (P1, D-082): cleanup-wait thread failure ->
+    std::terminate`, the summary line names it, and the harness exits **3** ("every case passes except R1"); any
+    other outcome of the case (exit 0, exit 70, a mix) is a plain FAIL (exit 1). `make test-runtime2-async-memory`
+    passes that status through (make reports `Error 3`) after running the mutants; it is the last prerequisite of
+    `test-rt-vm`, so no other target is skipped. Once R1 is repaired the same case expects the controlled
+    `parallel task resources exhausted`, exit 1, in every run, and the suite exits 0.
+  - Out of C140 scope: a safe repair must fail or cancel queued work that no worker can run (a withdrawn variant that
+    waited without a worker could deadlock, section 10), a scheduler change under the D-077 #2 stop condition. A
+    narrower controlled-exit mitigation (catch in `coro_abort_parallel`, print, `_exit(1)`) was suggested by the
+    reviewer but is unbuilt, untested and unsuitable for embedding or persistent-session hosts as it stands.
+  - Unexplored triggers: thread limits other than address space (cgroup `pids.max`, `RLIMIT_NPROC`; root bypasses
+    NPROC here) were not tested; a pids limit is the likeliest real deployment trigger and could reach R1 more often.
+  - Consequence: the parallel-task resource-safety requirement stays FAILED while R1 is open. It blocks a clean
+    safety PASS and a public release. C140, C140a and C140b are not a full resource-safety certification.
 

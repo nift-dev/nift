@@ -178,9 +178,17 @@ prefix per awaiting level above it:
 enforcement.** Each task's heap has its own budget (pre-existing): six tasks that each build a 16 MiB string reached
 173 MB of RSS under `NIFT_VM_HEAP_BUDGET=50000000` (review of C140). The controlled failures below are those the VM
 can observe; a process killed by the operating system (the OOM killer, a signal) before an allocation returns is
-outside any user-space guarantee. A thread-creation failure during the cleanup of a task (its cancellation, or the
-end of a task whose wait for a child was refused) still ends the process abnormally (`std::terminate`, exit 134;
-checkpoints/async-memory.md section 10, F8; not repaired).
+outside any user-space guarantee.
+
+**P1 SAFETY DEFECT R1 (D-082), open; blocks a clean safety PASS and a public release.** A thread-creation failure
+during the cleanup wait of a task's teardown (its cancellation, or the end of a task whose wait for a child was
+refused) ends the process abnormally: `std::terminate`, exit 134, no Nift message. It predates C140 (932ff5e2). It is
+reachable without injection under an address-space limit (about 2 in roughly 300 detached-recursion runs measured by
+the reviewer); other thread limits (cgroup `pids.max`, `RLIMIT_NPROC`) were not tested and may reach it more often.
+It is reproduced deterministically by `known-defect-r1` (tests/runtime2/async_memory.py, fault injection), which
+reports it as FAILED (known, outstanding) with exit 3. A safe repair changes the scheduler (failing queued work no
+worker can run) and is outside C140 (D-077 #2 stop condition). Details: checkpoints/async-memory.md sections 10-11.
+C140 is not a full resource-safety certification.
 
 **This is not comprehensive memory accounting.** Each task's own live heap is bounded by its own copy of the
 budget, not pooled with the others: the worst case is (live tasks) x (per-task budget) + the charged bytes, where the

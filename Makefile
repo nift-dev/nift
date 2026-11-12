@@ -1567,12 +1567,17 @@ test-runtime2-output-order: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 
-# C140 (D-077 #5 item 2): async recursion memory safety, with its eleven mutants and the fault-injection build (tests/runtime2/async_memory.py).
+# C140 (D-077 #5 item 2): async recursion memory safety, with its eleven mutants and the fault-injection build
+# (tests/runtime2/async_memory.py). Exit status (C140b, D-082): 0 = every case passes; 3 = every case passes except
+# the known P1 safety defect R1 (reported "FAILED (known, outstanding)", never as a pass; make says "Error 3");
+# anything else (1, 2) = a failure. The mutants run either way. It is the last prerequisite of test-rt-vm (end of
+# this file), so no other test-rt-vm target is skipped while R1 is outstanding.
 .PHONY: test-runtime2-async-memory
 test-runtime2-async-memory: $(TARGET)
-	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --nift "$(CURDIR)/$(TARGET)"
-	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --mutants
-test-rt-vm: test-runtime2-async-memory
+	@rc=0; $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --nift "$(CURDIR)/$(TARGET)" || rc=$$?; \
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --mutants || exit 1; \
+	if [ $$rc -eq 3 ]; then echo "test-runtime2-async-memory: every case passes except KNOWN DEFECT R1 (P1, D-082): exit 3"; fi; \
+	exit $$rc
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.
@@ -5957,3 +5962,6 @@ $(TSAN_LIBFFI_SIGNATURE):
 %.o: %.cpp
 %.o: %.c
 %.o: %.cc
+
+# C140b (D-082): last, so that the known defect R1 (exit 3 above) does not stop the other test-rt-vm targets.
+test-rt-vm: test-runtime2-async-memory

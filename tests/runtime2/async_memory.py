@@ -23,9 +23,17 @@ is also the check that a nested snapshot does not grow (no wrapper image, no wra
                               10 (a completed task's charge released twice) and 11 (std::bad_alloc creating a
                               task mapped to Internal again, with the fault-injection hook), built by sanctioned_mutant.py, must
                               each fail the cases named in MUTANTS; the mutant directories are deleted afterwards.
+                              Mutants 9 and 11 keep the fault-injection hook (their cases are injected).
+
+Exit status of --nift (C140b, D-082): 0 = every case passes; 3 = every case passes except known-defect-r1, which
+reproduced the known P1 safety defect R1 (a cleanup wait that cannot start a worker ends the process in
+std::terminate, exit 134) in every run, reported "FAILED (known, outstanding)" and never counted as a pass; 1 = any
+other failure, including known-defect-r1 giving anything but exit 134 in every run or the controlled exit 1 in every
+run (the expectation once R1 is repaired: the case then passes and the exit status is 0).
 """
-# The fault-injection build (NIFT_ASYNC_MEMORY_MUTANT=12, sanctioned_mutant.py) is made for the alloc-* and
-# timer-wait-thread cases and deleted afterwards; run through make (HARNESS_TOOLCHAIN_ENV).
+# The fault-injection build (NIFT_ASYNC_MEMORY_MUTANT=12, sanctioned_mutant.py) is made for the alloc-*,
+# timer-wait-thread, detached-* and known-defect-r1 cases and deleted afterwards; run through make
+# (HARNESS_TOOLCHAIN_ENV).
 import argparse
 import os
 import resource
@@ -214,13 +222,50 @@ ORDINARY_THREAD = 'fn(bad()) {\n  x := 1 / 0\n  return x\n}\nt := thread(bad)\np
 # Pinned capacity workload: the least budget for k sleeping tasks is exactly k * c.
 SLEEPERS = ('fn[async](z(i)) {\n  sleep(500)\n  return i\n}\nhs := []\ni := 0\nwhile (i < %d) {\n  hs.push(z(i))\n'
             '  i += 1\n}\nprint("spawned")\n')
-# C140a F1: a detached recursion whose parents return without awaiting or joining: a parent then waits only for its
-# un-awaited child, and a failed wait there must still be reported at the child's spawn (it reported 1:1 before:
-# 4 of 8 frozen-binary runs of the thread() form). Nondeterministic which of the spawn and that wait fails first, so
-# the case repeats and every run must give the spawn's position.
-DETACHED = 'fn[async](w(n)) {\n  if (n == 0) { return 0 }\n  w(n - 1)\n  return 1\n}\nw(400)\nprint("main done")\n'
-DETACHED_THREAD = ('fn(w(n)) {\n  if (n == 0) { return 0 }\n  t := thread(w, n - 1)\n  return 1\n}\nt := thread(w, 400)\n'
-                   'print("main done")\n')
+# C140a F1, made deterministic in C140b (T1): a parent whose body is done waits only for its un-awaited child (which
+# sleeps, so it is still live); the fault-injection build refuses that wait ("wait:1", the first worker Blocking wait
+# of the run, as if no compensating worker could be started). It must be reported at the child's spawn, every run.
+DETACHED = ('fn[async](w(n)) {\n  if (n == 0) {\n    sleep(300)\n    return 0\n  }\n  w(n - 1)\n  return 1\n}\n'
+            'w(1)\nprint("main done")\n')
+DETACHED_THREAD = ('fn(w(n)) {\n  if (n == 0) {\n    sleep(300)\n    return 0\n  }\n  t := thread(w, n - 1)\n'
+                   '  return 1\n}\nt := thread(w, 1)\nprint("main done")\n')
+# R1 (P1 safety defect, D-082; known, outstanding): a cancelled parent's teardown waits for its still-busy child in
+# the noexcept Vm::coro_abort_parallel; when that cleanup wait cannot start a worker ("cleanup:1") the process ends in
+# std::terminate (exit 134). The child signals `ready` and then runs 12 long string replacements, so it is inside a
+# native call when the root cancels the parent; the parent's teardown reaches the cleanup wait while it still runs.
+R1 = """ready := channel(1)
+fn[async](leaf(n)) {
+  s := "ab"
+  i := 0
+  while (i < n) {
+    s = s + s
+    i += 1
+  }
+  send(ready, 1)
+  k := 0
+  while (k < 12) {
+    s = s.replace("a", "c").replace("c", "a")
+    k += 1
+  }
+  return s.length()
+}
+fn[async](parent()) {
+  t := leaf(22)
+  x := await t
+  return x
+}
+print("before")
+p := parent()
+recv(ready)
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+print("after")
+"""
+R1_LABEL = "KNOWN DEFECT R1 (P1, D-082): cleanup-wait thread failure -> std::terminate"
 # C140a F2: a released charge must be exactly the one charged. One live sleeper, one awaited 1 ms task, then three
 # more sleepers under 3.5 charges: the 4th live task (the third sleeper after the await) is refused.
 RELEASE = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nb := z(3000)\nx := await z(1)\nc1 := z(3000)\n'
@@ -440,29 +485,41 @@ def case_capacity(nift):
     return problems
 
 
-TERMINATE = (-6, "", "terminate called after throwing an instance of 'std::system_error'\n"
-                    "  what():  Resource temporarily unavailable\n")
-
-
-def case_detached(nift, src, where, runs=12):
-    """Every run must give the spawn's position. The one other outcome accepted is the known, pre-existing,
-    unrepaired std::terminate of a cleanup wait that cannot start a worker (async-memory.md section 10, F8): it is
-    counted and printed, never treated as a pass of the position check (at least 6 runs must report the position)."""
+def case_detached(nift, src, where, runs=3):
+    hook = HOOK.get("binary")
+    if not hook:
+        return ["no fault-injection build"]
+    want = (1, "main done\n", "error: main.f:%s: %s\n" % (where, MESSAGE_THREADS))
     problems = []
-    positioned = terminated = 0
     for _ in range(runs):
-        got = run(nift, src, env=ONE_ARENA, as_bytes=1 << 30)
-        if got == (1, "main done\n", "error: main.f:%s: %s\n" % (where, MESSAGE_THREADS)):
-            positioned += 1
-        elif got == TERMINATE:
-            terminated += 1
-        else:
-            problems.append("%r" % (got,))
-    if terminated:
-        print("    known residual: %d of %d runs ended in the cleanup-wait std::terminate (exit 134)" % (terminated, runs))
-    if positioned < runs // 2:
-        problems.append("only %d of %d runs reported the position" % (positioned, runs))
+        got = run(hook, src, env={"NIFT_TEST_PARALLEL_BAD_ALLOC": "wait:1"})
+        if got != want:
+            problems.append("want %r, got %r" % (want, got))
     return problems
+
+
+R1_STATE = {}
+
+
+def case_r1(nift, runs=3):
+    """R1 is reported on its own: 'known' (every run ends in the std::terminate: the defect, FAILED, outstanding),
+    'fixed' (every run is the controlled limit error, exit 1: the permanent regression expectation once R1 is
+    repaired), or a plain FAIL for anything else (exit 0, exit 70, a mix)."""
+    hook = HOOK.get("binary")
+    if not hook:
+        return ["no fault-injection build"]
+    outcomes = [run(hook, R1, env={"NIFT_TEST_PARALLEL_BAD_ALLOC": "cleanup:1"}, timeout=60) for _ in range(runs)]
+    terminated = [o for o in outcomes if o[0] == -6 and "terminate called after throwing an instance of " \
+                  "'std::system_error'" in o[2]]
+    controlled = [o for o in outcomes if o[0] == 1 and o[2].rstrip("\n").endswith(MESSAGE_THREADS)
+                  and "internal" not in o[2]]
+    if len(terminated) == runs:
+        R1_STATE["state"] = "known"
+        return []
+    if len(controlled) == runs:
+        R1_STATE["state"] = "fixed"
+        return []
+    return ["neither the known defect in every run nor the controlled exit 1 in every run: %r" % (outcomes,)]
 
 
 def case_release(nift):
@@ -574,8 +631,9 @@ CASES = {
     "ordinary-unawaited-async": lambda n: case_ordinary(n, ORDINARY),
     "ordinary-unawaited-thread": lambda n: case_ordinary(n, ORDINARY_THREAD),
     "capacity": case_capacity,
-    "detached-async": lambda n: case_detached(n, DETACHED, "3:3"),
-    "detached-thread": lambda n: case_detached(n, DETACHED_THREAD, "3:8"),
+    "detached-async": lambda n: case_detached(n, DETACHED, "6:3"),
+    "detached-thread": lambda n: case_detached(n, DETACHED_THREAD, "6:8"),
+    "known-defect-r1": case_r1,
     "release-exact": case_release,
     "threads-default-environment": case_default_env,
     "alloc-start": lambda n: case_alloc(n, "start"),
@@ -609,14 +667,22 @@ VALUE_ONLY = {4: ["exact-async", "exact-thread"]}  # caught by a wrong value wit
 def check(nift, only=""):
     failing = []
     names = [n for n in CASES if only in n]
+    R1_STATE.clear()
     for name in names:
         problems = PROBLEMS[name] = CASES[name](nift)
+        if name == "known-defect-r1" and not problems and R1_STATE.get("state") == "known":
+            print("FAILED (known, outstanding) %s: %s" % (name, R1_LABEL))
+            continue
         print(("PASS " if not problems else "FAIL ") + name)
         for p in problems:
             print("    " + p)
         if problems:
             failing.append(name)
-    print("async-memory: %d/%d pass" % (len(names) - len(failing), len(names)))
+    known = R1_STATE.get("state") == "known"
+    print("async-memory: %d/%d pass%s" % (len(names) - len(failing) - (1 if known else 0), len(names),
+                                         "; FAILED, known and outstanding: " + R1_LABEL if known else ""))
+    if R1_STATE.get("state") == "fixed":
+        print("NOTE known-defect-r1: the controlled exit 1 in every run: R1 appears repaired; update D-082 records")
     return failing
 
 
@@ -631,7 +697,7 @@ def mutants():
                 print("FAIL async-memory mutant %d: harness: build failed: %s" % (n, b.stderr[-400:] or b.stdout[-400:]))
                 bad += 1
                 continue
-            HOOK["binary"] = os.path.join(out, "nift") if n == 11 else None  # 11 keeps the fault-injection hook
+            HOOK["binary"] = os.path.join(out, "nift") if n in (9, 11) else None  # these keep the fault hook
             failing = []
             for name in expected:
                 failing += check(os.path.join(out, "nift"), name)
@@ -663,7 +729,9 @@ def main():
             print("FAIL async-memory: harness: fault-injection build failed: %s" % error)
             return 1
         HOOK["binary"] = os.path.join(out, "nift")
-        return 1 if check(os.path.abspath(args.nift), args.only) else 0
+        if check(os.path.abspath(args.nift), args.only):
+            return 1
+        return 3 if R1_STATE.get("state") == "known" else 0  # exit 3: every case passes except the known defect R1
     finally:
         shutil.rmtree(out, ignore_errors=True)
 
