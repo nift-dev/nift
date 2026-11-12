@@ -1209,43 +1209,59 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/vm_run.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 .PHONY: test-rt-vm test-rt-vm-sanitize bench-rt-vm
+# C140c (D-083 #2, #3): every test-rt-vm suite runs through tests/runtime2/suite_status.sh, which keeps its complete
+# log ($(RT_VM_SUITE_LOGS)/NAME.log) and records its status; a failing suite does not stop the others (the "-"), and
+# the last line prints one PASSED / FAILED / NOT-RUN line per expected suite and the counts, and sets the status:
+# 0 every suite passed; 3 every suite passed except async-memory's known defect R1 (D-082); 1 anything else.
+RT_VM_SUITE_STATUS = $(TEST_DIR)/test-rt-vm.suites
+RT_VM_SUITE_LOGS = $(TEST_DIR)/test-rt-vm-logs
+RT_VM_SUITE = bash tests/runtime2/suite_status.sh run "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
+RT_VM_SUITES = rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint legacy-names vm-parity \
+	vm-adversarial-timeout-selftest vm-adversarial vm-subset vm-subset-gen vm-builtins vm-host \
+	vm-records-coverage vm-path-wording vm-known-refused vm-engine-selection vm-former-replay vm-d018 \
+	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
+	vm-modules module-host-order vm-structs vm-globals semantics-modules semantics-modules-structs \
+	modules-d041 cp12b-inventory async-memory
 test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
-	"$(RT_VM_UNIT)"
-	"$(RT_VM_GLOBALS)"
-	"$(RT_VM_MODULES)"
-	"$(RT_VM_PREPARED)"
-	python3 tools/rt-lint.py src/rt
-	python3 tools/rt-vm/legacy_names.py --check
-	python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
-	python3 tests/runtime2/vm_adversarial_timeout_selftest.py
-	python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} --count $${RT_VM_ADV:-600}
-	python3 tests/runtime2/vm_subset.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
+	@bash tests/runtime2/suite_status.sh reset "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
+	-@$(RT_VM_SUITE) rt-vm-unit -- "$(RT_VM_UNIT)"
+	-@$(RT_VM_SUITE) rt-vm-globals -- "$(RT_VM_GLOBALS)"
+	-@$(RT_VM_SUITE) rt-vm-modules -- "$(RT_VM_MODULES)"
+	-@$(RT_VM_SUITE) rt-vm-prepared -- "$(RT_VM_PREPARED)"
+	-@$(RT_VM_SUITE) rt-lint -- python3 tools/rt-lint.py src/rt
+	-@$(RT_VM_SUITE) legacy-names -- python3 tools/rt-vm/legacy_names.py --check
+	-@$(RT_VM_SUITE) vm-parity -- python3 tests/runtime2/vm_parity.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GEN:-300} --seed $${RT_VM_SEED:-1} --rt-diff
+	-@$(RT_VM_SUITE) vm-adversarial-timeout-selftest -- python3 tests/runtime2/vm_adversarial_timeout_selftest.py
+	-@$(RT_VM_SUITE) vm-adversarial -- python3 tests/runtime2/vm_adversarial.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} --count $${RT_VM_ADV:-600}
+	-@$(RT_VM_SUITE) vm-subset -- python3 tests/runtime2/vm_subset.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-subset-gen -- python3 tests/runtime2/vm_subset_gen.py --nift "$(CURDIR)/$(TARGET)" --suite both --seed $${RT_VM_SEED:-1} \
 		--count $${RT_VM_SUBSET_GEN:-500}
-	python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_former_replay.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} \
+	-@$(RT_VM_SUITE) vm-builtins -- python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-host -- python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-records-coverage -- python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-path-wording -- python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-known-refused -- python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-engine-selection -- python3 tests/runtime2/vm_engine_selection.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-former-replay -- python3 tests/runtime2/vm_former_replay.py --nift "$(CURDIR)/$(TARGET)" --seed $${RT_VM_SEED:-1} \
 		--sample $${RT_VM_FORMER:-600}
-	python3 tests/runtime2/vm_d018.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_policy_negative.py
-	python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_golden.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_int_bounds.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_inventory.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_chain.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_modules.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_MODULES_GEN:-100} --seed $${RT_VM_SEED:-1}
-	python3 tests/runtime2/module_host_order.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/vm_structs.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_STRUCTS_GEN:-100} --seed $${RT_VM_SEED:-1}
-	python3 tests/runtime2/vm_globals.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GLOBALS_GEN:-200} --seed $${RT_VM_SEED:-1}
-	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)"
-	python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs
-	python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
-	python3 tools/rt-vm/cp12b_inventory.py selftest
+	-@$(RT_VM_SUITE) vm-d018 -- python3 tests/runtime2/vm_d018.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-context-consistency -- python3 tests/runtime2/vm_context_consistency.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-policy-negative -- python3 tests/runtime2/vm_policy_negative.py
+	-@$(RT_VM_SUITE) vm-review-cp12 -- python3 tests/runtime2/vm_review_cp12.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-golden -- python3 tests/runtime2/vm_golden.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-int-bounds -- python3 tests/runtime2/vm_int_bounds.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-inventory -- python3 tests/runtime2/vm_inventory.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-chain -- python3 tests/runtime2/vm_chain.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-modules -- python3 tests/runtime2/vm_modules.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_MODULES_GEN:-100} --seed $${RT_VM_SEED:-1}
+	-@$(RT_VM_SUITE) module-host-order -- python3 tests/runtime2/module_host_order.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-structs -- python3 tests/runtime2/vm_structs.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_STRUCTS_GEN:-100} --seed $${RT_VM_SEED:-1}
+	-@$(RT_VM_SUITE) vm-globals -- python3 tests/runtime2/vm_globals.py --nift "$(CURDIR)/$(TARGET)" --gen $${RT_VM_GLOBALS_GEN:-200} --seed $${RT_VM_SEED:-1}
+	-@$(RT_VM_SUITE) semantics-modules -- python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) semantics-modules-structs -- python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs
+	-@$(RT_VM_SUITE) modules-d041 -- python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
+	-@$(RT_VM_SUITE) cp12b-inventory -- python3 tools/rt-vm/cp12b_inventory.py selftest
+	-@$(RT_VM_SUITE) async-memory -- $(ASYNC_MEMORY_GATE)
+	@bash tests/runtime2/suite_status.sh summary "$(RT_VM_SUITE_STATUS)" $(RT_VM_SUITES)
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -1568,16 +1584,17 @@ test-runtime2-output-order: $(TARGET)
 test-rt-vm: test-runtime2-output-order
 
 # C140 (D-077 #5 item 2): async recursion memory safety, with its eleven mutants and the fault-injection build
-# (tests/runtime2/async_memory.py). Exit status (C140b, D-082): 0 = every case passes; 3 = every case passes except
-# the known P1 safety defect R1 (reported "FAILED (known, outstanding)", never as a pass; make says "Error 3");
-# anything else (1, 2) = a failure. The mutants run either way. It is the last prerequisite of test-rt-vm (end of
-# this file), so no other test-rt-vm target is skipped while R1 is outstanding.
+# (tests/runtime2/async_memory.py). Exit status (C140b/C140c, D-082): 0 = every case passes; 3 = every case passes
+# except the known P1 safety defect R1 (reported "FAIL known-defect-r1" and "FAILED (known, outstanding)", never as
+# a pass; make says "Error 3"); anything else (1, 2) = a failure. The mutants run either way.
+# C140c (REVIEW-C140B G1): it is NOT a prerequisite of test-rt-vm (a failing prerequisite stops make before
+# test-rt-vm's own recipe, so its suites would never run while R1 is open); it is the last suite of the test-rt-vm
+# recipe instead (ASYNC_MEMORY_GATE through suite_status.sh, after every other suite), and the suite summary that
+# follows reports it and sets test-rt-vm's status (3 while R1 is the only failure).
+ASYNC_MEMORY_GATE = env $(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/async_memory_gate.sh "$(CURDIR)/$(TARGET)" $(PYTHON)
 .PHONY: test-runtime2-async-memory
 test-runtime2-async-memory: $(TARGET)
-	@rc=0; $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --nift "$(CURDIR)/$(TARGET)" || rc=$$?; \
-	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/async_memory.py --mutants || exit 1; \
-	if [ $$rc -eq 3 ]; then echo "test-runtime2-async-memory: every case passes except KNOWN DEFECT R1 (P1, D-082): exit 3"; fi; \
-	exit $$rc
+	@$(ASYNC_MEMORY_GATE)
 
 # Owner 2026-11-10 13:26, item 7 (D-065, docs/runtime-2/known-limitations.md): each named deferral is
 # refused cleanly and deterministically under the VM default, and still runs on legacy.
@@ -5962,6 +5979,3 @@ $(TSAN_LIBFFI_SIGNATURE):
 %.o: %.cpp
 %.o: %.c
 %.o: %.cc
-
-# C140b (D-082): last, so that the known defect R1 (exit 3 above) does not stop the other test-rt-vm targets.
-test-rt-vm: test-runtime2-async-memory

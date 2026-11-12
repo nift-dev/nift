@@ -27,7 +27,8 @@ is also the check that a nested snapshot does not grow (no wrapper image, no wra
 
 Exit status of --nift (C140b, D-082): 0 = every case passes; 3 = every case passes except known-defect-r1, which
 reproduced the known P1 safety defect R1 (a cleanup wait that cannot start a worker ends the process in
-std::terminate, exit 134) in every run, reported "FAILED (known, outstanding)" and never counted as a pass; 1 = any
+std::terminate, exit 134) in every run, reported as "FAIL known-defect-r1: ..." and "FAILED (known, outstanding)"
+and never counted as a pass; 1 = any
 other failure, including known-defect-r1 giving anything but exit 134 in every run or the controlled exit 1 in every
 run (the expectation once R1 is repaired: the case then passes and the exit status is 0).
 """
@@ -671,6 +672,7 @@ def check(nift, only=""):
     for name in names:
         problems = PROBLEMS[name] = CASES[name](nift)
         if name == "known-defect-r1" and not problems and R1_STATE.get("state") == "known":
+            print("FAIL %s: %s (exit 134 in every run)" % (name, R1_LABEL))  # a FAIL line: certify fingerprints it
             print("FAILED (known, outstanding) %s: %s" % (name, R1_LABEL))
             continue
         print(("PASS " if not problems else "FAIL ") + name)

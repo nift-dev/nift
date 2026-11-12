@@ -410,16 +410,33 @@ hook in mutant 9's build.
     concurrently. (The reviewer's own cleanup programs did not reach the wait because their child finished on
     cancellation before the parent's teardown looked; this child cannot.)
   - Reporting: the case runs on every suite run; when every run (3) ends in the terminate it prints
-    `FAILED (known, outstanding) known-defect-r1: KNOWN DEFECT R1 (P1, D-082): cleanup-wait thread failure ->
-    std::terminate`, the summary line names it, and the harness exits **3** ("every case passes except R1"); any
-    other outcome of the case (exit 0, exit 70, a mix) is a plain FAIL (exit 1). `make test-runtime2-async-memory`
-    passes that status through (make reports `Error 3`) after running the mutants; it is the last prerequisite of
-    `test-rt-vm`, so no other target is skipped. Once R1 is repaired the same case expects the controlled
-    `parallel task resources exhausted`, exit 1, in every run, and the suite exits 0.
-  - Out of C140 scope: a safe repair must fail or cancel queued work that no worker can run (a withdrawn variant that
-    waited without a worker could deadlock, section 10), a scheduler change under the D-077 #2 stop condition. A
-    narrower controlled-exit mitigation (catch in `coro_abort_parallel`, print, `_exit(1)`) was suggested by the
-    reviewer but is unbuilt, untested and unsuitable for embedding or persistent-session hosts as it stands.
+    `FAIL known-defect-r1: KNOWN DEFECT R1 (P1, D-082): cleanup-wait thread failure -> std::terminate (exit 134 in
+    every run)` and `FAILED (known, outstanding) known-defect-r1: ...`, the summary line names it, and the harness
+    exits **3** ("every case passes except R1"); any other outcome of the case (exit 0, exit 70, a mix) is a plain
+    FAIL (exit 1). `make test-runtime2-async-memory` passes that status through (make reports `Error 3`) after
+    running the mutants. Once R1 is repaired the same case expects the controlled `parallel task resources
+    exhausted`, exit 1, in every run, and the suite exits 0.
+  - Wiring (corrected in C140c, REVIEW-C140B G1; D-083): C140b made the target the last *prerequisite* of
+    `test-rt-vm`, and claimed that no other target was skipped. That was wrong: make runs a target's recipe only
+    after all its prerequisites succeed, so with R1 exiting 3 the suites of `test-rt-vm`'s own recipe (rt unit tests,
+    vm_parity `--rt-diff`, vm_adversarial, vm_golden, vm_modules, ...) never ran, with or without `-k`; the C140b
+    `test-rt-vm` gate result is not evidence for them. Since C140c:
+    - async-memory is no prerequisite; it is the last of the 35 suites of the `test-rt-vm` recipe.
+    - Every suite runs through `tests/runtime2/suite_status.sh run`, which keeps its complete log
+      (`.build/test-rt-vm-logs/NAME.log`), records its status, and lets the next suite run even if it failed.
+    - The last recipe line, `suite_status.sh summary`, prints one line per expected suite (`PASSED`, `FAILED rc=N`
+      with a `FAIL test-rt-vm suite NAME` line, `NOT-RUN`, or `FAILED (known, outstanding)` for async-memory's exit
+      3), and `test-rt-vm suites: 35 expected, R ran, P passed, F failed, N not run`; a suite that did not run is a
+      failure, never a pass. Exit status: 0 every suite passed; **3** every suite passed except R1; 1 anything else
+      (so a real failure is never hidden behind R1, and R1 never behind it: both are listed).
+    - certify.py, which also runs a failing gate's recipe lines one by one, sees R1 as one failing line of
+      `test-rt-vm` with its `FAIL known-defect-r1` fingerprint; no named baseline (v4.12.0, B4b, weekend/r2) has that
+      line, so it classifies FAILED-NEW, never PASSED or FAILED-BASELINE (that needs an identical failure on every
+      applicable named baseline).
+  - Scope: a bounded repair has been investigated (INVESTIGATION-R1-CLEANUP-ABORT.md) and is pending an owner scope
+    decision. (A withdrawn variant that waited without a worker could deadlock, section 10. A narrower
+    controlled-exit mitigation, catch in `coro_abort_parallel`, print, `_exit(1)`, was suggested by the reviewer but
+    is unbuilt, untested and unsuitable for embedding or persistent-session hosts as it stands.)
   - Unexplored triggers: thread limits other than address space (cgroup `pids.max`, `RLIMIT_NPROC`; root bypasses
     NPROC here) were not tested; a pids limit is the likeliest real deployment trigger and could reach R1 more often.
   - Consequence: the parallel-task resource-safety requirement stays FAILED while R1 is open. It blocks a clean

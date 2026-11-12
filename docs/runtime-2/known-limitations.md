@@ -186,8 +186,9 @@ refused) ends the process abnormally: `std::terminate`, exit 134, no Nift messag
 reachable without injection under an address-space limit (about 2 in roughly 300 detached-recursion runs measured by
 the reviewer); other thread limits (cgroup `pids.max`, `RLIMIT_NPROC`) were not tested and may reach it more often.
 It is reproduced deterministically by `known-defect-r1` (tests/runtime2/async_memory.py, fault injection), which
-reports it as FAILED (known, outstanding) with exit 3. A safe repair changes the scheduler (failing queued work no
-worker can run) and is outside C140 (D-077 #2 stop condition). Details: checkpoints/async-memory.md sections 10-11.
+reports it as FAILED (known, outstanding) with exit 3 (the last suite of `test-rt-vm`, whose per-suite summary lists it). A bounded repair has been
+investigated (INVESTIGATION-R1-CLEANUP-ABORT.md) and is pending an owner scope decision. Details:
+checkpoints/async-memory.md sections 10-11.
 C140 is not a full resource-safety certification.
 
 **This is not comprehensive memory accounting.** Each task's own live heap is bounded by its own copy of the
