@@ -2498,3 +2498,27 @@ certification-priority reset remains in force."
    where the budget, not the thread bound, trips first. Awaited and un-awaited paths, for async() and thread(); the
    mutant plan M1-M5 plus the un-awaited-release mutant; callgrind 35/35 with no re-baselining; the full gates. The
    result is not to be described as comprehensive memory enforcement.
+
+## D-083 — C140c requirements; the bounded R1 repair authorised as a separate checkpoint (owner, 2026-11-13)
+
+1. **C140c (tests, Makefile and docs only).** A negative control in a scratch copy (an ordinary test-rt-vm suite
+   failing while R1 also fails: both failures must appear in the result); a suite that ran and failed must be
+   distinguishable from one that never ran (no skipped suite may look like a success or an expected failure);
+   complete per-suite logs and exact candidate identities (tip, tree, nift sha256) for the test-rt-vm run.
+2. **R1 repair approved.** The bounded R1 repair (REVIEW-C140A section 4, INVESTIGATION-R1-CLEANUP-ABORT.md) is
+   approved as a separate production checkpoint after C140 is accepted, not before.
+
+## D-084 — C140 accepted; R1 repair authorised as C141 (owner, 2026-11-13)
+
+1. **C140 accepted** as the async recursion memory-safety checkpoint (D-077 #5 item 2): commits 3759f481 (C140),
+   8792a3b0 (C140a), b52b0ff8 (C140b) and 0d97461e (C140c); final tree c0dbdd77e2f9e7ad82dd42bacb07982aef2e364d;
+   nift sha256 0895a234adc48478e82d5a1531b55a43540ea91961c50f86b849e9c4e52d9cd2.
+2. **Recorded result.** test-rt-vm at 0d97461e: 35 VM suites executed, 34 passed, async-memory failed with the known
+   defect R1 only (exit 3), none skipped (`35 expected, 35 ran, 34 passed, 0 failed, 0 not run, known defect R1
+   outstanding (FAILED)`).
+3. **Not a clean resource-safety PASS.** C140 is not a full resource-safety certification; per-task heap budgets
+   remain separate (not a process-wide RSS limit).
+4. **R1 stays an open P1 safety defect** (D-082) until C141 is accepted. C141 implements the bounded R1 repair
+   (D-083 #2) under the coordinator's brief: no std::terminate, controlled `limit.exceeded` exit 1, no new
+   deadlock, no user code starting after the failure, atomic and idempotent failure state, charges released once,
+   D-079 output order preserved, healthy scheduling unchanged, no allocation or throw on the noexcept cleanup path.
