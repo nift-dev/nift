@@ -1225,7 +1225,7 @@ RT_VM_SUITES = rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint leg
 	vm-records-coverage vm-path-wording vm-known-refused vm-engine-selection vm-former-replay vm-d018 \
 	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
 	vm-modules module-host-order vm-structs vm-globals semantics-modules semantics-modules-structs \
-	modules-d041 cp12b-inventory async-memory
+	modules-d041 cp12b-inventory save-safety async-memory
 .PHONY: test-rt-vm-invalidate test-rt-vm-verify
 test-rt-vm-invalidate:
 	@bash tests/runtime2/suite_status.sh invalidate "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
@@ -1269,6 +1269,7 @@ test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT)
 	-@$(RT_VM_SUITE) semantics-modules-structs -- python3 tests/runtime2/semantics_modules.py --nift "$(CURDIR)/$(TARGET)" --dir semantics-structs
 	-@$(RT_VM_SUITE) modules-d041 -- python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
 	-@$(RT_VM_SUITE) cp12b-inventory -- python3 tools/rt-vm/cp12b_inventory.py selftest
+	-@$(RT_VM_SUITE) save-safety -- $(SAVE_SAFETY_GATE)
 	-@$(RT_VM_SUITE) async-memory -- $(ASYNC_MEMORY_GATE)
 	@bash tests/runtime2/suite_status.sh summary "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" $(RT_VM_SUITES)
 
@@ -1592,12 +1593,12 @@ test-runtime2-output-order: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 # save() filesystem safety (D-074, D-091 #5; checkpoints/save-safety.md): the target classification in both engines,
-# scratch fixtures only, and one negative control (NIFT_SAVE_MUTANT=1..7) per contract.
+# scratch fixtures only, and one negative control (NIFT_SAVE_MUTANT=1..8) per contract. REVIEW-C142 M1: a suite of
+# the test-rt-vm recipe (save-safety), not a prerequisite, so its failure cannot stop the other suites (C140b G1).
+SAVE_SAFETY_GATE = env $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/save_safety.py --nift "$(CURDIR)/$(TARGET)" --mutants
 .PHONY: test-runtime2-save-safety
 test-runtime2-save-safety: $(TARGET)
-	$(PYTHON) -B tests/runtime2/save_safety.py --nift "$(CURDIR)/$(TARGET)"
-	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/save_safety.py --mutants
-test-rt-vm: test-runtime2-save-safety
+	$(SAVE_SAFETY_GATE)
 
 # C140 (D-077 #5 item 2): async recursion memory safety, with its mutants and the fault-injection build
 # (tests/runtime2/async_memory.py). Exit status: 0 = every case passes and every mutant is caught; 1 = a failure.

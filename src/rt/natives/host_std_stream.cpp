@@ -3,8 +3,10 @@
 
 #include "rt/natives/builtin.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <mutex>
+#include <system_error>
 #include <vector>
 #if defined(_WIN32)
 #include <windows.h>
@@ -54,8 +56,22 @@ bool save_target(const std::filesystem::path& path, std::filesystem::path& resol
     namespace fs = std::filesystem;
     resolved = path;
     std::error_code ec;
+#if !defined(_WIN32) && !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 8)  // test-only: any lstat error a new file
+    struct stat raw {};
+    if (::lstat(path.c_str(), &raw) != 0 && errno != ENOENT) {  // REVIEW-C142 L1: only ENOENT means a new file
+        const int failure = errno;
+        error = "save: cannot check the target: " + std::generic_category().message(failure);
+        return false;
+    }
+#endif
     fs::file_status st = fs::symlink_status(path, ec);
-    if (ec || st.type() == fs::file_type::not_found) return true;  // a new file: save()'s parent check applies
+    if (st.type() == fs::file_type::not_found) return true;  // a new file: save()'s parent check applies
+    if (ec) { error = "save: cannot check the target: " + ec.message(); return false; }
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 2)  // test-only: no std-stream refusal
+    // REVIEW-C142 L4: before resolving, as stat() follows every link: /dev/stdout on a pipe (pipe:[...]) has no
+    // canonical path, so it would otherwise read as dangling.
+    if (std_stream_target(path)) { error = "save: target is the process's standard output or error"; return false; }
+#endif
     if (fs::is_symlink(st)) {
         const fs::path target = fs::canonical(path, ec);  // follows the whole chain; fails if it dangles or loops
 #if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 1  // test-only: a dangling link is saved as a new file
@@ -67,9 +83,6 @@ bool save_target(const std::filesystem::path& path, std::filesystem::path& resol
         resolved = target;
 #endif
     }
-#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 2)  // test-only: no std-stream refusal
-    if (std_stream_target(resolved)) { error = "save: target is the process's standard output or error"; return false; }
-#endif
 #if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 3)  // test-only: no special-file refusal
     if (ec || !fs::is_regular_file(st)) { error = "save: target is not a regular file"; return false; }
 #endif

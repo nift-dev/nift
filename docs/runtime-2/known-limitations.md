@@ -227,6 +227,22 @@ non-regular file (FIFO, socket, device, directory) and a read-only file are refu
   rename, not refused; rename(2) never follows the last component, so it is never written through or opened. The
   temporary file is created exclusively (O_CREAT|O_EXCL), never through an existing name or link. Neither window is
   tested (documented only).
+- **save() is not race-safe; the worst case is for root (REVIEW-C142 M2).** Through window (1) the temporary file is
+  created, and the rename replaces whatever entry has the target's name, in a directory that was never validated: a
+  read-only or protected regular file, a FIFO or a device node (an ancestor swapped for a link to /dev makes a root
+  save replace `/dev/<name>`). The legacy engine's non-exclusive temporary open follows a link planted at the
+  (predictable) temporary name, so there it can write into a FIFO or device (pre-existing, REVIEW-C142 L2).
+- **Following symlinks, as root.** A save through a link replaces the link's target (before C142, only the link). A
+  link planted by another user in a directory root saves into can redirect a root save onto any regular file whose
+  owner-write bit is set (for example /etc/passwd); Linux's `protected_symlinks` blocks it only in sticky
+  world-writable directories.
+- **Deliberate behaviour changes** (save-safety.md, "Behaviour changes"): a clean save of a special, read-only,
+  std-stream or dangling target is now refused (before: a no-op); a save through a link needs write access to the
+  target's directory; a VM save fails if a name already exists at the temporary path; a link loop reads as dangling;
+  an lstat error other than ENOENT is refused (`cannot check the target`); a link to stdout or stderr on a pipe gets
+  the std-stream message.
+- **Narrowing items awaiting the owner** (REVIEW-C142 (d)): a dev/inode/type re-check just before the rename, an
+  exclusive legacy temporary file, a pinned parent directory. None is implemented.
 - **The legacy engine** keeps its existing (non-exclusive) temporary-file creation; the classification and the
   resolved target are the shared helper's.
 - **Windows** (`_wfopen` with "wbx", `std::filesystem` classification, the console and handle identity of the

@@ -25,7 +25,9 @@ Families (rule ids):
                       suite list names a suite twice, or a `-@` line of the
                       test-rt-vm recipe is not a $(RT_VM_SUITE) suite (its
                       status would never reach the summary), or the recipe's
-                      suites and RT_VM_SUITES differ
+                      suites and RT_VM_SUITES differ, or test-rt-vm gains a
+                      prerequisite outside RT_VM_PREREQUISITES (REVIEW-C142 M1;
+                      with a negative control on an added prerequisite)
 
 The swallowed-returncode rule is deliberately conservative in its idea of
 "controls the outcome": it strips statically-dead blocks (if False:, if 0:,
@@ -945,6 +947,33 @@ def scan_shell(text: str, path: Path) -> list[dict]:
 
 # --- Makefile suite wiring (C141, D-084 L1) -----------------------------------
 
+# REVIEW-C142 M1: the prerequisites test-rt-vm had when the check was extended (C142a), frozen. A failing
+# prerequisite stops make before the recipe, so none of the suites runs (C140b G1): a new gate belongs in the recipe
+# as a $(RT_VM_SUITE) suite. These existing ones are listed, not endorsed; an entry that is no longer a prerequisite
+# is reported (stale), so the list only shrinks.
+RT_VM_PREREQUISITES = frozenset([
+    "test-rt-mutation-protocol-mutants", "test-rt-refrep-mutants", "test-rt-sort-protection-mutants",
+    "test-rt-protocol-compile-fail", "test-runtime2-refrep-cli", "test-runtime2-cp13b", "test-rt-source-map",
+    "test-rt-error-oom", "test-cp25r", "test-runtime2-b5-evalorder", "test-rt-vm-invalidate",
+    "test-runtime2-vm-corpus-complete", "$(RT_VM_UNIT)", "$(RT_VM_GLOBALS)", "$(RT_VM_MODULES)", "$(RT_VM_RUN)",
+    "$(RT_VM_PREPARED)", "$(TARGET)", "$(TEST_DIR)/rt-parse-dump$(EXEEXT)", "test-rt-vm-sharing-oracle",
+    "test-runtime2-cp16-n1", "test-runtime2-module-host-order-mutants", "test-runtime2-host-set-complete",
+    "test-runtime2-deadcode-admission", "test-runtime2-deadcode-admission-mutants",
+    "test-runtime2-legacy-name-registration", "test-runtime2-output-order", "test-runtime2-named-deferrals",
+    "test-runtime2-import-depth", "test-runtime2-deferral-dependencies", "test-runtime2-precise-positions",
+    "test-runtime2-approved-refusal-selftest", "test-runtime2-inventory-links",
+    "test-runtime2-inventory-host-mutant", "test-runtime2-inventory-limits", "test-runtime2-reason-ids",
+    "test-runtime2-kind-bits", "test-runtime2-closures-s1", "test-runtime2-closures-s1-stress",
+    "test-runtime2-closures-s1-mutants", "test-runtime2-cp12c-mutant-controls", "test-runtime2-for-s2",
+    "test-runtime2-for-s2-mutants", "test-runtime2-b5-snapshot-memory", "test-runtime2-capture-origins",
+    "test-rt-vm-policy-tooling", "test-runtime2-cp14b", "test-runtime2-cp14b-sort", "test-runtime2-cp14b-witnesses",
+    "test-runtime2-d040-witnesses", "test-runtime2-cp14b-profile", "test-runtime2-cp22", "test-runtime2-coro-module",
+    "test-runtime2-cp17-n2", "test-runtime2-cp17-tripwire", "test-runtime2-collections",
+    "test-runtime2-collections-mutants", "test-runtime2-refsem", "test-runtime2-refsem-mutants", "test-runtime2-b3",
+    "test-runtime2-b3-mutants", "test-runtime2-b4", "test-runtime2-b4-mutants", "test-runtime2-safety",
+    "test-runtime2-safety-mutants", "test-runtime2-vm-default", "test-runtime2-args-cmd", "test-runtime2-packages",
+])
+
 def scan_makefile_suites(text: str, path: Path) -> list[dict]:
     """test-rt-vm: every `-@` recipe line runs through $(RT_VM_SUITE) (suite_status.sh run), each suite once, and the
     recipe's suites are exactly RT_VM_SUITES (what the summary expects)."""
@@ -988,7 +1017,25 @@ def scan_makefile_suites(text: str, path: Path) -> list[dict]:
         finding(f"the test-rt-vm recipe runs suite {name}, which RT_VM_SUITES does not list")
     for name in sorted(set(listed) - set(ran)):
         finding(f"RT_VM_SUITES lists suite {name}, which the test-rt-vm recipe does not run")
+    prerequisites: list[str] = []
+    for line in logical:
+        m = re.match(r"^test-rt-vm\s*:(?!=)(.*)$", line)
+        if m:
+            prerequisites += m.group(1).split()
+    for name in sorted(set(prerequisites) - RT_VM_PREREQUISITES):
+        finding(f"test-rt-vm has a new prerequisite {name}: its failure would stop the suites (C140b G1); "
+                f"run it as a $(RT_VM_SUITE) suite of the recipe")
+    for name in sorted(RT_VM_PREREQUISITES - set(prerequisites)):
+        finding(f"RT_VM_PREREQUISITES lists {name}, which is no longer a prerequisite of test-rt-vm (stale)")
     return findings
+
+
+def suite_wiring_negative_control(text: str, path: Path) -> list[dict]:
+    """REVIEW-C142 M1: the same scan on the Makefile with one added test-rt-vm prerequisite must report it."""
+    probe = "test-runtime2-negative-control-gate"
+    reported = any(probe in f["detail"] for f in scan_makefile_suites(text + f"\ntest-rt-vm: {probe}\n", path))
+    return [] if reported else [{"rule": "suite-wiring", "file": str(path),
+                                 "detail": "negative control: an added test-rt-vm prerequisite was not reported"}]
 
 
 # --- dispatch ---------------------------------------------------------------
@@ -1018,6 +1065,7 @@ def main() -> int:
     if args.makefile:
         scanned.append(str(args.makefile))
         findings.extend(scan_makefile_suites(args.makefile.read_text(encoding="utf-8"), args.makefile))
+        findings.extend(suite_wiring_negative_control(args.makefile.read_text(encoding="utf-8"), args.makefile))
     for root in args.paths:
         if root.is_dir():
             files = sorted(root.rglob("*"))
