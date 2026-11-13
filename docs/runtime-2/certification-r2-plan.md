@@ -168,3 +168,36 @@ per-instance cap of US$3, PRIOR_USD, and deletion on any setup or build failure.
    branch, so it is dispatched by ref; the action SHAs are pinned first.
 7. The certification tag `runtime-2-certified-<name>` (immutable).
 8. Release, which is a separate decision from certification.
+
+## Record: test-v46-relative-imports fingerprint extractor (D-092 #1, owner 2026-11-14)
+
+**Why it changed.** `scripts/certify_fingerprints.py` matched only `CERTIFY-ERR … cmd=` lines for this gate:
+- The C19/C26 record was an abort: the first fixture's fn-flags refusal ended the script.
+- C94, C97 and C104 changed the gate's output (`eeb7e819` fixtures use `fn(...)`, `62c198e0` gates accept only the
+  approved refusals, `cf833f5a` no touched smoke aborts silently). Since then every fixture runs, and the smoke
+  reports the failing case as
+  `FAIL module-private async callables: refused with import-collision (inventory status implement)`, plus the
+  umbrella FAIL.
+- The old extractor found no case in that log, so it gave no fingerprint, and certify classed the known failure as
+  FAILED-NEW (reported in the refreshed record, C141b `36329790`, SOURCES.tsv).
+
+**What the extractor matches now** (this gate only):
+- The refused-case line, matched whole. Its case, reason and status are the case ID. The log carries no diagnostic
+  position, so none is matched.
+- Any other FAIL line, as a case of its own.
+
+`import-collision` is in no general list, and no other gate's Spec changed. The C19/C26 record
+(tests/runtime2/certify-fingerprints/test-v46-relative-imports.txt) is unchanged and still extracts its abort case
+as before.
+
+**Controls** (in certify_fingerprints_selftest.py, on the refreshed log embedded as a fixture, sha256 `80dbfc84…`).
+Each control fails under its own mutated extractor:
+1. **The known failure is recognised.** It is found in the fingerprint and is stable across roots and TMPDIRs.
+   Mutant: the old CERTIFY-ERR-only Spec.
+2. **An unrelated reason or case is rejected as new.** Mutant: the reason and status are dropped from the case ID.
+3. **A changed status or message, or an extra failure, does not match.** Mutant: no generic FAIL capture.
+
+**Effect on classification.**
+- When a regression baseline's log shows the identical failure, the gate is now FAILED-BASELINE.
+- When the baseline fails as the C26 record did (the old abort), it is FAILED-NEW. That is the honest result.
+
