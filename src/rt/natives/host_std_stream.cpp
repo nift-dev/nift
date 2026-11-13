@@ -10,6 +10,7 @@
 #include <windows.h>
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace nift::rt::natives {
@@ -47,6 +48,40 @@ bool std_stream_target(const std::filesystem::path& path) {
         if (::fstat(n, &fd) == 0 && fd.st_dev == target.st_dev && fd.st_ino == target.st_ino) return true;
     return false;
 #endif
+}
+
+bool save_target(const std::filesystem::path& path, std::filesystem::path& resolved, std::string& error) {
+    namespace fs = std::filesystem;
+    resolved = path;
+    std::error_code ec;
+    fs::file_status st = fs::symlink_status(path, ec);
+    if (ec || st.type() == fs::file_type::not_found) return true;  // a new file: save()'s parent check applies
+    if (fs::is_symlink(st)) {
+        const fs::path target = fs::canonical(path, ec);  // follows the whole chain; fails if it dangles or loops
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 1  // test-only: a dangling link is saved as a new file
+        if (ec) return true;
+#endif
+        if (ec) { error = "save: dangling symlink"; return false; }
+        st = fs::status(target, ec);
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 5)  // test-only: the link itself is replaced
+        resolved = target;
+#endif
+    }
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 2)  // test-only: no std-stream refusal
+    if (std_stream_target(resolved)) { error = "save: target is the process's standard output or error"; return false; }
+#endif
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 3)  // test-only: no special-file refusal
+    if (ec || !fs::is_regular_file(st)) { error = "save: target is not a regular file"; return false; }
+#endif
+    bool read_only = (st.permissions() & fs::perms::owner_write) == fs::perms::none;
+#if !defined(_WIN32)
+    read_only = read_only || (::geteuid() != 0 && ::access(resolved.c_str(), W_OK) != 0);
+#endif
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 4  // test-only: no read-only refusal
+    read_only = false;
+#endif
+    if (read_only) { error = "save: target is read-only"; return false; }
+    return true;
 }
 
 // REVIEW-C139 C2 (narrowed in C139b): the null device (/dev/null; NUL on Windows) discards what is written, so a

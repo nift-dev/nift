@@ -43,33 +43,44 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
     HostCall call(context.host, host::HostOp::Save, "save");
     call.adopt(file->path);
     if (call.begin() != host::HostStatus::Ok) { error = call.error().message; return Status::Error; }
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 6  // test-only: a temporary file before the classification
+    if (std::FILE* early = std::fopen((file->path.string() + ".nift-tmp-early").c_str(), "wbx")) std::fclose(early);
+#endif
+    fs::path target;  // D-074, D-091 #5: refused before the dirty check and before any temporary file
+    if (!save_target(file->path, target, error)) {
+        if (context.host.error_code) *context.host.error_code = "io.write_failed";
+        call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
+        return Status::Recoverable;
+    }
     if (!file->dirty) { call.succeed(); out = Value::null(); return Status::Ok; }
     if (file->std_stream) context.publish_output();  // D-073 #3 (save()'s replacement of the target is F-save's)
     std::error_code ec;
-    const auto parent = file->path.parent_path();
+    const auto parent = target.parent_path();
     if (!parent.empty() && !fs::exists(parent, ec)) {
         error = "save: parent directory does not exist";
         if (context.host.error_code) *context.host.error_code = "io.write_failed";
         call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
         return Status::Recoverable;
     }
-    const fs::perms perms =
-        fs::exists(file->path, ec) && !ec ? fs::status(file->path, ec).permissions() : fs::perms::unknown;
-    fs::path temp = file->path;
+    const fs::perms perms = fs::exists(target, ec) && !ec ? fs::status(target, ec).permissions() : fs::perms::unknown;
+    fs::path temp = target;
     temp += ".nift-tmp-" + std::to_string(static_cast<unsigned long long>(
                                std::chrono::steady_clock::now().time_since_epoch().count()));
     {
-        std::ofstream output(temp, std::ios::binary | std::ios::trunc);
+        // Exclusive creation (O_CREAT|O_EXCL): never through an existing name or symlink at the temporary path.
+#if defined(_WIN32)
+        std::FILE* output = _wfopen(temp.c_str(), L"wbx");
+#else
+        std::FILE* output = std::fopen(temp.c_str(), "wbx");
+#endif
         if (!output) {
             error = "save: cannot create temporary file";
             if (context.host.error_code) *context.host.error_code = "io.write_failed";
             call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
             return Status::Recoverable;
         }
-        output.write(file->working.data(), static_cast<std::streamsize>(file->working.size()));
-        output.flush();
-        if (!output) {
-            output.close();
+        const bool written = std::fwrite(file->working.data(), 1, file->working.size(), output) == file->working.size();
+        if (std::fclose(output) != 0 || !written) {
             fs::remove(temp, ec);
             error = "save: temporary write failed";
             if (context.host.error_code) *context.host.error_code = "io.write_failed";
@@ -78,7 +89,13 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
         }
     }
     if (perms != fs::perms::unknown) fs::permissions(temp, perms, ec);
-    if (!filesystem::replace_file_atomic(temp, file->path)) {
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 7  // test-only: the target written in place, not replaced
+    const bool replaced = static_cast<bool>(std::ofstream(target, std::ios::binary) << file->working) &&
+                          fs::remove(temp, ec);
+#else
+    const bool replaced = filesystem::replace_file_atomic(temp, target);
+#endif
+    if (!replaced) {
         error = "save: atomic replace failed";
         if (context.host.error_code) *context.host.error_code = "io.atomic_replace_failed";
         call.fail(host::HostStatus::Recoverable, host_error("io.atomic_replace_failed", error));

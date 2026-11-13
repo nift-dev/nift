@@ -1591,6 +1591,13 @@ test-runtime2-output-order: $(TARGET)
 	"$(TEST_DIR)/null-device-unit" "$(TEST_DIR)/null-device-unit.tmp"
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
+# save() filesystem safety (D-074, D-091 #5; checkpoints/save-safety.md): the target classification in both engines,
+# scratch fixtures only, and one negative control (NIFT_SAVE_MUTANT=1..7) per contract.
+.PHONY: test-runtime2-save-safety
+test-runtime2-save-safety: $(TARGET)
+	$(PYTHON) -B tests/runtime2/save_safety.py --nift "$(CURDIR)/$(TARGET)"
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/save_safety.py --mutants
+test-rt-vm: test-runtime2-save-safety
 
 # C140 (D-077 #5 item 2): async recursion memory safety, with its mutants and the fault-injection build
 # (tests/runtime2/async_memory.py). Exit status: 0 = every case passes and every mutant is caught; 1 = a failure.

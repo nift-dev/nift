@@ -211,6 +211,31 @@ Deep recursion through `async`/`thread()` is also slow beyond a few hundred
 levels (about 60 s at depth 1000; the scheduler wakes every blocked level on each completion). Details:
 [checkpoints/async-memory.md](checkpoints/async-memory.md).
 
+## save() filesystem safety (C142; D-074, D-091 #5)
+
+`save()` classifies its target before the dirty check and before any temporary file exists, in both engines
+(checkpoints/save-safety.md). A regular file is replaced atomically, a symlink is followed and its target replaced
+(the link kept), and a dangling symlink, the process's stdout or stderr (any alias, a redirect target included), any
+non-regular file (FIFO, socket, device, directory) and a read-only file are refused (`io.write_failed`). What stays:
+
+- **Hard links break by design.** The saved name gets a new inode with the new content; other names of the old
+  inode keep the old content.
+- **Race windows, bounded and documented, not closed.** (1) A directory component of the resolved path swapped
+  (for example for a symlink) between the check and the rename, by someone with write access to an ancestor: the
+  save lands in the swapped directory. Closing it needs openat/renameat through a directory descriptor, a broader
+  redesign not made. (2) A read-only or special file swapped in at the target name after the check is replaced by the
+  rename, not refused; rename(2) never follows the last component, so it is never written through or opened. The
+  temporary file is created exclusively (O_CREAT|O_EXCL), never through an existing name or link.
+- **The legacy engine** keeps its existing (non-exclusive) temporary-file creation; the classification and the
+  resolved target are the shared helper's.
+- **Windows** (`_wfopen` with "wbx", `std::filesystem` classification, the console and handle identity of the
+  output repair): compiled nowhere yet; unverified until Windows CI.
+- **Pre-existing, unchanged:** `file(p).open("w")` reads the existing file before `save()` is ever reached, so opening
+  a FIFO with no writer blocks at `open`, not at `save()` (the classification cannot reach it; open is out of scope).
+- **Pre-existing, unchanged (incremental builds):** a file a page's own pre-build hook writes with `save()` is not a
+  dependency of that page, so changing that file outside the hook does not rebuild the page in modified mode (found
+  while fixing the CP01-tick flake, D-091 #3; dynamic_reads_review.sh).
+
 ## Release-audit items
 
 Findings that are not release blockers by themselves but must be decided in the release audit.
@@ -222,5 +247,5 @@ Findings that are not release blockers by themselves but must be decided in the 
 | **`make test-runtime2-host-deps`: FAILED** (exit 2) with 24 known refusals unrelated to slot 2, all in read_limit.py, none with an import. By capability group (inventory row, status): `builtin-bytes:open_bytes` 7 (implement); `callable:run` 6 and `callable:cmd` 2 (deferred-named); `callable:read` 3 (implement); `host-handle-flow` 4, `statement:Command` 1 and `type:length` 1 (PENDING-OWNER) | **FAILED, not PASS, and not an approved release deferral** (D-071 #1). Checkpoint acceptance is not blocked; the 24 stay open under their capability groups and on the certification inventory (the recorded fingerprint tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt, 33 FAILs, contains all 24), still open as release-gate findings (D-075 #1, owner 2026-11-12 01:27), subject to final release qualification. Baseline: the C129 freeze compared a scratch rebuild of the slot-1 sources (sha256 not recorded; deleted at cleanup), with identical 24 FAILs, so the independent review could not reproduce the baseline ("fresh baseline reproduction was unavailable because the Slot 1 binary was not present") | decisions.md D-071 #1; REVIEW-C129-SLOT2 section H; rescan-post-cp1.md sections 29.5 and 30 |
 | **P1 release blocker** (D-072 #1, owner 2026-11-11 18:00): `print` / `cat` output order. a.txt `hello` (no newline); `print(1)` / `cat("a.txt")` / `print(2)` with stdout a pipe: legacy writes `1\nhello2\n`, the VM writes `hello1\n2\n`. No import involved | **Implemented and accepted** (C139, the output-order checkpoint, D-077 #5 item 1; accepted by D-079 #1, owner 2026-11-12; docs/runtime-2/checkpoints/output-order.md). Not an approved difference | decisions.md D-072 #1; tsv `defect:print-cat-output-order`; rescan-post-cp1.md section 31 |
 | **P2** (D-072 #2): read-mode file handle trace order: legacy traces `open` then `read`, the VM `read` then `open`; output equal | **Under read-only investigation, not approved** | decisions.md D-072 #2; tsv `difference:file-open-read-trace-order` |
-| **P1 filesystem safety, open** (F-save; D-073 #1, owner 2026-11-11 22:23, provisional P1): `save()` writes a temporary file and renames it over the target on both engines, so a FIFO, device node, socket, or a symlink to a non-regular file (`/dev/*`, `/proc/self/fd/*` aliases) is destroyed and replaced by a regular file. Demonstrated in this sandbox on 2026-11-11 at 19:12: a probe's `save()` turned `/dev/stdout` into a 2-byte regular file; the coordinator restored the symlink to /proc/self/fd/1 at 22:23 (D-073 #1) and every gate result that depended on it in that window was re-run (rescan-post-cp1.md 32.8) | **Open: repair before certification**, in the `save()` checkpoint (D-077 #5 item 3); no production change before that checkpoint | decisions.md D-073 #1, D-077 #5; scratch review INVESTIGATE-SAVE-SPECIAL-TARGETS.md |
+| **P1 filesystem safety, open** (F-save; D-073 #1, owner 2026-11-11 22:23, provisional P1): `save()` writes a temporary file and renames it over the target on both engines, so a FIFO, device node, socket, or a symlink to a non-regular file (`/dev/*`, `/proc/self/fd/*` aliases) is destroyed and replaced by a regular file. Demonstrated in this sandbox on 2026-11-11 at 19:12: a probe's `save()` turned `/dev/stdout` into a 2-byte regular file; the coordinator restored the symlink to /proc/self/fd/1 at 22:23 (D-073 #1) and every gate result that depended on it in that window was re-run (rescan-post-cp1.md 32.8) | **Implemented in C142** (D-074, D-091 #5): special targets, symlinks, std streams and read-only files are classified first and refused or resolved (section "save() filesystem safety" above); pending independent review and owner acceptance | decisions.md D-073 #1, D-077 #5; scratch review INVESTIGATE-SAVE-SPECIAL-TARGETS.md |
 

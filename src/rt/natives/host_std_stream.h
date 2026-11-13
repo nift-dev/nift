@@ -19,6 +19,14 @@ struct Context;
 // CI). A path that does not exist is not a std stream.
 bool std_stream_target(const std::filesystem::path& path);
 
+// save()'s target (D-074, D-091 #5), classified before the dirty check and before any temporary file exists. A
+// symlink is followed to its target (`resolved`, which save() replaces, keeping the link); otherwise `resolved` is
+// `path`. Refused (false, `error` set): a dangling or looping symlink, the process's stdout or stderr (any alias, a
+// redirect target included), anything but a regular file (FIFO, socket, device, directory; never opened), and a
+// read-only file: the owner-write bit clear, for every user including root, or, for a non-root user, no write
+// access. A missing path is a new file (true). Races: checkpoints/save-safety.md.
+bool save_target(const std::filesystem::path& path, std::filesystem::path& resolved, std::string& error);
+
 // The null device (/dev/null by st_rdev; NUL on Windows): the only std stream a worker may open (C139b).
 bool null_device(const std::filesystem::path& path);
 

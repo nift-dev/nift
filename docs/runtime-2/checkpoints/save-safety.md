@@ -1,0 +1,82 @@
+# save() filesystem safety (C142; production checkpoint)
+
+**Status:** implemented locally; pending freeze review and owner acceptance. Owner decisions D-074 #1 (the contracts)
+and D-091 #5 (authorised after C141 acceptance); the design note was approved with three answers (both engines
+through one shared helper, the legacy change limited to its call site; classification before the dirty check; the
+read-only rule) and seven additions.
+
+## The defect (F-save, D-073 #1)
+
+Both engines wrote a temporary file beside the path and renamed it over the path. A symlink was therefore replaced by
+a regular file (the link lost, its target unchanged); a FIFO, socket or device node at the path was destroyed and
+replaced; a read-only file was replaced silently when run as root; and a path naming the process's own stdout or
+stderr (for example `/dev/stdout`, or the file stdout is redirected to) was replaced. Demonstrated in this sandbox on
+2026-11-11, when a probe's `save()` turned `/dev/stdout` into a regular file (restored by the coordinator).
+Re-checked at 3632979 in scratch: the symlink and 0444 cases on both engines.
+
+## Contract and classification order
+
+`nift::rt::natives::save_target(path, resolved, error)` (src/rt/natives/host_std_stream.{h,cpp}, beside the output
+repair's `std_stream_target`, which it reuses). Both engines call it after the host call begins and before the dirty
+check, so the result does not depend on whether the buffer changed, and before any temporary file exists. Refusals
+are recoverable `io.write_failed` errors with these messages:
+
+| Step | Target | Result |
+| --- | --- | --- |
+| 1 | `symlink_status` finds nothing | a new file: the existing parent check and atomic create |
+| 2 | a symlink | followed (`canonical`, the whole chain); dangling or looping: **`save: dangling symlink`**; otherwise every later step uses the resolved target, and the save replaces the target, keeping the link |
+| 3 | the process's stdout or stderr (st_dev/st_ino against fstat(1) and fstat(2); never opened) | **`save: target is the process's standard output or error`**, including a redirect target under its own name and a link to it |
+| 4 | not a regular file (FIFO, socket, character or block device, directory) | **`save: target is not a regular file`**, from stat only: never opened or modified |
+| 5 | owner-write bit clear (every user, root included), or, for a non-root user, `access(W_OK)` fails | **`save: target is read-only`** |
+| 6 | a regular writable file, hard-linked or not | the temporary file (created exclusively, `fopen(..., "wbx")`: O_CREAT|O_EXCL, never through an existing name or link) in the resolved target's directory, its mode copied from the target, ownership not changed, no fsync (as before); then the atomic rename over the resolved target. A hard link breaks: the saved name gets a new inode, other names keep the old content |
+
+The legacy engine (src/ParserExpression.cpp, the `save` branch) changes only at its call site: the classification,
+and the resolved target in place of the handle's path; its temporary-file creation is unchanged (not exclusive).
+
+## Races (bounded, documented; known-limitations.md)
+
+- Between the classification and the rename, the name at the resolved target can be replaced by someone with write
+  access to its directory: rename(2) does not follow its last component, so a symlink, FIFO, device or read-only file
+  swapped in is replaced, never written through or opened.
+- A directory component of the resolved path swapped by someone with write access to an ancestor sends the save into
+  the swapped directory. Closing this needs openat/fstatat/renameat through a directory descriptor (and the same in the
+  temporary-file creation): the broader redesign D-074 excludes, so it is documented, not closed.
+- Windows: `_wfopen(..., L"wbx")`, `std::filesystem` classification, the output repair's console and handle identity;
+  not compiled anywhere yet, unverified until Windows CI.
+
+Pre-existing and unchanged (known-limitations.md): `open("w")` reads the existing file, so a FIFO with no writer blocks
+at `open` (both engines, 5-second timeout in scratch), before `save()` is reached.
+
+## Tests (`make test-runtime2-save-safety`, in `test-rt-vm`; tests/runtime2/save_safety.py)
+
+Every case runs in both engines (NIFT_VM=require and NIFT_VM=0), each in a fresh temporary directory, with an
+address-space and file-size limit and a 20-second timeout. The harness never opens /dev/stdout and checks that it is
+still the link to /proc/self/fd/1 before and after. Special files reach `save()` through a file opened on an absent
+name and an `mv()` of the fixture onto it, so `open()` never reads them; the device is a `mknod c 1 3` inside the
+directory, only stat()ed and removed in a finally block, and reported NOT-RUN (listed in skip_phrases.tsv, never a
+pass) where mknod is not permitted.
+
+| Case | Checks |
+| --- | --- |
+| regular | saved, mode kept (0640), new inode, no temporary file |
+| new-file | created |
+| hard-link | saved name new content and new inode; the other link keeps the old content |
+| symlink | the target saved, the link kept |
+| dangling | refused; the link kept, nothing created |
+| read-only, read-only-unchanged | 0444, run as root: refused (with and without a write); content, inode, mode kept |
+| fifo, socket, device | swapped in after open: refused; still that type |
+| symlink-fifo, symlink-device | a link to one swapped in: refused; the node and the link kept |
+| stdout, stderr, symlink-stdout | stdout or stderr redirected to a scratch file, saved by name or through a link: refused; the file's inode kept, the program's output intact |
+
+Negative controls (one per contract, `NIFT_SAVE_MUTANT`, test-only, each built with sanctioned_mutant.py and removed
+after its run):
+
+| Mutant | Removes | Caught by |
+| --- | --- | --- |
+| 1 | the dangling refusal (saved as a new file) | dangling (both engines) |
+| 2 | the std-stream refusal | stdout, stderr, symlink-stdout (both) |
+| 3 | the special-file refusal | fifo, socket, symlink-fifo (both); the device cases too where mknod is permitted |
+| 4 | the read-only refusal | read-only, read-only-unchanged (both) |
+| 5 | symlink resolution (the link itself replaced) | symlink (both) |
+| 6 | classification before any temporary file (one created first) | every VM case (temporary file left) |
+| 7 | atomic replacement (the target written in place) | regular (same inode), hard-link (the other link changes) |
