@@ -35,6 +35,9 @@ and the resolved target in place of the handle's path; its temporary-file creati
 
 ## Races (bounded, documented; known-limitations.md)
 
+Neither remaining race window is tested: a deterministic check-then-swap would need a further test-only hook
+build, which was not made (accepted by the owner's coordinator, 2026-11-14). They are documented only.
+
 - Between the classification and the rename, the name at the resolved target can be replaced by someone with write
   access to its directory: rename(2) does not follow its last component, so a symlink, FIFO, device or read-only file
   swapped in is replaced, never written through or opened.

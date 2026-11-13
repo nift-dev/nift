@@ -225,7 +225,8 @@ non-regular file (FIFO, socket, device, directory) and a read-only file are refu
   save lands in the swapped directory. Closing it needs openat/renameat through a directory descriptor, a broader
   redesign not made. (2) A read-only or special file swapped in at the target name after the check is replaced by the
   rename, not refused; rename(2) never follows the last component, so it is never written through or opened. The
-  temporary file is created exclusively (O_CREAT|O_EXCL), never through an existing name or link.
+  temporary file is created exclusively (O_CREAT|O_EXCL), never through an existing name or link. Neither window is
+  tested (documented only).
 - **The legacy engine** keeps its existing (non-exclusive) temporary-file creation; the classification and the
   resolved target are the shared helper's.
 - **Windows** (`_wfopen` with "wbx", `std::filesystem` classification, the console and handle identity of the
