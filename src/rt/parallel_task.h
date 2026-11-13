@@ -9,6 +9,7 @@
 #include "rt/proto.h"
 #include "rt/shared_gc.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <condition_variable>
 #include <chrono>
@@ -62,6 +63,7 @@ struct ParallelTaskRecord {
     bool failure_catchable = false;
     StopReason failure_reason = StopReason::Error;
     std::uint32_t failure_offset = 0;
+    bool failure_starved = false;  // C141: failed unrun by ParallelRuntime::starve (kParallelResourcesExhausted)
     // C140a: the spawning instruction in the parent's program (proto index, instruction index), for a position
     std::uint32_t spawn_proto = 0xffffffffu, spawn_instr = 0, spawn_offset = 0;
     bool failure_error_origin = false;
@@ -147,24 +149,34 @@ public:
     std::size_t worker_count() const;
     void wait_idle();
     bool cancel_queued(const std::shared_ptr<ParallelTaskRecord>& record);
-    bool block_worker(ParallelWaitKind kind = ParallelWaitKind::Blocking);
+    // `exhausted` (C141, cleanup waits): when no compensating worker can be started, keep the block, set it, no throw.
+    bool block_worker(ParallelWaitKind kind = ParallelWaitKind::Blocking, bool* exhausted = nullptr);
     void resume_worker(ParallelWaitKind kind = ParallelWaitKind::Blocking);
     // Only used at a timer suspension: bounded nested dispatch retains every
     // isolate on its owning OS thread and never adds a CPU execution permit.
     static bool help_timer(std::chrono::steady_clock::time_point deadline);
     // C140: the first budget or thread-creation failure of any task, awaited or not; the run ends with it (exit 1).
-    void note_limit(const std::string& message, std::uint32_t offset) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!limit_failed_) { limit_failed_ = true; limit_message_ = message; limit_offset_ = offset; }
-    }
+    // `reason` (static: the budget or the resources text) is the fatal limit (C141, D-085); waiters are woken.
+    void note_limit(const std::string& message, std::uint32_t offset, const char* reason);
     bool take_limit(std::string& message, std::uint32_t& offset) {
         std::lock_guard<std::mutex> lock(mutex_);
-        message = limit_message_; offset = limit_offset_; return limit_failed_;
+        message = limit_message_.empty() && fatal_limit() ? fatal_limit() : limit_message_.c_str();
+        offset = limit_offset_; return limit_failed_;
     }
+    // C141 (D-085): this runtime's first fatal limit (set once, with the first recorded limit), else null. From then
+    // on every shared wait (send, recv, lock) that would block ends the run with it (shared_detail::wait_shared).
+    const char* fatal_limit() const noexcept { return fatal_.load(std::memory_order_acquire); }
+    // C141 (R1, D-083): a cleanup wait could not start a worker. Every queued task fails unrun (limit.exceeded, its
+    // waiters woken, its charge released once), new tasks are refused from now on, and the limit is recorded once.
+    // noexcept and allocation-free: it runs in Vm::coro_abort_parallel (parallel_starve.cpp).
+    void starve(std::uint32_t offset) noexcept;
 private:
     void worker_loop();
     void execute_record(std::shared_ptr<ParallelTaskRecord> record, bool owns_cpu);
     void ensure_worker_locked();
+    static bool refuse_starved(ParallelTaskRecord& record, std::string& error) {
+        record.failure_code = "limit.exceeded"; error = kParallelResourcesExhausted; return false;
+    }
     void release_locked(std::size_t charge) noexcept {  // C140a: an over-release is our defect: fail loudly
         if (charge > reserved_) std::abort();
         reserved_ -= charge;
@@ -178,8 +190,11 @@ private:
     std::size_t active_ = 0, computing_ = 0, blocked_ = 0, resuming_ = 0;
     std::size_t native_blocked_ = 0, transient_blocked_ = 0;
     std::size_t reserved_ = 0;  // C140 (b): runtime-wide sum of admitted records' reserved_bytes
-    bool limit_failed_ = false;
+    bool limit_failed_ = false, starved_ = false;
+    std::atomic<const char*> fatal_{nullptr};  // C141: written under mutex_ with limit_failed_, read lock-free
     std::string limit_message_;
+    std::mutex starve_mutex_;  // C141: one sweep at a time owns spare_
+    std::deque<std::shared_ptr<ParallelTaskRecord>> spare_;  // C141: built up front, so a sweep swaps, never allocates
     std::uint32_t limit_offset_ = 0;
     std::size_t blocking_capacity_ = kBlockedCapacity;
     std::size_t limit_ = 8, capacity_ = kTaskCapacity;
@@ -190,7 +205,8 @@ private:
 // stack on its thread. Reusable compensating workers are bounded by admission.
 class ParallelBlock {
 public:
-    explicit ParallelBlock(ParallelWaitKind kind = ParallelWaitKind::Blocking);
+    // `offset`: the source position a cleanup wait reports if it starves the runtime (C141).
+    explicit ParallelBlock(ParallelWaitKind kind = ParallelWaitKind::Blocking, std::uint32_t offset = 0);
     ~ParallelBlock();
     bool admitted() const noexcept { return admitted_; }
     // The refusal when not admitted: the capacity, or (C140 (a)) no worker thread could be created.

@@ -193,7 +193,8 @@ Value shared_make_channel(std::int64_t capacity, SharedOpError& error) {
 }
 
 bool shared_mutex_lock(const Value& handle, std::uint64_t owner,
-                       const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error) {
+                       const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error,
+                       const ParallelRuntime* runtime) {
     const auto entry = find_entry(handle, HandleKind::Mutex);
     if (!entry) {
         fail(error, "runtime.invalid_argument", "mutex: invalid handle");
@@ -205,8 +206,8 @@ bool shared_mutex_lock(const Value& handle, std::uint64_t owner,
         fail(error, "runtime.invalid_argument", "mutex: recursive lock is not supported");
         return false;
     }
-    if (!wait_shared(lock, r.cv, [&] { return !entry->locked || cancelled(task); })) {
-        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+    if (const char* why = wait_shared(lock, r.cv, runtime, [&] { return !entry->locked || cancelled(task); })) {
+        fail(error, "limit.exceeded", why); return false;
     }
     if (cancelled(task)) {
         take_task_cancelled(task);

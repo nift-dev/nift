@@ -44,8 +44,10 @@ void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& resul
     };
 #if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 8)  // test-only: an un-awaited failure dropped
     if (result.reason == StopReason::Error && result.code == "limit.exceeded" &&  // rt-lint: allow-string-compare
-        (ends("parallel task memory budget exceeded") || ends(kParallelResourcesExhausted)))
-        if (auto runtime = record.runtime.lock()) runtime->note_limit(result.message, result.offset);
+        (ends(kParallelBudgetExceeded) || ends(kParallelResourcesExhausted)))
+        if (auto runtime = record.runtime.lock())
+            runtime->note_limit(result.message, result.offset,
+                                ends(kParallelBudgetExceeded) ? kParallelBudgetExceeded : kParallelResourcesExhausted);
 #endif
 }
 

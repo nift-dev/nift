@@ -10,7 +10,8 @@ namespace nift::rt {
 using namespace shared_detail;
 
 bool shared_channel_send(const Value& handle, const Value& value, const TransferProtoMap* protos,
-                         const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error) {
+                         const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error,
+                         const ParallelRuntime* runtime) {
     const auto entry = find_channel(handle);
     if (!entry) {
         fail(error, "runtime.invalid_argument", "send: expected a channel");
@@ -24,8 +25,8 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
         return entry->closed || cancelled(task) ||
                entry->buffer.size() < (entry->capacity == 0 ? 1u : entry->capacity);
     };
-    if (!wait_shared(lock, r.cv, ready)) {
-        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+    if (const char* why = wait_shared(lock, r.cv, runtime, ready)) {
+        fail(error, "limit.exceeded", why); return false;
     }
     if (entry->closed) {
         fail(error, "runtime.channel_closed", "send: channel is closed");
@@ -42,11 +43,12 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
     r.cv.notify_all();
     if (entry->capacity != 0) return true;
     // A rendezvous send completes only when a receiver takes the value.
-    if (!wait_shared(lock, r.cv, [&] { return item->consumed || entry->closed || cancelled(task); })) {
+    if (const char* why = wait_shared(lock, r.cv, runtime, [&] { return item->consumed || entry->closed ||
+                                                                       cancelled(task); })) {
         const auto at = std::find(entry->buffer.begin(), entry->buffer.end(), item);
         if (at != entry->buffer.end()) entry->buffer.erase(at);
         r.cv.notify_all();
-        fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+        fail(error, "limit.exceeded", why); return false;
     }
     if (item->consumed) return true;
     if (cancelled(task)) {
@@ -63,7 +65,7 @@ bool shared_channel_send(const Value& handle, const Value& value, const Transfer
 
 bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
                          const std::shared_ptr<ParallelTaskRecord>& task, Value& out, bool& closed,
-                         SharedOpError& error) {
+                         SharedOpError& error, const ParallelRuntime* runtime) {
     closed = false;
     const auto entry = find_channel(handle);
     if (!entry) {
@@ -74,8 +76,9 @@ bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
     TransferGraph graph;
     {
         std::unique_lock<std::recursive_mutex> lock(r.mutex);
-        if (!wait_shared(lock, r.cv, [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); })) {
-            fail(error, "limit.exceeded", "parallel blocking wait limit exceeded"); return false;
+        const auto ready = [&] { return !entry->buffer.empty() || entry->closed || cancelled(task); };
+        if (const char* why = wait_shared(lock, r.cv, runtime, ready)) {
+            fail(error, "limit.exceeded", why); return false;
         }
         if (cancelled(task)) {
             take_task_cancelled(task);

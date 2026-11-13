@@ -65,7 +65,7 @@ void Vm::close_handle_runtime(VmResult& result, bool on_error) {
     // on_error close mode.
     std::optional<ParallelBlock> blocked;
     if (!options_.current_task || handle_table_.stats().created != 0)
-        blocked.emplace(ParallelWaitKind::Cleanup);
+        blocked.emplace(ParallelWaitKind::Cleanup, options_.current_task ? options_.current_task->spawn_offset : 0u);
     const handles::CloseReport close = handle_table_.close_context(handle_context_, on_error);
     handle_context_open_ = false;
     // CP17 x CP18: a cleanup report lost to an allocation failure (a dying

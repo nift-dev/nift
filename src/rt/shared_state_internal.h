@@ -47,20 +47,24 @@ struct Registry {
     std::uint64_t next_id = 1;
 };
 
+// Null when `ready`, else why the wait fails (limit.exceeded): the blocking capacity, or (C141, D-085) `runtime`'s
+// fatal limit, its first recorded reason: once a run has a fatal limit, no shared wait blocks (it would never end).
 template<class Mutex, class Condition, class Predicate>
-bool wait_shared(std::unique_lock<Mutex>& lock, Condition& cv, Predicate ready) {
+const char* wait_shared(std::unique_lock<Mutex>& lock, Condition& cv, const ParallelRuntime* runtime, Predicate ready) {
+    const auto fatal = [runtime] { return kFatalWaits && runtime ? runtime->fatal_limit() : nullptr; };
     while (!ready()) {
+        if (const char* why = fatal()) return why;
         lock.unlock();
         {
             ParallelBlock blocked;
             lock.lock();
-            if (!blocked.admitted()) return ready();
-            cv.wait(lock, ready);
+            if (!blocked.admitted()) return ready() ? nullptr : "parallel blocking wait limit exceeded";
+            cv.wait(lock, [&] { return ready() || fatal(); });
             lock.unlock();
         }
         lock.lock();  // predicate can change while reacquiring the CPU permit
     }
-    return true;
+    return nullptr;
 }
 
 Registry& registry();

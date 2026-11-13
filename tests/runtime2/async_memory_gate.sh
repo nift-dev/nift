@@ -1,11 +1,10 @@
 #!/bin/bash
-# C140b/C140c: the async-memory gate (D-082). Run with the harness toolchain environment (make's
-# HARNESS_TOOLCHAIN_ENV). Exit 0: every case passes; 3: every case passes except the known defect R1; otherwise a
-# failure (1). The mutants run either way, and their failure is a failure (1).
+# C140b/C140c/C141: the async-memory gate (D-082, D-085). Run with the harness toolchain environment (make's
+# HARNESS_TOOLCHAIN_ENV). Exit 0: every case passes and every mutant is caught; otherwise a failure (1). The mutants
+# run either way. (The C140b exit 3 for the known defect R1 is gone: C141 repaired R1 and R2, D-084.)
 #   async_memory_gate.sh NIFT [PYTHON]
 nift=$1 python=${2:-python3}
 rc=0
-"$python" -B tests/runtime2/async_memory.py --nift "$nift" || rc=$?
-"$python" -B tests/runtime2/async_memory.py --mutants || exit 1
-if [ "$rc" -eq 3 ]; then echo "test-runtime2-async-memory: every case passes except KNOWN DEFECT R1 (P1, D-082): exit 3"; fi
+"$python" -B tests/runtime2/async_memory.py --nift "$nift" || rc=1
+"$python" -B tests/runtime2/async_memory.py --mutants || rc=1
 exit "$rc"

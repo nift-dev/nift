@@ -40,14 +40,12 @@ ProgramTransferMap::ProgramTransferMap(const Program& program) {
         by_index_.push_back(proto);
     }
 }
-
 bool ProgramTransferMap::index_of(const Proto* proto, std::uint32_t& index) const {
     const auto found = by_pointer_.find(proto);
     if (found == by_pointer_.end()) return false;
     index = found->second;
     return true;
 }
-
 const Proto* ProgramTransferMap::proto_of(std::uint32_t index) const {
     return index < by_index_.size() ? by_index_[index] : nullptr;
 }
@@ -89,17 +87,18 @@ ParallelRuntime::~ParallelRuntime() {
     }
     cv_.notify_all(); resume_cv_.notify_all(); shared_detail::notify_shared_cancellation();
     for (auto& thread : workers_) if (thread.joinable()) thread.join();
-    shared_collect();
+    shared_collect(); NIFT_CHECK_DRAINED(reserved_);
 }
 void ParallelRuntime::ensure_worker_locked() {
     if (!stopping_ && !queue_.empty() && workers_.size() < limit_ + blocking_capacity_ &&
         workers_.size() < std::min(limit_, active_) + native_blocked_ +
                            std::min(kTimerWorkerCapacity, transient_blocked_))
-        workers_.emplace_back([this] { worker_loop(); });
+        workers_.emplace_back((NIFT_INJECT_BAD_ALLOC("nothread"), [this] { worker_loop(); }));
 }
 bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::string& error) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (stopping_) { error = "parallel runtime is shutting down"; return false; }
+    if (starved_ && !kStarveAdmits) return refuse_starved(*record, error);  // C141: nothing new starts
     // Admission is bounded independently of CPU slots. Saturation is an
     // explicit refusal; blocking workers release CPU permits.
     if (active_ >= capacity_) { error = "parallel task admission limit exceeded"; return false; }
@@ -183,20 +182,21 @@ bool ParallelRuntime::help_timer(std::chrono::steady_clock::time_point deadline)
     --timer_help_depth;
     return true;
 }
-bool ParallelRuntime::block_worker(ParallelWaitKind kind) {
+bool ParallelRuntime::block_worker(ParallelWaitKind kind, bool* exhausted) {
     std::lock_guard<std::mutex> lock(mutex_);
     const bool native = kind == ParallelWaitKind::Blocking;
     if (native && native_blocked_ == blocking_capacity_) return false;
     --computing_; ++blocked_;
     if (native) ++native_blocked_; else ++transient_blocked_;
     try { NIFT_INJECT_WAIT(kind); ensure_worker_locked(); }
-    catch (...) {
-        ++computing_; --blocked_;
-        if (native) --native_blocked_; else --transient_blocked_;
-        throw;
+    catch (...) {  // C141: a cleanup wait keeps its block (its permit stays released) and starves the runtime
+        if (!exhausted || kCleanupRethrow) {
+            ++computing_; --blocked_; if (native) --native_blocked_; else --transient_blocked_;
+            throw;
+        }
+        *exhausted = true;  // and falls through: the released permit is notified like any block's (M1)
     }
-    resume_cv_.notify_one();
-    cv_.notify_all();
+    resume_cv_.notify_one(); cv_.notify_all();
     return true;
 }
 void ParallelRuntime::resume_worker(ParallelWaitKind kind) {
@@ -206,12 +206,14 @@ void ParallelRuntime::resume_worker(ParallelWaitKind kind) {
     resume_cv_.wait(lock, [&] { return computing_ < limit_; });
     --resuming_; --blocked_; ++computing_;
 }
-ParallelBlock::ParallelBlock(ParallelWaitKind kind) : runtime_(running_pool), kind_(kind) {
-    try { if (runtime_ && !runtime_->block_worker(kind_)) { admitted_ = false; runtime_ = nullptr; } }
+ParallelBlock::ParallelBlock(ParallelWaitKind kind, std::uint32_t offset) : runtime_(running_pool), kind_(kind) {
+    bool* starved = kind_ == ParallelWaitKind::Cleanup ? &exhausted_ : nullptr;
+    try { if (runtime_ && !runtime_->block_worker(kind_, starved)) { admitted_ = false; runtime_ = nullptr; } }
     catch (const std::system_error&) {  // C140 (a): no worker thread for a blocking wait: refused like the capacity
         if (kThreadFailureInternal || kind_ != ParallelWaitKind::Blocking) throw;
         admitted_ = false; exhausted_ = true; runtime_ = nullptr;
     }
+    if (starved && exhausted_ && runtime_) runtime_->starve(offset);  // C141: noexcept, allocation-free
 }
 ParallelBlock::~ParallelBlock() { if (runtime_) runtime_->resume_worker(kind_); }
 bool ParallelRuntime::try_acquire(std::string& error) {

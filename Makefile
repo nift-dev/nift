@@ -1212,7 +1212,11 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 # C140c (D-083 #2, #3): every test-rt-vm suite runs through tests/runtime2/suite_status.sh, which keeps its complete
 # log ($(RT_VM_SUITE_LOGS)/NAME.log) and records its status; a failing suite does not stop the others (the "-"), and
 # the last line prints one PASSED / FAILED / NOT-RUN line per expected suite and the counts, and sets the status:
-# 0 every suite passed; 3 every suite passed except async-memory's known defect R1 (D-082); 1 anything else.
+# 0 every suite passed; 1 anything else. C141 (D-084 L2): the first prerequisite deletes the previous run's status and
+# logs, the recipe's first line records this run's identity (HEAD, tree, nift sha256, time, nonce), and the summary
+# checks it and writes $(RT_VM_SUITE_LOGS)/SUMMARY last; `make test-rt-vm-verify` (suite_status.sh verify) accepts
+# only a completed, passed run of the current identity, so stale results are never evidence. Durable certification
+# evidence stays certify.py's (B21: scripts/certify_evidence.py, enforced by tests/runtime2/certification_guard.sh).
 RT_VM_SUITE_STATUS = $(TEST_DIR)/test-rt-vm.suites
 RT_VM_SUITE_LOGS = $(TEST_DIR)/test-rt-vm-logs
 RT_VM_SUITE = bash tests/runtime2/suite_status.sh run "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
@@ -1222,8 +1226,13 @@ RT_VM_SUITES = rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint leg
 	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
 	vm-modules module-host-order vm-structs vm-globals semantics-modules semantics-modules-structs \
 	modules-d041 cp12b-inventory async-memory
-test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
-	@bash tests/runtime2/suite_status.sh reset "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
+.PHONY: test-rt-vm-invalidate test-rt-vm-verify
+test-rt-vm-invalidate:
+	@bash tests/runtime2/suite_status.sh invalidate "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
+test-rt-vm-verify:
+	@bash tests/runtime2/suite_status.sh verify "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
+test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+	@bash tests/runtime2/suite_status.sh reset "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) rt-vm-unit -- "$(RT_VM_UNIT)"
 	-@$(RT_VM_SUITE) rt-vm-globals -- "$(RT_VM_GLOBALS)"
 	-@$(RT_VM_SUITE) rt-vm-modules -- "$(RT_VM_MODULES)"
@@ -1261,7 +1270,7 @@ test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT
 	-@$(RT_VM_SUITE) modules-d041 -- python3 tests/runtime2/modules_d041.py --nift "$(CURDIR)/$(TARGET)" --legacy-today
 	-@$(RT_VM_SUITE) cp12b-inventory -- python3 tools/rt-vm/cp12b_inventory.py selftest
 	-@$(RT_VM_SUITE) async-memory -- $(ASYNC_MEMORY_GATE)
-	@bash tests/runtime2/suite_status.sh summary "$(RT_VM_SUITE_STATUS)" $(RT_VM_SUITES)
+	@bash tests/runtime2/suite_status.sh summary "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" $(RT_VM_SUITES)
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
 # sanitized nift (both engines in one sanitized binary).
@@ -1583,14 +1592,12 @@ test-runtime2-output-order: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 
-# C140 (D-077 #5 item 2): async recursion memory safety, with its eleven mutants and the fault-injection build
-# (tests/runtime2/async_memory.py). Exit status (C140b/C140c, D-082): 0 = every case passes; 3 = every case passes
-# except the known P1 safety defect R1 (reported "FAIL known-defect-r1" and "FAILED (known, outstanding)", never as
-# a pass; make says "Error 3"); anything else (1, 2) = a failure. The mutants run either way.
+# C140 (D-077 #5 item 2): async recursion memory safety, with its mutants and the fault-injection build
+# (tests/runtime2/async_memory.py). Exit status: 0 = every case passes and every mutant is caught; 1 = a failure.
+# C141 (D-084, D-085) repaired R1 and R2, so the C140b exit 3 for the known defect R1 is gone.
 # C140c (REVIEW-C140B G1): it is NOT a prerequisite of test-rt-vm (a failing prerequisite stops make before
-# test-rt-vm's own recipe, so its suites would never run while R1 is open); it is the last suite of the test-rt-vm
-# recipe instead (ASYNC_MEMORY_GATE through suite_status.sh, after every other suite), and the suite summary that
-# follows reports it and sets test-rt-vm's status (3 while R1 is the only failure).
+# test-rt-vm's own recipe, so its suites would never run); it is the last suite of the test-rt-vm recipe instead
+# (ASYNC_MEMORY_GATE through suite_status.sh, after every other suite), and the suite summary that follows reports it.
 ASYNC_MEMORY_GATE = env $(HARNESS_TOOLCHAIN_ENV) bash tests/runtime2/async_memory_gate.sh "$(CURDIR)/$(TARGET)" $(PYTHON)
 .PHONY: test-runtime2-async-memory
 test-runtime2-async-memory: $(TARGET)
@@ -3040,7 +3047,7 @@ test-guarantee-registry-ci:
 	python3 scripts/check_guarantee_registry.py --local
 
 test-test-integrity:
-	python3 scripts/test_integrity_check.py tests scripts --output "$(TEST_DIR)/bh2/test-integrity-report.json"
+	python3 scripts/test_integrity_check.py tests scripts --makefile Makefile --output "$(TEST_DIR)/bh2/test-integrity-report.json"
 	python3 scripts/check_header_name_collisions.py
 
 BH1_WEBSITE_ROOT ?= ../nift-dev.github.io

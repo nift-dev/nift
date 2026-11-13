@@ -158,7 +158,7 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     context.in_worker = options_.current_task != nullptr || (coro_ && coro_->current != 0);
     if (spec.id >= natives::BuiltinId::SharedMutex && spec.id <= natives::BuiltinId::AtomicCompareExchange) {
         context.protos = transfer_map_;
-        context.task = options_.current_task;
+        context.task = options_.current_task; context.parallel = options_.parallel.get();
         if (!shared_owner_token_) {
             static std::atomic<std::uint64_t> next_owner{1};
             shared_owner_token_ = next_owner.fetch_add(1, std::memory_order_relaxed);

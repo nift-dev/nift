@@ -1,8 +1,7 @@
 #pragma once
 // Source-thread snapshot validation and bounded parallel task submission.
 #include <memory>
-#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT == 11 || \
-                                          NIFT_ASYNC_MEMORY_MUTANT == 12)
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -15,6 +14,7 @@ namespace nift::rt {
 struct ParallelTaskRecord;
 // C140 (a): the stable `limit.exceeded` text when no worker thread can be created (known-limitations.md).
 inline constexpr const char* kParallelResourcesExhausted = "parallel task resources exhausted";
+inline constexpr const char* kParallelBudgetExceeded = "parallel task memory budget exceeded";  // C140 (b)
 struct VmResult;
 // C140: records a task's budget or thread-creation failure with its runtime (ParallelRuntime::note_limit), so that
 // the run ends with it even when no one awaits the task.
@@ -22,33 +22,48 @@ void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& resul
 // C140a/C140b, test-only. Mutant 11 keeps the old Internal mapping of a bad_alloc creating a task; builds 9, 11 and 12
 // fail the n-th pass through a site, NIFT_TEST_PARALLEL_BAD_ALLOC="<site>:n": std::bad_alloc at "start" or
 // "submit" (task creation), std::system_error (no thread) at "wait", "timer" or "cleanup" (a worker's ParallelBlock of
-// that kind: Blocking, Timer, Cleanup).
-// Absent from production builds (the build guard refuses *MUTANT* defines on production objects).
-#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT == 11 || \
-                                          NIFT_ASYNC_MEMORY_MUTANT == 12)
+// that kind: Blocking, Timer, Cleanup); C141: "nothread:n" fails every worker-thread start from the n-th on (sticky).
+// Builds 13-18 (C141 mutants) keep the hook too. Absent from production builds (the build guard refuses *MUTANT*
+// defines on production objects).
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
 // The variable holds one or more comma-separated "<site>:n" items, each counted separately ("wait:1,cleanup:1").
 inline void inject_bad_alloc(const char* site) {
-    static const char* const sites[] = {"start", "submit", "wait", "timer", "cleanup"};
-    static std::atomic<int> counts[5];
+    static const char* const sites[] = {"start", "submit", "wait", "timer", "cleanup", "nothread"};
+    static std::atomic<int> counts[6];
     const char* spec = std::getenv("NIFT_TEST_PARALLEL_BAD_ALLOC");
     const std::size_t n = std::strlen(site);
     int index = 0;
-    while (index < 5 && std::strcmp(sites[index], site) != 0) ++index;  // rt-lint: allow-string-compare test-only
-    if (!spec || index == 5) return;
+    while (index < 6 && std::strcmp(sites[index], site) != 0) ++index;  // rt-lint: allow-string-compare test-only
+    if (!spec || index == 6) return;
     for (const char* at = std::strstr(spec, site); at; at = std::strstr(at + 1, site)) {
         if ((at != spec && at[-1] != ',') || at[n] != ':') continue;
-        if (++counts[index] != std::atoi(at + n + 1)) return;
+        const int count = ++counts[index], nth = std::atoi(at + n + 1);
+        if (index == 5 ? count < nth : count != nth) return;  // "nothread" stays failed from the n-th start on
         if (site[0] == 's') throw std::bad_alloc();
         throw std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 }
 #define NIFT_INJECT_BAD_ALLOC(site) ::nift::rt::inject_bad_alloc(site)
+// C141: a charge still reserved when the runtime is destroyed (a leak) aborts the fault-injection builds.
+#define NIFT_CHECK_DRAINED(reserved) ((reserved) != 0 ? std::abort() : static_cast<void>(0))
 #define NIFT_INJECT_WAIT(k) ::nift::rt::inject_bad_alloc((k) == ParallelWaitKind::Timer ? "timer" \
                                                      : (k) == ParallelWaitKind::Cleanup ? "cleanup" : "wait")
 #else
 #define NIFT_INJECT_BAD_ALLOC(site) static_cast<void>(0)
+#define NIFT_CHECK_DRAINED(reserved) static_cast<void>(0)
 #define NIFT_INJECT_WAIT(k) static_cast<void>(0)
 #endif
+// C141 test-only switches (mutants): 13 restores the cleanup-wait rethrow (std::terminate), 14 removes the sweep of
+// queued work, 15 removes the refusal of new work once starved, 16 marks swept tasks "cancelled", 18 lets a shared
+// wait block after a fatal limit (D-085). (17, the starving block without its notify, caught by no test: removed.)
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT >= 13
+inline constexpr int kStarveMutant = NIFT_ASYNC_MEMORY_MUTANT;
+#else
+inline constexpr int kStarveMutant = 0;
+#endif
+inline constexpr bool kCleanupRethrow = kStarveMutant == 13, kStarveSweeps = kStarveMutant != 14;
+inline constexpr bool kStarveAdmits = kStarveMutant == 15, kStarveCancels = kStarveMutant == 16;
+inline constexpr bool kFatalWaits = kStarveMutant != 18;
 inline constexpr bool kAllocFailureInternal =
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 11
     true;

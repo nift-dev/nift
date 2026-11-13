@@ -397,6 +397,8 @@ hook in mutant 9's build.
   `main done`, then `error: main.f:6:3: parallel task resources exhausted` (`6:8` for thread()), exit 1. M9 gives
   `1:1` in every run (5 of 5 for each form) and is caught deterministically. No probabilistic acceptance remains in
   any gate case; the real-limit detached recursion is not run by the suite.
+- (Superseded by C141, section 12: R1 is fixed; `known-defect-r1`, the exit 3 and the "known, outstanding" reporting
+  are gone, and the suite exits 0. The text below is the C140b/C140c record.)
 - **R1: P1 safety defect (D-082), known and outstanding.** A thread-creation failure in the cleanup wait of a task's
   teardown (`ParallelBlock(Cleanup)` in the `noexcept` `Vm::coro_abort_parallel`) ends the process with
   `std::terminate`, exit 134, no Nift message.
@@ -442,3 +444,122 @@ hook in mutant 9's build.
   - Consequence: the parallel-task resource-safety requirement stays FAILED while R1 is open. It blocks a clean
     safety PASS and a public release. C140, C140a and C140b are not a full resource-safety certification.
 
+
+## 12. C141 (owner D-084 #4, D-085): R1 and R2 repaired
+
+Owner authority: D-084 #4 (the bounded R1 repair, under the coordinator's brief) and D-085 (the reviewer's extended
+Option 1, after the C141 stop report REVIEW-C141-STOP: the sweep alone turned R1's abort into a hang, and R2 already
+existed at 0895a234). Approved semantics: once a fatal resource limit has been recorded, by the starve (below) or by
+C140 (d)'s note path, every shared wait (`send`, both of its waits; `recv`; mutex `lock`) that would block ends the
+run through the non-catchable limit path, exit 1, at that wait's position, with the first recorded reason.
+
+- **R1 (cleanup wait, the starve).** A cleanup wait (`ParallelBlock(Cleanup)` in the `noexcept`
+  `Vm::coro_abort_parallel` and `Vm::close_handle_runtime`) whose compensating worker cannot start no longer rethrows
+  (`std::terminate`, exit 134). It keeps its block (its CPU permit stays released, so the waited-for task can still
+  run), notifies `resume_cv_` and `cv_` like any successful block (the M1 fix), and starves the runtime
+  (`ParallelRuntime::starve`, parallel_starve.cpp): the limit is recorded once (`parallel task resources exhausted`, at
+  the spawn of the task being cleaned up); every queued task is swept: it fails unrun with `limit.exceeded` at its
+  own spawn, its waiters are woken and its charge is released once (as `cancel_queued`); every later `submit` is
+  refused with the same limit; the shared waits are woken. The starve allocates nothing and throws nothing: the queue
+  is swapped with a deque kept for the purpose, the message is a static string, the error code is a 14-character
+  literal; the fault-injection builds make any allocation by the starving thread throw, which in that `noexcept` path
+  would be exit 134, and every starve the tests drive exits 1. `resume_cv_` needs no notify in the starve itself (a
+  sweep changes no CPU permit).
+- **R2 (shared waits after a fatal limit).** `ParallelRuntime::fatal_limit()` is the runtime's first recorded fatal
+  limit (an atomic static string, set under the runtime mutex together with the existing C140 limit record, never
+  overwritten): `note_limit` (C140 (d): a task ended with the budget or thread limit) and `starve` set it and wake
+  the shared waits. `shared_detail::wait_shared` takes the caller's runtime (per runtime, never process-wide: the VM
+  passes `options_.parallel`, which is the root's runtime on the main thread and the same runtime, non-owning, in
+  every isolate) and, when its condition is not ready, returns that reason instead of blocking (also when woken); the
+  four call sites report it as `limit.exceeded`. A wait whose condition is already ready completes as before.
+- **What a run looks like.** R1's program: `before`, `runtime.cancelled`, `after`, then `error: main.f:18:8: parallel
+  task resources exhausted`, exit 1 (the root's own code still runs; the limit ends the run, as for any un-awaited
+  task's limit, C140 (d)). d1.f (R2) under a budget that refuses the producer: `before`, `error: main.f:12:6: parallel
+  task memory budget exceeded`, exit 1, where it hung before.
+- **Not changed.** Healthy scheduling (no limit recorded: no new branch is taken but a null check before blocking);
+  the D-079 records (the limit errors stay non-catchable); output order (published output stays in program order;
+  the cases compare stdout exactly). The existing limitations stay: a task that computes without waiting is never
+  interrupted (non-cooperative code); and **found in C141, outside D-085, not repaired**: an uncaught error of the
+  main program while a task it started is blocked in a shared wait nothing will satisfy waits for that task forever
+  (`Vm::coro_uncaught` -> `Coro::wait_parallel`), with an ordinary error too (`1 / 0` after starting a task blocked in
+  `recv`: exit 124 under a 10 s timeout here) and with the root's own refused spawn; it is not a recorded fatal limit.
+
+### 12.1 Tests (tests/runtime2/async_memory.py; 18 new cases, `known-defect-r1` removed)
+
+Injected cases run on the fault-injection build (12) 3 times each and must give the exact result every time; the
+others on the production build. OPS, CONC and FIRST take their operation from their first line: op 0 is the
+calibration (the same text, so the same charges: the least budget under which it succeeds is the budget under which
+op 1's failing spawn, and only it, is refused).
+
+| Case | Program, fault | Exact result (exit 1 unless stated) |
+| --- | --- | --- |
+| r1-cleanup-wait | R1, `cleanup:1` | `before/runtime.cancelled/after`, `18:8` resources |
+| r2-thread-start | R1, `nothread:2`, 2 workers | `before`, `24:1` resources (the root's `recv(ready)`) |
+| hang-a | hang_a.f (review), `cleanup:1`, 2 workers | the producer ran: `..42/after`, `19:8`; or it was swept: `37:6` (the recv) |
+| hang-b | hang_b.f (review), `cleanup:1`, 2 workers | swept: `before/runtime.cancelled`, `45:6` (the recv); or ran: `19:8` |
+| r2-budget | d1.f (review), production, least budget - 1 | `before`, `12:6` budget (hung before) |
+| r2-submit, r2-start | d1.f, `submit:2` / `start:2` | `before`, `12:6` resources |
+| wait-{recv,send,lock}-after | OPS op 1/2/3: the failure first (the root sleeps 300 ms) | `before`, `30:8` / `34:3` (the 2nd send) / `37:3` budget |
+| wait-{recv,send,lock}-woken | the same, the wait first (the helper sleeps 300 ms) | the same |
+| wait-concurrent | CONC: 3 tasks blocked in recv, send and lock; 3 budget failures; the root in recv | `before`, `52:8` budget, one error line, no `never` |
+| first-reason | FIRST: a budget failure, then a starve (`cleanup:1`); and the starve alone | `38:8` budget; alone: `38:8` resources |
+| starve-await-swept | SWEPT: a queued task (behind a 30M-iteration task) awaited after the starve | `42:6` `future: ` resources; its `marker` never printed |
+| starve-spawn-refused | SPAWN: a spawn after the starve | `35:6` resources; no `marker` |
+| healthy-unchanged | R1, hang_a, hang_b, SWEPT, SPAWN, d1 without any fault, production | exit 0 and the full output |
+
+The hang-a and hang-b alternatives are the two schedules of the reviewers' programs (the producer dequeued before
+or after the starve); both are exact and exit 1; the M14 case (SWEPT) does not depend on that schedule (its queued
+task cannot start while two long tasks hold both permits). Accounting: the fault-injection builds abort (exit 134)
+when a runtime is destroyed with any charge still reserved (`NIFT_CHECK_DRAINED`; checked once by inverting it: all
+three exit paths tried aborted), and an over-release aborts in every build (C140a), so every injected case also
+checks that each charge was released exactly once.
+
+### 12.2 Mutants (each a sanctioned_mutant.py build; every one keeps the fault hook)
+
+| Mutant | Change | Caught by |
+| --- | --- | --- |
+| 13 | the cleanup wait rethrows (std::terminate) | r1-cleanup-wait, starve-spawn-refused (exit 134) |
+| 14 | no sweep of queued tasks | starve-await-swept (the queued task runs and prints) (hang-b does not catch it: its recv fails by the R2 path either way) |
+| 15 | no refusal once starved | starve-spawn-refused |
+| 16 | swept tasks marked cancelled | starve-await-swept (catchable `runtime.cancelled`) |
+| 18 | `wait_shared` ignores the fatal limit | r2-budget, r2-submit, wait-recv-woken, wait-send-after, wait-lock-woken, wait-concurrent (hang: the 20 s timeout) |
+
+A mutant for the M1 notify (17: the starving block returns without notifying) was built and run against every
+injected case: none catches it, so it is not in MUTANTS and its switch was removed. A missed notify only delays a
+task resuming at that moment until the next completion notifies `resume_cv_`; a hang needs every resumer to queue
+before the starving thread's next instructions, which no test can force without a scheduling hook.
+
+### 12.3 Harness (D-084 L1-L4)
+
+- **The R1 tolerance and the exit-3 convention are gone** from async_memory.py, async_memory_gate.sh,
+  suite_status.sh and the Makefile: the suite and test-rt-vm exit 0 or 1.
+- **L1:** test_integrity_check.py's new rule `suite-wiring` (`make test-test-integrity` passes `--makefile Makefile`)
+  fails when RT_VM_SUITES names a suite twice, when a `-@` line of the test-rt-vm recipe is not
+  `$(RT_VM_SUITE) NAME --`, when the recipe runs a suite twice, or when the recipe's suites and RT_VM_SUITES differ.
+  Shown on scratch copies of the Makefile: a duplicated name, a bare `-@python3 ...vm_golden.py` line and a second
+  vm-golden line are each a finding (exit 1); the real Makefile is clean.
+- **L2:** a stale status file or log is never evidence. `test-rt-vm-invalidate`, the first prerequisite, deletes the
+  previous run's status and logs; the recipe's first line writes this run's identity (HEAD, tree, uncommitted-file
+  count, nift path and sha256, UTC time, nonce) as the status file's first line; the summary rejects a status file
+  whose identity is not the current checkout and binary, and writes `LOGDIR/SUMMARY` last; `make test-rt-vm-verify`
+  (`suite_status.sh verify`) accepts only a completed, passed run of the current identity. Negative control (scratch
+  Makefile with two suites, l2/negctl.log): with a completed PASS run present, a failing prerequisite leaves nothing
+  (verify: FAIL); without the invalidate prerequisite (the C140c shape) and a changed binary, the stale PASS files
+  are rejected by identity; an interrupted run (no SUMMARY), a failed suite and a hand-edited identity are rejected;
+  the positive control verifies. Durable certification evidence is unchanged and stays certify.py's: B21 (C42) is
+  implemented in scripts/certify_evidence.py and scripts/certify.py (evidence outside every tree; missing evidence
+  is FAILED, never a pass) and enforced by tests/runtime2/certification_guard.sh (its B21 section and the owner's
+  six-step acceptance test).
+- **L3/L4, I2:** R1 and R2 are recorded as fixed by C141 (known-limitations.md). No document carried a `make -k test`
+  note (REVIEW-C140C L4), so none is removed. I2 (test-rt-vm's permanent exit 3 stopping a plain `make test`) is
+  gone with the exit 3; a plain `make test` still stops at the first failing target, and `test-runtime2-host-deps`
+  is a known FAILED `test:` prerequisite (24 refusals, C129, D-071 #1), so a full local run still needs `make -k
+  test` for that unrelated reason.
+
+### 12.4 Size
+
+Production (`src/`, `git diff --numstat` against 9fe26ecd): see the C141 report for the split; the non-comment,
+non-blank added lines are about 105 production and 40 test-only (the fault hook, the mutant switches, the
+no-allocation and drained checks, all compiled only under `NIFT_ASYNC_MEMORY_MUTANT`).
+
+Gate results for this commit are in the C141 report (run on the committed tree).

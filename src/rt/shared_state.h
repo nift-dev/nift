@@ -17,6 +17,7 @@ namespace nift::rt {
 
 class TransferProtoMap;
 struct ParallelTaskRecord;
+class ParallelRuntime;
 
 struct SharedOpError {
     std::string code;
@@ -35,8 +36,10 @@ Value shared_make_atomic_int(std::int64_t initial, SharedOpError& error);
 Value shared_make_atomic_bool(bool initial, SharedOpError& error);
 Value shared_make_channel(std::int64_t capacity, SharedOpError& error);
 
+// `runtime` (C141, D-085): the caller's parallel runtime, whose fatal limit fails a wait that would block.
 bool shared_mutex_lock(const Value& handle, std::uint64_t owner,
-                       const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error);
+                       const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error,
+                       const ParallelRuntime* runtime = nullptr);
 bool shared_mutex_try_lock(const Value& handle, std::uint64_t owner, bool& locked, SharedOpError& error);
 bool shared_mutex_unlock(const Value& handle, std::uint64_t owner, SharedOpError& error);
 bool shared_mutex_locked(const Value& handle, bool& locked, SharedOpError& error);
@@ -46,10 +49,11 @@ bool shared_mutex_set(const Value& handle, std::uint64_t owner, const Value& val
                       SharedOpError& error);
 
 bool shared_channel_send(const Value& handle, const Value& value, const TransferProtoMap* protos,
-                         const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error);
+                         const std::shared_ptr<ParallelTaskRecord>& task, SharedOpError& error,
+                         const ParallelRuntime* runtime = nullptr);
 bool shared_channel_recv(const Value& handle, const TransferProtoMap* protos,
                          const std::shared_ptr<ParallelTaskRecord>& task, Value& out, bool& closed,
-                         SharedOpError& error);
+                         SharedOpError& error, const ParallelRuntime* runtime = nullptr);
 bool shared_channel_close(const Value& handle, SharedOpError& error);
 bool shared_channel_close_any(const Value& handle, SharedOpError& error);
 

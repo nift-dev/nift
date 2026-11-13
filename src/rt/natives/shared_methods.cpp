@@ -82,7 +82,7 @@ Status shared_channel(const Context& context, const Value* args, std::uint32_t a
 Status shared_send(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc != 2) return invalid(context, "send: expected a channel and a value", error);
     SharedOpError failure;
-    shared_channel_send(args[0], args[1], context.protos, context.task, failure);
+    shared_channel_send(args[0], args[1], context.protos, context.task, failure, context.parallel);
     return complete(context, failure, out, error);
 }
 
@@ -91,7 +91,7 @@ Status shared_recv(const Context& context, const Value* args, std::uint32_t argc
     SharedOpError failure;
     Value value;
     bool closed = false;
-    if (!shared_channel_recv(args[0], context.protos, context.task, value, closed, failure))
+    if (!shared_channel_recv(args[0], context.protos, context.task, value, closed, failure, context.parallel))
         return recoverable(context, failure, error);
     if (closed) {
         std::string why;
@@ -117,7 +117,7 @@ Status shared_cancel(const Context& context, const Value* args, std::uint32_t ar
 Status mutex_lock(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (!no_args(argc, "lock", error)) return Status::Error;
     SharedOpError failure;
-    shared_mutex_lock(args[0], context.owner_token, context.task, failure);
+    shared_mutex_lock(args[0], context.owner_token, context.task, failure, context.parallel);
     return complete(context, failure, out, error);
 }
 

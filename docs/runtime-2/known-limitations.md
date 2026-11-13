@@ -180,15 +180,19 @@ enforcement.** Each task's heap has its own budget (pre-existing): six tasks tha
 can observe; a process killed by the operating system (the OOM killer, a signal) before an allocation returns is
 outside any user-space guarantee.
 
-**P1 SAFETY DEFECT R1 (D-082), open; blocks a clean safety PASS and a public release.** A thread-creation failure
-during the cleanup wait of a task's teardown (its cancellation, or the end of a task whose wait for a child was
-refused) ends the process abnormally: `std::terminate`, exit 134, no Nift message. It predates C140 (932ff5e2). It is
-reachable without injection under an address-space limit (about 2 in roughly 300 detached-recursion runs measured by
-the reviewer); other thread limits (cgroup `pids.max`, `RLIMIT_NPROC`) were not tested and may reach it more often.
-It is reproduced deterministically by `known-defect-r1` (tests/runtime2/async_memory.py, fault injection), which
-reports it as FAILED (known, outstanding) with exit 3 (the last suite of `test-rt-vm`, whose per-suite summary lists it). A bounded repair has been
-investigated (INVESTIGATION-R1-CLEANUP-ABORT.md) and is pending an owner scope decision. Details:
-checkpoints/async-memory.md sections 10-11.
+**R1 and R2: fixed by C141 (D-084, D-085).** R1 (P1, D-082): a thread-creation failure during the cleanup wait of
+a task's teardown (its cancellation, or the end of a task whose wait for a child was refused) ended the process in
+`std::terminate` (exit 134, no Nift message); it predated C140 (932ff5e2). R2 (found in the C141 review, present at
+0895a234 with only `NIFT_VM_HEAP_BUDGET`): after a task's budget or thread failure, a shared wait that nothing would
+ever satisfy (a `recv` on a channel the failed task was to fill) blocked forever. Since C141, once a run has a fatal
+resource limit (a task's budget or thread failure, or a cleanup wait that cannot start a worker, which also fails
+every queued task unrun and refuses new ones), every `send`, `recv` or mutex `lock` that would block ends the run with
+exit 1 at its own position and the first recorded reason (`parallel task memory budget exceeded` or `parallel task
+resources exhausted`); a wait that can complete without blocking still completes. Remaining limitations (unchanged,
+not caused by a limit): a task that computes without waiting is never interrupted, so the run ends only when it
+finishes (non-cooperative code); and an uncaught error of the main program while a task it started is blocked in a
+shared wait nothing will satisfy still waits for that task forever (also with an ordinary error such as `1 / 0`; found
+in C141, outside D-085's scope, reported). Details: checkpoints/async-memory.md sections 10-12.
 C140 is not a full resource-safety certification.
 
 **This is not comprehensive memory accounting.** Each task's own live heap is bounded by its own copy of the
@@ -198,7 +202,7 @@ under an address-space limit) the run stops with `parallel task resources exhaus
 while a task is being created (C140a, D-081); an allocation failure anywhere else is still an internal failure. The number of tasks that can be unfinished at once is floor(budget / c), with c =
 64 KiB + the task's bootstrap bytes (about 73 KB for a small program: 14,651 tasks under the default budget; before
 C140 the admission capacity, 16,384, was the only bound). A budget or thread failure in a task nobody awaits still
-ends the run, after the rest of the program, with exit 1; an ordinary error of such a task is ignored, as before.
+ends the run, after the rest of the program (or at the first shared wait that would block, C141), with exit 1; an ordinary error of such a task is ignored, as before.
 Deep recursion through `async`/`thread()` is also slow beyond a few hundred
 levels (about 60 s at depth 1000; the scheduler wakes every blocked level on each completion). Details:
 [checkpoints/async-memory.md](checkpoints/async-memory.md).

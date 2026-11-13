@@ -36,7 +36,7 @@ void Vm::coro_abort_parallel() noexcept {
     shared_detail::notify_shared_cancellation();
     for (const auto& record : coro_->parallel_live) {
         if (!record || record->complete()) continue;
-        ParallelBlock blocked(ParallelWaitKind::Cleanup);
+        ParallelBlock blocked(ParallelWaitKind::Cleanup, record->spawn_offset);  // C141: never throws here
         std::unique_lock<std::mutex> lock(record->mutex);
         record->cv.wait(lock, [&] { return record->state != ParallelTaskState::Pending; });
     }

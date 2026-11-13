@@ -21,6 +21,11 @@ Families (rule ids):
                       a conditional, assertion, raise or exit path
   vacuous-pass        a guard can only ever print PASS (no subprocess, no
                       assertion construct), i.e. it tests nothing
+  suite-wiring        (C141, D-084 L1; --makefile) the Makefile's test-rt-vm
+                      suite list names a suite twice, or a `-@` line of the
+                      test-rt-vm recipe is not a $(RT_VM_SUITE) suite (its
+                      status would never reach the summary), or the recipe's
+                      suites and RT_VM_SUITES differ
 
 The swallowed-returncode rule is deliberately conservative in its idea of
 "controls the outcome": it strips statically-dead blocks (if False:, if 0:,
@@ -938,6 +943,54 @@ def scan_shell(text: str, path: Path) -> list[dict]:
     return findings
 
 
+# --- Makefile suite wiring (C141, D-084 L1) -----------------------------------
+
+def scan_makefile_suites(text: str, path: Path) -> list[dict]:
+    """test-rt-vm: every `-@` recipe line runs through $(RT_VM_SUITE) (suite_status.sh run), each suite once, and the
+    recipe's suites are exactly RT_VM_SUITES (what the summary expects)."""
+    findings: list[dict] = []
+    logical = re.sub(r"\\\n", " ", text).split("\n")
+
+    def finding(detail: str) -> None:
+        findings.append({"rule": "suite-wiring", "file": str(path), "detail": detail})
+
+    listed: list[str] = []
+    for line in logical:
+        m = re.match(r"^RT_VM_SUITES\s*:?=\s*(.*)$", line)
+        if m:
+            listed = m.group(1).split()
+    if not listed:
+        finding("RT_VM_SUITES is not defined")
+    for name in sorted({n for n in listed if listed.count(n) > 1}):
+        finding(f"RT_VM_SUITES names {name} {listed.count(name)} times")
+    recipe: list[str] = []
+    for i, line in enumerate(logical):
+        if line.startswith("test-rt-vm:") and i + 1 < len(logical) and logical[i + 1].startswith("\t"):
+            for body in logical[i + 1:]:
+                if not body.startswith("\t"):
+                    break
+                recipe.append(body)
+            break
+    if not recipe:
+        finding("no test-rt-vm recipe")
+    ran: list[str] = []
+    for body in recipe:
+        if not body.startswith("\t-@"):
+            continue
+        m = re.match(r"^\t-@\$\(RT_VM_SUITE\)\s+(\S+)\s+--\s", body)
+        if not m:
+            finding(f"test-rt-vm recipe line is not a $(RT_VM_SUITE) suite: {body.strip()[:100]}")
+            continue
+        ran.append(m.group(1))
+    for name in sorted({n for n in ran if ran.count(n) > 1}):
+        finding(f"the test-rt-vm recipe runs suite {name} {ran.count(name)} times")
+    for name in sorted(set(ran) - set(listed)):
+        finding(f"the test-rt-vm recipe runs suite {name}, which RT_VM_SUITES does not list")
+    for name in sorted(set(listed) - set(ran)):
+        finding(f"RT_VM_SUITES lists suite {name}, which the test-rt-vm recipe does not run")
+    return findings
+
+
 # --- dispatch ---------------------------------------------------------------
 
 def scan_file(path: Path) -> list[dict]:
@@ -957,10 +1010,14 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("paths", nargs="+", type=Path)
     ap.add_argument("--output", required=True, type=Path)
+    ap.add_argument("--makefile", type=Path, help="also check the Makefile's test-rt-vm suite wiring")
     args = ap.parse_args()
 
     findings: list[dict] = []
     scanned: list[str] = []
+    if args.makefile:
+        scanned.append(str(args.makefile))
+        findings.extend(scan_makefile_suites(args.makefile.read_text(encoding="utf-8"), args.makefile))
     for root in args.paths:
         if root.is_dir():
             files = sorted(root.rglob("*"))

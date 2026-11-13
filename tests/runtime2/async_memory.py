@@ -23,18 +23,22 @@ is also the check that a nested snapshot does not grow (no wrapper image, no wra
                               10 (a completed task's charge released twice) and 11 (std::bad_alloc creating a
                               task mapped to Internal again, with the fault-injection hook), built by sanctioned_mutant.py, must
                               each fail the cases named in MUTANTS; the mutant directories are deleted afterwards.
-                              Mutants 9 and 11 keep the fault-injection hook (their cases are injected).
+                              Mutants 9, 11 and 13-18 keep the fault-injection hook (their cases are injected).
 
-Exit status of --nift (C140b, D-082): 0 = every case passes; 3 = every case passes except known-defect-r1, which
-reproduced the known P1 safety defect R1 (a cleanup wait that cannot start a worker ends the process in
-std::terminate, exit 134) in every run, reported as "FAIL known-defect-r1: ..." and "FAILED (known, outstanding)"
-and never counted as a pass; 1 = any
-other failure, including known-defect-r1 giving anything but exit 134 in every run or the controlled exit 1 in every
-run (the expectation once R1 is repaired: the case then passes and the exit status is 0).
+C141 (R1, R2; D-084, D-085): once a run has a fatal resource limit (a task's budget or thread failure noted by the
+runtime, or a cleanup wait that cannot start a worker, which starves the runtime: queued tasks fail unrun, new ones
+are refused), every shared wait that would block (send, recv, lock) ends the run with exit 1 at its own position,
+with the first recorded reason; never exit 70, 134 or a hang. Mutants 13 (the cleanup wait rethrows: terminate),
+14 (no sweep of queued tasks), 15 (no refusal once starved), 16 (swept tasks "cancelled", catchable) and 18 (a
+shared wait ignores the fatal limit) keep the hook too. The fault-injection builds also abort (exit 134) when a
+runtime is destroyed with a charge still reserved (NIFT_CHECK_DRAINED), so every injected case checks the
+accounting, and an over-release aborts in every build (C140a).
+
+Exit status of --nift: 0 = every case passes; 1 = a failure. (The C140b exit 3 for the known defect R1 is gone.)
 """
 # The fault-injection build (NIFT_ASYNC_MEMORY_MUTANT=12, sanctioned_mutant.py) is made for the alloc-*,
-# timer-wait-thread, detached-* and known-defect-r1 cases and deleted afterwards; run through make
-# (HARNESS_TOOLCHAIN_ENV).
+# timer-wait-thread, detached-*, r1-*, r2-*, hang-*, starve-* and first-reason cases and deleted afterwards; run
+# through make (HARNESS_TOOLCHAIN_ENV).
 import argparse
 import os
 import resource
@@ -266,7 +270,347 @@ try {
 }
 print("after")
 """
-R1_LABEL = "KNOWN DEFECT R1 (P1, D-082): cleanup-wait thread failure -> std::terminate"
+# C141 (D-085): the reviewer's sweep routes (hang_a, hang_b), R2 (d1: a budget or thread failure in an un-awaited task,
+# then a recv that would block forever), each shared wait after and during a failure (OPS: op 1 recv, 2 send, 3 lock;
+# d 0: the failure is recorded first, d 300: the wait is blocked first and woken), concurrent and repeated failures
+# (CONC: three budget failures, three blocked workers and the root), the first reason kept (FIRST: a budget failure,
+# then a starve), the starve's sweep (SWEPT: a queued task awaited) and refusal (SPAWN: a spawn after it). OPS, CONC
+# and FIRST take their op from the first line: op 0 is the calibration run (same text, so the same charges: the
+# least budget under which it succeeds is the budget at which the failing spawn of op 1 is the one refused).
+HANG_A = """ready := channel(1)
+ch := channel(1)
+fn[async](leaf(n)) {
+  s := "ab"
+  i := 0
+  while (i < n) {
+    s = s + s
+    i += 1
+  }
+  send(ready, 1)
+  k := 0
+  while (k < 12) {
+    s = s.replace("a", "c").replace("c", "a")
+    k += 1
+  }
+  return s.length()
+}
+fn[async](parent()) {
+  t := leaf(22)
+  x := await t
+  return x
+}
+fn[async](producer()) {
+  send(ch, 42)
+  return 0
+}
+print("before")
+p := parent()
+recv(ready)
+q := producer()
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+v := recv(ch)
+print(v)
+print("after")
+"""
+HANG_B = """ready := channel(1)
+ch := channel(1)
+fn[async](leaf(n)) {
+  s := "ab"
+  i := 0
+  while (i < n) {
+    s = s + s
+    i += 1
+  }
+  send(ready, 1)
+  k := 0
+  while (k < 12) {
+    s = s.replace("a", "c").replace("c", "a")
+    k += 1
+  }
+  return s.length()
+}
+fn[async](parent()) {
+  t := leaf(22)
+  x := await t
+  return x
+}
+fn[async](busy2(n)) {
+  i := 0
+  while (i < n) {
+    i += 1
+  }
+  return i
+}
+fn[async](producer()) {
+  send(ch, 42)
+  return 0
+}
+print("before")
+p := parent()
+recv(ready)
+b := busy2(3000000)
+q := producer()
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+v := recv(ch)
+print(v)
+print("after")
+"""
+D1 = """ch := channel(1)
+fn[async](producer()) {
+  send(ch, 42)
+  return 0
+}
+fn[async](helper()) {
+  q := producer()
+  return 0
+}
+print("before")
+h := helper()
+v := recv(ch)
+print(v)
+print("after")
+"""
+OPS = """op := 0
+d := 0
+ch := channel(1)
+held := channel(1)
+m := mutex(0)
+fn[async](child()) {
+  return 0
+}
+fn[async](helper(t, go)) {
+  sleep(t)
+  if (go != 0) {
+    q := child()
+  }
+  return 0
+}
+fn[async](holder(mx, go)) {
+  mx.lock()
+  send(held, 1)
+  sleep(go * 700 + 300)
+  return 0
+}
+print("before")
+k := holder(m, op)
+recv(held)
+h := helper(d, op)
+if (d == 0) {
+  sleep(300)
+}
+if (op == 1) {
+  v := recv(ch)
+}
+if (op == 2) {
+  send(ch, 1)
+  send(ch, 2)
+}
+if (op == 3) {
+  m.lock()
+}
+print("never")
+"""
+CONC = """op := 0
+ch := channel(1)
+full := channel(1)
+send(full, 0)
+m := mutex(0)
+m.lock()
+fn[async](child()) {
+  return 0
+}
+fn[async](helper(go)) {
+  sleep(300)
+  if (go != 0) {
+    q := child()
+  }
+  return 0
+}
+fn[async](rx(c, go)) {
+  if (go == 0) {
+    sleep(600)
+    return 0
+  }
+  v := recv(c)
+  print("rx never")
+  return v
+}
+fn[async](tx(c, go)) {
+  if (go == 0) {
+    sleep(600)
+    return 0
+  }
+  send(c, 1)
+  print("tx never")
+  return 0
+}
+fn[async](locker(mx, go)) {
+  if (go == 0) {
+    sleep(600)
+    return 0
+  }
+  mx.lock()
+  print("lock never")
+  return 0
+}
+print("before")
+a := rx(ch, op)
+b := tx(full, op)
+l := locker(m, op)
+h1 := helper(op)
+h2 := helper(op)
+h3 := helper(op)
+if (op != 0) {
+  v := recv(ch)
+}
+print("never")
+"""
+FIRST = """op := 0
+ready := channel(1)
+ch := channel(1)
+fn[async](leaf(n)) {
+  send(ready, 1)
+  i := 0
+  while (i < n) {
+    i += 1
+  }
+  return i
+}
+fn[async](parent(go)) {
+  t := leaf(go * 27000000 + 3000000)
+  x := await t
+  return x
+}
+fn[async](child()) {
+  return 0
+}
+fn[async](helper(go)) {
+  if (go != 0) {
+    q := child()
+  }
+  return 0
+}
+print("before")
+p := parent(op)
+recv(ready)
+h := helper(op)
+sleep(300)
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+if (op != 0) {
+  v := recv(ch)
+}
+print("never")
+"""
+SWEPT = """ready := channel(1)
+ch := channel(1)
+fn[async](leaf(n)) {
+  s := "ab"
+  i := 0
+  while (i < n) {
+    s = s + s
+    i += 1
+  }
+  send(ready, 1)
+  k := 0
+  while (k < 12) {
+    s = s.replace("a", "c").replace("c", "a")
+    k += 1
+  }
+  return s.length()
+}
+fn[async](parent()) {
+  t := leaf(22)
+  x := await t
+  return x
+}
+fn[async](busy2(n)) {
+  i := 0
+  while (i < n) {
+    i += 1
+  }
+  return i
+}
+fn[async](producer()) {
+  send(ch, 42)
+  return 0
+}
+fn[async](marker()) {
+  print("marker")
+  return 7
+}
+print("before")
+p := parent()
+recv(ready)
+b := busy2(30000000)
+q := marker()
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+try {
+  v := await q
+  print(v)
+} catch (e) {
+  print(e.code)
+}
+print("after")
+"""
+SPAWN = """ready := channel(1)
+fn[async](leaf(n)) {
+  s := "ab"
+  i := 0
+  while (i < n) {
+    s = s + s
+    i += 1
+  }
+  send(ready, 1)
+  k := 0
+  while (k < 12) {
+    s = s.replace("a", "c").replace("c", "a")
+    k += 1
+  }
+  return s.length()
+}
+fn[async](parent()) {
+  t := leaf(22)
+  x := await t
+  return x
+}
+fn[async](marker()) {
+  print("marker")
+  return 7
+}
+print("before")
+p := parent()
+recv(ready)
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+z := marker()
+x := await z
+print(x)
+print("after")
+"""
 # C140a F2: a released charge must be exactly the one charged. One live sleeper, one awaited 1 ms task, then three
 # more sleepers under 3.5 charges: the 4th live task (the third sleeper after the await) is refused.
 RELEASE = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nb := z(3000)\nx := await z(1)\nc1 := z(3000)\n'
@@ -499,28 +843,92 @@ def case_detached(nift, src, where, runs=3):
     return problems
 
 
-R1_STATE = {}
-
-
-def case_r1(nift, runs=3):
-    """R1 is reported on its own: 'known' (every run ends in the std::terminate: the defect, FAILED, outstanding),
-    'fixed' (every run is the controlled limit error, exit 1: the permanent regression expectation once R1 is
-    repaired), or a plain FAIL for anything else (exit 0, exit 70, a mix)."""
+def hooked(src, fault, want, runs=3, workers=None, timeout=30):
+    """An injected case: `want` (or one of the tuples in a list `want`) in every run."""
     hook = HOOK.get("binary")
     if not hook:
         return ["no fault-injection build"]
-    outcomes = [run(hook, R1, env={"NIFT_TEST_PARALLEL_BAD_ALLOC": "cleanup:1"}, timeout=60) for _ in range(runs)]
-    terminated = [o for o in outcomes if o[0] == -6 and "terminate called after throwing an instance of " \
-                  "'std::system_error'" in o[2]]
-    controlled = [o for o in outcomes if o[0] == 1 and o[2].rstrip("\n").endswith(MESSAGE_THREADS)
-                  and "internal" not in o[2]]
-    if len(terminated) == runs:
-        R1_STATE["state"] = "known"
-        return []
-    if len(controlled) == runs:
-        R1_STATE["state"] = "fixed"
-        return []
-    return ["neither the known defect in every run nor the controlled exit 1 in every run: %r" % (outcomes,)]
+    env = {"NIFT_TEST_PARALLEL_BAD_ALLOC": fault} if fault else {}
+    if workers:
+        env["NIFT_VM_PARALLEL_WORKERS"] = str(workers)
+    wants = want if isinstance(want, list) else [want]
+    got = [run(hook, src, env=env, timeout=timeout) for _ in range(runs)]
+    return [] if all(g in wants for g in got) else ["want %r, got %r" % (wants, got)]
+
+
+def threads_at(where, stdout="before\n", prefix=""):
+    return (1, stdout, "error: main.f:%s: %s%s\n" % (where, prefix, MESSAGE_THREADS))
+
+
+def budget_at(where, stdout="before\n"):
+    return (1, stdout, "error: main.f:%s: %s\n" % (where, MESSAGE_BUDGET))
+
+
+CALIBRATED = {}
+
+
+def calibrated(nift, src, problems):
+    """The least budget under which op 0 of src succeeds (cached per binary and program)."""
+    key = (nift, src)
+    if key not in CALIBRATED:
+        CALIBRATED[key] = least_budget(nift, src, problems)
+    return CALIBRATED[key]
+
+
+def case_fatal(nift, src, op, want, d=0, runs=3, hook=False, fault=None):
+    """op of src under its calibrated budget: `want` in every run, under a 20 s timeout (a wait that ignores the
+    fatal limit blocks forever: mutant 18)."""
+    binary = HOOK.get("binary") if hook else nift
+    if not binary:
+        return ["no fault-injection build"]
+    problems = []
+    budget = calibrated(binary, src, problems)
+    if budget is None:
+        return problems
+    text = src.replace("op := 0", "op := %d" % op, 1).replace("d := 0", "d := %d" % d, 1)
+    env = {"NIFT_VM_HEAP_BUDGET": str(budget)}
+    if fault:
+        env["NIFT_TEST_PARALLEL_BAD_ALLOC"] = fault
+    got = [run(binary, text, env=env, timeout=20) for _ in range(runs)]
+    return [] if all(g == want for g in got) else ["budget %d: want %r, got %r" % (budget, want, got)]
+
+
+def case_d1_budget(nift):
+    """R2 as the review found it (d1.f): a budget failure in an un-awaited task, then a recv that would block forever.
+    Under one byte less than the least budget the program needs, the producer's spawn is the refused one."""
+    problems = []
+    need = least_budget(nift, D1, problems)  # every failing probe is the budget refusal (it hung before C141)
+    if need is None:
+        return problems
+    budget = need - 1
+    got = [run(nift, D1, env={"NIFT_VM_HEAP_BUDGET": str(budget)}, timeout=20) for _ in range(3)]
+    want = budget_at("12:6")
+    return [] if all(g == want for g in got) else ["budget %d: want %r, got %r" % (budget, want, got)]
+
+
+def case_first_reason(nift):
+    """The first recorded reason is kept: with a budget failure first and a starve after it the wait reports the
+    budget; with the starve alone (a large budget) it reports the resources (so the starve is reached)."""
+    problems = case_fatal(nift, FIRST, 1, budget_at("38:8", "before\nruntime.cancelled\n"), hook=True,
+                          fault="cleanup:1")
+    return problems + hooked(FIRST.replace("op := 0", "op := 1", 1), "cleanup:1",
+                             threads_at("38:8", "before\nruntime.cancelled\n"))
+
+
+def case_healthy(nift):
+    """Healthy scheduling is unchanged: the starve programs without a fault, on the production build, exit 0."""
+    problems = []
+    for name, src, workers, want in (
+            ("r1", R1, None, "before\nruntime.cancelled\nafter\n"),
+            ("hang_a", HANG_A, 2, "before\nruntime.cancelled\n42\nafter\n"),
+            ("hang_b", HANG_B, 2, "before\nruntime.cancelled\n42\nafter\n"),
+            ("swept", SWEPT, 2, "before\nmarker\nruntime.cancelled\n7\nafter\n"),
+            ("spawn", SPAWN, None, "before\nruntime.cancelled\nmarker\n7\nafter\n"),
+            ("d1", D1, None, "before\n42\nafter\n")):
+        got = run(nift, src, env={"NIFT_VM_PARALLEL_WORKERS": str(workers)} if workers else None, timeout=60)
+        if got != (0, want, ""):
+            problems.append("%s: %r" % (name, got))
+    return problems
 
 
 def case_release(nift):
@@ -634,7 +1042,28 @@ CASES = {
     "capacity": case_capacity,
     "detached-async": lambda n: case_detached(n, DETACHED, "6:3"),
     "detached-thread": lambda n: case_detached(n, DETACHED_THREAD, "6:8"),
-    "known-defect-r1": case_r1,
+    "r1-cleanup-wait": lambda n: hooked(R1, "cleanup:1", threads_at("18:8", "before\nruntime.cancelled\nafter\n")),
+    "r2-thread-start": lambda n: hooked(R1, "nothread:2", threads_at("24:1"), workers=2),
+    "hang-a": lambda n: hooked(HANG_A, "cleanup:1", [threads_at("19:8", "before\nruntime.cancelled\n42\nafter\n"),
+                                                    threads_at("37:6", "before\nruntime.cancelled\n")], workers=2),
+    "hang-b": lambda n: hooked(HANG_B, "cleanup:1", [threads_at("45:6", "before\nruntime.cancelled\n"),
+                                                    threads_at("19:8", "before\nruntime.cancelled\n42\nafter\n")],
+                               workers=2),
+    "r2-budget": case_d1_budget,
+    "r2-submit": lambda n: hooked(D1, "submit:2", threads_at("12:6")),
+    "r2-start": lambda n: hooked(D1, "start:2", threads_at("12:6")),
+    "wait-recv-after": lambda n: case_fatal(n, OPS, 1, budget_at("30:8")),
+    "wait-recv-woken": lambda n: case_fatal(n, OPS, 1, budget_at("30:8"), d=300),
+    "wait-send-after": lambda n: case_fatal(n, OPS, 2, budget_at("34:3")),
+    "wait-send-woken": lambda n: case_fatal(n, OPS, 2, budget_at("34:3"), d=300),
+    "wait-lock-after": lambda n: case_fatal(n, OPS, 3, budget_at("37:3")),
+    "wait-lock-woken": lambda n: case_fatal(n, OPS, 3, budget_at("37:3"), d=300),
+    "wait-concurrent": lambda n: case_fatal(n, CONC, 1, budget_at("52:8")),
+    "first-reason": case_first_reason,
+    "starve-await-swept": lambda n: hooked(SWEPT, "cleanup:1", threads_at("42:6", "before\nruntime.cancelled\n",
+                                                                          "future: "), workers=2),
+    "starve-spawn-refused": lambda n: hooked(SPAWN, "cleanup:1", threads_at("35:6", "before\nruntime.cancelled\n")),
+    "healthy-unchanged": case_healthy,
     "release-exact": case_release,
     "threads-default-environment": case_default_env,
     "alloc-start": lambda n: case_alloc(n, "start"),
@@ -658,6 +1087,11 @@ MUTANTS = {
     9: ["detached-async", "detached-thread"],
     10: ["release-exact", "release-completion"],
     11: ["alloc-start", "alloc-submit", "alloc-rollback-start", "alloc-rollback-submit"],
+    13: ["r1-cleanup-wait", "starve-spawn-refused"],
+    14: ["starve-await-swept"],
+    15: ["starve-spawn-refused"],
+    16: ["starve-await-swept"],
+    18: ["r2-budget", "r2-submit", "wait-recv-woken", "wait-send-after", "wait-lock-woken", "wait-concurrent"],
 }
 
 
@@ -668,23 +1102,14 @@ VALUE_ONLY = {4: ["exact-async", "exact-thread"]}  # caught by a wrong value wit
 def check(nift, only=""):
     failing = []
     names = [n for n in CASES if only in n]
-    R1_STATE.clear()
     for name in names:
         problems = PROBLEMS[name] = CASES[name](nift)
-        if name == "known-defect-r1" and not problems and R1_STATE.get("state") == "known":
-            print("FAIL %s: %s (exit 134 in every run)" % (name, R1_LABEL))  # a FAIL line: certify fingerprints it
-            print("FAILED (known, outstanding) %s: %s" % (name, R1_LABEL))
-            continue
         print(("PASS " if not problems else "FAIL ") + name)
         for p in problems:
             print("    " + p)
         if problems:
             failing.append(name)
-    known = R1_STATE.get("state") == "known"
-    print("async-memory: %d/%d pass%s" % (len(names) - len(failing) - (1 if known else 0), len(names),
-                                         "; FAILED, known and outstanding: " + R1_LABEL if known else ""))
-    if R1_STATE.get("state") == "fixed":
-        print("NOTE known-defect-r1: the controlled exit 1 in every run: R1 appears repaired; update D-082 records")
+    print("async-memory: %d/%d pass" % (len(names) - len(failing), len(names)))
     return failing
 
 
@@ -699,7 +1124,7 @@ def mutants():
                 print("FAIL async-memory mutant %d: harness: build failed: %s" % (n, b.stderr[-400:] or b.stdout[-400:]))
                 bad += 1
                 continue
-            HOOK["binary"] = os.path.join(out, "nift") if n in (9, 11) else None  # these keep the fault hook
+            HOOK["binary"] = os.path.join(out, "nift") if n in (9, 11) or n >= 13 else None  # these keep the hook
             failing = []
             for name in expected:
                 failing += check(os.path.join(out, "nift"), name)
@@ -731,9 +1156,7 @@ def main():
             print("FAIL async-memory: harness: fault-injection build failed: %s" % error)
             return 1
         HOOK["binary"] = os.path.join(out, "nift")
-        if check(os.path.abspath(args.nift), args.only):
-            return 1
-        return 3 if R1_STATE.get("state") == "known" else 0  # exit 3: every case passes except the known defect R1
+        return 1 if check(os.path.abspath(args.nift), args.only) else 0
     finally:
         shutil.rmtree(out, ignore_errors=True)
 

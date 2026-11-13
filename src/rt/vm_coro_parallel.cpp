@@ -173,7 +173,7 @@ void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
         return;
     }
     future->state = FutureState::Failed;
-    future->failure.message = record->failure_message;
+    future->failure.message = record->failure_starved ? kParallelResourcesExhausted : record->failure_message;
     future->failure.code = record->failure_code;
     future->failure.offset = record->failure_offset;
     future->failure.error_origin = record->failure_error_origin;

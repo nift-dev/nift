@@ -40,6 +40,7 @@
 namespace nift::rt {
 class TransferProtoMap;
 struct ParallelTaskRecord;
+class ParallelRuntime;
 }
 
 namespace nift::rt::natives {
@@ -60,6 +61,7 @@ struct Context {
     // owner token (recursive-lock identity) used by shared built-ins.
     const TransferProtoMap* protos = nullptr;
     std::shared_ptr<ParallelTaskRecord> task;
+    const ParallelRuntime* parallel = nullptr;  // C141 (D-085): this VM's runtime (the root's too): its fatal limit
     std::uint64_t owner_token = 0;
     // N1: the code of the failing HostCall in this call (empty when the native
     // has no HostCall, e.g. validate's schema.rejected).
