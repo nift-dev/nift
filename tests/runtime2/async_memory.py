@@ -920,10 +920,13 @@ print("after")
 """
 
 
-# C141a (W1, D-087 #1): an observer between the starve's phases. As SWEPT, then the root keeps spawning (one per
-# millisecond) after the cancel; the test-only hook NIFT_TEST_HOLD_PHASE2 holds phase 2 until a submit is refused.
-# Phase 1 recorded the failure in the cleanup block's lock hold, so the refusal has the first reason, nothing queued
-# starts, and the run ends once, at the refused spawn (mutant 19: the queued spawns run, `marker`).
+# C141a (W1, D-087 #1; D-088, D-089): supplementary concurrency coverage of the interval between the starve's phases,
+# not a mutation control. As SWEPT, then the root keeps spawning (one per millisecond) after the cancel; the test-only
+# hook NIFT_TEST_HOLD_PHASE2 holds phase 2 until a submit is refused. Phase 1 recorded the failure in the cleanup
+# block's lock hold, so the refusal has the first reason, nothing queued starts, and the run ends once, at the refused
+# spawn. It never fails on correct code (30 of 30 runs on the C141a hook build, c141ag/d088-phase-observer.log). It is
+# not in MUTANTS: it catches mutant 19 in about 2 of 3 runs only (the queued spawns run, `marker`); the deterministic
+# mutation control for W1 (mutant 19) is starve-sweeps-under-lock.
 PHASES = """ready := channel(1)
 go := atomic<int>(0)
 fn[async](leaf()) {
