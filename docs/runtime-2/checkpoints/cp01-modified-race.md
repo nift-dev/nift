@@ -53,8 +53,14 @@ certification-guard entries are gone.
   remove/delete, no-ops, targeted/full rebuilds, mode switches, crash points,
   settle, hash/hybrid shared-template repair, and the deterministic syscall
   guard. Run by `test-runtime2-cp01-simplify`, which is part of `make test`.
-- `tests/runtime2/dynamic_reads_review.sh`: the platform-independent follow-up
-  is paced past a timestamp tick.
+- `tests/runtime2/dynamic_reads_review.sh`, `tests/runtime2/dynamic_reads.sh` and
+  `modified_race.sh` part (c) (D-091 #3, the C24 treatment of aa812279): every
+  input written before a build that a freshness check follows, and part (c)'s
+  pre-build hook output, is sequenced with `tests/runtime2/cp01/ticks.py`
+  (strictly newer than the last build, strictly older than the next), replacing
+  the earlier pacing. The checks still fail on any extra rebuild: forcing the
+  equal tick, or a hook output stamped newer than the page-info, fails them
+  (10 of 10 isolated runs each passed; four negative controls caught).
 - `tests/build_recovery_random.py`: in modified mode, page-info comparisons
   ignore `dependency-hashes`; outputs are still byte-identical to a clean
   build.

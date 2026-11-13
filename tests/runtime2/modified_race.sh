@@ -5,6 +5,8 @@
 set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 CYCLES="${NIFT_RACE_CYCLES:-1000}"
+TICKS="$(cd "$(dirname "$0")" && pwd)/cp01/ticks.py"  # (c): sequenced hook output (D-091 #3)
+PY="$(command -v python3 || command -v python)"
 fail=0
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 cd "$T" && "$NIFT" init >/dev/null 2>&1 && "$NIFT" build >/dev/null 2>&1 || { echo "setup failed"; exit 2; }
@@ -30,9 +32,15 @@ if [ "$miss" -ne 0 ]; then echo "FAIL immediate atomic saves: missed $miss/$CYCL
 
 # (c) files Nift itself writes are not concurrent edits: a pre-build hook that
 # regenerates an input must not cause rebuilds forever (review finding F1).
+# D-091 #3 (the C24 treatment, aa812279): the hook's output, and the inputs written before the
+# first build, are sequenced with tests/runtime2/cp01/ticks.py (stamped just before the
+# filesystem clock, so strictly older than the page-info the build writes next). Before, the
+# hook's write could share the page-info's coarse timestamp tick and the v4.12 modified rule
+# rebuilt once more, at random. Any follow-up rebuild still fails the check.
 mkdir -p gen
-printf 'sleep(20)\nr := cmd("sh","-c","echo CONST > gen/data.html").cwd(getenv("NIFT_HOOK_ROOT")).run()\n' > content/index.pre-build.f
+printf 'sleep(20)\nr := cmd("sh","-c","echo CONST > gen/data.html").cwd(getenv("NIFT_HOOK_ROOT")).run()\nq := cmd("%s","%s","gen/data.html","gen").cwd(getenv("NIFT_HOOK_ROOT")).run()\n' "$PY" "$TICKS" > content/index.pre-build.f
 printf '@input("gen/data.html")\nhello\n' > content/index.html
+"$PY" "$TICKS" --age "$T" content/index.html content content/index.pre-build.f gen >/dev/null || { echo "FAIL sequencing the hook fixture"; fail=1; }
 "$NIFT" build >/dev/null 2>&1; "$NIFT" build >/dev/null 2>&1
 n=0; for i in 1 2 3 4 5; do sleep 0.05; "$NIFT" build 2>&1 | grep "built " >/dev/null && n=$((n+1)); done
 if [ "$n" -eq 0 ]; then echo "PASS pre-build hook output is not racy"; else echo "FAIL pre-build hook output: $n/5 follow-up builds rebuilt"; fail=1; fi

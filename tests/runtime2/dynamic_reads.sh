@@ -6,6 +6,16 @@
 set -u -o pipefail
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
+# D-091 #3 (the C24 treatment, aa812279): an input written right before a build could share the
+# filesystem's timestamp tick with the page-info that build writes; the v4.12 modified rule then
+# rebuilds the page once more, and "stays up to date" failed at random. Every input written before
+# a build is now sequenced (tests/runtime2/cp01/ticks.py): the project is aged as a whole, keeping
+# its order, and the written paths are stamped just before the filesystem clock, so they are
+# strictly newer than the last build and strictly older than the next. No rebuild is tolerated.
+# (The first path's directory holds ticks.py's clock probe, so it is listed too.)
+PY="$(command -v python3 || command -v python)"
+TICKS="$(cd "$(dirname "$0")" && pwd)/cp01/ticks.py"
+sequenced() { "$PY" "$TICKS" --age "$T" "$@" >/dev/null || { echo "FAIL [$mode] sequencing the edit of $*"; fail=1; }; }
 check() { # name expected-substring
   if grep -q -- "$2" public/index.html; then echo "PASS [$mode] $1"; else echo "FAIL [$mode] $1 (expected '$2')"; sed -n '/<body>/,/<\/body>/p' public/index.html | head -12; fail=1; fi
 }
@@ -28,19 +38,20 @@ ENV:@getenv("NIFT_RT2_PROBE")
 SENV:@script { return getenv("NIFT_RT2_OTHER") }
 EOF
   export NIFT_RT2_PROBE=one; unset NIFT_RT2_OTHER
+  sequenced content/index.html content data/a.json data .nift/config.json
   "$NIFT" build --all >/dev/null 2>&1
   check "initial glob" "GLOB:1"
   up_to_date "after initial build"
 
-  echo '<b>BANNER</b>' > templates/banner.html; "$NIFT" build >/dev/null 2>&1
+  echo '<b>BANNER</b>' > templates/banner.html; sequenced templates/banner.html templates; "$NIFT" build >/dev/null 2>&1
   check "absent path appears" "BANNER"
-  echo '{}' > data/b.json; "$NIFT" build >/dev/null 2>&1
+  echo '{}' > data/b.json; sequenced data/b.json data; "$NIFT" build >/dev/null 2>&1
   check "glob gains a match" "GLOB:2"
   check "directory gains an entry" "DIR:2"
-  touch data/notes.txt; "$NIFT" build >/dev/null 2>&1
+  touch data/notes.txt; sequenced data/notes.txt data; "$NIFT" build >/dev/null 2>&1
   check "directory listing change outside glob" "DIR:3"
   check "glob unaffected by non-matching file" "GLOB:2"
-  rm data/a.json; "$NIFT" build >/dev/null 2>&1
+  rm data/a.json; sequenced data .; "$NIFT" build >/dev/null 2>&1
   check "present path disappears" "FILE:false"
   export NIFT_RT2_PROBE=two; "$NIFT" build >/dev/null 2>&1
   check "@getenv value change" "ENV:two"
