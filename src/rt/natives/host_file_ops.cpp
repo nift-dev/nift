@@ -46,14 +46,15 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
 #if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 6  // test-only: a temporary file before the classification
     if (std::FILE* early = std::fopen((file->path.string() + ".nift-tmp-early").c_str(), "wbx")) std::fclose(early);
 #endif
-    fs::path target;  // D-074, D-091 #5: refused before the dirty check and before any temporary file
-    if (!save_target(file->path, target, error)) {
+    SaveTarget checked;  // D-074, D-091 #5: refused before the dirty check and before any temporary file
+    if (!save_target(file->path, checked, error)) {
         if (context.host.error_code) *context.host.error_code = "io.write_failed";
         call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
         return Status::Recoverable;
     }
     if (!file->dirty) { call.succeed(); out = Value::null(); return Status::Ok; }
     if (file->std_stream) context.publish_output();  // D-073 #3 (save()'s replacement of the target is F-save's)
+    const fs::path& target = checked.resolved;
     std::error_code ec;
     const auto parent = target.parent_path();
     if (!parent.empty() && !fs::exists(parent, ec)) {
@@ -64,15 +65,9 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
     }
     const fs::perms perms = fs::exists(target, ec) && !ec ? fs::status(target, ec).permissions() : fs::perms::unknown;
     fs::path temp = target;
-    temp += ".nift-tmp-" + std::to_string(static_cast<unsigned long long>(
-                               std::chrono::steady_clock::now().time_since_epoch().count()));
+    temp += save_temp_suffix();
     {
-        // Exclusive creation (O_CREAT|O_EXCL): never through an existing name or symlink at the temporary path.
-#if defined(_WIN32)
-        std::FILE* output = _wfopen(temp.c_str(), L"wbx");
-#else
-        std::FILE* output = std::fopen(temp.c_str(), "wbx");
-#endif
+        std::FILE* output = open_save_temp(temp);  // exclusive: never through an existing name or symlink
         if (!output) {
             error = "save: cannot create temporary file";
             if (context.host.error_code) *context.host.error_code = "io.write_failed";
@@ -89,6 +84,12 @@ Status file_save(const Context& context, const Value* args, std::uint32_t argc, 
         }
     }
     if (perms != fs::perms::unknown) fs::permissions(temp, perms, ec);
+    if (!save_target_unchanged(checked, error)) {  // D-093: revalidated just before the rename
+        fs::remove(temp, ec);
+        if (context.host.error_code) *context.host.error_code = "io.write_failed";
+        call.fail(host::HostStatus::Recoverable, host_error("io.write_failed", error));
+        return Status::Recoverable;
+    }
 #if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 7  // test-only: the target written in place, not replaced
     const bool replaced = static_cast<bool>(std::ofstream(target, std::ios::binary) << file->working) &&
                           fs::remove(temp, ec);

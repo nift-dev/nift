@@ -216,22 +216,26 @@ levels (about 60 s at depth 1000; the scheduler wakes every blocked level on eac
 `save()` classifies its target before the dirty check and before any temporary file exists, in both engines
 (checkpoints/save-safety.md). A regular file is replaced atomically, a symlink is followed and its target replaced
 (the link kept), and a dangling symlink, the process's stdout or stderr (any alias, a redirect target included), any
-non-regular file (FIFO, socket, device, directory) and a read-only file are refused (`io.write_failed`). What stays:
+non-regular file (FIFO, socket, device, directory) and a read-only file are refused (`io.write_failed`); just before
+the rename the destination is revalidated (C142b, D-093). Supported: safe refusal of prohibited targets under
+ordinary, non-adversarial conditions, and atomic replacement of permitted regular files. Not guaranteed: race-free
+operation against concurrent adversarial path replacement. What stays:
 
 - **Hard links break by design.** The saved name gets a new inode with the new content; other names of the old
   inode keep the old content.
-- **Race windows, bounded and documented, not closed.** (1) A directory component of the resolved path swapped
-  (for example for a symlink) between the check and the rename, by someone with write access to an ancestor: the
-  save lands in the swapped directory. Closing it needs openat/renameat through a directory descriptor, a broader
-  redesign not made. (2) A read-only or special file swapped in at the target name after the check is replaced by the
-  rename, not refused; rename(2) never follows the last component, so it is never written through or opened. The
-  temporary file is created exclusively (O_CREAT|O_EXCL), never through an existing name or link. Neither window is
-  tested (documented only).
+- **Race windows, narrowed, not closed.** The revalidation just before the rename (D-093 (d)1) refuses a destination
+  that changed (`target changed during save`); it narrows the TOCTOU race but does not eliminate it. (1) A directory
+  component of the resolved path swapped by someone with write access to an ancestor after the revalidation sends the
+  save into the swapped directory: the deferred (d)2 (a pinned parent directory). It is a filesystem race, not a
+  portability issue, and serious under elevated privilege: avoid privileged saves into directories controlled by
+  untrusted users. (2) A read-only or special file swapped in at the target name after the revalidation is replaced
+  by the rename, not refused; rename(2) never follows the last component, so it is never written through or opened.
+  The swaps the revalidation catches are tested with a hook build; these remaining windows are not tested.
 - **save() is not race-safe; the worst case is for root (REVIEW-C142 M2).** Through window (1) the temporary file is
   created, and the rename replaces whatever entry has the target's name, in a directory that was never validated: a
   read-only or protected regular file, a FIFO or a device node (an ancestor swapped for a link to /dev makes a root
-  save replace `/dev/<name>`). The legacy engine's non-exclusive temporary open follows a link planted at the
-  (predictable) temporary name, so there it can write into a FIFO or device (pre-existing, REVIEW-C142 L2).
+  save replace `/dev/<name>`). Both engines now create the temporary file exclusively (C142b), so neither writes
+  through a link planted at the temporary name (REVIEW-C142 L2, fixed).
 - **Following symlinks, as root.** A save through a link replaces the link's target (before C142, only the link). A
   link planted by another user in a directory root saves into can redirect a root save onto any regular file whose
   owner-write bit is set (for example /etc/passwd); Linux's `protected_symlinks` blocks it only in sticky
@@ -241,12 +245,13 @@ non-regular file (FIFO, socket, device, directory) and a read-only file are refu
   target's directory; a VM save fails if a name already exists at the temporary path; a link loop reads as dangling;
   an lstat error other than ENOENT is refused (`cannot check the target`); a link to stdout or stderr on a pipe gets
   the std-stream message.
-- **Narrowing items awaiting the owner** (REVIEW-C142 (d)): a dev/inode/type re-check just before the rename, an
-  exclusive legacy temporary file, a pinned parent directory. None is implemented.
-- **The legacy engine** keeps its existing (non-exclusive) temporary-file creation; the classification and the
-  resolved target are the shared helper's.
+- **Narrowing items** (REVIEW-C142 (d), D-093): (d)1, the revalidation, and (d)3, the exclusive legacy temporary
+  file, implemented in C142b; (d)2, the pinned parent directory, deferred.
+- **Legacy behaviour change, owner-approved (D-093):** the legacy engine's save() now creates its temporary file
+  exclusively, like the VM: an existing name at the temporary path fails the save ("cannot create temporary file")
+  instead of being truncated or written through.
 - **Windows** (`_wfopen` with "wbx", `std::filesystem` classification, the console and handle identity of the
-  output repair): compiled nowhere yet; unverified until Windows CI.
+  output repair; the revalidation without dev/ino identity): compiled nowhere yet; unverified until Windows CI.
 - **Pre-existing, unchanged:** `file(p).open("w")` reads the existing file before `save()` is ever reached, so opening
   a FIFO with no writer blocks at `open`, not at `save()` (the classification cannot reach it; open is out of scope).
 - **Pre-existing, unchanged (incremental builds):** a file a page's own pre-build hook writes with `save()` is not a
@@ -264,5 +269,5 @@ Findings that are not release blockers by themselves but must be decided in the 
 | **`make test-runtime2-host-deps`: FAILED** (exit 2) with 24 known refusals unrelated to slot 2, all in read_limit.py, none with an import. By capability group (inventory row, status): `builtin-bytes:open_bytes` 7 (implement); `callable:run` 6 and `callable:cmd` 2 (deferred-named); `callable:read` 3 (implement); `host-handle-flow` 4, `statement:Command` 1 and `type:length` 1 (PENDING-OWNER) | **FAILED, not PASS, and not an approved release deferral** (D-071 #1). Checkpoint acceptance is not blocked; the 24 stay open under their capability groups and on the certification inventory (the recorded fingerprint tests/runtime2/certify-fingerprints/test-runtime2-host-deps.txt, 33 FAILs, contains all 24), still open as release-gate findings (D-075 #1, owner 2026-11-12 01:27), subject to final release qualification. Baseline: the C129 freeze compared a scratch rebuild of the slot-1 sources (sha256 not recorded; deleted at cleanup), with identical 24 FAILs, so the independent review could not reproduce the baseline ("fresh baseline reproduction was unavailable because the Slot 1 binary was not present") | decisions.md D-071 #1; REVIEW-C129-SLOT2 section H; rescan-post-cp1.md sections 29.5 and 30 |
 | **P1 release blocker** (D-072 #1, owner 2026-11-11 18:00): `print` / `cat` output order. a.txt `hello` (no newline); `print(1)` / `cat("a.txt")` / `print(2)` with stdout a pipe: legacy writes `1\nhello2\n`, the VM writes `hello1\n2\n`. No import involved | **Implemented and accepted** (C139, the output-order checkpoint, D-077 #5 item 1; accepted by D-079 #1, owner 2026-11-12; docs/runtime-2/checkpoints/output-order.md). Not an approved difference | decisions.md D-072 #1; tsv `defect:print-cat-output-order`; rescan-post-cp1.md section 31 |
 | **P2** (D-072 #2): read-mode file handle trace order: legacy traces `open` then `read`, the VM `read` then `open`; output equal | **Under read-only investigation, not approved** | decisions.md D-072 #2; tsv `difference:file-open-read-trace-order` |
-| **P1 filesystem safety, open** (F-save; D-073 #1, owner 2026-11-11 22:23, provisional P1): `save()` writes a temporary file and renames it over the target on both engines, so a FIFO, device node, socket, or a symlink to a non-regular file (`/dev/*`, `/proc/self/fd/*` aliases) is destroyed and replaced by a regular file. Demonstrated in this sandbox on 2026-11-11 at 19:12: a probe's `save()` turned `/dev/stdout` into a 2-byte regular file; the coordinator restored the symlink to /proc/self/fd/1 at 22:23 (D-073 #1) and every gate result that depended on it in that window was re-run (rescan-post-cp1.md 32.8) | **Implemented in C142** (D-074, D-091 #5): special targets, symlinks, std streams and read-only files are classified first and refused or resolved (section "save() filesystem safety" above); pending independent review and owner acceptance | decisions.md D-073 #1, D-077 #5; scratch review INVESTIGATE-SAVE-SPECIAL-TARGETS.md |
+| **P1 filesystem safety, open** (F-save; D-073 #1, owner 2026-11-11 22:23, provisional P1): `save()` writes a temporary file and renames it over the target on both engines, so a FIFO, device node, socket, or a symlink to a non-regular file (`/dev/*`, `/proc/self/fd/*` aliases) is destroyed and replaced by a regular file. Demonstrated in this sandbox on 2026-11-11 at 19:12: a probe's `save()` turned `/dev/stdout` into a 2-byte regular file; the coordinator restored the symlink to /proc/self/fd/1 at 22:23 (D-073 #1) and every gate result that depended on it in that window was re-run (rescan-post-cp1.md 32.8) | **Implemented in C142, C142a and C142b** (D-074, D-091 #5, D-093): special targets, symlinks, std streams and read-only files are classified first and refused or resolved, and the destination is revalidated just before the rename (section "save() filesystem safety" above). Supported: safe refusal of prohibited targets under ordinary, non-adversarial conditions, and atomic replacement of permitted regular files. Not guaranteed: race-free operation against concurrent adversarial path replacement (the deferred parent-directory race, (d)2). Pending independent review and owner acceptance | decisions.md D-073 #1, D-077 #5; scratch review INVESTIGATE-SAVE-SPECIAL-TARGETS.md |
 

@@ -2,6 +2,7 @@
 // Output-order repair (D-072 #1, D-073 #2-#3; design review-ha DESIGN-OUTPUT-ORDER.md): recognise a path that names
 // the process's own stdout or stderr object, and hold std-stream output streams still open at the end of a run until
 // the VM output and the error message are written.
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -26,7 +27,26 @@ bool std_stream_target(const std::filesystem::path& path);
 // redirect target included), anything but a regular file (FIFO, socket, device, directory; never opened), and a
 // read-only file: the owner-write bit clear, for every user including root, or, for a non-root user, no write
 // access. A missing path is a new file (true). Races: checkpoints/save-safety.md.
-bool save_target(const std::filesystem::path& path, std::filesystem::path& resolved, std::string& error);
+struct SaveTarget {
+    std::filesystem::path path;      // as save() was given it
+    std::filesystem::path resolved;  // what the rename replaces
+    bool existed = false;            // false: a new file (ENOENT)
+    bool via_link = false;
+    unsigned long long dev = 0, ino = 0;  // the resolved file's identity (POSIX; 0 on Windows)
+};
+bool save_target(const std::filesystem::path& path, SaveTarget& target, std::string& error);
+
+// D-093 (REVIEW-C142 (d)1): immediately before the rename, the destination is checked again without being opened:
+// absent if it was absent; otherwise the same file (dev/ino), still a regular writable file under the same rules,
+// not a symlink; and a link save's link still resolves to the same target. False ("save: target changed during
+// save"): the caller removes its temporary file. This narrows the check-to-rename race; it does not remove it.
+bool save_target_unchanged(const SaveTarget& target, std::string& error);
+
+// The temporary file's name suffix (".nift-tmp-<ns>") and its exclusive creation (O_CREAT|O_EXCL: an existing
+// name, a symlink included, fails it; nothing is truncated or written through), shared by both engines (D-093,
+// REVIEW-C142 (d)3).
+std::string save_temp_suffix();
+std::FILE* open_save_temp(const std::filesystem::path& temp);
 
 // The null device (/dev/null by st_rdev; NUL on Windows): the only std stream a worker may open (C139b).
 bool null_device(const std::filesystem::path& path);

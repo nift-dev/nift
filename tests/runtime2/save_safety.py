@@ -2,7 +2,8 @@
 """save() filesystem safety (D-074, D-091 #5; checkpoints/save-safety.md), in both engines.
 
   save_safety.py --nift NIFT     every case, VM (NIFT_VM=require) and legacy (NIFT_VM=0)
-  save_safety.py --mutants       NIFT_SAVE_MUTANT=1..8, each built with sanctioned_mutant.py, must be caught
+  save_safety.py --mutants       NIFT_SAVE_MUTANT=1..10 and 12, each built with sanctioned_mutant.py, must be
+                                 caught; 11 (correct code with the test-only hooks) is the control and must pass
   save_safety.py --nift NIFT --mutants   both (the test-rt-vm suite, REVIEW-C142 M1)
 
 Every fixture is in a fresh temporary directory: no case writes, or opens for writing, any path outside it, and
@@ -53,10 +54,10 @@ def as_user(uid):
     return start
 
 
-def run(nift, d, src, vm, stdout_name=None, stderr_name=None, uid=None):
+def run(nift, d, src, vm, stdout_name=None, stderr_name=None, uid=None, extra=None):
     with open(os.path.join(d, "main.f"), "w") as f:
         f.write(src)
-    env = {"PATH": "/usr/bin:/bin", "HOME": d, "LANG": "C", "NIFT_VM": "require" if vm else "0"}
+    env = {"PATH": "/usr/bin:/bin", "HOME": d, "LANG": "C", "NIFT_VM": "require" if vm else "0", **(extra or {})}
     out = open(os.path.join(d, stdout_name), "a") if stdout_name else subprocess.PIPE
     err = open(os.path.join(d, stderr_name), "a") if stderr_name else subprocess.PIPE
     try:
@@ -206,6 +207,84 @@ def nobody(d):
 
 
 NIFT = [None]
+CHANGED = "save: target changed during save"
+
+
+def is_link(d, n, to):
+    return os.path.islink(os.path.join(d, n)) and os.readlink(os.path.join(d, n)) == to
+
+
+def expect(cond, problem):
+    return [] if cond else [problem]
+
+
+def original(d, ino, n, was):
+    """`n` is the object that was `was` before the run, unchanged: the same inode and the old content."""
+    return expect(os.lstat(os.path.join(d, n)).st_ino == ino[was] and text(d, n) == "old", "%s is not the original" % n)
+
+
+# D-093 (REVIEW-C142 (d)1), hook builds only (NIFT_SAVE_MUTANT 9-12): NIFT_TEST_SAVE_SWAP runs in the program's
+# directory at the pre-rename point. Each swap must be refused, the swapped and the original objects unchanged.
+RACE = {
+    "race-fifo": (lambda d: write(d, "t.txt"), program("t.txt"), "mv t.txt keep.txt && mkfifo t.txt",
+                  lambda d, ino: expect(is_type("fifo", os.path.join(d, "t.txt")), "t.txt is no longer the FIFO") +
+                  original(d, ino, "keep.txt", "t.txt")),
+    "race-read-only": (lambda d: write(d, "t.txt"), program("t.txt"),
+                       "mv t.txt keep.txt && printf other > t.txt && chmod 444 t.txt",
+                       lambda d, ino: expect(text(d, "t.txt") == "other" and stat.S_IMODE(os.stat(os.path.join(
+                           d, "t.txt")).st_mode) == 0o444, "the read-only file changed") + original(d, ino, "keep.txt", "t.txt")),
+    "race-new-inode": (lambda d: write(d, "t.txt"), program("t.txt"), "mv t.txt keep.txt && printf other > t.txt",
+                       lambda d, ino: expect(text(d, "t.txt") == "other", "the new file changed") +
+                       original(d, ino, "keep.txt", "t.txt")),
+    "race-symlink": (lambda d: write(d, "t.txt"), program("t.txt"), "mv t.txt keep.txt && ln -s keep.txt t.txt",
+                     lambda d, ino: expect(is_link(d, "t.txt", "keep.txt"), "the link was replaced") +
+                     original(d, ino, "keep.txt", "t.txt")),
+    "race-retarget": (lambda d: (write(d, "t.txt"), write(d, "u.txt", "other"), os.symlink("t.txt", os.path.join(d, "l.txt"))),
+                      program("l.txt"), "ln -sfn u.txt l.txt",
+                      lambda d, ino: expect(is_link(d, "l.txt", "u.txt") and text(d, "u.txt") == "other",
+                                            "the retargeted link or its target changed") + original(d, ino, "t.txt", "t.txt")),
+    "race-appear": (lambda d: None, program("n.txt"), "printf other > n.txt",
+                    lambda d, ino: expect(text(d, "n.txt") == "other", "the file that appeared changed")),
+}
+# D-093 (REVIEW-C142 (d)3): the hook builds fix the temporary name; an occupied name fails the save, with nothing
+# truncated, written through or created.
+SQUAT = "t.txt.nift-tmp-fixed"
+OCCUPIED = {
+    "occupied-regular": (lambda d: write(d, SQUAT, "squat"),
+                         lambda d, ino: expect(text(d, SQUAT) == "squat" and os.lstat(os.path.join(d, SQUAT)).st_ino ==
+                                               ino[SQUAT], "the squatting file changed")),
+    "occupied-link": (lambda d: (write(d, "other.txt", "other"), os.symlink("other.txt", os.path.join(d, SQUAT))),
+                      lambda d, ino: expect(is_link(d, SQUAT, "other.txt") and text(d, "other.txt") == "other",
+                                            "written through the link at the temporary name")),
+    "occupied-dangling": (lambda d: os.symlink("nowhere.txt", os.path.join(d, SQUAT)),
+                          lambda d, ino: expect(is_link(d, SQUAT, "nowhere.txt") and not os.path.lexists(
+                              os.path.join(d, "nowhere.txt")), "created through the dangling link")),
+}
+
+
+def hook_case(nift, name, vm):
+    d = tempfile.mkdtemp(prefix="save-")
+    try:
+        if name in RACE:
+            setup, src, swap, kept = RACE[name]
+            message, extra = CHANGED, {"NIFT_TEST_SAVE_SWAP": swap}
+        else:
+            setup, kept = OCCUPIED[name]
+            src, message, extra = program("t.txt"), "save: cannot create temporary file", {}
+            write(d, "t.txt")
+        setup(d)
+        ino = {n: os.lstat(os.path.join(d, n)).st_ino for n in os.listdir(d)}
+        rc, out, err = run(nift, d, src, vm, extra=extra)
+        p = expect(rc == 1 and message in err and "saved" not in out, "rc %s, stderr %r" % (rc, err[-300:]))
+        try:  # a fixture that a broken save removed is a failure, not a harness error
+            p += expect(name in RACE or original(d, ino, "t.txt", "t.txt") == [], "t.txt changed")
+            p += kept(d, ino)
+        except OSError as e:
+            p.append("a fixture is gone: %s" % e)
+        leftover = [n for n in temps(d) if n != SQUAT]
+        return p + expect(not leftover, "temporary file left: %s" % leftover)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 SPECIAL = {"fifo": special("fifo", False), "socket": special("socket", False), "device": special("device", False),
            "symlink-fifo": special("fifo", True), "symlink-device": special("device", True)}
 STD = {"stdout": std("stdout", "std.txt"), "stderr": std("stderr", "std.txt"), "symlink-stdout": std("stdout", "ls.txt")}
@@ -251,17 +330,18 @@ def stdout_link():
     return os.path.islink("/dev/stdout") and os.readlink("/dev/stdout") == "/proc/self/fd/1"
 
 
-def check(nift):
-    """The names of the failing cases (engine-qualified), after printing every result."""
+def check(nift, hooks=False):
+    """The names of the failing cases (engine-qualified), after printing every result; with `hooks` (a hook build),
+    the race and occupied-name cases too."""
     if not stdout_link():
         print("FAIL save-safety: /dev/stdout is not the link to /proc/self/fd/1 before the run")
-        return ["environment"]
+        return ["environment"], []
     NIFT[0] = nift
     failing, total, notrun = [], 0, []
-    for name in list(CASES) + list(SPECIAL) + list(STD):
+    for name in list(CASES) + list(SPECIAL) + list(STD) + (list(RACE) + list(OCCUPIED) if hooks else []):
         for vm in (True, False):
             label = "%s %s" % ("vm" if vm else "legacy", name)
-            problems = case(nift, name, vm)
+            problems = hook_case(nift, name, vm) if name in RACE or name in OCCUPIED else case(nift, name, vm)
             if problems is None:
                 notrun.append(label)
                 continue
@@ -288,30 +368,45 @@ MUTANTS = {
     6: ["vm dangling", "vm read-only", "vm fifo", "vm stdout"],
     7: ["vm hard-link", "vm regular"],
     8: ["vm not-a-directory", "legacy not-a-directory"],  # REVIEW-C142 L1 reverted: any lstat error a new file
+    # 9-12 are hook builds (the swap hook, the fixed temporary name); 11 is the control: correct code, which must pass
+    9: ["%s %s" % (e, c) for e in ("vm", "legacy") for c in ("race-fifo", "race-read-only", "race-new-inode",
+                                                            "race-symlink", "race-appear")],  # no revalidation
+    10: ["vm race-retarget", "legacy race-retarget"],  # no link re-check
+    11: [],
+    12: ["%s %s" % (e, c) for e in ("vm", "legacy") for c in OCCUPIED],  # a non-exclusive temporary file
 }
+HOOK_BUILDS = (9, 10, 11, 12)
 
 
 def mutants():
-    bad = 0
+    missed_mutants, control = 0, "not run"
     for n, expected in sorted(MUTANTS.items()):
         out = os.path.join(ROOT, ".build", "mutant-nift", "save-safety-%d" % n)
         try:
             b = subprocess.run([sys.executable, "-B", os.path.join(HERE, "sanctioned_mutant.py"), "--out", out,
                                 "--define=-DNIFT_SAVE_MUTANT=%d" % n], capture_output=True, text=True)
             if b.returncode != 0:
-                print("FAIL save-safety mutant %d: harness: build failed: %s" % (n, b.stderr[-400:] or b.stdout[-400:]))
-                bad += 1
+                print("FAIL save-safety build %d: harness: build failed: %s" % (n, b.stderr[-400:] or b.stdout[-400:]))
+                missed_mutants += n != 11
+                control = "build failed" if n == 11 else control
                 continue
-            failing, notrun = check(os.path.join(out, "nift"))
+            failing, notrun = check(os.path.join(out, "nift"), hooks=n in HOOK_BUILDS)
+            if n == 11:  # the control: correct code with the hooks, every case (the race cases included) passes
+                control = "FAIL: " + ", ".join(failing) if failing else "PASS"
+                print("%s save-safety hook control (build 11): %s" % ("FAIL" if failing else "PASS",
+                                                                      ", ".join(failing) or "every case passes"))
+                continue
             missed = [c for c in expected if c not in failing and c not in notrun]  # a NOT-RUN case is listed above
             if missed:
                 print("FAIL save-safety mutant %d: not caught by %s" % (n, missed))
-                bad += 1
+                missed_mutants += 1
             else:
                 print("PASS save-safety mutant %d: caught by %s" % (n, ", ".join(expected)))
         finally:
             shutil.rmtree(out, ignore_errors=True)
-    print("%s save-safety mutants: %d of %d caught" % ("FAIL" if bad else "PASS", len(MUTANTS) - bad, len(MUTANTS)))
+    bad = missed_mutants or control != "PASS"
+    print("%s save-safety mutants: %d of %d caught; hook control: %s" % (
+        "FAIL" if bad else "PASS", len(MUTANTS) - 1 - missed_mutants, len(MUTANTS) - 1, control))
     return 1 if bad else 0
 
 

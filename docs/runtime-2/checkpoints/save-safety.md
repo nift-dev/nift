@@ -30,35 +30,51 @@ are recoverable `io.write_failed` errors with these messages:
 | 5 | owner-write bit clear (every user, root included), or, for a non-root user, `access(W_OK)` fails | **`save: target is read-only`** |
 | 6 | a regular writable file, hard-linked or not | the temporary file (created exclusively, `fopen(..., "wbx")`: O_CREAT|O_EXCL, never through an existing name or link) in the resolved target's directory, its mode copied from the target, ownership not changed, no fsync (as before); then the atomic rename over the resolved target. A hard link breaks: the saved name gets a new inode, other names keep the old content |
 
-The legacy engine (src/ParserExpression.cpp, the `save` branch) changes only at its call site: the classification,
-and the resolved target in place of the handle's path; its temporary-file creation is unchanged (not exclusive).
+| 7 (C142b, D-093) | immediately before the rename | **`save: target changed during save`** (the temporary file removed, the original untouched) unless the destination is unchanged: absent if it was absent; otherwise not a symlink, the same file (dev/ino), and still allowed by steps 2-5; and a save through a link: the link still resolves to the same target (`save_target_unchanged`, both engines) |
+
+The temporary file's name and its exclusive creation (`save_temp_suffix`, `open_save_temp`: `fopen "wbx"`, O_CREAT|
+O_EXCL, so an existing name, a symlink included, fails it with nothing truncated, written through or created) are
+shared by both engines. The legacy engine (src/ParserExpression.cpp, the `save` branch) changes only at its call
+site: the classification, the resolved target, the shared temporary file (C142b: before, a non-exclusive
+`std::ofstream`, which truncated an existing name and followed a link there; REVIEW-C142 L2 fixed, an owner-approved
+legacy behaviour change, D-093) and the revalidation.
+
+**What save() supports, and what it does not (owner, D-093).** Supported: safe refusal of prohibited targets under
+ordinary, non-adversarial conditions, and atomic replacement of permitted regular files. Not guaranteed: race-free
+operation against concurrent adversarial path replacement.
 
 ## Races (bounded, documented; known-limitations.md)
 
-Neither remaining race window is tested: a deterministic check-then-swap would need a further test-only hook
-build, which was not made (accepted by the owner's coordinator, 2026-11-14). They are documented only.
+save() is not race-safe. The C142b revalidation (step 7) narrows the check-to-rename window to the few syscalls
+between that check and the rename; it does not eliminate the TOCTOU race. The swaps it catches are tested
+deterministically with a test-only hook build (below); what remains is not tested.
 
-- Between the classification and the rename, the name at the resolved target can be replaced by someone with write
-  access to its directory: rename(2) does not follow its last component, so a symlink, FIFO, device or read-only file
-  swapped in is replaced, never written through or opened.
+- Between the revalidation and the rename, the name at the resolved target can still be replaced by someone with
+  write access to its directory: rename(2) does not follow its last component, so a symlink, FIFO, device or
+  read-only file swapped in then is replaced, never written through or opened. (Before C142b this window ran from the
+  classification, before the temporary file was written, to the rename.)
 - A directory component of the resolved path swapped by someone with write access to an ancestor sends the save into
   the swapped directory. Closing this needs openat/fstatat/renameat through a directory descriptor (and the same in the
-  temporary-file creation): the broader redesign D-074 excludes, so it is documented, not closed.
+  temporary-file creation): REVIEW-C142 (d)2, deferred by the owner (D-093). It is a filesystem race, not a
+  portability issue, and it is serious under elevated privilege: **do not run privileged saves into directories that
+  untrusted users control.** The revalidation re-resolves the path too, so it catches such a swap made before it, but
+  not one made between it and the rename.
 - **Worst case, as root (REVIEW-C142 M2).** Through such a parent or path swap the temporary file is created, and the
   rename replaces whatever entry has the target's name, in a directory that was never validated: a read-only or
   protected regular file, a FIFO, or a device node. For example, an ancestor swapped for a symlink to /dev makes a
-  root save create `/dev/<name>.nift-tmp-*` and rename it over `/dev/<name>` (`/dev/null`, say). The VM never writes
-  through a link planted at the temporary name (O_EXCL); the legacy engine's temporary open follows one (pre-existing,
-  L2), so there a planted link can turn the save into a write into a FIFO or device. save() is not race-safe.
+  root save create `/dev/<name>.nift-tmp-*` and rename it over `/dev/<name>` (`/dev/null`, say). Neither engine
+  writes through a link planted at the temporary name (O_EXCL in both since C142b; before, the legacy engine's
+  temporary open followed one, REVIEW-C142 L2). save() is not race-safe.
 - **Following symlinks (approved order #2) as root.** A save through a link now replaces the link's target, and the
   temporary file is created in the target's directory. A link planted by another user in a directory that root saves
   into can therefore redirect a root save onto any regular file whose owner-write bit is set (for example
   `/etc/passwd`, 0644). Linux's `protected_symlinks` blocks this only in sticky world-writable directories. Before
   C142 such a save replaced only the link.
-- The reviewer's narrowing items (re-checking the target's dev, inode and type just before the rename; an exclusive
-  legacy temporary file; pinning the parent directory) await an owner decision; none is implemented.
+- The reviewer's narrowing items (D-093): (d)1, the revalidation just before the rename, and (d)3, the exclusive legacy
+  temporary file, are implemented (C142b); (d)2, pinning the parent directory, is deferred.
 - Windows: `_wfopen(..., L"wbx")`, `std::filesystem` classification, the output repair's console and handle identity;
-  not compiled anywhere yet, unverified until Windows CI.
+  the revalidation there has no dev/ino identity (only the type, writability and link checks). Not compiled anywhere
+  yet, unverified until Windows CI.
 
 ## Behaviour changes (deliberate; REVIEW-C142 L5 and "differences beyond the corrected contracts")
 
@@ -67,13 +83,17 @@ build, which was not made (accepted by the owner's coordinator, 2026-11-14). The
    classification runs before the dirty check by design (answer (ii)).
 2. A save through a symlink needs write access to the **target's** directory (the temporary file is created there),
    not the link's.
-3. VM: an existing name at the temporary path fails the save ("cannot create temporary file") instead of being
-   truncated; a failing close of the temporary file is now an error.
+3. An existing name at the temporary path fails the save ("cannot create temporary file") instead of being
+   truncated or written through: the VM since C142, the legacy engine since C142b (owner-approved, D-093); a failing
+   close of the temporary file is now an error in both.
 4. A symlink loop is reported as `save: dangling symlink`.
 5. An lstat error other than ENOENT (ENOTDIR, EACCES, ELOOP in a directory component, EIO) is refused as
    `save: cannot check the target: <reason>` (C142a, REVIEW-C142 L1); before, it was treated as a new file and failed
    later with a misleading message.
-6. `/dev/stdout` (or any link to the process's stdout or stderr) is refused with the std-stream message even when
+6. A destination that changed between the classification and the rename (a different file, a new symlink, a
+   special or read-only file, a file where there was none, a retargeted link) is refused, `save: target changed
+   during save`, and the temporary file removed (C142b, D-093).
+7. `/dev/stdout` (or any link to the process's stdout or stderr) is refused with the std-stream message even when
    stdout is a pipe: the std-stream check runs on the path, through stat(), before the link is resolved (C142a,
    REVIEW-C142 L4); before, `canonical()` could not resolve `pipe:[...]` and the refusal read `dangling symlink`.
 
@@ -105,6 +125,10 @@ pass) where mknod is not permitted.
 | symlink-read-only (L3) | a link to a 0444 file: refused; the file and the link kept |
 | non-root-access (L3) | nift run as nobody; a root-owned 0644 file in a directory anyone may write (not sticky): refused by access(W_OK) (the rename alone would succeed); reported NOT-RUN where the harness cannot run nift as nobody |
 | not-a-directory (L1) | `f.txt/x`, f.txt a regular file (ENOTDIR): refused as `cannot check the target: Not a directory`; f.txt kept |
+| race-fifo, race-read-only, race-new-inode, race-symlink (C142b, hook builds) | at the pre-rename point the hook moves t.txt aside and puts a FIFO, a 0444 file, a new regular file, or a link to the original there: refused (`target changed during save`); the swapped object and the original unchanged, no temporary file left |
+| race-retarget (hook builds) | a save through l.txt -> t.txt; the hook retargets l.txt to u.txt: refused; t.txt, u.txt and the new link unchanged |
+| race-appear (hook builds) | a new file; the hook creates it: refused; the created file unchanged |
+| occupied-regular, occupied-link, occupied-dangling (hook builds) | the (fixed) temporary name is already a regular file, a link to another file, or a dangling link: refused (`cannot create temporary file`); nothing truncated, written through or created |
 | stdout-pipe-link (L4) | stdout a pipe; a scratch link to /proc/self/fd/1 renamed (mv) onto a name opened while absent, never opened: refused with the std-stream message; the link kept |
 
 Negative controls (one per contract, `NIFT_SAVE_MUTANT`, test-only, each built with sanctioned_mutant.py and removed
@@ -120,6 +144,14 @@ after its run):
 | 6 | classification before any temporary file (one created first) | every VM case (temporary file left) |
 | 7 | atomic replacement (the target written in place) | regular (same inode), hard-link (the other link changes) |
 | 8 (C142a) | REVIEW-C142 L1 (any lstat error treated as a new file) | not-a-directory (both) |
+| 9 (C142b, hook build) | the revalidation | race-fifo, race-read-only, race-new-inode, race-symlink, race-appear (both) |
+| 10 (hook build) | the link re-check | race-retarget (both) |
+| 11 (hook build) | nothing: the control, correct code with the hooks | must pass every case, the race and occupied cases included |
+| 12 (hook build) | the exclusive temporary file (`"wb"`: truncates, follows a link) | occupied-regular, occupied-link, occupied-dangling (both) |
+
+The hooks exist only in builds 9-12 (`NIFT_SAVE_MUTANT` 9 to 12, built with sanctioned_mutant.py): the swap command
+from `NIFT_TEST_SAVE_SWAP`, run at the pre-rename point, and a fixed temporary name (`.nift-tmp-fixed`). The
+production nift contains neither (its binary has no `NIFT_TEST_SAVE_SWAP` string).
 
 Wiring (C142a, REVIEW-C142 M1): `save-safety` is a suite of the test-rt-vm recipe (`$(SAVE_SAFETY_GATE)`, the cases
 then the mutants) and of `RT_VM_SUITES`, not a prerequisite, so its failure cannot stop the other suites (the C140b

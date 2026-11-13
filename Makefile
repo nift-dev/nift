@@ -1593,7 +1593,8 @@ test-runtime2-output-order: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/output_order.py --mutants
 test-rt-vm: test-runtime2-output-order
 # save() filesystem safety (D-074, D-091 #5; checkpoints/save-safety.md): the target classification in both engines,
-# scratch fixtures only, and one negative control (NIFT_SAVE_MUTANT=1..8) per contract. REVIEW-C142 M1: a suite of
+# scratch fixtures only, one negative control (NIFT_SAVE_MUTANT=1..10, 12) per contract, and the hook-build control
+# (11, D-093: the race and occupied-name cases on correct code). REVIEW-C142 M1: a suite of
 # the test-rt-vm recipe (save-safety), not a prerequisite, so its failure cannot stop the other suites (C140b G1).
 SAVE_SAFETY_GATE = env $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/save_safety.py --nift "$(CURDIR)/$(TARGET)" --mutants
 .PHONY: test-runtime2-save-safety

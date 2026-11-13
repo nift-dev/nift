@@ -4,7 +4,9 @@
 #include "rt/natives/builtin.h"
 
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <system_error>
 #include <vector>
@@ -52,9 +54,10 @@ bool std_stream_target(const std::filesystem::path& path) {
 #endif
 }
 
-bool save_target(const std::filesystem::path& path, std::filesystem::path& resolved, std::string& error) {
+bool save_target(const std::filesystem::path& path, SaveTarget& target, std::string& error) {
     namespace fs = std::filesystem;
-    resolved = path;
+    target = SaveTarget{path, path};
+    fs::path& resolved = target.resolved;
     std::error_code ec;
 #if !defined(_WIN32) && !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 8)  // test-only: any lstat error a new file
     struct stat raw {};
@@ -67,20 +70,22 @@ bool save_target(const std::filesystem::path& path, std::filesystem::path& resol
     fs::file_status st = fs::symlink_status(path, ec);
     if (st.type() == fs::file_type::not_found) return true;  // a new file: save()'s parent check applies
     if (ec) { error = "save: cannot check the target: " + ec.message(); return false; }
+    target.existed = true;
 #if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 2)  // test-only: no std-stream refusal
     // REVIEW-C142 L4: before resolving, as stat() follows every link: /dev/stdout on a pipe (pipe:[...]) has no
     // canonical path, so it would otherwise read as dangling.
     if (std_stream_target(path)) { error = "save: target is the process's standard output or error"; return false; }
 #endif
     if (fs::is_symlink(st)) {
-        const fs::path target = fs::canonical(path, ec);  // follows the whole chain; fails if it dangles or loops
+        target.via_link = true;
+        const fs::path linked = fs::canonical(path, ec);  // follows the whole chain; fails if it dangles or loops
 #if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 1  // test-only: a dangling link is saved as a new file
         if (ec) return true;
 #endif
         if (ec) { error = "save: dangling symlink"; return false; }
-        st = fs::status(target, ec);
+        st = fs::status(linked, ec);
 #if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 5)  // test-only: the link itself is replaced
-        resolved = target;
+        resolved = linked;
 #endif
     }
 #if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 3)  // test-only: no special-file refusal
@@ -94,7 +99,55 @@ bool save_target(const std::filesystem::path& path, std::filesystem::path& resol
     read_only = false;
 #endif
     if (read_only) { error = "save: target is read-only"; return false; }
+#if !defined(_WIN32)
+    struct stat id {};
+    if (::stat(resolved.c_str(), &id) == 0) {
+        target.dev = id.st_dev;
+        target.ino = id.st_ino;
+    }
+#endif
     return true;
+}
+
+bool save_target_unchanged(const SaveTarget& target, std::string& error) {
+    namespace fs = std::filesystem;
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT >= 9 && NIFT_SAVE_MUTANT <= 12  // test-only: the swap hook
+    if (const char* swap = std::getenv("NIFT_TEST_SAVE_SWAP")) static_cast<void>(std::system(swap));
+#endif
+    std::error_code ec;
+    bool same = true;
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 9)  // test-only: no revalidation
+    const fs::file_status now = fs::symlink_status(target.resolved, ec);
+    SaveTarget again;
+    std::string ignored;
+    if (!target.existed) same = now.type() == fs::file_type::not_found;  // nothing may have appeared
+    else same = !fs::is_symlink(now) && save_target(target.resolved, again, ignored) && again.existed &&
+                again.dev == target.dev && again.ino == target.ino;
+#endif
+#if !(defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 10)  // test-only: no link re-check
+    if (same && target.via_link) same = fs::canonical(target.path, ec) == target.resolved && !ec;
+#endif
+    if (!same) error = "save: target changed during save";
+    return same;
+}
+
+std::string save_temp_suffix() {
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT >= 9 && NIFT_SAVE_MUTANT <= 12  // test-only: a fixed name
+    return ".nift-tmp-fixed";
+#else
+    return ".nift-tmp-" +
+           std::to_string(static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+#endif
+}
+
+std::FILE* open_save_temp(const std::filesystem::path& temp) {
+#if defined(NIFT_SAVE_MUTANT) && NIFT_SAVE_MUTANT == 12  // test-only: non-exclusive (truncates, follows a link)
+    return std::fopen(temp.c_str(), "wb");
+#elif defined(_WIN32)
+    return _wfopen(temp.c_str(), L"wbx");
+#else
+    return std::fopen(temp.c_str(), "wbx");
+#endif
 }
 
 // REVIEW-C139 C2 (narrowed in C139b): the null device (/dev/null; NUL on Windows) discards what is written, so a
