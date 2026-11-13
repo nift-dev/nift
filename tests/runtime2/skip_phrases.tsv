@@ -176,3 +176,6 @@ tests/v46_resource_paths.py	detected	-	print("  (package symlink escape skipped:
 tests/runtime2/b06/run.py	justified	a FAIL (exit 1), never a skip: the gate fails when the probe build is missing	print("FAIL b06: no --probe build: the comparator-sort fixtures did not run on the VM")
 tests/runtime2/named_deferrals.py	justified	a docstring line, not printed (review of C83-C99, L-2)	`echo`. On another platform the script prints a SKIP line saying so and exits 0; the gate is
 tests/runtime2/named_deferrals.py	detected	-	print("SKIP named deferrals: Linux only (libc.so.6, echo); not run on %s" % sys.platform)
+tests/runtime2/suite_status.sh	detected	C140c (D-083) per-suite status: a suite with no status line is printed NOT-RUN, counted, and makes the summary return 1 (never PASS)	if [ -z "$rc" ]; then echo "  NOT-RUN $name"; notrun=$((notrun + 1)); continue; fi
+tests/runtime2/suite_status.sh	justified	C140c (D-083) count line: reports how many expected suites did not run; any nonzero count makes the summary return 1, no assertion is skipped	echo "test-rt-vm suites: ${#} expected, $ran ran, $passed passed, $failed failed, $notrun not run"
+tests/runtime2/suite_status.sh	justified	C140c (D-083) a FAIL line, never a skip: printed when a suite did not run, and the summary returns 1	[ $notrun -gt 0 ] && echo "FAIL test-rt-vm: $notrun suite(s) did not run"
