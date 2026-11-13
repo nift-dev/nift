@@ -196,6 +196,10 @@ MAKE_TARGETS = [
     ("test-rt-value", "memory/mutation safety", {}, "value layer, heap budget and OOM units"),
     ("test-runtime2-kind-bits", "compiler/execution", {}, ""),
     ("test-rt-source-map", "compiler/execution", {}, ""),
+    # D-090 (owner 2026-11-14): the certification guard is a required gate of the first certification.
+    ("test-runtime2-certification-guard", "certification integrity",
+     {"macos": "macOS: the guard reads the GNU make database of the whole certify plan through scripts/certify.py; it certifies the plan itself, which is platform independent, so the Linux job runs it (D-090)", "windows": "Windows: scripts/certify.py imports the POSIX-only pwd module and the guard drives GNU make -p and bash over the POSIX plan; the plan is platform independent and the Linux job runs it (D-090)"},
+     "required (D-090); FAILED since C140c (three unlisted skip phrases in tests/runtime2/suite_status.sh); expected PASS once the candidate fix lands"),
 ]
 # Review N1: environmental skips expected on a platform, per entry: (regex on the skip line, reason). A skip line
 # is classified by certify's own classifier (scripts/certify.py skipped_assertions: SKIP_MARKERS, ZERO_SKIPS,

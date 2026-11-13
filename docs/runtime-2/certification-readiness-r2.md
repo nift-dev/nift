@@ -12,6 +12,7 @@ The report follows D-077 and D-078 (owner 2026-11-12, attachments 83af45ff and 2
 - **Not ready to certify. The four approved production checkpoints are not done** (section 6).
 - **The inventory gate does not complete.** The tool prints `INVENTORY: BLOCKED: 11 PENDING-OWNER reason(s), not adjudicated: …` (exit 3). This report classifies that as **"Inventory incomplete: 11 open reasons"** (section 3).
 - **`test-runtime2-host-deps` is FAILED, with 6 outstanding cases** (section 4).
+- **The required certification guard (`test-runtime2-certification-guard`, D-090) is FAILED** (since C140c). It is expected to PASS once the candidate fix lands.
 - **The mandatory sanitizer, mutation, toolchain, cross-platform and performance gates are NOT RUN.**
 - **Deferrals do not change any of this.** A deferral never turns a failed mandatory execution test into a PASS
   (D-078 #5). A refusal-contract pass shows that a deferred capability is refused in the approved manner, never that
@@ -144,6 +145,7 @@ inventory gate runs without it.
 
 | Gate | Class now | Evidence or reason |
 |---|---|---|
+| `make test-runtime2-certification-guard` (required gate, D-090) | **FAILED** | It has failed unnoticed since C140c: three skip phrases in tests/runtime2/suite_status.sh were never listed. A fix is being prepared on the candidate. **Expected PASS once it lands**, and it must then pass on the frozen candidate. Not run in this sparse worktree |
 | `make test-rt-vm` | PASS (local, C136 binary; the source is unchanged at C137) | uninterrupted run, rc 0 (REVIEW-C136-SLOT3). It must be re-run on the frozen candidate |
 | CP25-R inventory (`cp25r-inventory`) | **FAILED** | tool: `BLOCKED: 11 PENDING-OWNER reason(s)`, exit 3. Classified as: Inventory incomplete, 11 open reasons |
 | D-077 #1 refusal contracts (`test-cp25r`, the post_cert_refusals part) | PASS (a refusal contract; the capabilities are DEFERRED) | section 3 |

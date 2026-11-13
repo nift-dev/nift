@@ -98,6 +98,11 @@ jobs:
       - name: Subset make targets (embedding, value layer, kind bits, source map)
         if: runner.os != 'Windows'
         run: make test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+      # D-090: the certification guard is a required gate. It checks the certify plan, which is platform independent,
+      # so it runs on the Linux job only (platform-subsets.md gives the macOS and Windows reasons).
+      - name: Certification guard (required gate, D-090)
+        if: runner.os == 'Linux'
+        run: make test-runtime2-certification-guard
       - name: Subset make targets on Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}

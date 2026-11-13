@@ -57,7 +57,8 @@ Owner, 2026-11-12 04:25 (D-077 #4):
   - builds nift and the unit binaries;
   - runs the table;
   - runs the make targets `test-v45-embed-contracts`, `test-rt-value`, `test-runtime2-kind-bits` and
-    `test-rt-source-map`.
+    `test-rt-source-map`;
+  - on the Linux job only, runs the required certification guard `test-runtime2-certification-guard` (D-090).
 
   The action versions are the ones the existing certified workflows use. **They are to be pinned to commit SHAs
   before the push.** That needs a lookup, and no GitHub access was authorised here.
@@ -99,7 +100,10 @@ Each one is the exact line, matched per platform and entry. Any other skip is PA
 A skip the platforms turn out to need beyond these (for example the GNU `/usr/bin/time` options in vm_host_memory on
 macOS) shows up as PARTIAL or FAIL on the first dispatch. It is then classified explicitly, never absorbed.
 
-Plus the 4 make targets on all three platforms.
+Plus the 4 make targets on all three platforms, and the required certification guard on Linux (D-090). The guard
+checks the certify plan, which is platform independent; the table gives the macOS and Windows reasons. It is FAILED
+today (since C140c: three skip phrases in tests/runtime2/suite_status.sh were never listed), and is expected to PASS
+once the candidate fix lands.
 
 ## The subset
 
@@ -198,6 +202,7 @@ Plus the 4 make targets on all three platforms.
 | `make test-rt-value` | memory/mutation safety | run | run | run | value layer, heap budget and OOM units |
 | `make test-runtime2-kind-bits` | compiler/execution | run | run | run |  |
 | `make test-rt-source-map` | compiler/execution | run | run | run |  |
+| `make test-runtime2-certification-guard` | certification integrity | run | **excluded**: macOS: the guard reads the GNU make database of the whole certify plan through scripts/certify.py; it certifies the plan itself, which is platform independent, so the Linux job runs it (D-090) | **excluded**: Windows: scripts/certify.py imports the POSIX-only pwd module and the guard drives GNU make -p and bash over the POSIX plan; the plan is platform independent and the Linux job runs it (D-090) | required (D-090); FAILED since C140c (three unlisted skip phrases in tests/runtime2/suite_status.sh); expected PASS once the candidate fix lands |
 
 ## Already covered on Windows and macOS by the existing workflows
 
