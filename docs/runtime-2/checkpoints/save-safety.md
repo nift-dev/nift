@@ -74,7 +74,23 @@ deterministically with a test-only hook build (below); what remains is not teste
   temporary file, are implemented (C142b); (d)2, pinning the parent directory, is deferred.
 - Windows: `_wfopen(..., L"wbx")`, `std::filesystem` classification, the output repair's console and handle identity;
   the revalidation there has no dev/ino identity (only the type, writability and link checks). Not compiled anywhere
-  yet, unverified until Windows CI.
+  yet, unverified until Windows CI; status table below (D-094 L3).
+
+| save() on Windows (D-094 L3) | Status |
+| --- | --- |
+| Exclusive temporary-file creation (`_wfopen` "wbx") | to verify on Windows |
+| Ordinary regular-file saves (atomic replace, `MoveFileExW`) | to verify on Windows |
+| Refusal of unsupported targets | to verify on Windows |
+| Symlink handling | to verify where Windows supports symlinks |
+| stdout/stderr handle check (console names, handle identity) | needs Windows execution evidence |
+| Target identity re-check before the rename | **NOT IMPLEMENTED / NOT VERIFIED on Windows**: dev/ino are 0 there, so only the type, writability and link checks run |
+| Concurrent adversarial path replacement | not guaranteed (as on every platform) |
+
+The Unix revalidation tests (the hook-build race cases) are not Windows evidence. Any destructive behaviour of save()
+under ordinary conditions found on Windows is a blocker, to be escalated.
+
+For users (D-094 L2): if another process or an editor replaces the target while a save is under way, save() may refuse
+(`save: target changed during save`) rather than overwrite the changed file. This is deliberate.
 
 ## Behaviour changes (deliberate; REVIEW-C142 L5 and "differences beyond the corrected contracts")
 
@@ -158,4 +174,5 @@ then the mutants) and of `RT_VM_SUITES`, not a prerequisite, so its failure cann
 G1 defect). scripts/test_integrity_check.py's suite-wiring rule now also reports any test-rt-vm prerequisite outside a
 frozen list of the existing ones (RT_VM_PREREQUISITES; a stale entry is reported too), with a negative control in every
 run: the same scan on the Makefile plus one added prerequisite must report it. On the C142 Makefile it reports
-`test-runtime2-save-safety`.
+`test-runtime2-save-safety`. Limitation (Low, infrastructure; D-094 L4): it sees only literal `test-rt-vm:` lines,
+not prerequisites added through a variable or an included .mk file; recorded, not extended.

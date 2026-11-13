@@ -250,8 +250,30 @@ operation against concurrent adversarial path replacement. What stays:
 - **Legacy behaviour change, owner-approved (D-093):** the legacy engine's save() now creates its temporary file
   exclusively, like the VM: an existing name at the temporary path fails the save ("cannot create temporary file")
   instead of being truncated or written through.
-- **Windows** (`_wfopen` with "wbx", `std::filesystem` classification, the console and handle identity of the
-  output repair; the revalidation without dev/ino identity): compiled nowhere yet; unverified until Windows CI.
+- **"target changed during save" (D-094 L1).** Just before the rename save() checks the destination again; if it
+  changed (another file, a new link, a special or read-only file, a file where there was none, a retargeted link) the
+  save is refused, `save: target changed during save` (`io.write_failed`), its temporary file removed and nothing
+  replaced. Both engines create the temporary file exclusively and fail the save ("cannot create temporary file") if
+  the temporary name is already occupied.
+- **For users (D-094 L2):** if another process or an editor replaces the target while a save is under way, save()
+  may refuse rather than overwrite the changed file. This is deliberate.
+- **Windows** (compiled nowhere yet; unverified until Windows CI):
+
+  | save() on Windows (D-094 L3) | Status |
+  | --- | --- |
+  | Exclusive temporary-file creation (`_wfopen` "wbx") | to verify on Windows |
+  | Ordinary regular-file saves (atomic replace, `MoveFileExW`) | to verify on Windows |
+  | Refusal of unsupported targets | to verify on Windows |
+  | Symlink handling | to verify where Windows supports symlinks |
+  | stdout/stderr handle check (console names, handle identity) | needs Windows execution evidence |
+  | Target identity re-check before the rename | **NOT IMPLEMENTED / NOT VERIFIED on Windows**: dev/ino are 0 there, so only the type, writability and link checks run |
+  | Concurrent adversarial path replacement | not guaranteed (as on every platform) |
+
+  The Unix revalidation tests (the hook-build race cases) are not Windows evidence. Any destructive behaviour of save()
+  under ordinary conditions found on Windows is a blocker, to be escalated.
+- **Low, infrastructure (D-094 L4):** the test-rt-vm prerequisite lint (scripts/test_integrity_check.py,
+  suite-wiring) sees only literal `test-rt-vm:` lines; a prerequisite added through a variable or an included .mk
+  file is not detected. Recorded, not extended.
 - **Pre-existing, unchanged:** `file(p).open("w")` reads the existing file before `save()` is ever reached, so opening
   a FIFO with no writer blocks at `open`, not at `save()` (the classification cannot reach it; open is out of scope).
 - **Pre-existing, unchanged (incremental builds):** a file a page's own pre-build hook writes with `save()` is not a
