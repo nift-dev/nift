@@ -1,0 +1,116 @@
+$ make -k test-sha256  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/c141b-fp.PS1n8v/nift-certify-0010143/29e54c97733f00e8)
+python3 scripts/check_vendored_sha256.py
+vendored sha256 subset: 5 verbatim blocks verified against recorded hashes
+".build/sha256-unit"
+selected implementation: x86-sha-ni
+note: running as root; unreadable-file check skipped (root bypasses permissions)
+note: running as root; unreadable-file check skipped (root bypasses permissions)
+sha256 unit: 1310 checks, 0 failures (implementations: portable, x86-sha-ni)
+".build/sha256-unit-san"
+selected implementation: x86-sha-ni
+note: running as root; unreadable-file check skipped (root bypasses permissions)
+note: running as root; unreadable-file check skipped (root bypasses permissions)
+sha256 unit: 1310 checks, 0 failures (implementations: portable, x86-sha-ni)
+".build/sha256-unit-portable"
+selected implementation: portable
+note: no accelerated transform on this CPU/target; portable only
+note: running as root; unreadable-file check skipped (root bypasses permissions)
+sha256 unit: 655 checks, 0 failures (implementations: portable)
+NIFT_BIN="/home/claude/review/cand-b5/nift" bash tests/sha256_builtins.sh
+FAIL NIST empty (expected 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', got 'error: /tmp/c141b-fp.PS1n8v/nift-certify-0010143/29e54c97733f00e8/tmp.pOkgd2fCDX/vectors.f:9:14: not compiled for the VM (builtin-bytes:bytes): bytes values with `bytes()` is not supported by the Runtime 2.0 VM yet')
+FAIL NIST abc (expected 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', got 'note: the program was not executed: no part of it ran')
+FAIL NIST 448-bit (expected '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1', got 'note: to run it on the legacy interpreter: NIFT_VM=0 nift vectors.f')
+FAIL NIST 896-bit (expected 'cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1', got 'note: please report unsupported programs at https://github.com/nift-dev/nift/issues')
+FAIL NIST one million a (expected 'cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0', got '')
+FAIL empty bytes (expected 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', got '')
+FAIL bytes equal string bytes (expected 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', got '')
+PASS UTF-8 text
+PASS NFD not normalised
+PASS NFC not normalised
+FAIL bytes with NULs (expected '6b1e73a0094b7b812d3b9e22cffb4f8239319847522c4fa103753b6950020f93', got 'error: /tmp/c141b-fp.PS1n8v/nift-certify-0010143/29e54c97733f00e8/tmp.pOkgd2fCDX/nul.f:1:14: not compiled for the VM (builtin-bytes:bytes): bytes values with `bytes()` is not supported by the Runtime 2.0 VM yet')
+FAIL string with NULs (open) (expected '6eff8621199d90f3f33f56d9c835121a4e3922e4be8a1b0285cee3c839137938', got 'note: the program was not executed: no part of it ran')
+FAIL bytes with NULs (open_bytes) (expected '6eff8621199d90f3f33f56d9c835121a4e3922e4be8a1b0285cee3c839137938', got 'note: to run it on the legacy interpreter: NIFT_VM=0 nift nul.f')
+FAIL file with NULs and CRLF (expected '6eff8621199d90f3f33f56d9c835121a4e3922e4be8a1b0285cee3c839137938', got 'note: please report unsupported programs at https://github.com/nift-dev/nift/issues')
+FAIL line endings not normalised (expected 'false', got '')
+PASS 38 files (block/buffer boundaries, 5 MiB, random binary) match hashlib and sha256sum/shasum
+FAIL repeated hashing is stable (expected 'true', got 'error: /tmp/c141b-fp.PS1n8v/nift-certify-0010143/29e54c97733f00e8/tmp.pOkgd2fCDX/repeat.f:5:14: not compiled for the VM (builtin-bytes:open_bytes): bytes values with `open_bytes()` is not supported by the Runtime 2.0 VM yet')
+FAIL sha256(open_bytes(p)) == sha256_file(p) (expected 'true', got 'note: the program was not executed: no part of it ran')
+FAIL loops and functions (expected 'true', got 'note: to run it on the legacy interpreter: NIFT_VM=0 nift repeat.f')
+PASS threads and async tasks hash concurrently
+PASS missing file is a recoverable io.open_failed
+PASS file used as a directory is missing
+PASS same code as open()
+PASS directory
+PASS open() wording for directories
+PASS number rejected
+PASS null rejected
+PASS array rejected
+PASS callable rejected
+FAIL arity (expected 'sha256: expected one string or bytes value', got 'not compiled for the VM (builtin-arity:sha256): `sha256()` with this number of arguments is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift err.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues')
+PASS path type
+FAIL path arity (expected 'sha256_file: expected one path', got 'not compiled for the VM (builtin-arity:sha256_file): `sha256_file()` with this number of arguments is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift err.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues')
+PASS unreadable file is a recoverable io.open_failed (as nobody)
+PASS absolute path outside the project
+PASS relative path with ..
+PASS symlink followed
+PASS dangling symlink is missing
+PASS --fs-root restricts sha256_file when requested
+FAIL user sha256 wins (top level) (expected 'user:abc', got 'error: /tmp/c141b-fp.PS1n8v/nift-certify-0010143/29e54c97733f00e8/tmp.pOkgd2fCDX/shadow.f:1:1: not compiled for the VM (fn-name-reserved): a function named like a built-in is not supported by the Runtime 2.0 VM yet')
+FAIL user sha256_file wins (top level) (expected 'userfile:x', got 'note: the program was not executed: no part of it ran')
+FAIL user sha256 wins (loop) (expected 'user:loop', got 'note: to run it on the legacy interpreter: NIFT_VM=0 nift shadow.f')
+FAIL user sha256_file wins (loop) (expected 'userfile:loop', got 'note: please report unsupported programs at https://github.com/nift-dev/nift/issues')
+PASS [modified] initial digest
+PASS [modified] external digest
+PASS [modified] caught missing file
+PASS [modified] read kept by a failed try block
+PASS [modified] Host-op trace records the read
+PASS [modified] unchanged inputs stay up to date
+PASS [modified] edited hashed file rebuilds the page
+PASS [modified] up to date after rebuild
+PASS [modified] edited external file rebuilds the page
+PASS [modified] caught missing file appearing rebuilds the page
+PASS [modified] read inside a failed try block stays a dependency
+PASS [modified] up to date at the end
+PASS [hash] initial digest
+PASS [hash] external digest
+PASS [hash] caught missing file
+PASS [hash] read kept by a failed try block
+PASS [hash] Host-op trace records the read
+PASS [hash] unchanged inputs stay up to date
+PASS [hash] edited hashed file rebuilds the page
+PASS [hash] up to date after rebuild
+PASS [hash] edited external file rebuilds the page
+PASS [hash] caught missing file appearing rebuilds the page
+PASS [hash] read inside a failed try block stays a dependency
+PASS [hash] up to date at the end
+PASS [hash] touch without content change (content snapshot)
+PASS [hybrid] initial digest
+PASS [hybrid] external digest
+PASS [hybrid] caught missing file
+PASS [hybrid] read kept by a failed try block
+PASS [hybrid] Host-op trace records the read
+PASS [hybrid] unchanged inputs stay up to date
+PASS [hybrid] edited hashed file rebuilds the page
+PASS [hybrid] up to date after rebuild
+PASS [hybrid] edited external file rebuilds the page
+PASS [hybrid] caught missing file appearing rebuilds the page
+PASS [hybrid] read inside a failed try block stays a dependency
+PASS [hybrid] up to date at the end
+PASS [modified] write in failed try: initial
+PASS [modified] write in failed try keeps the earlier read as a dependency
+PASS [hash] write in failed try: initial
+PASS [hash] write in failed try keeps the earlier read as a dependency
+PASS [modified] forced race, unsequenced edit: same-tick page-info needs rebuilding (the old flake)
+PASS [modified] forced race, sequenced edit: up to date after the fastest build
+PASS [modified] forced race: the sequenced edit is built
+PASS [hybrid] forced race, unsequenced edit: same-tick page-info needs rebuilding (the old flake)
+PASS [hybrid] forced race, sequenced edit: up to date after the fastest build
+PASS [hybrid] forced race: the sequenced edit is built
+sha256 builtins: 68 passed, fail=1
+make: *** [Makefile:2803: test-sha256] Error 1

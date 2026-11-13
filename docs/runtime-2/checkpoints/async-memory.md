@@ -612,3 +612,54 @@ behind by the failed creation still fails the case (NIFT_CHECK_DRAINED aborts th
 Also: tests/rt/parallel_isolation_stubs.cpp follows the ParallelBlock constructor's C141 signature, and
 tests/rt/parallel_isolation_stubs_check.py re-pins the production bodies' fingerprint (C141 changed the constructor);
 the starve-await-swept timing margin (review T1) is replaced by the completion hook.
+
+### 12.6 Acceptance follow-up (owner D-091 #2): the I2 record, identities, fingerprints
+
+C141 and C141a were accepted at 5a2bd3db (tree cf5ec506, nift sha256 569847c3...05; D-091 #1). This records the
+evidence the acceptance rests on; nothing in production or in an expected test result changes.
+
+**Identities.** I2 (`make -k test`, the 146 direct prerequisites of `test`, run in pieces) ran at 226d39ae (tree
+66253db4, porcelain 0, nift 569847c3...05), one identity for every target. The accepted candidate is 5a2bd3db: its two
+later commits change only a test comment and the section 12.5 row (2f455a68) and tests/runtime2/skip_phrases.tsv
+(5a2bd3db), so the binary is identical. The certification guard, BLOCKING at 226d39ae (the three C140c
+suite_status.sh lines missing from skip_phrases.tsv), was rerun on 5a2bd3db with an identity stamp before and after
+(head 5a2bd3db, tree cf5ec506, porcelain 0, nift 569847c3...05): rc 0, 160 PASS, 0 FAIL.
+
+**I2 classification** (D-090 classes, revised by D-091 #2; per target: identity, run, rc, log, first error and its
+fingerprint, class and evidence, C141a involvement; the full table is the implementer's i2-table.tsv). All 146 ran;
+no failing log involves C141a code.
+
+| Class | Count | Targets |
+| --- | --- | --- |
+| PASS | 92 | the rest |
+| KNOWN FAILURE (fingerprint equal to recorded evidence) | 3 | test-runtime2-host-deps (the C129 record, D-071 #1), test-runtime2-cp03-simplify, test-cp19-s1-dispatch (tests/runtime2/certify-fingerprints) |
+| KNOWN FLAKY, never PASS | 2 | test-runtime2-modified-race, test-runtime2-dynamic-reads: the CP01 equal timestamp tick (below) |
+| PENDING-OWNER behavioural difference | 1 | test-v410-sort-factory-parity: `named-precedence`, VM `int` against legacy `function` (tests/runtime2/cp25/pending_differences.tsv) |
+| OUTSTANDING, environment | 4 | test-unreadable-source and test-dependency-status (uid 0: mode-000 and chmod-0 checks; dependency-status stops at `denied-parent`, so its later cases did not run), test-v44-shell-restricted and test-progress-pty (no terminal) |
+| OUTSTANDING, baseline unverified | 43 | VM refusals of tests expecting legacy behaviour, no baseline compared (deferred to the B21 campaign, D-090 #4): process-capture, v49-selector-parity, parser-hardening, cp15-numeric-repair, cp17/18/19/20-bytes, v42-struct, v43-language, v44-execution-shell, v44-language-foundation, prepared-method-parity, v48-warn, v48-bytes-index-parity, v48-comparison-parity, v48-callable-parity, v48-map-set-index, v48-prepared-object-literal-parity, v48-prepared-collection-parity, location-method-receiver, v48-identifier-parity, v48-callback-parity, v46-time-cli, v46-timer, v46-secure-random-cli, v46-output-cli, v46-relative-imports, sha256, runtime2-cp16-legacy, cp19-shared-eval, cp19-r1, the v410 object-member, native-dispatch, callback-overlay, glob-prefix, filesystem-recipe (parity and guard), large-string and file-buffer parity gates, sort-number-compact, evaluated-operand, call-semantics |
+| BLOCKING at 226d39ae, resolved by 5a2bd3db | 1 | test-runtime2-certification-guard (above) |
+
+**KNOWN FLAKY** (REVIEW-C141a F1). The v4.12 modified rule rebuilds a page when a dependency is not older than its
+page-info (`ProjectInfo::dependency_changed`, `>=`), and the kernel stamps file times from a coarse clock (4 ms here).
+An input written just before a build, or a pre-build hook's output, can land in the tick of the page-info that build
+writes, so the next `status` or build reports one rebuild (cp01-modified-race.md, "Residual v4.12 behaviour"). The two
+gates failed this way before C140 (2026-10-23, 2026-11-07) and use no coroutines, so the scheduler C141a changed is
+unreachable from them. Isolated reruns at 5a2bd3db: modified-race 2 of 3 and dynamic-reads 3 of 3 (implementer), 5 of
+6 and 6 of 6 (reviewer). A classified flaky failure is never a pass; the test-only fix is D-091 #3.
+
+**Refreshed failure records** (REVIEW-C141a F2). The records of test-sha256, test-v44-language-foundation and
+test-v46-relative-imports in tests/runtime2/certify-fingerprints/ predate later test commits, and their current logs
+differ from them for the following reasons:
+- test-sha256: aa812279 (C24) removed one FAIL line;
+- test-v44-language-foundation: a6c121e2 (C96, D-065 #4) now reports by name the check the record shows as a silent
+  errexit;
+- test-v46-relative-imports: eeb7e819 (C94), 62c198e0 (C97) and cf833f5a (C104) let every fixture run and report the
+  `import-collision` refusal.
+
+The originals are kept unchanged: they are the original evidence, and certify_fingerprints_selftest.py reads them.
+The current logs, from the certification runner on 5a2bd3db, are beside them in `refreshed-2026-11-14/`, with
+SOURCES.tsv giving each log's identity, sha256, responsible commits and difference.
+
+Open (reported, not changed): the test-v46-relative-imports extractor in scripts/certify_fingerprints.py matches only
+`CERTIFY-ERR` lines. It therefore extracts no fingerprint from the current log, which reports its failures as `FAIL`
+lines, and certify would class the gate FAILED-NEW against any baseline until that extractor is updated.

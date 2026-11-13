@@ -1,0 +1,17 @@
+$ make -k test-v46-relative-imports  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/c141b-fp.PS1n8v/nift-certify-0010143/baa5753a775e1fd0)
+NIFT="/home/claude/review/cand-b5/nift" bash tests/v44_relative_import_ownership_smoke.sh
+PASS plain @fn in a script: refused before execution (fn-flags, approved, D-047 #1 / D-048 #1); legacy channel exact
+PASS package ownership output: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+PASS child module export does not leak into the consumer namespace: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+PASS package-relative traversal does not reach the consumer decoy: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+PASS package-relative symlink does not escape the package root: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+PASS v4.4 relative import module ownership
+NIFT="/home/claude/review/cand-b5/nift" bash tests/v46_import_worker_ownership_smoke.sh
+PASS module initialization worker keeps its loading module: refused before execution (coro-module-init-task, approved, D-064 #2); legacy channel exact
+PASS worker alias/reference cloning and parent isolation: refused before execution (coro-module-capture, approved, D-064 #3); legacy channel exact
+PASS direct nested package import: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+PASS single worker nested package import: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+FAIL module-private async callables: refused with import-collision (inventory status implement)
+PASS worker module isolation output: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact
+FAIL v4.6 worker module import ownership
+make: *** [Makefile:3787: test-v46-relative-imports] Error 1

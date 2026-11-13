@@ -2603,3 +2603,81 @@ certification-priority reset remains in force."
    without a new decision); no save() before C141 is accepted; no Linode, integration, push, CI, tag or release
    without approval. After C141: save(), then native::, then certification; further scheduler work only for a
    demonstrated defect.
+
+## D-088 — C141a: proceed as planned (owner, 2026-11-13 21:24 AEDT)
+
+1. **No new implementation requirements.** Finish the full gates on the frozen C141a, then the independent review.
+2. **The phase-observer test** (it catches M19 in about 2 runs of 3) is acceptable as supplementary coverage only if it
+   passes consistently on correct code. Its purpose and limits are documented accurately, not as a deterministic
+   negative control. If it can fail intermittently on correct code, it is removed or redesigned before
+   certification. M19 coverage rests on starve-sweeps-under-lock.
+3. **Review points: the atomic ordering** of (1) recording the failure, (2) marking it failed, (3) removing the queued
+   work and (4) releasing the permit. (5) Publishing and waking may follow, but must not let tasks escape or leave
+   waiters blocked. The removal of `starve_mutex_` introduces no lock-order problem.
+4. **Verification must show:** a full async-memory pass; every mutant caught; every VM suite executed;
+   builtins-guards and the previously missed targets passing; `make -k test` accounting for all 146 prerequisites;
+   only the known host-deps failures (withdrawn by D-090 #3); an accurate inventory; no new performance regression.
+   Three-run results are preliminary only.
+5. **Next after acceptance:** save(), then L6 native::, then cross-platform certification.
+6. **Correction (integrator, 2026-11-13):** the "21 mutants" in the relayed D-088 was the integrator's miscount. The
+   async-memory mutant set is 20 (M1-M11, M13-M21); number 12 is the fault-injection hook build (correct code),
+   which must pass. No repository record said 21.
+
+## D-089 — mutants, the phase-observer wording, benchmarking, I2 (owner, 2026-11-14 00:46 AEDT)
+
+1. **Mutants:** 20 mutants plus M12, the fault-injection control build, accepted. No mutant is invented to fill the
+   numbering.
+2. **The phase-observer test** stays as supplementary coverage. The comment-only follow-up is approved: it corrects
+   the two overstated descriptions and separates supplementary concurrency coverage from deterministic mutation
+   detection (2f455a68).
+3. **Performance:** the instruction-count evidence is accepted. No further local benchmarking. The Linode wall-clock
+   certification requirement remains.
+4. **I2:** account for all 146 targets with the exact source and binary identity, each run or correctly up to date.
+   The only failures are host-deps and the inventory, with their fingerprints preserved. Any other failure is
+   reported; the expected-failure list is never extended. Running it in pieces is fine if the final report shows
+   complete coverage. (Superseded in part by D-090 #2 and #3.)
+5. **Next:** I2, the comment-only follow-up, freeze, then the independent review (the W1 atomic transition, S1 wake
+   ordering, N1 admission, the failure-announcement interval). No scope changes. Then save(), L6 native::,
+   certification.
+
+## D-090 — skip-phrase fix, I2 classification, revised acceptance condition (owner, 2026-11-14 00:52 AEDT)
+
+1. **Skip-phrase fix approved** as a separate tests-only commit (5a2bd3db): the three exact C140c suite_status.sh
+   messages, each with a reason. No wildcards; a missing or skipped suite never becomes PASS; an unlisted skip still
+   fails the guard, with an effective negative control; nonzero status preserved; the certification guard is in the
+   authoritative certification gate inventory (scripts/certify.py MANDATORY); the reviewer verifies all of it.
+2. **I2 classification, no baseline comparison now.** All 146 targets are classified, each with identity, run or
+   up to date, rc, log, first error and fingerprint, the class with its evidence, and whether it touches C141a code.
+   Classes: PASS; KNOWN FAILURE (existing baseline evidence only); OUTSTANDING - baseline unverified; OUTSTANDING -
+   environment; BLOCKING (scheduler-related or unexplained); NOT RUN. No resemblance-based "pre-existing" labels; no
+   new allowlist.
+3. **Revised acceptance condition:** every required target accounted for and every failure classified; no newly
+   introduced or unexplained failure attributable to C141a left unresolved; the targeted gates pass; the reviewer
+   confirms the attribution; a classified failure is never a pass; anything not confidently classified is
+   escalated. D-088's "only host-deps" requirement is withdrawn.
+4. **No Linode now.** The baseline comparison is deferred to the B21 campaign, and its budget (about US$8.87) is
+   reserved for it.
+5. **Next:** finish I2, then the skip-phrase and wording commits (separate), freeze, the independent review (W1, S1,
+   N1, the mutation controls, the failure classifications), then owner acceptance. No save() before acceptance.
+
+## D-091 — C141 and C141a accepted at 5a2bd3db; save() authorised (owner, 2026-11-14 04:43 AEDT)
+
+1. **Accepted** at 5a2bd3db (nift sha256 569847c3...05): R1, R2, W1, S1 and N1 closed; async-memory 63/63; 20 of 20
+   mutants; the VM suites 35/35; no instruction-count regression; review REVIEW-C141a ACCEPT-WITH-NOTES. This is not
+   full certification.
+2. **One bounded records/tests-only follow-up, no production change, the binary unchanged:** D-088, D-089 and D-090
+   in this file; in the I2 table, modified-race and dynamic-reads become KNOWN FLAKY (the CP01 equal timestamp tick),
+   never PASS, and v410-sort-factory-parity a PENDING-OWNER behavioural difference; the record that I2 ran at
+   226d39ae while the accepted candidate is 5a2bd3db, with the binary unchanged; a narrow certification-guard rerun
+   on 5a2bd3db for its identity; the sha256, v44-language-foundation and v46-relative-imports fingerprints refreshed,
+   keeping the original evidence and citing the responsible commits.
+3. **A separate test-only fix** for modified-race and dynamic-reads, using the CP01 ticks.py sequencing approach.
+   The rebuild assertions are kept; production rebuild semantics are not changed. Before the Linode campaign; it may
+   be part of test preparation.
+4. **The ordinary-error shutdown hang** stays a separate tracked finding. C141 is not reopened; no cancellation
+   redesign.
+5. **save() authorised** with the D-074 contracts: special files, symlinks, read-only targets, atomic replacement,
+   hard-link documentation, standard-stream destinations; symlink races bounded. Scratch fixtures and effective
+   negative controls. Stop if a broad redesign is needed. Freeze, independent review, owner acceptance.
+6. **Sequence:** save(), L6 native:: Option B, freeze, Linode certification and Windows/macOS CI, then performance
+   qualification and the release decision. No Linode, integration, push, CI, tag or release without approval.

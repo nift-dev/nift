@@ -1,0 +1,6 @@
+$ make -k test-v44-language-foundation  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/c141b-fp.PS1n8v/nift-certify-0010143/ff6445842e4a8cb9)
+.build/parser-statement-state-unit
+tests/v44_ast_expression_smoke.sh
+FAIL: big-int equality: expected [0] got [exit 1: error: /tmp/c141b-fp.PS1n8v/nift-certify-0010143/ff6445842e4a8cb9/tmp.ihCRJg8rka/probe.f:2:1: not compiled for the VM (prepared-unpreparable): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet]
+v4.4 AST expression smoke: FAIL
+make: *** [Makefile:3431: test-v44-language-foundation] Error 1
