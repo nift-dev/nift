@@ -2522,3 +2522,84 @@ certification-priority reset remains in force."
    (D-083 #2) under the coordinator's brief: no std::terminate, controlled `limit.exceeded` exit 1, no new
    deadlock, no user code starting after the failure, atomic and idempotent failure state, charges released once,
    D-079 output order preserved, healthy scheduling unchanged, no allocation or throw on the noexcept cleanup path.
+
+## D-085 — C141: the extended Option 1 approved, R1 and R2 (owner, 2026-11-13 14:17 AEDT)
+
+1. **Approved:** REVIEW-C141-STOP's extended Option 1, closing R1 (the cleanup-wait abort, D-082) and R2 (shared
+   waits blocking forever after a recorded fatal limit; pre-existing, reproducible on 0895a234 with only
+   `NIFT_VM_HEAP_BUDGET`).
+2. **Semantic change approved.** Once a fatal resource limit has been recorded (by the C141 sweep or by the C140 (d)
+   note), every channel send or recv and mutex lock (every `wait_shared` site) that would block ends the run through
+   the non-catchable limit path, exit 1, at that wait. A program may execute fewer statements than under C140.
+3. **Constraints.** A per-runtime flag (never process-global); the first recorded reason and message are
+   authoritative (budget versus thread), as static messages; no allocation or throw on the cleanup path; the
+   mandatory `resume_cv_` lost-wake-up fix; waiters already blocked are notified when the state is recorded
+   (verified under concurrent failure); no new dependency links or cancellation machinery. About 100 production
+   lines; substantially more: stop and report.
+4. **Semantics.** Exit 1, never 70, 134 or a hang; healthy runs unchanged; D-079 order; no new user code starts
+   after the failure; idempotent, with no duplicate errors and no leaked or double-released charges.
+5. **Mandatory deterministic tests.** R1 to exit 1; the R2 heap-budget hang to exit 1; the C141 sweep hang route;
+   send, recv and mutex after a failure; the diagnostic and its position; no new user code; output order;
+   accounting and cleanup; repeated and concurrent failure; healthy scheduling unchanged. hang_a.f, hang_b.f and
+   d1.f become permanent regression cases. Four mutants, all caught, including a deterministic case proving the
+   sweep is necessary (M14 must fail an effective test); if that is impossible, return rather than weaken it.
+6. **Unchanged.** A hang in non-cooperative user code stays a documented limitation; no preemptive cancellation.
+   The tolerated exit 134 is removed. Freeze, verify provenance, independent review, then owner acceptance;
+   save() not before C141 is accepted; no Linode, integration, push, CI, tag or release without approval.
+7. **Extended by D-087 #4 (N1):** new task submissions are refused after any recorded fatal resource-limit failure
+   (memory, thread creation, the cleanup path, or an un-awaited task's C140 (d) note), with the first recorded reason
+   authoritative. This intentionally narrows the accepted C140 behaviour, under which the rest of the program,
+   spawns included, ran after a noted limit. Code already running stays cooperative: no preemptive cancellation.
+
+## D-086 — C141 review guidance; the ordinary-error hang is investigation only (owner, 2026-11-13 16:30 AEDT)
+
+1. **C141 scope not expanded.** Complete the gates and freeze checks; confirm R1 and R2 exit 1, the first reason
+   preserved, accounting and idempotent cleanup, no allocation or throw on the cleanup path, no scheduler or
+   output-order regression, and effective mutants.
+2. **M17 (the lost-wake-up notify) is not retired silently.** Its mutation and explanation are kept as review
+   evidence. The reviewer establishes whether a reachable lost-wake-up schedule exists without the notify, whether
+   the condition-variable predicates and notify ordering are correct, whether a deterministic scheduling or
+   fault-injection test is possible, and whether M17 is equivalent, redundant or genuinely untested. No
+   probabilistic or flaky tests. A surviving M17 does not block acceptance if equivalence or the invariant is
+   established independently; an unresolved reachable lost wake-up is a blocker.
+3. **The ordinary-error shutdown hang** (an uncaught main-program error such as `1 / 0` while a started task is
+   blocked in a recv nothing will satisfy) is a provisional P1 liveness defect, **investigation only**: reproduce
+   it on the accepted C140 binary (0895a234); async, thread() or both; trace fatal-error shutdown and cancellation;
+   whether existing cancellation can end the blocked waits without changing healthy execution or adding scheduler
+   machinery; fatal shutdown only, or ordinary cancellation too; the effect on output order, cleanup and exception
+   semantics. Do not reuse the starvation flag without checking its consequences. No fix and no C141 expansion
+   without a further owner decision; if a bounded fix is feasible, return its exact scope and risks. Kept separate
+   from R1 and R2 until shown to share a root cause. The owner leans to fixing it before a public release if it is
+   genuine.
+4. C141 awaits review and owner acceptance; no save() before it; no Linode, integration, push, CI, tag or release
+   without approval.
+
+## D-087 — C141a scope: W1, S1, I2, N1 and the inventory (owner, 2026-11-13 18:33 AEDT)
+
+1. **W1 is mandatory: the reviewer's swap-under-lock.** In one `mutex_` hold: the failed state, the removal of the
+   queue, each charge released exactly once, and the permit release; waiters wake only once the queue holds nothing
+   executable. Phase 2 (publishing the failure, notifying the waiters) runs outside the lock, with exclusive ownership
+   of the swept queue. `starve_mutex_` is removed only if exclusivity is confirmed. The phase-1/phase-2 interval is
+   tested, not assumed: no observer sees an incompletely published failure, the first reason is authoritative, the
+   transition is idempotent. M19 (restoring the gap) is mandatory and caught deterministically; no timing-based
+   acceptance. The notify-only fix is rejected.
+2. **S1 in C141a:** a bounded wake-up fix in `resume_worker`, with a deterministic state-controlled test; the
+   condition-variable predicates, healthy scheduling and output order preserved; no busy-wait. A small natural file
+   split is approved if the 400-line limit needs it; no compression, no restructuring.
+3. **I2:** `make -k test` on an identified frozen tree and binary is approved as the check. It must show all 146
+   prerequisites attempted or correctly up to date, none silently omitted, the known host-deps failures with matching
+   fingerprints, no other target failing, the aggregate test target nonzero, every failure visible, and full logs and
+   identities. Not classified PASS: "all required targets evaluated, only documented outstanding failures".
+4. **N1:** D-085 is extended (recorded there, item 7): new task submissions are refused after any recorded fatal
+   resource-limit failure, the first reason authoritative; the admission check must not race the failure transition
+   (the reviewer verifies); running code stays cooperative.
+5. **Inventory:** `defect:print-cat-output-order` corrected to implemented-accepted, citing D-079, now; records only.
+   D-085, D-086 and these rulings are added to this file.
+6. **C141a closes** W1 with M19, the S1 test, the M17 test, a deterministic M14, the healthy-output test, the stub
+   fix, the N1 admission test, and the records and inventory. The cleanup path is verified allocation-free and
+   non-throwing before the commit. Freeze; the independent review examines the intervals between lock holds, not
+   operations in isolation. Return for owner acceptance only when closed.
+7. **Unchanged:** the ordinary-error hang stays separate (no A1 and no change to ordinary fatal-error cancellation
+   without a new decision); no save() before C141 is accepted; no Linode, integration, push, CI, tag or release
+   without approval. After C141: save(), then native::, then certification; further scheduler work only for a
+   demonstrated defect.

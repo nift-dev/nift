@@ -38,6 +38,14 @@ std::size_t image_bytes(const Program& program) {
 }
 
 void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result) {
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+    // C141a (T1, M14), test-only: run_parallel_task calls this just before it publishes the task's completion (and
+    // execute_record then releases its CPU permit). With NIFT_TEST_HOLD_COMPLETION set, a task does not finish while
+    // work is queued and no worker is waiting to resume (polled under the runtime mutex, at most 10 s).
+    if (std::getenv("NIFT_TEST_HOLD_COMPLETION"))
+        if (auto runtime = record.runtime.lock())
+            wait_for_test([&] { return runtime->completion_may_proceed_for_test(); });
+#endif
     const auto ends = [&](const std::string& tail) {
         return result.message.size() >= tail.size() &&
                result.message.compare(result.message.size() - tail.size(), tail.size(), tail) == 0;

@@ -96,9 +96,15 @@ void ParallelRuntime::ensure_worker_locked() {
         workers_.emplace_back((NIFT_INJECT_BAD_ALLOC("nothread"), [this] { worker_loop(); }));
 }
 bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::string& error) {
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+    // C141a (N1), test-only: with NIFT_TEST_SUBMIT_AFTER_LIMIT set, a spawn by the main program while a task is
+    // active first waits (polled under mutex_, at most 10 s) until a limit has been recorded.
+    if (!running_pool && std::getenv("NIFT_TEST_SUBMIT_AFTER_LIMIT"))
+        wait_for_test([this] { std::lock_guard<std::mutex> held(mutex_); return active_ == 0 || limit_failed_; });
+#endif
     std::unique_lock<std::mutex> lock(mutex_);
     if (stopping_) { error = "parallel runtime is shutting down"; return false; }
-    if (starved_ && !kStarveAdmits) return refuse_starved(*record, error);  // C141: nothing new starts
+    if ((kNoteAdmits ? starved_ : limit_failed_) && !kStarveAdmits) return refuse_fatal(*record, error);  // C141a N1
     // Admission is bounded independently of CPU slots. Saturation is an
     // explicit refusal; blocking workers release CPU permits.
     if (active_ >= capacity_) { error = "parallel task admission limit exceeded"; return false; }
@@ -130,8 +136,14 @@ void ParallelRuntime::worker_loop() {
         std::shared_ptr<ParallelTaskRecord> record;
         {
             std::unique_lock<std::mutex> lock(mutex_);
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+            ++parked_for_test_;  // test-only (C141a, S1): idle workers parked here (parallel_block.cpp's hook)
+#endif
             cv_.wait(lock, [&] { return (stopping_ && queue_.empty()) ||
                                       (!queue_.empty() && computing_ < limit_ && resuming_ == 0); });
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+            --parked_for_test_;
+#endif
             if (stopping_ && queue_.empty()) break;
             record = std::move(queue_.front()); queue_.pop_front(); ++computing_;
         }
@@ -181,30 +193,6 @@ bool ParallelRuntime::help_timer(std::chrono::steady_clock::time_point deadline)
     pool->execute_record(std::move(record), false);
     --timer_help_depth;
     return true;
-}
-bool ParallelRuntime::block_worker(ParallelWaitKind kind, bool* exhausted) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    const bool native = kind == ParallelWaitKind::Blocking;
-    if (native && native_blocked_ == blocking_capacity_) return false;
-    --computing_; ++blocked_;
-    if (native) ++native_blocked_; else ++transient_blocked_;
-    try { NIFT_INJECT_WAIT(kind); ensure_worker_locked(); }
-    catch (...) {  // C141: a cleanup wait keeps its block (its permit stays released) and starves the runtime
-        if (!exhausted || kCleanupRethrow) {
-            ++computing_; --blocked_; if (native) --native_blocked_; else --transient_blocked_;
-            throw;
-        }
-        *exhausted = true;  // and falls through: the released permit is notified like any block's (M1)
-    }
-    resume_cv_.notify_one(); cv_.notify_all();
-    return true;
-}
-void ParallelRuntime::resume_worker(ParallelWaitKind kind) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    ++resuming_;
-    if (kind == ParallelWaitKind::Blocking) --native_blocked_; else --transient_blocked_;
-    resume_cv_.wait(lock, [&] { return computing_ < limit_; });
-    --resuming_; --blocked_; ++computing_;
 }
 ParallelBlock::ParallelBlock(ParallelWaitKind kind, std::uint32_t offset) : runtime_(running_pool), kind_(kind) {
     bool* starved = kind_ == ParallelWaitKind::Cleanup ? &exhausted_ : nullptr;

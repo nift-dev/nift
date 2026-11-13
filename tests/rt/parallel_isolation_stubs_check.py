@@ -28,18 +28,18 @@ import subprocess
 import sys
 
 EXPECTED = {
-    "nift::rt::ParallelBlock::ParallelBlock(nift::rt::ParallelWaitKind)",
+    "nift::rt::ParallelBlock::ParallelBlock(nift::rt::ParallelWaitKind, unsigned int)",
     "nift::rt::ParallelBlock::~ParallelBlock()",
     "nift::rt::parallel_task_identity(std::shared_ptr<nift::rt::ParallelTaskRecord> const&)",
     "nift::rt::notify_parallel_wait_states(std::shared_ptr<nift::rt::ParallelTaskRecord> const&)",
 }
 # sha256 of the extracted production definitions (see extract()). Re-pin only after reviewing
 # tests/rt/parallel_isolation_stubs.cpp against the new production code.
-PINNED_BODIES = "1f4a1418bb4f50ad7acc463bd932222c9eaaf1f4766b4331b71bdf2911503890"
+PINNED_BODIES = "dd1fc589c32f91094f8803bb1dd4ecf74e592f08e0691cb76dd4a49d3605fec7"  # C141 (ctor offset)
 
 BODY_PATTERNS = [
     r"^thread_local ParallelRuntime\* running_pool = nullptr;$",
-    r"^ParallelBlock::ParallelBlock\(ParallelWaitKind kind\).*?^}$",
+    r"^ParallelBlock::ParallelBlock\(ParallelWaitKind kind, std::uint32_t offset\).*?^}$",
     r"^ParallelBlock::~ParallelBlock\(\).*?}$",
     r"^std::uint64_t parallel_task_identity\(const std::shared_ptr<ParallelTaskRecord>& record\) \{.*?^}$",
     r"^void notify_parallel_wait_states\(const std::shared_ptr<ParallelTaskRecord>& record\) \{.*?^}$",

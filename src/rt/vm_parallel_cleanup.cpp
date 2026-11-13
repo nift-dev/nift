@@ -36,6 +36,12 @@ void Vm::coro_abort_parallel() noexcept {
     shared_detail::notify_shared_cancellation();
     for (const auto& record : coro_->parallel_live) {
         if (!record || record->complete()) continue;
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+        // C141a (M17), test-only: with NIFT_TEST_CLEANUP_AFTER_RESUMER set, this cleanup wait first waits until a
+        // worker is waiting to resume: the one schedule in which the starving block's notify matters.
+        if (coro_->parallel && std::getenv("NIFT_TEST_CLEANUP_AFTER_RESUMER"))
+            wait_for_test([this] { return coro_->parallel->resuming_for_test(); });
+#endif
         ParallelBlock blocked(ParallelWaitKind::Cleanup, record->spawn_offset);  // C141: never throws here
         std::unique_lock<std::mutex> lock(record->mutex);
         record->cv.wait(lock, [&] { return record->state != ParallelTaskState::Pending; });

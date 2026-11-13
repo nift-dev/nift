@@ -522,12 +522,15 @@ checks that each charge was released exactly once.
 | 14 | no sweep of queued tasks | starve-await-swept (the queued task runs and prints) (hang-b does not catch it: its recv fails by the R2 path either way) |
 | 15 | no refusal once starved | starve-spawn-refused |
 | 16 | swept tasks marked cancelled | starve-await-swept (catchable `runtime.cancelled`) |
+| 17 | the starving block returns without its notify (M1) | starve-notifies-resumer (C141a: a hang, the 30 s timeout) |
 | 18 | `wait_shared` ignores the fatal limit | r2-budget, r2-submit, wait-recv-woken, wait-send-after, wait-lock-woken, wait-concurrent (hang: the 20 s timeout) |
+| 19 | the sweep in `starve()`'s own lock hold, after the cleanup block's (f448c7b8's order) | starve-sweeps-under-lock, starve-phase-observer (C141a, W1: a queued task starts in the window) |
+| 20 | the last resumer does not wake the idle workers (S1) | resume-wakes-workers (C141a: a hang) |
+| 21 | new tasks admitted after a noted limit, refused only once starved (N1) | refuse-after-note (C141a: the loop never ends) |
 
-A mutant for the M1 notify (17: the starving block returns without notifying) was built and run against every
-injected case: none catches it, so it is not in MUTANTS and its switch was removed. A missed notify only delays a
-task resuming at that moment until the next completion notifies `resume_cv_`; a hang needs every resumer to queue
-before the starving thread's next instructions, which no test can force without a scheduling hook.
+C141 shipped without mutant 17: none of its cases forced the schedule in which the M1 notify matters. C141a adds it
+with a state hook (`NIFT_TEST_CLEANUP_AFTER_RESUMER`: the cleanup wait first waits until a worker is waiting to
+resume) and the RESUMER program (section 12.5).
 
 ### 12.3 Harness (D-084 L1-L4)
 
@@ -563,3 +566,49 @@ non-blank added lines are about 105 production and 40 test-only (the fault hook,
 no-allocation and drained checks, all compiled only under `NIFT_ASYNC_MEMORY_MUTANT`).
 
 Gate results for this commit are in the C141 report (run on the committed tree).
+
+### 12.5 C141a (review of C141; owner D-086, D-087)
+
+Production (all in the parallel runtime; the C141 semantics otherwise unchanged):
+- **W1 (High): the starve in two phases.** At f448c7b8 the cleanup block released its CPU permit and notified the
+  workers (M1) in one lock hold, and `starve()` swept the queue in a second one: in between, a worker (woken or
+  already awake), `help_timer`, a new worker or `submit` could start or admit work after the failure (observed once
+  in three hooked runs). Now phase 1 (`exhaust_locked` -> `sweep_locked`, in `block_worker`'s lock hold) records the
+  failure (`starved_`, and the limit and `fatal_` unless a limit was recorded first), swaps the queue into `spare_`
+  and releases the swept tasks' admissions and charges once; phase 2 (`starve()`, after the hold, by the thread
+  whose phase 1 swept: `starver_`) sets the limit's offset, fails the swept records and wakes their waiters, then
+  the shared waits. `starve_mutex_` is removed: `spare_` is written once, by the thread that sets `starved_`, and
+  read and cleared only by that thread's phase 2. The notify-only fix (moving the M1 notify into `starve()`) was
+  rejected (D-087 #1): it narrows the window but leaves the other paths; the test below fails on it.
+- **S1 (pre-existing, CP23-era): the last resumer wakes the idle workers.** `resume_worker` decremented `resuming_`
+  (part of `worker_loop`'s predicate) without notifying `cv_`: if every wake-up of an idle worker came while a resumer
+  was still counted, a queued task waited for an unrelated notify (forever, if the resumer busy-waits on it). Now the
+  last resumer notifies `cv_` when work is queued and a permit is still free. `block_worker` and `resume_worker`
+  moved to parallel_block.cpp (parallel_task.cpp was at the 400-line limit; approved split, D-087 #2).
+- **N1 (D-087 #3, an intended narrowing of C140 (d)): no new task after any recorded fatal limit.** `submit` refuses
+  once a limit has been recorded, by the starve or by the C140 (d) note path (a task ended with the budget or thread
+  limit), with the first recorded reason, under the runtime mutex under which both record it (no race with the
+  failure transition). Before C141a, after a noted limit the rest of the program, spawns included, ran to its end;
+  now a later spawn ends the run there (exit 1, the first reason). Code already running stays cooperative: it is not
+  interrupted; its shared waits end the run (R2) and its spawns are refused.
+
+Tests (tests/runtime2/async_memory.py), each 3 runs with the exact result:
+
+| Case | Program, hooks (test builds only) | Exact result |
+| --- | --- | --- |
+| starve-await-swept (M14) | SWEPT (`leaf` and `b` hold both permits until signalled), `cleanup:1`, `NIFT_TEST_HOLD_COMPLETION` (a task does not finish while work is queued and nobody waits to resume) | `before/runtime.cancelled`, `31:6` `future: ` resources |
+| starve-sweeps-under-lock (W1, M19) | SWEPT, plus `NIFT_TEST_STARVE_AFTER_DEQUEUE` (between the phases the workers are woken and the starve waits until nothing is queued) | the same; M19 and the notify-only fix: `marker`/`7` |
+| starve-phase-observer (W1) | PHASES: the root keeps spawning after the cancel; `NIFT_TEST_HOLD_PHASE2` holds phase 2 until a spawn is refused | `before`, `35:8` resources (one error, the first reason) |
+| starve-notifies-resumer (M17) | RESUMER, `NIFT_TEST_CLEANUP_AFTER_RESUMER` | `before/runtime.cancelled/1/after`, `25:8` resources |
+| resume-wakes-workers (S1, M20) | RESUMING, `NIFT_TEST_S1` (blocks only while a resumer waits; the resumer takes its permit only once two are free) | exit 0, `before/1/3/4/2/after` |
+| refuse-after-note (N1, M21) | NOTED: helper's child fails (`submit:2`, resources); `NIFT_TEST_SUBMIT_AFTER_LIMIT` makes the main program's next spawn wait until the limit is recorded | `before`, `14:8` resources (M21: the loop never ends) |
+| healthy-unchanged | adds RESUMING; SWEPT's no-fault form awaits `b` and `q` first (one exact order) | exit 0, the full output |
+
+N1 changes two C140a cases' expected result: in `alloc-rollback-start` and `alloc-rollback-submit` the failed creation
+inside an abandoned task is now a recorded limit, so the main program's next spawn (`c1`, 11:7) is refused with that
+first reason instead of the three sleepers running (`all live`) and the run ending with it afterwards; a charge left
+behind by the failed creation still fails the case (NIFT_CHECK_DRAINED aborts the injection build).
+
+Also: tests/rt/parallel_isolation_stubs.cpp follows the ParallelBlock constructor's C141 signature, and
+tests/rt/parallel_isolation_stubs_check.py re-pins the production bodies' fingerprint (C141 changed the constructor);
+the starve-await-swept timing margin (review T1) is replaced by the completion hook.

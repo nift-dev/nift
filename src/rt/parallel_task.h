@@ -168,15 +168,40 @@ public:
     const char* fatal_limit() const noexcept { return fatal_.load(std::memory_order_acquire); }
     // C141 (R1, D-083): a cleanup wait could not start a worker. Every queued task fails unrun (limit.exceeded, its
     // waiters woken, its charge released once), new tasks are refused from now on, and the limit is recorded once.
-    // noexcept and allocation-free: it runs in Vm::coro_abort_parallel (parallel_starve.cpp).
+    // noexcept and allocation-free: it runs in Vm::coro_abort_parallel (parallel_starve.cpp). Phase 2 of the
+    // starve: phase 1 (exhaust_locked) already refused new work and emptied the queue in block_worker's lock hold.
     void starve(std::uint32_t offset) noexcept;
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+    // C141a (M17), test-only: whether a worker is waiting to resume (vm_parallel_cleanup.cpp's hook).
+    bool resuming_for_test() const { std::lock_guard<std::mutex> lock(mutex_); return resuming_ != 0; }
+    // C141a (T1, M14), test-only: whether a finishing task may publish its completion and release its permit now:
+    // no work is queued (nothing could take the permit), or a worker is waiting to resume (it takes the permit first).
+    bool completion_may_proceed_for_test() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.empty() || resuming_ != 0;
+    }
+#endif
 private:
     void worker_loop();
     void execute_record(std::shared_ptr<ParallelTaskRecord> record, bool owns_cpu);
     void ensure_worker_locked();
-    static bool refuse_starved(ParallelTaskRecord& record, std::string& error) {
-        record.failure_code = "limit.exceeded"; error = kParallelResourcesExhausted; return false;
+    // C141a (N1, D-087): after any recorded fatal limit (the C140 (d) note or the starve; under mutex_, where both are
+    // recorded) no task is admitted: refused with the first recorded reason. Test-only M21: refused once starved only.
+    bool refuse_fatal(ParallelTaskRecord& record, std::string& error) {
+        const char* reason = fatal_.load(std::memory_order_relaxed);  // set with limit_failed_, under mutex_
+        record.failure_code = "limit.exceeded"; error = reason ? reason : kParallelResourcesExhausted;
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+        refusals_for_test_.fetch_add(1);  // test-only: the phase-2 observer hook (parallel_starve.cpp)
+#endif
+        return false;
     }
+    // C141 (W1): phase 1 of the starve, in block_worker's mutex_ hold that released the cleanup wait's permit, so no
+    // queued task can start and no new one be admitted after the failure: sets `exhausted`, then sweep_locked().
+    void exhaust_locked(bool& exhausted) noexcept;
+    // Under mutex_, once per runtime: the failure (starved_, and the limit unless one was recorded first: submit
+    // refuses from here on), the queue swapped into spare_, each swept task's admission and charge released once; the
+    // calling thread becomes starver_, whose phase 2 records the offset and marks the swept records failed.
+    void sweep_locked() noexcept;
     void release_locked(std::size_t charge) noexcept {  // C140a: an over-release is our defect: fail loudly
         if (charge > reserved_) std::abort();
         reserved_ -= charge;
@@ -193,8 +218,16 @@ private:
     bool limit_failed_ = false, starved_ = false;
     std::atomic<const char*> fatal_{nullptr};  // C141: written under mutex_ with limit_failed_, read lock-free
     std::string limit_message_;
-    std::mutex starve_mutex_;  // C141: one sweep at a time owns spare_
-    std::deque<std::shared_ptr<ParallelTaskRecord>> spare_;  // C141: built up front, so a sweep swaps, never allocates
+    // C141: built up front, so the one sweep swaps, never allocates; written only by sweep_locked (once, under
+    // mutex_), then read and cleared only by the starve that claims swept_pending_ (under mutex_).
+    std::deque<std::shared_ptr<ParallelTaskRecord>> spare_;
+    bool swept_pending_ = false, offset_pending_ = false;
+    std::thread::id starver_;  // C141a: the thread whose phase 1 recorded the limit and swept; it alone runs phase 2's
+                               // part for them (the offset, the swept records)
+#if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
+    std::atomic<int> refusals_for_test_{0};
+    std::size_t parked_for_test_ = 0;  // under mutex_: worker threads waiting in worker_loop's cv_.wait
+#endif
     std::uint32_t limit_offset_ = 0;
     std::size_t blocking_capacity_ = kBlockedCapacity;
     std::size_t limit_ = 8, capacity_ = kTaskCapacity;

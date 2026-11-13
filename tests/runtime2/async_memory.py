@@ -29,10 +29,12 @@ C141 (R1, R2; D-084, D-085): once a run has a fatal resource limit (a task's bud
 runtime, or a cleanup wait that cannot start a worker, which starves the runtime: queued tasks fail unrun, new ones
 are refused), every shared wait that would block (send, recv, lock) ends the run with exit 1 at its own position,
 with the first recorded reason; never exit 70, 134 or a hang. Mutants 13 (the cleanup wait rethrows: terminate),
-14 (no sweep of queued tasks), 15 (no refusal once starved), 16 (swept tasks "cancelled", catchable) and 18 (a
-shared wait ignores the fatal limit) keep the hook too. The fault-injection builds also abort (exit 134) when a
-runtime is destroyed with a charge still reserved (NIFT_CHECK_DRAINED), so every injected case checks the
-accounting, and an over-release aborts in every build (C140a).
+14 (no sweep of queued tasks), 15 (no refusal once starved), 16 (swept tasks "cancelled", catchable), 17 (the
+starving block without its notify: a hang), 18 (a shared wait ignores the fatal limit), 19 (the sweep after
+the cleanup block's lock hold, not in it: W1), 20 (the last resumer does not wake the idle workers: S1) and 21 (new
+tasks admitted after a noted limit: N1) keep the hook too. The
+fault-injection builds also abort (exit 134) when a runtime is destroyed with a charge still reserved
+(NIFT_CHECK_DRAINED), so every injected case checks the accounting, and an over-release aborts in every build (C140a).
 
 Exit status of --nift: 0 = every case passes; 1 = a failure. (The C140b exit 3 for the known defect R1 is gone.)
 """
@@ -516,38 +518,33 @@ if (op != 0) {
 }
 print("never")
 """
+# SWEPT (C141a, review T1): the sweep-necessity case (mutant 14), deterministic by state. With 2 workers, `leaf`
+# and `b` hold both CPU permits until they are signalled (`leaf` until p's teardown cancels it, `b` until `go`), so
+# `q` is queued when p is cancelled. The test-only hook NIFT_TEST_HOLD_COMPLETION (parallel_task_start.cpp, hook
+# builds only) holds a finishing task while work is queued and nobody is waiting to resume: `b`'s permit is released
+# only once p waits to resume, so p takes it, not `q`; `leaf` cannot finish before the sweep, so p's cleanup waits
+# for it and starves the runtime (`cleanup:1`), sweeping `q`. Mutant 14 (no sweep) lets `q` run (`marker`, `7`).
 SWEPT = """ready := channel(1)
-ch := channel(1)
-fn[async](leaf(n)) {
-  s := "ab"
-  i := 0
-  while (i < n) {
-    s = s + s
-    i += 1
-  }
+go := atomic<int>(0)
+fn[async](leaf()) {
   send(ready, 1)
-  k := 0
-  while (k < 12) {
-    s = s.replace("a", "c").replace("c", "a")
-    k += 1
-  }
-  return s.length()
-}
-fn[async](parent()) {
-  t := leaf(22)
-  x := await t
-  return x
-}
-fn[async](busy2(n)) {
   i := 0
-  while (i < n) {
+  while (i >= 0) {
     i += 1
   }
   return i
 }
-fn[async](producer()) {
-  send(ch, 42)
-  return 0
+fn[async](parent()) {
+  t := leaf()
+  x := await t
+  return x
+}
+fn[async](busy2(flag)) {
+  i := 0
+  while (flag.load() == 0) {
+    i += 1
+  }
+  return i
 }
 fn[async](marker()) {
   print("marker")
@@ -556,9 +553,10 @@ fn[async](marker()) {
 print("before")
 p := parent()
 recv(ready)
-b := busy2(30000000)
+b := busy2(go)
 q := marker()
 cancel(p)
+go.store(1)
 try {
   y := await p
 } catch (e) {
@@ -619,8 +617,10 @@ RELEASE = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nb := z(3000)\nx := 
 # ordinary limit, at the spawn, with nothing published. Exercised deterministically by the test-only fault-injection
 # build (NIFT_ASYNC_MEMORY_MUTANT=12, never production: parallel_task_start.h), in the default environment.
 ALLOC = 'fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nprint("before")\nx := await z(1)\nprint("after")\n'
-# The 2nd creation (inside an abandoned task) fails; the root then needs 3 live sleepers under 3.5 charges: a charge
-# or a listed task left behind by the failed creation would refuse the third (or hang the end of the run).
+# The 2nd creation (inside an abandoned task) fails; before C141a the root then needed 3 live sleepers under 3.5
+# charges (a charge left behind would refuse the third). Since C141a (N1, D-087 #3) the failure is a recorded limit,
+# so the root's next spawn (c1, 11:7) is refused with that first reason; a charge left behind by the failed creation
+# aborts the fault-injection build at the end of the run (NIFT_CHECK_DRAINED, exit 134), a listed task hangs it.
 ALLOC_ROLLBACK = ('fn[async](z(ms)) {\n  sleep(ms)\n  return ms\n}\nfn[async](d()) {\n  y := z(1)\n  return 0\n}\nd()\n'
                   'sleep(300)\nc1 := z(600)\nc2 := z(600)\nc3 := z(600)\nprint("all live")\n')
 # C140a F8: a timer wait in a thread() task that cannot start a compensating worker (std::system_error).
@@ -843,7 +843,7 @@ def case_detached(nift, src, where, runs=3):
     return problems
 
 
-def hooked(src, fault, want, runs=3, workers=None, timeout=30):
+def hooked(src, fault, want, runs=3, workers=None, timeout=30, extra=None):
     """An injected case: `want` (or one of the tuples in a list `want`) in every run."""
     hook = HOOK.get("binary")
     if not hook:
@@ -851,6 +851,7 @@ def hooked(src, fault, want, runs=3, workers=None, timeout=30):
     env = {"NIFT_TEST_PARALLEL_BAD_ALLOC": fault} if fault else {}
     if workers:
         env["NIFT_VM_PARALLEL_WORKERS"] = str(workers)
+    env.update(extra or {})
     wants = want if isinstance(want, list) else [want]
     got = [run(hook, src, env=env, timeout=timeout) for _ in range(runs)]
     return [] if all(g in wants for g in got) else ["want %r, got %r" % (wants, got)]
@@ -864,6 +865,173 @@ def budget_at(where, stdout="before\n"):
     return (1, stdout, "error: main.f:%s: %s\n" % (where, MESSAGE_BUDGET))
 
 
+# C141a (M17, the review of C141, Part B): C (`waiter`, a child of P) is woken by the root's send while P (looping) and
+# X (`spinner`, the root's task, busy-waiting on the atomic only C sets) hold both permits, so C waits to resume; P is
+# cancelled, and its cleanup wait for C, held by the test-only hook until C is waiting to resume, starves the runtime
+# (`cleanup:1`). The starving block's notify (M1) resumes C; without it (mutant 17) C, X and P wait forever. X is the
+# root's task (P's teardown would cancel a child of P at a loop back-edge, and its completion would wake C); C catches
+# the cancellation of its recv by P's teardown and still sets the atomic.
+RESUMER = """ch := channel(1)
+cready := channel(1)
+xready := channel(1)
+a := atomic<int>(0)
+fn[async](waiter(c, r, flag)) {
+  send(r, 1)
+  v := 0
+  try {
+    v = recv(c)
+  } catch (e) {
+    v = 0
+  }
+  flag.store(1)
+  return v
+}
+fn[async](spinner(r, flag)) {
+  send(r, 1)
+  n := 0
+  while (flag.load() == 0) {
+    n += 1
+  }
+  return 1
+}
+fn[async](parent(c, r, flag)) {
+  w := waiter(c, r, flag)
+  k := 0
+  while (k < 100000000) {
+    k += 1
+  }
+  return k
+}
+print("before")
+p := parent(ch, cready, a)
+recv(cready)
+x := spinner(xready, a)
+recv(xready)
+send(ch, 1)
+cancel(p)
+try {
+  y := await p
+} catch (e) {
+  print(e.code)
+}
+z := await x
+print(z)
+print("after")
+"""
+
+
+# C141a (W1, D-087 #1): an observer between the starve's phases. As SWEPT, then the root keeps spawning (one per
+# millisecond) after the cancel; the test-only hook NIFT_TEST_HOLD_PHASE2 holds phase 2 until a submit is refused.
+# Phase 1 recorded the failure in the cleanup block's lock hold, so the refusal has the first reason, nothing queued
+# starts, and the run ends once, at the refused spawn (mutant 19: the queued spawns run, `marker`).
+PHASES = """ready := channel(1)
+go := atomic<int>(0)
+fn[async](leaf()) {
+  send(ready, 1)
+  i := 0
+  while (i >= 0) {
+    i += 1
+  }
+  return i
+}
+fn[async](parent()) {
+  t := leaf()
+  x := await t
+  return x
+}
+fn[async](busy2(flag)) {
+  i := 0
+  while (flag.load() == 0) {
+    i += 1
+  }
+  return i
+}
+fn[async](marker()) {
+  print("marker")
+  return 7
+}
+print("before")
+p := parent()
+recv(ready)
+b := busy2(go)
+q := marker()
+cancel(p)
+go.store(1)
+while (true) {
+  z := marker()
+  sleep(1)
+}
+"""
+# C141a (N1, D-087 #3): a thread failure in an un-awaited task (helper's child, `submit:2`), then the main program's
+# later spawn is refused with the first reason. The test-only hook NIFT_TEST_SUBMIT_AFTER_LIMIT makes a spawn by the
+# main program wait, while a task is active, until a limit is recorded, so it is the first spawn after the note (and
+# the child's is the second submit). Mutant 21 and f448c7b8 admit it: the loop never ends (the timeout).
+NOTED = """fn[async](child()) {
+  return 0
+}
+fn[async](helper()) {
+  q := child()
+  return 0
+}
+fn[async](later()) {
+  return 5
+}
+print("before")
+h := helper()
+while (true) {
+  z := later()
+  w := await z
+}
+"""
+# C141a (S1, D-087 #2): with 2 workers, resumer (R) waits to resume while x and y hold both permits and setter (Q) is
+# queued; x and y then block, freeing both permits. The test-only hook NIFT_TEST_S1 (parallel_block.cpp) makes them
+# block only while R waits to resume, and R take its permit only once both are free, so every wake-up of the idle
+# worker happened while R still counted as resuming. The last resumer's wake-up (S1) starts Q, which sets the atomic
+# R busy-waits on; without it (mutant 20) Q never starts and the run never ends.
+RESUMING = """f := atomic<int>(0)
+gx := atomic<int>(0)
+c1 := channel(1)
+cx := channel(1)
+cy := channel(1)
+up := channel(2)
+fn[async](resumer(c, flag)) {
+  v := recv(c)
+  n := 0
+  while (flag.load() == 0) {
+    n += 1
+  }
+  return 1
+}
+fn[async](blocker(go, c, u)) {
+  send(u, 1)
+  n := 0
+  while (go.load() == 0) {
+    n += 1
+  }
+  v := recv(c)
+  return v
+}
+fn[async](setter(flag)) {
+  flag.store(1)
+  return 2
+}
+print("before")
+r := resumer(c1, f)
+x := blocker(gx, cx, up)
+y := blocker(gx, cy, up)
+recv(up)
+recv(up)
+q := setter(f)
+send(c1, 1)
+gx.store(1)
+print(await r)
+send(cx, 3)
+send(cy, 4)
+print(await x)
+print(await y)
+print(await q)
+print("after")
+"""
 CALIBRATED = {}
 
 
@@ -915,6 +1083,15 @@ def case_first_reason(nift):
                              threads_at("38:8", "before\nruntime.cancelled\n"))
 
 
+# SWEPT without a fault, made schedule-independent (C141a; the reviewer's option (b)): b is released, and b and q are
+# awaited before the cancel, so `marker` precedes `7` and `runtime.cancelled` in every run. With SWEPT itself two
+# orders occur without a fault, on C140 (0895a234) as on C141 (the reviewer: 45 runs on each binary).
+SWEPT_HEALTHY = SWEPT.replace(
+    "q := marker()\ncancel(p)\n",
+    "q := marker()\ngo.store(1)\nw := await b\nv := await q\nprint(v)\ncancel(p)\n", 1).replace(
+    "try {\n  v := await q\n  print(v)\n} catch (e) {\n  print(e.code)\n}\n", "", 1)
+
+
 def case_healthy(nift):
     """Healthy scheduling is unchanged: the starve programs without a fault, on the production build, exit 0."""
     problems = []
@@ -922,9 +1099,10 @@ def case_healthy(nift):
             ("r1", R1, None, "before\nruntime.cancelled\nafter\n"),
             ("hang_a", HANG_A, 2, "before\nruntime.cancelled\n42\nafter\n"),
             ("hang_b", HANG_B, 2, "before\nruntime.cancelled\n42\nafter\n"),
-            ("swept", SWEPT, 2, "before\nmarker\nruntime.cancelled\n7\nafter\n"),
+            ("swept", SWEPT_HEALTHY, 2, "before\nmarker\n7\nruntime.cancelled\nafter\n"),
             ("spawn", SPAWN, None, "before\nruntime.cancelled\nmarker\n7\nafter\n"),
-            ("d1", D1, None, "before\n42\nafter\n")):
+            ("d1", D1, None, "before\n42\nafter\n"),
+            ("resuming", RESUMING, 2, "before\n1\n3\n4\n2\nafter\n")):
         got = run(nift, src, env={"NIFT_VM_PARALLEL_WORKERS": str(workers)} if workers else None, timeout=60)
         if got != (0, want, ""):
             problems.append("%s: %r" % (name, got))
@@ -956,7 +1134,7 @@ def case_alloc(nift, site, rollback=False):
         return problems
     fault["NIFT_VM_HEAP_BUDGET"] = str(three + three // 6)
     got = run(hook, ALLOC_ROLLBACK, env=fault, timeout=30)
-    want = (1, "all live\n", "error: main.f:6:8: %s\n" % MESSAGE_THREADS)
+    want = (1, "", "error: main.f:11:7: %s\n" % MESSAGE_THREADS)  # C141a (N1): c1 refused, the first reason
     return [] if got == want else ["budget 3.5 c: want %r, got %r" % (want, got)]
 
 
@@ -1060,8 +1238,25 @@ CASES = {
     "wait-lock-woken": lambda n: case_fatal(n, OPS, 3, budget_at("37:3"), d=300),
     "wait-concurrent": lambda n: case_fatal(n, CONC, 1, budget_at("52:8")),
     "first-reason": case_first_reason,
-    "starve-await-swept": lambda n: hooked(SWEPT, "cleanup:1", threads_at("42:6", "before\nruntime.cancelled\n",
-                                                                          "future: "), workers=2),
+    "starve-await-swept": lambda n: hooked(SWEPT, "cleanup:1", threads_at("31:6", "before\nruntime.cancelled\n",
+                                                                          "future: "), workers=2,
+                                           extra={"NIFT_TEST_HOLD_COMPLETION": "1"}),
+    "starve-notifies-resumer": lambda n: hooked(RESUMER, "cleanup:1",
+                                                threads_at("25:8", "before\nruntime.cancelled\n1\nafter\n"),
+                                                workers=2, extra={"NIFT_TEST_CLEANUP_AFTER_RESUMER": "1"}),
+    # C141a (W1): the window between the cleanup block's permit release and the starve, held open by the test-only
+    # hook NIFT_TEST_STARVE_AFTER_DEQUEUE (parallel_starve.cpp): workers are woken there, so a queued task would start
+    # unless the queue was already swept in the same lock hold (mutant 19: the sweep after it, f448c7b8's order).
+    "starve-sweeps-under-lock": lambda n: hooked(SWEPT, "cleanup:1", threads_at("31:6", "before\nruntime.cancelled\n",
+                                                                                "future: "), workers=2,
+                                                 extra={"NIFT_TEST_HOLD_COMPLETION": "1",
+                                                        "NIFT_TEST_STARVE_AFTER_DEQUEUE": "1"}),
+    "starve-phase-observer": lambda n: hooked(PHASES, "cleanup:1", threads_at("35:8"), workers=2,
+                                              extra={"NIFT_TEST_HOLD_COMPLETION": "1", "NIFT_TEST_HOLD_PHASE2": "1"}),
+    "refuse-after-note": lambda n: hooked(NOTED, "submit:2", threads_at("14:8"),
+                                          extra={"NIFT_TEST_SUBMIT_AFTER_LIMIT": "1"}),
+    "resume-wakes-workers": lambda n: hooked(RESUMING, None, (0, "before\n1\n3\n4\n2\nafter\n", ""), workers=2,
+                                             extra={"NIFT_TEST_S1": "1"}),
     "starve-spawn-refused": lambda n: hooked(SPAWN, "cleanup:1", threads_at("35:6", "before\nruntime.cancelled\n")),
     "healthy-unchanged": case_healthy,
     "release-exact": case_release,
@@ -1091,7 +1286,11 @@ MUTANTS = {
     14: ["starve-await-swept"],
     15: ["starve-spawn-refused"],
     16: ["starve-await-swept"],
+    17: ["starve-notifies-resumer"],
     18: ["r2-budget", "r2-submit", "wait-recv-woken", "wait-send-after", "wait-lock-woken", "wait-concurrent"],
+    19: ["starve-sweeps-under-lock"],
+    20: ["resume-wakes-workers"],
+    21: ["refuse-after-note"],
 }
 
 

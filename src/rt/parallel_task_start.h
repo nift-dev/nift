@@ -3,8 +3,10 @@
 #include <memory>
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <thread>
 #include <new>
 #include <system_error>
 #endif
@@ -43,6 +45,10 @@ inline void inject_bad_alloc(const char* site) {
         throw std::system_error(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 }
+// C141a (M17), test-only: polls `ready` every millisecond, for at most 10 s (vm_parallel_cleanup.cpp's hook).
+template<class Ready> inline void wait_for_test(Ready ready) {
+    for (int i = 0; i < 10000 && !ready(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+}
 #define NIFT_INJECT_BAD_ALLOC(site) ::nift::rt::inject_bad_alloc(site)
 // C141: a charge still reserved when the runtime is destroyed (a leak) aborts the fault-injection builds.
 #define NIFT_CHECK_DRAINED(reserved) ((reserved) != 0 ? std::abort() : static_cast<void>(0))
@@ -54,8 +60,11 @@ inline void inject_bad_alloc(const char* site) {
 #define NIFT_INJECT_WAIT(k) static_cast<void>(0)
 #endif
 // C141 test-only switches (mutants): 13 restores the cleanup-wait rethrow (std::terminate), 14 removes the sweep of
-// queued work, 15 removes the refusal of new work once starved, 16 marks swept tasks "cancelled", 18 lets a shared
-// wait block after a fatal limit (D-085). (17, the starving block without its notify, caught by no test: removed.)
+// queued work, 15 removes the refusal of new work once starved, 16 marks swept tasks "cancelled", 17 drops the
+// starving block's notify (M1; C141a), 18 lets a shared wait block after a fatal limit (D-085), 19 sweeps in
+// starve()'s own lock hold, after block_worker's (f448c7b8's order: the W1 window), 20 drops the last resumer's
+// wake-up of the idle workers (S1), 21 admits new tasks after a noted (C140 (d)) limit, refusing only once starved
+// (N1).
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT >= 13
 inline constexpr int kStarveMutant = NIFT_ASYNC_MEMORY_MUTANT;
 #else
@@ -63,7 +72,9 @@ inline constexpr int kStarveMutant = 0;
 #endif
 inline constexpr bool kCleanupRethrow = kStarveMutant == 13, kStarveSweeps = kStarveMutant != 14;
 inline constexpr bool kStarveAdmits = kStarveMutant == 15, kStarveCancels = kStarveMutant == 16;
-inline constexpr bool kFatalWaits = kStarveMutant != 18;
+inline constexpr bool kStarveNotifies = kStarveMutant != 17, kFatalWaits = kStarveMutant != 18;
+inline constexpr bool kSweepOutsideLock = kStarveMutant == 19;  // M19: the sweep in starve()'s own lock hold
+inline constexpr bool kResumeWakes = kStarveMutant != 20, kNoteAdmits = kStarveMutant == 21;  // M20, M21
 inline constexpr bool kAllocFailureInternal =
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 11
     true;

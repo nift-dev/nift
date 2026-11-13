@@ -21,8 +21,8 @@
 namespace nift::rt {
 
 // production: runtime_(running_pool); running_pool is nullptr without a ParallelRuntime, so the
-// block is admitted and the destructor does nothing.
-ParallelBlock::ParallelBlock(ParallelWaitKind kind) : runtime_(nullptr), kind_(kind) {}
+// block is admitted (no block_worker, no starve: C141's offset is unused) and the destructor does nothing.
+ParallelBlock::ParallelBlock(ParallelWaitKind kind, std::uint32_t) : runtime_(nullptr), kind_(kind) {}
 ParallelBlock::~ParallelBlock() {}
 
 // Unreachable without a VM-created ParallelTaskRecord; production returns 0 for a null record.
