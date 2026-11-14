@@ -175,7 +175,7 @@ def cases(work, address_space, rss_bound):
     for device in (zero, full):
         exceed("open(%s)" % device, "open", 'x := open("%s")' % device, work, address_space, rss_bound)
         exceed("open_bytes(%s)" % device, "open_bytes", 'x := open_bytes("%s")' % device, work, address_space, rss_bound)
-        exceed("cat(%s)" % device, "cat", 'cat("%s")' % device, work, address_space, rss_bound)
+        exceed("cat(%s)" % device, "cat", 'native::cat("%s")' % device, work, address_space, rss_bound)
         exceed("file(%s).open(r)" % device, "open", 'f := file("%s")\nf.open("r")' % device, work, address_space, rss_bound)
         # Q-H8: "w" still reads the existing content first; now bounded.
         exceed("file(%s).open(w)" % device, "open", 'f := file("%s")\nf.open("w")' % device, work, address_space, rss_bound)
