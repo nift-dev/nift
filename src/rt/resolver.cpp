@@ -3,6 +3,7 @@
 #include "rt/alias.h"
 #include "rt/binding_rules.h"
 #include "rt/native.h"
+#include "rt/native_qualifier.h"
 #include "rt/structs.h"
 
 namespace nift::rt {
@@ -62,7 +63,13 @@ bool admit_function(const Ast& ast, NodeId id, UnitPlan& plan) {
     if (fn.flags & kFlagAsync) plan.coroutines = true;
     if (fn.a == kNoNode || fn.b == kNoNode) return reject(plan, fn, "fn-shape");
     const std::string_view name = ast.text(ast.at(fn.a));
+    // L6 (D-075 #2): the seven natives are `native::<name>` in VM-default execution, so a user function may
+    // take their names under ordinary rules.
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 4)  // test-only: those names stay reserved
+    if (reserved_name(name) && !native_function_name(name)) return reject(plan, fn, "fn-name-reserved");
+#else
     if (reserved_name(name)) return reject(plan, fn, "fn-name-reserved");
+#endif
     if (plan.index.count(name)) return reject(plan, fn, "fn-redeclared");
     const NodeId* params = ast.list(fn);
     for (std::uint32_t k = 0; k < fn.count; ++k) {

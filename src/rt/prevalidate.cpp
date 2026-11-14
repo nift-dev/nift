@@ -3,6 +3,7 @@
 #include "rt/ast.h"
 #include "rt/binding_rules.h"
 #include "rt/lexer.h"
+#include "rt/native_qualifier.h"
 #include "rt/parser.h"
 
 #include <map>
@@ -259,6 +260,12 @@ void check_region(std::string_view src, std::uint32_t begin, std::uint32_t end, 
         }
         if (element_pending && !stack.empty() && t.kind != Tok::End) stack.back().element = t.begin;
         element_pending = false;
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 3)  // test-only: no native:: rule before running
+        if (t.kind == Tok::Ident) {
+            std::string problem = native_token_problem(src, begin, t.begin, t.end, lex.peek().kind == Tok::Colon);
+            if (!problem.empty()) return out.take(t.begin, std::move(problem), "native-qualifier");
+        }
+#endif
         if ((t.kind == Tok::End || is_close(t.kind) || t.kind == Tok::Comma) && needs_right_operand(prev)) {
             const std::uint32_t at = operand_anchor(stack, value_start, false);
             // `a.` is a malformed member path for legacy, `a +` an empty operand
@@ -346,6 +353,19 @@ Prevalidation prevalidate(std::string_view source) {
         const Node& node = ast.at(id);
         if (node.kind == NodeKind::Opaque && node.reason == OpaqueReason::LegacyRuntimeError)
             check_region(source, node.begin, node.end, skips, functions, finding);
+    }
+    // L6: in structured source, a qualified head is only a call's callee, and only one of the seven.
+    std::set<NodeId> callees;
+    for (NodeId id = 0; id < ast.size(); ++id)
+        if (ast.at(id).kind == NodeKind::Call && ast.at(id).a != kNoNode) callees.insert(ast.at(id).a);
+    for (NodeId id = 0; id < ast.size(); ++id) {
+#if defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 3  // test-only: no native:: rule before running
+        break;
+#endif
+        const Node& node = ast.at(id);
+        std::string problem =
+            node.kind == NodeKind::Ident ? native_node_problem(ast.text(node), callees.count(id) != 0) : "";
+        if (!problem.empty()) finding.take(node.begin, std::move(problem), "native-qualifier");
     }
     // Not syntax: the for-loop/catch binding rule (rt/binding_rules.h), on
     // both engines before anything runs.

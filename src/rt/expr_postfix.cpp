@@ -1,5 +1,6 @@
 // Postfix links of the Runtime 2.0 expression parser (see expr_postfix.h).
 #include "rt/expr_postfix.h"
+#include "rt/native_qualifier.h"
 
 #include <algorithm>
 #include <iterator>
@@ -45,6 +46,10 @@ bool ExprParser::receiver_ok(std::uint32_t begin, std::uint32_t end) const {
             continue;
         }
         if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+        // L6: legacy reads a `native::name(` head as `name(` (rt/native_qualifier.h); its `::` is no operator.
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 5)  // test-only: `::` read as an operator
+        if (text.substr(k, kNativeQualifier.size()) == kNativeQualifier) { k += kNativeQualifier.size() - 1; continue; }
+#endif
         if (c == '(' || c == '[' || c == '{') ++depth;
         else if (c == ')' || c == ']' || c == '}') --depth;
         else if (depth == 0 && std::string_view("+-*/%<>=!&|?:,").find(c) != std::string_view::npos) return false;

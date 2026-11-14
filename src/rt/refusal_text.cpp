@@ -74,6 +74,7 @@ constexpr Family kFamilies[] = {
     {"free-name", "a name that is not declared in this scope"},
     {"unresolved-name", "a name the VM cannot resolve"},
     {"fn-name-reserved", "a function named like a built-in"},
+    {"native-unqualified", "calling cat, cp, mv, rm, ls, mkdir or touch without `native::`"},
     {"param-name-reserved", "a parameter named like a built-in"},
     {"binding-name-reserved", "a binding named like a built-in"},
     {"binding-call-reserved", "calling a binding named like a built-in"},
@@ -218,6 +219,13 @@ std::string invocation_assign_text(const std::string& reason) {
     return "cannot assign to `" + reason.substr(kInvocationAssign.size()) +
            "`: the script invocation bindings `args` and `cmd` are read-only\n";
 }
+// L6 (D-075 #2, the approved VM-only breaking change): how to migrate.
+std::string native_hint(const std::string& reason) {
+    return reason == "native-unqualified"  // rt-lint: allow-string-compare cold path
+               ? "note: Runtime 2.0 calls them as native::name(...), for example native::cp(\"a\", \"b\"); a user "
+                 "function of that name is an ordinary function\n"
+               : std::string();
+}
 std::string invocation_assign_hint(const std::string& reason) {
     const std::string name = reason.substr(kInvocationAssign.size());
     return "note: declare a new binding instead (`my_" + name + " := " + name + "`), or replace it with a top-level `" +
@@ -230,7 +238,7 @@ std::string vm_refusal_diagnostic(const std::string& where, const std::string& r
         return "error: " + where + ": " + reason + ": " + invocation_assign_text(reason) +
                "note: the program was not executed: no part of it ran\n" + invocation_assign_hint(reason);
     return "error: " + where + ": not compiled for the VM (" + reason + "): " + describe_refusal(reason) +
-           " is not supported by the Runtime 2.0 VM yet\n" +
+           " is not supported by the Runtime 2.0 VM yet\n" + native_hint(reason) +
            refusal_notes("note: the program was not executed: no part of it ran\n", fallback);
 }
 
@@ -240,7 +248,8 @@ std::string vm_session_refusal_diagnostic(const std::string& where, const std::s
     const bool program_error = invocation_assign(reason);
     const std::string head = "error: " + where + ": NIFT_VM session refused: " + reason + ": " +
         (program_error ? invocation_assign_text(reason)
-                       : describe_refusal(reason) + " is not supported by the Runtime 2.0 VM yet\n");
+                       : describe_refusal(reason) + " is not supported by the Runtime 2.0 VM yet\n" +
+                             native_hint(reason));
     const auto notes = [&](const std::string& executed) {
         return program_error ? executed + invocation_assign_hint(reason) : refusal_notes(executed.c_str(), fallback);
     };

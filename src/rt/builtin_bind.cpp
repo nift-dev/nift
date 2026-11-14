@@ -1,4 +1,5 @@
 #include "rt/builtin_bind.h"
+#include "rt/native_qualifier.h"
 
 // rt-lint: cold-file names are resolved here at compile time only, never on the VM hot path
 
@@ -72,7 +73,20 @@ bool session_method_candidates(KindSet kinds, std::string_view name, std::vector
     return out.size() > 1;
 }
 
-const BuiltinSpec* bind_function(std::string_view name) { return natives::find_builtin(Receiver::None, name); }
+// L6 (D-075 #2): `native::<name>` binds only the seven natives; in VM-default execution the unqualified seven bind
+// no built-in (a user function, or the `native-unqualified` refusal). Every name-based analysis goes through here.
+const BuiltinSpec* bind_function(std::string_view name) {
+    if (const std::string_view qualified = native_qualified(name); !qualified.empty()) {
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 1)  // test-only: the qualifier accepts any built-in name
+        if (!native_function_name(qualified)) return nullptr;
+#endif
+        return natives::find_builtin(Receiver::None, qualified);
+    }
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 2)  // test-only: the unqualified seven stay bound
+    if (native_function_name(name)) return nullptr;
+#endif
+    return natives::find_builtin(Receiver::None, name);
+}
 
 bool pure_method_name(std::string_view name) { return first_method(name) != nullptr; }
 

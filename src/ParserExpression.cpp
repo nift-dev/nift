@@ -1,5 +1,6 @@
 #include "ProcessEnvironment.h"
 #include "rt/thread_owned.h"
+#include "rt/native_qualifier.h"
 #include "rt/natives/host_std_stream.h"  // save_target (D-074, D-091 #5)
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -1583,7 +1584,52 @@ std::optional<nift::detail::EvalOutcome<nift::RuntimeValue>> Parser::evaluate_so
                 return Outcome::value(std::move(result));
 }
 
-bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view, const PreparedFilesystemOperation* recipe, OrdinaryArgumentFrame*, int inherited_depth) {
+// L6 (rt/native_qualifier.h; D-075 #2, D-095): `native::name(` is evaluated as `name(`, which this evaluator already
+// resolves natively before user, module and host callables (canonical_native_call). The rewrite keeps the length
+// (the qualifier becomes spaces after the `(`), so every position is unchanged; only qualifiers outside string
+// literals are rewritten, each where it stands, so arguments keep their ordinary meaning. A name outside the seven,
+// or any other spelling of `native::`, is an error with the prevalidator's text.
+static bool native_unqualified_text(const std::string& in, std::string& out, std::string& error) {
+    out = in;
+    char quote = 0;
+    const std::size_t q = nift::rt::kNativeQualifier.size();
+    for (std::size_t k = 0; k < out.size(); ++k) {
+        const char c = out[k];
+        if (quote) {
+            if (c == '\\') ++k;
+            else if (c == quote) quote = 0;
+            continue;
+        }
+        if (c == '"' || c == '\'') { quote = c; continue; }
+        if (c == '/' && k + 1 < out.size() && (out[k + 1] == '/' || out[k + 1] == '*')) break;  // a trailing comment
+        const bool word_start = k == 0 || !(std::isalnum(static_cast<unsigned char>(out[k - 1])) || out[k - 1] == '_');
+        if (!word_start || out.compare(k, q, nift::rt::kNativeQualifier) != 0) continue;
+        std::size_t e = k + q;
+        while (e < out.size() && (std::isalnum(static_cast<unsigned char>(out[e])) || out[e] == '_')) ++e;
+        const std::string name = out.substr(k + q, e - k - q);
+        if (name.empty() || e >= out.size() || out[e] != '(' || (k > 0 && out[k - 1] == '.')) {
+            error = nift::rt::kNativeMalformed;
+            return false;
+        }
+#if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 6)  // test-only: legacy accepts any name after the qualifier
+        if (!nift::rt::native_function_name(name)) {
+            error = "native::" + name + nift::rt::native_not_a_function_suffix();
+            return false;
+        }
+#endif
+        out.replace(k, e + 1 - k, name + "(" + std::string(q, ' '));
+        k += name.size();
+    }
+    return true;
+}
+
+bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view, const PreparedFilesystemOperation* recipe, OrdinaryArgumentFrame* argument_frame, int inherited_depth) {
+    if (expression.find(nift::rt::kNativeQualifier) != std::string::npos) {  // L6: see native_unqualified_text
+        std::string unqualified;
+        if (!native_unqualified_text(expression, unqualified, error)) return false;
+        if (unqualified != expression)
+            return evaluate_expression_impl(unqualified, value, error, view, recipe, argument_frame, inherited_depth);
+    }
     last_expression_mutation_ = false;
     auto resolve_direct = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
         const std::string text = trim_copy(raw);

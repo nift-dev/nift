@@ -1,6 +1,7 @@
 #include "rt/compiler_deferred.h"
 #include "rt/legacy_names.h"
 #include "rt/name_scan.h"
+#include "rt/native_qualifier.h"
 
 // rt-lint: cold-file compile-time dead-code admission (slot 3)
 
@@ -43,6 +44,16 @@ bool UnitCompiler::deferred_call(const Node& node, std::string_view name, std::u
 #if defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 1  // test-only: no deferral (today's refusal)
     return false;
 #endif
+    // L6: `native::<name>` outside the seven. The prevalidator reports it before a script runs; elsewhere (a
+    // template, NIFT_PREVALIDATE=off) it is raised when reached, legacy's error and position. No later line or
+    // scope can bind a qualified name, so sessions and dynamic scope do not matter.
+    if (!native_qualified(name).empty()) {
+        fb_->set_offset(site(node));
+        fb_->mark_deferred_raise(
+            fb_->note(fb_->emit(OpCode::Undefined, dst, 1), std::string(name) + native_not_a_function_suffix()));
+        fb_->emit(OpCode::LoadNull, dst);
+        return true;
+    }
     // Sessions never defer (5.2 "Sessions", D-068 #4): a later line can bind any name. This covers every unit
     // the session compiler builds, the `nift -i` start-up file included (5.7a condition 1).
 #if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 2)  // test-only: sessions defer like scripts

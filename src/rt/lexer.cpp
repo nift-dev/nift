@@ -57,6 +57,14 @@ Token Lexer::scan() {
         return number_token(start);
     if (is_ident_start(c)) {
         while (pos_ < end_ && is_ident_char(src_[pos_])) ++pos_;
+        // L6 (rt/native_qualifier.h): `native::name(`, nothing between, lexes `native::name` as one identifier, a
+        // qualified call head. Any other spelling stays `native` `:` `:` ..., which no grammar accepts.
+        if (pos_ - start == 6 && src_.substr(start, 6) == "native" &&  // rt-lint: allow-string-compare lexer
+            pos_ + 2 < end_ && src_[pos_] == ':' && src_[pos_ + 1] == ':' && is_ident_start(src_[pos_ + 2])) {
+            std::uint32_t name_end = pos_ + 2;
+            while (name_end < end_ && is_ident_char(src_[name_end])) ++name_end;
+            if (name_end < end_ && src_[name_end] == '(') pos_ = name_end;
+        }
         return {Tok::Ident, start, pos_};
     }
     return punct_token(start);
