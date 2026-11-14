@@ -157,7 +157,7 @@ NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out
     return NegativeLiteral::Invalid;
 }
 
-bool decode_string_literal(std::string_view text, Value& out) {
+bool decode_string_literal(std::string_view text, Value& out, bool raw_markers) {
     if (text.size() < 2 || (text.front() != '"' && text.front() != '\'') || text.back() != text.front()) return false;
     const std::string_view body = text.substr(1, text.size() - 2);
     std::string decoded;
@@ -185,7 +185,7 @@ bool decode_string_literal(std::string_view text, Value& out) {
         }
         const auto byte = static_cast<unsigned char>(c);
         if (byte < 0x20 || byte == 0x7f) return false;  // raw control/NUL: later class
-        if (c == '$' && i + 1 < body.size() && body[i + 1] == '[') return false;  // parser emits parts
+        if (!raw_markers && c == '$' && i + 1 < body.size() && body[i + 1] == '[') return false;  // parser: parts
         if (c == text.front()) return false;
         decoded.push_back(c);
     }

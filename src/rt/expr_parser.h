@@ -75,7 +75,11 @@ private:
     NodeId primary();
     NodeId primary_name(Token token);
     NodeId string_literal(Token token);
-    NodeId sequence(NodeKind kind, Tok close, std::uint32_t begin, bool allow_spread);
+    bool raw_argument() const;
+    // `literals`: how a direct quoted-literal argument containing `$[` is parsed (F5, D-102; call arguments only).
+    enum class Literals : std::uint8_t { Interpolate, Raw, Ambiguous };
+    NodeId sequence(NodeKind kind, Tok close, std::uint32_t begin, bool allow_spread,
+                    Literals literals = Literals::Interpolate);
     NodeId object(std::uint32_t begin);
     NodeId lambda_if_any(std::uint32_t begin, bool async);
     NodeId lambda_body(NodeId lambda);

@@ -200,8 +200,9 @@ bool verbatim_literal_ok(const Ast& ast, NodeId item) {
 // Call arguments or array elements up to `close` (current token is the first
 // one after the opening bracket). A trailing comma is a legacy run-time error
 // ("expression cannot be empty").
-NodeId ExprParser::sequence(NodeKind kind, Tok close, std::uint32_t begin, bool allow_spread) {
+NodeId ExprParser::sequence(NodeKind kind, Tok close, std::uint32_t begin, bool allow_spread, Literals literals) {
     std::vector<NodeId> items;
+    bool ambiguous = false;
     ++nesting_;
     while (!is(close)) {
         NodeId item = kNoNode;
@@ -211,6 +212,17 @@ NodeId ExprParser::sequence(NodeKind kind, Tok close, std::uint32_t begin, bool 
             advance();
             const NodeId inner = parse(kTernary);
             if (inner != kNoNode) item = node1(NodeKind::Spread, at, inner);
+        } else if (literals != Literals::Interpolate && raw_argument()) {
+            // F5 (D-102): legacy passes an argument that is exactly one quoted literal as its text (CP10).
+#if !(defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 1)  // mutant 1: the raw literal interpolates again
+            if (literals == Literals::Raw) {
+                item = leaf(NodeKind::String, tok_);
+                ast_.at(item).flags |= kFlagRawLiteral | (src_[tok_.begin] == '\'' ? kFlagSingleQuote : 0);
+                advance();
+            }
+#endif
+            ambiguous = literals == Literals::Ambiguous;
+            if (item == kNoNode) item = unit();
         } else {
             item = unit();
         }
@@ -230,8 +242,19 @@ NodeId ExprParser::sequence(NodeKind kind, Tok close, std::uint32_t begin, bool 
     --nesting_;
     const NodeId id = ast_.add(kind, begin, tok_.end);
     ast_.set_list(id, items);
+    if (ambiguous) ast_.at(id).flags |= kFlagAmbiguousLiteralArg;
     advance();
     return id;
+}
+
+// The current token is a quoted literal containing `$[` and no backslash, and the argument ends with it.
+bool ExprParser::raw_argument() const {
+    if (!is(Tok::String)) return false;
+    const std::string_view body = src_.substr(tok_.begin + 1, tok_.end - tok_.begin - 2);
+    if (body.find("$[") == std::string_view::npos || body.find('\\') != std::string_view::npos) return false;
+    Lexer probe = lex_;
+    const Tok after = probe.peek().kind;
+    return after == Tok::Comma || after == Tok::RParen;
 }
 
 // { "key": value, ... }: keys must be double-quoted (legacy run-time error

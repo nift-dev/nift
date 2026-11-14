@@ -161,7 +161,21 @@ NodeId ExprParser::call(NodeId callee, std::uint32_t begin) {
     advance();
     // `h( )`: legacy "expression cannot be empty" (a whitespace-only list).
     if (is(Tok::RParen) && tok_.begin != open.end) return fail(OpaqueReason::LegacyRuntimeError);
-    const NodeId args = sequence(NodeKind::Call, Tok::RParen, open.begin, true);
+    // F5 (D-102): a direct `$[` literal argument is raw, except for the output family (print, err, warn), which
+    // interpolates, and a method named write/write_line/write_val, decided only by its receiver at run time.
+    const Node& head = ast_.at(callee);
+    const bool member = head.kind == NodeKind::Member || head.kind == NodeKind::SafeMember;
+    const std::string_view name = ast_.text(member ? ast_.at(head.b) : head);
+    const bool output = head.kind == NodeKind::Ident &&  // rt-lint: allow-string-compare parse time
+                        (name == "print" || name == "err" || name == "warn");
+    const bool stream = member &&  // rt-lint: allow-string-compare parse time
+                        (name == "write" || name == "write_line" || name == "write_val");
+#if defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 2  // mutant 2: the output family takes raw literals too
+    const Literals literals = stream ? Literals::Ambiguous : Literals::Raw;
+#else
+    const Literals literals = output ? Literals::Interpolate : stream ? Literals::Ambiguous : Literals::Raw;
+#endif
+    const NodeId args = sequence(NodeKind::Call, Tok::RParen, open.begin, true, literals);
     if (args == kNoNode) return kNoNode;
     ast_.at(args).a = callee;
     ast_.at(args).begin = begin;

@@ -59,7 +59,8 @@ bool UnitCompiler::constant_of(const Node& node, Value& value, bool& is_constant
             return true;
         case NodeKind::String:
             if (node.count != 0) { is_constant = false; return true; }  // interpolation lowering
-            if (!decode_string_literal(text(node), value)) return fail(node, "string-literal");
+            if (!decode_string_literal(text(node), value, node.flags & kFlagRawLiteral))  // F5: raw `$[` kept as text
+                return fail(node, "string-literal");
             return true;
         case NodeKind::True: case NodeKind::False: value = Value::boolean(node.kind == NodeKind::True); return true;
         case NodeKind::Null: value = Value::null(); return true;

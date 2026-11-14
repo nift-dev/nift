@@ -58,6 +58,8 @@ enum : std::uint16_t {
     kFlagObjectPattern = 1u << 11, // Pattern: {a, b} (otherwise [a, b])
     kFlagDeferredBody = 1u << 12,  // FnDecl written as template `@fn`: body translated at call time
     kFlagTemplateImport = 1u << 13, // Import written as `@import(...)` (its run-time messages say "@import")
+    kFlagRawLiteral = 1u << 14,    // String: a direct call argument passed raw, `$[...]` kept as text (F5, D-102)
+    kFlagAmbiguousLiteralArg = 1u << 15, // Call: write/write_line/write_val with a direct `$[` literal (C145)
 };
 
 // Why an Opaque node was produced (recorded per class in cp10-parser.md).
