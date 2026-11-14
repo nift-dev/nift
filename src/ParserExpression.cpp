@@ -1600,7 +1600,8 @@ static bool native_unqualified_text(const std::string& in, std::string& out, std
             else if (c == quote) quote = 0;
             continue;
         }
-        if (c == '"' || c == '\'') { quote = c; continue; }
+        if (c == '\x22' || c == '\'') { quote = c; continue; }  // a double or single quote (no bare quote here:
+        // tools/rt-vm/legacy_names.py pairs the double quotes of this file to find its string literals)
         if (c == '/' && k + 1 < out.size() && (out[k + 1] == '/' || out[k + 1] == '*')) break;  // a trailing comment
         const bool word_start = k == 0 || !(std::isalnum(static_cast<unsigned char>(out[k - 1])) || out[k - 1] == '_');
         if (!word_start || out.compare(k, q, nift::rt::kNativeQualifier) != 0) continue;
