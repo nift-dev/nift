@@ -3,12 +3,12 @@
 
   shell_call_syntax.py --nift NIFT              every form, three front ends, both engines
   shell_call_syntax.py --nift NIFT --mutants    the production binary passes every case (no-mutation control), then
-                                                NIFT_C144_MUTANT=1..3, each built with sanctioned_mutant.py, must be
+                                                NIFT_C144_MUTANT=1..4, each built with sanctioned_mutant.py, must be
                                                 caught (and removed afterwards)
 
 Front ends: `nift -i` with piped stdin, plain `nift` with piped stdin, and the interactive session (plain `nift` on a
 pty). Engines: the VM default and NIFT_VM=0. Each case runs in a fresh scratch directory whose PATH starts with a
-fake bin (cat cp mv rm ls mkdir touch native foo echo read sleep test len print), each leaving LAUNCHED-<name>
+fake bin (cat cp mv rm ls mkdir touch native foo echo read sleep test len print o.f a.b.c), each leaving a marker
 if ever run. Call forms must launch nothing; the real command forms (`cp a.txt c.txt`, `command cp ...`, `ls -l`)
 must launch the program. Nothing outside the scratch directories is written, and /dev/stdout is never opened.
 Exit status: 0 = every case passes (and every mutant is caught); 1 = a failure.
@@ -28,13 +28,13 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 FAKE = ["cat", "cp", "mv", "rm", "ls", "mkdir", "touch", "native", "foo", "echo", "read", "sleep", "test", "len",
-        "print"]
+        "print", "o.f", "a.b.c"]
 FOO = 'fn(foo(x)) { print("U " + x) }'
 # Function-call forms: nothing may launch. (lines, check of (engine, output, directory) or None)
 CALLS = {
     "cat": ['cat ("a.txt")'],
     "cp": ['cp ("a.txt", "c.txt")'],
-    "cp-tab": ['cp\t("a.txt", "c.txt")'],
+    "cp-tab": ['cp\t("a.txt", "c.txt")'],  # on the pty the tab is the completion key, not a blank
     "cp-spaces": ['cp   ("a.txt", "c.txt")'],
     "mv": ['mv ("a.txt", "m.txt")'],
     "rm": ['rm ("a.txt")'],
@@ -51,6 +51,8 @@ CALLS = {
     "echo": ['echo ("hi")'],
     "len": ['len ("abc")'],
     "user-function": [FOO, 'foo ("x")'],
+    "member": ['o.f ("x")'],  # C144b (D-103): a dotted member-call head
+    "member-deep": ['a.b.c  ("x")'],  # (blanks, not a tab: on the pty a tab is the completion key)
     "qualified": ['native::cp("a.txt", "q.txt")'],
     "unqualified": ['cp("a.txt", "r.txt")'],
 }
@@ -59,6 +61,14 @@ COMMANDS = {
     "command-line": (['cp a.txt c.txt'], "cp"),
     "explicit-command": (['command cp a.txt c.txt'], "cp"),
     "ls-flags": (['ls -l'], "ls"),
+    # N2 (D-103, owner-confirmed): an env-assignment prefix keeps the line shell syntax, so this is an intended command.
+    "env-prefix": (['FOO=1 cp ("a.txt", "c.txt")'], "cp"),
+}
+# Command-form Nift built-in (N3): `print hi` prints through Nift's command-form print and launches nothing.
+# A classifier that captures command lines (mutant 3) turns it into a legacy statement, which legacy's own
+# command-line rule then runs as PATH `print`, so this case catches mutant 3 on legacy too.
+BUILTIN_COMMANDS = {
+    "print-command-form": (['print hi'], "hi"),
 }
 
 
@@ -189,7 +199,20 @@ def check(nift, quiet=False):
                                            "" if ok else ": launched %s; out %r" % (launched(d), out[-200:])))
                 finally:
                     shutil.rmtree(d, ignore_errors=True)
-    total = len(FRONTS) * 2 * (len(CALLS) + len(COMMANDS))
+            for name, (lines, text) in BUILTIN_COMMANDS.items():
+                d = fixture()
+                try:
+                    out = runner(nift, d, vm, lines)
+                    ok = not launched(d) and text in out
+                    label = "%s %s builtin %s" % (front, engine, name)
+                    if not ok:
+                        failing.append(label)
+                    if not ok or not quiet:
+                        print("%s %s%s" % ("PASS" if ok else "FAIL", label,
+                                           "" if ok else ": launched %s; out %r" % (launched(d), out[-200:])))
+                finally:
+                    shutil.rmtree(d, ignore_errors=True)
+    total = len(FRONTS) * 2 * (len(CALLS) + len(COMMANDS) + len(BUILTIN_COMMANDS))
     print("shell-call-syntax: %d/%d pass" % (total - len(failing), total))
     return failing
 
@@ -198,9 +221,11 @@ def check(nift, quiet=False):
 MUTANTS = {
     1: ["%s %s call cp" % (f, e) for f in FRONTS for e in ("vm", "legacy")],  # the first-word-only rule
     2: ["%s %s call native-spaced-colons" % (f, e) for f in FRONTS for e in ("vm", "legacy")],  # native rule dropped
-    # captures `cp a.txt c.txt`: the VM session refuses it (nothing launches). On legacy the line still runs PATH cp,
-    # because legacy's own statement splitter treats a command-style line without `(` as a command (CP10).
-    3: ["%s vm command %s" % (f, c) for f in FRONTS for c in ("command-line", "ls-flags")],
+    # captures `cp a.txt c.txt`: the VM session refuses it (nothing launches). On legacy `cp a.txt c.txt` still runs
+    # PATH cp (legacy's own CP10 command-line rule), so the legacy side is caught by `print hi` (N3).
+    3: ["%s vm command %s" % (f, c) for f in FRONTS for c in ("command-line", "ls-flags")] +
+       ["%s legacy builtin print-command-form" % f for f in FRONTS],
+    4: ["%s %s call %s" % (f, e, c) for f in FRONTS for e in ("vm", "legacy") for c in ("member", "member-deep")],
 }
 
 

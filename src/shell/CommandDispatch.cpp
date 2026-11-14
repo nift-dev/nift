@@ -75,8 +75,9 @@ bool is_ident_char(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
 
-// C144 (D-101): function-call syntax is Nift, never a command line: an identifier (or native::<identifier>), optional
-// blanks, then an unquoted `(`; or `native`, optional blanks, `::` (every qualifier spelling reaches the L6 checks).
+// C144 (D-101, D-103): function-call syntax is Nift, never a command line: an identifier (or native::<identifier>, or
+// a dotted member head such as o.f, C144b), optional blanks, then an unquoted `(`; or `native`, optional blanks, `::`
+// (every qualifier spelling reaches the L6 checks).
 // The parser decides whether it is a valid call. `cp a.txt c.txt` has no `(` after the first word and stays a command.
 bool has_call_syntax_head(const std::string& line) {
     std::size_t i = 0;
@@ -93,6 +94,11 @@ bool has_call_syntax_head(const std::string& line) {
         if (line.compare(i, 2, "::") == 0) return true;
         i = name;
     }
+#endif
+#if !(defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 4)  // mutant 4: the dotted (member-call) rule dropped
+    while (i + 1 < line.size() && line[i] == '.' &&  // C144b: a member-call head, o.f ( or a.b.c (
+           (std::isalpha(static_cast<unsigned char>(line[i + 1])) || line[i + 1] == '_'))
+        for (++i; i < line.size() && is_ident_char(line[i]); ++i) {}
 #endif
     blanks();
 #if defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 3  // mutant 3: also captures `cp a.txt c.txt`

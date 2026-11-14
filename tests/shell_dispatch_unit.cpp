@@ -140,6 +140,12 @@ void test_call_syntax() {
     expect(!nift({"echo", "hi", ">", "f"}, "echo hi > f"), "redirect is a command");
     expect(!nift({"./x", "(a)"}, "./x (a)"), "explicit path is a command");
     expect(!nift({"echo", "a(b)"}, "echo a(b)"), "( later in the line is not call syntax");
+    // C144b (D-103): a dotted member-call head is call syntax too; an env-assignment prefix stays shell syntax.
+    expect(nift({"o.f", "(x)"}, "o.f (\"x\")"), "o.f (...) is Nift");
+    expect(nift({"a.b.c", "(x)"}, "a.b.c\t(\"x\")"), "a.b.c<TAB>(...) is Nift");
+    expect(!nift({"o.f", "x"}, "o.f x"), "o.f x is a command");
+    expect(!nift({"o.", "(x)"}, "o. (x)"), "o. (...) is not a member head");
+    expect(!nift({"FOO=1", "cp", "(a,b)"}, "FOO=1 cp (\"a\",\"b\")"), "FOO=1 cp (...) stays a command (N2)");
 }
 
 void test_lines() {
