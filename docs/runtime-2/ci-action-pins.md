@@ -99,7 +99,7 @@ sources and dates are as in the table above.
 | v44-cross-platform.yml | `actions/setup-python@v6` | 1 | `ece7cb06caefa5fff74198d8649806c4678c61a1` |
 | v44-cross-platform.yml | `msys2/setup-msys2@v2` | 1 | `ec48f7c5447b3140e2b088413ae3a55687bccb6e` |
 
-## Pins that were already in place (checked, not changed)
+## Pins that were already in place (checked; one corrected under D-105)
 
 The packaging and distribution workflows already used commit SHAs. Only the Homebrew pin carries a tag comment. For
 each of the others, the tag that points at its SHA was looked up with sources (1) and (2):
@@ -108,8 +108,30 @@ each of the others, the tag that points at its SHA was looked up with sources (1
 |---|---|---|---|
 | `actions/checkout` | `fbc6f3992d24…` | v5, v5.1.0 | Same commit as the new v5 pin. |
 | `actions/setup-python` | `ece7cb06caef…` | v6, v6.3.0 | Same commit as the new v6 pin. |
-| `actions/upload-artifact` | `043fb46d1a93…` | v7.0.1 | Valid, but older than v7, which is now v7.0.2 (`cf430e03`). The new `@v7` pins therefore run v7.0.2 and the existing ones v7.0.1. |
+| `actions/upload-artifact` | `043fb46d1a93…` | v7.0.1 | Valid commit, older than v7, which is now v7.0.2 (`cf430e03`). The new `@v7` pins run v7.0.2 and these pins run v7.0.1. **The mix is intentional (D-105): both are kept.** |
 | `actions/download-artifact` | `37930b1c2abaa49bbe596cd826c3c89aef350131` | v7, v7.0.0 | Matches. |
-| `msys2/setup-msys2` (release.yml) | `66cd2cce69ca…` | v2.32.0 | Valid, but older than v2, which is now v2.33.0 (`ec48f7c5`). |
+| `msys2/setup-msys2` (release.yml) | `66cd2cce69ca…` | v2.32.0 | Valid commit, older than v2, which is now v2.33.0 (`ec48f7c5`). **The mix is intentional (D-105): both are kept.** |
 | `Homebrew/actions/setup-homebrew` | `df4b09108a1de9d6f995fe68f302b3f68bd6d2ef` | 2026.07.20.1 | **Matches its comment** (`# 2026.07.20.1`). |
-| `snapcore/action-build` (snap.yml) | `b391f430cb2650fd359ed4d2cfe88b2c481800e0` | v1, but as an **annotated tag object** | **Not a commit.** `v1^{}` peels to commit `3bdaa03e1ba6bf59a65f84a751d943d549a54e79`, and the API reports `object.type: tag`. Left unchanged under D-104 rule 3; reported for an owner decision. |
+| `snapcore/action-build` (snap.yml) | was `b391f430cb2650fd359ed4d2cfe88b2c481800e0` | v1 | **Corrected under D-105.** The old SHA was the annotated tag object for v1, not a commit. The line is now `@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1`. |
+
+**The snapcore/action-build re-pin (D-105, verified 2026-11-14, read-only).** Its two identities:
+
+| Identity | SHA | How it was verified |
+|---|---|---|
+| Original pin: the annotated tag object for `v1` | `b391f430cb2650fd359ed4d2cfe88b2c481800e0` | `ls-remote` lists it as `refs/tags/v1`. `GET /repos/snapcore/action-build/git/tags/b391f430…` returns `tag: v1`, with `object.sha` 3bdaa03e… and `object.type: commit`. |
+| Resolved commit, now pinned | `3bdaa03e1ba6bf59a65f84a751d943d549a54e79` | `ls-remote` lists it as `refs/tags/v1^{}`. `GET /repos/snapcore/action-build/git/commits/3bdaa03e…` returns a commit object, with a tree and parents. |
+
+**Every pin is a commit (D-105 check).** In `.github/workflows` there are 178 `uses:` references, covering 13 distinct
+SHAs. Each SHA was checked as a commit:
+- Twelve resolve to commit objects through the GitHub API: `git/commits/<sha>` for most, and `commits/<sha>` for
+  upload-artifact `043fb46d`.
+- The thirteenth, upload-artifact `cf430e03`, was confirmed through `commits/v7`, and `ls-remote` lists it as a
+  lightweight tag.
+
+No pin is a tag object.
+
+## Before any cross-platform CI
+
+actionlint was not available offline here, so no workflow has been linted (D-105). Before any cross-platform CI run,
+run actionlint against the final consolidated workflows, which means the merged runtime-2 tree, not prep alone. It may
+run in the certification environment. Record its version and result with the campaign evidence.

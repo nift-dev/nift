@@ -201,10 +201,13 @@ inventory gate runs without it.
   capabilities as DEFERRED from the harnesses' own lines (read_limit.py's `DEFERRED capabilities …` line,
   `post_cert_refusals.py`, the inventory), which is the rule in certification-r2-plan.md section 3.
 - **Action SHA pins: done** in 17c6277c (D-104). Every tag reference in `.github/workflows` is pinned to its commit,
-  and the table is in ci-action-pins.md. Two items about pins that were already in place wait on the owner and are not
-  yet resolved:
-  - In snap.yml, the `snapcore/action-build` pin `b391f430` is the annotated tag object for v1, not its commit
-    `3bdaa03e`.
-  - Some existing pins are older than the new pins: `upload-artifact` v7.0.1 (`043fb46d`) against the new `@v7`
-    pins at v7.0.2, and release.yml's `setup-msys2` v2.32.0 (`66cd2cce`) against the new `@v2` pins at v2.33.0.
+  and the table is in ci-action-pins.md. The two items about pins that were already in place are resolved (D-105):
+  - **The snap pin is corrected.** snap.yml's `snapcore/action-build` pin was the annotated tag object for v1
+    (`b391f430`). It is now pinned to that tag's commit (`3bdaa03e`, `# v1`).
+  - **The mixed versions are kept on purpose.** `upload-artifact` stays at v7.0.1 (`043fb46d`) where it was already
+    pinned, while the new `@v7` pins run v7.0.2. release.yml's `setup-msys2` stays at v2.32.0 (`66cd2cce`), while
+    the new `@v2` pins run v2.33.0.
+  - Every `uses:` reference is now a commit SHA; none is a tag object.
+- **Before any cross-platform CI:** run actionlint against the final consolidated workflows (D-105). It may run in the
+  certification environment, since it is not available locally.
 - **Before any launch:** run every locally runnable gate on the frozen candidate (the owner's standing rule).
