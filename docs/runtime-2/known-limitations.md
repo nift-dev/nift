@@ -71,6 +71,31 @@ This construct is refused on the VM by an owner decision. It is not pending work
 | --- | --- | --- |
 | A map, set or stack as a map key or set member, lookups included | `collection-mutable-key` | D-NEXT-refsem #6 (keys, D6) |
 | Plain `@fn(...)` in a script (legacy keeps accepting it) | `fn-flags` | D-067 #3, amending D-047 #1 / D-048 #1 |
+| An unqualified `cat`, `cp`, `mv`, `rm`, `ls`, `mkdir` or `touch` call with no user or module function of that name (write `native::cp(...)`) | `native-unqualified` | D-075 #2, D-095 (Runtime 2.0 breaking change, below) |
+
+**Runtime 2.0 breaking change: `native::` for seven file built-ins (L6; D-075 #2, D-095;
+[checkpoints/native-qualifier.md](checkpoints/native-qualifier.md)).**
+- Scope: programs the VM runs, which are script files, `-e`/`-c`/stdin programs, `-i` sessions, the REPL and the
+  modules they import. There, `cat`, `cp`, `mv`, `rm`, `ls`, `mkdir` and `touch` are no longer built-ins. Call them
+  as `native::cat(...)` and so on: the same natives, with the same checks, limits, tracing and dependency
+  observations.
+- An unqualified call of one of the seven, with no user or module function of that name, refuses the whole program
+  at compile time (`native-unqualified`), even when the call is never reached. The diagnostic suggests the
+  `native::` spelling, and nothing runs. In a session, the statement is refused like any other refusal.
+- A user function named `cp` (or any of the seven) is an ordinary function on the VM. Legacy keeps calling its
+  native first; that difference is approved (D-075 #2) and pinned in tests/runtime2/l6/adversarial-approved.json.
+- Unchanged: website builds. Templates (`@script`, `$[...]`) and build hooks run on the legacy evaluator (D-053), so
+  they keep the unqualified seven. This is **transitional engine-specific compatibility** (D-096 #1), not the
+  intended permanent API: the goal remains consistent `native::` naming. `native::name(` works there too, with the
+  same output and effects as the unqualified form. Every other built-in is unchanged, and no function call ever
+  launches an external program.
+- Legacy (`NIFT_VM=0`) keeps the unqualified seven as the historical oracle, and also accepts `native::name(`.
+- Exactly `native::name(` is valid: no space around `::` and the `(` immediately after the name. Any other
+  spelling, and `native::` before a name outside the seven, is reported with the same text and position by both
+  engines. Under the default syntax prevalidation, which checks every script, it is reported before anything runs.
+  Where prevalidation does not run (`NIFT_PREVALIDATE=off`), both engines raise the same error, at the same position,
+  when the call is reached (D-095 (b)).
+- Migration: the repository's call sites are listed in tests/runtime2/l6/MANIFEST.tsv.
 
 ## Refusals awaiting an owner ruling
 

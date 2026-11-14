@@ -2681,3 +2681,77 @@ certification-priority reset remains in force."
    negative controls. Stop if a broad redesign is needed. Freeze, independent review, owner acceptance.
 6. **Sequence:** save(), L6 native:: Option B, freeze, Linode certification and Windows/macOS CI, then performance
    qualification and the release decision. No Linode, integration, push, CI, tag or release without approval.
+
+## D-095 — C142 accepted at 502875c4; L6 `native::` authorised; the L6 design approved (owner, 2026-11-14)
+
+Recorded from the coordinator's relays. D-092 to D-094 (the save() rounds) are recorded in
+checkpoints/save-safety.md and known-limitations.md.
+
+1. **C142 (save() filesystem safety) accepted** at 502875c4. **L6 Option B (D-075 #2) authorised**, scoped exactly:
+   - the seven functions `cat`, `cp`, `mv`, `rm`, `ls`, `mkdir`, `touch`;
+   - `native::name(` resolves at compile time in both engines to the existing native ids;
+   - the unqualified seven are removed from VM-default execution only; legacy keeps them as the historical oracle;
+   - user functions with these names stay possible, and other built-ins are unchanged;
+   - a function call never launches an external executable;
+   - an unknown qualifier gets a clear diagnostic;
+   - no runtime namespace objects and no general namespace system;
+   - the VM-only removal is an explicit Runtime 2.0 breaking change.
+2. **Design approved, with three answers.**
+   - (a) An unqualified call of the seven in the VM, with no user or module function of that name, is a
+     whole-program compile-time refusal `native-unqualified` with a migration hint, even when unreachable,
+     consistent with the C136 undefined-callables machinery.
+   - (b) `native::` before another name: a compile-time error in the VM and a run-time error in legacy. Recorded as
+     compile-time parity for scripts (the CP13 prevalidation, both engines), plus the equal run-time error where
+     prevalidation does not run; the tests cover both paths.
+   - (c) The migration is a separate commit with a manifest (tests/runtime2/l6/MANIFEST.tsv).
+3. **Conditions:**
+   - (1) A legacy flag, if any, applies to the outer callee only. Arguments and nested calls keep their meaning; this
+     is tested, with a leak mutant.
+   - (2) One syntax rule in both engines, exactly `native::name(`, with the listed spellings tested and `::` inside
+     strings and comments left untouched.
+   - (3) No benchmark or workload of the v4.12.0 comparison, the builtins-guards website-build workloads or the B21
+     performance campaign is rewritten in a way v4.12.0 cannot run. benchmarks/v43_scripting_perf.py stays
+     untouched; the owner decides.
+   - (4) Evidence for each text scanner and for legacy's prepared fast path.
+   - (5) Sessions/REPL, embedding, hooks and templates are tested in both engines where the path exists.
+   - (6) The inventory gets only the one new reason, `native-unqualified`, approved under D-075. PENDING-OWNER rows
+     are not touched; inventory --check shows the same 59 PENDING-OWNER reasons before and after.
+   - (7) Frozen evidence and fingerprints are untouched; stop and report if one would change.
+   - (8) Stop and report if src goes well beyond about 250 lines or needs namespace objects or a general mechanism.
+4. **Scope of the breaking change:** VM-run scripts (file, `-e`, `-i`, imports). Templates and hooks keep the
+   unqualified seven (legacy evaluator, D-053) until the template compiler exists. Migration covers only the call
+   sites the 146-target run proves are needed, each listed in the manifest.
+5. **Later points:** mutant 1 must be effective, and a no-mutation control is required. There is no separate bypass
+   mutant; instead the report shows that a compiled `native::cp` has the same native id and path as pre-L6 `cp`.
+   The report lists every benchmark or workload whose VM-default run is now refused.
+6. **Sequence:** syntax and both engines (C143), the migration commit, records, freeze, the gates, the
+   instruction-count comparison against 502875c4 on the website-build workloads, then the report. No push,
+   integration, Linode or CI.
+
+## D-096 — L6: templates and hooks as the initial boundary; the benchmark variant (owner, 2026-11-14)
+
+Recorded from the coordinator's relay. No new production scope.
+
+1. **Templates and build hooks: approved as the initial L6 boundary.** They stay on legacy (D-053) and keep the
+   unqualified seven. Templates and hooks are not migrated, and the template compiler is not started. This is
+   transitional engine-specific compatibility, not the intended permanent API; the goal remains consistent `native::`
+   naming. Condition: `native::` must work in legacy execution, templates and hooks included. Tests show
+   `native::cat` and `native::touch` in an `@script` template and in a legacy file and `-e` run, with output identical
+   to the unqualified legacy form (tests/runtime2/native_qualifier.py `legacy-equivalence-*`).
+2. **Benchmark: approved with an adjustment.** benchmarks/v43_scripting_perf.py stays byte-identical. A separate
+   Runtime 2.0 variant (benchmarks/v43_scripting_perf_rt2.py) uses `native::touch`. It keeps the same inputs, sizes,
+   operation counts, filesystem state, outputs, side effects, error behaviour, and warmup/measurement method; it
+   shares the code and changes only the call spelling. Reporting labels two categories: (1) identical-source and (2)
+   equivalent-operation (version-adapted). touch is not dropped from the cross-version comparison when equivalence is
+   shown; the two categories are never aggregated without an explanation; no re-baselining. Both variants, their
+   exact difference and the equivalence evidence are in tests/runtime2/l6/MANIFEST.tsv.
+3. **Before the freeze:**
+   - all six mutants caught, with mutant 1 re-verified against a no-mutation control;
+   - explicit tests:
+     - (a) a user function `cat` is called under the VM default, also next to an unqualified call in an unreachable
+       branch, with no `native-unqualified` refusal;
+     - (b) `native::cat` reaches the native even when a user function `cat` exists (both engines);
+     - (c) call syntax never launches an external executable;
+     - (d) the unqualified seven are refused only under the VM default; legacy is unchanged;
+     - (e) migrated tests keep their behavioural invariants (the manifest's `invariant` column);
+   - the CallNative id evidence and the listed gates.
