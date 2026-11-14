@@ -242,7 +242,8 @@ operation against concurrent adversarial path replacement. What stays:
   world-writable directories.
 - **Deliberate behaviour changes** (save-safety.md, "Behaviour changes"): a clean save of a special, read-only,
   std-stream or dangling target is now refused (before: a no-op); a save through a link needs write access to the
-  target's directory; a VM save fails if a name already exists at the temporary path; a link loop reads as dangling;
+  target's directory; both engines create the temporary file exclusively and refuse an occupied temporary name
+  (the VM since C142, the legacy engine since C142b, D-093); a link loop reads as dangling;
   an lstat error other than ENOENT is refused (`cannot check the target`); a link to stdout or stderr on a pipe gets
   the std-stream message.
 - **Narrowing items** (REVIEW-C142 (d), D-093): (d)1, the revalidation, and (d)3, the exclusive legacy temporary
