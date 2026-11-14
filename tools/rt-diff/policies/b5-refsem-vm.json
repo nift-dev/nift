@@ -3,7 +3,7 @@
   "id": "b5-gen_g00002_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00002/main.f",
-  "source_sha256": "ca41a6c80ce1d957c1250e01c05c140c55a97012c97ee36ace75d0e10fa73dc0",
+  "source_sha256": "890aa246d6367f3a7cc0cd2cb030f2f174c19f70971c9bbb493da115f6044707",
   "channel": "stdout",
   "old": "true\ntrue\n3\n[1,2]\ntrue\ntrue\ntrue\ndata-$\ntrue\nfalse\n-2.5\ntrue\n",
   "new": "true\ntrue\n3\n[1,2,99]\ntrue\ntrue\ntrue\ndata-$\ntrue\nfalse\n-2.5\ntrue\n",
@@ -12,13 +12,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00002/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "559f4e88e244d7b0ef018f2ec13deba1d51b3ecdab277f6161e4e974381ccfbf"
+  "tree_sha256": "ea3b4211c8b205c62b77eff441d635293adfea65a06a20eda17f4dd0bb2ce1db"
  },
  {
   "id": "b5-gen_g00002_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00002/main.f",
-  "source_sha256": "ca41a6c80ce1d957c1250e01c05c140c55a97012c97ee36ace75d0e10fa73dc0",
+  "source_sha256": "890aa246d6367f3a7cc0cd2cb030f2f174c19f70971c9bbb493da115f6044707",
   "channel": "combined",
   "old": "true\ntrue\n3\n[1,2]\ntrue\ntrue\ntrue\ndata-$\ntrue\nfalse\n-2.5\ntrue\n",
   "new": "true\ntrue\n3\n[1,2,99]\ntrue\ntrue\ntrue\ndata-$\ntrue\nfalse\n-2.5\ntrue\n",
@@ -27,13 +27,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00002/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "559f4e88e244d7b0ef018f2ec13deba1d51b3ecdab277f6161e4e974381ccfbf"
+  "tree_sha256": "ea3b4211c8b205c62b77eff441d635293adfea65a06a20eda17f4dd0bb2ce1db"
  },
  {
   "id": "b5-gen_g00008_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00008/main.f",
-  "source_sha256": "45db7f31c81f09dc4cedc6fac9ba256a508862f254f34e51aa560d2fe8c668a4",
+  "source_sha256": "f196261fb66774f12a13238045b31cb782ab55dfb704ab9187d2d5abae8f4809",
   "channel": "stdout",
   "old": "true\ntrue\n2016\n2.1\nnull\nC\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n16\n18\n0.7\n3\n[1,2]\n16.875\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n",
   "new": "true\ntrue\n2016\n2.1\nnull\nC\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n16\n18\n0.7\n3\n[1,2,99]\n16.875\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n",
@@ -42,13 +42,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00008/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "f8bcd9d279604efbc7876f395db6c3604a4e17e56d8900c5bfd6a39598148b25"
+  "tree_sha256": "9b471fb6ede53d95ca3432e9669cf4b16a0afc7be73ff32821c0ff561222a846"
  },
  {
   "id": "b5-gen_g00008_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00008/main.f",
-  "source_sha256": "45db7f31c81f09dc4cedc6fac9ba256a508862f254f34e51aa560d2fe8c668a4",
+  "source_sha256": "f196261fb66774f12a13238045b31cb782ab55dfb704ab9187d2d5abae8f4809",
   "channel": "combined",
   "old": "true\ntrue\n2016\n2.1\nnull\nC\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n16\n18\n0.7\n3\n[1,2]\n16.875\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n",
   "new": "true\ntrue\n2016\n2.1\nnull\nC\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n16\n18\n0.7\n3\n[1,2,99]\n16.875\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n",
@@ -57,7 +57,7 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00008/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "f8bcd9d279604efbc7876f395db6c3604a4e17e56d8900c5bfd6a39598148b25"
+  "tree_sha256": "9b471fb6ede53d95ca3432e9669cf4b16a0afc7be73ff32821c0ff561222a846"
  },
  {
   "id": "b5-gen_g00028_main-stdout",
@@ -123,7 +123,7 @@
   "id": "b5-gen_g00060_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00060/main.f",
-  "source_sha256": "6012d54e6e48b508ee791164822209e1c93117dba99a8fa6d159e2b0a6b76a05",
+  "source_sha256": "58aacd9bc42b6dfb37e67fc90855b0289a0911a73d2a83f9008f9d0ff8e64b86",
   "channel": "stdout",
   "old": "hello\n10\n4\n14\n6\n1\n-\n{\"k\":1,\"s\":\"-\"}\n3\n[1,2]\n1\n1\n2\n3\nq\n0\n",
   "new": "hello\n10\n4\n14\n6\n1\n-\n{\"k\":1,\"s\":\"-\"}\n3\n[1,2,99]\n1\n1\n2\n3\nq\n0\n",
@@ -132,13 +132,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00060/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "69a23d9d4088847cd0a9600a18f60cfca3b2ab033aba03bbb4f822635e205515"
+  "tree_sha256": "bc598417131017f198e18844674ea611018b268dedef54f78e00695ff1744a4c"
  },
  {
   "id": "b5-gen_g00060_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00060/main.f",
-  "source_sha256": "6012d54e6e48b508ee791164822209e1c93117dba99a8fa6d159e2b0a6b76a05",
+  "source_sha256": "58aacd9bc42b6dfb37e67fc90855b0289a0911a73d2a83f9008f9d0ff8e64b86",
   "channel": "combined",
   "old": "hello\n10\n4\n14\n6\n1\n-\n{\"k\":1,\"s\":\"-\"}\n3\n[1,2]\n1\n1\n2\n3\nq\n0\n",
   "new": "hello\n10\n4\n14\n6\n1\n-\n{\"k\":1,\"s\":\"-\"}\n3\n[1,2,99]\n1\n1\n2\n3\nq\n0\n",
@@ -147,13 +147,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00060/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "69a23d9d4088847cd0a9600a18f60cfca3b2ab033aba03bbb4f822635e205515"
+  "tree_sha256": "bc598417131017f198e18844674ea611018b268dedef54f78e00695ff1744a4c"
  },
  {
   "id": "b5-gen_g00071_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00071/main.f",
-  "source_sha256": "29851a3cb48c9f143a546b7466a58e84699d5859498e990d90caf2b8b45a0d58",
+  "source_sha256": "c3c4346ebd310091697c4c9d097aff981ca4dc04c8aff8d93a78a12c01b49d68",
   "channel": "stdout",
   "old": "4\nNift\n{\"k\":4,\"s\":\"Nift\"}\n4\n10\n1\nitem 1\n1\n3\n4\n1\n2\n2\nitem 2\n1\n3\n4\n1\n2\n3\nitem 3\n1\n3\n4\n1\n2\nNift\nNift\nNiftpNift\n3\n[1,2]\n192\n",
   "new": "4\nNift\n{\"k\":4,\"s\":\"Nift\"}\n4\n10\n1\nitem 1\n1\n3\n4\n1\n2\n2\nitem 2\n1\n3\n4\n1\n2\n3\nitem 3\n1\n3\n4\n1\n2\nNift\nNift\nNiftpNift\n3\n[1,2,99]\n192\n",
@@ -162,13 +162,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00071/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "917e9e869da91634715cb096fc3f0bf546281220f4bf6ef014626734fd15c6e2"
+  "tree_sha256": "e05483d750cf81ff7babc4c280a96afacb057f868e8f08b08457b7c9d8119676"
  },
  {
   "id": "b5-gen_g00071_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00071/main.f",
-  "source_sha256": "29851a3cb48c9f143a546b7466a58e84699d5859498e990d90caf2b8b45a0d58",
+  "source_sha256": "c3c4346ebd310091697c4c9d097aff981ca4dc04c8aff8d93a78a12c01b49d68",
   "channel": "combined",
   "old": "4\nNift\n{\"k\":4,\"s\":\"Nift\"}\n4\n10\n1\nitem 1\n1\n3\n4\n1\n2\n2\nitem 2\n1\n3\n4\n1\n2\n3\nitem 3\n1\n3\n4\n1\n2\nNift\nNift\nNiftpNift\n3\n[1,2]\n192\n",
   "new": "4\nNift\n{\"k\":4,\"s\":\"Nift\"}\n4\n10\n1\nitem 1\n1\n3\n4\n1\n2\n2\nitem 2\n1\n3\n4\n1\n2\n3\nitem 3\n1\n3\n4\n1\n2\nNift\nNift\nNiftpNift\n3\n[1,2,99]\n192\n",
@@ -177,13 +177,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00071/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "917e9e869da91634715cb096fc3f0bf546281220f4bf6ef014626734fd15c6e2"
+  "tree_sha256": "e05483d750cf81ff7babc4c280a96afacb057f868e8f08b08457b7c9d8119676"
  },
  {
   "id": "b5-gen_g00101_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00101/main.f",
-  "source_sha256": "902a6a4a71a60085d9ae947940ed486a4b14f3888d1580048bc7a1c601d618de",
+  "source_sha256": "2a69b340b078a20d5ce2bcc29e6080b23c6552fec0f931b16cc55a6b95ddf205",
   "channel": "stdout",
   "old": "[42,2,100,7]\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n3\n[1,2]\n0.7\ntrue\ntrue\ntrue\ndata-Nift\ntrue\ntrue\n",
   "new": "[42,2,100,7]\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n3\n[1,2,99]\n0.7\ntrue\ntrue\ntrue\ndata-Nift\ntrue\ntrue\n",
@@ -192,13 +192,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00101/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "97a1d4372d162ae37440a9b3af9df22ab9bb1fe28ad48760bb1f6812401c4a6c"
+  "tree_sha256": "4ea13cbd6019d604533ef533f4c2b726a9b0a7446fc1b82f228819bf012106e4"
  },
  {
   "id": "b5-gen_g00101_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00101/main.f",
-  "source_sha256": "902a6a4a71a60085d9ae947940ed486a4b14f3888d1580048bc7a1c601d618de",
+  "source_sha256": "2a69b340b078a20d5ce2bcc29e6080b23c6552fec0f931b16cc55a6b95ddf205",
   "channel": "combined",
   "old": "[42,2,100,7]\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n3\n[1,2]\n0.7\ntrue\ntrue\ntrue\ndata-Nift\ntrue\ntrue\n",
   "new": "[42,2,100,7]\n4\nNIFT\nfalse\ntrue\n[\"Nift\"]\n3\n[1,2,99]\n0.7\ntrue\ntrue\ntrue\ndata-Nift\ntrue\ntrue\n",
@@ -207,13 +207,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00101/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "97a1d4372d162ae37440a9b3af9df22ab9bb1fe28ad48760bb1f6812401c4a6c"
+  "tree_sha256": "4ea13cbd6019d604533ef533f4c2b726a9b0a7446fc1b82f228819bf012106e4"
  },
  {
   "id": "b5-gen_g00112_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00112/main.f",
-  "source_sha256": "2c52858b59f7bed8565d18f5a6072d24d4ff05f440199c71e3dea6b9b1726b1a",
+  "source_sha256": "517780b2d7abb52d8067e6c63d1a32253f106919c483319a28c78cd99b31a9a2",
   "channel": "stdout",
   "old": "boom 2\n3\n[1,2]\n8\n14\n",
   "new": "boom 2\n3\n[1,2,99]\n8\n14\n",
@@ -222,13 +222,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00112/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "c2432be520588bfaab7db1344e9a408cb20a880f32a911818c6223044b5f30ad"
+  "tree_sha256": "fb4e883489df42102c0891dee967f5104a3da1b6d51e0606d88d23630c88a037"
  },
  {
   "id": "b5-gen_g00112_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00112/main.f",
-  "source_sha256": "2c52858b59f7bed8565d18f5a6072d24d4ff05f440199c71e3dea6b9b1726b1a",
+  "source_sha256": "517780b2d7abb52d8067e6c63d1a32253f106919c483319a28c78cd99b31a9a2",
   "channel": "combined",
   "old": "boom 2\n3\n[1,2]\n8\n14\n",
   "new": "boom 2\n3\n[1,2,99]\n8\n14\n",
@@ -237,13 +237,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00112/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "c2432be520588bfaab7db1344e9a408cb20a880f32a911818c6223044b5f30ad"
+  "tree_sha256": "fb4e883489df42102c0891dee967f5104a3da1b6d51e0606d88d23630c88a037"
  },
  {
   "id": "b5-gen_g00125_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00125/main.f",
-  "source_sha256": "d7003365eb513ff1f325bc77e8986144859eb5de4419e89ad12ae9dac57df9a6",
+  "source_sha256": "e7f6bbeba571bbfcd1f8ef0e44b89624603305e3fbdc3dce5b848f2f6fa7ea47",
   "channel": "stdout",
   "old": "3\n[1,2]\n42\nq\n{\"k\":42,\"s\":\"q\"}\nboom 2\n2\n1\n3\n4\ntrue\ntrue\n84\n8\n4\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
   "new": "3\n[1,2,99]\n42\nq\n{\"k\":42,\"s\":\"q\"}\nboom 2\n2\n1\n3\n4\ntrue\ntrue\n84\n8\n4\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
@@ -252,13 +252,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00125/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "2eea2ec5a5efd46651b27026ac050384b9926ef3163d9d491420ab3dc90bf5b3"
+  "tree_sha256": "ebdd0cdf894b490d2c873bbc9645fa81244a4c984a3f8ba0f8eb9fd80274ae3f"
  },
  {
   "id": "b5-gen_g00125_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00125/main.f",
-  "source_sha256": "d7003365eb513ff1f325bc77e8986144859eb5de4419e89ad12ae9dac57df9a6",
+  "source_sha256": "e7f6bbeba571bbfcd1f8ef0e44b89624603305e3fbdc3dce5b848f2f6fa7ea47",
   "channel": "combined",
   "old": "3\n[1,2]\n42\nq\n{\"k\":42,\"s\":\"q\"}\nboom 2\n2\n1\n3\n4\ntrue\ntrue\n84\n8\n4\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
   "new": "3\n[1,2,99]\n42\nq\n{\"k\":42,\"s\":\"q\"}\nboom 2\n2\n1\n3\n4\ntrue\ntrue\n84\n8\n4\n10\nALPHA-BETA\ntrue\nfalse\n[\"alpha\",\"beta\"]\n",
@@ -267,13 +267,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00125/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "2eea2ec5a5efd46651b27026ac050384b9926ef3163d9d491420ab3dc90bf5b3"
+  "tree_sha256": "ebdd0cdf894b490d2c873bbc9645fa81244a4c984a3f8ba0f8eb9fd80274ae3f"
  },
  {
   "id": "b5-gen_g00133_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00133/main.f",
-  "source_sha256": "6d54324b204f161c174d1d80b7e3de1cfc3b9c6a0b6f1798be29681788b67213",
+  "source_sha256": "9193383cbd80ffa11b7b67d563882fcb9815cd6b7890745d5b69cb861c641edc",
   "channel": "stdout",
   "old": "4\n8\ntrue\ntrue\ntrue\ndata--q\ntrue\nfalse\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n0.45\n5\n0.5\n0\np\n{\"k\":0,\"s\":\"p\"}\n5\n3\n[1,2]\n",
   "new": "4\n8\ntrue\ntrue\ntrue\ndata--q\ntrue\nfalse\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n0.45\n5\n0.5\n0\np\n{\"k\":0,\"s\":\"p\"}\n5\n3\n[1,2,99]\n",
@@ -282,13 +282,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00133/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "dc62c0f32e0dc38beb40491cd7f2e81b5d94282f86d54e85f01423cb5f59ab32"
+  "tree_sha256": "497641155270f143cb092ab87712143864a3afa1af5a31b1e7ffc5998f263bda"
  },
  {
   "id": "b5-gen_g00133_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00133/main.f",
-  "source_sha256": "6d54324b204f161c174d1d80b7e3de1cfc3b9c6a0b6f1798be29681788b67213",
+  "source_sha256": "9193383cbd80ffa11b7b67d563882fcb9815cd6b7890745d5b69cb861c641edc",
   "channel": "combined",
   "old": "4\n8\ntrue\ntrue\ntrue\ndata--q\ntrue\nfalse\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n0.45\n5\n0.5\n0\np\n{\"k\":0,\"s\":\"p\"}\n5\n3\n[1,2]\n",
   "new": "4\n8\ntrue\ntrue\ntrue\ndata--q\ntrue\nfalse\n5\nX-Y-Z\nfalse\nfalse\n[\"x\",\"y\",\"z\"]\n0.45\n5\n0.5\n0\np\n{\"k\":0,\"s\":\"p\"}\n5\n3\n[1,2,99]\n",
@@ -297,13 +297,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00133/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "dc62c0f32e0dc38beb40491cd7f2e81b5d94282f86d54e85f01423cb5f59ab32"
+  "tree_sha256": "497641155270f143cb092ab87712143864a3afa1af5a31b1e7ffc5998f263bda"
  },
  {
   "id": "b5-gen_g00159_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00159/main.f",
-  "source_sha256": "9011e742f7586e58fc485056a5daf4c8cebf782cfd7432baa0183ddc756d7099",
+  "source_sha256": "e707d3152c4165f878362faf66e3ab92049b4a4f0772cd7ecd44c23239ff9936",
   "channel": "stdout",
   "old": "boom 4\n3\n[1,2]\n1\nitem 1\n2\nitem 2\n3\nitem 3\ntrue\nfalse\nfalse\n55\n1\nitem 1\n2\nitem 2\n3\nitem 3\n12\n4\n1\n1\n3\n",
   "new": "boom 4\n3\n[1,2,99]\n1\nitem 1\n2\nitem 2\n3\nitem 3\ntrue\nfalse\nfalse\n55\n1\nitem 1\n2\nitem 2\n3\nitem 3\n12\n4\n1\n1\n3\n",
@@ -312,13 +312,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00159/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "d7f6cb999a2dae15404f94496c146a0919b7122f7c325c4b7977a06f15ed8f16"
+  "tree_sha256": "d3515c01ebe8961c3b371c86e2aee29c60893fdc6ccc6ed14ce6084ea9edaa3a"
  },
  {
   "id": "b5-gen_g00159_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00159/main.f",
-  "source_sha256": "9011e742f7586e58fc485056a5daf4c8cebf782cfd7432baa0183ddc756d7099",
+  "source_sha256": "e707d3152c4165f878362faf66e3ab92049b4a4f0772cd7ecd44c23239ff9936",
   "channel": "combined",
   "old": "boom 4\n3\n[1,2]\n1\nitem 1\n2\nitem 2\n3\nitem 3\ntrue\nfalse\nfalse\n55\n1\nitem 1\n2\nitem 2\n3\nitem 3\n12\n4\n1\n1\n3\nerror: $ROOT/main.f:49:7: division by zero\n",
   "new": "boom 4\n3\n[1,2,99]\n1\nitem 1\n2\nitem 2\n3\nitem 3\ntrue\nfalse\nfalse\n55\n1\nitem 1\n2\nitem 2\n3\nitem 3\n12\n4\n1\n1\n3\nerror: $ROOT/main.f:49:7: division by zero\n",
@@ -327,13 +327,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00159/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "d7f6cb999a2dae15404f94496c146a0919b7122f7c325c4b7977a06f15ed8f16"
+  "tree_sha256": "d3515c01ebe8961c3b371c86e2aee29c60893fdc6ccc6ed14ce6084ea9edaa3a"
  },
  {
   "id": "b5-gen_g00169_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00169/main.f",
-  "source_sha256": "69038cd8489f447ec8908f9d211ffa1690bb5f5f082708f4971802b44b8076fc",
+  "source_sha256": "66f89fe453a4c3b195c4f4f1ef2389740afcca04070235859e9b8ba1a6543eda",
   "channel": "stdout",
   "old": "5\nq\n10\n18\nfalse\nfalse\n3\n[1,2]\nnull\nC\nfalse\nfalse\n",
   "new": "5\nq\n10\n18\nfalse\nfalse\n3\n[1,2,99]\nnull\nC\nfalse\nfalse\n",
@@ -342,13 +342,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00169/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "dd4aad31e5bd19343705df5e5a87994d10dc3706461418a57930a0c6a79438dd"
+  "tree_sha256": "de321784a48bcb7343c1255c0645f883f79cbd5c20bd7202f07f2d37e81848a8"
  },
  {
   "id": "b5-gen_g00169_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00169/main.f",
-  "source_sha256": "69038cd8489f447ec8908f9d211ffa1690bb5f5f082708f4971802b44b8076fc",
+  "source_sha256": "66f89fe453a4c3b195c4f4f1ef2389740afcca04070235859e9b8ba1a6543eda",
   "channel": "combined",
   "old": "5\nq\n10\n18\nfalse\nfalse\n3\n[1,2]\nnull\nC\nfalse\nfalse\n",
   "new": "5\nq\n10\n18\nfalse\nfalse\n3\n[1,2,99]\nnull\nC\nfalse\nfalse\n",
@@ -357,7 +357,7 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00169/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "dd4aad31e5bd19343705df5e5a87994d10dc3706461418a57930a0c6a79438dd"
+  "tree_sha256": "de321784a48bcb7343c1255c0645f883f79cbd5c20bd7202f07f2d37e81848a8"
  },
  {
   "id": "b5-gen_g00189_main-stdout",
@@ -393,7 +393,7 @@
   "id": "b5-gen_g00190_main-stdout",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00190/main.f",
-  "source_sha256": "3cbfafc7ba65052ddb7032f16f8c58030dec0b8dda78f96e5ec22a1bcf9a0829",
+  "source_sha256": "1fb102e7f6227533d59ae9a95299482a41eee9f20e427b4a8ce35a2506bc621a",
   "channel": "stdout",
   "old": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\nfalse\nfalse\n0.1\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ndata-[\"p\"]\ntrue\n3\n[1,2]\n1\nitem 1\n2\nitem 2\n3\nitem 3\n",
   "new": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\nfalse\nfalse\n0.1\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ndata-[\"p\"]\ntrue\n3\n[1,2,99]\n1\nitem 1\n2\nitem 2\n3\nitem 3\n",
@@ -402,13 +402,13 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00190/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "86cdc46ccca2e4748882cb92fed590c28bcc17586729599cdf6e1a4a555dc2e4"
+  "tree_sha256": "f5643393b25e398cb4bbaf3378d69d53cab27d42060f7e56129b17580eaf1049"
  },
  {
   "id": "b5-gen_g00190_main-combined",
   "decision": "D-NEXT-refsem-b",
   "entry": "gen/g00190/main.f",
-  "source_sha256": "3cbfafc7ba65052ddb7032f16f8c58030dec0b8dda78f96e5ec22a1bcf9a0829",
+  "source_sha256": "1fb102e7f6227533d59ae9a95299482a41eee9f20e427b4a8ce35a2506bc621a",
   "channel": "combined",
   "old": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\nfalse\nfalse\n0.1\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ndata-[\"p\"]\ntrue\n3\n[1,2]\n1\nitem 1\n2\nitem 2\n3\nitem 3\n",
   "new": "1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\n1\nitem 1\n2\nitem 2\n3\nitem 3\nfalse\nfalse\n0.1\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ndata-[\"p\"]\ntrue\n3\n[1,2,99]\n1\nitem 1\n2\nitem 2\n3\nitem 3\n",
@@ -417,7 +417,7 @@
   "test": "tools/rt-diff/gen.py (rt-diff --gen 200 --seed 1, entry gen/g00190/main.f)",
   "gen_seed": 1,
   "scope_note": "B07 (owner 2026-11-10, combined-b3-b5.md section 60): kept as this exact owner-approved rule, scoped to rt-diff --gen --seed 1 (out of scope, neither used nor unused, in other seeds); the sharing oracle leaves the program UNCLASSIFIED (fail closed: identity-sensitive or handle built-in file())",
-  "tree_sha256": "86cdc46ccca2e4748882cb92fed590c28bcc17586729599cdf6e1a4a555dc2e4"
+  "tree_sha256": "f5643393b25e398cb4bbaf3378d69d53cab27d42060f7e56129b17580eaf1049"
  },
  {
   "id": "b5-semantics_copy_at_call-stdout",

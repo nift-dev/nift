@@ -22,6 +22,8 @@ EXPECTED_REFUSAL={
  'print(to_string(1))':'callable:to_string',
  'print(unknown(1))':'callable:unknown',
  'print(print())':'static-error:arity',
+ # L6 (D-075 #2, D-095): the VM refuses an unqualified ls; native::ls is the Runtime 2.0 spelling.
+ 'print(ls("missing/*").size())':'native-unqualified',
 }
 failures=[];refused=0
 with tempfile.TemporaryDirectory() as d:

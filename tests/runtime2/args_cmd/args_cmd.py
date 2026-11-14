@@ -287,7 +287,7 @@ def suite(root):
               repr((vm.returncode, vm.stderr)))
 
     # 3. Refused before any effect (NIFT_VM=0 shows the effect is real).
-    touch = 'touch("side.txt")\nprint("before")\n'
+    touch = 'native::touch("side.txt")\nprint("before")\n'
     refused("cmd(...) builder", touch + 'c := cmd("echo", "hi")\n', work, home, "callable:cmd")
     refused("cmd(...).run()", touch + 'r := cmd("ls").run()\n', work, home, "callable:cmd")
     refused("run() neighbour", touch + 'r := run("echo", "hi")\n', work, home, "callable:run")
@@ -304,7 +304,7 @@ def suite(root):
             ["a"])
     refused("assign a member of an element of args", touch + 'args[0].x = 1\n', work, home, "invocation-assign:args",
             ["a"])
-    refused("assign args after a loop of effects", 'for(i : [1, 2]) { touch("side.txt") }\nprint("before")\n'
+    refused("assign args after a loop of effects", 'for(i : [1, 2]) { native::touch("side.txt") }\nprint("before")\n'
             'args = ["x"]\n', work, home, "invocation-assign:args")
     refused("read args before a top-level shadow", touch + 'print(args.size())\nargs := ["k"]\n', work, home,
             "unresolved-name", ["a"])
@@ -405,7 +405,7 @@ def suite(root):
     check(vm.returncode == 1 and "callable:cmd" in vm.stderr and "a\n" not in vm.stdout,
           "-i -e session: cmd(...) refused before effect", repr((vm.returncode, vm.stdout, vm.stderr)))
 
-    vm, _ = run([NIFT], work, None, home, 'touch("s.txt"); cmd = "x"\nprint("next")\n')
+    vm, _ = run([NIFT], work, None, home, 'native::touch("s.txt"); cmd = "x"\nprint("next")\n')
     check(vm.returncode == 1 and "NIFT_VM session refused: invocation-assign:cmd: cannot assign to `cmd`" in vm.stderr
           and "not supported" not in vm.stderr and not (work / "s.txt").exists() and "next" not in vm.stdout,
           "piped session: D-062 assignment rejected before the line runs", repr((vm.returncode, vm.stderr)))
@@ -471,7 +471,7 @@ def suite(root):
         parity("shadow: " + label, [NIFT, "sh.f", "a", "b"], work, home)
 
     # 10. Argument-count limits: positionless refusals (no invented location); legacy runs them.
-    (work / "many.f").write_text('touch("side.txt")\nprint(args.size())\n')
+    (work / "many.f").write_text('native::touch("side.txt")\nprint(args.size())\n')
     for count, reason in ((70000, "limit:invocation-arguments"), (40000, "limit:too many registers")):
         vm, _ = run([NIFT, "many.f", *(["a"] * count)], work, None, home)
         check(vm.returncode == 1 and "(" + reason + ")" in vm.stderr and

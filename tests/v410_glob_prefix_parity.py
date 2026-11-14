@@ -13,12 +13,13 @@ with tempfile.TemporaryDirectory(prefix='nift-prefix-general-') as directory:
  for pattern in patterns+[str(root/'files'/'**'/'*.dat'),str(root/'files'/'*')]:
   reference=by_pattern[pattern.replace(str(root),'<ORACLE_ROOT>')];expected=(reference['exit'],reference['stdout'],reference['stderr'])
   for binary in binaries:
-   q=subprocess.run([str(binary),'-'],input='print(ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())',cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60);actual=(q.returncode,q.stdout.replace(str(root),'<ORACLE_ROOT>'),q.stderr.replace(str(root),'<ORACLE_ROOT>'))
+   q=subprocess.run([str(binary),'-'],input='print(native::ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())',cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60);actual=(q.returncode,q.stdout.replace(str(root),'<ORACLE_ROOT>'),q.stderr.replace(str(root),'<ORACLE_ROOT>'))
    assert actual==expected,(pattern,actual,expected)
   rows.append(dict(pattern=pattern.replace(str(root),'<ORACLE_ROOT>'),exit=expected[0],stdout=expected[1],stderr=expected[2]));print(pattern.replace(str(root),'<ORACLE_ROOT>'),'PASS',flush=True)
  # Retarget a directory alias between calls in the SAME Parser process.
  reference=next(row for row in oracle if row.get('name')=='same-parser-retarget')
- source=reference['source'];expected=(reference['exit'],reference['stdout'],reference['stderr'])
+ # L6: the recorded oracle source predates native::; the VM-default run qualifies ls( (the oracle data is unchanged).
+ source=reference['source'].replace('ls(','native::ls(');expected=(reference['exit'],reference['stdout'],reference['stderr'])
  link=root/'files/linked-dir';link.unlink();link.symlink_to('sub',target_is_directory=True)
  q=subprocess.run([str(binaries[0]),'-'],input=source,cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
  assert (q.returncode,q.stdout,q.stderr)==expected,(q.stdout,q.stderr,expected)

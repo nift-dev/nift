@@ -35,7 +35,7 @@ def program(name, swap=None, write=True, before=""):
     if write:
         s += 'f.write("%s")\n' % NEW
     if swap:
-        s += 'mv("%s", "%s")\n' % (swap, name)
+        s += 'native::mv("%s", "%s")\n' % (swap, name)
     return s + 'f.save()\nf.close()\nprint("saved")\n'
 
 

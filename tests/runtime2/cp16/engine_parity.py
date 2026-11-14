@@ -62,6 +62,13 @@ READS = {
     "env": 'xn := env()',
     "platform": 'xp := platform()',
 }
+# L6 (D-075 #2, D-095): a VM-run script calls the seven as native::name(...); templates and build hooks run
+# on the legacy evaluator and keep the unqualified READS above.
+SCRIPT_READS = {
+    "cat": 'native::cat("data/r.txt")',
+    "ls_dir": 'xl := native::ls("data")',
+    "ls_glob": 'xg := native::ls("data/*.txt")',
+}
 CONTEXTS = ["page", "function", "module", "async", "thread", "pre_build", "build", "post_build", "script"]
 DEP_FIELDS = ["dependencies", "reqs", "absent", "kinds", "listings", "environment",
               "environment-snapshot", "platform", "dependency-hashes"]
@@ -93,6 +100,7 @@ def make_case(root, read, context):
     write(os.path.join(root, "data", "r.txt"), "r-1\n")
     write(os.path.join(root, "data", "rw.txt"), "rw-1\n")
     if context == "script":
+        stmt = SCRIPT_READS.get(read, stmt)
         write(os.path.join(root, "main.f"), stmt + "\nprint(\"ok\")\n")
         return ["main.f"]
     entry = {"name": "a", "title": "a", "template": ""}

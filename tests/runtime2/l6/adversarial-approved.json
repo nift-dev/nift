@@ -1,0 +1,119 @@
+[
+ {
+  "name": "names-cat-fn",
+  "source_sha256": "71246e5cce347d6e19693227a2f23c62815ba21d633d3aae92fff5cd83b1b6c3",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "cat: expected string path"
+  }
+ },
+ {
+  "name": "names-cp-fn",
+  "source_sha256": "1a60f44bb83b5dfddf76c1fc1b9172f78348b7314457923a952d8762383f074a",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "copy: expected source(s) and destination"
+  }
+ },
+ {
+  "name": "names-cp-fn0",
+  "source_sha256": "8c1c84b40385c7f71be134deba5d19fe83cf710377c045ee8f5865257f67ce0a",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "u\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "copy: expected source(s) and destination"
+  }
+ },
+ {
+  "name": "names-ls-fn",
+  "source_sha256": "785c81e9971f8126d6eb18dfc3c4e0346ccd5eb7800785e7e4de71b0b92a20a1",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "ls: expected string path"
+  }
+ },
+ {
+  "name": "names-mkdir-fn",
+  "source_sha256": "8d01442a4d3e57eacc958fb008293e29952bd2a82cf8e5dc0ff901fec8d55a74",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "make_dir: expected string path"
+  }
+ },
+ {
+  "name": "names-mv-fn",
+  "source_sha256": "959635241ffb711389b8327c90a08daaed7cd2873a9d49371a13fd9c37740f7b",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "move: expected source(s) and destination"
+  }
+ },
+ {
+  "name": "names-mv-fn0",
+  "source_sha256": "1ca67f6affbe15ca4ac928d715622ba96d4d917b6105690a2f37722040f8ed92",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "u\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "move: expected source(s) and destination"
+  }
+ },
+ {
+  "name": "names-rm-fn",
+  "source_sha256": "e91bc1592ec1b31681b656e326e028a72fcbbfa4fa9faf824901a23a51b665c6",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "remove: expected string path or array of paths"
+  }
+ },
+ {
+  "name": "names-touch-fn",
+  "source_sha256": "78f78501e76b2fef82a6cb836bc6683be9ae6948fd0ef84c4c6dc692859cd702",
+  "rule": "D-075 #2 L6 (D-095): a user function named like one of the seven runs on the VM; legacy keeps its native head first (the historical oracle)",
+  "stdout": "42\n",
+  "exit": 0,
+  "error": "",
+  "legacy": {
+   "stdout": "",
+   "exit": 1,
+   "error": "touch: expected string path"
+  }
+ }
+]

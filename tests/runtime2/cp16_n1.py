@@ -24,7 +24,7 @@ from pathlib import Path
 
 CASES = [
     ("open", 'open({path})', True),
-    ("cat", 'cat({path})', True),
+    ("cat", 'native::cat({path})', True),
     ("sha256_file", 'sha256_file({path})', True),
     ("open_bytes", 'open_bytes({path})', False),  # VM refuses builtin-bytes on this baseline
 ]

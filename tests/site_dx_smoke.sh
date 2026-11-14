@@ -81,36 +81,36 @@ cat > try.f <<'F'
 // line2
 try {
     c := 3
-    d := cat("/nonexistent/raised-on-line-5")
+    d := native::cat("/nonexistent/raised-on-line-5")
 } catch(err) {
     print(err.line.to_string() + ":" + err.column.to_string())
 }
 try {
   x := 1
-  y := cat("/nonexistent/line11")
+  y := native::cat("/nonexistent/line11")
 } catch(e) { print(e.line.to_string() + ":" + e.column.to_string()) }
-try { z := cat("/nonexistent/line13") } catch(e) { print(e.line.to_string() + ":" + e.column.to_string()) }
+try { z := native::cat("/nonexistent/line13") } catch(e) { print(e.line.to_string() + ":" + e.column.to_string()) }
 try {
     try {
         q := 1
-        w := cat("/nonexistent/line17")
+        w := native::cat("/nonexistent/line17")
     } catch(inner) {
         print("inner " + inner.line.to_string() + ":" + inner.column.to_string())
-        k := cat("/nonexistent/line20")
+        k := native::cat("/nonexistent/line20")
     }
 } catch(outer) {
     print("outer " + outer.line.to_string() + ":" + outer.column.to_string())
 }
 fn(load()) {
     a := 1
-    t := cat("/nonexistent/line27")
+    t := native::cat("/nonexistent/line27")
 }
 try {
     load()
 } catch(f) { print("fn " + f.line.to_string() + ":" + f.column.to_string()) }
 if(true) {
     try {
-        v := cat("/nonexistent/line34")
+        v := native::cat("/nonexistent/line34")
     } catch(g) { print("if " + g.line.to_string() + ":" + g.column.to_string()) }
 }
 F

@@ -20,11 +20,13 @@ with tempfile.TemporaryDirectory() as d:
  if os.environ.get('MSYSTEM'):
   native_tree=subprocess.check_output(['cygpath','-m',str(root/'tree')],text=True,encoding='utf-8').strip()
  patterns=['tree/*.txt','tree/**/*.txt','tree/**/**/end.txt','tree/.*.txt','tree/**/.private/*.txt','tree/missing/*.txt','tree/?/*.txt',native_tree+'/*.txt']
- path=root/'probe.f';path.write_text('\n'.join('print(ls('+json.dumps(p,ensure_ascii=False)+').stringify())' for p in patterns)+'\n',encoding='utf-8')
+ path=root/'probe.f';path.write_text('\n'.join('print(native::ls('+json.dumps(p,ensure_ascii=False)+').stringify())' for p in patterns)+'\n',encoding='utf-8')
  p=subprocess.run([binary,str(path)],cwd=root,text=True,capture_output=True)
  assert p.returncode==0,p.stderr
  if baseline:
-  q=subprocess.run([str(Path(baseline).resolve()),str(path)],cwd=root,text=True,capture_output=True)
+  # A release before Runtime 2.0 L6 has no native::, so the baseline runs the unqualified program.
+  original=root/'probe-baseline.f';original.write_text(path.read_text(encoding='utf-8').replace('native::',''),encoding='utf-8')
+  q=subprocess.run([str(Path(baseline).resolve()),str(original)],cwd=root,text=True,capture_output=True)
   assert (p.returncode,p.stdout,p.stderr)==(q.returncode,q.stdout,q.stderr),(p,q)
  results=[json.loads(x) for x in p.stdout.splitlines()]
  for result in results:

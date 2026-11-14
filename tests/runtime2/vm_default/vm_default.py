@@ -113,7 +113,7 @@ def run(nift, cwd, args, extra, stdin=None, stats=True):
 
 
 RUN_FEATURE = "the call `run()`"
-PLATFORM_SCRIPT = 'touch("side.txt")\nprint(platform())\n'
+PLATFORM_SCRIPT = 'native::touch("side.txt")\nprint(platform())\n'
 
 
 PROGRAM_NOTE = "note: the program was not executed: no part of it ran\n"
@@ -334,13 +334,13 @@ def main():
         # 5. -e program and eval: refused by default; the hint repeats the invocation.
         d = work / "inline"
         d.mkdir()
-        proc, rows = run(nift, d, ["-e", 'touch("t.txt")\nr := run("echo", "hi")'], {})
-        hint = "-e 'touch(\"t.txt\")\nr := run(\"echo\", \"hi\")'"
+        proc, rows = run(nift, d, ["-e", 'native::touch("t.txt")\nr := run("echo", "hi")'], {})
+        hint = "-e 'native::touch(\"t.txt\")\nr := run(\"echo\", \"hi\")'"
         problems = diagnostic_problems(proc.stderr, "<command-line>:2:6", hint)
         check(proc.returncode == 1 and proc.stdout == "" and not (d / "t.txt").exists() and not problems and
               [r.get("outcome") for r in rows] == ["require-error"],
               "-e program refused by default before effects", f"rc={proc.returncode} {problems} rows={rows}")
-        proc, rows = run(nift, d, ["-e", 'touch("t.txt")\nr := run("echo", "hi")\nprint(type(r))'],
+        proc, rows = run(nift, d, ["-e", 'native::touch("t.txt")\nr := run("echo", "hi")\nprint(type(r))'],
                          {"NIFT_VM": "0"})
         check(proc.returncode == 0 and proc.stdout == "object\n" and (d / "t.txt").exists() and rows == [],
               "-e program runs on legacy under NIFT_VM=0", f"rc={proc.returncode} err={proc.stderr!r}")
@@ -377,8 +377,8 @@ def main():
         # typed REPL on a terminal reports it and returns to the prompt.
         d = work / "session"
         d.mkdir()
-        lines = 'x := 4\nprint(x)\ntouch("early.txt")\nr := run("echo", "hi");touch("refused.txt")\n' \
-                'print("B")\ntouch("late.txt")\n'
+        lines = 'x := 4\nprint(x)\nnative::touch("early.txt")\nr := run("echo", "hi");native::touch("refused.txt")\n' \
+                'print("B")\nnative::touch("late.txt")\n'
         sessions = {}
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
             for name in ("early.txt", "refused.txt", "late.txt"):
@@ -443,10 +443,10 @@ def main():
         for name in ("early.txt", "refused.txt"):
             if (d / name).exists():
                 (d / name).unlink()
-        status, out = run_tty(nift, d, [], {}, ['print("A")', 'touch("early.txt")',
-                                                'fn(gdef()){return 1};touch("refused.txt");r := run("echo")',
+        status, out = run_tty(nift, d, [], {}, ['print("A")', 'native::touch("early.txt")',
+                                                'fn(gdef()){return 1};native::touch("refused.txt");r := run("echo")',
                                                 "print(5)", "gdef()", "exit"])
-        tty_diag = expected_session_diagnostic("<stdin>:3:48", "", note=TTY_SESSION_NOTE)
+        tty_diag = expected_session_diagnostic("<stdin>:3:56", "", note=TTY_SESSION_NOTE)
         check("A\n" in out and (d / "early.txt").exists() and tty_diag in out and
               not (d / "refused.txt").exists() and "\n5\n" in out and "callable:gdef" in out and status == 0 and
               "no part of it ran" not in out,
@@ -460,9 +460,9 @@ def main():
               all(r.get("legacy_executions", 0) == 0 and r.get("vm_executions", 0) == 0 for r in rows),
               "-i script: VM-owned session refuses the initial unit before effects, full diagnostic at the file "
               "position", f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
-        proc, rows = run(nift, d, ["-i", "-e", 'touch("t.txt");r := run("echo", "hi")'], {}, stdin="")
-        problems = diagnostic_problems(proc.stderr, "<command-line>:1:21",
-                                       "-i -e 'touch(\"t.txt\");r := run(\"echo\", \"hi\")'", session=True)
+        proc, rows = run(nift, d, ["-i", "-e", 'native::touch("t.txt");r := run("echo", "hi")'], {}, stdin="")
+        problems = diagnostic_problems(proc.stderr, "<command-line>:1:29",
+                                       "-i -e 'native::touch(\"t.txt\");r := run(\"echo\", \"hi\")'", session=True)
         check(proc.returncode == 1 and proc.stdout == "" and not (d / "t.txt").exists() and not problems,
               "-i -e: the initial unit is refused before effects with the full, shell-quoted diagnostic",
               f"rc={proc.returncode} out={proc.stdout!r} {problems}")
@@ -494,17 +494,17 @@ def main():
                              ("1", {"NIFT_VM": "1"})):
             on_vm(["--platform=linux", "p.f"], None, extra, "linux\n", "side.txt", f"script file (NIFT_VM {label})")
         on_vm(["p.f", "--platform=windows"], None, {}, "windows\n", "side.txt", "selector after the script path")
-        on_vm(["--platform=my.custom", "-e", 'touch("t.txt");print(platform())'], None, {}, "my.custom\n", "t.txt",
+        on_vm(["--platform=my.custom", "-e", 'native::touch("t.txt");print(platform())'], None, {}, "my.custom\n", "t.txt",
               "-e program")
-        on_vm(["--platform=linux", "-c", 'touch("t.txt");print(platform())'], None, {}, "linux\n", "t.txt",
+        on_vm(["--platform=linux", "-c", 'native::touch("t.txt");print(platform())'], None, {}, "linux\n", "t.txt",
               "-c program")
-        on_vm(["--platform=linux", "-"], 'touch("t.txt")\nprint(platform())\n', {}, "linux\n", "t.txt",
+        on_vm(["--platform=linux", "-"], 'native::touch("t.txt")\nprint(platform())\n', {}, "linux\n", "t.txt",
               "stdin program")
         on_vm(["--platform=linux", "-i", "p.f"], "print(platform())\n", {}, "linux\nlinux\n", "side.txt",
               "-i script and the session after it", units=2)
-        on_vm(["--platform=linux", "-i", "-e", 'touch("t.txt")'], "print(platform())\n", {}, "linux\n", "t.txt",
+        on_vm(["--platform=linux", "-i", "-e", 'native::touch("t.txt")'], "print(platform())\n", {}, "linux\n", "t.txt",
               "-i -e program and the session after it", units=2)
-        on_vm(["--platform=linux"], 'touch("r.txt")\nprint(platform())\n', {}, "linux\n", "r.txt",
+        on_vm(["--platform=linux"], 'native::touch("r.txt")\nprint(platform())\n', {}, "linux\n", "r.txt",
               "REPL session", units=2)
         for label, args in (("--platform=native", ["--platform=native", "p.f"]), ("no selector", ["p.f"])):
             on_vm(args, None, {}, "native\n", "side.txt", f"{label} (as before)")
@@ -514,7 +514,7 @@ def main():
               and rows == [], "--platform=linux under NIFT_VM=0 runs on legacy with the same output",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
         clean()
-        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "0"}, stdin='touch("r.txt")\nprint(platform())\n')
+        proc, rows = run(nift, d, ["--platform=linux"], {"NIFT_VM": "0"}, stdin='native::touch("r.txt")\nprint(platform())\n')
         check(proc.returncode == 0 and proc.stdout == "linux\n" and (d / "r.txt").exists() and rows == [],
               "--platform=linux REPL under NIFT_VM=0 is legacy with the same output",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
@@ -523,13 +523,13 @@ def main():
         for args, where, hint, label in (
                 (["--platform=linux", "case.f"], f"{(d / 'case.f').resolve().as_posix()}:7:6",
                  "--platform=linux case.f", "script file"),
-                (["--platform=windows", "-e", 'touch("t.txt")\nr := run("echo", "hi")'], "<command-line>:2:6",
-                 "--platform=windows -e 'touch(\"t.txt\")\nr := run(\"echo\", \"hi\")'", "-e program"),
+                (["--platform=windows", "-e", 'native::touch("t.txt")\nr := run("echo", "hi")'], "<command-line>:2:6",
+                 "--platform=windows -e 'native::touch(\"t.txt\")\nr := run(\"echo\", \"hi\")'", "-e program"),
                 (["--platform=linux", "-"], "<stdin>:2:6", "--platform=linux -", "stdin program")):
             for mode, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
                 clean()
                 proc, rows = run(nift, d, args, extra,
-                                 stdin='touch("t.txt")\nr := run("echo", "hi")\n' if args[-1] == "-" else None)
+                                 stdin='native::touch("t.txt")\nr := run("echo", "hi")\n' if args[-1] == "-" else None)
                 effects = [n for n in ("side.txt", "t.txt") if (d / n).exists()]
                 problems = diagnostic_problems(proc.stderr, where, hint)
                 check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
@@ -555,9 +555,9 @@ def main():
         # nothing in the main program or the module ran.
         d = work / "module"
         d.mkdir()
-        (d / "m.nft").write_text('touch("mod-side.txt")\nfn(go()) {\n  r := run("echo", "hi")\n  return r\n}\n'
+        (d / "m.nft").write_text('native::touch("mod-side.txt")\nfn(go()) {\n  r := run("echo", "hi")\n  return r\n}\n'
                                  'export(go)\n')
-        (d / "main.f").write_text('touch("main-side.txt")\nprint("before")\nimport("m.nft")\nprint(type(go()))\n')
+        (d / "main.f").write_text('native::touch("main-side.txt")\nprint("before")\nimport("m.nft")\nprint(type(go()))\n')
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
             for name in ("main-side.txt", "mod-side.txt"):
                 if (d / name).exists():
@@ -580,17 +580,17 @@ def main():
         # every scripting entry point before anything (imports, ~/.niftrc) runs.
         d = work / "invalid"
         d.mkdir()
-        (d / "ok.f").write_text('touch("side.txt")\nprint("ran")\n')
-        (d / "m.nft").write_text('touch("mod-side.txt")\nfn(go()) {\n  return 1\n}\nexport(go)\n')
-        (d / "main.f").write_text('import("m.nft")\ntouch("side.txt")\nprint(go())\n')
+        (d / "ok.f").write_text('native::touch("side.txt")\nprint("ran")\n')
+        (d / "m.nft").write_text('native::touch("mod-side.txt")\nfn(go()) {\n  return 1\n}\nexport(go)\n')
+        (d / "main.f").write_text('import("m.nft")\nnative::touch("side.txt")\nprint(go())\n')
         (d / "home").mkdir()
-        (d / "home/.niftrc").write_text('touch("rc-side.txt")\n')
+        (d / "home/.niftrc").write_text('native::touch("rc-side.txt")\n')
         entries = (("script file", ["ok.f"], None), ("module program", ["main.f"], None),
-                   ("-e", ["-e", 'touch("side.txt")'], None), ("-c", ["-c", 'touch("side.txt")'], None),
-                   ("stdin", ["-"], 'touch("side.txt")\n'), ("eval", ["eval", 'touch("side.txt")'], None),
-                   ("REPL", [], 'touch("side.txt")\n'), ("-i", ["-i"], 'touch("side.txt")\n'),
+                   ("-e", ["-e", 'native::touch("side.txt")'], None), ("-c", ["-c", 'native::touch("side.txt")'], None),
+                   ("stdin", ["-"], 'native::touch("side.txt")\n'), ("eval", ["eval", 'native::touch("side.txt")'], None),
+                   ("REPL", [], 'native::touch("side.txt")\n'), ("-i", ["-i"], 'native::touch("side.txt")\n'),
                    ("-i script", ["-i", "ok.f"], ""), ("--platform", ["--platform=linux", "ok.f"], None),
-                   ("--platform REPL", ["--platform=linux"], 'touch("side.txt")\n'))
+                   ("--platform REPL", ["--platform=linux"], 'native::touch("side.txt")\n'))
         accepted = ("unset", "require", "0 (", "1 (", "classify", "classify-all")
         for value in ("", "off", "false", "banana"):
             shown = f"'{value}'" + (" (empty)" if value == "" else "")
@@ -686,7 +686,7 @@ def main():
             for name in names:
                 if (d / name).exists():
                     (d / name).unlink()
-            status, out = run_tty(nift, d, [], {}, [line, 'touch("after.txt")', "exit"])
+            status, out = run_tty(nift, d, [], {}, [line, 'native::touch("after.txt")', "exit"])
             check(status == 0 and all((d / n).exists() for n in made) and (d / "after.txt").exists() and
                   not any((d / n).exists() for n in never) and "FALLBACK" not in out and
                   "the session continues" in out,
@@ -722,9 +722,9 @@ def main():
         # statement (earlier statements ran once, later ones not), prints the
         # diagnostic with the "interrupted" note and continues at a usable
         # prompt. Piped, the session still stops with exit 1 before running it.
-        startup = ('print("{tag}-START")\ntouch("{tag}-early.txt")\nfn(greet()){{return "hello"}}\nearly := 5\n'
-                   'r := run("echo", "x")\ntouch("{tag}-late.txt")\nlate := 6\n')
-        typed = ["print(early)", "print(greet())", 'touch("typed.txt")', "print(late)", "exit"]
+        startup = ('print("{tag}-START")\nnative::touch("{tag}-early.txt")\nfn(greet()){{return "hello"}}\nearly := 5\n'
+                   'r := run("echo", "x")\nnative::touch("{tag}-late.txt")\nlate := 6\n')
+        typed = ["print(early)", "print(greet())", 'native::touch("typed.txt")', "print(late)", "exit"]
         for label, args, name, tag in (("~/.niftrc", [], ".niftrc", "RC"), ("nift -i file", ["-i", "init.f"],
                                                                             "init.f", "INIT")):
             d = work / f"startup-{tag.lower()}"
@@ -783,7 +783,7 @@ def main():
             for name in witnesses:
                 if (d / name).exists():
                     (d / name).unlink()
-            proc, rows = run(nift, d, [], {}, stdin="\n".join(lines + ['touch("later.txt")']) + "\n")
+            proc, rows = run(nift, d, [], {}, stdin="\n".join(lines + ['native::touch("later.txt")']) + "\n")
             present = [n for n in witnesses if (d / n).exists()]
             check(proc.returncode == 1 and not any(n in present for n in never + ["later.txt"]) and
                   "NIFT_VM session refused" in proc.stderr and "the session stopped here" in proc.stderr and
@@ -793,7 +793,7 @@ def main():
             for name in witnesses:
                 if (d / name).exists():
                     (d / name).unlink()
-            status, out = run_tty(nift, d, [], {}, lines + ['touch("typed.txt")', "exit"])
+            status, out = run_tty(nift, d, [], {}, lines + ['native::touch("typed.txt")', "exit"])
             present = [n for n in witnesses if (d / n).exists()]
             check(status == 0 and not any(n in present for n in never) and "typed.txt" in present and
                   "the session continues" in out,
@@ -853,8 +853,8 @@ def main():
         # stops the session with exit 1 (documented in REFUSAL_MATRIX.md).
         d = work / "ie-tty"
         d.mkdir()
-        status, out = run_tty(nift, d, ["-i", "-e", 'touch("e.txt");r := run("echo", "hi")'], {},
-                              ['touch("typed.txt")', "exit"])
+        status, out = run_tty(nift, d, ["-i", "-e", 'native::touch("e.txt");r := run("echo", "hi")'], {},
+                              ['native::touch("typed.txt")', "exit"])
         check(status == 1 and "the session stopped here" in out and not (d / "e.txt").exists() and
               not (d / "typed.txt").exists(),
               "-i -e on a tty: refused initial unit stops the session with exit 1, nothing typed runs",
@@ -865,8 +865,8 @@ def main():
         # refuses and everything after it never run; each earlier statement
         # runs exactly once; the refusal names the refused position and the
         # interrupted statement. Piped: the whole file is refused, nothing runs.
-        init = ('print("s1")\nn := 0\nn += 1\nfn(g(a)) { return a.size() }\nprint("s3")\ntouch("s3.txt")\n'
-                'g(3)\nprint("s5")\ntouch("s5.txt")\n')
+        init = ('print("s1")\nn := 0\nn += 1\nfn(g(a)) { return a.size() }\nprint("s3")\nnative::touch("s3.txt")\n'
+                'g(3)\nprint("s5")\nnative::touch("s5.txt")\n')
         for label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
             d = work / f"incremental-{name.strip('.').replace('.', '-')}"
             d.mkdir()
@@ -938,7 +938,7 @@ def main():
             ("no value echo", 'fn(two()) { return 2 }\ntwo()\nq := 7\nq += 1\nif(q > 1) { print("in") }\n'
              'print("only")\n', "in\nonly\n", [], [], None),
             ("malformed statement after valid ones",
-             'print("v1")\ntouch("v1.txt")\nz := (1 +\nprint("v2")\ntouch("v2.txt")\n', "v1\n", ["v1.txt"],
+             'print("v1")\nnative::touch("v1.txt")\nz := (1 +\nprint("v2")\nnative::touch("v2.txt")\n', "v1\n", ["v1.txt"],
              ["v2.txt"], ":3:"),
             ("unterminated final block", 'print("u1")\nfn(f()) {\n  print("x")\n', "u1\n", [], [], ":2:"),
         )
@@ -999,9 +999,9 @@ def main():
         for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
             d = work / f"exit-{name.strip('.').replace('.', '-')}"
             d.mkdir()
-            (d / name).write_text('print("e1")\ntouch("e1.txt")\nexit\nprint("e2")\ntouch("e2.txt")\n')
+            (d / name).write_text('print("e1")\nnative::touch("e1.txt")\nexit\nprint("e2")\nnative::touch("e2.txt")\n')
             path = (d / name).resolve().as_posix()
-            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', 'touch("typed.txt")', "exit"])
+            status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', 'native::touch("typed.txt")', "exit"])
             path_control(work, out, "e2", "e2")
             check(status == 0 and out.startswith("e1\nerror: ") and f"error: {path}:3:1: NIFT_VM session refused" in out
                   and f"initialisation from {path} was interrupted at line 3 (`exit`); later statements in it were "
@@ -1101,7 +1101,7 @@ def main():
         for where_label, args, name in (("~/.niftrc", [], ".niftrc"), ("nift -i file", ["-i", "init.f"], "init.f")):
             d = work / f"syntax-stmt-{name.strip('.').replace('.', '-')}"
             d.mkdir()
-            (d / name).write_text('print("s0")\nif(true) {\n  touch("IN")\n  print("inside")\n  z := (1 +\n}\n')
+            (d / name).write_text('print("s0")\nif(true) {\n  native::touch("IN")\n  print("inside")\n  z := (1 +\n}\n')
             path = (d / name).resolve().as_posix()
             status, out = run_tty(nift, d, args, {}, ['print("PROMPT")', "exit"])
             path_control(work, out, "inside", "inside")
@@ -1236,7 +1236,7 @@ def main():
         # (`&`) segment; NIFT_VM=1 sessions stop like the default.
         d = work / "matrix"
         d.mkdir()
-        proc, rows = run(nift, d, ["-"], {}, stdin='touch("t.txt")\nr := run("echo", "hi")\n')
+        proc, rows = run(nift, d, ["-"], {}, stdin='native::touch("t.txt")\nr := run("echo", "hi")\n')
         problems = diagnostic_problems(proc.stderr, "<stdin>:2:6", "-")
         check(proc.returncode == 1 and proc.stdout == "" and not (d / "t.txt").exists() and not problems and
               [r.get("outcome") for r in rows] == ["require-error"],
@@ -1247,7 +1247,7 @@ def main():
             for name in never + ["later.txt", "typed.txt"]:
                 if (d / name).exists():
                     (d / name).unlink()
-            proc, rows = run(nift, d, [], {}, stdin=line + '\ntouch("later.txt")\n')
+            proc, rows = run(nift, d, [], {}, stdin=line + '\nnative::touch("later.txt")\n')
             time.sleep(0.2)
             present = [n for n in never + ["later.txt"] if (d / n).exists()]
             check(proc.returncode == 1 and not present and "NIFT_VM session refused" in proc.stderr,
@@ -1256,7 +1256,7 @@ def main():
             for name in never + ["later.txt", "typed.txt"]:
                 if (d / name).exists():
                     (d / name).unlink()
-            status, out = run_tty(nift, d, [], {}, [line, 'touch("typed.txt")', "exit"])
+            status, out = run_tty(nift, d, [], {}, [line, 'native::touch("typed.txt")', "exit"])
             time.sleep(0.2)
             present = [n for n in never if (d / n).exists()]
             check(status == 0 and not present and (d / "typed.txt").exists(),
@@ -1266,7 +1266,7 @@ def main():
             if (d / name).exists():
                 (d / name).unlink()
         proc, rows = run(nift, d, [], {"NIFT_VM": "1"},
-                         stdin='touch("early.txt")\nr := run("echo", "hi")\ntouch("late.txt")\n')
+                         stdin='native::touch("early.txt")\nr := run("echo", "hi")\nnative::touch("late.txt")\n')
         check(proc.returncode == 1 and (d / "early.txt").exists() and not (d / "late.txt").exists() and
               "the session stopped here" in proc.stderr and all(r.get("legacy_executions", 0) == 0 for r in rows),
               "NIFT_VM=1 piped session: VM-owned, stops at the refusal like the default (no legacy fallback)",

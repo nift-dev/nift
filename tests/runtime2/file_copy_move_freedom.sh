@@ -62,7 +62,7 @@ out="$("$NIFT" "$W/project/s.f" 2>&1)"; echo "$out" | grep -q copied && pass "st
 if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -c %d "$W")" ]; then
   S="$(mktemp -d /dev/shm/nift-xdev-XXXXXX)"
   echo xdev-a > "$W/xa.txt"; echo xdev-b > "$W/xb.txt"; chmod 640 "$W/xa.txt"
-  printf 'f := file("%s")\ng := f.move("%s")\nmv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"
+  printf 'f := file("%s")\ng := f.move("%s")\nnative::mv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"
   out="$("$NIFT" "$W/x.f" 2>&1)"
   if [ "$out" = "$S/xa.txt" ] && [ "$(cat "$S/xa.txt")" = xdev-a ] && [ "$(cat "$S/xb.txt")" = xdev-b ] && [ ! -e "$W/xa.txt" ] && [ ! -e "$W/xb.txt" ] \
      && [ "$(stat -c %a "$S/xa.txt")" = 640 ] && ! ls -A "$S" | grep -q nift-tmp; then

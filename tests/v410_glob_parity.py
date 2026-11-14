@@ -24,11 +24,11 @@ with tempfile.TemporaryDirectory() as d:
  absolute=directory+'/*.dat'
  prefix=absolute[:-5];names=['a.dat',literal]+(['external.dat','link.dat'] if links else []);cases.append((absolute,sorted(prefix+name for name in names)))
  for pattern,expected in cases:
-  code='print(ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())'
+  code='print(native::ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())'
   p=subprocess.run([binary,'-'],input=code,cwd=root,text=True,encoding='utf-8',capture_output=True)
   assert p.returncode==0,(pattern,code,p.returncode,p.stderr)
   assert json.loads(p.stdout)==expected,(pattern,p.stdout,expected)
   if baseline:
-   q=subprocess.run([str(Path(baseline).resolve()),'-'],input=code,cwd=root,text=True,encoding='utf-8',capture_output=True)
+   q=subprocess.run([str(Path(baseline).resolve()),'-'],input=code.replace('native::',''),cwd=root,text=True,encoding='utf-8',capture_output=True)
    assert (p.returncode,p.stdout,p.stderr)==(q.returncode,q.stdout,q.stderr),(p,q)
  print('PASS',len(cases),'exact glob path/ordering/hidden/Unicode/alias contracts')

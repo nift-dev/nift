@@ -167,8 +167,8 @@ printf 'hello' > a.txt
 cat > tr.f <<'EOF'
 print(open("a.txt"))
 print(exists("nope.txt"))
-print(ls(".").length())
-touch("w.txt")
+print(native::ls(".").length())
+native::touch("w.txt")
 print(run("true").exit_code)
 print(getenv("CP16_UNSET_VAR"))
 EOF

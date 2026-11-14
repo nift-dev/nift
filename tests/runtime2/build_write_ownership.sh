@@ -82,7 +82,7 @@ done
 printf '<p>ok</p>\n' > content/index.html; bounded "$NIFT" build >/dev/null 2>&1 || bad "build after refusals"
 
 # Standalone scripts own no pages: unaffected.
-printf 'cp("%s/project/payload.txt", "%s/project/public/scratch.txt")\nprint("ok")\n' "$W" "$W" > "$W/s.f"
+printf 'native::cp("%s/project/payload.txt", "%s/project/public/scratch.txt")\nprint("ok")\n' "$W" "$W" > "$W/s.f"
 [ "$(bounded "$NIFT" "$W/s.f" 2>&1)" = ok ] && pass "standalone scripts are not restricted" || bad "standalone script restricted"
 
 # R5: cross-filesystem move partial-failure semantics.
@@ -90,7 +90,7 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -
   S="$(mktemp -d /dev/shm/nift-xdev-XXXXXX)"
   # (a) the copy fails (file size limit): the original stays, no temporary is left.
   head -c 300000 /dev/zero > "$W/big.bin"
-  printf 'try { mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
+  printf 'try { native::mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
   # SIGXFSZ ignored so the over-size write fails with EFBIG instead of killing nift.
   out="$( trap '' XFSZ; ulimit -f 200; ulimit -v 2097152; timeout 60 "$NIFT" "$W/m1.f" 2>&1 )"
   if echo "$out" | grep -q "CAUGHT io.move_failed" && [ "$(stat -c %s "$W/big.bin")" = 300000 ] && [ ! -e "$S/big.bin" ] && ! ls -A "$S" | grep -q nift-tmp; then
@@ -99,7 +99,7 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -
   # (b) the copy succeeds but the source cannot be removed: reported as a partial result.
   if [ "$(id -u)" != 0 ] || command -v setpriv >/dev/null; then
     mkdir "$W/ro"; echo keep > "$W/ro/f.txt"; chmod 555 "$W/ro"
-    printf 'try { mv("%s", "%s/f.txt") } catch(e) { print("CAUGHT " + e.message) }\n' "$W/ro/f.txt" "$S" > "$W/m2.f"
+    printf 'try { native::mv("%s", "%s/f.txt") } catch(e) { print("CAUGHT " + e.message) }\n' "$W/ro/f.txt" "$S" > "$W/m2.f"
     PRIV=(); [ "$(id -u)" = 0 ] && PRIV=(setpriv --bounding-set -dac_override,-dac_read_search)
     out="$(bounded "${PRIV[@]}" "$NIFT" "$W/m2.f" 2>&1)"
     if echo "$out" | grep -q "CAUGHT move: copied to $S/f.txt but could not remove the source $W/ro/f.txt" && [ -f "$W/ro/f.txt" ] && [ "$(cat "$S/f.txt")" = keep ]; then

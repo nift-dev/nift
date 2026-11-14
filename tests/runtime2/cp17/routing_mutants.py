@@ -26,21 +26,21 @@ def project(root: Path, kind: str):
     if kind == "hook":
         config["config"]["pre build"] = "scripts/pre.f"
         tracked["pre-build"] = "scripts/pre.f"
-        (root / "scripts/pre.f").write_text('touch("hook-marker.txt")\n')
+        (root / "scripts/pre.f").write_text('native::touch("hook-marker.txt")\n')
         (root / "templates/t.html").write_text("@content")
         (root / "content/index.html").write_text("PAGE-OK\n")
     elif kind == "build":
         tracked["build"] = "scripts/build.f"
         (root / "scripts/build.f").write_text(
-            'touch("public/index.html")\ntouch("build-marker.txt")\n')
+            'native::touch("public/index.html")\nnative::touch("build-marker.txt")\n')
         (root / "templates/t.html").write_text("@content")
         (root / "content/index.html").write_text("PAGE-OK\n")
     elif kind == "page":
         (root / "templates/t.html").write_text("@content")
-        (root / "content/index.html").write_text('@script { touch("page-marker.txt") }\n')
+        (root / "content/index.html").write_text('@script { native::touch("page-marker.txt") }\n')
     elif kind == "template":
         tracked["template"] = "templates/t.html"
-        (root / "templates/t.html").write_text('@script { touch("template-marker.txt") }\n@content')
+        (root / "templates/t.html").write_text('@script { native::touch("template-marker.txt") }\n@content')
         (root / "content/index.html").write_text("PAGE-OK\n")
     (root / ".nift/config.json").write_text(json.dumps(config))
     (root / ".nift/tracked.json").write_text(json.dumps({"tracked": [tracked]}))

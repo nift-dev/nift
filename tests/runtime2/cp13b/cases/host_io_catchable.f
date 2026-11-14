@@ -1,5 +1,5 @@
 try {
-  text := cat("/nonexistent/cp13b-host")
+  text := native::cat("/nonexistent/cp13b-host")
   print(text)
 } catch(e) {
   print(e.code)

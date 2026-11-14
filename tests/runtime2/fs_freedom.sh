@@ -58,7 +58,7 @@ echo 'x' > "$W/neighbour/data/new.txt"; "$NIFT" build >/dev/null 2>&1
 grep -q "LS:2" public/index.html && pass "external glob change triggers rebuild" || bad "external glob change missed"
 
 # Standalone script: absolute, parent traversal, symlinks.
-printf 'print(cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/data"))\n' "$W" > "$W/project/s.f"
+printf 'print(native::cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/data"))\n' "$W" > "$W/project/s.f"
 out="$("$NIFT" s.f 2>&1)"; echo "$out" | grep NEIGHBOUR-2 >/dev/null && pass "standalone absolute read" || bad "standalone read: $out"
 
 # --fs-root remains an explicit restriction.

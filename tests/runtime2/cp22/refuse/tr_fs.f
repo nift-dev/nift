@@ -1,8 +1,8 @@
 fn[async](work(dn)) {
-  mkdir(dn)
-  touch(dn + "/f.txt")
+  native::mkdir(dn)
+  native::touch(dn + "/f.txt")
   a := is_file(dn + "/f.txt")
-  rm(dn + "/f.txt")
+  native::rm(dn + "/f.txt")
   b := is_file(dn + "/f.txt")
   return dn + ":" + a + ":" + b
 }

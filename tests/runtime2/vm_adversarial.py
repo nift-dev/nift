@@ -175,6 +175,29 @@ def b5_pinned(source, vm):
     return "approved:B5 pinned (" + row["rule"].split(":")[0] + ")"
 
 
+# L6 (D-075 #2, D-095): a user function named cat, cp, mv, rm, ls, mkdir or touch is an ordinary function on the
+# VM, while legacy (the historical oracle) keeps calling its native built-in. Exactly the generated names-* programs
+# in tests/runtime2/l6/adversarial-approved.json, pinned by source hash with the exact VM result (a VM execution)
+# and the exact legacy result; any other difference, or a pinned one whose result changes, is still a difference.
+L6_PINNED = {row["source_sha256"]: row for row in json.load(open(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "l6", "adversarial-approved.json")))}
+
+
+def l6_pinned(source, legacy, vm, st):
+    row = L6_PINNED.get(hashlib.sha256(source.encode()).hexdigest())
+    if row is None or vm[2] == "timeout" or legacy[2] == "timeout" or not st or st.get("outcome") != "vm":
+        return None
+
+    def result(run):
+        first = run[1].decode("utf-8", "replace").strip().split("\n")[0]
+        return run[0].decode("utf-8", "replace"), run[2], re.sub(r"^error: .*?p\.f:[0-9]+:[0-9]+: ", "", first)
+    if result(vm) != (row["stdout"], row["exit"], row["error"]) or vm[1]:
+        return None
+    if result(legacy) != (row["legacy"]["stdout"], row["legacy"]["exit"], row["legacy"]["error"]):
+        return None
+    return "approved:L6 pinned (" + row["rule"].split(":")[0] + ")"
+
+
 def outcome_key(st):
     if not st:
         return "no-stats"
@@ -219,7 +242,7 @@ def check(nift, item, work, timeout):
             legacy, vm, st, retry = run_pair(nift, path, d, extra, item_timeout(family, name, timeout))
         verdict = classify_difference(legacy, vm, st)
         if verdict == "diff":
-            verdict = b5_pinned(source, vm) or verdict
+            verdict = b5_pinned(source, vm) or l6_pinned(source, legacy, vm, st) or verdict
         if retry and "asymmetric" in retry:
             verdict = "diff"
         key = outcome_key(st) if vm[2] != "timeout" else "timeout"

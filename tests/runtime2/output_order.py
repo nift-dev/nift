@@ -36,7 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 MODES = ("pipe", "file", "append", "merged")
 BIG = "x" * 1023
 DATA = {"a.txt": "hello", "b.txt": "B\n", "bin.dat": b"a\x00b\xff"}
-MODULE = 'fn(show(p)) {\n  cat(p)\n  return 0\n}\nexport(show)\n'
+MODULE = 'fn(show(p)) {\n  native::cat(p)\n  return 0\n}\nexport(show)\n'
 ALIASES = {"fd": "/dev/fd/1", "link": "out-link"}
 if sys.platform.startswith("linux"):
     ALIASES["proc"] = "/proc/self/fd/1"
@@ -60,18 +60,18 @@ def handle_cases():
 
 CASES = {
     # cat in program order (D-072 #1)
-    "print-cat-print": ('print(1)\ncat("a.txt")\nprint(2)\n', MODES),
-    "two-cats": ('cat("a.txt")\ncat("b.txt")\nprint(3)\n', MODES),
-    "three-cats": ('print(0)\ncat("a.txt")\ncat("a.txt")\ncat("b.txt")\nprint(4)\n', MODES),
-    "cat-fn-loop": ('fn(f(i)) {\n  print(i)\n  cat("b.txt")\n  return i\n}\ni := 0\nwhile (i < 3) {\n  f(i)\n'
+    "print-cat-print": ('print(1)\nnative::cat("a.txt")\nprint(2)\n', MODES),
+    "two-cats": ('native::cat("a.txt")\nnative::cat("b.txt")\nprint(3)\n', MODES),
+    "three-cats": ('print(0)\nnative::cat("a.txt")\nnative::cat("a.txt")\nnative::cat("b.txt")\nprint(4)\n', MODES),
+    "cat-fn-loop": ('fn(f(i)) {\n  print(i)\n  native::cat("b.txt")\n  return i\n}\ni := 0\nwhile (i < 3) {\n  f(i)\n'
                     '  i += 1\n}\nprint("end")\n', MODES),
     "cat-module": ('import("m.nft")\nprint(1)\nshow("a.txt")\nprint(2)\n', MODES),
-    "cat-after-64k": ('big := "%s"\ni := 0\nwhile (i < 80) {\n  print(big)\n  i += 1\n}\ncat("a.txt")\nprint(2)\n'
+    "cat-after-64k": ('big := "%s"\ni := 0\nwhile (i < 80) {\n  print(big)\n  i += 1\n}\nnative::cat("a.txt")\nprint(2)\n'
                       % BIG, MODES),
-    "cat-binary": ('print(1)\ncat("bin.dat")\nprint(2)\n', MODES),
-    "cat-missing-caught": ('print(1)\ntry {\n  cat("nope.txt")\n} catch (e) {\n  print("caught")\n}\nprint(2)\n',
+    "cat-binary": ('print(1)\nnative::cat("bin.dat")\nprint(2)\n', MODES),
+    "cat-missing-caught": ('print(1)\ntry {\n  native::cat("nope.txt")\n} catch (e) {\n  print("caught")\n}\nprint(2)\n',
                            MODES),
-    "cat-then-error": ('print(1)\ncat("a.txt")\nprint(1 / 0)\n', MODES),
+    "cat-then-error": ('print(1)\nnative::cat("a.txt")\nprint(1 / 0)\n', MODES),
     "print-then-error": ('print(1)\nprint(2)\nprint(1 / 0)\n', MODES),
     # REVIEW-C139 C1: a pending print before close() and before a write that bypasses the stream buffer
     "write-print-close": ('print(1)\nw := ofstream("/dev/fd/1")\nw.write("S\\n")\nprint("P")\nw.close()\nprint(2)\n',
@@ -88,18 +88,18 @@ CASES = {
     "stderr-write-close": ('print(1)\ne := ofstream("/dev/fd/2")\ne.write("E\\n")\ne.close()\nprint(2)\n', MODES),
     # reads of the program's own output (the redirect target by name)
     "read-own-open": ('print(1)\nprint(2)\nprint(open("o.txt").length())\n', ("file", "append")),
-    "read-own-cat": ('print("ab")\ncat("o.txt")\nprint(2)\n', ("file", "append")),
+    "read-own-cat": ('print("ab")\nnative::cat("o.txt")\nprint(2)\n', ("file", "append")),
     "read-own-file": ('print(1)\nf := file("o.txt")\nf.open("r")\nprint(f.read().length())\nf.close()\n',
                       ("file", "append")),
     # ordinary files are unchanged
-    "ordinary-file": ('print(1)\ns := ofstream("x.txt")\ns.write("S\\n")\ns.close()\nprint(2)\ncat("x.txt")\n', MODES),
+    "ordinary-file": ('print(1)\ns := ofstream("x.txt")\ns.write("S\\n")\ns.close()\nprint(2)\nnative::cat("x.txt")\n', MODES),
     # workers: print and cat in order; an ordinary file; a std-stream handle is refused (VM oracle)
-    "thread-print-cat": ('fn(w()) {\n  print("w")\n  cat("b.txt")\n  return 1\n}\nprint(1)\nt := thread(w)\n'
+    "thread-print-cat": ('fn(w()) {\n  print("w")\n  native::cat("b.txt")\n  return 1\n}\nprint(1)\nt := thread(w)\n'
                          'print(t.join())\nprint(2)\n', MODES),
-    "async-print-cat": ('fn[async](w()) {\n  print("w")\n  cat("b.txt")\n  return 1\n}\nprint(1)\nprint(await w())\n'
+    "async-print-cat": ('fn[async](w()) {\n  print("w")\n  native::cat("b.txt")\n  return 1\n}\nprint(1)\nprint(await w())\n'
                         'print(2)\n', MODES),
     "worker-ordinary-file": ('fn(w()) {\n  s := ofstream("x.txt")\n  s.write("S\\n")\n  s.close()\n  return 1\n}\n'
-                             'print(1)\nt := thread(w)\nprint(t.join())\ncat("x.txt")\n', MODES),
+                             'print(1)\nt := thread(w)\nprint(t.join())\nnative::cat("x.txt")\n', MODES),
 }
 CASES.update(handle_cases())
 # D-073 #2: the approved, VM-specific refusal of a std-stream handle in a worker (exact VM bytes; caught, so the

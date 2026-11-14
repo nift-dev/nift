@@ -330,7 +330,7 @@ class Gen:
         path = "async%d.txt" % self.counter
         self.emit('h := file("%s" + n); h.open("w"); h.write("v" + n); h.save(); h.close()' % path)
         self.emit('ok := exists("%s" + n)' % path)
-        self.emit('rm("%s" + n)' % path)
+        self.emit('native::rm("%s" + n)' % path)
         self.emit("return n * 2")
         self.depth -= 1
         self.emit("}")
@@ -364,9 +364,9 @@ class Gen:
         self.emit('print(is_file("%s"))' % f)
         self.emit('print(is_dir("."))')
         self.emit('print(open("%s"))' % f)
-        self.emit('print(ls("*.txt").length() > 0)')
+        self.emit('print(native::ls("*.txt").length() > 0)')
         if self.r.random() < 0.5:
-            self.emit('rm("%s")' % f)
+            self.emit('native::rm("%s")' % f)
             self.emit('print(exists("%s"))' % f)
 
     def s_env(self):

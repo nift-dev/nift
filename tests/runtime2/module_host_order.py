@@ -44,7 +44,7 @@ CASES = {
                                  '  print(exists("a.txt"))\n}\nimport("m.nft")\nprint(x)\n'},
                                 "module-host-op:exists"),
     "copy-over-module": ({"m.nft": M, "m2.nft": 'x := 2\nexport(x)\n',
-                          "main.f": 'cp("m2.nft", "m.nft")\nimport("m.nft")\nprint(x)\n'}, "module-host-op:cp"),
+                          "main.f": 'native::cp("m2.nft", "m.nft")\nimport("m.nft")\nprint(x)\n'}, "module-host-op:cp"),
     "remove-module": ({"m.nft": M, "main.f": 'print("go")\nremove("m.nft")\nimport("m.nft")\nprint(x)\n'},
                       "module-host-op:remove"),
     "host-in-module-init": ({"m.nft": 'print(exists("a.txt"))\nk := 1\nexport(k)\n',
@@ -114,10 +114,10 @@ CASES = {
     # here (cat, file, is_dir, getenv below; cp: copy-over-module; remove: remove-module; exists: host-before-import-top
     # and host-in-module-init). A refusal of a post-import-* case would be a guard defect not covered by the approval.
     # cat writes to stdout directly; no print precedes it here (see the C131 note in rescan-post-cp1.md section 30).
-    "post-import-cat": ({"m.nft": M, "a.txt": "hello", "main.f": 'import("m.nft")\nprint(cat("a.txt"))\nprint(x)\n'},
+    "post-import-cat": ({"m.nft": M, "a.txt": "hello", "main.f": 'import("m.nft")\nprint(native::cat("a.txt"))\nprint(x)\n'},
                         "vm"),
     "post-import-cp": ({"m.nft": M, "m2.nft": 'x := 2\nexport(x)\n',
-                        "main.f": 'import("m.nft")\ncp("m2.nft", "m.nft")\nprint(x)\nprint(exists("m.nft"))\n'}, "vm"),
+                        "main.f": 'import("m.nft")\nnative::cp("m2.nft", "m.nft")\nprint(x)\nprint(exists("m.nft"))\n'}, "vm"),
     "post-import-remove": ({"m.nft": M, "main.f": 'import("m.nft")\nremove("m.nft")\nprint(x)\nprint(exists("m.nft"))\n'},
                            "vm"),
     # Write mode: a read-mode handle's trace order (open, read) differs between the engines with or without an
@@ -131,7 +131,7 @@ CASES = {
                                                   'print(getenv("NIFT_R1_UNSET_VAR"))\nprint(x)\n'}, "vm"),
     "post-import-exists": ({"m.nft": M, "a.txt": "hello",
                             "main.f": 'import("m.nft")\nprint(exists("a.txt"))\nprint(exists("b.txt"))\nprint(x)\n'}, "vm"),
-    "cat-before-import": ({"m.nft": M, "a.txt": "hello", "main.f": 'print(cat("a.txt"))\nimport("m.nft")\nprint(x)\n'},
+    "cat-before-import": ({"m.nft": M, "a.txt": "hello", "main.f": 'print(native::cat("a.txt"))\nimport("m.nft")\nprint(x)\n'},
                           "module-host-op:cat"),
     "file-in-module-init": ({"m.nft": 'f := file("a.txt")\nk := 1\nexport(k)\n', "a.txt": "hello",
                              "main.f": 'import("m.nft")\nprint(k)\n'}, "module-host-op:file"),
