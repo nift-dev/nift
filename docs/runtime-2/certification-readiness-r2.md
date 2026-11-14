@@ -63,6 +63,22 @@ history, so 30 remain `implement`.
 10. `statement:Command`: shell command lines, plus finding F-HD2.
 11. `unresolved-name`: a catch-all.
 
+**`method:stringify` outside its recorded scope (D-104, Option B).** On the consolidated tree (candidate plus prep;
+CONSOLIDATION-DRYRUN R3), `inventory.py report --check` also reports
+`deferred-post-cert reason(s) seen outside their recorded scope: method:stringify (rt-diff-corpus/workspaces/script-outside)`.
+That is three separate records:
+
+- **(a) The approved refusal.** The program's real-run refusal is `native-unqualified`, the approved L6 refusal
+  (D-075 #2; status `approved` in the candidate's classification.tsv). The cause is `ls("../neighbour").stringify()`
+  at 3:7. D-101 F8 deliberately left that fixture unqualified. **The fixture stays unchanged, as historical evidence.**
+- **(b) The older postponement.** `method:stringify` is deferred-post-cert (D-067 #7, D-068 #11, D-076, D-077 #1) only
+  within its recorded scope, `smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f>fn-param`, in
+  `post_cert_deferrals.tsv`. That scope is **not** extended to cover this sighting, and nothing is reclassified: the
+  sighting's root is an approved refusal, not a deferral.
+- **(c) The outstanding classification.** The out-of-scope sighting stays visible and blocks `--check`. It needs an
+  owner disposition before release. It is listed alongside the 11 open entries above but is not counted as a twelfth
+  PENDING-OWNER reason. The inventory classification stays "Inventory incomplete".
+
 **The 30 `implement` rows:**
 - `binding-name-reserved`
 - `builtin-bytes:bytes`, `builtin-bytes:decode`, `builtin-bytes:encode`
@@ -175,6 +191,8 @@ inventory gate runs without it.
 ## 7. Open decisions and findings
 
 - **The 11 open inventory reasons** (section 3). They keep the inventory gate from completing.
+- **The `method:stringify` sighting in rt-diff-corpus/workspaces/script-outside** (section 3, D-104 Option B). It
+  stays visible and blocking and needs an owner disposition before release. The fixture is unchanged (D-101 F8).
 - **The 6 host-deps cases**, and findings **F-HD1** and **F-HD2** (production diagnostics).
 - **C1:** the integrator records the D-076 defer table (attachment 3d29daee) and D-078 in decisions.md at
   integration.
