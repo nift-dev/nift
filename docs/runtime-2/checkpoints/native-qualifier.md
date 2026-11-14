@@ -108,8 +108,11 @@ These were not changed:
 - benchmarks/v43_scripting_perf.py, which stays byte-identical (D-096 #2); its Runtime 2.0 variant
   benchmarks/v43_scripting_perf_rt2.py changes only `touch(` to `native::touch(` in fs.nift and reports
   identical-source and equivalent-operation workloads separately (`--check-equivalence` gives the evidence). Both
-  versions time `nift run <script>`, which this candidate and v4.12.0 both reject ("unknown command 'run'"), so
-  neither runs its scripts;
+  versions time `nift run <script>`, which this candidate and v4.12.0 both reject ("unknown command 'run'"). So
+  both variants currently time that error path, on both versions; only the `nift sh` row runs its input. Neither
+  variant's numbers are evidence of `native::touch` performance, and no comparison from them may be reported until
+  the owner decides (the benchmark is not repaired here). `--check-equivalence` also makes an untimed direct run
+  (`nift <script>`), kept separate from the timed command line, to compare the operations themselves;
 - the website checkout.
 
 The freeze report lists every benchmark and workload whose VM-default run is now refused.

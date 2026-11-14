@@ -9,9 +9,11 @@ writes it.
 
 Finding (2026-11-14): the original times `nift run <script>`. That command line is rejected with "unknown command
 'run' and path does not exist" by this candidate and by v4.12.0 alike. So every workload, fs included, measures that
-error path; neither the original nor this variant runs its script. --check-equivalence also runs the script
-directly (`nift <script>`) to compare the operations themselves. The original keeps its command line (no
-re-baselining).
+error path; neither the original nor this variant runs its script. (Only repl_500_statements, `nift sh`, runs its
+input.) Neither variant's numbers are evidence of native::touch performance, and no comparison from them may be
+reported until the owner decides. The original keeps its command line (no re-baselining, no repair here).
+--check-equivalence compares two things, kept separate: the timed command line (`nift run <script>`, which is the
+error path) and, separately and untimed, a direct run (`nift <script>`), which compares the operations themselves.
 
 Reporting keeps the two categories apart and never aggregates them:
   identical_source        every workload except fs_10_touch_open: the same source as in v43_scripting_perf.py
@@ -62,7 +64,9 @@ def timings():
         "identical_source": {k: v for k, v in results.items() if k != "fs_10_touch_open"},
         "equivalent_operation": {"fs_10_touch_open": results["fs_10_touch_open"]},
         "note": "equivalent_operation differs from v43_scripting_perf.py only by touch( -> native::touch( in "
-                "fs.nift; not aggregated with identical_source",
+                "fs.nift; not aggregated with identical_source. Both variants time `nift run <script>`, which this "
+                "candidate and v4.12.0 reject (unknown command 'run'): these numbers are the error path, not "
+                "evidence of native::touch performance; no comparison may be reported until the owner decides",
     }, indent=2, sort_keys=True))
 
 
@@ -104,17 +108,18 @@ def check_equivalence():
     ok = True
     # "benchmark": the command line the benchmark times (`nift run <script>`); "direct": `nift <script>`, which
     # runs the script, so the operations themselves are compared.
-    for form in ("benchmark", "direct"):
+    for form, title in (("benchmark", "timed command line `nift run` (the error path)"),
+                        ("direct", "untimed direct run `nift <script>`")):
         reference = run_fs(nift, source, "0", form)  # the original source, legacy engine
-        print("%s form, original fs.nift (NIFT_VM=0): rc %s stdout %r stderr %r files %s"
-              % (form, reference[0], reference[1], reference[2][:120], sorted(reference[3])))
+        print("%s, original fs.nift (NIFT_VM=0): rc %s stdout %r stderr %r files %s"
+              % (title, reference[0], reference[1], reference[2][:120], sorted(reference[3])))
         if form == "direct":
             ok = ok and reference[0] == 0 and sorted(reference[3]) == sorted("f%d" % i for i in range(1, 11))
         for label, vm in (("VM default", None), ("NIFT_VM=0", "0")):
             got = run_fs(nift, adapt(source), vm, form)
             same = got == reference
             ok = ok and same
-            print("%s %s form, adapted fs.nift (%s): %s" % ("PASS" if same else "FAIL", form, label,
+            print("%s %s, adapted fs.nift (%s): %s" % ("PASS" if same else "FAIL", title, label,
                   "identical stdout, stderr, exit and files" if same else got))
     others = [n for n, t in captured.items() if n != ADAPTED and adapt(t) != t]
     ok = ok and not others
