@@ -166,10 +166,10 @@ NodeId ExprParser::call(NodeId callee, std::uint32_t begin) {
     const Node& head = ast_.at(callee);
     const bool member = head.kind == NodeKind::Member || head.kind == NodeKind::SafeMember;
     const std::string_view name = ast_.text(member ? ast_.at(head.b) : head);
-    const bool output = head.kind == NodeKind::Ident &&  // rt-lint: allow-string-compare parse time
-                        (name == "print" || name == "err" || name == "warn");
-    const bool stream = member &&  // rt-lint: allow-string-compare parse time
-                        (name == "write" || name == "write_line" || name == "write_val");
+    const bool output = head.kind == NodeKind::Ident &&
+                        (name == "print" || name == "err" || name == "warn");  // rt-lint: allow-string-compare parse
+    const bool stream = member && (name == "write" ||  // rt-lint: allow-string-compare parse time
+                                   name == "write_line" || name == "write_val");  // rt-lint: allow-string-compare
 #if defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 2  // mutant 2: the output family takes raw literals too
     const Literals literals = stream ? Literals::Ambiguous : Literals::Raw;
 #else
