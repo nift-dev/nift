@@ -344,7 +344,9 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
 bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, std::uint16_t dst) {
     const Node& callee = ast_.at(callee_id);
     // F6 (D-102): a field call where legacy's method head wins (only reached from method_call's NotBuiltin case).
-    if (member && legacy_field_call_refused(text(ast_.at(callee.b)))) return fail(callee, "legacy-method-precedence");
+    // Sessions keep their own session:legacy-method-precedence refusal (D-106: not changed here).
+    if (member && !session_ && legacy_field_call_refused(text(ast_.at(callee.b))))
+        return fail(callee, "legacy-method-precedence");
     const bool numeric_return = session_ && (fb_->flags() & kInstrReturnCall);
     const NodeId* args = ast_.list(node);
     const std::uint16_t mark = fb_->top();

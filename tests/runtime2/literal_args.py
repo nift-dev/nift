@@ -307,6 +307,10 @@ def _f6_entry(nift):
             files={"m.f": 'fn(g()) {\n  o := {"cat": (p) => "U"}\n  return o.cat("a")\n}\nexport(g)\n'})
     if m[0] != 1 or m[1] or "(legacy-method-precedence)" not in m[2]:
         problems.append("module: %s" % show(m))
+    # Sessions keep their own refusal, session:legacy-method-precedence (D-106: not narrowed or replaced by C145).
+    s = run(nift, None, True, args=["-i"], stdin='o := {"cat": (p) => "U"}\nprint(o.cat("a"))\n')
+    if "session refused: session:legacy-method-precedence" not in s[2] or "U" in s[1]:
+        problems.append("session: %s" % show(s))
     return problems
 
 
