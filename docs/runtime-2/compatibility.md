@@ -30,6 +30,9 @@ command-form natives: `cp a.txt c.txt` still runs PATH `cp`, CP19 S1). Expected 
 - C144b (D-103): a dotted member-call head with a blank before `(` (`o.f ("x")`, `a.b.c ("x")`) is Nift too. Before
   C144b it ran a PATH program named `o.f`. On legacy it is the member call; under the VM default it is refused by the
   existing spaced-call grammar (as in scripts). It never launches.
+- C144b notes (D-106): a dotted command name followed by call syntax (`make.sh (1)`) is a member-call head and
+  enters Nift; `command make.sh (1)` (or quoting) keeps explicit external execution. A dot followed by a digit
+  (`python3.12 (`) is not a member identifier, so such a line stays a shell command.
 - `native :: …`, `native ::…` and `native::name (…)` are Nift (the L6 checks or a session refusal), never a program
   named `native`.
 - Inherently ambiguous inputs that change: `echo (hi)` and any `NAME (…)` command line whose first argument starts with
@@ -218,6 +221,39 @@ mutants: `tests/runtime2/assign_family_mutants.py`.
 | (**APPROVED**, B5 cycle refusal) `g[0][0] = g`, `o["k"] = o`, `o["a"]["b"] = o`, `o["n"] = [o]` | stores a copy | the catchable `runtime.reference_cycle`; nothing is written |
 | (**APPROVED**, Q2 B) `const g := [[1]]; g[0][0] = 2; g[0][0] += 2` | `cannot assign to const binding: g` | `[[4]]` (`const` is binding-only) |
 | (**APPROVED**, D-018c) a failing path store in a `while`/`for` body: `g[0][5] = 7`, `o["q"]["z"] = 1` | `invalid index target` | the canonical message: `index out of range: 5`, `object has no member: q` |
+
+## Literal call arguments and legacy method heads (C145; D-102, D-106)
+
+**F5, literal call arguments (legacy/CP10 semantics, now legacy-equal).** An argument that is exactly one quoted
+literal containing `$[`, with no backslash, is passed as its text, not interpolated: `x := "a.txt"` then `id("$[x]")`
+is `$[x]`. The same holds for user functions, lambdas, values in variables and fields, struct methods and
+constructors, natives (every `native::` function, `exists`, `open`, `remove`, `move`, `file(...)`, string, array, set
+and object methods), `thread`, `await` and `error()`. Such an argument is never evaluated: `"$[nope]"`, `"$[1/0]"` and
+`"$[x"` pass through unchanged. Before C145 the VM interpolated these (`exists("$[x]")` tested `a.txt`,
+`native::rm("$[x]")` removed `a.txt`) or refused them.
+
+Still interpolating, as in legacy:
+- the free output family: `print("$[x]")` (and `err(...)`, `warn(...)`, which the VM refuses for other reasons);
+- an argument that is part of an expression (`id("$[x]" + "")`, `id(("$[x]"))`, `id("$[x]".length())`), a receiver,
+  an assignment or a return;
+- `print(id("$[x]"))` prints `$[x]`, because the raw decision belongs to the inner call.
+
+A method named `write`, `write_line` or `write_val` with such a literal is refused before anything runs
+(`host-literal-arg`): legacy interpolates for an `ofstream` and passes the text for a `file()` handle or a struct
+method, which only the run-time receiver decides. Handles were already refused; a struct method of that name is newly
+refused.
+
+**F6, legacy method heads.** For 46 method names (`all any append cat count count_by cwd done elapsed env filter find
+find_index group_by group_by_each index_by insert insert_after insert_before map max_by min_by partition pause paused
+pipe prepend read_all_bytes read_bytes read_val reduce replace_once reset resume run running sort_by start status
+stderr stdin stdout stop unique_by write_bytes write_val`), legacy tries its method head before a plain object's
+callable field: `o := {"cat": (p) => "U"}` then `o.cat("a")` is "unknown value or malformed expression" in legacy
+and v4.12.0. The VM called the field; it now refuses the program (`legacy-method-precedence`) before the field runs,
+in scripts, `-e` and modules. Other names (`o.f`, `o.push`, `o.cp`) still call the field, as legacy does. Struct
+methods and `native::` are unaffected. Sessions keep `session:legacy-method-precedence` (narrowing it is deferred).
+
+**Pending compatibility work, not changed by C145:** `a := ["q"]; a.insert(0, "z")` is "insert: invalid index" in
+legacy, while the VM inserts. Recorded only; no decision.
 
 ## Documented compatibility differences (approved by the owner, not release blockers)
 

@@ -2794,3 +2794,34 @@ Recorded from the coordinator's relay.
      refuses spaced calls (pre-existing VM grammar, as in scripts).
 3. **C145** (F5 Option B and the F6 refusal extension, D-102) starts only after C144b's independent review is
    accepted and on the coordinator's go-ahead.
+
+## D-102 — C145 approved: F5 Option B and the F6 refusal extension (owner, 2026-11-15)
+
+Recorded from the coordinator's relay.
+
+1. **F5 Option B:** literal `$[...]` call arguments follow legacy (CP10). A direct quoted literal argument is passed
+   as its text, except to the free output family and output-stream writes; method calls named
+   write/write_line/write_val with such a literal get a narrow `host-literal-arg` refusal (receiver-dependent).
+2. **F6:** extend the legacy-method-precedence refusal to scripts, `-e` and modules for the pinned names.
+3. C145 starts only after C144 is frozen and independently reviewed, and after the reviewer's read-only design
+   check (review-f5/DESIGN-C145.md).
+
+## D-106 — C144b accepted at 6cf3e847; C145 authorised (owner, 2026-11-15)
+
+Recorded from the coordinator's relay. D-104 and D-105 are recorded where the coordinator keeps them.
+
+1. **C144b accepted** at 6cf3e847 (nift 24da3dd5…8c7f).
+2. **C145 authorised**, the final authorised production checkpoint, with exactly three changes in separately
+   identifiable commits:
+   - F5: a call argument that is exactly one quoted literal containing `$[` and no backslash, followed by `,` or `)`,
+     becomes a plain constant String leaf; the output family keeps interpolating; a raw argument is never evaluated;
+   - the `host-literal-arg` refusal for member calls named write, write_line or write_val with such a literal;
+   - F6: `legacy_field_call_refused()` with exactly the pinned 46 names, refused as `legacy-method-precedence` in
+     method_call's NotBuiltin case before the callable runs; the 136-name session list is not reused and the session
+     refusal is not narrowed (deferred).
+   The array `insert` difference is recorded as pending compatibility work only.
+3. **C144b notes to record:** a dotted command name followed by call syntax (`make.sh (1)`) enters Nift and `command`
+   keeps explicit external execution; a dot followed by a digit (`python3.12 (`) is not a member identifier and stays
+   a shell command.
+4. **Stop conditions:** new compiler or interpolation infrastructure for F5; a conflict of F6 with an approved B5
+   contract; src beyond about 70 lines; any change to frozen evidence, fingerprints or recorded oracle data.

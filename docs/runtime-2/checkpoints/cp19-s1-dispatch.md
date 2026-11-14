@@ -62,6 +62,9 @@ checks). Classification as Nift is not acceptance: the parser decides. Expected 
 - C144b (D-103): a dotted member-call head with a blank before `(` (`o.f ("x")`, `a.b.c ("x")`) is Nift too. Before
   C144b it ran a PATH program named `o.f`. On legacy it is the member call; under the VM default it is refused by the
   existing spaced-call grammar (as in scripts). It never launches.
+- C144b notes (D-106): a dotted command name followed by call syntax (`make.sh (1)`) is a member-call head and
+  enters Nift; `command make.sh (1)` (or quoting) keeps explicit external execution. A dot followed by a digit
+  (`python3.12 (`) is not a member identifier, so such a line stays a shell command.
 - `native :: …`, `native ::…` and `native::name (…)` are Nift (the L6 checks or a session refusal), never a program
   named `native`.
 - Inherently ambiguous inputs that change: `echo (hi)` and any `NAME (…)` command line whose first argument starts with

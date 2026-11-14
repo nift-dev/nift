@@ -72,6 +72,8 @@ This construct is refused on the VM by an owner decision. It is not pending work
 | A map, set or stack as a map key or set member, lookups included | `collection-mutable-key` | D-NEXT-refsem #6 (keys, D6) |
 | Plain `@fn(...)` in a script (legacy keeps accepting it) | `fn-flags` | D-067 #3, amending D-047 #1 / D-048 #1 |
 | An unqualified `cat`, `cp`, `mv`, `rm`, `ls`, `mkdir` or `touch` call with no user or module function of that name (write `native::cp(...)`) | `native-unqualified` | D-075 #2, D-095 (Runtime 2.0 breaking change, below) |
+| A call of a plain object field named like one of 46 legacy method heads (`o.cat(...)`; legacy: "unknown value or malformed expression") | `legacy-method-precedence` | D-102, D-106 (C145 F6; compatibility.md) |
+| A method named `write`, `write_line` or `write_val` with a direct `$[` literal argument (`s.write("$[x]")`): legacy's result depends on the run-time receiver | `host-literal-arg` (its inventory row is unchanged) | D-102, D-106 (C145; compatibility.md) |
 
 **Runtime 2.0 breaking change: `native::` for seven file built-ins (L6; D-075 #2, D-095;
 [checkpoints/native-qualifier.md](checkpoints/native-qualifier.md)).**
@@ -179,6 +181,9 @@ object it names, so a later path through another member of that object (`o["m"][
 refused. This is a checkpoint-1 limitation of the incomplete kind inference, not a permanent rule
 (owner 20:11): it stays with the inference work for the inventory rescan; mixed operand kinds of a compound update are refused (`type:compound-assignment`). A future
 stored through a path stays refused (`coro-future-flow:Assign`).
+
+**Pending compatibility work (recorded, not decided):** `a := ["q"]; a.insert(0, "z")` is "insert: invalid index" in
+legacy, while the VM inserts (found during C145; D-106 keeps it out of C145).
 
 ## Legacy-equal behaviour kept on purpose (D-079)
 
