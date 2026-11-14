@@ -200,5 +200,11 @@ inventory gate runs without it.
   whose deferred content consists only of refusal contracts classifies PASSED. This report counts those
   capabilities as DEFERRED from the harnesses' own lines (read_limit.py's `DEFERRED capabilities …` line,
   `post_cert_refusals.py`, the inventory), which is the rule in certification-r2-plan.md section 3.
-- **Before any launch:** pin the cross-platform workflow's action SHAs. Run every locally runnable gate on the frozen
-  candidate (the owner's standing rule).
+- **Action SHA pins: done** in 17c6277c (D-104). Every tag reference in `.github/workflows` is pinned to its commit,
+  and the table is in ci-action-pins.md. Two items about pins that were already in place wait on the owner and are not
+  yet resolved:
+  - In snap.yml, the `snapcore/action-build` pin `b391f430` is the annotated tag object for v1, not its commit
+    `3bdaa03e`.
+  - Some existing pins are older than the new pins: `upload-artifact` v7.0.1 (`043fb46d`) against the new `@v7`
+    pins at v7.0.2, and release.yml's `setup-msys2` v2.32.0 (`66cd2cce`) against the new `@v2` pins at v2.33.0.
+- **Before any launch:** run every locally runnable gate on the frozen candidate (the owner's standing rule).
