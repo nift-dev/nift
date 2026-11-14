@@ -130,13 +130,13 @@ bool is_nift_statement_line(const std::vector<std::string>& tokens,
     if (snapshot.shell_builtins.count(first)) return false;
 
     const std::string raw = trim_left(raw_line);
+#if !(defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 1)  // mutant 1: the first-word-only rule (before C144)
+    if (has_call_syntax_head(raw)) return true;  // (before the quote test: legacy_names.py pairs its quotes)
+#endif
     if (!raw.empty() && (raw[0] == '"' || raw[0] == '\'')) return true;
 
     if (first[0] == '#') return true;
     if (first.find('(') != std::string::npos) return true;
-#if !(defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 1)  // mutant 1: the first-word-only rule (before C144)
-    if (has_call_syntax_head(raw)) return true;
-#endif
     if (nift_keywords().count(first)) return true;
     if (first.find(":=") != std::string::npos) return true;
     if (tokens.size() >= 2 && is_assignment_operator(tokens[1])) return true;
