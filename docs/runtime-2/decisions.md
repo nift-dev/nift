@@ -2769,8 +2769,28 @@ corrected v43 benchmark is cert-prep tooling; D-100: the owner does not accept t
    in `nift`, `nift -i` and piped stdin. Required: function-call syntax (an identifier or `native::name`, optional
    blanks, an unquoted `(`) and every `native ::` form are Nift, for every name, checked after the shell built-in and
    `command` checks; classification is not acceptance, the parser decides. Unchanged: command lines without `(` after
-   the first word, `command NAME …`, pipelines, redirects, connectors, `$[...]`, paths, cd and jobs. Bounded to the
+   the first word, `command NAME …`, pipelines, redirects, connectors, `$[...]`, paths; all shell built-ins keep
+   precedence (corrected by D-103 R2; the original text said "cd and jobs"). Bounded to the
    classifier (stop beyond about 40 src lines). Tests: unit expectations, a session test with a fake PATH in both
    engines and three front ends, mutants (the first-word-only revert, the native rule dropped, a rule capturing
    `cp a.txt c.txt`) with a no-mutation control; the compatibility deltas recorded (compatibility.md,
    checkpoints/cp19-s1-dispatch.md).
+
+## D-103 — C144 accepted at 3030eca2; C144b; C145 scheduled (owner, 2026-11-15)
+
+Recorded from the coordinator's relay.
+
+1. **C144 accepted** at 3030eca2 (nift ca92bb97…3001), with the review notes in REVIEW-C144.
+2. **C144b** (N1): a spaced member call `o.f ("x")` ran a PATH program named `o.f` in the shell loop. The classifier
+   now also treats a dotted head (identifier(.identifier)+, blanks, unquoted `(`) as Nift. The VM may refuse the line
+   under its existing spaced-call grammar; it never launches. Bounded to the classifier; no VM grammar change.
+   - N2 confirmed: an environment-assignment prefix stays shell syntax (`FOO=1 cp (…)` is a command), pinned in the
+     test as intended.
+   - N3: a legacy-side case (`print hi`, command-form print) catches mutant 3 on legacy as well.
+   - R1: the no-launch claim in known-limitations is narrowed to what C144/C144b implement, and the member-call delta
+     is recorded (compatibility.md, checkpoints/cp19-s1-dispatch.md). R2: D-101's "cd and jobs" reads "all shell
+     built-ins keep precedence".
+   - Wording for `foo ("x")` with a user function: Nift parsing; legacy calls the user function; the VM default
+     refuses spaced calls (pre-existing VM grammar, as in scripts).
+3. **C145** (F5 Option B and the F6 refusal extension, D-102) starts only after C144b's independent review is
+   accepted and on the coordinator's go-ahead.

@@ -23,9 +23,13 @@ command-form natives: `cp a.txt c.txt` still runs PATH `cp`, CP19 S1). Expected 
 
 - `NAME (args)` (blanks or tabs before an unquoted `(`) is Nift for every identifier, not only the seven: `cp ("a",
   "b")`, `print ("x")`, `echo ("hi")`, `len ("abc")`, `foo ("x")`. On legacy this is a call where legacy accepts the
-  spaced form (a user function: `foo ("x")` calls `foo("x")`, as in v4.12.0 and scripts) and otherwise "undefined
-  callable: NAME"; on the VM the spaced call is a session refusal (`session:opaque`). Before C144 these ran the
+  spaced form and otherwise "undefined callable: NAME". `foo ("x")` with a user function `foo`: Nift parsing; legacy
+  calls the user function (as in v4.12.0 and scripts); the VM default refuses spaced calls (`session:opaque`, the
+  pre-existing VM grammar, as in scripts). Before C144 these ran the
   program on PATH (or command-form `print`/a user function with the string argument `(x)`).
+- C144b (D-103): a dotted member-call head with a blank before `(` (`o.f ("x")`, `a.b.c ("x")`) is Nift too. Before
+  C144b it ran a PATH program named `o.f`. On legacy it is the member call; under the VM default it is refused by the
+  existing spaced-call grammar (as in scripts). It never launches.
 - `native :: …`, `native ::…` and `native::name (…)` are Nift (the L6 checks or a session refusal), never a program
   named `native`.
 - Inherently ambiguous inputs that change: `echo (hi)` and any `NAME (…)` command line whose first argument starts with
@@ -33,8 +37,9 @@ command-form natives: `cp a.txt c.txt` still runs PATH `cp`, CP19 S1). Expected 
   error; write the command without the parentheses). Use `command NAME …` or quote the argument to keep the program.
 - Unchanged: `cp a.txt c.txt`, `ls -l` and every line without `(` right after its first word; `command NAME …`;
   pipelines, redirects, connectors and `&` of ordinary commands; `$[...]` in arguments; explicit paths (`./x (a)`);
-  the shell built-ins (`cd ("..")` stays shell `cd` with the literal `(..)`); an environment-assignment prefix
-  (`FOO=1 cp ("a","b")` stays a command line); `time (…)`, `nohup (…)`, `sudo (…)` follow the same first-word rule
+  all shell built-ins keep precedence (`cd ("..")` stays shell `cd` with the literal `(..)`; likewise `exit`, `quit`,
+  `jobs`, `fg`, `bg`, `wait`); an environment-assignment prefix keeps the line shell syntax (`FOO=1 cp ("a","b")`
+  stays a command line and runs PATH `cp`; intended, owner-confirmed, D-103 N2); `time (…)`, `nohup (…)`, `sudo (…)` follow the same first-word rule
   and become Nift.
 
 | Break | Decision | Checkpoint |
