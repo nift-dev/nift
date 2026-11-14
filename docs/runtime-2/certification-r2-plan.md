@@ -258,6 +258,8 @@ different workloads, so it needs an explicit decision.
 - `stream_read_5k_lines` and `read_val_500` stay FAILED with no timing on both versions, and are not rewritten without separate approval;
 - the seven valid workloads are comparable under the two categories.
 
+**Comparison of record (D-097, D-098).** `benchmarks/v412_scripting_compare.py` is the scripting comparison of record. The candidate's `benchmarks/v43_scripting_perf_rt2.py` (the L6 variant) times the `nift run` error path, and its numbers are not evidence.
+
 **Historical numbers.** The v4.3 figures in docs/handover/V4.3-LANGUAGE-CAMPAIGN.md (CP91) are kept, but they are
 **not comparable**: their execution was never validated, and on the evidence above their `nift run` and `nift sh`
 rows measured error exits. Wall-clock measurement of the corrected tool happens on Linode only, with approval.

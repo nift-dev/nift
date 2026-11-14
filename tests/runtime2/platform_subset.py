@@ -276,8 +276,18 @@ def check(makefile):
         for path in re.findall(r"(?:tests|tools)/[\w./-]+\.(?:py|sh)", cmd):
             if not os.path.exists(os.path.join(REPO, path)):
                 problems.append("%s: %s does not exist" % (eid, path))
-    text = open(makefile).read()
-    m = re.search(r"^test-rt-vm: test-runtime2-vm-corpus-complete.*?\n((?:\t.*\n)+)", text, re.M)
+    return problems + recipe_problems(open(makefile).read(), makefile)
+
+
+# The test-rt-vm recipe: its head names test-runtime2-vm-corpus-complete among its prerequisites, wherever it stands
+# (C140c added test-rt-vm-invalidate before it, D-103 dry run R2); the recipe is the tab-indented lines after it.
+RECIPE = re.compile(r"^test-rt-vm:(?:[^\n]*[ \t])?test-runtime2-vm-corpus-complete(?=[ \t]|$)[^\n]*\n((?:\t.*\n)+)", re.M)
+
+
+def recipe_problems(text, makefile="Makefile"):
+    """Every test script the test-rt-vm recipe runs is in the table; a missing recipe is a problem, never a pass."""
+    problems = []
+    m = RECIPE.search(text)
     if not m:
         problems.append("the test-rt-vm recipe was not found in %s" % makefile)
     else:
@@ -411,9 +421,23 @@ def selftest():
         rc = run_table(entries, a)
         expect("excluded entry run", os.path.exists(marker), False)
         expect("run with only an excluded and a passing entry", rc, 0)
+    # D-103 R2: the recipe check reads both recipe heads, and still fails on an unlisted suite or a missing recipe.
+    old_head = "test-rt-vm: test-runtime2-vm-corpus-complete $(RT_VM_UNIT)\n\tpython3 tests/runtime2/vm_golden.py --nift x\n"
+    c140c = ("test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT)\n"
+             "\t-@$(RT_VM_SUITE) vm-golden -- python3 tests/runtime2/vm_golden.py --nift x\n")
+    unlisted = c140c + "\t-@$(RT_VM_SUITE) new -- python3 tests/runtime2/brand_new_suite.py --nift x\n"
+    decoy = "test-rt-vm: test-runtime2-vm-corpus-complete-old\n\tpython3 tests/runtime2/brand_new_suite.py\n"
+    expect("recipe, the pre-C140c head", recipe_problems(old_head), [])
+    expect("recipe, the C140c head (test-rt-vm-invalidate first)", recipe_problems(c140c), [])
+    expect("recipe, an unlisted suite", recipe_problems(unlisted),
+           ["test-rt-vm runs tests/runtime2/brand_new_suite.py, which the platform table does not list"])
+    expect("recipe, missing", recipe_problems("all: nift\n\techo\n"),
+           ["the test-rt-vm recipe was not found in Makefile"])
+    expect("recipe, a longer target name is not the prerequisite", recipe_problems(decoy),
+           ["the test-rt-vm recipe was not found in Makefile"])
     for f in failures:
         print("FAIL platform subset selftest:", f)
-    print("%s platform subset selftest: %d check(s)" % ("FAIL" if failures else "PASS", 12))
+    print("%s platform subset selftest: %d check(s)" % ("FAIL" if failures else "PASS", 17))
     return 1 if failures else 0
 
 
