@@ -15,12 +15,21 @@ Cases (fake `nift`, a shell script that sleeps per engine and per attempt):
   lock-death  a lane holder killed with SIGKILL releases the lane
 """
 import os
+import shutil
 import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import vm_adversarial as adv  # noqa: E402
+
+CREATED = []  # every temporary directory this self-test makes, removed when it ends
+
+
+def scratch(prefix):
+    d = tempfile.mkdtemp(prefix=prefix)
+    CREATED.append(d)
+    return d
 
 FAKE = """#!/bin/sh
 # NIFT_VM=0: legacy (explicit since the VM-default policy); otherwise the VM.
@@ -37,7 +46,7 @@ echo out
 
 
 def case(mode):
-    d = tempfile.mkdtemp(prefix="adv-timeout-")
+    d = scratch("adv-timeout-")
     nift = os.path.join(d, "fake-nift")
     with open(nift, "w") as f:
         f.write(FAKE)
@@ -59,7 +68,7 @@ with adv.heavy_lock(True):
 
 def heavy_lock_case():
     import subprocess
-    d = tempfile.mkdtemp(prefix="adv-lock-")
+    d = scratch("adv-lock-")
     lock = os.path.join(d, "heavy.lock")
     procs = []
     for k in range(2):
@@ -86,7 +95,7 @@ with adv.heavy_lock(True):
 
 def lock_death_case():
     import signal, subprocess, time
-    d = tempfile.mkdtemp(prefix="adv-lockdeath-")
+    d = scratch("adv-lockdeath-")
     env = dict(os.environ, NIFT_ADV_HEAVY_LOCK=os.path.join(d, "heavy.lock"))
     holder = subprocess.Popen([sys.executable, "-c", HOLDER, HERE], env=env, stdout=subprocess.PIPE, text=True)
     if holder.stdout.readline().strip() != "held":
@@ -102,7 +111,7 @@ def lock_death_case():
 def default_lock_path_case():
     import subprocess
     paths = set()
-    for tmp in (tempfile.mkdtemp(prefix="adv-t1-"), tempfile.mkdtemp(prefix="adv-t2-")):
+    for tmp in (scratch("adv-t1-"), scratch("adv-t2-")):
         env = {k: v for k, v in os.environ.items() if k != "NIFT_ADV_HEAVY_LOCK"}
         env["TMPDIR"] = tmp
         probe = subprocess.run([sys.executable, "-c", "import sys; sys.path.insert(0, sys.argv[1]); "
@@ -139,6 +148,8 @@ def main():
             failures.append("lock-death: the lane stayed held after its holder was killed")
     finally:
         adv.RETRY_FACTOR = old
+        for d in CREATED:
+            shutil.rmtree(d, ignore_errors=True)
     for f in failures:
         print("FAIL " + f)
     print(("PASS" if not failures else "FAIL") + " vm adversarial timeout policy: 7 cases")
