@@ -87,14 +87,31 @@ This construct is refused on the VM by an owner decision. It is not pending work
 - Unchanged: website builds. Templates (`@script`, `$[...]`) and build hooks run on the legacy evaluator (D-053), so
   they keep the unqualified seven. This is **transitional engine-specific compatibility** (D-096 #1), not the
   intended permanent API: the goal remains consistent `native::` naming. `native::name(` works there too, with the
-  same output and effects as the unqualified form. Every other built-in is unchanged, and no function call ever
-  launches an external program.
+  same output and effects as the unqualified form. Every other built-in is unchanged.
+- **No implicit external program (scope, D-101 F4).** Function-call syntax never falls back to running a program
+  found on PATH: a call is a native, a user function, or refused. This is about implicit dispatch only. The explicit
+  process APIs `run()` and `cmd()` launch programs by design (legacy runs them; the VM refuses them as
+  `deferred-named`). Known exception, being corrected in C144: in an interactive or piped shell session, a call
+  written with a blank before `(` (`cp ("a.txt", "c.txt")`) is currently classified as a shell command line and
+  runs the program on PATH.
 - Legacy (`NIFT_VM=0`) keeps the unqualified seven as the historical oracle, and also accepts `native::name(`.
 - Exactly `native::name(` is valid: no space around `::` and the `(` immediately after the name. Any other
-  spelling, and `native::` before a name outside the seven, is reported with the same text and position by both
-  engines. Under the default syntax prevalidation, which checks every script, it is reported before anything runs.
-  Where prevalidation does not run (`NIFT_PREVALIDATE=off`), both engines raise the same error, at the same position,
-  when the call is reached (D-095 (b)).
+  spelling, and `native::` before a name outside the seven, is caught by the default syntax prevalidation, which
+  checks every script file, `-e`/`-c` and stdin program before engine selection. Both engines then report it with the
+  same text and position, before anything runs.
+- **Where prevalidation does not run, the engines differ (D-101 F2, F3).** Neither engine ever calls a wrong
+  native or launches a program in any of these cases, but timing, text or position can differ:
+  - with `NIFT_PREVALIDATE=off`, the VM refuses the whole program before anything runs, while legacy runs the
+    earlier statements (for example prints their output) and then raises its error at the call;
+  - the text differs for `native :: cp(` (legacy: `unknown value or malformed expression: native :: cp(...)`, not
+    the malformed-call message) and in templates (`@script { return native :: cat(...) }` gives legacy's
+    "unknown value or malformed expression");
+  - an unknown name nested in an expression has the same text but a different position: the VM points at the call
+    (`print(native::copy(...))` at 2:7), legacy at the statement (2:1);
+  - prevalidation does not cover a bad spelling inside a `$[...]` segment of a script string, `native` and `::` on
+    different lines, `fn(native::cat(p))` as a signature, or statements typed or piped into a session. The VM
+    refuses each (an opaque refusal); legacy reports its own error when it reaches it (`invalid callable signature`
+    for the signature form), and a session reports the error and continues.
 - Migration: the repository's call sites are listed in tests/runtime2/l6/MANIFEST.tsv.
 
 ## Refusals awaiting an owner ruling

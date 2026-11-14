@@ -15,14 +15,17 @@ approved), D-095 (L6 authorised; the design approved with answers (a) to (c) and
   `native::cp (`, `native::  cp(`, `native::cp` without a call, `x.native::cp(` and `native::native::cp(` are
   reported as `malformed native:: call: write native::name(...)`. `native::` before any other name is reported as
   `native::NAME is not a native function (native:: names cat, cp, mv, rm, ls, mkdir and touch)`. Both engines report
-  the same text at the same position. `::` inside strings and comments is ordinary text.
+  the same text at the same position wherever the prevalidator checks the program (see the unknown-name item
+  below for where it does not). `::` inside strings and comments is ordinary text.
 - **VM-default execution** (script files, `-e`, `-c`, stdin, `-i`, the REPL, and imported modules): the unqualified
   seven are not built-ins. A user or module function with one of these names is an ordinary function. Otherwise an
   unqualified call refuses the whole program at compile time (`native-unqualified`), reached or not, before anything
   runs. The diagnostic adds `note: Runtime 2.0 calls them as native::name(...), for example native::cp("a", "b"); a
   user function of that name is an ordinary function`. In a session the refused statement is handled like any other
-  session refusal. A function call never launches an external executable: the call is a native or a user function,
-  or it is refused.
+  session refusal. Function-call syntax never implicitly launches an external executable: the call is a native or a
+  user function, or it is refused. This concerns implicit dispatch only; the explicit process APIs `run()` and
+  `cmd()` launch programs by design (D-101 F4). Exception, corrected in C144: an interactive or piped session
+  classifies a call written with a blank before `(` as a shell command line (F1, the CP19 S1 classifier).
 - **Legacy** (`NIFT_VM=0`, the historical oracle) keeps the unqualified seven unchanged and also accepts
   `native::name(`.
 - **Templates and build hooks are unchanged** (D-096 #1: the initial L6 boundary). `@script`, `$[...]` and hook
@@ -31,9 +34,15 @@ approved), D-095 (L6 authorised; the design approved with answers (a) to (c) and
   effects as the unqualified form.
 - **An unknown name, by path (D-095 (b)).** The CP13 syntax prevalidation checks every script before engine selection,
   so under the default it refuses the program before anything runs, the same way in both engines. Where
-  prevalidation does not run (`NIFT_PREVALIDATE=off`, and template code, which it does not cover), both engines raise
-  the same uncatchable error at the same position when the call is reached. Both paths are tested
-  (`unknown-print`/`unknown-copy`/`unknown-foo` and `unknown-unvalidated`).
+  prevalidation does not run, the engines refuse alike but report differently (D-101 F2, F3; known-limitations.md):
+  - `NIFT_PREVALIDATE=off`: the VM refuses the whole program; legacy runs the earlier statements, then errors at the
+    call. A top-level unknown name has the same text and position (tested: `unknown-unvalidated`); a nested one has
+    the same text, but the VM points at the call and legacy at the statement.
+  - `native :: cp(` and template code: legacy's text is its own "unknown value or malformed expression".
+  - Prevalidation misses a bad spelling in a `$[...]` segment, `native` and `::` on separate lines,
+    `fn(native::cat(p))`, and session statements; the VM refuses each, legacy errors when it reaches it.
+  In none of these does a wrong native run or a program launch. The default path is tested by
+  `unknown-print`/`unknown-copy`/`unknown-foo`.
 
 ## Implementation (src, C143 +196/-4, C143a 1 line)
 
@@ -117,6 +126,30 @@ These were not changed:
 
 The freeze report lists every benchmark and workload whose VM-default run is now refused.
 
+**Criterion-2 sites left unqualified (D-101 F8).** Three sites fell back on `native-unqualified` in the discovery run
+but were left unqualified, because a qualified copy still does not run on the VM. They were never committed (the
+qualification was undone in the working tree before the migration commit), so no commit records them. They can be
+checked at the frozen tree: each is still unqualified, and a scratch copy with `native::` added is refused for
+another reason under `NIFT_VM=require`:
+- tests/runtime2/rt-diff-corpus/scripts/trace-coverage/main.f: `callable:cmd` (17:6);
+- tests/runtime2/rt-diff-corpus/workspaces/script-outside/project/main.f: `module-host-op:cat` (1:7);
+- tests/site_dx_smoke.sh, the `arity.f` heredoc (line 124): `static-error:arity` (5:5).
+
 The approved legacy/VM difference for a user function named like one of the seven is pinned in
 tests/runtime2/l6/adversarial-approved.json: nine generated programs, each by source hash, with the exact results
 of both engines.
+
+## Performance and gate notes (D-101)
+
+- **Instruction counts.** A callgrind run of `nift build --all` on the dogfood sites siteA and siteB-1k compared the
+  candidate with a rebuild of 502875c4 (two repetitions, alternating). It shows **no measurable instruction-count
+  change**: every candidate-vs-base delta was smaller than the base-vs-base noise of about 0.06% (REVIEW-L6 section 8).
+  Website builds take the legacy path, where L6 adds only the `native::` text scan.
+- **Gate records (F7).**
+  - test-v410-native-dispatch-parity exits 2 with the same 3 failures as before L6 (`callable:to_string`,
+    `callable:unknown` and `static-error:arity`, all `implement`); its new L6 case passes.
+  - test-v45-native-runtime stops at its first failing sub-target (`callable:ffi_open`, deferred-named), so its later
+    sub-targets (adversarial-runtime, concurrency, job-control with its cp21 prerequisites, and target) did not run in the freeze
+    gate set; their scripts contain no calls to the seven.
+  - The rt-diff corpus entry trace-coverage is now refused first with `native-unqualified`. Its `callable:cmd`
+    refusal is still counted by the other corpus entries that call `cmd()`.
