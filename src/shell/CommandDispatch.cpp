@@ -71,6 +71,36 @@ std::size_t first_word_index(const std::vector<std::string>& tokens) {
     return i;
 }
 
+bool is_ident_char(char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+}
+
+// C144 (D-101): function-call syntax is Nift, never a command line: an identifier (or native::<identifier>), optional
+// blanks, then an unquoted `(`; or `native`, optional blanks, `::` (every qualifier spelling reaches the L6 checks).
+// The parser decides whether it is a valid call. `cp a.txt c.txt` has no `(` after the first word and stays a command.
+bool has_call_syntax_head(const std::string& line) {
+    std::size_t i = 0;
+    const auto blanks = [&] { while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) ++i; };
+    blanks();
+    const std::size_t start = i;
+    while (i < line.size() && is_ident_char(line[i])) ++i;
+    if (i == start || std::isdigit(static_cast<unsigned char>(line[start]))) return false;
+    const bool native = line.compare(start, i - start, "native") == 0;
+#if !(defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 2)  // mutant 2: the native:: rule dropped
+    if (native) {
+        const std::size_t name = i;
+        blanks();
+        if (line.compare(i, 2, "::") == 0) return true;
+        i = name;
+    }
+#endif
+    blanks();
+#if defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 3  // mutant 3: also captures `cp a.txt c.txt`
+    if (i > start) return true;
+#endif
+    return i < line.size() && line[i] == '(';
+}
+
 void fill_args(const std::vector<std::string>& tokens, std::size_t name_index, Decision& out) {
     out.args.assign(tokens.begin() + static_cast<std::ptrdiff_t>(name_index + 1), tokens.end());
 }
@@ -104,6 +134,9 @@ bool is_nift_statement_line(const std::vector<std::string>& tokens,
 
     if (first[0] == '#') return true;
     if (first.find('(') != std::string::npos) return true;
+#if !(defined(NIFT_C144_MUTANT) && NIFT_C144_MUTANT == 1)  // mutant 1: the first-word-only rule (before C144)
+    if (has_call_syntax_head(raw)) return true;
+#endif
     if (nift_keywords().count(first)) return true;
     if (first.find(":=") != std::string::npos) return true;
     if (tokens.size() >= 2 && is_assignment_operator(tokens[1])) return true;

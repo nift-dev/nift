@@ -115,6 +115,33 @@ void test_line_detection() {
            "interpolated command is command form");
 }
 
+// C144 (D-101): function-call syntax, spaced or not, is Nift; command lines stay command lines.
+void test_call_syntax() {
+    const ShellSnapshot s = snapshot();
+    const auto nift = [&](const std::vector<std::string>& toks, const std::string& raw) {
+        return nift::shell::is_nift_statement_line(toks, raw, s);
+    };
+    expect(nift({"cp", "(a.txt,", "c.txt)"}, "cp (\"a.txt\", \"c.txt\")"), "cp (...) is Nift");
+    expect(nift({"cp", "(a.txt,", "c.txt)"}, "cp\t(\"a.txt\", \"c.txt\")"), "cp<TAB>(...) is Nift");
+    expect(nift({"cp", "(a.txt,", "c.txt)"}, "  cp   (\"a.txt\", \"c.txt\")"), "cp<spaces>(...) is Nift");
+    expect(nift({"print", "(x)"}, "print (\"x\")"), "print (...) is Nift");
+    expect(nift({"myfn", "(x)"}, "myfn (\"x\")"), "user function spaced call is Nift");
+    expect(nift({"echo", "(hi)"}, "echo (hi)"), "echo (hi) is Nift (recorded compatibility delta)");
+    expect(nift({"native::cp(a,b)"}, "native::cp(\"a\",\"b\")"), "native::cp(...) is Nift");
+    expect(nift({"native::cp", "(a,b)"}, "native::cp (\"a\",\"b\")"), "native::cp (...) is Nift");
+    expect(nift({"native", "::", "cp(a,b)"}, "native :: cp(\"a\",\"b\")"), "native :: cp(...) is Nift");
+    expect(nift({"native", "::cp"}, "native ::cp"), "native ::cp is Nift");
+    expect(!nift({"cp", "a.txt", "c.txt"}, "cp a.txt c.txt"), "cp a.txt c.txt is a command");
+    expect(!nift({"ls", "-l"}, "ls -l"), "ls -l is a command");
+    expect(!nift({"native", "x"}, "native x"), "native x is a command");
+    expect(!nift({"command", "cp", "(a,b)"}, "command cp (\"a\",\"b\")"), "command cp (...) is a command");
+    expect(!nift({"cd", "(..)"}, "cd (\"..\")"), "cd stays the shell built-in");
+    expect(!nift({"ls", "|", "wc", "-l"}, "ls | wc -l"), "pipeline is a command");
+    expect(!nift({"echo", "hi", ">", "f"}, "echo hi > f"), "redirect is a command");
+    expect(!nift({"./x", "(a)"}, "./x (a)"), "explicit path is a command");
+    expect(!nift({"echo", "a(b)"}, "echo a(b)"), "( later in the line is not call syntax");
+}
+
 void test_lines() {
     const ShellSnapshot s = snapshot();
     LinePlan chain = nift::shell::classify_line({"false", "&&", "echo", "x"}, s);
@@ -255,6 +282,7 @@ void test_paths() {
 int main() {
     test_segments();
     test_line_detection();
+    test_call_syntax();
     test_lines();
     test_syntax_validation();
     test_paths();

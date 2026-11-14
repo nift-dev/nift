@@ -3609,6 +3609,13 @@ $(SHELL_DISPATCH_MUTANT_SYNTAX): $(SHELL_DISPATCH_LINK_OBJECTS) $(SHELL_DISPATCH
 test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
 	$(SHELL_DISPATCH_UNIT)
 
+# C144 (D-101): function-call syntax in the interactive and piped shell is Nift, never a program launch (both
+# engines, three front ends, a fake PATH with markers), with NIFT_C144_MUTANT 1-3 and a no-mutation control.
+.PHONY: test-runtime2-shell-call-syntax
+test-runtime2-shell-call-syntax: $(TARGET) $(SHELL_DISPATCH_UNIT)
+	$(SHELL_DISPATCH_UNIT)
+	env $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/shell_call_syntax.py --nift "$(CURDIR)/$(TARGET)" --mutants
+test-cp19-s1-dispatch: test-runtime2-shell-call-syntax
 test-cp19-s1-dispatch: $(TARGET) $(SHELL_DISPATCH_UNIT) $(SHELL_DISPATCH_MUTANT) $(SHELL_DISPATCH_MUTANT_QUOTING) $(SHELL_DISPATCH_MUTANT_EAGER) $(SHELL_DISPATCH_MUTANT_SYNTAX)
 	$(SHELL_DISPATCH_UNIT)
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
