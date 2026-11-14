@@ -252,6 +252,12 @@ Two original workloads are invalid programs as written, on both versions: `line 
 `line = null`. They stay identical and are reported FAILED, with no timing. Correcting their sources would make them
 different workloads, so it needs an explicit decision.
 
+**Owner confirmation (D-098, 2026-11-14).** 42eda4f0 is approved as built:
+- the shell row pipes the same 500 statements into plain `nift`;
+- `nift sh` and `nift run` are obsolete and stay errors, and the `nift sh` negative control is kept;
+- `stream_read_5k_lines` and `read_val_500` stay FAILED with no timing on both versions, and are not rewritten without separate approval;
+- the seven valid workloads are comparable under the two categories.
+
 **Historical numbers.** The v4.3 figures in docs/handover/V4.3-LANGUAGE-CAMPAIGN.md (CP91) are kept, but they are
 **not comparable**: their execution was never validated, and on the evidence above their `nift run` and `nift sh`
 rows measured error exits. Wall-clock measurement of the corrected tool happens on Linode only, with approval.
