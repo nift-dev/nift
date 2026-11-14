@@ -3,7 +3,8 @@
 
   native_qualifier.py --nift NIFT          every case, VM (NIFT_VM=require) and legacy (NIFT_VM=0)
   native_qualifier.py --embed              builds and runs the embedding-API check (harness toolchain env)
-  native_qualifier.py --mutants            NIFT_L6_MUTANT=1..6, each built with sanctioned_mutant.py, must be caught
+  native_qualifier.py --nift N --mutants   the production binary N passes every case (no-mutation control), then
+                                           NIFT_L6_MUTANT=1..6, each built with sanctioned_mutant.py, must be caught
 
 Contract: `native::<name>(` (nothing around `::`, the `(` straight after) calls the native of exactly cat, cp, mv,
 rm, ls, mkdir, touch in both engines, with every check the unqualified native had. In VM-default execution the
@@ -74,6 +75,7 @@ def run(nift, d, src, vm, args=None, stdin=None, extra=None, cwd=None):
             f.write(src)
     env = {"PATH": os.path.join(d, "fakebin") + ":/usr/bin:/bin", "HOME": d, "LANG": "C",
            "NIFT_VM": "require" if vm else "0", **(extra or {})}
+    env = {k: v for k, v in env.items() if v is not None}  # None: unset (the VM default)
     try:
         p = subprocess.run([nift] + (args or ["main.f"]), cwd=cwd or d, env=env, input=stdin, capture_output=True,
                            text=True, timeout=60, preexec_fn=limits)
@@ -132,7 +134,9 @@ for _n in SEVEN:
                 if vm:
                     return problems + ok(rc == 1 and REFUSED in err and "native::name(...)" in err and not out,
                                          show(rc, out, err)) + ok(read(d, "a.txt") == "A", "an effect ran")
-                return problems + ok(rc == 0 and out.startswith("first"), show(rc, out, err))
+                # legacy is unchanged: the unqualified native runs (its effect checked at the top level)
+                effect = wrap != "%s" or CALLS[n][1](d, out[len("first\n"):]) or n == "ls"
+                return problems + ok(rc == 0 and out.startswith("first") and effect, show(rc, out, err))
             finally:
                 shutil.rmtree(d, ignore_errors=True)
         CASES["unqualified-%s-%s" % (_n, _where)] = _unqualified
@@ -152,6 +156,20 @@ for _n in SEVEN:
             shutil.rmtree(d, ignore_errors=True)
     CASES["user-function-" + _n] = _user
 
+    # D-096 3a: with a user function of the name, the unqualified call (reached, and in an unreachable branch) is the
+    # user function under the VM default, never the native-unqualified refusal. Legacy's native head wins (recorded).
+    def _user_vm_default(nift, vm, n=_n):
+        d = fixture()
+        try:
+            src = 'fn(%s(path)) { print(path) }\n%s("example")\nif (false) { %s("never") }\n' % (n, n, n)
+            rc, out, err = run(nift, d, src, vm, extra={"NIFT_VM": None} if vm else None)
+            p = ok(not launched(d), "launched %s" % launched(d))
+            return p + (ok(rc == 0 and out == "example\n" and not err, show(rc, out, err)) if vm else [])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+    CASES["user-function-default-" + _n] = _user_vm_default
+
+
 
 def both_equal(src, files=None, extra=None, want=None, check=None):
     """The same rc, stdout and stderr in both engines (the VM's pass is compared with legacy's)."""
@@ -170,6 +188,15 @@ def both_equal(src, files=None, extra=None, want=None, check=None):
         p += ok(checked and legacy[3], "fixture check failed")
         return p + (ok(want(rc, out, err), show(rc, out, err)) if want else [])
     return f
+
+
+# D-096 3b: native::<name> reaches the Nift native even when a user function of that name exists (both engines,
+# the same output; the user function never runs).
+for _n in SEVEN:
+    CASES["shadowed-qualified-" + _n] = both_equal(
+        'fn(%s(x, y)) { print("user") }\n%s\n' % (_n, CALLS[_n][0]),
+        want=lambda rc, out, err: rc == 0 and "user" not in out,
+        check=lambda d, n=_n: CALLS[n][1](d, "A" if n == "cat" else "true\n" if n == "ls" else ""))
 
 
 # A name outside the seven, every other spelling: reported before anything runs, same text and position.
@@ -305,6 +332,71 @@ def _site(nift, vm):
         shutil.rmtree(d, ignore_errors=True)
 
 
+def _tree(d):
+    """Every file under d (fake PATH excluded) with its content: the filesystem effect of a run."""
+    out = {}
+    for dp, _, fs in os.walk(d):
+        for f in fs:
+            path = os.path.join(dp, f)
+            if "fakebin" not in path and os.path.relpath(path, d) != "main.f":
+                out[os.path.relpath(path, d)] = read(dp, f)
+    return out
+
+
+LEGACY_FORMS = 'print("s")\n%(p)stouch("t1")\n%(p)scat("a.txt")\nprint(%(p)sls(".").length())\n'
+
+
+def f(nift, vm):
+    """D-096 1: legacy execution (NIFT_VM=0) of native:: equals the unqualified legacy form: a script file and -e,
+    the same rc, stdout, stderr and resulting files (a mutating native, touch, and cat)."""
+    p = []
+    for mode in ("file", "-e"):
+        results = []
+        for prefix in ("", "native::"):
+            d = fixture()
+            try:
+                src = LEGACY_FORMS % {"p": prefix}
+                args = ["main.f"] if mode == "file" else ["-e", src]
+                rc, out, err = run(nift, d, src if mode == "file" else None, False, args=args)
+                results.append((rc, out, err, _tree(d), launched(d)))
+            finally:
+                shutil.rmtree(d, ignore_errors=True)
+        p += ok(results[0] == results[1] and results[0][0] == 0 and "t1" in results[0][3] and
+                results[0][1].startswith("s\nA"), "%s: unqualified %r != qualified %r" % (mode, results[0][:4], results[1][:4]))
+    return p
+
+
+CASES["legacy-equivalence-script"] = f
+
+
+def f(nift, vm):  # noqa: F811 (one registered function per case)
+    """D-096 1: a site template (@script, legacy evaluator) with native::cat and native::touch builds the same page,
+    output (cat writes to stdout) and files as the unqualified form."""
+    results = []
+    for prefix in ("", "native::"):
+        d = fixture()
+        try:
+            env = {"PATH": os.path.join(d, "fakebin") + ":/usr/bin:/bin", "HOME": d, "LANG": "C"}
+            s = os.path.join(d, "site")
+            os.makedirs(s)
+            subprocess.run([nift, "init"], cwd=s, env=env, capture_output=True, timeout=60, check=True)
+            with open(os.path.join(s, "data.txt"), "w") as fh:
+                fh.write("DATA")
+            with open(os.path.join(s, "content", "index.html"), "w") as fh:
+                fh.write('R:@script { %(p)stouch("tm"); return %(p)scat("data.txt") }\n' % {"p": prefix})
+            b = subprocess.run([nift, "build"], cwd=s, env=env, capture_output=True, text=True, timeout=120)
+            stdout = "".join(line for line in b.stdout.splitlines(True) if not line.startswith("time taken:"))
+            results.append((b.returncode, stdout, b.stderr, read(s, "public/index.html"), read(s, "tm"),
+                            launched(d)))
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+    return ok(results[0] == results[1] and results[0][0] == 0 and results[0][1].startswith("DATA") and
+              results[0][4] == "", "unqualified %r != qualified %r" % (results[0], results[1]))
+
+
+CASES["legacy-equivalence-template"] = f
+
+
 @case("unknown-unvalidated")
 def _unvalidated(nift, vm):
     """NIFT_PREVALIDATE=off: the engines' own handling (template paths have no prevalidation): an error when reached,
@@ -380,7 +472,13 @@ MUTANTS = {
 }
 
 
-def mutants():
+def mutants(nift):
+    # No-mutation control: the production binary passes every case, so a case failing on a mutant is the mutation's.
+    control = check(nift)
+    if control:
+        print("FAIL native-qualifier mutants: no-mutation control: the production binary fails %s" % control)
+        return 1
+    print("PASS native-qualifier no-mutation control: the production binary passes every case")
     bad = 0
     for n, expected in sorted(MUTANTS.items()):
         out = os.path.join(ROOT, ".build", "mutant-nift", "native-qualifier-%d" % n)
@@ -414,7 +512,10 @@ def main():
     rc = 1 if args.nift and check(os.path.abspath(args.nift), args.only) else 0
     if args.embed:
         rc = max(rc, embed())
-    return max(rc, mutants()) if args.mutants else rc
+    if args.mutants and not args.nift:
+        print("FAIL native-qualifier mutants: --mutants needs --nift (the no-mutation control)")
+        return 1
+    return max(rc, mutants(os.path.abspath(args.nift))) if args.mutants else rc
 
 
 if __name__ == "__main__":
