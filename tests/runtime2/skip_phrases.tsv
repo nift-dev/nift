@@ -145,6 +145,7 @@ tests/runtime2/read_limit.py	detected	-	print("SKIP capture-while-running cases 
 tests/runtime2/refsem/stale_vm.cpp	justified	a harness diagnostic on a failing path (the unit fails)	std::fprintf(stderr, "harness: %s not run (%s %s)\n", name, r.refusal.c_str(), r.execution.message.c_str());
 tests/runtime2/rt_parser_corpus.py	detected	-	print("paren oracle: skipped %d nondeterministic entries (tools/rt-diff/ignore.txt)" % len(skipped))
 tests/runtime2/safety/mutants.sh	detected	-	link=$(printf '%s\n' $objects | grep -vxE "$skip" | grep -v '\.a$' | tr '\n' ' ')
+tests/runtime2/shell_call_syntax.py	detected	-	print("shell-call-syntax: skipped (POSIX pty and fake PATH)")
 tests/runtime2/vm_host.py	detected	-	print("SKIP symlink fixtures: symlinks unavailable")
 tests/runtime2/vm_host_memory.py	detected	-	print("SKIP vm_host_memory: /usr/bin/time unavailable")
 tests/runtime2/vm_host_memory.py	detected	-	print("SKIP peak tracker: build failed")
