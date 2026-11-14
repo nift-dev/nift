@@ -5720,6 +5720,14 @@ include tests/runtime2/cp23/certification.mk
 # D-077 #4: the platform subset table (tests/runtime2/platform_subset.py; docs/runtime-2/platform-subsets.md):
 # every exclusion has a concrete reason and every test-rt-vm suite is listed. The dispatch-only
 # runtime2-cross-platform workflow runs the subset itself on Linux, macOS and Windows.
+# D-097: benchmarks/v412_scripting_compare.py (the corrected copy of v43_scripting_perf.py, which stays byte-identical)
+# validates every workload before timing and never times an invalid run. Selftest: positive and negative controls,
+# two timed samples, timings never reported. It needs native::touch (L6 Option B), so it is not in `test`; pass
+# V412_NIFT=<v4.12.0 binary> for the v412 profile and the equivalence proof.
+.PHONY: test-v412-scripting-compare-selftest
+test-v412-scripting-compare-selftest: $(TARGET)
+	$(PYTHON) -B tests/runtime2/v412_scripting_compare_selftest.py --nift "$(CURDIR)/$(TARGET)" \
+	  $(if $(V412_NIFT),--v412-nift "$(V412_NIFT)")
 .PHONY: test-runtime2-platform-subset-table
 test-runtime2-platform-subset-table:
 	$(PYTHON) tests/runtime2/platform_subset.py --check

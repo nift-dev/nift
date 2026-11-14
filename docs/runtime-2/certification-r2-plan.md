@@ -201,3 +201,58 @@ Each control fails under its own mutated extractor:
 - When a regression baseline's log shows the identical failure, the gate is now FAILED-BASELINE.
 - When the baseline fails as the C26 record did (the old abort), it is FAILED-NEW. That is the honest result.
 
+## Record: scripting comparison tooling, v4.12.0 versus Runtime 2.0 (D-097, owner 2026-11-14)
+
+This is tooling, not a release gate. The mandatory comparison is still the separate website-build benchmark against
+v4.12.0 (gate 8). The scripting comparison becomes a finding only if it reveals a genuine regression in a supported
+workload.
+
+**The defect.**
+- `benchmarks/v43_scripting_perf.py` (CP91) runs scripts as `nift run <script>` and the shell as `nift sh`.
+- Both v4.12.0 (sha256 `7dd42dce…a6fb`) and the candidate (`e48fd3bf…18f1`) reject both commands with
+  `unknown command 'run'` / `'sh'`, exit 1. So **every** row of that benchmark timed an error exit, the shell row
+  included.
+- It also ran the scripts from the caller's directory, so the relative-path workloads did not find their files.
+- The original is kept **byte-identical**.
+
+**The corrected copy: `benchmarks/v412_scripting_compare.py`.**
+- **Invocation.** Scripts run as `nift <script>`, with the script's directory as the working directory. The shell row
+  pipes the same 500 statements into plain `nift`, which is the shell; `nift run <script>` is not used or restored.
+- **Workloads.** The same workloads, sources, inputs, sizes and operation counts, and 15 samples with no warmup, as in
+  the original.
+- **Validity oracle**, applied before timing and to every sample:
+  - exit status 0;
+  - the exact stdout;
+  - empty stderr;
+  - the exact files and sizes in a work directory recreated before every sample, with HOME kept separate;
+  - the operation count in the source.
+
+  A failing workload is FAILED with its reason and **has no timing**.
+- **Binary check.** `--expect-sha256` and a before/after hash discard a run (exit 3) if the binary changes during it.
+- **Categories, reported separately and never aggregated:**
+  - **identical-source:** the same program text on both versions;
+  - **equivalent-operation:** `fs_10_touch_open`, the one workload whose source differs, `touch(...)` under
+    `--version-profile v412` and `native::touch(...)` under `rt2`. The profile is a flag, not version detection.
+    `--equivalence` proves this one first: the same exit, stdout, stderr and ten 0-byte files on both binaries (PASS).
+- **Selftest:** `make test-v412-scripting-compare-selftest` (tests/runtime2/v412_scripting_compare_selftest.py).
+  - **Negative controls**, each with no timing: a `nift run` profile; a `nift sh` profile; an unqualified `touch(`
+    under rt2; a wrong expected output; a missing side effect.
+  - **Positive controls:** both profiles, and the equivalence proof.
+  - **Mutant:** an oracle that accepts everything makes the selftest fail (shown).
+
+**Correctness results** (validate-only, in the prep sandbox; no timing is evidence):
+
+| Workload | v4.12.0 | Runtime 2.0 candidate |
+|---|---|---|
+| run_startup_empty, statements_2k, named_fn_100_calls, lambda_100_calls, import_once, repl_500_statements, fs_10_touch_open | PASS | PASS |
+| `stream_read_5k_lines` | **FAILED**: "cannot change binding type: line" | **FAILED**: refused, `context:assignment-error` |
+| `read_val_500` | **FAILED**: "cannot change binding type: val" | **FAILED**: refused, `host-handle-flow` (finding F-HD1) |
+
+Two original workloads are invalid programs as written, on both versions: `line := i.read_line()` and later
+`line = null`. They stay identical and are reported FAILED, with no timing. Correcting their sources would make them
+different workloads, so it needs an explicit decision.
+
+**Historical numbers.** The v4.3 figures in docs/handover/V4.3-LANGUAGE-CAMPAIGN.md (CP91) are kept, but they are
+**not comparable**: their execution was never validated, and on the evidence above their `nift run` and `nift sh`
+rows measured error exits. Wall-clock measurement of the corrected tool happens on Linode only, with approval.
+
