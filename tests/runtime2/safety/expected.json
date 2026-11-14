@@ -4916,13 +4916,13 @@
  },
  "m_insert_object_loop": {
   "exit": 1,
-  "stderr": "error: p.f:3:16: value has no member: insert\n",
-  "stdout": "b\n"
+  "stderr": "error: p.f:3:16: not compiled for the VM (legacy-method-precedence): calling an object field whose name legacy reserves as a method is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+  "stdout": ""
  },
  "m_insert_object_mapget": {
   "exit": 1,
-  "stderr": "error: p.f:5:1: value has no member: insert\n",
-  "stdout": "b\n"
+  "stderr": "error: p.f:5:1: not compiled for the VM (legacy-method-precedence): calling an object field whose name legacy reserves as a method is not supported by the Runtime 2.0 VM yet\nnote: the program was not executed: no part of it ran\nnote: to run it on the legacy interpreter: NIFT_VM=0 nift p.f\nnote: please report unsupported programs at https://github.com/nift-dev/nift/issues\n",
+  "stdout": ""
  },
  "m_insert_object_param": {
   "exit": 1,

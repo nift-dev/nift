@@ -52,3 +52,22 @@ over-refused name (`push`) to the pinned list. Each is caught.
 
 One new classification row, `legacy-method-precedence` (class I, approved, D-102/D-106). `host-literal-arg` keeps its
 row unchanged. The PENDING-OWNER set is unchanged.
+
+## Recorded safety transcripts changed (D-106, D-107)
+
+The F6 guard refuses a call of one of the 46 names on any object-kind or unknown-kind receiver, whether or not the
+field exists (design 6c). Two safety cases call `.insert(0, 1)` on a plain object without that field. Legacy prints
+`b` and then reports `unknown value or malformed expression: a.insert(0, 1)` at the same position; the VM previously
+ran and raised `value has no member: insert`; it now refuses the program before anything runs. D-107 approved
+updating exactly these two entries of tests/runtime2/safety/expected.json (`safety.py --update`; the diff touches only
+these two entries, 4 lines each way):
+
+| Case (program unchanged, tests/runtime2/safety/safety.py) | Recorded before (C134 transcript) | Recorded now |
+| --- | --- | --- |
+| `m_insert_object_loop`: `print("b")` / `xs := [{"k": 1}]` / `for (a : xs) { a.insert(0, 1) }` / `print("after")` | exit 1; stdout `b\n`; stderr `error: p.f:3:16: value has no member: insert` | exit 1; stdout empty; stderr `error: p.f:3:16: not compiled for the VM (legacy-method-precedence): calling an object field whose name legacy reserves as a method is not supported by the Runtime 2.0 VM yet` and the standard notes (the program was not executed; `NIFT_VM=0 nift p.f`; the issues URL) |
+| `m_insert_object_mapget`: `print("b")` / `m := map()` / `m.set("k", {"k": 1})` / `a := m.get("k")` / `a.insert(0, 1)` | exit 1; stdout `b\n`; stderr `error: p.f:5:1: value has no member: insert` | exit 1; stdout empty; the same refusal at `p.f:5:1` |
+
+`m_insert_object_session` keeps its recorded transcript (`session:legacy-method-precedence`): the F6 guard does not
+apply in sessions (9789d332). Mutant 4 (the F6 guard removed) is caught by literal_args.py (`f6-oracle`,
+`f6-entry-points`) and by these two safety cases (`m_insert_object_loop`, `m_insert_object_mapget` fail with the old
+transcript); `m_insert_object_session` passes under mutant 4, as it should.

@@ -404,3 +404,16 @@ As section 5 says, `expected.json` is a recorded snapshot, not proof of
 correctness: it was produced by `safety.py --update` from the candidate
 binary. The binding evidence is the runner's invariants, the
 legacy-matched cases, the mutants and the fuzz gate.
+
+## 9. Recorded transcript changes
+
+- **C145 (D-106, D-107):** two entries of `expected.json` were updated with `safety.py --update`; no other entry and
+  no program changed. The F6 refusal `legacy-method-precedence` (a plain object's `insert` call; legacy: "unknown
+  value or malformed expression") replaces the run-time error the VM gave before:
+
+| Case (program unchanged, tests/runtime2/safety/safety.py) | Recorded before (C134 transcript) | Recorded now |
+| --- | --- | --- |
+| `m_insert_object_loop`: `print("b")` / `xs := [{"k": 1}]` / `for (a : xs) { a.insert(0, 1) }` / `print("after")` | exit 1; stdout `b\n`; stderr `error: p.f:3:16: value has no member: insert` | exit 1; stdout empty; stderr `error: p.f:3:16: not compiled for the VM (legacy-method-precedence): calling an object field whose name legacy reserves as a method is not supported by the Runtime 2.0 VM yet` and the standard notes (the program was not executed; `NIFT_VM=0 nift p.f`; the issues URL) |
+| `m_insert_object_mapget`: `print("b")` / `m := map()` / `m.set("k", {"k": 1})` / `a := m.get("k")` / `a.insert(0, 1)` | exit 1; stdout `b\n`; stderr `error: p.f:5:1: value has no member: insert` | exit 1; stdout empty; the same refusal at `p.f:5:1` |
+
+  Details: checkpoints/c145-literal-args.md.
