@@ -8,5 +8,8 @@
 namespace nift::rt {
 
 bool reserved_name(std::string_view name);
+// F6 (D-102, D-106): method names whose legacy method head is tried before a plain object's callable field, so legacy
+// reports "unknown value or malformed expression" where the VM would call the field (pinned: 46 names).
+bool legacy_field_call_refused(std::string_view name);
 
 } // namespace nift::rt

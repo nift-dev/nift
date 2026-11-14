@@ -2,6 +2,8 @@
 
 #include "rt/legacy_names.h"
 
+#include <algorithm>
+#include <iterator>
 #include <unordered_set>
 
 // rt-lint: cold-file names are checked at compile and validation time only, never on the VM hot path
@@ -32,6 +34,23 @@ bool reserved_name(std::string_view name) {
         "null", "this", "self", "lambda", "content", "input", "script",
     };
     return names.count(name) != 0;
+}
+
+bool legacy_field_call_refused(std::string_view name) {
+    static constexpr std::string_view names[] = {  // sorted (binary search); C145 review-f5 F6 table
+        "all", "any", "append", "cat", "count", "count_by", "cwd", "done", "elapsed", "env", "filter", "find",
+        "find_index", "group_by", "group_by_each", "index_by", "insert", "insert_after", "insert_before", "map",
+        "max_by", "min_by", "partition", "pause", "paused", "pipe", "prepend",
+#if defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 5  // mutant 5: one of the 10 over-refused names (push) added
+        "push",
+#endif
+        "read_all_bytes", "read_bytes", "read_val", "reduce", "replace_once", "reset", "resume", "run", "running",
+        "sort_by", "start", "status", "stderr", "stdin", "stdout", "stop", "unique_by", "write_bytes", "write_val",
+    };
+#if defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 4  // mutant 4: the F6 guard removed
+    return false;
+#endif
+    return std::binary_search(std::begin(names), std::end(names), name);
 }
 
 } // namespace nift::rt

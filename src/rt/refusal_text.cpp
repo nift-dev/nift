@@ -116,6 +116,7 @@ constexpr Family kFamilies[] = {
     {"host-literal-arg", "a literal argument to a host operation"},
     {"incdec-target", "this increment or decrement target"},
     {"lambda-", "this lambda form"},
+    {"legacy-method-precedence", "calling an object field whose name legacy reserves as a method"},
     {"number-literal", "this number literal"},
     {"string-literal", "this string literal"},
     {"object-duplicate-key", "an object literal with a duplicate key"},
