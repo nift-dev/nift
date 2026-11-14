@@ -2755,3 +2755,22 @@ Recorded from the coordinator's relay. No new production scope.
      - (d) the unqualified seven are refused only under the VM default; legacy is unchanged;
      - (e) migrated tests keep their behavioural invariants (the manifest's `invariant` column);
    - the CallNative id evidence and the listed gates.
+
+## D-101 — L6 accepted at 9c1a0d86; the L6 docs follow-up; C144 shell call syntax (owner, 2026-11-14)
+
+Recorded from the coordinator's relay. D-097 to D-100 are recorded where the coordinator keeps them (D-097: the
+corrected v43 benchmark is cert-prep tooling; D-100: the owner does not accept the F1 session behaviour).
+
+1. **L6 accepted** at 9c1a0d86 (nift e48fd3bf…18f1), as checkpoint acceptance only. A docs-only follow-up (e4d1eb4c)
+   corrects F2/F3 (diagnostic parity only where prevalidation runs), F4 (the no-launch statement concerns implicit
+   dispatch; run()/cmd() launch by design), the instruction-count wording, F8 and F7.
+2. **C144, the interactive-shell dispatch correction.** Root cause: `is_nift_statement_line` (CP19 S1, f1664d19)
+   treated a line as Nift only when its first shell word contained `(`, so `cp ("a.txt", "c.txt")` ran PATH `cp`
+   in `nift`, `nift -i` and piped stdin. Required: function-call syntax (an identifier or `native::name`, optional
+   blanks, an unquoted `(`) and every `native ::` form are Nift, for every name, checked after the shell built-in and
+   `command` checks; classification is not acceptance, the parser decides. Unchanged: command lines without `(` after
+   the first word, `command NAME …`, pipelines, redirects, connectors, `$[...]`, paths, cd and jobs. Bounded to the
+   classifier (stop beyond about 40 src lines). Tests: unit expectations, a session test with a fake PATH in both
+   engines and three front ends, mutants (the first-word-only revert, the native rule dropped, a rule capturing
+   `cp a.txt c.txt`) with a no-mutation control; the compatibility deltas recorded (compatibility.md,
+   checkpoints/cp19-s1-dispatch.md).

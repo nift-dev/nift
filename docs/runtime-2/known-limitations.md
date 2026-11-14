@@ -91,9 +91,8 @@ This construct is refused on the VM by an owner decision. It is not pending work
 - **No implicit external program (scope, D-101 F4).** Function-call syntax never falls back to running a program
   found on PATH: a call is a native, a user function, or refused. This is about implicit dispatch only. The explicit
   process APIs `run()` and `cmd()` launch programs by design (legacy runs them; the VM refuses them as
-  `deferred-named`). Known exception, being corrected in C144: in an interactive or piped shell session, a call
-  written with a blank before `(` (`cp ("a.txt", "c.txt")`) is currently classified as a shell command line and
-  runs the program on PATH.
+  `deferred-named`). Since C144 this holds in the interactive and piped shell too: a call written with a blank before
+  `(` (`cp ("a.txt", "c.txt")`) is Nift, not a command line (compatibility.md lists the shell inputs that change).
 - Legacy (`NIFT_VM=0`) keeps the unqualified seven as the historical oracle, and also accepts `native::name(`.
 - Exactly `native::name(` is valid: no space around `::` and the `(` immediately after the name. Any other
   spelling, and `native::` before a name outside the seven, is caught by the default syntax prevalidation, which

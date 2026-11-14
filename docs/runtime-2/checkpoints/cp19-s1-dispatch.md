@@ -46,6 +46,36 @@ Filesystem and process built-ins do **not** intercept command form. `ls`,
 `cp`, `mv`, `rm`, `cat`, `mkdir`, `touch`, `copy`, `remove` and every other
 non-allow-listed built-in resolve through `PATH` (or report 127).
 
+**C144 correction (D-100, D-101).** Step 1 originally tested only whether the *first shell word* contains `(`, so a
+call written with a blank before `(` (`cp ("a.txt", "c.txt")`) fell through to steps 2-6 and ran the program on PATH,
+unlike v4.12.0 (any `(` was Nift) and unlike scripts. `is_nift_statement_line` now also treats a line as Nift when it
+starts with an identifier (or `native::<identifier>`), optional blanks and an unquoted `(`, or with `native`, optional
+blanks and `::` (src/shell/CommandDispatch.cpp `has_call_syntax_head`, checked after the shell built-in and `command`
+checks). Classification as Nift is not acceptance: the parser decides. Expected compatibility deltas:
+
+- `NAME (args)` (blanks or tabs before an unquoted `(`) is Nift for every identifier, not only the seven: `cp ("a",
+  "b")`, `print ("x")`, `echo ("hi")`, `len ("abc")`, `foo ("x")`. On legacy this is a call where legacy accepts the
+  spaced form (a user function: `foo ("x")` calls `foo("x")`, as in v4.12.0 and scripts) and otherwise "undefined
+  callable: NAME"; on the VM the spaced call is a session refusal (`session:opaque`). Before C144 these ran the
+  program on PATH (or command-form `print`/a user function with the string argument `(x)`).
+- `native :: …`, `native ::…` and `native::name (…)` are Nift (the L6 checks or a session refusal), never a program
+  named `native`.
+- Inherently ambiguous inputs that change: `echo (hi)` and any `NAME (…)` command line whose first argument starts with
+  an unquoted `(` (not valid POSIX sh), and `NAME (…) | other` / `NAME (…) > f` (now a Nift statement, refused or an
+  error; write the command without the parentheses). Use `command NAME …` or quote the argument to keep the program.
+- Unchanged: `cp a.txt c.txt`, `ls -l` and every line without `(` right after its first word; `command NAME …`;
+  pipelines, redirects, connectors and `&` of ordinary commands; `$[...]` in arguments; explicit paths (`./x (a)`);
+  the shell built-ins (`cd ("..")` stays shell `cd` with the literal `(..)`); an environment-assignment prefix
+  (`FOO=1 cp ("a","b")` stays a command line); `time (…)`, `nohup (…)`, `sudo (…)` follow the same first-word rule
+  and become Nift.
+
+Tests: tests/shell_dispatch_unit.cpp (`test_call_syntax`) and tests/runtime2/shell_call_syntax.py
+(`make test-runtime2-shell-call-syntax`, a prerequisite of test-cp19-s1-dispatch): `nift -i` and plain `nift` with
+piped stdin, and the interactive session on a pty, in both engines, with a fake PATH whose cat, cp, mv, rm, ls,
+mkdir, touch, native, foo, echo, read, sleep, test, len and print leave markers; call forms launch nothing, the real
+command forms do. Mutants (NIFT_C144_MUTANT, sanctioned builds): 1 restores the first-word-only rule, 2 drops the
+`native ::` rule, 3 also captures `cp a.txt c.txt`; each is caught, after a no-mutation control.
+
 ## Exactly-once guarantees
 
 - Classification is final; a failed user function or allow-listed built-in is
@@ -242,7 +272,8 @@ Trailing whitespace in this record was removed.
 
 - `ls`, `cp`, `mv`, `rm`, `cat`, `mkdir`, `touch` and other non-allow-listed
   names in command form now run the external tool from `PATH`. For example,
-  `mkdir x` runs `/bin/mkdir`; use `mkdir("x")` to call the Nift built-in.
+  `mkdir x` runs `/bin/mkdir`; use `mkdir("x")` to call the Nift built-in (`native::mkdir("x")` under the
+  Runtime 2.0 VM, L6). Since C144, `mkdir ("x")` with a blank before `(` is call syntax too, never the program.
 - `print hello` and `pwd` remain Nift command-form built-ins.
 - `command <name>` forces external resolution even if a shell-state command,
   user function or allow-listed built-in has that name.

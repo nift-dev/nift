@@ -24,8 +24,9 @@ approved), D-095 (L6 authorised; the design approved with answers (a) to (c) and
   user function of that name is an ordinary function`. In a session the refused statement is handled like any other
   session refusal. Function-call syntax never implicitly launches an external executable: the call is a native or a
   user function, or it is refused. This concerns implicit dispatch only; the explicit process APIs `run()` and
-  `cmd()` launch programs by design (D-101 F4). Exception, corrected in C144: an interactive or piped session
-  classifies a call written with a blank before `(` as a shell command line (F1, the CP19 S1 classifier).
+  `cmd()` launch programs by design (D-101 F4). Until C144 an interactive or piped session classified a call written
+  with a blank before `(` as a shell command line (F1, the CP19 S1 classifier); C144 corrects it
+  (checkpoints/cp19-s1-dispatch.md).
 - **Legacy** (`NIFT_VM=0`, the historical oracle) keeps the unqualified seven unchanged and also accepts
   `native::name(`.
 - **Templates and build hooks are unchanged** (D-096 #1: the initial L6 boundary). `@script`, `$[...]` and hook

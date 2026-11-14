@@ -16,6 +16,27 @@ Must not change unless a decision in `decisions.md` approves it.
 
 ## Approved breaks
 
+**Interactive shell: function-call syntax is never a command line (C144; D-100, D-101).** In `nift`, `nift -i` and
+piped stdin, both engines (classification happens before engine selection); scripts, `-e`, `-c`, `nift -`, templates
+and hooks were never affected. This restores v4.12.0's treatment of `NAME (…)` as Nift (it does not restore v4.12.0's
+command-form natives: `cp a.txt c.txt` still runs PATH `cp`, CP19 S1). Expected deltas against CP19 S1 to C143:
+
+- `NAME (args)` (blanks or tabs before an unquoted `(`) is Nift for every identifier, not only the seven: `cp ("a",
+  "b")`, `print ("x")`, `echo ("hi")`, `len ("abc")`, `foo ("x")`. On legacy this is a call where legacy accepts the
+  spaced form (a user function: `foo ("x")` calls `foo("x")`, as in v4.12.0 and scripts) and otherwise "undefined
+  callable: NAME"; on the VM the spaced call is a session refusal (`session:opaque`). Before C144 these ran the
+  program on PATH (or command-form `print`/a user function with the string argument `(x)`).
+- `native :: …`, `native ::…` and `native::name (…)` are Nift (the L6 checks or a session refusal), never a program
+  named `native`.
+- Inherently ambiguous inputs that change: `echo (hi)` and any `NAME (…)` command line whose first argument starts with
+  an unquoted `(` (not valid POSIX sh), and `NAME (…) | other` / `NAME (…) > f` (now a Nift statement, refused or an
+  error; write the command without the parentheses). Use `command NAME …` or quote the argument to keep the program.
+- Unchanged: `cp a.txt c.txt`, `ls -l` and every line without `(` right after its first word; `command NAME …`;
+  pipelines, redirects, connectors and `&` of ordinary commands; `$[...]` in arguments; explicit paths (`./x (a)`);
+  the shell built-ins (`cd ("..")` stays shell `cd` with the literal `(..)`); an environment-assignment prefix
+  (`FOO=1 cp ("a","b")` stays a command line); `time (…)`, `nohup (…)`, `sudo (…)` follow the same first-word rule
+  and become Nift.
+
 | Break | Decision | Checkpoint |
 | --- | --- | --- |
 | Project-root confinement removed from general filesystem operations | D-002 | CP03 |
