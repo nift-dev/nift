@@ -31,11 +31,11 @@ jobs:
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys2
         if: runner.os == 'Windows'
         with:
@@ -43,12 +43,12 @@ jobs:
           update: true
           install: make diffutils mingw-w64-ucrt-x86_64-gcc
       - name: Check out the immutable E2 baseline
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: c5f449c31cf93bd0155cae0332d6c4ffdd2aa161
           path: .build/e2-source
       - name: Check out the immutable E3B baseline
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: 6775a0028db69b0eaf55343b3dc00079920529d4
           path: .build/e3b-source
@@ -76,7 +76,7 @@ jobs:
           } else { $suffix = '' }
           python tests/run_identity_certification.py --e3b "./.build/e3b-source/nift$suffix" --e2 "./.build/e2-source/nift$suffix"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: sidecar-native-${{ matrix.id }}
@@ -100,11 +100,11 @@ jobs:
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys2
         if: runner.os == 'Windows'
         with:
@@ -135,7 +135,7 @@ jobs:
           } else { $suffix = '' }
           python tests/sidecar_platform_contracts.py --nift "./nift$suffix" --imports .build/sidecar-imports --output .build/sidecar-crossover.json --export .build/sidecar-export.json
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: sidecar-crossover-${{ matrix.id }}

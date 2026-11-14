@@ -54,6 +54,7 @@ Every gate that cannot run locally is named before the launch (section 2, column
 | Evidence | `--evidence-root /var/tmp/nift-certify`, `--work-root /var/tmp/nift-certify-work`, `--campaign-id cb35-<start>-<tip8>`, with `--resume` on restart; the destructive gates run in private copies | B21 1-5 |
 | Unprivileged user | `tester` (`--unprivileged-user`) for root-only reruns | SKIPPED-ENVIRONMENTAL |
 | Bindings | Go 1.26, Node 22, .NET 10 (cb35 setup) | `test-bindings` |
+| GitHub Actions | every `uses:` pinned to a full commit SHA with a `# <tag>` comment (D-104); table in ci-action-pins.md | ci-action-pins.md (resolution sources, date) |
 
 ## 2. Gate inventory
 
