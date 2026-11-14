@@ -3873,6 +3873,8 @@ RT_LEGACY_ORACLE_OBJECTS := $(filter-out src/nift.o src/CLI.o $(RT_LINK_SOURCES:
 # CP16: the legacy objects use the Host layer (kept above), whose handle table
 # needs these src/rt objects.
 RT_LEGACY_ORACLE_OBJECTS += src/rt/handle.o src/rt/value.o src/rt/string.o src/rt/heap_account.o
+# C142: legacy save() shares the VM's save-target checks (src/rt/natives/host_std_stream.cpp).
+RT_LEGACY_ORACLE_OBJECTS += src/rt/natives/host_std_stream.o
 $(TEST_DIR)/rt-legacy-oracle$(EXEEXT): tests/rt/legacy_oracle.cpp $(RT_PARSER_SOURCES) $(RT_PARSER_HEADERS) $(RT_LEGACY_ORACLE_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p $(TEST_DIR)
