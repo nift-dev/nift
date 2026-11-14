@@ -128,7 +128,13 @@ bool UnitCompiler::expr_to(NodeId id, std::uint16_t dst) {
         case NodeKind::Assign: case NodeKind::CompoundAssign:
             return !invocation_write(id) && assignment_expr(node, dst);
         case NodeKind::IncDec: return !invocation_write(id) && inc_dec_expr(node, dst);
-        case NodeKind::Call: return call(node, dst);
+        case NodeKind::Call:
+#if !(defined(NIFT_C145_MUTANT) && NIFT_C145_MUTANT == 3)  // mutant 3: the write-family fallback dropped
+            // C145 (D-102): write/write_line/write_val with a direct `$[` literal: legacy interpolates for an
+            // ofstream and passes it raw otherwise, decided by the receiver at run time; refused before anything runs.
+            if (node.flags & kFlagAmbiguousLiteralArg) return fail(node, "host-literal-arg");
+#endif
+            return call(node, dst);
         case NodeKind::Await: return await_expr(node, dst);  // CP22 (compiler_coro.cpp)
         case NodeKind::Member: return member(node, dst);
         case NodeKind::Index: return index(node, dst);
