@@ -307,6 +307,10 @@ def _f6_entry(nift):
             files={"m.f": 'fn(g()) {\n  o := {"cat": (p) => "U"}\n  return o.cat("a")\n}\nexport(g)\n'})
     if m[0] != 1 or m[1] or "(legacy-method-precedence)" not in m[2]:
         problems.append("module: %s" % show(m))
+    # A refused receiver keeps its own reason: `cmd(...).run()` is callable:cmd, not legacy-method-precedence.
+    c = run(nift, 'print("before")\nr := cmd("ls").run()\n', True)
+    if c[0] != 1 or c[1] or "(callable:cmd)" not in c[2] or "legacy-method-precedence" in c[2]:
+        problems.append("cmd receiver: %s" % show(c))
     # Sessions keep their own refusal, session:legacy-method-precedence (D-106: not narrowed or replaced by C145).
     s = run(nift, None, True, args=["-i"], stdin='o := {"cat": (p) => "U"}\nprint(o.cat("a"))\n')
     if "session refused: session:legacy-method-precedence" not in s[2] or "U" in s[1]:
