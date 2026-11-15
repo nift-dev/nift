@@ -2825,3 +2825,18 @@ Recorded from the coordinator's relay. D-104 and D-105 are recorded where the co
    a shell command.
 4. **Stop conditions:** new compiler or interpolation infrastructure for F5; a conflict of F6 with an approved B5
    contract; src beyond about 70 lines; any change to frozen evidence, fingerprints or recorded oracle data.
+
+## D-107 and D-109 — C145 completion and acceptance (owner, 2026-11-15)
+
+Recorded from the coordinator's relays.
+
+- **D-107:** option (a) approved: exactly the two safety transcripts `m_insert_object_loop` and
+  `m_insert_object_mapget` record the F6 refusal; the size exception for this candidate (+87/−9, 12 files) approved.
+- **D-109: C145 accepted** at dc43246a (nift c63e5413…dd1e). This closes the last production checkpoint; no further
+  production work is authorised. Review notes (REVIEW-C145), documented in compatibility.md, known-limitations and
+  checkpoints/c145-literal-args.md:
+  - N1: the F6 compile-time refusal also applies in unreachable code (`if (false) { print(o.cat("a")) }`), where
+    legacy completes: conservative admission behaviour that can differ from legacy execution.
+  - N2: the refusal message ("calling an object field…") also appears for a missing field or a receiver whose type is
+    not known at compile time; the message is not changed.
+  - **actionlint: NOT RUN — REQUIRED BEFORE CROSS-PLATFORM CI**, deferred to the certification environment.

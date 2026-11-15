@@ -252,6 +252,16 @@ and v4.12.0. The VM called the field; it now refuses the program (`legacy-method
 in scripts, `-e` and modules. Other names (`o.f`, `o.push`, `o.cp`) still call the field, as legacy does. Struct
 methods and `native::` are unaffected. Sessions keep `session:legacy-method-precedence` (narrowing it is deferred).
 
+- **N1 (D-109): unreachable code is refused too.** The F6 refusal is a compile-time admission check, so it also
+  applies where the call is never reached: `o := {"cat": (p) => "U"}` / `print("before")` /
+  `if (false) { print(o.cat("a")) }` / `print("after")` is refused on the VM (`legacy-method-precedence` at 3:20,
+  nothing runs), while legacy prints `before` and `after` and exits 0. This is conservative admission behaviour that
+  can differ from legacy execution.
+- **N2 (D-109): the message is broader than its cause.** "calling an object field whose name legacy reserves as a
+  method" is also the text when the receiver has no field of that name (`{"k": 1}.insert(0, 1)`, the safety cases
+  above) or when the receiver's type is not known at compile time (a parameter, `m.get("k")`). The message is
+  unchanged by decision.
+
 **Pending compatibility work, not changed by C145:** `a := ["q"]; a.insert(0, "z")` is "insert: invalid index" in
 legacy, while the VM inserts. Recorded only; no decision.
 

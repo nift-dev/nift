@@ -71,3 +71,17 @@ these two entries, 4 lines each way):
 apply in sessions (9789d332). Mutant 4 (the F6 guard removed) is caught by literal_args.py (`f6-oracle`,
 `f6-entry-points`) and by these two safety cases (`m_insert_object_loop`, `m_insert_object_mapget` fail with the old
 transcript); `m_insert_object_session` passes under mutant 4, as it should.
+
+## Review notes (REVIEW-C145; D-109)
+
+- **N1 (D-109): unreachable code is refused too.** The F6 refusal is a compile-time admission check, so it also
+  applies where the call is never reached: `o := {"cat": (p) => "U"}` / `print("before")` /
+  `if (false) { print(o.cat("a")) }` / `print("after")` is refused on the VM (`legacy-method-precedence` at 3:20,
+  nothing runs), while legacy prints `before` and `after` and exits 0. This is conservative admission behaviour that
+  can differ from legacy execution.
+- **N2 (D-109): the message is broader than its cause.** "calling an object field whose name legacy reserves as a
+  method" is also the text when the receiver has no field of that name (`{"k": 1}.insert(0, 1)`, the safety cases
+  above) or when the receiver's type is not known at compile time (a parameter, `m.get("k")`). The message is
+  unchanged by decision.
+- The classification row for `legacy-method-precedence` (tests/runtime2/cp25/classification.tsv) is test data and is
+  not edited; these notes are its documentation.
