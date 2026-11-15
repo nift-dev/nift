@@ -208,6 +208,19 @@ inventory gate runs without it.
     pinned, while the new `@v7` pins run v7.0.2. release.yml's `setup-msys2` stays at v2.32.0 (`66cd2cce`), while
     the new `@v2` pins run v2.33.0.
   - Every `uses:` reference is now a commit SHA; none is a tag object.
+- **The platform-subset table check runs twice in a full certification run (D-110, D-111): a harmless duplicate.**
+  `test-runtime2-platform-subset-table` is a `$(RT_VM_SUITE)` suite in the test-rt-vm recipe (`platform-subset-table`,
+  D-110). It is also a direct `certify-targets` prerequisite (D-111 (a)), because the certification guard requires a
+  certify-targets recipe to invoke tests/runtime2/platform_subset.py, which CI runs directly. `certify.py --list`
+  plans it as a parallel entry of its own, and the exclusive test-rt-vm entry runs it again through its recipe's
+  sub-make. It is a phony, read-only check (`--check`, then `--selftest` in a private temporary directory), about
+  2 seconds, so the two runs cannot disturb each other or the tree. It is kept as is (D-111: no added complexity).
+- **Deferred certification-infrastructure limitation (D-111 #3): removing a test-rt-vm suite from BOTH the test-rt-vm
+  recipe and `RT_VM_SUITES` is not detected by any check.** The test-integrity suite-wiring guard compares the two
+  lists, so it catches a suite removed from only one of them. suite_status.sh's summary checks the suites against
+  `RT_VM_SUITES`. Neither has an independent record of the expected suites, and the certification guard does not
+  look inside the test-rt-vm recipe. No guard change was made (D-111). At this integration `RT_VM_SUITES` lists 39
+  suites.
 - **Before any cross-platform CI:** run actionlint against the final consolidated workflows (D-105). It may run in the
   certification environment, since it is not available locally.
 - **Before any launch:** run every locally runnable gate on the frozen candidate (the owner's standing rule).

@@ -1225,7 +1225,7 @@ RT_VM_SUITES = rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint leg
 	vm-records-coverage vm-path-wording vm-known-refused vm-engine-selection vm-former-replay vm-d018 \
 	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
 	vm-modules module-host-order vm-structs vm-globals semantics-modules semantics-modules-structs \
-	modules-d041 cp12b-inventory native-qualifier literal-args save-safety async-memory
+	modules-d041 cp12b-inventory native-qualifier literal-args save-safety async-memory platform-subset-table
 .PHONY: test-rt-vm-invalidate test-rt-vm-verify
 test-rt-vm-invalidate:
 	@bash tests/runtime2/suite_status.sh invalidate "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
@@ -1273,6 +1273,7 @@ test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT)
 	-@$(RT_VM_SUITE) literal-args -- $(LITERAL_ARGS_GATE)
 	-@$(RT_VM_SUITE) save-safety -- $(SAVE_SAFETY_GATE)
 	-@$(RT_VM_SUITE) async-memory -- $(ASYNC_MEMORY_GATE)
+	-@$(RT_VM_SUITE) platform-subset-table -- $(MAKE) --no-print-directory test-runtime2-platform-subset-table
 	@bash tests/runtime2/suite_status.sh summary "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" $(RT_VM_SUITES)
 
 # ASan+UBSan: the unit tests, then the corpus and generated programs on a
@@ -5811,7 +5812,10 @@ test-v412-scripting-compare-selftest: $(TARGET)
 test-runtime2-platform-subset-table:
 	$(PYTHON) tests/runtime2/platform_subset.py --check
 	$(PYTHON) -B tests/runtime2/platform_subset.py --selftest
-test-rt-vm: test-runtime2-platform-subset-table
+# D-110: run by test-rt-vm as a $(RT_VM_SUITE) suite of its recipe (platform-subset-table), not as a prerequisite,
+# so its failure cannot stop the other suites (C140b G1).
+# D-111 (a): certify-targets reaches it directly too (the certification guard: CI runs platform_subset.py).
+certify-targets: test-runtime2-platform-subset-table
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"

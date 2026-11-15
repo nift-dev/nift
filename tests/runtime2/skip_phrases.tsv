@@ -129,6 +129,9 @@ tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shel
 tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shell short-circuit cases), not a message	('skip_and',['-i'],'x:=0\ncommand /usr/bin/false && command /usr/bin/printf "%s\\n" "$[(x+=1)]"\nx\nexit\n','',2),
 tests/runtime2/cp19/session_cli.py	detected	-	if unverified:print(f'SKIP UNVERIFIED COMPARATOR COVERAGE: session_cli.py: {unverified} VM-session comparator '
 tests/runtime2/cp22/adversarial.py	justified	a FAIL line: the gate fails	print(f"FAIL {tag} adv{k}: not run on the VM: {st.get('outcome')} {st.get('reason')}")
+tests/runtime2/cp25/post_cert_refusals.py	justified	a FAIL line: the negative control fails (return 1)	print("FAIL post-cert refusals negative control: %s; %d scoped unit(s) not run (corpus missing)%s" % (
+tests/runtime2/cp25/post_cert_refusals.py	detected	-	print("NOT RUN post-cert refusals: %s" % n)
+tests/runtime2/cp25/post_cert_refusals.py	detected	-	print("NOT RUN post-cert refusals: %d unit(s) not run; this is not a pass" % len(not_run))
 tests/runtime2/file_copy_move_freedom.sh	detected	-	else echo "SKIP cross-device move (/dev/shm missing or on the same filesystem)"; fi
 tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print("FAIL: base.f did not run on the VM")
 tests/runtime2/for_s2_bench.py	justified	a FAIL line: the gate fails	print(f"FAIL: {label}: a loop did not run on the VM")
@@ -138,10 +141,15 @@ tests/runtime2/host_deps.py	detected	-	print("SKIP [modified] edit during stream
 tests/runtime2/host_m3_order.py	detected	-	print(f"SKIP root {base}: {error}")
 tests/runtime2/literals/run.py	detected	-	print(f"PASS {name} [{context}] side effects preserved, later call skipped")
 tests/runtime2/packages/packages.py	detected	-	print("SKIP E2 writer (git unavailable)")
-tests/runtime2/read_limit.py	detected	-	print("SKIP process capture (no head)")
-tests/runtime2/read_limit.py	detected	-	print("SKIP default 1 GiB limit (MemAvailable %d MiB < 4096)" % (available // MiB))
-tests/runtime2/read_limit.py	detected	-	print("SKIP read_line EIO (no /proc/self/mem)")
-tests/runtime2/read_limit.py	detected	-	print("SKIP capture-while-running cases (needs /proc, yes, head, sh)")
+tests/runtime2/platform_subset.py	justified	docstring text (the module docstring), not printed	{py}); its exit status decides PASS or FAIL. An entry that exits 0 is PARTIAL, not PASS, when it printed a skip that
+tests/runtime2/platform_subset.py	justified	docstring text (the module docstring), not printed	list for that platform and entry (review L3, N1); design-boundary lines are NOTEs. --selftest checks this. A unit binary that was not built is a FAIL, not a skip. Exit 1 if any included entry
+tests/runtime2/platform_subset.py	justified	a comment in the table, not printed	# NOTE; a required skip listed here for this platform and entry is an EXPECTED SKIP; any other skip makes the entry
+tests/runtime2/platform_subset.py	justified	docstring text (classify), not printed	"""(status, notes): FAIL on a non-zero exit; else PARTIAL on any unexpected skip; else PASS. notes lists every
+tests/runtime2/platform_subset.py	justified	docstring text (classify), not printed	skip line with its class (NOTE design boundary, EXPECTED SKIP, UNEXPECTED SKIP)."""
+tests/runtime2/platform_subset.py	justified	a FAIL line: the entry fails and the run returns 1	print("FAIL %s: unit binary %s was not built (a missing build is a failure, not a skip)" % (eid, argv[0]))
+tests/runtime2/read_limit.py	detected	-	print("NOT RUN", name, "(%s)" % why)
+tests/runtime2/read_limit.py	detected	-	print("%d case(s) NOT RUN; this is not a pass" % len(not_run))
+tests/runtime2/read_limit_names_selftest.py	detected	-	print("NOT RUN read_limit names selftest: scripts/certify_fingerprints.py is not in this checkout")
 tests/runtime2/refsem/stale_vm.cpp	justified	a harness diagnostic on a failing path (the unit fails)	std::fprintf(stderr, "harness: %s not run (%s %s)\n", name, r.refusal.c_str(), r.execution.message.c_str());
 tests/runtime2/rt_parser_corpus.py	detected	-	print("paren oracle: skipped %d nondeterministic entries (tools/rt-diff/ignore.txt)" % len(skipped))
 tests/runtime2/safety/mutants.sh	detected	-	link=$(printf '%s\n' $objects | grep -vxE "$skip" | grep -v '\.a$' | tr '\n' ' ')
