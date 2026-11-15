@@ -44,7 +44,8 @@ EXPECTED_MUTANT = {
     "collection-callback": {"coro-collection-callback"},
 }
 F12 = set().union(*EXPECTED_MUTANT.values())
-# method:join stays E2+D, PENDING-OWNER (its 9 CP24/lambda-variadic sightings remain with the fix), so it is
+# method:join stays E2+D (its 9 CP24/lambda-variadic sightings remain with the fix; since D-077 #1 it is
+# deferred-post-cert, scoped to those units only, so the mutant's thread-probe sightings are outside its scope), so it is
 # not a retired row; every other F12 reason above is retired in slot 1 and must be reported as seen again.
 RETIRED = F12 - {"method:join"}
 

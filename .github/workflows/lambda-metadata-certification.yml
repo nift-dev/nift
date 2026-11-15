@@ -11,11 +11,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys2
         if: runner.os == 'Windows'
         with:
@@ -52,7 +52,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python tests/lambda_metadata_contracts.py --nift $binary
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: lambda-metadata-${{ runner.os }}
@@ -61,8 +61,8 @@ jobs:
   msvc-ownership:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
       - name: Actual LambdaInstance clone and destruction under MSVC STL
         shell: pwsh
         run: |
@@ -71,7 +71,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ./.build/lambda-metadata/msvc-ownership.exe | Tee-Object .build/lambda-metadata/msvc-stl.txt
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: lambda-metadata-msvc
@@ -80,8 +80,8 @@ jobs:
   sanitizer:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
       - name: ASan UBSan LSan callable lifecycle

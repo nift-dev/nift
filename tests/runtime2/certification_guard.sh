@@ -14,7 +14,8 @@ REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke
           test-rt-parser test-sha256 test-site-dx
           test-rt-vm test-runtime2-cp16-n1 test-build-recovery test-runtime2-cp13b-mutants test-runtime2-cp14b-mutants test-runtime2-cp18 test-runtime2-cp18-switch test-runtime2-cp18-sanitize test-runtime2-cp18-cow
           test-runtime2-cp22-mutants test-cp19-certify test-cp23-certify)
-WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml)
+WORKFLOWS=(.github/workflows/test-integrity.yml .github/workflows/checkpoint-10-cross-platform.yml .github/workflows/v44-cross-platform.yml
+           .github/workflows/runtime2-cross-platform.yml)
 python3 - "${WORKFLOWS[@]}" -- "${REQUIRED[@]}" <<'PY'
 import re, sys
 sys.path.insert(0, 'scripts')

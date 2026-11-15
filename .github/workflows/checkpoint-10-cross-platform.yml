@@ -47,12 +47,12 @@ jobs:
             runner_os: Windows
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         id: python
         with:
           python-version: '3.13'
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         if: runner.os == 'Windows'
         with:
           msystem: UCRT64
@@ -94,13 +94,13 @@ jobs:
         shell: msys2 {0}
         run: make test-dependency-status test-dependency-path-identity PYTHON="$(cygpath -u '${{ steps.python.outputs.python-path }}')"
       - name: Record native dependency status contracts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dependency-status-${{ matrix.id }}
           path: .build/dependency-status-contracts.json
           if-no-files-found: error
       - name: Record native dependency path identity contracts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dependency-path-identity-${{ matrix.id }}
           path: .build/dependency-path-identity.json
@@ -132,7 +132,7 @@ jobs:
       - name: Ownership lifecycle/concurrency suite (POSIX)
         if: runner.os != 'Windows'
         run: make test-ownership-concurrency
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: checkpoint-10-${{ matrix.id }}
           path: .build/checkpoint-10/${{ matrix.id }}.json
@@ -143,8 +143,8 @@ jobs:
     needs: corpus
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
@@ -159,7 +159,7 @@ jobs:
             .build/checkpoint-10/downloaded/macos.json \
             .build/checkpoint-10/downloaded/windows.json \
             --output .build/checkpoint-10/comparison.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: checkpoint-10-comparison
           path: .build/checkpoint-10/comparison.json

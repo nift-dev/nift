@@ -1,0 +1,182 @@
+# read_limit.py after the D-077 #3 repair, pinned C137 nift (sha256 4bb09e9e...41c0b909c4), run 2026-11-12 in the prep sandbox
+# through a scratch driver that does not execute any script opening a device in "w" mode (hard rule: no write to
+# /dev/*): the two cases file(/dev/zero).open(w) and file(/dev/full).open(w) therefore FAIL here with "GUARDED" (exit 99);
+# they are not part of the 24, they pass on the VM elsewhere (C136 host-deps.log) and are NOT RUN evidence here, not
+# failures of the repair. The other 6 FAILs are the unapproved refusals that stay FAILED.
+baseline VmPeak 14 MiB, VmHWM 7 MiB; RLIMIT_AS 118 MiB; RSS bound 79 MiB; limit 64 MiB
+PASS open: file of exactly the limit is read whole
+PASS open: empty file
+PASS open one byte over: fatal open limit error (exit 1)
+PASS open one byte over: peak RSS 10 MiB within 79 MiB
+PASS open_bytes: file of exactly the limit is read whole [legacy channel, NIFT_VM=0]
+PASS open_bytes: empty file [legacy channel, NIFT_VM=0]
+PASS open_bytes one byte over: fatal open_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS open_bytes one byte over: peak RSS 10 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS open_bytes: file of exactly the limit is read whole [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS open_bytes: empty file [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS open_bytes one byte over: fatal open_bytes limit error (exit 1) [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS file().open: exact limit
+PASS file().open one byte over: fatal open limit error (exit 1)
+PASS file().open one byte over: peak RSS 10 MiB within 79 MiB
+PASS ifstream read_all: exact limit
+PASS ifstream read_all one byte over: fatal read_all limit error (exit 1)
+PASS ifstream read_all one byte over: peak RSS 10 MiB within 79 MiB
+FAIL read_line: line of exactly the limit error: $WORK/case.f:2:7: not compiled for the VM (type:length): an operation whose operand types the VM cannot prove (length) is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read_line: line of exactly the limit (printed, measured by the harness)
+PASS read_line: line of exactly the limit [legacy channel, NIFT_VM=0]
+PASS read_line one byte over: fatal read_line limit error (exit 1)
+PASS read_line one byte over: peak RSS 10 MiB within 79 MiB
+PASS open(/dev/zero): fatal open limit error (exit 1)
+PASS open(/dev/zero): peak RSS 71 MiB within 79 MiB
+PASS open_bytes(/dev/zero): fatal open_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS open_bytes(/dev/zero): peak RSS 71 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS open_bytes(/dev/zero): fatal open_bytes limit error (exit 1) [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS cat(/dev/zero): fatal cat limit error (exit 1)
+PASS cat(/dev/zero): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/zero).open(r): fatal open limit error (exit 1)
+PASS file(/dev/zero).open(r): peak RSS 71 MiB within 79 MiB
+FAIL file(/dev/zero).open(w): fatal open limit error (exit 99) GUARDED: device write not run here
+PASS file(/dev/zero).open(w): peak RSS 0 MiB within 79 MiB
+PASS open(/dev/full): fatal open limit error (exit 1)
+PASS open(/dev/full): peak RSS 71 MiB within 79 MiB
+PASS open_bytes(/dev/full): fatal open_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS open_bytes(/dev/full): peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS open_bytes(/dev/full): fatal open_bytes limit error (exit 1) [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS cat(/dev/full): fatal cat limit error (exit 1)
+PASS cat(/dev/full): peak RSS 71 MiB within 79 MiB
+PASS file(/dev/full).open(r): fatal open limit error (exit 1)
+PASS file(/dev/full).open(r): peak RSS 71 MiB within 79 MiB
+FAIL file(/dev/full).open(w): fatal open limit error (exit 99) GUARDED: device write not run here
+PASS file(/dev/full).open(w): peak RSS 0 MiB within 79 MiB
+PASS ifstream(/dev/zero).read_all: fatal read_all limit error (exit 1)
+PASS ifstream(/dev/zero).read_all: peak RSS 71 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_all_bytes: fatal read_all_bytes limit error (exit 1)  the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_all_bytes: peak RSS 10 MiB within 79 MiB
+PASS ifstream(/dev/zero).read_line: fatal read_line limit error (exit 1)
+PASS ifstream(/dev/zero).read_line: peak RSS 72 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_bytes(huge): fatal read_bytes limit error (exit 1)  the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_bytes(huge): peak RSS 10 MiB within 79 MiB
+PASS ifstream(/dev/zero).read(huge): fatal read limit error (exit 1)
+PASS ifstream(/dev/zero).read(huge): peak RSS 71 MiB within 79 MiB
+FAIL ifstream(/dev/zero) >> token: fatal extraction limit error (exit 1) tement:Command): a shell command line inside a script is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero) >> token: peak RSS 10 MiB within 79 MiB
+FAIL ifstream(/dev/zero).read_val: fatal read_val limit error (exit 1)  the VM (host-handle-flow): this flow of host handles is not supported by the Runtime 2.0 VM yet
+note: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS ifstream(/dev/zero).read_val: peak RSS 10 MiB within 79 MiB
+FAIL read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed) e: the program was not executed: no part of it ran
+note: to run it on the legacy interpreter: NIFT_VM=0 nift $WORK/case.f
+note: please report unsupported programs at https://github.com/nift-dev/nift/issues
+
+PASS read(limit/2) x 16 from /dev/zero (8 x limit streamed)
+PASS ifstream(/dev/zero).read_all_bytes: fatal read_all_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero).read_all_bytes: peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero).read_bytes(huge): fatal read_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero).read_bytes(huge): peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero) >> token: fatal extraction limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero) >> token: peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero).read_val: fatal read_val limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS ifstream(/dev/zero).read_val: peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed) [legacy channel, NIFT_VM=0]
+PASS read_line loop over a file 3 x the limit
+PASS sha256_file of a file 3 x the limit
+PASS open() of a regular file 3 x the limit: fatal open limit error (exit 1)
+PASS open() of a regular file 3 x the limit: peak RSS 10 MiB within 79 MiB
+PASS FIFO: exactly the limit
+PASS FIFO: one byte over: fatal open limit error (exit 1)
+PASS FIFO: one byte over: peak RSS 10 MiB within 79 MiB
+PASS FIFO whose writer never stops (open_bytes): fatal open_bytes limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS FIFO whose writer never stops (open_bytes): peak RSS 72 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS FIFO whose writer never stops (open_bytes): fatal open_bytes limit error (exit 1) [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS FIFO whose writer never stops (ifstream read_all): fatal read_all limit error (exit 1)
+PASS FIFO whose writer never stops (ifstream read_all): peak RSS 71 MiB within 79 MiB
+PASS FIFO writers finished (reader released the pipe)
+PASS growing file: whole value within the limit or a limit error (exit 1)
+PASS run(): capture of exactly the limit [legacy channel, NIFT_VM=0]
+PASS run(): capture one byte over: fatal run limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS run(): capture one byte over: peak RSS 10 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS run(): capture of exactly the limit [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS run(): capture one byte over: fatal run limit error (exit 1) [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS cmd().run(): capture of 128 MiB: fatal run limit error (exit 1) [legacy channel, NIFT_VM=0]
+PASS cmd().run(): capture of 128 MiB: peak RSS 10 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS cmd().run(): capture of 128 MiB: fatal run limit error (exit 1) [VM default: refusal contract, callable:cmd deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS read_line on a directory: catchable read error
+PASS read_line on a EIO (/proc/self/mem): catchable read error
+PASS read(): stdin line of exactly the limit [legacy channel, NIFT_VM=0]
+PASS read(): stdin line one byte over is a limit error [legacy channel, NIFT_VM=0]
+PASS read(): endless stdin (/dev/zero) stops at the limit [legacy channel, NIFT_VM=0]
+PASS read(): endless stdin peak RSS 71 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS read(): stdin line of exactly the limit [VM default: refusal contract, callable:read deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS read(): stdin line one byte over is a limit error [VM default: refusal contract, callable:read deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS read(): endless stdin (/dev/zero) stops at the limit [VM default: refusal contract, callable:read deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS run(yes) never ends: fatal run limit error (exit 1, 0.10s) [legacy channel, NIFT_VM=0]
+PASS run(yes) never ends: no producer left running [legacy channel, NIFT_VM=0]
+PASS run(yes) never ends: marker never created (child stopped before finishing) [legacy channel, NIFT_VM=0]
+PASS run(yes) never ends: peak RSS 10 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS run(head -c 150000000 /dev/zero): fatal run limit error (exit 1, 0.11s) [legacy channel, NIFT_VM=0]
+PASS run(head -c 150000000 /dev/zero): no producer left running [legacy channel, NIFT_VM=0]
+PASS run(head -c 150000000 /dev/zero): marker never created (child stopped before finishing) [legacy channel, NIFT_VM=0]
+PASS run(head -c 150000000 /dev/zero): peak RSS 10 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS run(sh -c 'yes; touch marker') kills the descendant: fatal run limit error (exit 1, 0.10s) [legacy channel, NIFT_VM=0]
+PASS run(sh -c 'yes; touch marker') kills the descendant: no producer left running [legacy channel, NIFT_VM=0]
+PASS run(sh -c 'yes; touch marker') kills the descendant: marker never created (child stopped before finishing) [legacy channel, NIFT_VM=0]
+PASS run(sh -c 'yes; touch marker') kills the descendant: peak RSS 11 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS stderr capture of an endless producer: fatal run limit error (exit 1, 0.09s) [legacy channel, NIFT_VM=0]
+PASS stderr capture of an endless producer: no producer left running [legacy channel, NIFT_VM=0]
+PASS stderr capture of an endless producer: marker never created (child stopped before finishing) [legacy channel, NIFT_VM=0]
+PASS stderr capture of an endless producer: peak RSS 11 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS run(yes) never ends: fatal run limit error (exit 1, 0.10s) [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS run(head -c 150000000 /dev/zero): fatal run limit error (exit 1, 0.11s) [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS run(sh -c 'yes; touch marker') kills the descendant: fatal run limit error (exit 1, 0.10s) [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS stderr capture of an endless producer: fatal run limit error (exit 1, 0.09s) [VM default: refusal contract, callable:run deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS cmd(yes).pipe(cat).run(): fatal run limit error (exit 1, 0.07s) [legacy channel, NIFT_VM=0]
+PASS cmd(yes).pipe(cat).run(): no producer left running [legacy channel, NIFT_VM=0]
+PASS cmd(yes).pipe(cat).run(): marker never created (child stopped before finishing) [legacy channel, NIFT_VM=0]
+PASS cmd(yes).pipe(cat).run(): peak RSS 11 MiB within 79 MiB [legacy channel, NIFT_VM=0]
+PASS cmd(yes).pipe(cat).run(): fatal run limit error (exit 1, 0.07s) [VM default: refusal contract, callable:cmd deferred (D-065 #2: run() and cmd() deferred from the initial release)]
+PASS no zombie processes left by the capture cases
+PASS NIFT_READ_LIMIT=1K means 1024 bytes
+PASS NIFT_READ_LIMIT=2MiB means 2097152 bytes
+PASS NIFT_READ_LIMIT=1g means 1073741824 bytes
+PASS NIFT_READ_LIMIT=4096 means 4096 bytes
+PASS NIFT_READ_LIMIT=3m means 3145728 bytes
+PASS NIFT_READ_LIMIT=0 is rejected loudly
+PASS NIFT_READ_LIMIT=-1 is rejected loudly
+PASS NIFT_READ_LIMIT=abc is rejected loudly
+PASS NIFT_READ_LIMIT=12Q is rejected loudly
+PASS NIFT_READ_LIMIT=99999999999999999999 is rejected loudly
+PASS NIFT_READ_LIMIT=18014398509481984T is rejected loudly
+PASS default limit: open_bytes(/dev/zero) stops at 1073741824 bytes [VM default: refusal contract, builtin-bytes:open_bytes deferred (D-077 #5: approved, implementation after the first certification baseline)]
+PASS default limit: open_bytes(/dev/zero) stops at 1073741824 bytes [legacy channel, NIFT_VM=0]
+PASS page build: initial build
+PASS page build: limit is a build failure naming the operation and limit
+PASS page build: last-good output preserved
+PASS page build: no interrupted-state marker
+PASS page build: next build after the fix succeeds without --repair
+PASS page build: up to date afterwards
+PASS page build: forced race, build after the unsequenced edit
+PASS page build: forced race, an unsequenced edit needs a rebuild
+PASS page build: forced race, rebuild
+PASS page build: forced race, build after the sequenced edit
+PASS page build: forced race, a sequenced edit is up to date
+DEFERRED capabilities, checked only as VM refusal contracts (not evidence that they work on the VM): builtin-bytes:open_bytes 7 (D-077 #5: approved, implementation after the first certification baseline); callable:cmd 2 (D-065 #2: run() and cmd() deferred from the initial release); callable:read 3 (D-077 #5: approved, implementation after the first certification baseline); callable:run 6 (D-065 #2: run() and cmd() deferred from the initial release)
+8 failure(s)
+rc=1

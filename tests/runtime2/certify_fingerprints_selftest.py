@@ -372,6 +372,60 @@ with tempfile.TemporaryDirectory() as d:
     check("cp14b hook only when asked", other.stderr == "", repr(other.stderr))
     n += 3
 
+# D-092 #1: test-v46-relative-imports, current log format (the refused case's FAIL line). The fixture is the refreshed
+# record tests/runtime2/certify-fingerprints/refreshed-2026-11-14/test-v46-relative-imports.txt (C141b 36329790, sha256
+# 80dbfc84...2ae80), embedded so that the original C26 record stays the table's input. Three controls, and a mutated
+# extractor for each that must make it fail.
+V46 = "test-v46-relative-imports"
+V46_ROOT = "/home/claude/review/cand-b5"
+V46_LOG = '$ make -k test-v46-relative-imports  (cwd=/home/claude/review/cand-b5, TMPDIR=/tmp/c141b-fp.PS1n8v/nift-certify-0010143/baa5753a775e1fd0)\nNIFT="/home/claude/review/cand-b5/nift" bash tests/v44_relative_import_ownership_smoke.sh\nPASS plain @fn in a script: refused before execution (fn-flags, approved, D-047 #1 / D-048 #1); legacy channel exact\nPASS package ownership output: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nPASS child module export does not leak into the consumer namespace: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nPASS package-relative traversal does not reach the consumer decoy: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nPASS package-relative symlink does not escape the package root: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nPASS v4.4 relative import module ownership\nNIFT="/home/claude/review/cand-b5/nift" bash tests/v46_import_worker_ownership_smoke.sh\nPASS module initialization worker keeps its loading module: refused before execution (coro-module-init-task, approved, D-064 #2); legacy channel exact\nPASS worker alias/reference cloning and parent isolation: refused before execution (coro-module-capture, approved, D-064 #3); legacy channel exact\nPASS direct nested package import: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nPASS single worker nested package import: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nFAIL module-private async callables: refused with import-collision (inventory status implement)\nPASS worker module isolation output: refused before execution (import-nested, deferred-named, D-065 1); legacy channel exact\nFAIL v4.6 worker module import ownership\nmake: *** [Makefile:3787: test-v46-relative-imports] Error 1\n'
+V46_KNOWN = "FAIL module-private async callables: refused with import-collision (inventory status implement)"
+
+
+def v46_controls():
+    fp = lambda text, root=V46_ROOT: F.fingerprint(V46, text, [root], rc=2)
+    base = fp(V46_LOG)
+    moved = re.sub(r"c141b-fp\.\w+", "c141b-fp.ZZZZZZ", V46_LOG.replace(V46_ROOT, "/srv/other/checkout"))
+    known = (base is not None and any("refused with import-collision (inventory status implement)" in c[1]
+                                      for c in base["cases"]) and F.same(base, fp(moved, "/srv/other/checkout")))
+    unrelated = all(not F.same(base, fp(V46_LOG.replace(old, new, 1))) for old, new in (
+        ("refused with import-collision", "refused with import-nested"),
+        ("FAIL module-private async callables", "FAIL module-public async callables")))
+    extra = V46_LOG.replace("FAIL v4.6 worker", "FAIL module init worker keeps its module: exit 1 != 0\nFAIL v4.6 worker", 1)
+    changed = all(not F.same(base, fp(text)) for text in (
+        V46_LOG.replace("(inventory status implement)", "(inventory status approved)", 1),
+        V46_LOG.replace("refused with import-collision (", "refused with import-collision at 3:7 (", 1),
+        extra))
+    return {"known": known, "unrelated-rejected": unrelated, "changed-or-extra-rejected": changed}
+
+
+got = v46_controls()
+for name, ok in got.items():
+    check(f"{V46} control {name}", ok, "the current extractor does not satisfy it")
+check(f"{V46} known line in the fixture", V46_KNOWN in V46_LOG.splitlines())
+real = F.SPECS[V46]
+mutants = {
+    "known": F.Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$"],
+                    lines=r"^(?:error: |\w+Error: |CERTIFY-ERR )", abort=True, errtrace=True, rc_category=True),
+    "unrelated-rejected": F.Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$",
+                                  r"^FAIL (?P<id>[^:]+): refused with \S+ \(inventory status [\w-]+\)$", F._FAILLINE],
+                                 lines=r"^(?:error: |\w+Error: |CERTIFY-ERR |FAIL )", abort=True, errtrace=True,
+                                 rc_category=True),
+    "changed-or-extra-rejected": F.Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$",
+                                         r"^FAIL (?P<id>[^:]+: refused with \S+ \(inventory status [\w-]+\))$"],
+                                        lines=r"^(?:error: |\w+Error: |CERTIFY-ERR )", abort=True,
+                                        errtrace=True, rc_category=True),
+}
+try:
+    for target, spec in mutants.items():
+        F.SPECS[V46] = spec
+        res = v46_controls()
+        check(f"{V46} mutant for {target} detected", not res[target], f"the control passes on the mutated extractor: {res}")
+        print(f"{V46} mutant for {target}: control {target} {'FAILS (detected)' if not res[target] else 'PASSES (NOT detected)'}")
+finally:
+    F.SPECS[V46] = real
+n += 7
+
 # no failing case found: no fingerprint, never equal (never "same step")
 check("no case: no fingerprint", F.fingerprint("test-v44-shell-restricted", "PASS a\nmake: *** [x] Error 1\n") is None)
 check("no fingerprint never matches", not F.same(None, None))

@@ -133,8 +133,15 @@ _FAILLINE = r"^FAIL (?P<id>.+?)(?:: (?P<detail>.*))?$"
 SPECS = {
     "test-v44-shell-restricted": Spec([r"^FAIL (?P<id>[\w-]+)$"], summary=[r"^FAILED: "],
                                       count=r"^FAILED: (?P<list>.+)$"),
-    "test-v46-relative-imports": Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$"],
-                                      lines=r"^(?:error: |\w+Error: |CERTIFY-ERR )", abort=True, errtrace=True,
+    # D-092 #1 (owner 2026-11-14): since C94/C97/C104 (eeb7e819, 62c198e0, cf833f5a) every fixture runs and the smoke
+    # reports a refused case as `FAIL <case>: refused with <reason> (inventory status <status>)`, plus the umbrella FAIL
+    # line; the C26 record (an abort with no case line) is still extracted as before. The refusal line is matched whole:
+    # its case, reason and status form the case ID, so another case, reason or status is a different case (never the
+    # known one). Any other FAIL line is a case of its own (_FAILLINE), so an extra failure changes the fingerprint.
+    "test-v46-relative-imports": Spec([r"^CERTIFY-ERR (?P<id>\S+) rc=(?P<rc>\d+) cmd=(?P<detail>.*)$",
+                                       r"^FAIL (?P<id>[^:]+: refused with \S+ \(inventory status [\w-]+\))$",
+                                       _FAILLINE],
+                                      lines=r"^(?:error: |\w+Error: |CERTIFY-ERR |FAIL )", abort=True, errtrace=True,
                                       rc_category=True),
     "test-runtime2-cp03-simplify": Spec([_FAILLINE], abort=True),
     # bad "$1 (expected '$2', got '$3')": $3 may span lines, so the id ends at " (expected '"

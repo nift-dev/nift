@@ -39,11 +39,28 @@ scheduled. --check treats them so:
   implemented-accepted         the capability is implemented and accepted, so the refusal must not be
                                emitted any more: seen again, it blocks (exit 3), like a retired reason.
 Every row of the classification must carry one of STATUSES (G1, exit 1), seen or not.
+
+`deferred-post-cert` (owner 2026-11-12 04:25, D-077 #1: "DEFERRED — POST-CERTIFICATION IMPLEMENTATION"): a named
+capability whose implementation D-076 (or an earlier explicit deferral) schedules after the first certification
+baseline. It is not `deferred-named` (a deferral from the initial release), and it is not accepted by the gates that
+accept an approved or deferred-named refusal (approved_refusal.py and the parity gates): a refusal-contract pass is
+not evidence that the capability works. Each such row needs an entry in post_cert_deferrals.tsv (--deferrals):
+the capability, the decision references, the refusal evidence, and the scope: the exact units (`unit>root`, the
+unit's real-run refusal reason) in which the reason is deferred. --check:
+  - G1 fails (exit 1) when a deferred-post-cert row has no complete entry, or an entry names a row that is not
+    deferred-post-cert;
+  - blocks (exit 3) when a deferred-post-cert reason is seen as a refusal in a unit outside its scope, or a scoped
+    unit's real-run reasons no longer include its recorded root (scope drift): a deferral never covers a new
+    program or a changed cause without review.
+When nothing blocks, --check says "Inventory complete, with named deferred capabilities" and reports the four
+classes separately (supported, approved difference, named deferred, unresolved). It never reports that all
+supported functionality passes: a refusal inventory cannot show that, and a deferred capability does not execute.
 """
 import argparse
 import collections
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -53,8 +70,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rt-vm"))
-STATUSES = ("approved", "deferred-named", "implement", "implemented-awaiting-review", "implemented-accepted",
-            "PENDING-OWNER", "retired")
+STATUSES = ("approved", "deferred-named", "deferred-post-cert", "implement", "implemented-awaiting-review",
+            "implemented-accepted", "PENDING-OWNER", "retired")
+DEFERRAL_FIELDS = ("reason", "capability", "decision", "scope", "refusal")
+COMPLETE = "Inventory complete, with named deferred capabilities"
 # Family grouping (owner 2026-11-11 02:53, D-067 #10): only these four reason families have a family row
 # `<prefix>:*` that classifies an unlisted member. Every other reason needs its own exact row; an unlisted
 # `type:<op>` (or any other) reason fails G1 (slot 1, D-068 #11: `type:*` is no longer a family row).
@@ -187,13 +206,45 @@ def load_classification(path):
     return rows
 
 
+def load_deferrals(path):
+    """post_cert_deferrals.tsv (D-077 #1): reason -> {capability, decision, scope: {unit: root}, refusal}. A missing
+    file is empty (then every deferred-post-cert row fails G1)."""
+    rows = {}
+    if not path or not os.path.exists(path):
+        return rows
+    header = None
+    for line in open(path):
+        if line.startswith("#") or not line.strip():
+            continue
+        cells = line.rstrip("\n").split("\t")
+        if header is None:
+            header = cells
+            continue
+        row = dict(zip(header, cells))
+        scope = {}
+        for item in (row.get("scope") or "").split(";"):
+            unit, _, root = item.strip().partition(">")
+            if unit.strip():
+                scope[unit.strip()] = root.split("@")[0].strip()  # `@L:C,...`: pinned sightings (post_cert_refusals.py)
+        row["scope"] = scope
+        rows[row.get("reason", "")] = row
+    return rows
+
+
+def unit_of(uid):
+    """classify-all ids are `path|script`, execute entries `path`: compare paths."""
+    return (uid or "").split("|")[0]
+
+
 def report(args):
     d = args.dir
     cls = load_classification(args.classification)
+    deferrals = load_deferrals(args.deferrals)
     full = collections.defaultdict(set)      # reason -> units (classify-all, non-consequential)
     conseq = collections.defaultdict(set)
     deferred = collections.defaultdict(set)  # slot 3: reason -> units with a deferred site of it (5.4)
     refused = set()  # reasons seen as a refusal (not only as a deferred site): REVIEW-C136-SLOT3 F-A
+    refused_units = collections.defaultdict(set)  # reason -> units refusing with it (not deferred sites): D-077 #1
     for line in open(os.path.join(d, "classify-all.jsonl")):
         r = json.loads(line)
         for it in r.get("reasons") or []:
@@ -202,7 +253,9 @@ def report(args):
                 deferred[reason_key(it["reason"])].add(r["id"])
             elif not it.get("consequential"):
                 refused.add(reason_key(it["reason"]))
+                refused_units[reason_key(it["reason"])].add(unit_of(r["id"]))
     fallback = collections.defaultdict(set)  # reason -> entries leaving the VM (execute)
+    unit_reasons = collections.defaultdict(set)  # execute entry -> its non-VM reasons (scope roots, D-077 #1)
     entries = fb_entries = 0
     for line in open(os.path.join(d, "execute.jsonl")):
         r = json.loads(line)
@@ -212,6 +265,8 @@ def report(args):
             if e["outcome"] not in ("vm", "vm-error"):
                 left = True
                 fallback[reason_key(e["reason"])].add(r["entry"])
+                refused_units[reason_key(e["reason"])].add(unit_of(r["entry"]))
+                unit_reasons[unit_of(r["entry"])].add(reason_key(e["reason"]))
         fb_entries += left
     seen = set(full) | set(fallback)
     refused |= set(fallback)
@@ -249,6 +304,14 @@ def report(args):
     if deferred:  # never fallback entries: the unit runs on the VM and raises only if the site is reached
         out += ["", "## Deferred sites (slot 3; the row's status applies)", ""]
         out += ["- `%s`: %d unit(s): %s" % (r, len(u), ", ".join(sorted(u))) for r, u in sorted(deferred.items())]
+    post_cert = sorted(r for r in seen if (row_for(r) or {}).get("status") == "deferred-post-cert")
+    if post_cert:  # D-077 #1: named deferred capabilities are refusals, never passing functionality
+        out += ["", "## Named deferred capabilities (D-077 #1, DEFERRED — POST-CERTIFICATION IMPLEMENTATION)", "",
+                "These reasons are refused. A refusal-contract pass is not evidence that the capability works.", ""]
+        for r in post_cert:
+            e = deferrals.get(r) or {}
+            out.append("- `%s`: %s (%s); scope %d unit(s)" % (r, e.get("capability", "?"), e.get("decision", "?"),
+                                                            len(e.get("scope") or {})))
     if conseq:
         out += ["", "Consequential classify-all reasons (may be spurious, not classified): " +
                 ", ".join("`%s` %d" % (r, len(u)) for r, u in sorted(conseq.items()) if r not in full)]
@@ -272,6 +335,26 @@ def report(args):
             p = "invalid status %r for row %s (one of %s)" % (row.get("status"), reason, ", ".join(STATUSES))
             problems.append(p)
             print("INVENTORY:", p, file=sys.stderr)
+    # D-077 #1: every deferred-post-cert row has a complete deferral entry (capability, decision references, scope with
+    # a recorded root per unit, refusal evidence), and every entry belongs to a deferred-post-cert row.
+    for reason, row in sorted(cls.items()):
+        if row.get("status") == "deferred-post-cert":
+            entry = deferrals.get(reason) or {}
+            missing = [f for f in DEFERRAL_FIELDS if not entry.get(f)]
+            if entry.get("decision") and not re.search(r"\bD-0[0-9][0-9]\b", entry["decision"]):
+                missing.append("decision reference (D-0nn)")
+            if any(not root for root in (entry.get("scope") or {}).values()):
+                missing.append("a root for every scope unit")
+            if missing:
+                p = "deferred-post-cert row %s has no complete deferral entry (missing %s)" % (reason, ", ".join(missing))
+                problems.append(p)
+                print("INVENTORY:", p, file=sys.stderr)
+    for reason in sorted(deferrals):
+        if (cls.get(reason) or {}).get("status") != "deferred-post-cert":
+            p = "deferral entry %s names a row whose status is %r, not deferred-post-cert" % (
+                reason, (cls.get(reason) or {}).get("status"))
+            problems.append(p)
+            print("INVENTORY:", p, file=sys.stderr)
     awaiting = sorted(r for r, row in cls.items() if row.get("status") == "implemented-awaiting-review")
     by_status = collections.defaultdict(list)
     for reason in sorted(seen):
@@ -281,7 +364,7 @@ def report(args):
         print("INVENTORY: G1 %s: %d reason(s) seen, %s" % (
             "FAIL" if problems else "PASS", len(seen),
             ", ".join("%s %d" % (k, len(by_status.get(k, []))) for k in STATUSES)), file=sys.stderr)
-        for status in ("deferred-named", "implement"):
+        for status in ("deferred-named", "deferred-post-cert", "implement"):
             print("INVENTORY: %s: %s" % (status, ", ".join(by_status.get(status, [])) or "none"), file=sys.stderr)
         if owner:
             print("INVENTORY: BLOCKED: %d PENDING-OWNER reason(s), not adjudicated: %s" % (len(owner), ", ".join(owner)),
@@ -306,10 +389,38 @@ def report(args):
         print("INVENTORY: BLOCKED: %d row(s) implemented, awaiting review: %s" % (len(awaiting), ", ".join(awaiting)),
               file=sys.stderr)
         blocked = True
+    # D-077 #1: a deferred-post-cert reason is deferred only in its recorded units, and only while each unit's real
+    # run still refuses with the recorded root. A new unit or a changed cause blocks until it is reviewed.
+    outside, drift = [], []
+    for reason in by_status.get("deferred-post-cert", []):
+        scope = (deferrals.get(reason) or {}).get("scope") or {}
+        for u in sorted(refused_units.get(reason, ())):
+            if u not in scope:
+                outside.append("%s (%s)" % (reason, u))
+            elif scope.get(u) not in unit_reasons.get(u, ()):
+                drift.append("%s (%s: real run %s, recorded %s)" % (
+                    reason, u, ", ".join(sorted(unit_reasons.get(u, ()))) or "VM only", scope.get(u)))
+    if args.check and outside:
+        print("INVENTORY: BLOCKED: deferred-post-cert reason(s) seen outside their recorded scope: %s" %
+              "; ".join(outside), file=sys.stderr)
+        blocked = True
+    if args.check and drift:
+        print("INVENTORY: BLOCKED: deferred-post-cert scope drift (the recorded root no longer refuses): %s" %
+              "; ".join(drift), file=sys.stderr)
+        blocked = True
     if blocked:
         return 3
     if args.check and owner:
         return 3
+    if args.check:
+        # D-077 #1 wording: never "all supported functionality passes". The four classes stay distinct.
+        print("INVENTORY: %s. Supported: %d of %d execute entries ran entirely on the VM (their correctness is "
+              "established by the differential and gate suites, not by this inventory). Approved difference: %d "
+              "reason(s). Named deferred (refused, not executed): deferred-named %d, deferred-post-cert %d. Approved "
+              "for implementation, not implemented (refused): %d. Unresolved defect or decision (PENDING-OWNER): 0." % (
+                  COMPLETE, entries - fb_entries, entries, len(by_status.get("approved", [])),
+                  len(by_status.get("deferred-named", [])), len(by_status.get("deferred-post-cert", [])),
+                  len(by_status.get("implement", []))), file=sys.stderr)
     return 0
 
 
@@ -326,6 +437,7 @@ def main():
     r.add_argument("--classification", default=str(HERE / "classification.tsv"))
     r.add_argument("--markdown")
     r.add_argument("--check", action="store_true")
+    r.add_argument("--deferrals", default=str(HERE / "post_cert_deferrals.tsv"))
     a = ap.parse_args()
     if a.cmd == "collect":
         os.makedirs(a.out, exist_ok=True)

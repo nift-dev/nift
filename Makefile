@@ -2830,7 +2830,10 @@ test: test-sha256
 # absence and unreadable paths), file().copy/move without project-root
 # containment, bounded whole reads (NIFT_READ_LIMIT, fatal limit error). See
 # docs/runtime-2/checkpoints/feature-host-deps.md. read_limit.py runs its
-# memory cases under RLIMIT_AS.
+# memory cases under RLIMIT_AS. D-077 #3: deferred capabilities run their limit
+# invariants on the legacy channel plus a VM refusal contract; unapproved refusals
+# stay FAILED; read_limit_contract_controls.py are the negative controls
+# (docs/runtime-2/host-deps-test-contract.md).
 READ_LIMIT_UNIT := $(TEST_DIR)/read-limit-unit$(EXEEXT)
 $(READ_LIMIT_UNIT): tests/read_limit_unit.cpp src/ReadLimit.h
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
@@ -2843,6 +2846,8 @@ test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/build_write_ownership.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_controls.py
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 -B tests/runtime2/read_limit_contract_controls.py
+	python3 -B tests/runtime2/read_limit_names_selftest.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/read_limit.py
 test: test-runtime2-host-deps
 
@@ -4582,6 +4587,9 @@ test-runtime2-reason-ids: $(TARGET) $(REASON_ID_MUTANT_BIN_1) $(REASON_ID_MUTANT
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant status
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant validity
 	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant deferred
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant scope
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant drift
+	$(PYTHON) tests/runtime2/cp25/inventory_families.py --mutant entry
 test-rt-vm: test-runtime2-reason-ids
 # --- CP20 shell spawn: focused suite and compiling negative controls ---------
 CP20_MUTANT_NIFTS := $(foreach m,1 2 3 4 5 6 7 8 9 11 12,$(TEST_DIR)/cp20-mutants/$(m)/nift$(EXEEXT))
@@ -5785,11 +5793,36 @@ test-runtime2-cp23-tsan: $(addprefix $(TEST_DIR)/rt-tsan/,$(CP23_TSAN_UNITS))
 include tests/runtime2/cp23/certification.mk
 # CP25-R (D-057) legacy/VM differentials for corrected refusal families (G3), and
 # the classified refusal inventory (G1; not a certification edge: regenerated
-# from the candidate binary, `--check` fails on an unclassified reason).
+# from the candidate binary, `--check` fails on an unclassified reason), and the
+# refusal contract of the D-077 #1 post-certification deferrals (post_cert_refusals.py:
+# a refusal-contract pass, not evidence that the deferred capabilities work).
+# D-077 #4: the platform subset table (tests/runtime2/platform_subset.py; docs/runtime-2/platform-subsets.md):
+# every exclusion has a concrete reason and every test-rt-vm suite is listed. The dispatch-only
+# runtime2-cross-platform workflow runs the subset itself on Linux, macOS and Windows.
+# D-097: benchmarks/v412_scripting_compare.py (the corrected copy of v43_scripting_perf.py, which stays byte-identical)
+# validates every workload before timing and never times an invalid run. Selftest: positive and negative controls,
+# two timed samples, timings never reported. It needs native::touch (L6 Option B), so it is not in `test`; pass
+# V412_NIFT=<v4.12.0 binary> for the v412 profile and the equivalence proof.
+.PHONY: test-v412-scripting-compare-selftest
+test-v412-scripting-compare-selftest: $(TARGET)
+	$(PYTHON) -B tests/runtime2/v412_scripting_compare_selftest.py --nift "$(CURDIR)/$(TARGET)" \
+	  $(if $(V412_NIFT),--v412-nift "$(V412_NIFT)")
+.PHONY: test-runtime2-platform-subset-table
+test-runtime2-platform-subset-table:
+	$(PYTHON) tests/runtime2/platform_subset.py --check
+	$(PYTHON) -B tests/runtime2/platform_subset.py --selftest
+test-rt-vm: test-runtime2-platform-subset-table
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control root
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control position
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control unlisted-position
+# D-078 review L2: the deferrals' pinned sightings are enforced only by post_cert_refusals.py (--check strips
+# positions), so the inventory gate never runs --check without it.
 cp25r-inventory: $(TARGET)
+	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/inventory.py collect --nift "$(CURDIR)/$(TARGET)" --out "$(TEST_DIR)/cp25r-inventory"
 	$(PYTHON) tests/runtime2/cp25/inventory.py report "$(TEST_DIR)/cp25r-inventory" \
 	  --markdown "$(TEST_DIR)/cp25r-inventory/INVENTORY.md" --check

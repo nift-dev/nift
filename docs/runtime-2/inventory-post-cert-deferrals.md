@@ -1,0 +1,289 @@
+# CP25-R inventory: D-077 #1 reconciliation of the 59 PENDING-OWNER reasons
+
+Records and tests only; no production change. Prepared on branch `prep/cert-r2` (base C137 `040a6726`) for
+independent review. decisions.md is not edited here: the D-076 and D-077 entries are recorded by C138 (`c59c2e17`,
+attachments 3d29daee and 83af45ff).
+
+## D-078 update (owner 2026-11-12, attachment 2ea1c509)
+
+**Status after D-078:** 137 reasons seen.
+
+| Status | Count |
+|---|---:|
+| approved | 14 |
+| deferred-named | 29 |
+| deferred-post-cert | **50** |
+| implement | 30 |
+| implemented-accepted | 3 |
+| PENDING-OWNER | **11** |
+
+`--check` exits 3 and prints `INVENTORY: BLOCKED: 11 PENDING-OWNER reason(s), not adjudicated: …` (exit 3). The report classifies this as **Inventory incomplete: 11 open reasons**:
+- `callable:minify`
+- `coro-async-value`
+- `method:catch`, `method:error`, `method:throw`
+- `method:sort_by`
+- `method:to_string`
+- `opaque:legacy-runtime-error`
+- `shebang-statement`
+- `statement:Command`
+- `unresolved-name`
+
+These stay OPEN (D-078 #3). None was converted to make the gate green.
+
+**What D-078 changed:**
+- **#1: four rows approved by name, citing D-077 and D-078.** These are `alias-argument`, `type:push`, `method:push` and `fn-name-reserved`.
+  - Each keeps its reproducer and history: the `was:` chain in the approval column, and the refusal column of `post_cert_deferrals.tsv`.
+  - `type:push`, `method:push` and `alias-argument` are **pinned to their exact classify-all sightings**:
+    - `type:push`: `review_d6_alias_argument.f` at 1:12;
+    - `method:push`: `p.f` at 5:1, `reference.f` at 4:1, and `review_d6_alias_argument.f` at 1:12.
+  - **How an unlisted push refusal is caught:**
+    - a new sighting in a scoped unit fails `post_cert_refusals.py`;
+    - a sighting in any other unit blocks `inventory.py --check` (scope).
+  - The negative control `--negative-control unlisted-position` drops one pinned sighting per pinned unit. All 11 pinned entries then fail.
+- **#2: `builtin-bytes:open_bytes` and `callable:read` move from `implement` to `deferred-post-cert`.**
+  - They now appear once, under the named deferrals.
+  - The original implementation approval is kept in the approval column as history.
+  - Their refused and supported forms are recorded in `post_cert_deferrals.tsv`.
+  - The B01 coverage that stays executing is listed in host-deps-test-contract.md.
+- **#3: the 8 union-kind operand rows become `deferred-post-cert`, narrowly.**
+  - The rows are `type:+`, `type:<`, `type:compound-assignment`, `type:increment`, `type:unary`, `type:length`, `type:script-return` and `type:index`.
+  - The deferral covers only safe admission refusal before execution. It does not cover wrong execution, unsound narrowing, internal errors, safety defects, or a new refusal family.
+  - Each is pinned to its exact sightings.
+  - The history (D-068 #6/#7, then "stays open" under D-077 #1) is kept.
+- **#5: every deferred-post-cert entry carries a `report_class`:**
+  - **DEFERRED – COMPATIBILITY (16):** `alias-argument`, `assign-free-name`, `assign-free-name:undeclared`, `context:assignment-error`, `context:assignment-type`, `coro-future-flow:Member`, `method:await`, `error-result-expression`, `fn-name-reserved`, `free-name:undeclared`, `jump-not-last`, `method:q`, `opaque:irregular-legacy-parse`, `prepared-decl-type`, `prepared-fn-unprepared`, `type:push`.
+  - **DEFERRED – IMPLEMENTATION (34):** all the others.
+
+**Refusal contracts on the pinned C137 binary:**
+- `post_cert_refusals.py`: PASS, 50 reasons, 94 scoped units.
+- Negative controls:
+  - `root`: 50 of 50 detected;
+  - `position`: 50 of 50 detected;
+  - `unlisted-position`: 11 of 11 pinned entries detected.
+
+**Dependency (review L2).** The pinned sightings (`@L:C` in a scope) are enforced **only** by
+`post_cert_refusals.py`; `inventory.py --check` strips the positions and checks units and roots only. So
+`make cp25r-inventory` now runs `post_cert_refusals.py` before `--check`, and `test-cp25r` runs it as well; neither
+inventory gate runs without it.
+
+Note: the sections below describe the D-077 #1 reconciliation as it was first made (40 and 19). The table above is current.
+
+## Ruling applied
+
+D-077 #1 (owner 2026-11-12 04:25): a reason covered by D-076 or an earlier explicit deferral may be recorded as
+**DEFERRED — POST-CERTIFICATION IMPLEMENTATION**, individually, with its decision reference and a reproducible
+refusal. A reason that shows a safety defect, a wrong result, an internal failure (exit 70) or an unapproved semantic
+difference stays open, and so does a catch-all or generic reason that could conceal future failures. The owner is
+deferring implementation, not approving the refusal as language behaviour.
+
+### The D-076 defer table (verbatim; review condition C1)
+
+Several rows cite "D-076 (legacy quirks)" or "D-076 (legacy parser compatibility quirks)". The D-076 entry in
+decisions.md (C138 `c59c2e17`) quotes only the scope paragraph. The defer table is in the owner's attachment
+**3d29daee**, section "What I'd defer", quoted verbatim below. The integrator will record it in decisions.md at
+integration; this page does not edit decisions.md.
+
+> This is where I'd reverse some of my recent recommendations.
+>
+> | Work | Revised recommendation |
+> |---|---|
+> | `native::` migration | **After first certification** |
+> | Struct defaults and type tracking | After first certification |
+> | Postfix spelling | After first certification |
+> | Nested functions | After first certification |
+> | Variadics and destructuring | After first certification |
+> | Safe-access operators | After first certification |
+> | Remaining dead-code admission families | After first certification |
+> | Legacy parser compatibility quirks | Defer |
+> | Session-only improvements | Defer |
+
+The decision log reads "Legacy parser compatibility quirks" as "legacy quirks".
+- **Rows covered by the attachment's own wording:** `opaque:irregular-legacy-parse` and `method:q`.
+- **Rows with an explicit earlier deferral:** `context:assignment-*`, `jump-not-last`, `prepared-*` and
+  `fn-name-reserved` are context and precedence quirks, not parser quirks. Their deferral rests on D-014 (class 2:
+  "preserved (or refused, falling back) until a recorded compatibility change replaces it") and D-018 ("the VM
+  refuses the construct before execution … recorded for later checkpoints"). D-076 confirms the schedule only.
+
+## Inventory representation
+
+- **New status `deferred-post-cert`.** `deferred-named` was not reused. It means a deferral *from the initial release*
+  (D-065, D-067 #2), and the refusal gates (`approved_refusal.py`/`.sh`, the v410 parity gates, `eval_entry.py`,
+  `script_import_syntax.sh`) accept an approved or deferred-named refusal as expected. Reusing it would have turned
+  those failing gate cases into passes: that is the blanket conversion D-077 forbids. Those gates do not accept
+  `deferred-post-cert`, and `real-tsv-post-cert` in `inventory_families.py` pins this.
+- **`tests/runtime2/cp25/post_cert_deferrals.tsv`.** One entry per deferred-post-cert row, with these fields:
+  - the capability;
+  - the decision references;
+  - the **scope**: the exact units, each as `unit>root`, where root is the unit's real-run refusal reason;
+  - the refusal evidence: the program, its exact first diagnostic with position, and this reason's classify-all
+    position.
+- **`inventory.py report --check` rules:**
+  - **G1 fails (exit 1)** when a deferred-post-cert row has no complete entry (capability, a `D-0nn` reference, the
+    scope with a root per unit, refusal), or when an entry names a row of another status.
+  - **It blocks (exit 3)** when a deferred-post-cert reason is refused in a unit outside its scope ("seen outside their
+    recorded scope"). It also blocks when a scoped unit's real run no longer refuses with its recorded root ("scope
+    drift"). A deferral never silently covers a new program or a changed cause.
+  - **When nothing blocks**, it prints "**Inventory complete, with named deferred capabilities**". The four classes
+    stay separate: supported (execute entries that ran entirely on the VM), approved difference, named deferred
+    (deferred-named and deferred-post-cert: refused, not executed), and unresolved. The `implement` rows are
+    reported separately as "approved for implementation, not implemented (refused)". The inventory never says that
+    all supported functionality passes.
+  - **The markdown report** lists the deferred-post-cert reasons in their own section: "these reasons are refused".
+- **`tests/runtime2/cp25/post_cert_refusals.py --nift BIN`** (in `test-cp25r`) re-runs every scoped unit of every entry:
+  - under the VM default it requires exit 1, the recorded root, "no part of it ran" and no stdout;
+  - classify-all must list the reason, unless the real run refuses with it directly;
+  - the representative program's first diagnostic must be the recorded exact line;
+  - a unit whose corpus is missing is NOT RUN (exit 2), never a pass.
+
+  `--negative-control` alters every root and position in memory, and every entry must then fail.
+- **Derivative (chain-masked) reasons** are deferred only when every scoped unit's real-run root is itself a named
+  deferral (deferred-named) or a capability that D-076 defers (structs, variadics, the CP24 template APIs, legacy
+  quirks). The scope confines each one to those units.
+
+## Result
+
+**40 rows deferred-post-cert and 19 rows stay PENDING-OWNER.** So `--check` still exits 3: the inventory gate is
+**not** complete. Each of the 19 needs an owner decision; the list is at the end of this page.
+
+Measured on the pinned C137 binary (sha256 `4bb09e9e…41c0b909c4`), collected from a scratch copy of the tree with
+the `docs/evidence/cp410-competitiveness/probes` corpus:
+
+| | Before (C137 records) | After |
+|---|---|---|
+| Collect | 788 units (588 excluding generated); 607 execute entries | same |
+| `report --check` | G1 PASS, 137 seen: approved 14, deferred-named 29, implement 32, implemented-accepted 3, **PENDING-OWNER 59**; exit 3 | G1 PASS, 137 seen: approved 14, deferred-named 29, **deferred-post-cert 40**, implement 32, implemented-accepted 3, **PENDING-OWNER 19**; exit 3 |
+| `post_cert_refusals.py` | — | PASS: 40 reasons, 79 scoped units refused as recorded; negative control PASS (40 of 40 detected) |
+
+### All 59 rows
+
+| # | Reason | Before | After | Decision references | Refusal evidence (pinned C137 binary, VM default, exit 1) or why it stays open |
+|---:|---|---|---|---|---|
+| 1 | `alias-argument` | PENDING-OWNER | **deferred-post-cert** | D-015 (CP11 D6 language-evolution candidate); D-NEXT-refsem (B5 shared references); D-077 #5 (all other approved implementation after the first certification baseline); D-076; D-077 #1 | program vm-corpus/cp11/review_d6_alias_argument.f; first diagnostic: error: review_d6_alias_argument.f:5:3: not compiled for the VM (alias-argument): passing an aliased array or object as an argument is not supported by the Runtime 2.0 VM yet; classify-all: alias-argument at 5:3 (scope: 1 unit(s)) |
+| 2 | `assign-free-name` | PENDING-OWNER | **deferred-post-cert** | D-067 #2c (legacy dynamic scope deferred); D-067 #11 and D-068 #1 (dead-code admission); D-076 (remaining dead-code admission, legacy quirks); D-077 #1 | program semantics/assign_undeclared.f; first diagnostic: error: assign_undeclared.f:1:1: not compiled for the VM (assign-free-name): assignment to a name that is not declared is not supported by the Runtime 2.0 VM yet; classify-all: assign-free-name at 1:1 (scope: 3 unit(s)) |
+| 3 | `assign-free-name:undeclared` | PENDING-OWNER | **deferred-post-cert** | D-067 #2c; D-067 #11; D-076; D-077 #1 | program vm-corpus/cp04/callee_undefined_assign.f; first diagnostic: error: callee_undefined_assign.f:1:11: not compiled for the VM (assign-free-name): assignment to a name that is not declared is not supported by the Runtime 2.0 VM yet; classify-all: assign-free-name:undeclared at 1:11 (scope: 1 unit(s)) |
+| 4 | `callable:minify` | PENDING-OWNER | **PENDING-OWNER (open)** | — | not covered: minify() is a pure built-in usable in a plain script without a project (row: not template-only); no deferral (D-053, D-065, D-067 #2, D-076) names it. Owner decision: defer by name, or implement. Refusal: `error: s.f:1:6: not compiled for the VM (callable:minify): the call `minify()` is not supported by the Runtime 2.0 VM yet` on smoke/v44_minify_script_smoke/001-s/s.f; legacy exit 0. |
+| 5 | `context:assignment-error` | PENDING-OWNER | **deferred-post-cert** | D-009 #1; D-014 (class 2, CP11 N1/M1); D-018 (context-dependent legacy behaviour is refused and recorded for later checkpoints); D-076 (legacy quirks); D-077 #1 | program semantics/loop_type_mismatch.f; first diagnostic: error: loop_type_mismatch.f:3:16: not compiled for the VM (context:assignment-error): a context-dependent legacy behaviour (assignment-error) is not supported by the Runtime 2.0 VM yet; classify-all: context:assignment-error at 3:16 (scope: 7 unit(s)) |
+| 6 | `context:assignment-type` | PENDING-OWNER | **deferred-post-cert** | D-014 (class 2); D-018; D-076 (legacy quirks); D-077 #1 | program vm-corpus/cp11/replay_loop_type_change.f; first diagnostic: error: replay_loop_type_change.f:3:16: not compiled for the VM (context:assignment-type): a context-dependent legacy behaviour (assignment-type) is not supported by the Runtime 2.0 VM yet; classify-all: context:assignment-type at 3:16 (scope: 1 unit(s)) |
+| 7 | `coro-async-value` | PENDING-OWNER | **PENDING-OWNER (open)** | — | not covered: an async function used as a value is coroutine capability, which D-076 does not defer; legacy runs the scoped unit (churn.f, exit 0). Owner decision. Refusal: `error: churn.f:4:15: not compiled for the VM (coro-async-value): this coroutine or async usage is not supported by the Runtime 2.0 VM yet` on smoke/v45_adversarial_runtime/007-churn/churn.f; legacy exit 0. |
+| 8 | `coro-future-flow:Member` | PENDING-OWNER | **deferred-post-cert** | D-067 #11; D-068 #1; D-076 (unimplemented dead-code admission); D-077 #1 | program vm-corpus/cp04/async_future.f; first diagnostic: error: async_future.f:3:7: not compiled for the VM (coro-future-flow:Member): this coroutine or async usage is not supported by the Runtime 2.0 VM yet; classify-all: coro-future-flow:Member at 3:7 (scope: 1 unit(s)) |
+| 9 | `error-result-expression` | PENDING-OWNER | **deferred-post-cert** | D-067 #11; D-018 (loop sub-case); D-076 (unimplemented dead-code admission, legacy quirks); D-077 #1 | program vm-corpus/cp04/render_error.f; first diagnostic: error: render_error.f:2:1: not compiled for the VM (error-result-expression): a statement whose result is an Error value is not supported by the Runtime 2.0 VM yet; classify-all: error-result-expression at 2:1 (scope: 1 unit(s)) |
+| 10 | `fn-name-reserved` | PENDING-OWNER | **deferred-post-cert** | D-009 #3; D-014 (class 2, CP11 D4: to be implemented as its own compatibility change); D-076 (legacy quirks); D-077 #1 | program semantics/loop_builtin_shadow.f; first diagnostic: error: loop_builtin_shadow.f:1:1: not compiled for the VM (fn-name-reserved): a function named like a built-in is not supported by the Runtime 2.0 VM yet; classify-all: fn-name-reserved at 1:1 (scope: 13 unit(s)) |
+| 11 | `free-name:undeclared` | PENDING-OWNER | **deferred-post-cert** | D-067 #2c; D-067 #11; D-076; D-077 #1 | program semantics/loop_callee_error_location.f; first diagnostic: error: loop_callee_error_location.f:2:3: not compiled for the VM (prepared-decl-type): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet; classify-all: free-name:undeclared at 3:14 (scope: 2 unit(s)) |
+| 12 | `jump-not-last` | PENDING-OWNER | **deferred-post-cert** | D-014 (class 2, CP11 D2); D-015 (language-evolution candidate); D-018; D-076 (legacy quirks); D-077 #1 | program vm-corpus/cp11/review_d2_jump_not_last.f; first diagnostic: error: review_d2_jump_not_last.f:4:29: not compiled for the VM (jump-not-last): this break or continue placement is not supported by the Runtime 2.0 VM yet; classify-all: jump-not-last at 4:29 (scope: 1 unit(s)) |
+| 13 | `method:array_value` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:array_value at 24:7 (scope: 1 unit(s)) |
+| 14 | `method:await` | PENDING-OWNER | **deferred-post-cert** | D-067 #11; D-068 #1; D-076; D-077 #1 | program vm-corpus/cp04/async_future.f; first diagnostic: error: async_future.f:3:7: not compiled for the VM (coro-future-flow:Member): this coroutine or async usage is not supported by the Runtime 2.0 VM yet; classify-all: method:await at 3:7 (scope: 1 unit(s)) |
+| 15 | `method:call` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/009-non-array-spread/non-array-spread.f; first diagnostic: error: non-array-spread.f:1:26: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:call at 4:7 (scope: 1 unit(s)) |
+| 16 | `method:call_helper` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/001-internal/internal.f; first diagnostic: error: internal.f:5:11: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:call_helper at 16:7 (scope: 1 unit(s)) |
+| 17 | `method:call_step` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/001-internal/internal.f; first diagnostic: error: internal.f:5:11: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:call_step at 15:7 (scope: 1 unit(s)) |
+| 18 | `method:catch` | PENDING-OWNER | **PENDING-OWNER (open)** | — | its scoped unit (names.f) is masked by opaque:legacy-runtime-error, which stays open (catch-all); cannot be deferred while its root is open. Refusal: `error: names.f:17:1: not compiled for the VM (opaque:legacy-runtime-error): source the VM parser does not structure (legacy-runtime-error) is not supported by the Runtime 2.0 VM yet` on smoke/v46_b4_cp1_characterization/001-names/names.f; legacy exit 0. |
+| 19 | `method:command` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:command at 16:6 (scope: 1 unit(s)) |
+| 20 | `method:count` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:count at 13:7 (scope: 1 unit(s)) |
+| 21 | `method:error` | PENDING-OWNER | **PENDING-OWNER (open)** | — | as method:catch (root opaque:legacy-runtime-error stays open). Refusal: `error: names.f:17:1: not compiled for the VM (opaque:legacy-runtime-error): source the VM parser does not structure (legacy-runtime-error) is not supported by the Runtime 2.0 VM yet` on smoke/v46_b4_cp1_characterization/001-names/names.f; legacy exit 0. |
+| 22 | `method:filter` | PENDING-OWNER | **deferred-post-cert** | D-053 (CP24 deferred post-release); D-067 #2d; D-065 #5; D-076; D-077 #1 | program probes/filter-aggregate-2000.f; first diagnostic: error: filter-aggregate-2000.f:1:6: not compiled for the VM (callable:inject): the call `inject()` is not supported by the Runtime 2.0 VM yet; classify-all: method:filter at 3:6 (scope: 1 unit(s)) |
+| 23 | `method:fixed` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:fixed at 25:7 (scope: 1 unit(s)) |
+| 24 | `method:group_by` | PENDING-OWNER | **deferred-post-cert** | D-053 (CP24 deferred post-release); D-067 #2d; D-065 #5; D-076; D-077 #1 | program probes/group-repeated-2000.f; first diagnostic: error: group-repeated-2000.f:1:6: not compiled for the VM (callable:inject): the call `inject()` is not supported by the Runtime 2.0 VM yet; classify-all: method:group_by at 3:6 (scope: 2 unit(s)) |
+| 25 | `method:helper` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/007-callable/callable.f; first diagnostic: error: callable.f:1:25: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:helper at 3:7 (scope: 2 unit(s)) |
+| 26 | `method:hidden` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/007-private/private.f; first diagnostic: error: private.f:1:36: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:hidden at 3:7 (scope: 1 unit(s)) |
+| 27 | `method:join` | PENDING-OWNER | **deferred-post-cert** | D-065 #5; D-067 #2d; D-053; D-067 #7 (variadics); D-076; D-077 #1 | program smoke/v44_automation_smoke/001-auto/site/auto.f; first diagnostic: error: auto.f:1:7: not compiled for the VM (callable:project_root): the call `project_root()` is not supported by the Runtime 2.0 VM yet; classify-all: method:join at 4:7 (scope: 3 unit(s)) |
+| 28 | `method:m` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/core_language_correctness/003-b3/b3.f; first diagnostic: error: b3.f:3:1: not compiled for the VM (struct-after-statement): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:m at 9:7 (scope: 2 unit(s)) |
+| 29 | `method:map` | PENDING-OWNER | **deferred-post-cert** | D-053 (CP24 deferred post-release); D-067 #2d; D-065 #5; D-076; D-077 #1 | program probes/map-aggregate-2000.f; first diagnostic: error: map-aggregate-2000.f:1:6: not compiled for the VM (callable:inject): the call `inject()` is not supported by the Runtime 2.0 VM yet; classify-all: method:map at 3:6 (scope: 2 unit(s)) |
+| 30 | `method:public_helper` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/001-internal/internal.f; first diagnostic: error: internal.f:5:11: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:public_helper at 18:7 (scope: 1 unit(s)) |
+| 31 | `method:push` | PENDING-OWNER | **deferred-post-cert** | owner 2026-11-10 13:26 implement list (path-in-call-argument); D-067 #7 (CP2); D-015 (CP11 D6); D-077 #5; D-076; D-077 #1 | program smoke/location_method_receiver/001-p/p.f; first diagnostic: error: p.f:3:9: not compiled for the VM (path-in-call-argument): an element path as a call argument is not supported by the Runtime 2.0 VM yet; classify-all: method:push at 5:1 (scope: 3 unit(s)) |
+| 32 | `method:q` | PENDING-OWNER | **deferred-post-cert** | D-024; D-076 (legacy parser compatibility quirks; CP2/CP2b structs); D-077 #1 | program smoke/v44_struct_callable_escape_smoke/001-a/a.f; first diagnostic: error: a.f:5:15: not compiled for the VM (opaque:irregular-legacy-parse): source the VM parser does not structure (irregular-legacy-parse) is not supported by the Runtime 2.0 VM yet; classify-all: method:q at 5:7 (scope: 1 unit(s)) |
+| 33 | `method:read` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/001-internal/internal.f; first diagnostic: error: internal.f:5:11: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:read at 14:7 (scope: 1 unit(s)) |
+| 34 | `method:secret` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program smoke/v42_struct_private_smoke/006-method/method.f; first diagnostic: error: method.f:3:7: not compiled for the VM (struct-private): this struct feature is not supported by the Runtime 2.0 VM yet; classify-all: method:secret at 3:7 (scope: 1 unit(s)) |
+| 35 | `method:sort_by` | PENDING-OWNER | **PENDING-OWNER (open)** | — | the row records a non-masked sighting outside the corpora (sort-factory nested-returned-factory gate, C111, legacy runs it); deferring the reason would conceal that capability gap. Refusal: `error: sort-aggregate-2000.f:1:6: not compiled for the VM (callable:inject): the call `inject()` is not supported by the Runtime 2.0 VM yet` on probes/sort-aggregate-2000.f; legacy exit 1. |
+| 36 | `method:stringify` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:stringify at 18:7 (scope: 1 unit(s)) |
+| 37 | `method:sum` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (ordinary struct functionality, CP2/CP2b); D-068 #11 (slots 4-5); D-076 (CP2/CP2b structs deferred until after the first certification baseline); D-077 #1 | program vm-corpus/cp04/struct_methods.f; first diagnostic: error: struct_methods.f:2:6: not compiled for the VM (static-error:struct-arity): a statically certain program error the VM does not reproduce yet (struct-arity) is not supported by the Runtime 2.0 VM yet; classify-all: method:sum at 3:7 (scope: 1 unit(s)) |
+| 38 | `method:throw` | PENDING-OWNER | **PENDING-OWNER (open)** | — | as method:catch (root opaque:legacy-runtime-error stays open). Refusal: `error: names.f:17:1: not compiled for the VM (opaque:legacy-runtime-error): source the VM parser does not structure (legacy-runtime-error) is not supported by the Runtime 2.0 VM yet` on smoke/v46_b4_cp1_characterization/001-names/names.f; legacy exit 0. |
+| 39 | `method:to_global` | PENDING-OWNER | **deferred-post-cert** | D-067 #7 (variadics/spread/destructuring, CP3); D-068 #11 (slot 6); D-076 (variadics deferred until after the first certification baseline); D-077 #1 | program smoke/v44_struct_variadic_methods_smoke/001-ok/ok.f; first diagnostic: error: ok.f:1:19: not compiled for the VM (fn-param): this function declaration form is not supported by the Runtime 2.0 VM yet; classify-all: method:to_global at 23:7 (scope: 1 unit(s)) |
+| 40 | `method:to_string` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed roots: opaque:legacy-runtime-error (open), fn-flags (an approved refusal, not a deferral), callable:run and builtin-receiver:to_string; not one deferred capability. Refusal: `error: ok.f:1:1: not compiled for the VM (fn-flags): this function declaration form is not supported by the Runtime 2.0 VM yet` on smoke/v44_cp2_variadic_functions_smoke/001-ok/ok.f; legacy exit 0. |
+| 41 | `method:trim` | PENDING-OWNER | **deferred-post-cert** | D-065 #2 (run() and cmd() deferred from the initial release); D-076; D-077 #1 | program smoke/v44_execution_shell_smoke/001-run/run.f; first diagnostic: error: run.f:1:6: not compiled for the VM (callable:run): the call `run()` is not supported by the Runtime 2.0 VM yet; classify-all: method:trim at 4:4 (scope: 1 unit(s)) |
+| 42 | `opaque:irregular-legacy-parse` | PENDING-OWNER | **deferred-post-cert** | D-024 (language consistency register and cleanup checkpoint); D-014; D-076 (legacy parser compatibility quirks); D-077 #1 | program smoke/v44_struct_callable_escape_smoke/001-a/a.f; first diagnostic: error: a.f:5:15: not compiled for the VM (opaque:irregular-legacy-parse): source the VM parser does not structure (irregular-legacy-parse) is not supported by the Runtime 2.0 VM yet; classify-all: opaque:irregular-legacy-parse at 5:15 (scope: 1 unit(s)) |
+| 43 | `opaque:legacy-runtime-error` | PENDING-OWNER | **PENDING-OWNER (open)** | — | catch-all: any source the VM parser does not structure; it refuses programs legacy runs to completion (b4.f, scalar-conversion s.f, names.f). D-077 #1 forbids converting catch-all reasons. Refusal: `error: power_operator.f:1:1: not compiled for the VM (opaque:legacy-runtime-error): source the VM parser does not structure (legacy-runtime-error) is not supported by the Runtime 2.0 VM yet` on semantics/power_operator.f; legacy exit 1. |
+| 44 | `prepared-decl-type` | PENDING-OWNER | **deferred-post-cert** | D-014 (class 2: 'The VM refuses such declarations statically since round 2'); D-015; D-018; D-076 (legacy quirks); D-077 #1 | program probes/call-locals-2000.f; first diagnostic: error: call-locals-2000.f:1:12: not compiled for the VM (prepared-decl-type): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet; classify-all: prepared-decl-type at 1:12 (scope: 8 unit(s)) |
+| 45 | `prepared-fn-unprepared` | PENDING-OWNER | **deferred-post-cert** | D-014 (round 2, M2); D-015 (exactly once); D-018; D-076 (legacy quirks); D-077 #1 | program vm-corpus/cp11/review2_m2_dup_arg_eval.f; first diagnostic: error: review2_m2_dup_arg_eval.f:11:5: not compiled for the VM (prepared-fn-unprepared): a legacy prepared-declaration behaviour is not supported by the Runtime 2.0 VM yet; classify-all: prepared-fn-unprepared at 11:5 (scope: 1 unit(s)) |
+| 46 | `shebang-statement` | PENDING-OWNER | **PENDING-OWNER (open)** | — | a v4.4 behaviour the smoke suite asserts ('the shebang marker is only special on source line one'), not clearly a legacy parser quirk under D-076; legacy runs both scoped units. Owner decision: defer by name, or implement (trivial). Refusal: `error: not-first.f:2:1: not compiled for the VM (shebang-statement): a shebang line after the first line is not supported by the Runtime 2.0 VM yet` on smoke/v44_executable_script_smoke/009-not-first/not-first.f; legacy exit 0. |
+| 47 | `statement:Command` | PENDING-OWNER | **PENDING-OWNER (open)** | — | shell command lines in script units (D-042 dispatch); D-065 #2 defers run()/cmd() only and D-076 does not name it; legacy runs the scoped units. Also one of the host-deps 24. Owner decision: extend D-065 #2 by name, or implement. Refusal: `error: parent.f:1:1: not compiled for the VM (statement:Command): a shell command line inside a script is not supported by the Runtime 2.0 VM yet` on smoke/v44_executable_script_smoke/002-parent/parent.f; legacy exit 0. |
+| 48 | `statement:Import` | PENDING-OWNER | **deferred-post-cert** | D-053; D-067 #2d; D-076; D-077 #1 | program smoke/v46_b4_cp6_import_module_projection/008-tmpl_call/tmpl_call.f; first diagnostic: error: tmpl_call.f:2:1: not compiled for the VM (opaque:template-text): template text inside a script is not supported by the Runtime 2.0 VM yet; classify-all: statement:Import at 1:1 (scope: 1 unit(s)) |
+| 49 | `statement:TemplateStmt` | PENDING-OWNER | **deferred-post-cert** | D-053; D-067 #2d; D-076; D-077 #1 | program smoke/v46_b4_cp4c_json_schema/001-schema-reject/schema-reject.f; first diagnostic: error: schema-reject.f:2:1: not compiled for the VM (opaque:template-text): template text inside a script is not supported by the Runtime 2.0 VM yet; classify-all: statement:TemplateStmt at 2:1 (scope: 4 unit(s)) |
+| 50 | `type:+` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7): its union sub-case (legacy runs it) is a capability gap D-076 does not defer, and D-068 keeps the row PENDING-OWNER because of it. Refusal: `error: replay_concat_array.f:1:7: not compiled for the VM (type:+): an operation whose operand types the VM cannot prove (+) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_concat_array.f; legacy exit 1. |
+| 51 | `type:<` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap); also legacy prints before failing on the scoped unit (class b). Refusal: `error: replay_ordering.f:2:7: not compiled for the VM (type:<): an operation whose operand types the VM cannot prove (<) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_ordering.f; legacy exit 1. |
+| 52 | `type:compound-assignment` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap). Refusal: `error: replay_string_plus_assign.f:2:1: not compiled for the VM (type:compound-assignment): an operation whose operand types the VM cannot prove (compound-assignment) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_string_plus_assign.f; legacy exit 1. |
+| 53 | `type:increment` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap). Refusal: `error: replay_increment_string.f:2:1: not compiled for the VM (type:increment): an operation whose operand types the VM cannot prove (increment) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_increment_string.f; legacy exit 1. |
+| 54 | `type:index` | PENDING-OWNER | **PENDING-OWNER (open)** | — | D row with legacy-running union cases (dead-code-admission.md 1.1): the same union gap, not deferred by D-076. Refusal: `error: review_d6_alias_readonly.f:4:9: not compiled for the VM (path-in-call-argument): an element path as a call argument is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/review_d6_alias_readonly.f; legacy exit 0. |
+| 55 | `type:length` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap); legacy prints before failing (class b); also one of the host-deps 24. Refusal: `error: review_d3_string_size.f:3:7: not compiled for the VM (type:length): an operation whose operand types the VM cannot prove (length) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/review_d3_string_size.f; legacy exit 1. |
+| 56 | `type:push` | PENDING-OWNER | **deferred-post-cert** | D-015 (CP11 D6); D-NEXT-refsem (B5); D-077 #5; D-076; D-077 #1 | program vm-corpus/cp11/review_d6_alias_argument.f; first diagnostic: error: review_d6_alias_argument.f:5:3: not compiled for the VM (alias-argument): passing an aliased array or object as an argument is not supported by the Runtime 2.0 VM yet; classify-all: type:push at 1:12 (scope: 1 unit(s)) |
+| 57 | `type:script-return` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap; its precise position is approved, the status is not). Refusal: `error: replay_return_array.f:1:1: not compiled for the VM (type:script-return): an operation whose operand types the VM cannot prove (script-return) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_return_array.f; legacy exit 1. |
+| 58 | `type:unary` | PENDING-OWNER | **PENDING-OWNER (open)** | — | mixed row (D-068 #6/#7, union gap). Refusal: `error: replay_negate_string.f:2:7: not compiled for the VM (type:unary): an operation whose operand types the VM cannot prove (unary) is not supported by the Runtime 2.0 VM yet` on vm-corpus/cp11/replay_negate_string.f; legacy exit 1. |
+| 59 | `unresolved-name` | PENDING-OWNER | **PENDING-OWNER (open)** | — | generic: any name the VM cannot resolve (eval values, assign_undeclared, bad-import); a catch-all that could conceal future failures. Refusal: `error: bad-import.f:1:7: not compiled for the VM (unresolved-name): a name the VM cannot resolve is not supported by the Runtime 2.0 VM yet` on smoke/v46_b4_cp1_characterization/007-bad-import/bad-import.f; legacy exit 1. |
+
+### Judgement calls for the reviewer
+
+- **`alias-argument`, and its derivatives `type:push` and `method:push`.**
+  - The capability is listed in D-015 (CP11 D6). B5 now defines the semantics (shared references), so the remaining
+    work is admission: an approved implementation, deferred by D-077 #5.
+  - If the reviewer reads D-077 #5 as not covering it, the row returns to PENDING-OWNER.
+- **`fn-name-reserved`.**
+  - D-009 #3 (user functions win) and D-014 (class 2: "to be implemented as its own change") make this an explicit
+    earlier deferral.
+  - It is the most user-visible deferral: 12 corpus programs, including the sha256 shadow and import-names smokes.
+- **`prepared-decl-type`.**
+  - D-014 records the static refusal explicitly.
+  - It refuses the call-locals and official-bfs probes, which legacy runs. They are not website-build workloads.
+- **The four D-018 context rows** (`context:assignment-*`, `jump-not-last`, `prepared-fn-unprepared`).
+  - They are deferred under D-014 class 2 and D-018, which already rule that the VM refuses context-dependent
+    legacy behaviour and records it for later checkpoints.
+  - D-076's "legacy quirks" confirms the schedule.
+- **`shebang-statement` is kept open, not deferred.** The v4.4 smoke asserts it as a feature, and it is not clearly a
+  "legacy parser compatibility quirk".
+
+### Why `free-name:undeclared` is deferred while `unresolved-name` is not (review Low)
+
+Both are generic in name, but their scope differs.
+
+**`free-name:undeclared`:**
+- It is a refinement of `free-name` (legacy dynamic scope, deferred-named under D-067 #2c). Its scope is exactly two
+  units: `semantics/loop_callee_error_location.f`, whose real run is refused as `prepared-decl-type`, and
+  `semantics/toplevel_callee_error_location.f`, refused as `free-name`.
+- On both, legacy also errors ("unknown value or malformed expression").
+- Any sighting in another unit, or a change of either root, blocks `--check`.
+
+**`unresolved-name`:**
+- It is the resolver's catch-all for any name the VM cannot resolve.
+- Its sightings have unrelated causes: an `eval` expression (`values.eval`), an undeclared assignment, and a missing
+  import binding (`bad-import.f`).
+- There is no single deferred capability to cite. Deferring it would record a capability that does not exist, even
+  with a scope.
+
+### Rows that stay open: decisions the owner needs
+
+- **Mixed type rows: `type:+`, `type:<`, `type:compound-assignment`, `type:increment`, `type:unary`, `type:length`,
+  `type:script-return`; plus `type:index`.**
+  - D-068 #6/#7 keeps them PENDING-OWNER because of the union-kind capability gap, which D-076 does not name.
+  - The question: defer "operations on union-kind operands" by name, or schedule them.
+- **Catch-all or generic reasons: `opaque:legacy-runtime-error`, `unresolved-name`.**
+  - These need splitting into specific reasons before any deferral.
+  - `method:catch`, `method:error`, `method:throw` and `method:to_string` depend on `opaque:legacy-runtime-error`.
+- **Not covered by any deferral: `callable:minify`, `statement:Command`, `coro-async-value`, `shebang-statement`.**
+  - For each: defer by name, or implement.
+  - `statement:Command` is also one of the host-deps 24.
+- **`method:sort_by`.** It has a recorded non-masked sighting in the sort-factory gate, so deferring the reason would
+  conceal that gap.
+
+## Open owner questions (review conditions)
+
+- **C1.** Record attachment 3d29daee's defer table in decisions.md (integrator, at integration; quoted above).
+- **C2.** One line from the owner confirming that D-077 #5's general clause ("All other approved feature
+  implementation remains deferred until after the first certification baseline") covers the four judgement-call
+  rows: `alias-argument`, `type:push`, `method:push` and `fn-name-reserved`. Without it they return to
+  PENDING-OWNER: change their status back, and drop their entries from `post_cert_deferrals.tsv`.
+
+## Not in the 59
+
+- `qualified:legacy-await-chain-defect` (CP23, async self-recursion) and `import-reinitialised` stay open, as D-077 #2
+  and D-068 #10 require. Neither is a reason seen on the corpora.
+- The 32 `implement` rows do not block `--check`, both before and after this change. Under D-076/D-077 #5 they are
+  also not implemented before certification. The completeness line reports them as "approved for implementation, not
+  implemented (refused)", never as supported. Whether the certification report should count them with the named
+  deferred capabilities is an owner question.
