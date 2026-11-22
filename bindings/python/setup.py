@@ -36,7 +36,7 @@ CABI_SOURCES = [
     "native/src/Sha256.cpp",
     "native/src/JsonFile.cpp",
     "native/src/JsonSchema.cpp",
-    "native/minifypp/src/Minify.cpp",
+    "native/src/EmbeddedMinify.cpp",
     "native/markuppp/src/Markup.cpp",
     "native/markuppp/src/AsciiDoc.cpp",
     "native/markuppp/src/ReStructuredText.cpp",

@@ -70,7 +70,7 @@ RT_HOST_SOURCES="$(grep -v '^#' "$EMBED/src/rt/host-sources.txt" | tr '\n' ' ')"
 PARSER_SOURCES="$PARSER_SOURCES $RT_HOST_SOURCES"
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
-  src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
+  src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp src/EmbeddedMinify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   $PARSER_SOURCES src/Ast.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
   src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp"

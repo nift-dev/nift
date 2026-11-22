@@ -39,7 +39,7 @@ SOURCES="
   src/Sha256.cpp
   src/JsonFile.cpp
   src/JsonSchema.cpp
-  minifypp/src/Minify.cpp
+  src/EmbeddedMinify.cpp
   markuppp/src/Markup.cpp
   markuppp/src/AsciiDoc.cpp
   markuppp/src/ReStructuredText.cpp

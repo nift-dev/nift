@@ -15,7 +15,7 @@ fail=0; saved=()
 # dependency files, mtimes included, and put back at the end, so the tree is
 # left exactly as it was (`make -q nift` still 0); sources are restored with
 # their own mtimes (cp -p, no touch).
-OBJS="src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o minifypp/src/Minify.o src/rt/natives/object_methods.o
+OBJS="src/rt/vm_ops.o src/Hooks.o markuppp/src/Markup.o src/EmbeddedMinify.o src/rt/natives/object_methods.o
       src/rt/vm_closure.o src/rt/compiler_coro.o"
 mkdir -p "$work/objs"
 for o in $OBJS; do for f in "$o" "${o%.o}.cfg" "${o%.o}.d"; do cp -p "$f" "$work/objs/$(echo "$f" | tr / _)"; done; done
@@ -75,7 +75,7 @@ case_ n2b-markuppp markuppp/src/Markup.o "$POISON"
 save minifypp/src/Minify.cpp
 printf '#pragma once\n#include "rt/aggregate.h"\n%s\n' "$DEF" > minifypp/include/probe_access.h
 printf '\n#include "probe_access.h"\n' >> minifypp/src/Minify.cpp
-case_ n2b-minifypp-header minifypp/src/Minify.o "$POISON"
+case_ n2b-minifypp-header src/EmbeddedMinify.o "$POISON"
 # N2c: a nested tests directory under src (not the repository's tests/)
 save src/rt/vm_ops.cpp
 mkdir -p src/rt/tests; printf '#pragma once\n#include "rt/aggregate.h"\n%s\n' "$DEF" > src/rt/tests/helper.h

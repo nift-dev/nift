@@ -70,7 +70,7 @@ done
 PARSER_SOURCES="$(printf '%s\n' $PARSER_SOURCES | LC_ALL=C sort -u)"
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
-  src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
+  src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp src/EmbeddedMinify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   $PARSER_SOURCES src/Ast.cpp src/Automation.cpp src/Process.cpp src/Hooks.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
   src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp src/embed/program_api.cpp"

@@ -13,7 +13,7 @@ RT_LINK_SOURCES := $(sort $(wildcard src/rt/*.cpp src/rt/natives/*.cpp))
 # CP16: the legacy interpreter's Host ops and run() go through the Host layer
 # (src/rt/host) and its process residues live on CP17's handle table.
 RT_HOST_LINK_SOURCES := $(sort $(wildcard src/rt/host/*.cpp src/rt/handles/*.cpp))
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/shell/CommandDispatch.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/PageObserver.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES) $(RT_HOST_LINK_SOURCES)
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/shell/CommandDispatch.cpp src/Serve.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/Sha256.cpp src/JsonFile.cpp src/JsonSchema.cpp src/EmbeddedMinify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/PageObserver.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp $(RT_LINK_SOURCES) $(RT_HOST_LINK_SOURCES)
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
