@@ -7,6 +7,10 @@
 #include <thread>
 #include <vector>
 
+#ifdef __APPLE__
+#include <pthread.h>
+#endif
+
 #if defined(__GNUC__) || defined(__clang__)
 #define NIFT_PARSER_ASYNC_POOL_HIDDEN __attribute__((visibility("hidden")))
 #else
@@ -29,11 +33,17 @@ public:
 private:
     NiftAsyncPool();
     ~NiftAsyncPool();
+    void run_worker();
+    void shutdown();
 
     std::mutex mutex_;
     std::condition_variable cv_;
     std::deque<std::function<void()>> queue_;
+#ifdef __APPLE__
+    std::vector<pthread_t> workers_;
+#else
     std::vector<std::thread> workers_;
+#endif
     bool stop_ = false;
 };
 

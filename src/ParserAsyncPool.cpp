@@ -2,6 +2,7 @@
 #include "ParserAsyncPool.h"
 
 #include <algorithm>
+#include <system_error>
 
 namespace nift::detail {
 namespace {
@@ -23,31 +24,78 @@ NiftAsyncPool::NiftAsyncPool() {
     const unsigned hint = std::thread::hardware_concurrency();
     const unsigned count = std::max(2u, hint == 0 ? 2u : hint);
     workers_.reserve(count);
-    for (unsigned i = 0; i < count; ++i) workers_.emplace_back([this] {
-        nift_async_pool_worker = true;
-        for (;;) {
-            std::function<void()> task;
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                cv_.wait(lock, [&] { return stop_ || !queue_.empty(); });
-                if (stop_ && queue_.empty()) break;
-                task = std::move(queue_.front());
-                queue_.pop_front();
-            }
-            task();
+#ifdef __APPLE__
+    // An awaiting legacy worker can execute another queued task on the same
+    // stack. Darwin's default worker stack is too small for the CP22 chain.
+    constexpr std::size_t worker_stack_bytes = 4 * 1024 * 1024;
+    pthread_attr_t attributes;
+    int error = pthread_attr_init(&attributes);
+    if (error) throw std::system_error(error, std::generic_category(), "pthread_attr_init");
+    error = pthread_attr_setstacksize(&attributes, worker_stack_bytes);
+    if (error) {
+        pthread_attr_destroy(&attributes);
+        throw std::system_error(error, std::generic_category(), "pthread_attr_setstacksize");
+    }
+#endif
+    try {
+        for (unsigned i = 0; i < count; ++i) {
+#ifdef __APPLE__
+            pthread_t worker;
+            error = pthread_create(&worker, &attributes, [](void* pool) -> void* {
+                static_cast<NiftAsyncPool*>(pool)->run_worker();
+                return nullptr;
+            }, this);
+            if (error) throw std::system_error(error, std::generic_category(), "pthread_create");
+            workers_.push_back(worker);
+#else
+            workers_.emplace_back([this] { run_worker(); });
+#endif
         }
-        nift_async_pool_worker = false;
-    });
+    } catch (...) {
+#ifdef __APPLE__
+        pthread_attr_destroy(&attributes);
+#endif
+        shutdown();
+        throw;
+    }
+#ifdef __APPLE__
+    pthread_attr_destroy(&attributes);
+#endif
+}
+
+void NiftAsyncPool::run_worker() {
+    nift_async_pool_worker = true;
+    for (;;) {
+        std::function<void()> task;
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [&] { return stop_ || !queue_.empty(); });
+            if (stop_ && queue_.empty()) break;
+            task = std::move(queue_.front());
+            queue_.pop_front();
+        }
+        task();
+    }
+    nift_async_pool_worker = false;
 }
 
 NiftAsyncPool::~NiftAsyncPool() {
+    shutdown();
+}
+
+void NiftAsyncPool::shutdown() {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         stop_ = true;
     }
     cv_.notify_all();
-    for (auto& worker : workers_)
-        if (worker.joinable()) worker.join();
+    for (auto& worker : workers_) {
+#ifdef __APPLE__
+        pthread_join(worker, nullptr);
+#else
+        worker.join();
+#endif
+    }
 }
 
 void NiftAsyncPool::submit(std::function<void()> task) {
