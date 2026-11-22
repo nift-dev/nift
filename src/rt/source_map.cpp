@@ -78,14 +78,19 @@ SourceOrigin SourceMap::at(std::uint32_t linked_offset) const {
     impl_->lookups.fetch_add(1, std::memory_order_relaxed);
 #endif
     if (!impl_ || impl_->sources.empty()) throw std::logic_error("SourceMap used after move");
-    std::call_once(impl_->built, [this] {
-        // Build in local storage: a throwing allocation leaves the shared
-        // tables untouched, so a retry starts from an empty, complete build.
-        std::vector<std::vector<std::uint32_t>> tables;
-        tables.reserve(impl_->sources.size());
-        for (const std::string& source : impl_->sources) tables.push_back(line_starts(source));
-        impl_->line_starts = std::move(tables);
-    });
+    if (!impl_->built.load(std::memory_order_acquire)) {
+        std::lock_guard<std::mutex> lock(impl_->build_mutex);
+        if (!impl_->built.load(std::memory_order_relaxed)) {
+            // Publish only complete tables. A failed allocation releases the
+            // mutex and leaves the map available for another attempt.
+            std::vector<std::vector<std::uint32_t>> tables;
+            tables.reserve(impl_->sources.size());
+            for (const std::string& source : impl_->sources)
+                tables.push_back(line_starts(source));
+            impl_->line_starts = std::move(tables);
+            impl_->built.store(true, std::memory_order_release);
+        }
+    }
     std::size_t module = 0;
     std::uint32_t offset = linked_offset;
     if (impl_->link != nullptr) {

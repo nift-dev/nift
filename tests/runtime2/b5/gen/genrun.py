@@ -6,6 +6,7 @@ its own directory under WORK (the gate's temporary directory), which the gate re
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -29,6 +30,19 @@ def env_for(d, mode, stats):
     return e
 
 
+def normalize_output(data, directory):
+    text = data.decode("utf-8", "replace")
+    roots = dict.fromkeys((directory, os.path.realpath(directory)))
+    for root in roots:
+        spellings = [(root, os.sep)]
+        if os.name == "nt":
+            spellings.append((root.replace("\\", "/"), "/"))
+        for path, separator in spellings:
+            text = text.replace(path + separator, "")
+            text = re.sub(re.escape(path) + r"""(?=$|[\s'":])""", "<D>", text)
+    return text
+
+
 def run(nift, files, mode, main="t.f", stdin=None, args=None):
     if WORK is None:
         raise RuntimeError("genrun.set_work() was not called")
@@ -40,7 +54,6 @@ def run(nift, files, mode, main="t.f", stdin=None, args=None):
     cmd = [os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "20", nift] + (args if args is not None else [main])
     p = subprocess.run(cmd, cwd=d, env=env_for(d, mode, st), input=(stdin.encode() if stdin else None),
                        stdin=(None if stdin else subprocess.DEVNULL), capture_output=True)
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "").replace(d, "<D>")
     rows = []
     if os.path.exists(st):
         for line in open(st):
@@ -49,7 +62,7 @@ def run(nift, files, mode, main="t.f", stdin=None, args=None):
             except ValueError:
                 pass
     shutil.rmtree(d, ignore_errors=True)
-    return norm(p.stdout), norm(p.stderr), p.returncode, rows
+    return (normalize_output(p.stdout, d), normalize_output(p.stderr, d), p.returncode, rows)
 
 
 def vm_vs_legacy(nift, files, main="t.f", stdin=None, args=None):

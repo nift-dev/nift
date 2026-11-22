@@ -342,6 +342,12 @@ def negative_controls(args):
     ok = True
     scratch = tempfile.mkdtemp(prefix="b5-operators-neg-")
     try:
+        reported_root = scratch.replace("\\", "/") if os.name == "nt" else scratch
+        diagnostic = f"error: {reported_root}/t.f:5:16: incorrect operand"
+        same_prefix = f"error: {reported_root}-other/t.f:5:16: incorrect operand"
+        ok = (genrun.normalize_output(diagnostic.encode(), scratch) == "error: t.f:5:16: incorrect operand"
+              and genrun.normalize_output(same_prefix.encode(), scratch) == same_prefix)
+        print(f"{'PASS' if ok else 'FAIL'} normalize only the generated case directory")
         trunc = os.path.join(scratch, "truncated")
         os.makedirs(os.path.dirname(os.path.join(trunc, TABLE)))
         lines = open(os.path.join(args.tree, TABLE)).read().splitlines()  # the table of --tree

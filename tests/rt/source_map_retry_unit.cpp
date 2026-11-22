@@ -45,7 +45,14 @@ int main() {
         bool threw = false;
         try { (void)map.at(16); } catch (const std::bad_alloc&) { threw = true; }
         countdown = -1;
-        if (threw) ++failed_initializations;
+        if (threw) {
+            ++failed_initializations;
+            countdown = 0;
+            bool retry_threw = false;
+            try { (void)map.at(16); } catch (const std::bad_alloc&) { retry_threw = true; }
+            countdown = -1;
+            check(retry_threw, "a failed retry also leaves initialization unpublished");
+        }
         const SourceOrigin entry = map.at(0);
         const SourceOrigin module = map.at(16);
         check(entry.path == "entry.f" && entry.line == 1 && entry.column == 1,

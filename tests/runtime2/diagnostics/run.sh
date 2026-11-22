@@ -169,7 +169,8 @@ print(r["outcome"]+(":"+r["reason"] if r["outcome"]=="fallback" else ""))' "$W/s
 }
 
 run_scripts() {  # run_scripts DIR
-  local dir="$1" f b
+  local dir="$1" f b arg
+  local argv=()
   for f in "$dir"/*.f "$dir"/*.args; do
     [ -e "$f" ] || continue
     b="$(basename "$f")"; b="${b%.f}"; b="${b%.args}"
@@ -177,8 +178,17 @@ run_scripts() {  # run_scripts DIR
     rm -rf "$W/case" "$W/home" "$W/tmp"; mkdir -p "$W/case" "$W/home" "$W/tmp"
     (cd "$dir" && find . -type f ! -name '*.stdout' ! -name '*.stderr' ! -name '*.exit' ! -name '*.files' ! -name '*.tsv' -exec cp --parents {} "$W/case/" \;)
     local real; real="$(cd "$W/case" && pwd -P)"
-    if [ "${f%.args}" != "$f" ]; then mapfile -t argv <"$f"; run_env "$W/case" "$NIFT" "${argv[@]}"
-    else run_env "$W/case" "$NIFT" "$b.f"; fi
+    if [ "${f%.args}" != "$f" ]; then
+      argv=()
+      while IFS= read -r arg || [ -n "$arg" ]; do argv+=("$arg"); done <"$f"
+      if [ "${#argv[@]}" -eq 0 ]; then
+        run_env "$W/case" "$NIFT"
+      else
+        run_env "$W/case" "$NIFT" "${argv[@]}"
+      fi
+    else
+      run_env "$W/case" "$NIFT" "$b.f"
+    fi
     append_files "$dir/$b.files"
     normalise "$real"
     compare "$b" "$dir/$b"

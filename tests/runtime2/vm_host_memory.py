@@ -300,7 +300,7 @@ def main():
         names.mkdir()
         for i in range(20000):
             (names / f"n{i:05d}").touch()
-        (root / "case.f").write_text('l := ls("names"); print(l.length())\n')
+        (root / "case.f").write_text('l := native::ls("names"); print(l.length())\n')
         peak, _, err = timed(nift, root, budget)
         if check("ls", peak, subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err),
                  failures):
@@ -311,7 +311,7 @@ def main():
         big_dir.mkdir(parents=True)
         for i in range(150000):
             (big_dir / f"f{i:06d}").touch()
-        deep_glob = 'l := ls("deep/a/b/c/d/e/f/g/h/*"); print(l.length())\n'
+        deep_glob = 'l := native::ls("deep/a/b/c/d/e/f/g/h/*"); print(l.length())\n'
         (root / "case.f").write_text(deep_glob)
         peak, _, err = timed(nift, root, budget)
         if check("glob", peak, subprocess.CompletedProcess([], 1 if b"memory budget" in err else 0, b"", err),
@@ -366,7 +366,7 @@ def main():
         dup_leaf.mkdir(parents=True)
         for i in range(1000):
             (dup_leaf / f"f{i:04d}").touch()
-        (root / "case.f").write_text('l := ls("dup/**/**/*"); print(l.length())\n')
+        (root / "case.f").write_text('l := native::ls("dup/**/**/*"); print(l.length())\n')
         dup_low = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="600000")
         peak, _, err = timed(nift, root, dup_low)
         if check("glob-duplicate-low", peak,
