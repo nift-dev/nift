@@ -51,6 +51,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+from fixture_paths import replace_fixture_root  # noqa: E402
 from vm_adversarial import classify_difference, outcome_key, run  # noqa: E402
 
 PRE = "fn(id(q)) { return q }\nfn(id2(p, q)) { return q }\n"
@@ -230,10 +231,11 @@ def check(nift, item, work, timeout):
         elif st["outcome"] not in ("vm", "vm-error", "fallback"):
             problem = f"unexpected outcome {st['outcome']}"
         elif b5_pinned(name, source, path) is not None:
-            pinned = b5_pinned(name, source, path)
-            if vm != pinned or st["outcome"] != "vm-error":
+            pinned = b5_pinned(name, source, "$SCRIPT")
+            observed = (vm[0], replace_fixture_root(vm[1], path, "$SCRIPT"), vm[2])
+            if observed != pinned or st["outcome"] != "vm-error":
                 problem = "not the pinned B5 reference-cycle error"
-            elif legacy == pinned:
+            elif (legacy[0], replace_fixture_root(legacy[1], path, "$SCRIPT"), legacy[2]) == pinned:
                 problem = "pinned as a B5 difference but legacy now agrees: stale pin"
             else:
                 verdict = "approved:B5 reference cycle"

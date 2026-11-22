@@ -83,6 +83,8 @@ jobs:
           make -j2 .build/rt-parse-dump.exe .build/rt-parser-unit.exe .build/rt-legacy-oracle.exe \
             .build/rt/vm-unit.exe .build/rt/vm-globals-unit.exe .build/rt/vm-modules-unit.exe \
             .build/rt/vm-prepared-parse.exe
+          g++ -std=c++17 -Wall -Wextra -static -municode tests/runtime2/trace_launcher_win.cpp \
+            -o .build/rt-trace-launcher.exe
       - name: VM subset (Linux, macOS)
         if: runner.os != 'Windows'
         shell: bash

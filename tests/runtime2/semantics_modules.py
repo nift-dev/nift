@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "semantics-modules")
 
@@ -38,7 +40,7 @@ def run(nift, probe, work):
     if "NIFT_VM" not in env:
         env["NIFT_VM"] = "0"
     p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "30", nift, "main.f"], cwd=os.path.join(dst, "p"), env=env, capture_output=True)
-    norm = lambda b: b.replace(os.path.realpath(dst).encode(), b"$P").replace(dst.encode(), b"$P")  # noqa: E731
+    norm = lambda b: replace_fixture_root(b, dst, "$P")  # noqa: E731
     return norm(p.stdout), norm(p.stderr), str(p.returncode).encode() + b"\n"
 
 

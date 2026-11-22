@@ -35,6 +35,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import strip_fixture_root
+
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b4")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -75,7 +77,7 @@ def run_text(nift, source, mode, work, name="t.f"):
     stats = os.path.join(d, "stats.jsonl")
     p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, name], cwd=d, env=env_for(d, mode, stats), stdin=subprocess.DEVNULL,
                        capture_output=True)
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
     rows = stats_lines(stats)
     shutil.rmtree(d, ignore_errors=True)
     return norm(p.stdout), norm(p.stderr), p.returncode, rows
@@ -110,7 +112,7 @@ def run_tree(nift, tree, mode, work):
             shutil.copy(os.path.join(tree, f), os.path.join(d, f))
     p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, "main.f"], cwd=d, env=env_for(d, mode, None), stdin=subprocess.DEVNULL,
                        capture_output=True)
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
     shutil.rmtree(d, ignore_errors=True)
     return norm(p.stdout), norm(p.stderr), p.returncode
 

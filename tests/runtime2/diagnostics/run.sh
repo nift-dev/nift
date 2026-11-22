@@ -106,6 +106,16 @@ rewrite() {
   sed "$pattern" "$file" >"$file.tmp" && mv -f "$file.tmp" "$file"
 }
 
+fixture_path() {
+  local path
+  path=$(cd "$1" && pwd -P) || return
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -am "$path"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
 normalise() {
   local s
   for s in out err; do
@@ -177,7 +187,7 @@ run_scripts() {  # run_scripts DIR
     [ -n "$FILTER" ] && ! [[ "$b" =~ $FILTER ]] && continue
     rm -rf "$W/case" "$W/home" "$W/tmp"; mkdir -p "$W/case" "$W/home" "$W/tmp"
     (cd "$dir" && find . -type f ! -name '*.stdout' ! -name '*.stderr' ! -name '*.exit' ! -name '*.files' ! -name '*.tsv' -exec cp --parents {} "$W/case/" \;)
-    local real; real="$(cd "$W/case" && pwd -P)"
+    local real; real="$(fixture_path "$W/case")" || exit 2
     if [ "${f%.args}" != "$f" ]; then
       argv=()
       while IFS= read -r arg || [ -n "$arg" ]; do argv+=("$arg"); done <"$f"
@@ -207,7 +217,7 @@ else
     run_env "$W/case" "$NIFT" init
     if [ "$(cat "$W/exit")" != 0 ]; then echo "FAIL $b (nift init failed)"; fail=$((fail+1)); n=$((n+1)); continue; fi
     cp -R "$d". "$W/case/"
-    real="$(cd "$W/case" && pwd -P)"
+    real="$(fixture_path "$W/case")" || exit 2
     run_env "$W/case" "$NIFT" build --all
     rewrite "$W/out" '/^time taken:/d' || exit 2
     append_files "$HERE/sites/$b.publish"

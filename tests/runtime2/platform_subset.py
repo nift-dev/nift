@@ -437,9 +437,18 @@ def selftest():
            ["the test-rt-vm recipe was not found in Makefile"])
     expect("recipe, a longer target name is not the prerequisite", recipe_problems(decoy),
            ["the test-rt-vm recipe was not found in Makefile"])
+    from fixture_paths import replace_fixture_root, strip_fixture_root
+    fixture = os.path.abspath("fixture directory")
+    reported = fixture.replace(os.sep, "/")
+    message = f"error: {reported}/p.f:5:2: bad operand"
+    unrelated = f"error: {reported}-other/p.f:5:2: bad operand"
+    expect("strip only the fixture prefix", strip_fixture_root(message, fixture), "error: p.f:5:2: bad operand")
+    expect("normalize exact fixture path in bytes", replace_fixture_root(message.encode(), fixture, "$ROOT"),
+           b"error: $ROOT/p.f:5:2: bad operand")
+    expect("retain unrelated paths that share a prefix", replace_fixture_root(unrelated, fixture, "$ROOT"), unrelated)
     for f in failures:
         print("FAIL platform subset selftest:", f)
-    print("%s platform subset selftest: %d check(s)" % ("FAIL" if failures else "PASS", 17))
+    print("%s platform subset selftest: %d check(s)" % ("FAIL" if failures else "PASS", 20))
     return 1 if failures else 0
 
 

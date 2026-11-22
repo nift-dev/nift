@@ -37,6 +37,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from fixture_paths import strip_fixture_root
+
 
 INTERNAL = ("internal failure", "compiler defect", "unexpected operands")
 VALS = {"int": "5", "str": '"s"', "null": "null", "bool": "true", "float": "1.5", "arr": "[1]",
@@ -137,7 +140,7 @@ def run(nift, files, session, timeout):
             rc, out, err = p.returncode, p.stdout, p.stderr
         except subprocess.TimeoutExpired as e:
             rc, out, err = "timeout", e.stdout or b"", e.stderr or b""
-        norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+        norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
         return rc, norm(out), norm(err)
     finally:
         shutil.rmtree(d, ignore_errors=True)

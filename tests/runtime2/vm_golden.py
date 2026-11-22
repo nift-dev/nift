@@ -34,6 +34,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+from fixture_paths import replace_fixture_root  # noqa: E402
 import vm_sites  # noqa: E402
 
 GOLDEN = os.path.join(HERE, "vm-golden")
@@ -171,11 +172,11 @@ def main():
             try:
                 p = subprocess.run([nift, "p.f"], cwd=d, env=env, capture_output=True, stdin=subprocess.DEVNULL,
                                    timeout=args.timeout)
-                got = (p.stdout, p.stderr, p.returncode)
+                got = (p.stdout, replace_fixture_root(p.stderr, path, "$SCRIPT"), p.returncode)
             except subprocess.TimeoutExpired:
                 got = (b"", b"timeout", "timeout")
             st = json.loads(open(stats).read().splitlines()[-1]) if os.path.exists(stats) else {}
-            stderr = b"" if error is None else b"error: %s:%d:%d: %s\n" % (path.encode(), error[0], error[1], error[2])
+            stderr = b"" if error is None else b"error: %s:%d:%d: %s\n" % (b"$SCRIPT", error[0], error[1], error[2])
             count += 1
             if st.get("outcome") not in ("vm", "vm-error"):
                 failures.append(f"{name}: not run on the VM ({st.get('outcome')} {st.get('reason')})")

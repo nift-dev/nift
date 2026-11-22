@@ -36,6 +36,8 @@ import subprocess
 import sys
 import tempfile
 
+from trace_subprocess import run_traced
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vm_policies  # noqa: E402
 
@@ -109,10 +111,7 @@ def run(nift, d, mode, extra):
     for leftover in ("log.txt", stats, ".trace"):
         if os.path.exists(os.path.join(d, leftover)):
             os.unlink(os.path.join(d, leftover))
-    with open(os.path.join(d, ".trace"), "w") as trace:
-        env["NIFT_TRACE_HOST"] = str(trace.fileno())
-        p = subprocess.run([nift, "p.f"], cwd=d, env=env, capture_output=True, stdin=subprocess.DEVNULL,
-                           pass_fds=(trace.fileno(),), timeout=120)
+    p = run_traced([nift, "p.f"], os.path.join(d, ".trace"), cwd=d, env=env, timeout=120)
     ops = collections.Counter()
     for line in open(os.path.join(d, ".trace")):
         rec = json.loads(line)

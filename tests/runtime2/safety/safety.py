@@ -28,6 +28,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from fixture_paths import strip_fixture_root
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPECTED = os.path.join(HERE, "expected.json")
@@ -231,7 +234,7 @@ def run(nift, name, files, stdin, argv, mode, work):
     else:
         cmd = [nift, "-i", *(["-e", "_s := 0", *argv] if argv else [])]
         p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", *cmd], cwd=d, env=env, input=stdin.encode(), capture_output=True)
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
     shutil.rmtree(d, ignore_errors=True)
     return {"exit": p.returncode, "stdout": norm(p.stdout), "stderr": norm(p.stderr)}
 

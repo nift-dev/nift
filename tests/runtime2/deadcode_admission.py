@@ -23,6 +23,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 G = 'fn(g(v)) {\n  print("g")\n  return v\n}\n'
 SHADOW_FN = 'fn(h()) {\n  return nope()\n}\nfn(m()) {\n  nope := () => "shadow"\n  return h()\n}\nprint(m())\n'
@@ -148,7 +150,7 @@ def run(nift, files, mode, args=("main.f",), stdin=None):
         p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "30", nift] + list(args), cwd=d, env=env, capture_output=True,
                            input=stdin.encode() if stdin is not None else None)
         stats = [json.loads(l) for l in open(st)] if os.path.exists(st) else []
-        return {"rc": p.returncode, "out": p.stdout, "err": p.stderr.replace(d.encode(), b"<root>"),
+        return {"rc": p.returncode, "out": p.stdout, "err": replace_fixture_root(p.stderr, d, "<root>"),
                 "stats": stats[-1] if stats else {}}
     finally:
         shutil.rmtree(d, ignore_errors=True)

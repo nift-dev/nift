@@ -24,6 +24,8 @@ import random
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vm_policies  # noqa: E402
@@ -93,7 +95,7 @@ def run(nift, work, src, env):
                        env=dict({"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d}, **env))
     stats = os.path.join(d, "stats.jsonl")
     st = json.loads(open(stats).read().splitlines()[-1]) if os.path.exists(stats) else {}
-    return p.returncode, p.stdout, p.stderr.replace(d.encode(), b"$D"), st
+    return p.returncode, p.stdout, replace_fixture_root(p.stderr, d, "$D"), st
 
 
 def compare(nift, work, src):

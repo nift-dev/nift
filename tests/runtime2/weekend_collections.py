@@ -37,6 +37,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import strip_fixture_root
+
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "collections")
 
@@ -67,7 +69,7 @@ def run(nift, path, mode, work, budget=None, extra=None):
         except (OSError, IndexError, ValueError):
             st = None
     # Diagnostics name the script by its absolute path: drop the per-run directory.
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
     return norm(p.stdout), norm(p.stderr), p.returncode, st
 
 

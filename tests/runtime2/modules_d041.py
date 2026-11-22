@@ -24,12 +24,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules-d041")
 
 
 def norm(data, work):
-    text = data.decode("utf-8", "replace").replace(os.path.realpath(work), "$P").replace(work, "$P")
+    text = replace_fixture_root(data.decode("utf-8", "replace"), work, "$P")
     return "".join(line for line in text.splitlines(True) if not line.startswith("time taken:"))
 
 

@@ -39,6 +39,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from fixture_paths import replace_fixture_root
+from trace_subprocess import run_traced
+
 
 HERE = Path(__file__).resolve().parent
 CASES = HERE / "cases"
@@ -167,24 +171,19 @@ def run(nift, folder, name, vm=None, extra=None, trace=None, switches=True):
         else:
             env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
         env.update(extra or {})
-        fds = ()
-        if trace is not None:
-            trace_file = open(Path(d) / "trace.jsonl", "wb")
-            fds = (trace_file.fileno(),)
-            env["NIFT_TRACE_HOST"] = str(trace_file.fileno())
         try:
-            p = subprocess.run([nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL, capture_output=True,
-                               timeout=TIMEOUT, pass_fds=fds)
+            if trace is None:
+                p = subprocess.run([nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+                                   timeout=TIMEOUT)
+            else:
+                p = run_traced([nift, name], Path(d) / "trace.jsonl", cwd=d, env=env, timeout=TIMEOUT)
             code = p.returncode
             out, err = p.stdout, p.stderr
         except subprocess.TimeoutExpired:
             return (b"", b"", "timeout"), None
-        finally:
-            if trace is not None:
-                trace_file.close()
         if trace is not None:
-            trace.extend((Path(d) / "trace.jsonl").read_text().replace(d, "$ROOT").splitlines())
-        out, err = out.replace(d.encode(), b"$ROOT"), err.replace(d.encode(), b"$ROOT")
+            trace.extend(replace_fixture_root((Path(d) / "trace.jsonl").read_text(), d, "$ROOT").splitlines())
+        out, err = replace_fixture_root(out, d, "$ROOT"), replace_fixture_root(err, d, "$ROOT")
         st = None
         if vm and stats.exists():
             try:

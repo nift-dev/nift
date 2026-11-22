@@ -28,6 +28,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 import mutant_provenance
 
@@ -88,7 +90,7 @@ def run(nift, work, name, want, budget=None, timeout_s=60):
     try:
         p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), str(timeout_s), nift, name], cwd=d, env=env,
                            stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout_s + 15)
-        result = (p.stdout.replace(d.encode(), b"$ROOT"), p.stderr.replace(d.encode(), b"$ROOT"),
+        result = (replace_fixture_root(p.stdout, d, "$ROOT"), replace_fixture_root(p.stderr, d, "$ROOT"),
                   p.returncode, p.returncode == 124)
     except subprocess.TimeoutExpired:
         result = (b"", b"", 124, True)

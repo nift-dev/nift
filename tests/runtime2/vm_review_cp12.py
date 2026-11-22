@@ -29,6 +29,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import vm_policies  # noqa: E402
+from fixture_paths import replace_fixture_root  # noqa: E402
 import vm_sites  # noqa: E402
 from vm_adversarial import run  # noqa: E402
 
@@ -155,8 +156,9 @@ def main():
             verdict, policy = vm_policies.classify(legacy, vm, st, source)
             outcome = st and st["outcome"]
             if name in EXACT and group == "D4":
-                pinned = exact_result(name, source, path)
-                verdict, policy = ("pinned", "exact") if vm == pinned else ("diff", None)
+                pinned = exact_result(name, source, "$SCRIPT")
+                observed = (vm[0], replace_fixture_root(vm[1], path, "$SCRIPT"), vm[2])
+                verdict, policy = ("pinned", "exact") if observed == pinned else ("diff", None)
             key = f"{group} {outcome}" + (f" {policy}" if policy else "")
             tally[key] = tally.get(key, 0) + 1
             if reason == "B5":

@@ -30,6 +30,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+from fixture_paths import replace_fixture_root  # noqa: E402
 import vm_sites  # noqa: E402
 
 MIN, MAX = -(1 << 63), (1 << 63) - 1
@@ -104,8 +105,8 @@ def check(nift, work, case):
             src = source.encode()
             nodes = [n for n in vm_sites.parse(src).walk() if vm_sites.text(src, n) == site_text.encode()]
             line, column = vm_sites.position(src, min(n.begin for n in nodes))
-            want = (b"", f"error: {path}:{line}:{column}: {err}\n".encode(), 1)
-        got = (p.stdout, p.stderr, p.returncode)
+            want = (b"", f"error: $SCRIPT:{line}:{column}: {err}\n".encode(), 1)
+        got = (p.stdout, replace_fixture_root(p.stderr, path, "$SCRIPT"), p.returncode)
         return None if got == want else f"{name}: got {got!r}, expected {want!r}"
     finally:
         shutil.rmtree(d, ignore_errors=True)

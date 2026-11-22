@@ -40,6 +40,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import strip_fixture_root
+
 
 HERE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b3")
 SENTINEL = "SECRET-b3"
@@ -68,7 +70,7 @@ def run(nift, path, mode, work, extra=None, tree=None):
             st = json.loads(open(stats).read().splitlines()[-1])
         except (OSError, IndexError, ValueError):
             st = None
-    norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
+    norm = lambda b: strip_fixture_root(b.decode("utf-8", "replace"), d)
     return norm(p.stdout), norm(p.stderr), p.returncode, st
 
 

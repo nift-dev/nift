@@ -23,6 +23,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fixture_paths import replace_fixture_root
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "closures-s1")
@@ -103,7 +105,7 @@ def run(nift, work, name, mode, env_extra=None):
             st = json.loads(open(stats).read().splitlines()[-1])
         except (OSError, IndexError, ValueError):
             st = None
-    return (p.stdout.replace(d.encode(), b"$ROOT"), p.stderr.replace(d.encode(), b"$ROOT"), p.returncode), st
+    return (replace_fixture_root(p.stdout, d, "$ROOT"), replace_fixture_root(p.stderr, d, "$ROOT"), p.returncode), st
 
 
 def golden(name, suffix=""):
