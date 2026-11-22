@@ -92,6 +92,12 @@ jobs:
             .build/rt/vm-prepared-parse.exe .build/rt-args-count-launcher.exe
           g++ -std=c++17 -Wall -Wextra -static -municode tests/runtime2/trace_launcher_win.cpp \
             -o .build/rt-trace-launcher.exe
+      - name: Source-map retry gate on Windows
+        if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
+        shell: msys2 {0}
+        run: |
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          make test-rt-source-map-retry PYTHON=python
       - name: VM subset (Linux, macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -138,7 +144,7 @@ jobs:
           python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \
             2>&1 | tee '.build/platform-subset/${{ matrix.id }}.txt'
       - name: VM subset on Windows
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
         shell: msys2 {0}
         env:
           MSYS: winsymlinks:nativestrict
@@ -177,4 +183,4 @@ jobs:
         shell: msys2 {0}
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
-          make -k test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+          make -k test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map-unit

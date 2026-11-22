@@ -768,13 +768,14 @@ test-rt-vm-sanitize: test-rt-source-map-tsan
 test-rt-vm-sanitize: test-rt-error-oom-sanitize
 certify-targets: test-runtime2-cp13b-mutants
 
-.PHONY: test-rt-source-map test-rt-source-map-retry test-rt-source-map-sanitize test-rt-source-map-tsan test-rt-error-oom test-rt-error-oom-sanitize
-test-rt-source-map: $(SOURCE_MAP_UNIT) $(SOURCE_MAP_RETRY_UNIT)
+.PHONY: test-rt-source-map test-rt-source-map-unit test-rt-source-map-retry test-rt-source-map-sanitize test-rt-source-map-tsan test-rt-error-oom test-rt-error-oom-sanitize
+test-rt-source-map: test-rt-source-map-unit test-rt-source-map-retry
+
+test-rt-source-map-unit: $(SOURCE_MAP_UNIT)
 	"$(SOURCE_MAP_UNIT)"
-	"$(SOURCE_MAP_RETRY_UNIT)"
 
 test-rt-source-map-retry: $(SOURCE_MAP_RETRY_UNIT)
-	"$(SOURCE_MAP_RETRY_UNIT)"
+	$(PYTHON) -c 'import subprocess, sys; sys.exit(subprocess.run(sys.argv[1:], timeout=60).returncode)' "$(SOURCE_MAP_RETRY_UNIT)"
 
 test-rt-error-oom: $(ERROR_OOM_UNIT)
 	"$(ERROR_OOM_UNIT)"
