@@ -6,9 +6,10 @@
 # project". The opt-in --fs-root restriction and Nift-owned state stay
 # protected.
 set -u -o pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/child_address_limit.sh"
 NIFT_REAL="${NIFT_BIN:-$(pwd)/nift}"
 # Standing rule: every nift run is bounded in disk, memory and time.
-NIFT() { ( ulimit -f 262144; ulimit -v 2097152; exec timeout 60 "$NIFT_REAL" "$@" ); }
+NIFT() { test_run_bounded 262144 "$NIFT_REAL" "$@"; }
 NIFT=NIFT
 fail=0
 pass() { echo "PASS $1"; }

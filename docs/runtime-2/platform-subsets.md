@@ -256,10 +256,13 @@ them on Linode:
     GitHub Actions.
   - `cp22-print_order` and the output-order tests the repair adds belong in this table, run on Windows, when the
     repair lands.
-- **macOS and RLIMIT_AS.** Darwin may ignore or reject RLIMIT_AS. The entries that set it, but whose assertions do
-  not depend on it, run on macOS and are CI-verified:
-  - `vm_parity`, `host_deps` and `read_limit_contract_controls` set it through Python;
-  - `file_copy_move_freedom` and `build_write_ownership` set it through `ulimit -v`.
+- **macOS and RLIMIT_AS.** The hosted ARM64 runner rejects a 2 or 4 GiB absolute limit because the launcher's
+  initial virtual map already exceeds 445 GB. The native test launcher measures the minimum settable limit and
+  applies a hard cap with the same 2 or 4 GiB growth allowance used by the Linux tests. It preserves tighter
+  inherited limits and fails if it cannot apply or verify the cap. CI checks a mapping below and above the cap
+  across `exec` and starts Nift under the guard before running `vm_parity`, `host_deps`,
+  `read_limit_contract_controls`, `file_copy_move_freedom` and `build_write_ownership`.
+  For direct invocation of these tests on macOS, build the launcher with `make .build/darwin-address-limit`.
 
   The two read-limit suites whose point is the address-space bound and `/proc` are excluded on macOS.
 - **macOS and GNU `timeout`.** `diagnostics/run.sh` and the shell harnesses call `timeout`. The workflow puts

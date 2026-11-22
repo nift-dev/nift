@@ -41,6 +41,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from child_address_limit import address_limited
 
 NIFT = os.path.abspath(os.environ.get("NIFT_BIN") or "./nift")
 MiB = 1 << 20
@@ -135,18 +136,22 @@ def run(script_text, cwd, limit=LIMIT, address_space=None, env_extra=None, timeo
     if env_extra:
         env.update(env_extra)
 
+    cap = address_space or 4 << 30   # always bounded (standing rule)
+
     def limit_memory():
         # Never fill the disk: no file written by nift or its children may
         # exceed FSIZE_LIMIT (captures included).
-        cap = address_space or 4 << 30   # always bounded (standing rule)
-        for kind, value in ((resource.RLIMIT_FSIZE, FSIZE_LIMIT), (resource.RLIMIT_AS, cap)):
+        limits = [(resource.RLIMIT_FSIZE, FSIZE_LIMIT)]
+        if sys.platform != "darwin":
+            limits.append((resource.RLIMIT_AS, cap))
+        for kind, value in limits:
             hard = resource.getrlimit(kind)[1]
             if hard != resource.RLIM_INFINITY:
                 value = min(value, hard)
             resource.setrlimit(kind, (value, value))
 
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        proc = subprocess.Popen([NIFT, str(script)], cwd=cwd, stdout=out, stderr=err, env=env,
+        proc = subprocess.Popen(address_limited([NIFT, str(script)], cap), cwd=cwd, stdout=out, stderr=err, env=env,
                                 preexec_fn=limit_memory, stdin=stdin if stdin is not None else subprocess.DEVNULL)
         deadline = time.monotonic() + timeout
         while True:

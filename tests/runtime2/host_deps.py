@@ -30,6 +30,7 @@ import re
 import resource
 import time
 from pathlib import Path
+from child_address_limit import address_limited
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cp01"))
@@ -58,7 +59,10 @@ UP_TO_DATE = re.compile(r"all \d+ tracked files? (is|are) up to date")
 
 def bounded():
     # Standing rule: every nift run is bounded in disk, memory and time.
-    for kind, value in ((resource.RLIMIT_FSIZE, 256 << 20), (resource.RLIMIT_AS, 4 << 30)):
+    limits = [(resource.RLIMIT_FSIZE, 256 << 20)]
+    if sys.platform != "darwin":
+        limits.append((resource.RLIMIT_AS, 4 << 30))
+    for kind, value in limits:
         hard = resource.getrlimit(kind)[1]
         if hard != resource.RLIM_INFINITY:
             value = min(value, hard)
@@ -66,7 +70,8 @@ def bounded():
 
 
 def nift(cwd, *args, env=None, check=True):
-    proc = subprocess.run(PRIV + [NIFT, *args], cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
+    command = address_limited(PRIV + [NIFT, *args], 4 << 30)
+    proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
                           preexec_fn=bounded)
     if check and proc.returncode != 0:
         raise RuntimeError("nift %s failed in %s:\n%s%s" % (" ".join(args), cwd, proc.stdout, proc.stderr))
@@ -404,7 +409,8 @@ def mid_stream(mode, root, oracle):
     write(root / "content" / "streamed.html", MID_PAGE)
     nift(root, "build")
     (ctl / "sync").write_text("")
-    proc = subprocess.Popen(PRIV + [NIFT, "build"], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    command = address_limited(PRIV + [NIFT, "build"], 4 << 30)
+    proc = subprocess.Popen(command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                             preexec_fn=bounded)
     deadline = time.monotonic() + 30
     while not (ctl / "opened").exists() and time.monotonic() < deadline and proc.poll() is None:

@@ -25,6 +25,7 @@ A difference is approved only through a named policy of vm_policies.py
 other difference or expectation mismatch.
 """
 import argparse, collections, json, os, resource, shutil, subprocess, sys, tempfile
+from child_address_limit import address_limited
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -52,17 +53,21 @@ def run(nift, script, cwd, mode, stats, timeout):
     try:
         out_path, err_path = os.path.join(cwd, ".stdout"), os.path.join(cwd, ".stderr")
         with open(out_path, "wb") as out, open(err_path, "wb") as err:
-            p = subprocess.run([nift, script], cwd=cwd, env=env, stdout=out, stderr=err, stdin=subprocess.DEVNULL,
+            command = [nift, script] if "ASAN_OPTIONS" in os.environ else address_limited([nift, script], 2 << 30)
+            p = subprocess.run(command, cwd=cwd, env=env, stdout=out, stderr=err, stdin=subprocess.DEVNULL,
                                timeout=timeout, preexec_fn=limit_child)
         # Compare whole outputs by size and hash, keep a prefix for reports.
-        return capped(out_path), capped(err_path), p.returncode
+        out, err = capped(out_path), capped(err_path)
+        if sys.platform == "darwin" and p.returncode == 125 and err.startswith(b"Darwin address-limit launcher:"):
+            raise RuntimeError(err.decode(errors="replace"))
+        return out, err, p.returncode
     except subprocess.TimeoutExpired:
         return b"", b"timeout", "timeout"
 
 
 def limit_child():
     """Generated programs can grow strings exponentially; bound both engines."""
-    if "ASAN_OPTIONS" not in os.environ:  # ASan reserves terabytes of address space
+    if sys.platform != "darwin" and "ASAN_OPTIONS" not in os.environ:  # ASan reserves terabytes
         resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
     resource.setrlimit(resource.RLIMIT_FSIZE, (256 << 20, 256 << 20))
 

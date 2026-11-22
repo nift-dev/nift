@@ -68,6 +68,9 @@ BINDIR ?= $(PREFIX)/bin
 DESTDIR ?=
 
 TEST_DIR := .build
+ifeq ($(shell uname -s),Darwin)
+	DARWIN_ADDRESS_LIMIT := $(TEST_DIR)/darwin-address-limit
+endif
 LIBFFI_TARGET := $(shell $(CC) -dumpmachine 2>/dev/null || uname -m)-$(notdir $(CC))
 LIBFFI_BUILD := $(TEST_DIR)/libffi/$(LIBFFI_TARGET)
 LIBFFI_STAMP := $(LIBFFI_BUILD)/.nift-built
@@ -122,6 +125,10 @@ RECOVERY_EPOCH_GUARD := $(TEST_DIR)/nift-recovery-epoch-guard$(EXEEXT)
 all: $(TARGET)
 
 FORCE:
+
+$(TEST_DIR)/darwin-address-limit: tests/runtime2/darwin_address_limit_probe.c
+	@mkdir -p "$(@D)"
+	$(CC) -O2 -Wall -Wextra -Werror "$<" -o "$@"
 
 # The shipped CLI is the REDUCED object set (no src/embed/*). Plain `make`
 # therefore builds only the ordinary Nift CLI; the embedding library and every
@@ -1247,7 +1254,7 @@ test-rt-vm-invalidate:
 	@bash tests/runtime2/suite_status.sh invalidate "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
 test-rt-vm-verify:
 	@bash tests/runtime2/suite_status.sh verify "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
-test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
+test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(DARWIN_ADDRESS_LIMIT)
 	@bash tests/runtime2/suite_status.sh reset "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) rt-vm-unit -- "$(RT_VM_UNIT)"
 	-@$(RT_VM_SUITE) rt-vm-globals -- "$(RT_VM_GLOBALS)"
@@ -2857,7 +2864,7 @@ $(READ_LIMIT_UNIT): tests/read_limit_unit.cpp src/ReadLimit.h
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -Isrc $(CXXFLAGS) tests/read_limit_unit.cpp -o "$@"
 .PHONY: test-runtime2-host-deps
-test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET)
+test-runtime2-host-deps: $(READ_LIMIT_UNIT) $(TARGET) $(DARWIN_ADDRESS_LIMIT)
 	"$(READ_LIMIT_UNIT)"
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/runtime2/host_deps.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/runtime2/file_copy_move_freedom.sh

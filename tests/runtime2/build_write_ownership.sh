@@ -10,13 +10,14 @@
 # Also: cross-filesystem moves (R5) keep the original when the copy fails and
 # report a partial result when the source cannot be removed afterwards.
 #
-# Every nift run is bounded: ulimit -f (disk), ulimit -v (memory), timeout.
+# Every nift run is bounded in disk, memory and time.
 set -u -o pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/child_address_limit.sh"
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 pass() { echo "PASS $1"; }
 bad() { echo "FAIL $1"; fail=1; }
-bounded() { ( ulimit -f 262144; ulimit -v 2097152; exec timeout 60 "$@" ); }
+bounded() { test_run_bounded 262144 "$@"; }
 W="$(mktemp -d)"; trap 'chmod -R u+w "$W" 2>/dev/null; rm -rf "$W"' EXIT
 cd "$W" && mkdir project outside && cd project || exit 2
 bounded "$NIFT" init >/dev/null 2>&1 || { echo "setup failed"; exit 2; }
@@ -97,7 +98,7 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -
   head -c 300000 /dev/zero > "$W/big.bin"
   printf 'try { native::mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
   # SIGXFSZ ignored so the over-size write fails with EFBIG instead of killing nift.
-  out="$( trap '' XFSZ; ulimit -f 200; ulimit -v 2097152; timeout 60 "$NIFT" "$W/m1.f" 2>&1 )"
+  out="$( trap '' XFSZ; test_run_bounded 200 "$NIFT" "$W/m1.f" 2>&1 )"
   if echo "$out" | grep -q "CAUGHT io.move_failed" && [ "$(stat -c %s "$W/big.bin")" = 300000 ] && [ ! -e "$S/big.bin" ] && ! ls -A "$S" | grep -q nift-tmp; then
     pass "cross-device move: failed copy leaves the original intact"
   else bad "cross-device move copy failure: $out; $(ls -la "$S" | tr '\n' ' ')"; fi

@@ -13,7 +13,7 @@ static int set_soft(rlim_t soft, rlim_t hard) {
     return setrlimit(RLIMIT_AS, &limits);
 }
 
-static int configure(rlim_t allowance) {
+static int configure(rlim_t allowance, int report) {
     struct rlimit inherited;
     if (getrlimit(RLIMIT_AS, &inherited) < 0) return -1;
     rlim_t cap = allowance < inherited.rlim_cur ? allowance : inherited.rlim_cur;
@@ -30,11 +30,22 @@ static int configure(rlim_t allowance) {
             else return -1;
         }
         baseline = high;
+        if (baseline == RLIM_INFINITY) {
+            errno = EINVAL;
+            return -1;
+        }
         cap = allowance < inherited.rlim_cur - baseline ? baseline + allowance : inherited.rlim_cur;
     }
     if (set_soft(cap, cap) < 0) return -1;
-    fprintf(stderr, "RLIMIT_AS baseline=%" PRIuMAX " allowance=%" PRIuMAX " applied=%" PRIuMAX "\n",
-            (uintmax_t)baseline, (uintmax_t)allowance, (uintmax_t)cap);
+    struct rlimit applied;
+    if (getrlimit(RLIMIT_AS, &applied) < 0) return -1;
+    if (applied.rlim_cur != cap || applied.rlim_max != cap) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (report)
+        fprintf(stderr, "RLIMIT_AS baseline=%" PRIuMAX " allowance=%" PRIuMAX " applied=%" PRIuMAX "\n",
+                (uintmax_t)baseline, (uintmax_t)allowance, (uintmax_t)cap);
     return 0;
 }
 
@@ -64,12 +75,22 @@ static int check_allocations(void) {
 
 int main(int argc, char *argv[]) {
     if (argc == 2 && strcmp(argv[1], "--check") == 0) return check_allocations();
-    if (argc != 2 || strcmp(argv[1], "--probe") != 0) return 2;
-    if (configure((rlim_t)128 << 20) < 0) {
-        perror("set address limit");
-        return 1;
+    const int probe = argc == 2 && strcmp(argv[1], "--probe") == 0;
+    rlim_t allowance = (rlim_t)128 << 20;
+    if (!probe) {
+        if (argc < 4 || strcmp(argv[2], "--") != 0 || argv[1][0] < '1' || argv[1][0] > '9') return 2;
+        char *end;
+        errno = 0;
+        uintmax_t requested = strtoumax(argv[1], &end, 10);
+        if (errno != 0 || *end != '\0' || requested >= (uintmax_t)RLIM_INFINITY) return 2;
+        allowance = (rlim_t)requested;
     }
-    execl(argv[0], argv[0], "--check", (char *)NULL);
-    perror("exec address-limit probe");
-    return 1;
+    if (configure(allowance, probe) < 0) {
+        perror("Darwin address-limit launcher: set address limit");
+        return 125;
+    }
+    if (probe) execl(argv[0], argv[0], "--check", (char *)NULL);
+    else execvp(argv[3], argv + 3);
+    perror("Darwin address-limit launcher: exec address-limited command");
+    return 125;
 }
