@@ -396,11 +396,13 @@ $(RT_ATOM_BUDGET): tests/rt/atom_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/atom_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
 
 # Memory investigation C3: natives check the budget before allocating results.
+# The replacement operator new/delete needs one allocation domain, including
+# allocations inside the C++ library (static runtime on Windows).
 $(RT_NATIVE_BUDGET): tests/rt/native_budget.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/native_budget.cpp $(RT_UNIT_OBJECTS) -o "$@"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/native_budget.cpp $(RT_UNIT_OBJECTS) $(LDFLAGS) -o "$@"
 
 # C3 follow-up: a heap limit of 0 means no room, never "disabled".
 $(RT_HEAP_LIMIT_ZERO): tests/runtime2/memory/heap_limit_zero_repro.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
