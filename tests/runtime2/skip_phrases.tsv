@@ -155,9 +155,6 @@ tests/runtime2/rt_parser_corpus.py	detected	-	print("paren oracle: skipped %d no
 tests/runtime2/safety/mutants.sh	detected	-	link=$(printf '%s\n' $objects | grep -vxE "$skip" | grep -v '\.a$' | tr '\n' ' ')
 tests/runtime2/shell_call_syntax.py	detected	-	print("shell-call-syntax: skipped (POSIX pty and fake PATH)")
 tests/runtime2/vm_host.py	detected	-	print("SKIP symlink fixtures: symlinks unavailable")
-tests/runtime2/vm_host_memory.py	detected	-	print("SKIP vm_host_memory: /usr/bin/time unavailable")
-tests/runtime2/vm_host_memory.py	detected	-	print("SKIP peak tracker: build failed")
-tests/runtime2/vm_host_memory.py	detected	-	print("SKIP peak tracker: cc unavailable")
 tests/serve_smoke.sh	detected	-	*) echo "SKIP: serve_smoke.sh runs on Linux (full) and macOS (lifecycle core); Windows uses tests/serve_windows_lifecycle.ps1"; exit 77 ;;
 tests/serve_smoke.sh	detected	-	PY=$(command -v python3) || { echo "SKIP: python3 not available; nift serve requires it, nothing was tested"; exit 77; }
 tests/serve_smoke.sh	justified	a counter initialisation, not a message	fail=0; passes=0; skips=0

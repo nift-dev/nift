@@ -34,6 +34,7 @@ Negative controls: the same predicates must reject the old default
 any required part.
 """
 import argparse
+import errno
 import json
 import os
 import subprocess
@@ -158,7 +159,14 @@ def run_tty(nift, cwd, args, extra, lines, settle=0.4):
                 out += data
     for line in lines:
         drain(settle)
-        os.write(fd, (line + "\r").encode())
+        try:
+            os.write(fd, (line + "\r").encode())
+        except OSError as error:
+            if error.errno != errno.EIO:
+                raise
+            # The slave can close before the test attempts to send input,
+            # notably when an initial unit refuses and terminates the child.
+            break
     drain(2.0)
     deadline = time.time() + 20
     while True:
