@@ -103,17 +103,17 @@ jobs:
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           make test-rt-source-map-retry PYTHON=python
-      - name: VM subset (Linux, macOS)
-        if: runner.os != 'Windows'
+      - name: Capture macOS memory and literal diagnostics
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           set -e -o pipefail
-          # Keep GNU timeout available to test subprocesses with a minimal PATH.
-          NIFT_TEST_TIMEOUT=$(command -v timeout)
-          export NIFT_TEST_TIMEOUT
-          # Use the same physical paths Python fixtures and Nift diagnostics report.
-          if [ "$RUNNER_OS" = macOS ]; then
-            export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"
+          export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"
+          {
+            if cc -O2 -Wall -Wextra -Werror tests/runtime2/darwin_address_limit_probe.c \
+                -o .build/darwin-address-limit-probe; then
+              .build/darwin-address-limit-probe --probe || echo 'Darwin address-limit probe failed'
+            fi
             # Probe the exact child limits used by the certification tests.
             # subprocess itself only reports a generic preexec_fn exception.
             python3 -u - <<'PYLIMITS'
@@ -139,11 +139,38 @@ jobs:
               except (subprocess.SubprocessError, OSError) as error:
                   print(f"{name}={value}: probe launch failed: {error}")
           PYLIMITS
-            # Link the same prepared parser and value objects used by Nift.
+            # Link the parser, values and minifier objects in CLI link order.
             if c++ -std=c++17 -O2 -Isrc tests/runtime2/literals/prepared_probe.cpp \
-                src/Ast.o src/RuntimeValue.o -o .build/prepared-literal-probe; then
+                src/RuntimeValue.o src/EmbeddedMinify.o src/Ast.o -o .build/prepared-literal-probe; then
               .build/prepared-literal-probe
             fi
+            python3 -u - <<'PYRSS'
+          import os
+          import sys
+          import tempfile
+          sys.path.insert(0, 'tests/runtime2')
+          from vm_subset import equality_memory
+          with tempfile.TemporaryDirectory() as work:
+              failures = equality_memory(os.path.abspath('nift'), work)
+          print('\n'.join(failures) if failures else 'PASS equality RSS control')
+          PYRSS
+          } 2>&1 | tee .build/macos-probes.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.build-unix.outcome == 'success' }}
+        with:
+          name: runtime2-macos-probes
+          path: .build/macos-probes.txt
+      - name: VM subset (Linux, macOS)
+        if: ${{ !cancelled() && runner.os != 'Windows' && steps.build-unix.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -e -o pipefail
+          # Keep GNU timeout available to test subprocesses with a minimal PATH.
+          NIFT_TEST_TIMEOUT=$(command -v timeout)
+          export NIFT_TEST_TIMEOUT
+          # Use the same physical paths Python fixtures and Nift diagnostics report.
+          if [ "$RUNNER_OS" = macOS ]; then
+            export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"
           fi
           mkdir -p .build/platform-subset
           python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \
