@@ -84,6 +84,10 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          # Use the same physical paths Python fixtures and Nift diagnostics report.
+          if [ "$RUNNER_OS" = macOS ]; then
+            export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"
+          fi
           mkdir -p .build/platform-subset
           python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \
             2>&1 | tee '.build/platform-subset/${{ matrix.id }}.txt'
@@ -92,12 +96,20 @@ jobs:
         shell: msys2 {0}
         env:
           MSYS: winsymlinks:nativestrict
+          PYTHONIOENCODING: utf-8
         run: |
           set -o pipefail
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           mkdir -p .build/platform-subset
+          export VM_PARSE_DUMP="$(cygpath -am "$PWD/.build/rt-parse-dump.exe")"
           python tests/runtime2/platform_subset.py --platform windows --nift "$PWD/nift.exe" --build .build \
             2>&1 | tee .build/platform-subset/windows.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: runtime2-platform-subset-${{ matrix.id }}
+          path: .build/platform-subset/
+          if-no-files-found: warn
       # A failed VM entry should leave its job red and still let independent gates run.
       - name: Subset make targets (embedding, value layer, kind bits, source map)
         if: ${{ !cancelled() && steps.build-unix.outcome == 'success' }}
@@ -113,9 +125,3 @@ jobs:
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           make -k test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: always()
-        with:
-          name: runtime2-platform-subset-${{ matrix.id }}
-          path: .build/platform-subset/
-          if-no-files-found: warn

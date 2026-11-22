@@ -365,14 +365,14 @@ $(RT_VALUE_DESTROY_OOM): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_UN
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_UNIT_OBJECTS) -o "$@"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_UNIT_OBJECTS) $(LDFLAGS) -o "$@"
 # A one-slot in-frame buffer: small graphs reach the spill and the
 # pointer-reversal fallback at every injected allocation failure.
 $(RT_VALUE_DESTROY_OOM_SMALL): tests/rt/value_destroy_oom.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_destroy-local)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(RT_OBJFLAGS_destroy-local) -- $(RT_OBJECTS_destroy-local)
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_destroy-local) -o "$@"
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_RT_DESTROY_LOCAL=1 $(RT_TEST_DEPFLAGS) tests/rt/value_destroy_oom.cpp $(RT_OBJECTS_destroy-local) $(LDFLAGS) -o "$@"
 
 # The exact side table never allocates; a full table reports over budget
 # (one-slot build; reserves ~2 GiB of address space, never touched).
@@ -697,7 +697,7 @@ test-cp23-snapshot-constants: $(TEST_DIR)/rt/cp23-snapshot-constants-unit $(TEST
 test-cp23-shared-unit-sanitize: $(TEST_DIR)/rt-san/cp23-shared-unit
 	env ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$<"
 
-SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map
+SOURCE_MAP_UNIT := $(TEST_DIR)/rt/source-map$(EXEEXT)
 $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_sourcemap-counter)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
@@ -705,14 +705,13 @@ $(SOURCE_MAP_UNIT): tests/rt/source_map_unit.cpp $(RT_VALUE_DEPS) $(RT_OBJECTS_s
 	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -DNIFT_SOURCEMAP_COUNTER -pthread $(RT_TEST_DEPFLAGS) \
 		tests/rt/source_map_unit.cpp $(RT_OBJECTS_sourcemap-counter) -o "$@"
 
-SOURCE_MAP_RETRY_UNIT := $(TEST_DIR)/rt/source-map-retry
-$(SOURCE_MAP_RETRY_UNIT): tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/source_map.h \
-		src/rt/module_link.cpp src/rt/module_link.h
+# Link the runtime objects so this test needs no platform-specific dead stripping.
+SOURCE_MAP_RETRY_UNIT := $(TEST_DIR)/rt/source-map-retry$(EXEEXT)
+$(SOURCE_MAP_RETRY_UNIT): tests/rt/source_map_retry_unit.cpp $(RT_VALUE_DEPS) $(RT_UNIT_OBJECTS)
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	mkdir -p "$(TEST_DIR)/rt"
-	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) -ffunction-sections -fdata-sections -pthread \
-		tests/rt/source_map_retry_unit.cpp src/rt/source_map.cpp src/rt/module_link.cpp \
-		-Wl,--gc-sections -o "$@"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(RT_UNIT_OBJECTS)
+	$(CXX) $(CPPFLAGS) -Itests/rt $(CXXFLAGS) $(RT_TEST_DEPFLAGS) $< $(RT_UNIT_OBJECTS) $(LDFLAGS) -o "$@"
 
 ERROR_OOM_UNIT := $(TEST_DIR)/rt/error-oom
 $(ERROR_OOM_UNIT): tests/rt/error_oom_unit.cpp src/rt/error.cpp src/rt/error.h \
