@@ -184,7 +184,7 @@ def suite(root):
         shutil.copy2(NIFT, bindir / "nift.exe")
     else:
         os.symlink(NIFT, bindir / "nift")
-    (work / "ex.f").write_text("#!/usr/bin/env nift\n" + PROG)
+    (work / "ex.f").write_bytes(("#!/usr/bin/env nift\n" + PROG).encode("utf-8"))
     os.chmod(work / "ex.f", 0o755)
     path_env = {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}
 
@@ -203,16 +203,35 @@ def suite(root):
            expect=["argc=1", "[z]"])
     parity("file with --platform", [NIFT, "--platform=windows", "prog.f", "q"], work, home,
            expect=["cmd=prog.f", "argc=1", "[q]"])
+    launch = []
+    absolute_script = str(work / "ex.f")
+    if os.name == "nt":
+        # Win32 cannot resolve a POSIX shebang. MSYS exec reads the actual
+        # script header and gives /usr/bin/env its original arguments.
+        bash = os.environ.get("NIFT_TEST_BASH")
+        if not bash:
+            raise RuntimeError("NIFT_TEST_BASH must identify MSYS2 bash for the Windows shebang tests")
+        # env keeps the relative script spelling that bash's exec can expand.
+        launch = [bash, "--noprofile", "--norc", "-c", 'exec /usr/bin/env -- "$@"', "nift-shebang"]
+        absolute_script = (work / "ex.f").as_posix()
+        path_env["MSYS2_ARG_CONV_EXCL"] = "*"
     shebang_cases = [
-        ("shebang script executed directly", [str(work / "ex.f"), "a", "b c"],
-         ["cmd=" + str(work / "ex.f"), "argc=2", "[b c]"]),
+        ("shebang script executed directly", [absolute_script, "a", "b c"],
+         ["cmd=" + absolute_script, "argc=2", "[b c]"]),
         ("shebang script as ./ex.f", ["./ex.f", "a"], ["cmd=./ex.f", "[a]"]),
     ]
     for label, argv, expected in shebang_cases:
         try:
-            parity(label, argv, work, home, extra=path_env, expect=expected)
+            parity(label, launch + argv, work, home, extra=path_env, expect=expected)
         except OSError as error:
             check(False, label + ": direct invocation failed", str(error))
+    if os.name == "nt":
+        bad_shebang = work / "bad-shebang.f"
+        bad_shebang.write_bytes(b"#!/usr/bin/env nift-missing-interpreter\nprint(0)\n")
+        os.chmod(bad_shebang, 0o755)
+        p, rows = run(launch + ["./bad-shebang.f"], work, None, home, extra=path_env)
+        check(p.returncode == 127 and not p.stdout and "nift-missing-interpreter" in p.stderr and not rows,
+              "shebang launch requires the named interpreter", repr((p.returncode, p.stdout, p.stderr, rows)))
     parity("nift ex.f (shebang stripped)", [NIFT, "ex.f", "a"], work, home, expect=["cmd=ex.f", "[a]"])
     for flag in ("-e", "-c"):
         parity(flag + " program", [NIFT, flag, INLINE, "a", "b c"], work, home,
