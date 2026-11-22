@@ -360,6 +360,17 @@ def equality_memory(nift, work):
         elif rss > EQUALITY_BUDGET + PROCESS_ALLOWANCE:
             failures.append(f"equality-memory-{name}: peak RSS {rss} bytes exceeds the budget "
                             f"{EQUALITY_BUDGET} + {PROCESS_ALLOWANCE}")
+            stats_path = os.path.join(d, ".nift-rss-stats.json")
+            stats_env = {**env, "NIFT_VM_STATS": stats_path}
+            stats_status, stats_out, stats_err, stats_rss = equality_process(nift, d, stats_env, "p.f")
+            try:
+                with open(stats_path) as f:
+                    stats = json.load(f)
+                failures.append(f"equality-memory-{name}: repeat peak RSS {stats_rss}, "
+                                f"VM heap peak {stats.get('heap_peak')}, VM heap live {stats.get('heap_live')}")
+            except (OSError, ValueError) as error:
+                failures.append(f"equality-memory-{name}: repeat stats unavailable ({error}), "
+                                f"exit {stats_status}, out {stats_out[:60]!r}, err {stats_err[-200:]!r}")
             # Record a startup-only invocation's footprint as context for the
             # failure. It does not change the workload's fixed allowance.
             with open(os.path.join(d, "startup.f"), "w") as f:

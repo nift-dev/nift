@@ -97,6 +97,17 @@ inline bool grow_unknown(const Context& context, Buffer& data, std::size_t neede
     if (limit != kSizeOverflow && target > limit / 2) target = limit;
     if (target > cap) target = cap;
     if (target < needed) target = needed;
+#ifdef _LIBCPP_VERSION
+    if constexpr (std::is_same_v<Buffer, BudgetedText>) {
+        // libc++ rounds long string allocations, including the terminator.
+        // A 16-byte multiple also fits versions using 8-byte alignment.
+        constexpr std::size_t alignment = 16;
+        if (cap >= alignment - 1) {
+            const std::size_t aligned = cap - (cap - (alignment - 1)) % alignment;
+            if (target > aligned && needed <= aligned) target = aligned;
+        }
+    }
+#endif
     if (!reserve_result(context, size_add(target, old))) return false;
     if (!reserve_buffer(data, target)) return false;
     // CP16 R6: the trim proof needs the bound on the capacity actually
