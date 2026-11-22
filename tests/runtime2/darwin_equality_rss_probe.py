@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tempfile
@@ -45,32 +46,45 @@ def build_control(work):
     return binary
 
 
-def measure(work, binary, label, cache_disabled=False):
+def measure(work, binary, label, settings=(), pressure_probe=False):
     _, source, expected = EQUALITY_MEMORY[0]
     (work / "flat.f").write_text(source)
     stats = work / "vm.json"
+    stats.unlink(missing_ok=True)
     native = work / "native.txt"
     env = env_for(str(work))
     env.update(NIFT_VM="require", NIFT_VM_HEAP_BUDGET=str(EQUALITY_BUDGET), NIFT_VM_STATS=str(stats))
-    if cache_disabled:
-        env["MallocLargeCache"] = "0"
-    proc = subprocess.run(["/usr/bin/time", "-l", "-o", native, binary, "flat.f"], cwd=work, env=env,
+    # Apply probe-only allocator settings after the system time executable
+    # starts. In particular, SIP strips inherited DYLD variables from it.
+    command = ["/usr/bin/time", "-l", "-o", native, "/usr/bin/env", *settings, binary, "flat.f"]
+    proc = subprocess.run(command, cwd=work, env=env,
                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    if (proc.returncode, proc.stdout, proc.stderr) != (0, expected, ""):
+    reported = re.fullmatch(r"allocator pressure relief: ([1-9][0-9]*) requests, [0-9]+ bytes released\n", proc.stderr)
+    stderr_ok = bool(reported) if pressure_probe else proc.stderr == ""
+    if proc.returncode != 0 or proc.stdout != expected or not stderr_ok:
         raise RuntimeError(f"{label}: exit {proc.returncode}, stdout {proc.stdout!r}, stderr {proc.stderr!r}")
     peak = json.loads(stats.read_text())["heap_peak"]
     print(f"{label} VM heap peak {peak}")
+    if pressure_probe:
+        print(proc.stderr, end="")
     print(native.read_text(), end="")
 
 
 def main():
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
+        trim = work / "pressure-relief.dylib"
+        subprocess.run(["cc", "-O2", "-Wall", "-Wextra", "-Werror", "-dynamiclib",
+                        Path(__file__).with_name("darwin_equality_trim_probe.c"), "-o", trim],
+                       check=True, timeout=60)
         mutant = build_control(work)
+        production = Path("nift").resolve()
         for _ in range(2):
-            measure(work, Path("nift").resolve(), "production")
+            measure(work, production, "production")
             measure(work, mutant, "historical work list")
-        measure(work, Path("nift").resolve(), "production with allocator large cache disabled", cache_disabled=True)
+        measure(work, production, "production with allocator large cache disabled", ("MallocLargeCache=0",))
+        measure(work, production, "production with allocator pressure relief probe",
+                (f"DYLD_INSERT_LIBRARIES={trim}",), pressure_probe=True)
 
 
 if __name__ == "__main__":
