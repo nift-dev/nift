@@ -87,7 +87,10 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          set -o pipefail
+          set -e -o pipefail
+          # Keep GNU timeout available to test subprocesses with a minimal PATH.
+          NIFT_TEST_TIMEOUT=$(command -v timeout)
+          export NIFT_TEST_TIMEOUT
           # Use the same physical paths Python fixtures and Nift diagnostics report.
           if [ "$RUNNER_OS" = macOS ]; then
             export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"

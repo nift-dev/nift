@@ -337,7 +337,8 @@ def equality_memory(nift, work):
             _, status, usage = os.wait4(p.pid, 0)  # this child's own peak RSS
             p.returncode = os.waitstatus_to_exitcode(status)
         out, err = open(out_path, "rb").read(), open(err_path, "rb").read()
-        rss = usage.ru_maxrss * 1024
+        # Darwin reports bytes, while Linux reports KiB.
+        rss = usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024
         if p.returncode != 0 or out.decode() != expected:
             failures.append(f"equality-memory-{name}: exit {p.returncode}, out {out[:60]!r}, err {err[-200:]!r}")
         elif rss > EQUALITY_BUDGET + PROCESS_ALLOWANCE:

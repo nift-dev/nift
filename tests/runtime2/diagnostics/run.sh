@@ -101,7 +101,17 @@ run_env() {  # run_env DIR CMD...
       timeout 20 "$@" >"$W/out" 2>"$W/err" </dev/null; echo $? >"$W/exit" )
 }
 
-normalise() { for s in out err; do sed -i "s#$1#\$ROOT#g; s#$W/case#\$ROOT#g" "$W/$s"; done; }
+rewrite() {
+  local file=$1 pattern=$2
+  sed "$pattern" "$file" >"$file.tmp" && mv -f "$file.tmp" "$file"
+}
+
+normalise() {
+  local s
+  for s in out err; do
+    rewrite "$W/$s" "s#$1#\$ROOT#g; s#$W/case#\$ROOT#g" || exit 2
+  done
+}
 
 append_files() {  # append_files LISTFILE
   [ -f "$1" ] || return 0
@@ -189,7 +199,7 @@ else
     cp -R "$d". "$W/case/"
     real="$(cd "$W/case" && pwd -P)"
     run_env "$W/case" "$NIFT" build --all
-    sed -i '/^time taken:/d' "$W/out"
+    rewrite "$W/out" '/^time taken:/d' || exit 2
     append_files "$HERE/sites/$b.publish"
     if [ -e "$W/case/.nift/.unfinished" ]; then echo "== state: .nift/.unfinished present ==" >>"$W/out"; fi
     normalise "$real"
