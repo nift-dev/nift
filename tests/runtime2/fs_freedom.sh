@@ -10,23 +10,28 @@ fail=0
 pass() { echo "PASS $1"; }
 bad() { echo "FAIL $1"; fail=1; }
 W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+# Paths written into Nift source bypass the MSYS argument conversion.
+fixture_root="$W"
+if command -v cygpath >/dev/null 2>&1; then
+  fixture_root="$(cygpath -am "$W")" || exit 2
+fi
 mkdir -p "$W/project" "$W/neighbour/data" "$W/elsewhere"
 echo 'NEIGHBOUR-1' > "$W/neighbour/data/note.txt"
 echo '{"title": "external json"}' > "$W/neighbour/data/info.json"
 printf '# External markdown\n' > "$W/neighbour/data/doc.md"
 ln -s "$W/neighbour/data" "$W/project-link-target" 2>/dev/null
 cd "$W/project" && "$NIFT" init >/dev/null 2>&1 || { echo "setup failed"; exit 2; }
-ln -s "$W/neighbour/data" linked-data
+ln -s "$W/neighbour/data" linked-data || { echo "setup failed: creating fixture symlink"; exit 2; }
 
 cat > content/index.html <<EOF
-ABS:@input("$W/neighbour/data/note.txt")
+ABS:@input("$fixture_root/neighbour/data/note.txt")
 REL:@input("../neighbour/data/note.txt")
 LINK:@input("linked-data/note.txt")
 @json(info, "../neighbour/data/info.json")JSON:\$[info.title]
 MD:@markup("md", "../neighbour/data/doc.md")
-EXISTS:@script { return exists("$W/neighbour/data/note.txt") }
+EXISTS:@script { return exists("$fixture_root/neighbour/data/note.txt") }
 LS:@script { return ls("../neighbour/data/*.txt").length() }
-WRITE:@script { f := file("$W/elsewhere/out.txt"); f.open("w"); f.write("written"); f.save(); f.close(); return "ok" }
+WRITE:@script { f := file("$fixture_root/elsewhere/out.txt"); f.open("w"); f.write("written"); f.save(); f.close(); return "ok" }
 OUTLINK:<a href="@pathto("../neighbour/data/note.txt")">n</a>
 EOF
 # Modified mode keeps the v4.12 rule (D-050): an input whose mtime is >= the
@@ -58,7 +63,7 @@ echo 'x' > "$W/neighbour/data/new.txt"; "$NIFT" build >/dev/null 2>&1
 grep -q "LS:2" public/index.html && pass "external glob change triggers rebuild" || bad "external glob change missed"
 
 # Standalone script: absolute, parent traversal, symlinks.
-printf 'print(native::cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/data"))\n' "$W" > "$W/project/s.f"
+printf 'print(native::cat("%s/neighbour/data/note.txt"))\nprint(exists("../neighbour/data"))\n' "$fixture_root" > "$W/project/s.f"
 out="$("$NIFT" s.f 2>&1)"; echo "$out" | grep NEIGHBOUR-2 >/dev/null && pass "standalone absolute read" || bad "standalone read: $out"
 
 # --fs-root remains an explicit restriction.
@@ -72,7 +77,7 @@ if echo "$out" | grep -q "path escapes configured filesystem root"; then pass "-
 [ -f "$W/neighbour/data/note.txt" ] && [ -f "$W/elsewhere/out.txt" ] && pass "rm leaves external files alone" || bad "rm removed external files"
 
 # --fs-root remains an explicit restriction for a project build as well.
-if NIFT_FS_ROOT="$W/project" "$NIFT" build --all >/dev/null 2>"$W/restricted-err"; then
+if NIFT_FS_ROOT="$fixture_root/project" "$NIFT" build --all >/dev/null 2>"$W/restricted-err"; then
   bad "restricted project build admitted an outside path"
 elif grep -q "path escapes configured filesystem root" "$W/restricted-err"; then
   pass "restricted project build refuses outside @path/@input reads"

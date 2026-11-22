@@ -27,6 +27,8 @@ import subprocess
 import sys
 import tempfile
 
+from rss_measure import peak_rss_bytes, time_args
+
 LOOP = "i0 := 0\nwhile (i0 < 2) {{\n  i0 += 1\n{body}}}\n"
 FN_TOP = "fn(w0()) {{\n{body}  return 0\n}}\nprint(w0())\n"
 FN_LOOP = "fn(w0()) {{\n{body}  return 0\n}}\ni0 := 0\nwhile (i0 < 2) {{ print(w0()); i0 += 1 }}\n"
@@ -321,9 +323,28 @@ EQUALITY_BUDGET = 50_000_000
 PROCESS_ALLOWANCE = 8 << 20
 
 
+def equality_process(nift, cwd, env, script):
+    darwin = sys.platform == "darwin"
+    command = ["/usr/bin/time", *time_args(darwin), "/bin/sh", "-c",
+               'exec "$@" 2>.nift-stderr', "nift-rss", nift, script]
+    # A native launcher avoids charging the Python parent's resident pages
+    # to the measured child before exec. Keep Nift's stderr apart from time.
+    process = subprocess.run(command, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    err_path = os.path.join(cwd, ".nift-stderr")
+    err = b""
+    if os.path.exists(err_path):
+        with open(err_path, "rb") as f:
+            err = f.read()
+    rss = peak_rss_bytes(process.stderr, darwin)
+    if rss is None:
+        err += process.stderr
+    return process.returncode, process.stdout, err, rss
+
+
 def equality_memory(nift, work):
     failures = []
-    if not hasattr(os, "wait4") or "ASAN_OPTIONS" in os.environ:
+    if os.name == "nt" or "ASAN_OPTIONS" in os.environ:
         return failures  # RSS is meaningless under ASan
     for name, source, expected in EQUALITY_MEMORY:
         d = tempfile.mkdtemp(dir=work)
@@ -331,19 +352,24 @@ def equality_memory(nift, work):
             f.write(source)
         env = env_for(d)
         env.update({"NIFT_VM": "require", "NIFT_VM_HEAP_BUDGET": str(EQUALITY_BUDGET)})
-        out_path, err_path = os.path.join(d, ".out"), os.path.join(d, ".err")
-        with open(out_path, "wb") as o, open(err_path, "wb") as e:
-            p = subprocess.Popen([nift, "p.f"], cwd=d, env=env, stdout=o, stderr=e, stdin=subprocess.DEVNULL)
-            _, status, usage = os.wait4(p.pid, 0)  # this child's own peak RSS
-            p.returncode = os.waitstatus_to_exitcode(status)
-        out, err = open(out_path, "rb").read(), open(err_path, "rb").read()
-        # Darwin reports bytes, while Linux reports KiB.
-        rss = usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024
-        if p.returncode != 0 or out.decode() != expected:
-            failures.append(f"equality-memory-{name}: exit {p.returncode}, out {out[:60]!r}, err {err[-200:]!r}")
+        status, out, err, rss = equality_process(nift, d, env, "p.f")
+        if status != 0 or out.decode() != expected:
+            failures.append(f"equality-memory-{name}: exit {status}, out {out[:60]!r}, err {err[-200:]!r}")
+        elif rss is None:
+            failures.append(f"equality-memory-{name}: native peak RSS unavailable: {err[-200:]!r}")
         elif rss > EQUALITY_BUDGET + PROCESS_ALLOWANCE:
             failures.append(f"equality-memory-{name}: peak RSS {rss} bytes exceeds the budget "
                             f"{EQUALITY_BUDGET} + {PROCESS_ALLOWANCE}")
+            # Record a startup-only invocation's footprint as context for the
+            # failure. It does not change the workload's fixed allowance.
+            with open(os.path.join(d, "startup.f"), "w") as f:
+                f.write("print(0)\n")
+            baseline_status, baseline_out, baseline_err, baseline_rss = equality_process(nift, d, env, "startup.f")
+            if baseline_status == 0 and baseline_out == b"0\n" and not baseline_err and baseline_rss is not None:
+                failures.append(f"equality-memory-{name}: separate startup control peak RSS {baseline_rss} bytes")
+            else:
+                failures.append(f"equality-memory-{name}: startup control failed with exit {baseline_status}, "
+                                f"out {baseline_out[:60]!r}, err {baseline_err[-200:]!r}")
         shutil.rmtree(d, ignore_errors=True)
     return failures
 

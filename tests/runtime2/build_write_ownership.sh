@@ -83,7 +83,12 @@ printf '<p>ok</p>\n' > content/index.html; bounded "$NIFT" build >/dev/null 2>&1
 
 # Standalone scripts own no pages: unaffected.
 printf 'native::cp("%s/project/payload.txt", "%s/project/public/scratch.txt")\nprint("ok")\n' "$W" "$W" > "$W/s.f"
-[ "$(bounded "$NIFT" "$W/s.f" 2>&1)" = ok ] && pass "standalone scripts are not restricted" || bad "standalone script restricted"
+out="$(bounded "$NIFT" "$W/s.f" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$out" = ok ]; then
+  pass "standalone scripts are not restricted"
+else
+  bad "standalone script failed (exit $rc): $out"
+fi
 
 # R5: cross-filesystem move partial-failure semantics.
 if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -c %d "$W")" ]; then

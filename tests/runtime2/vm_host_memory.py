@@ -16,12 +16,7 @@ import threading
 from pathlib import Path
 
 
-def peak_rss(stderr, darwin):
-    if darwin:
-        match = re.search(rb"^\s*(\d+)\s+maximum resident set size\s*$", stderr, re.M)
-        return (int(match.group(1)) + 1023) // 1024 if match else None
-    lines = stderr.strip().splitlines()
-    return int(lines[-1]) if lines and lines[-1].isdigit() else None
+from rss_measure import peak_rss_bytes, time_args
 
 
 def run_case(command, cwd, env, input_bytes):
@@ -33,9 +28,9 @@ def run_case(command, cwd, env, input_bytes):
 def timed(nift, cwd, env, input_bytes=None):
     timing = shutil.which("/usr/bin/time")
     darwin = sys.platform == "darwin"
-    args = ["-l"] if darwin else ["-f", "%M"]
-    proc = run_case([timing, *args, nift, "case.f"], cwd, env, input_bytes)
-    return peak_rss(proc.stderr, darwin), proc
+    proc = run_case([timing, *time_args(darwin), nift, "case.f"], cwd, env, input_bytes)
+    rss = peak_rss_bytes(proc.stderr, darwin)
+    return ((rss + 1023) // 1024 if rss is not None else None), proc
 
 
 def build_peak_tracker(root, failures):
