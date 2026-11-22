@@ -121,7 +121,7 @@ jobs:
         with:
           name: runtime2-windows-invocation
           path: .build/windows-invocation.txt
-      - name: Capture macOS memory and literal diagnostics
+      - name: Verify macOS address-space and equality memory controls
         if: runner.os == 'macOS'
         shell: bash
         run: |
@@ -133,46 +133,6 @@ jobs:
             result=$(printf 'print(0)\n' | .build/darwin-address-limit 134217728 -- ./nift -) || exit 1
             test "$result" = 0 || exit 1
             echo 'PASS Nift under the native Darwin address-space guard'
-            # Probe the exact child limits used by the certification tests.
-            # subprocess itself only reports a generic preexec_fn exception.
-            python3 -u - <<'PYLIMITS'
-          import os
-          import resource
-          import subprocess
-          import sys
-
-          for name, value in (("RLIMIT_AS", 2 << 30), ("RLIMIT_AS", 4 << 30),
-                              ("RLIMIT_FSIZE", 256 << 20), ("RLIMIT_FSIZE", 512 << 20)):
-              def set_limit():
-                  try:
-                      kind = getattr(resource, name)
-                      before = resource.getrlimit(kind)
-                      resource.setrlimit(kind, (value, value))
-                      os.write(2, f"{name}: inherited {before}, applied {resource.getrlimit(kind)}\n".encode())
-                  except (AttributeError, OSError, ValueError) as error:
-                      os.write(2, f"{name}={value}: {type(error).__name__}: {error}\n".encode())
-                      raise
-              try:
-                  probe = subprocess.run([sys.executable, "-c", "pass"], preexec_fn=set_limit, timeout=10)
-                  print(f"{name}={value}: probe child exit {probe.returncode}")
-              except (subprocess.SubprocessError, OSError) as error:
-                  print(f"{name}={value}: probe launch failed: {error}")
-          PYLIMITS
-            # Link the parser, values and minifier objects in CLI link order.
-            if c++ -std=c++17 -O2 -Isrc tests/runtime2/literals/prepared_probe.cpp \
-                src/RuntimeValue.o src/EmbeddedMinify.o src/Ast.o -o .build/prepared-literal-probe; then
-              .build/prepared-literal-probe
-            fi
-            python3 -u - <<'PYRSS'
-          import os
-          import sys
-          import tempfile
-          sys.path.insert(0, 'tests/runtime2')
-          from vm_subset import equality_memory
-          with tempfile.TemporaryDirectory() as work:
-              failures = equality_memory(os.path.abspath('nift'), work)
-          print('\n'.join(failures) if failures else 'PASS equality RSS control')
-          PYRSS
             python3 -u tests/runtime2/darwin_equality_rss_probe.py
           } 2>&1 | tee .build/macos-probes.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

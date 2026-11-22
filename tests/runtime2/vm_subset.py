@@ -320,7 +320,12 @@ EQUALITY_MEMORY = [
      "true\nfalse\n"),
 ]
 EQUALITY_BUDGET = 50_000_000
-PROCESS_ALLOWANCE = 8 << 20
+# Darwin's default allocator retains freed array capacity in its large cache.
+# An otherwise identical native control without that cache measured 42.9 MB
+# instead of 68.1 MB. The historical work-list regression measured 104.8 MB
+# with the default allocator. Keep the VM budget and use an RSS ceiling that
+# allows the measured native baseline and still rejects the regression.
+PROCESS_ALLOWANCE = (24 if sys.platform == "darwin" else 8) << 20
 
 
 def equality_process(nift, cwd, env, script):

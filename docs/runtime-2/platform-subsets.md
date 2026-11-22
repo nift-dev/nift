@@ -265,6 +265,15 @@ them on Linode:
   For direct invocation of these tests on macOS, build the launcher with `make .build/darwin-address-limit`.
 
   The two read-limit suites whose point is the address-space bound and `/proc` are excluded on macOS.
+
+- **macOS equality RSS.** The equality workloads run under the same 50,000,000-byte VM heap budget and use
+  native `/usr/bin/time -l` for peak RSS. On hosted ARM64 with the default allocator, two runs used
+  68,108,288 and 68,141,056 bytes, while the reconstructed historical per-element work list used 104,824,832
+  and 104,841,216 bytes with the same output and VM heap peak. A diagnostic run with `MallocLargeCache=0`
+  reduced the current implementation's RSS to 42,860,544 bytes. The macOS process allowance is 24 MiB,
+  giving a total ceiling of 75,165,824 bytes. The Linux process allowance remains 8 MiB. Certification uses
+  the default allocator and checks the historical regression on the same runner.
+  [Native measurements](https://github.com/nift-dev/nift/actions/runs/45073498235).
 - **macOS and GNU `timeout`.** `diagnostics/run.sh` and the shell harnesses call `timeout`. The workflow puts
   coreutils' `gnubin` on PATH on macOS.
 - **Windows symlinks.** The workflow sets `MSYS=winsymlinks:nativestrict`, as the FS-TYPE and SHA-256 steps of the

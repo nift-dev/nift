@@ -3,12 +3,12 @@
 import json
 import os
 from pathlib import Path
-import re
 import shlex
 import subprocess
 import tempfile
 
-from vm_subset import EQUALITY_BUDGET, EQUALITY_MEMORY, env_for
+from rss_measure import peak_rss_bytes
+from vm_subset import EQUALITY_BUDGET, EQUALITY_MEMORY, PROCESS_ALLOWANCE, env_for
 
 PER_ELEMENT_WORK = '''    if (left.is(Kind::Array)) {
         const auto& a = array_items(left);
@@ -46,7 +46,7 @@ def build_control(work):
     return binary
 
 
-def measure(work, binary, label, settings=(), pressure_probe=False):
+def measure(work, binary, label):
     _, source, expected = EQUALITY_MEMORY[0]
     (work / "flat.f").write_text(source)
     stats = work / "vm.json"
@@ -54,37 +54,38 @@ def measure(work, binary, label, settings=(), pressure_probe=False):
     native = work / "native.txt"
     env = env_for(str(work))
     env.update(NIFT_VM="require", NIFT_VM_HEAP_BUDGET=str(EQUALITY_BUDGET), NIFT_VM_STATS=str(stats))
-    # Apply probe-only allocator settings after the system time executable
-    # starts. In particular, SIP strips inherited DYLD variables from it.
-    command = ["/usr/bin/time", "-l", "-o", native, "/usr/bin/env", *settings, binary, "flat.f"]
+    command = ["/usr/bin/time", "-l", "-o", native, binary, "flat.f"]
     proc = subprocess.run(command, cwd=work, env=env,
                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    reported = re.fullmatch(r"allocator pressure relief: ([1-9][0-9]*) requests, [0-9]+ bytes released\n", proc.stderr)
-    stderr_ok = bool(reported) if pressure_probe else proc.stderr == ""
-    if proc.returncode != 0 or proc.stdout != expected or not stderr_ok:
+    if (proc.returncode, proc.stdout, proc.stderr) != (0, expected, ""):
         raise RuntimeError(f"{label}: exit {proc.returncode}, stdout {proc.stdout!r}, stderr {proc.stderr!r}")
     peak = json.loads(stats.read_text())["heap_peak"]
+    if not 0 < peak <= EQUALITY_BUDGET:
+        raise RuntimeError(f"{label}: VM heap peak {peak} is outside the budget")
     print(f"{label} VM heap peak {peak}")
-    if pressure_probe:
-        print(proc.stderr, end="")
-    print(native.read_text(), end="")
+    metrics = native.read_bytes()
+    print(metrics.decode(), end="")
+    rss = peak_rss_bytes(metrics, darwin=True)
+    if rss is None:
+        raise RuntimeError(f"{label}: native peak RSS missing")
+    return rss, peak
 
 
 def main():
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
-        trim = work / "pressure-relief.dylib"
-        subprocess.run(["cc", "-O2", "-Wall", "-Wextra", "-Werror", "-dynamiclib",
-                        Path(__file__).with_name("darwin_equality_trim_probe.c"), "-o", trim],
-                       check=True, timeout=60)
         mutant = build_control(work)
         production = Path("nift").resolve()
+        ceiling = EQUALITY_BUDGET + PROCESS_ALLOWANCE
         for _ in range(2):
-            measure(work, production, "production")
-            measure(work, mutant, "historical work list")
-        measure(work, production, "production with allocator large cache disabled", ("MallocLargeCache=0",))
-        measure(work, production, "production with allocator pressure relief probe",
-                (f"DYLD_INSERT_LIBRARIES={trim}",), pressure_probe=True)
+            production_rss, production_heap = measure(work, production, "production")
+            mutant_rss, mutant_heap = measure(work, mutant, "historical work list")
+            if production_heap != mutant_heap:
+                raise RuntimeError(f"expected equal VM heap peaks, got {production_heap} and {mutant_heap}")
+            if not production_rss <= ceiling < mutant_rss:
+                raise RuntimeError(f"expected production RSS {production_rss} <= ceiling {ceiling} "
+                                   f"< historical work-list RSS {mutant_rss}")
+        print(f"PASS default Darwin allocator: production passes and historical work list exceeds {ceiling} bytes")
 
 
 if __name__ == "__main__":
