@@ -91,9 +91,6 @@ OUTSTANDING = [
      "shell command line, while legacy performs stream extraction"),
     ("ifstream(/dev/zero).read_val", "host-handle-flow",
      "stream value read (read_val), not a byte read: classification not established, stays open"),
-    ("read_line: line of exactly the limit", "type:length",
-     "`.length()` on read_line()'s string-or-null result (a union-kind operand); the D-078 #3 deferral is pinned to its "
-     "corpus sightings and does not cover this case, which D-078 #4 keeps open"),
 ]
 
 
@@ -308,8 +305,7 @@ def cases(work, address_space, rss_bound):
                work, limit=small)
     check("read_line: line of exactly the limit", proc.returncode == 0 and proc.stdout.split() == [str(small), "next"],
           proc.stdout + proc.stderr)
-    # D-077 #3: the case above stays FAILED while the VM refuses `.length()` on read_line()'s result (type:length,
-    # PENDING-OWNER). The same invariant through a form the VM supports: the line is printed and measured here.
+    # Also check the invariant through the original VM-equivalent form.
     proc = run('s := ifstream("%s")\nprint(s.read_line())\nprint(s.read_line())\nclose(s)\n' % (work / "line-exact.txt"),
                work, limit=small)
     check(VM_EQUIVALENT + EQUIVALENT_NAMES[0],
@@ -317,6 +313,15 @@ def cases(work, address_space, rss_bound):
     legacy_channel(lambda: check("read_line: line of exactly the limit",
                                  run('s := ifstream("%s")\nprint(s.read_line().length())\nprint(s.read_line())\nclose(s)\n'
                                      % (work / "line-exact.txt"), work, limit=small).stdout.split() == [str(small), "next"]))
+    empty_length = ('s := ifstream("%s")\nprint(s.read_line().length())\n'
+                    'print("UNREACHED")\n') % (work / "empty.bin")
+    vm_eof = run(empty_length, work, limit=small, env_extra={"NIFT_VM": "require"})
+    legacy_eof = run(empty_length, work, limit=small, env_extra={"NIFT_VM": "0"})
+    check("read_line: length of EOF agrees with the legacy error",
+          vm_eof.returncode == legacy_eof.returncode == 1 and vm_eof.stdout == legacy_eof.stdout == "" and
+          vm_eof.stderr == legacy_eof.stderr and
+          ":2:7: unknown value or malformed expression: s.read_line().length()" in vm_eof.stderr,
+          vm_eof.stderr)
     exceed("read_line one byte over", "read_line", 's := ifstream("%s")\nx := s.read_line()' % (work / "line-over.txt"),
            work, address_space, rss_bound, small)
 

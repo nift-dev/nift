@@ -218,7 +218,9 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             return cycle && mutation_failed(fault, proto, in, mutation::detail::cycle_failure(0), R[in.a].heap(),
                                             RK(in.b), "");
         }
-        case OpCode::Length: if (!length_of(note, R[in.b], in.c != 0, out, fault)) return false; break;
+        case OpCode::Length:
+            if (!length_of(note, R[in.b], static_cast<LengthMode>(in.c), out, fault)) return false;
+            break;
         case OpCode::TypeMeet:
             out = Value::integer(
                 meet_text_types(static_cast<int>(RK(in.b).as_int()), static_cast<int>(RK(in.c).as_int())));

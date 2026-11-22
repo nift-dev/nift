@@ -113,7 +113,7 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
 bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fault& fault);
 bool push_value(Value& array, const Value& value, Fault& fault, const Note* note = nullptr,
                 const CycleGraph* graph = nullptr, bool* cycle = nullptr);
-// `length()` (size = false) or `size()` (size = true).
-bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault);
+enum class LengthMode : std::uint16_t { Length, Size, StreamLine };
+bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out, Fault& fault);
 
 } // namespace nift::rt

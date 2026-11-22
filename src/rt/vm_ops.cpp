@@ -372,7 +372,10 @@ bool push_value(Value& array, const Value& value, Fault& fault, const Note* note
     return refused(fault, out);
 }
 
-bool length_of(const Note* note, const Value& value, bool size, Value& out, Fault& fault) {
+bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out, Fault& fault) {
+    if (mode == LengthMode::StreamLine && value.is(Kind::Null))
+        return raise(fault, StopReason::Error, "unknown value or malformed expression: " + note_text(note));
+    const bool size = mode == LengthMode::Size;
     if (value.is(Kind::Array)) {
         out = Value::integer(static_cast<std::int64_t>(array_size(value)));
         return true;
