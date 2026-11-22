@@ -39,12 +39,14 @@ import json
 import os
 import subprocess
 import sys
-import pty
 import select
 import signal
 import tempfile
 import time
 from pathlib import Path
+
+if os.name != "nt":
+    import pty
 
 FAILS = []
 ISSUES = "https://github.com/nift-dev/nift/issues"
@@ -133,11 +135,70 @@ def notes(hint, executed=PROGRAM_NOTE):
             f"note: please report unsupported programs at {ISSUES}\n")
 
 
+def run_windows_tty(nift, cwd, args, env, lines, settle):
+    """Keep the native Windows CLI attached to a real pseudoconsole."""
+    import re
+    from winpty import Backend, PtyProcess
+
+    child = PtyProcess.spawn([nift, *args], cwd=str(cwd), env=env, dimensions=(30, 160),
+                             backend=str(Backend.ConPTY))
+    chunks = []
+    eof = False
+
+    def drain(seconds):
+        nonlocal eof
+        deadline = time.monotonic() + seconds
+        while not eof:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([child.fileobj], [], [], remaining)[0]:
+                break
+            # Decode after collection so UTF-8 split across reads cannot
+            # make pywinpty wait for more bytes after the socket closes.
+            chunk = child.fileobj.recv(4096)
+            if not chunk:
+                eof = True
+                break
+            if chunk != b"0011Ignore":  # pywinpty's nonblocking poll marker
+                chunks.append(chunk)
+
+    try:
+        for line in lines:
+            drain(settle)
+            if eof or not child.pty.isalive():
+                break
+            try:
+                child.write(line + "\r")
+            except EOFError:
+                break
+        drain(2.0)
+        deadline = time.monotonic() + 20
+        while child.pty.isalive():
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Windows pseudoconsole child did not exit")
+            if eof:
+                time.sleep(0.05)
+            else:
+                drain(0.2)
+        drain(0.2)
+        status = child.exitstatus
+        if status is None:
+            raise RuntimeError("Windows pseudoconsole child has no exit status")
+    finally:
+        child.close(force=True)
+    # ConPTY emits console window and cursor controls. Keep terminal text,
+    # including input echo and line boundaries, for the original assertions.
+    text = re.sub(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))", "",
+                  b"".join(chunks).decode(errors="replace")).replace("\r\n", "\n")
+    return status, text
+
+
 def run_tty(nift, cwd, args, extra, lines, settle=0.4):
     """Type `lines` into nift on a real terminal (pty); returns (status, output
     with the line editor's redraws removed)."""
     env = base_env(extra)
     env.update(HOME=str(cwd), TERM="dumb", NO_COLOR="1")
+    if os.name == "nt":
+        return run_windows_tty(nift, cwd, args, env, lines, settle)
     pid, fd = pty.fork()
     if pid == 0:
         os.chdir(cwd)

@@ -180,7 +180,10 @@ def suite(root):
     (work / "sess.f").write_text(SESSION_PROG)
     bindir = root / "bin"
     bindir.mkdir()
-    os.symlink(NIFT, bindir / "nift")
+    if os.name == "nt":
+        shutil.copy2(NIFT, bindir / "nift.exe")
+    else:
+        os.symlink(NIFT, bindir / "nift")
     (work / "ex.f").write_text("#!/usr/bin/env nift\n" + PROG)
     os.chmod(work / "ex.f", 0o755)
     path_env = {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")}
@@ -200,9 +203,16 @@ def suite(root):
            expect=["argc=1", "[z]"])
     parity("file with --platform", [NIFT, "--platform=windows", "prog.f", "q"], work, home,
            expect=["cmd=prog.f", "argc=1", "[q]"])
-    parity("shebang script executed directly", [str(work / "ex.f"), "a", "b c"], work, home, extra=path_env,
-           expect=["cmd=" + str(work / "ex.f"), "argc=2", "[b c]"])
-    parity("shebang script as ./ex.f", ["./ex.f", "a"], work, home, extra=path_env, expect=["cmd=./ex.f", "[a]"])
+    shebang_cases = [
+        ("shebang script executed directly", [str(work / "ex.f"), "a", "b c"],
+         ["cmd=" + str(work / "ex.f"), "argc=2", "[b c]"]),
+        ("shebang script as ./ex.f", ["./ex.f", "a"], ["cmd=./ex.f", "[a]"]),
+    ]
+    for label, argv, expected in shebang_cases:
+        try:
+            parity(label, argv, work, home, extra=path_env, expect=expected)
+        except OSError as error:
+            check(False, label + ": direct invocation failed", str(error))
     parity("nift ex.f (shebang stripped)", [NIFT, "ex.f", "a"], work, home, expect=["cmd=ex.f", "[a]"])
     for flag in ("-e", "-c"):
         parity(flag + " program", [NIFT, flag, INLINE, "a", "b c"], work, home,
@@ -473,12 +483,19 @@ def suite(root):
     # 10. Argument-count limits: positionless refusals (no invented location); legacy runs them.
     (work / "many.f").write_text('native::touch("side.txt")\nprint(args.size())\n')
     for count, reason in ((70000, "limit:invocation-arguments"), (40000, "limit:too many registers")):
-        vm, _ = run([NIFT, "many.f", *(["a"] * count)], work, None, home)
+        if os.name == "nt":
+            # Windows imposes a 32,767 UTF-16 unit command-line limit. Use the
+            # same CLI with the full argument vector past that OS boundary.
+            launcher = HERE.parents[2] / ".build" / "rt-args-count-launcher.exe"
+            argv = [str(launcher), str(count), NIFT, "many.f", "a"]
+        else:
+            argv = [NIFT, "many.f", *(["a"] * count)]
+        vm, _ = run(argv, work, None, home)
         check(vm.returncode == 1 and "(" + reason + ")" in vm.stderr and
               "many.f (the VM gave no exact position)" in vm.stderr and "many.f:1:1" not in vm.stderr and
               not (work / "side.txt").exists(), "%d arguments: positionless %s refusal" % (count, reason),
               vm.stderr[:300])
-        legacy, _ = run([NIFT, "many.f", *(["a"] * count)], work, "0", home)
+        legacy, _ = run(argv, work, "0", home)
         check(legacy.returncode == 0 and legacy.stdout == "%d\n" % count,
               "%d arguments: legacy runs it (known VM limit)" % count, legacy.stderr[:200])
         (work / "side.txt").unlink(missing_ok=True)

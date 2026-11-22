@@ -49,6 +49,13 @@ jobs:
         if: runner.os == 'Windows'
         with:
           python-version: '3.13'
+      - name: Install the Windows pseudoconsole test adapter
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          'pywinpty==3.1.2 --hash=sha256:d968dc4300b497f048318387781ed9931dc0038815f25b4f642a1749448769cb' |
+            Set-Content -Path "$env:RUNNER_TEMP/nift-pty-requirements.txt" -Encoding ascii
+          python -m pip install --only-binary=:all: --no-deps --require-hashes -r "$env:RUNNER_TEMP/nift-pty-requirements.txt"
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         if: runner.os == 'Windows'
         with:
@@ -82,7 +89,7 @@ jobs:
           make -j2
           make -j2 .build/rt-parse-dump.exe .build/rt-parser-unit.exe .build/rt-legacy-oracle.exe \
             .build/rt/vm-unit.exe .build/rt/vm-globals-unit.exe .build/rt/vm-modules-unit.exe \
-            .build/rt/vm-prepared-parse.exe
+            .build/rt/vm-prepared-parse.exe .build/rt-args-count-launcher.exe
           g++ -std=c++17 -Wall -Wextra -static -municode tests/runtime2/trace_launcher_win.cpp \
             -o .build/rt-trace-launcher.exe
       - name: VM subset (Linux, macOS)
@@ -96,6 +103,31 @@ jobs:
           # Use the same physical paths Python fixtures and Nift diagnostics report.
           if [ "$RUNNER_OS" = macOS ]; then
             export TMPDIR="$(cd "$RUNNER_TEMP" && pwd -P)"
+            # Probe the exact child limits used by the certification tests.
+            # subprocess itself only reports a generic preexec_fn exception.
+            python3 -u - <<'PYLIMITS'
+          import os
+          import resource
+          import subprocess
+          import sys
+
+          for name, value in (("RLIMIT_AS", 2 << 30), ("RLIMIT_AS", 4 << 30),
+                              ("RLIMIT_FSIZE", 256 << 20), ("RLIMIT_FSIZE", 512 << 20)):
+              def set_limit():
+                  try:
+                      kind = getattr(resource, name)
+                      before = resource.getrlimit(kind)
+                      resource.setrlimit(kind, (value, value))
+                      os.write(2, f"{name}: inherited {before}, applied {resource.getrlimit(kind)}\n".encode())
+                  except (AttributeError, OSError, ValueError) as error:
+                      os.write(2, f"{name}={value}: {type(error).__name__}: {error}\n".encode())
+                      raise
+              try:
+                  probe = subprocess.run([sys.executable, "-c", "pass"], preexec_fn=set_limit, timeout=10)
+                  print(f"{name}={value}: probe child exit {probe.returncode}")
+              except (subprocess.SubprocessError, OSError) as error:
+                  print(f"{name}={value}: probe launch failed: {error}")
+          PYLIMITS
           fi
           mkdir -p .build/platform-subset
           python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \

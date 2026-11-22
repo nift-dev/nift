@@ -131,6 +131,12 @@ $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
 	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(CLI_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
 
+# Test CLI intake above the host OS's native command-line capacity.
+$(TEST_DIR)/rt-args-count-launcher$(EXEEXT): tests/runtime2/args_cmd/argv_count_launcher.cpp $(filter-out src/nift.o,$(CLI_OBJECTS)) $(LIBFFI_A)
+	@mkdir -p "$(@D)"
+	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(filter-out src/nift.o $(MARKUP_C_OBJECTS),$(CLI_OBJECTS))
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $< $(filter-out src/nift.o,$(CLI_OBJECTS)) $(LDLIBS) -o "$@"
+
 # Toolchain/build signature the libffi stamp depends on. Regenerated cheaply
 # on every make; the file is rewritten only when its content changes, so an
 # unchanged compiler/target/flags do not invalidate the cached libffi build,
