@@ -31,6 +31,8 @@ DEPFILES := $(OBJECTS:.o=.d)
 
 ifeq ($(OS),Windows_NT)
 	EXEEXT := .exe
+	WINDRES ?= windres
+	CLI_MANIFEST := .build/nift-utf8.res
 	PREFIX ?= $(LOCALAPPDATA)/Programs/Nift
 	INSTALL_PROGRAM = cp
 	# Self-contained Windows binaries: the mingw runtime DLLs (libstdc++-6,
@@ -124,12 +126,18 @@ FORCE:
 # The shipped CLI is the REDUCED object set (no src/embed/*). Plain `make`
 # therefore builds only the ordinary Nift CLI; the embedding library and every
 # language binding are explicit, optional targets.
-$(TARGET): $(CLI_OBJECTS) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
+$(TARGET): $(CLI_OBJECTS) $(CLI_MANIFEST) $(LIBFFI_A) tests/abi/restricted-symbol-refs.txt
 	@bash scripts/build/check-config.sh --sets $(TEST_DIR) $(filter %.o,$^)
 	@bash scripts/build/check-config.sh $(CXX) $(PRODUCTION_GUARD) $(CPPFLAGS) $(CXXFLAGS) -- $(filter-out $(MARKUP_C_OBJECTS),$(CLI_OBJECTS))
 	@bash scripts/build/check-config.sh $(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -- $(MARKUP_C_OBJECTS)
 	@bash scripts/build/check-symbol-refs.sh tests/abi/restricted-symbol-refs.txt $(CLI_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(CLI_MANIFEST) $(LDLIBS) -o $@
+
+ifeq ($(OS),Windows_NT)
+$(CLI_MANIFEST): src/build/windows-cli.rc src/build/windows-cli.manifest
+	@mkdir -p "$(@D)"
+	$(WINDRES) --input-format=rc --output-format=coff --input="$<" --output="$@"
+endif
 
 # Test CLI intake above the host OS's native command-line capacity.
 $(TEST_DIR)/rt-args-count-launcher$(EXEEXT): tests/runtime2/args_cmd/argv_count_launcher.cpp $(filter-out src/nift.o,$(CLI_OBJECTS)) $(LIBFFI_A)

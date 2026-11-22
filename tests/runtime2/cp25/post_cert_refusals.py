@@ -87,6 +87,8 @@ def run(nift, tree, script, scratch, mode):
         err = p.stderr.decode(errors="replace")
         for prefix in (os.path.realpath(cwd) + os.sep, cwd + os.sep):
             err = err.replace(prefix, "")
+            if os.name == "nt":
+                err = err.replace(prefix.replace(os.sep, "/"), "")
         reasons = {}  # reason -> {"L:C"} of its non-consequential sightings
         if os.path.exists(stats):
             for line in open(stats):

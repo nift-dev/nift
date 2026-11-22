@@ -96,7 +96,7 @@ def run(argv, cwd, mode, home, stdin="", extra=None):
         stats.unlink()
     env = env_for(mode, home, extra)
     env["NIFT_VM_STATS"] = str(stats)
-    p = subprocess.run(argv, cwd=cwd, env=env, input=stdin, capture_output=True, text=True, timeout=120)
+    p = subprocess.run(argv, cwd=cwd, env=env, input=stdin, capture_output=True, encoding="utf-8", timeout=120)
     rows = [json.loads(l) for l in stats.read_text().splitlines() if l.strip()] if stats.exists() else []
     stats.unlink(missing_ok=True)
     return p, rows

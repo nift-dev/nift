@@ -47,6 +47,9 @@ def run(nift, name, vm):
             return (b"", b"", "timeout"), []
         created = sorted(set(os.listdir(d)) - before)
         out, err = p.stdout.replace(d.encode(), b"$ROOT"), p.stderr.replace(d.encode(), b"$ROOT")
+        if os.name == "nt":
+            root = Path(d).as_posix().encode() + b"/"
+            out, err = out.replace(root, b"$ROOT/"), err.replace(root, b"$ROOT/")
         return (out, err, p.returncode), created
 
 

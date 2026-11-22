@@ -174,7 +174,8 @@ def main():
             # A, C, D: identical observable behaviour, every effect once.
             if name in GOLDEN:
                 out, err, code = GOLDEN[name]
-                expected = (out, err.replace(b"{path}", os.path.join(d, "p.f").encode()), code)
+                path = os.path.join(d, "p.f").replace(os.sep, "/")
+                expected = (out, err.replace(b"{path}", path.encode()), code)
                 if vm != expected:
                     fail(name, f"VM result {vm!r} differs from the pinned expectation {expected!r}")
             elif vm != legacy:
