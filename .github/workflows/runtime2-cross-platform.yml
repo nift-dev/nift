@@ -103,6 +103,24 @@ jobs:
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           make test-rt-source-map-retry PYTHON=python
+      - name: Capture Windows invocation contract
+        if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
+        shell: msys2 {0}
+        env:
+          MSYS: winsymlinks:nativestrict
+          PYTHONIOENCODING: utf-8
+        run: |
+          set -e -o pipefail
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          NIFT_TEST_BASH=$(cygpath -am /usr/bin/bash.exe)
+          export NIFT_TEST_BASH
+          python tests/runtime2/args_cmd/args_cmd.py --nift "$(cygpath -am "$PWD/nift.exe")" \
+            2>&1 | tee .build/windows-invocation.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
+        with:
+          name: runtime2-windows-invocation
+          path: .build/windows-invocation.txt
       - name: Capture macOS memory and literal diagnostics
         if: runner.os == 'macOS'
         shell: bash

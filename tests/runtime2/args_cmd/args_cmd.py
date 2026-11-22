@@ -476,7 +476,7 @@ def suite(root):
          ["staging", "--force"], "argc=2\narg:staging\narg:--force\nenv=certified\nhello\n"),
         ("v44_executable_script_smoke certify.f", "certify.f",
          '#!/usr/bin/env nift\nprint(cmd)\nprint(args.join("|"))\nprint(pwd())\nprint(getenv("NIFT_EXEC_TEST"))\n',
-         ["one", "two"], "./certify.f\none|two\n" + str(six.resolve()) + "\ncertified\n"),
+         ["one", "two"], "./certify.f\none|two\n" + six.resolve().as_posix() + "\ncertified\n"),
         ("v45_cli_invocation_smoke invocation.f", "invocation.f", 'print(cmd)\nprint(args.join("|"))\n',
          ["hello world", "--", "--no-process", "-x"], "invocation.f\nhello world|--no-process|-x\n"),
         ("v44_package_language_smoke a.f", "a.f",
@@ -485,9 +485,9 @@ def suite(root):
     ]
     env = dict(path_env, NIFT_EXEC_TEST="certified")
     for label, name, src, argv, out in units:
-        (six / name).write_text(src)
+        (six / name).write_bytes(src.encode("utf-8"))
         os.chmod(six / name, 0o755)
-        start = ["./" + name] if name == "certify.f" else [NIFT, name]
+        start = launch + ["./" + name] if name == "certify.f" else [NIFT, name]
         parity("six: " + label, start + argv, six, home, extra=env, expect=[out])
 
     # 8. Top-level shadowing: an ordinary binding after it.
