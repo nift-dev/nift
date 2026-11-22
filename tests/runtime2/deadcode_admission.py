@@ -145,7 +145,7 @@ def run(nift, files, mode, args=("main.f",), stdin=None):
         st = os.path.join(d, "stats.jsonl")
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "LANG": "C", "NIFT_VM": mode,
                "NIFT_VM_STATS": st}
-        p = subprocess.run(["timeout", "30", nift] + list(args), cwd=d, env=env, capture_output=True,
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "30", nift] + list(args), cwd=d, env=env, capture_output=True,
                            input=stdin.encode() if stdin is not None else None)
         stats = [json.loads(l) for l in open(st)] if os.path.exists(st) else []
         return {"rc": p.returncode, "out": p.stdout, "err": p.stderr.replace(d.encode(), b"<root>"),

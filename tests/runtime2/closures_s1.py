@@ -95,7 +95,7 @@ def run(nift, work, name, mode, env_extra=None):
         env.update({"NIFT_VM": mode, "NIFT_VM_STATS": stats})
     else:
         env["NIFT_VM"] = "0"  # explicit legacy engine (VM-default policy)
-    p = subprocess.run(["timeout", "60", nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL,
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL,
                        capture_output=True)
     st = None
     if mode and os.path.exists(stats):

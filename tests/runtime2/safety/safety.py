@@ -227,10 +227,10 @@ def run(nift, name, files, stdin, argv, mode, work):
             with open(os.path.join(d, f), "w") as fh:
                 fh.write(text)
         cmd = [nift, "p.f", *argv]
-        p = subprocess.run(["timeout", "60", *cmd], cwd=d, env=env, stdin=subprocess.DEVNULL, capture_output=True)
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", *cmd], cwd=d, env=env, stdin=subprocess.DEVNULL, capture_output=True)
     else:
         cmd = [nift, "-i", *(["-e", "_s := 0", *argv] if argv else [])]
-        p = subprocess.run(["timeout", "60", *cmd], cwd=d, env=env, input=stdin.encode(), capture_output=True)
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", *cmd], cwd=d, env=env, input=stdin.encode(), capture_output=True)
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
     shutil.rmtree(d, ignore_errors=True)
     return {"exit": p.returncode, "stdout": norm(p.stdout), "stderr": norm(p.stderr)}

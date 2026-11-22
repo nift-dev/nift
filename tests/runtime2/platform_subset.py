@@ -356,6 +356,8 @@ def run_table(entries, a):
             continue
         print("=== %s (%s): %s" % (eid, area, line), flush=True)
         argv = shlex.split(line)
+        if argv[0] == "bash":
+            argv[0] = os.environ.get("NIFT_TEST_BASH", "bash")
         if argv[0].startswith(a.build + "/"):
             # Absolute: Windows resolves a relative executable against the parent's directory, not cwd.
             argv[0] = os.path.join(REPO, argv[0])

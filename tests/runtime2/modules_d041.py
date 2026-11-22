@@ -55,7 +55,7 @@ def check_step(nift, root, work, step):
         sys.exit("NIFT_VM is empty: use 0 (legacy), 1, require, classify or classify-all, or leave it unset")
     if "NIFT_VM" not in env:
         env["NIFT_VM"] = "0"
-    p = subprocess.run(["timeout", "60", nift, *step["run"]], cwd=root, env=env, capture_output=True)
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, *step["run"]], cwd=root, env=env, capture_output=True)
     out, err = norm(p.stdout, work), norm(p.stderr, work)
     label = " ".join(step["run"])
     for key, got in (("stdout", out), ("stderr", err)):

@@ -37,7 +37,7 @@ def run(nift, files, mode, main="t.f", stdin=None, args=None):
         with open(os.path.join(d, n), "w") as f:
             f.write(s)
     st = os.path.join(d, "stats.jsonl")
-    cmd = ["timeout", "20", nift] + (args if args is not None else [main])
+    cmd = [os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "20", nift] + (args if args is not None else [main])
     p = subprocess.run(cmd, cwd=d, env=env_for(d, mode, st), input=(stdin.encode() if stdin else None),
                        stdin=(None if stdin else subprocess.DEVNULL), capture_output=True)
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "").replace(d, "<D>")

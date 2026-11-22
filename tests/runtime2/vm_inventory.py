@@ -64,7 +64,7 @@ def run(nift, program, mode, work, extra=None):
         os.remove(stats)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work, "NIFT_VM": mode, "NIFT_VM_STATS": stats}
     env.update(extra or {})
-    p = subprocess.run(["timeout", "60", nift, "t.f"], cwd=work, env=env, capture_output=True)
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, "t.f"], cwd=work, env=env, capture_output=True)
     try:
         return p, json.loads(open(stats).read().splitlines()[-1])
     except (OSError, IndexError, ValueError):

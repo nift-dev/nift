@@ -60,7 +60,7 @@ def run(nift, path, mode, work, extra=None, tree=None):
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode, "NIFT_VM_STATS": stats}
     if extra:
         env.update(extra)
-    p = subprocess.run(["timeout", "120", nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL,
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "120", nift, name], cwd=d, env=env, stdin=subprocess.DEVNULL,
                        capture_output=True)
     st = None
     if os.path.exists(stats):
@@ -76,7 +76,7 @@ def run_session(nift, stdin, work, mode="require"):
     d = tempfile.mkdtemp(dir=work)
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d, "TMPDIR": d, "LANG": "C",
            "LC_ALL": "C", "TZ": "UTC", "NIFT_VM": mode, "NO_COLOR": "1"}
-    p = subprocess.run(["timeout", "120", nift, "-i"], cwd=d, env=env, input=stdin.encode(), capture_output=True)
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "120", nift, "-i"], cwd=d, env=env, input=stdin.encode(), capture_output=True)
     return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
 
 

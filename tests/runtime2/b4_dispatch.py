@@ -73,7 +73,7 @@ def run_text(nift, source, mode, work, name="t.f"):
     d = tempfile.mkdtemp(dir=work)
     open(os.path.join(d, name), "w").write(source)
     stats = os.path.join(d, "stats.jsonl")
-    p = subprocess.run(["timeout", "60", nift, name], cwd=d, env=env_for(d, mode, stats), stdin=subprocess.DEVNULL,
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, name], cwd=d, env=env_for(d, mode, stats), stdin=subprocess.DEVNULL,
                        capture_output=True)
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
     rows = stats_lines(stats)
@@ -84,7 +84,7 @@ def run_text(nift, source, mode, work, name="t.f"):
 def run_session(nift, stdin, mode, work):
     d = tempfile.mkdtemp(dir=work)
     stats = os.path.join(d, "stats.jsonl")
-    p = subprocess.run(["timeout", "60", nift, "-i"], cwd=d, env=env_for(d, mode, stats), input=stdin.encode(),
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, "-i"], cwd=d, env=env_for(d, mode, stats), input=stdin.encode(),
                        capture_output=True)
     rows = stats_lines(stats)
     shutil.rmtree(d, ignore_errors=True)
@@ -94,10 +94,10 @@ def run_session(nift, stdin, mode, work):
 def run_display(nift, spec, work):
     d = tempfile.mkdtemp(dir=work)
     if isinstance(spec, list):
-        p = subprocess.run(["timeout", "60", nift] + spec, cwd=d, env=env_for(d, "require", None),
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift] + spec, cwd=d, env=env_for(d, "require", None),
                            stdin=subprocess.DEVNULL, capture_output=True)
     else:
-        p = subprocess.run(["timeout", "60", nift, "-i"], cwd=d, env=env_for(d, "require", None), input=spec.encode(),
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, "-i"], cwd=d, env=env_for(d, "require", None), input=spec.encode(),
                            capture_output=True)
     shutil.rmtree(d, ignore_errors=True)
     return p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
@@ -108,7 +108,7 @@ def run_tree(nift, tree, mode, work):
     for f in os.listdir(tree):
         if f != "expect":
             shutil.copy(os.path.join(tree, f), os.path.join(d, f))
-    p = subprocess.run(["timeout", "60", nift, "main.f"], cwd=d, env=env_for(d, mode, None), stdin=subprocess.DEVNULL,
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "60", nift, "main.f"], cwd=d, env=env_for(d, mode, None), stdin=subprocess.DEVNULL,
                        capture_output=True)
     norm = lambda b: b.decode("utf-8", "replace").replace(d + os.sep, "")
     shutil.rmtree(d, ignore_errors=True)

@@ -58,7 +58,7 @@ def run(nift, work, src, env):
     d = tempfile.mkdtemp(dir=work)
     with open(os.path.join(d, "t.f"), "w") as f:
         f.write(src)
-    p = subprocess.run(["timeout", "30", nift, "t.f"], cwd=d, capture_output=True,
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "30", nift, "t.f"], cwd=d, capture_output=True,
                        env=dict({"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": d}, **env))
     stats = os.path.join(d, "stats.jsonl")
     st = json.loads(open(stats).read().splitlines()[-1]) if os.path.exists(stats) else {}

@@ -86,7 +86,7 @@ def run(nift, work, name, want, budget=None, timeout_s=60):
     if budget:
         env["NIFT_VM_HEAP_BUDGET"] = budget
     try:
-        p = subprocess.run(["timeout", str(timeout_s), nift, name], cwd=d, env=env,
+        p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), str(timeout_s), nift, name], cwd=d, env=env,
                            stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout_s + 15)
         result = (p.stdout.replace(d.encode(), b"$ROOT"), p.stderr.replace(d.encode(), b"$ROOT"),
                   p.returncode, p.returncode == 124)

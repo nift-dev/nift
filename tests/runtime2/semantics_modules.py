@@ -37,7 +37,7 @@ def run(nift, probe, work):
         sys.exit("NIFT_VM is empty: use 0 (legacy), 1, require, classify or classify-all, or leave it unset")
     if "NIFT_VM" not in env:
         env["NIFT_VM"] = "0"
-    p = subprocess.run(["timeout", "30", nift, "main.f"], cwd=os.path.join(dst, "p"), env=env, capture_output=True)
+    p = subprocess.run([os.environ.get("NIFT_TEST_TIMEOUT", "timeout"), "30", nift, "main.f"], cwd=os.path.join(dst, "p"), env=env, capture_output=True)
     norm = lambda b: b.replace(os.path.realpath(dst).encode(), b"$P").replace(dst.encode(), b"$P")  # noqa: E731
     return norm(p.stdout), norm(p.stderr), str(p.returncode).encode() + b"\n"
 
