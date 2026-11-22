@@ -28,25 +28,33 @@ bad=0; first=""; total=0
 # check OBJECT ID...: the sidecar names one of the IDs and this object's content
 check() {
   local o=$1; shift
-  local c="${o%.o}.cfg" line id sum ok=0 want
+  local c="${o%.o}.cfg" line id sum actual ok=0 want
   total=$((total + 1))
-  if [ -f "$c" ]; then
-    line=$(cat "$c"); id=${line%% *}; sum=${line#* }
+  if [ -f "$c" ] && line=$(cat "$c"); then
+    id=${line%% *}; sum=${line#* }
     for want in "$@"; do [ "$id" = "$want" ] && ok=1; done
-    if [ "$ok" = 1 ] && [ "$sum" != "$(sha256sum < "$o" | cut -d' ' -f1)" ]; then ok=0; fi
+    if [ "$ok" = 1 ]; then
+      if ! actual=$(sha256sum < "$o" | cut -d' ' -f1) || [ "$sum" != "$actual" ]; then ok=0; fi
+    fi
   fi
   if [ "$ok" = 0 ]; then bad=$((bad + 1)); [ -n "$first" ] || first=$o; fi
 }
 # block_ids FILE: the identity of each compile template in a signature file
 block_ids() {
-  awk -v dir="$tmpd" '/^nift-object-config-v4$/ { n++ } { print > (dir "/block" n) }' "$1"
-  for b in "$tmpd"/block*; do sha256sum < "$b" | cut -d' ' -f1; done
-  rm -f "$tmpd"/block*
+  awk -v dir="$tmpd" '
+    /^nift-object-config-v4$/ { n++ }
+    !n { exit 1 }
+    { print > (dir "/block" n) }
+    END { if (!n) exit 1 }
+  ' "$1" || return 1
+  for b in "$tmpd"/block*; do sha256sum < "$b" | cut -d' ' -f1 || return 1; done
 }
 if [ "${1:-}" = --sets ]; then
   test_dir=$2; shift 2
-  tmpd=$(mktemp -d); trap 'rm -rf "$tmpd"' EXIT
-  declare -A ids
+  tmpd=$(mktemp -d) || exit 1; trap 'rm -rf "$tmpd"' EXIT
+  signatures=()
+  ids=()
+  signature_count=0
   for o in "$@"; do
     case "$o" in
       "$test_dir"/rt-obj/*) rest=${o#"$test_dir"/rt-obj/}; set_dir=${rest%%/*}
@@ -57,9 +65,21 @@ if [ "${1:-}" = --sets ]; then
       "$test_dir"/*|/*|../*) continue ;;
       *) sig=${NIFT_INTREE_SIGNATURE:-.build/obj-config/default.flags}; stem=$o ;;
     esac
-    if [ ! -f "$sig" ]; then check "$o" missing-signature; continue; fi
-    [ -n "${ids[$sig]:-}" ] || ids[$sig]=$(block_ids "$sig" | tr '\n' ' ')
-    read -r -a blocks <<< "${ids[$sig]}"
+    if [ ! -f "$sig" ]; then check "$o"; continue; fi
+    for ((i = 0; i < signature_count; i++)); do
+      [ "${signatures[i]}" != "$sig" ] || break
+    done
+    if [ "$i" -eq "$signature_count" ]; then
+      if ! hashes=$(block_ids "$sig" | tr '\n' ' '); then hashes=; fi
+      rm -f "$tmpd"/block*
+      signatures[i]=$sig
+      ids[i]=$hashes
+      signature_count=$((signature_count + 1))
+    fi
+    if ! read -r -a blocks <<< "${ids[i]}" || [ -z "${blocks[0]:-}" ]; then
+      check "$o"
+      continue
+    fi
     if [ -f "${stem%.o}.c" ] && [ ${#blocks[@]} -gt 1 ]; then check "$o" "${blocks[1]}"
     else check "$o" "${blocks[0]}"; fi
   done

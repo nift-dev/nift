@@ -216,6 +216,12 @@ def check_args(out, args, root):
     return 1 if problems else 0
 
 
+def allowed_default(rel, directive, separator=os.sep):
+    # rel is already relative to the repository after resolving the dependency.
+    # On POSIX a literal backslash can be part of a different filename.
+    return (rel.replace(separator, '/'), directive) in DEFAULTS
+
+
 def self_test(root):
     """The refused set and the allowances follow the Makefile and the sources."""
     fail = []
@@ -233,6 +239,18 @@ def self_test(root):
         text = normalised(open(os.path.join(root, rel), 'rb').read())
         if not any(directive_text(k, n, r) == line for k, n, r in DIRECTIVE.findall(text)):
             fail.append(f'DEFAULTS entry missing from {rel}: {line}')
+    builder = '#define NIFT_RT_BUILDER_RELEASE(v) (v)'
+    for rel, separator, directive, expected in (
+        ('src/rt/build.h', '/', builder, True),
+        (r'src\rt\build.h', '\\', builder, True),
+        ('src/rt/build.h', '\\', builder, True),
+        (r'src\rt\build.h', '/', builder, False),
+        (r'other\rt\build.h', '\\', builder, False),
+        (r'src\rt\build.h.bak', '\\', builder, False),
+        (r'src\rt\build.h', '\\', '#undef NIFT_RT_BUILDER_RELEASE', False),
+    ):
+        if allowed_default(rel, directive, separator) != expected:
+            fail.append(f'allowance for {rel!r} with separator {separator!r}: {directive}')
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         d = os.path.join(tmp, 'x.d')
@@ -287,7 +305,7 @@ def main():
         for kind, name, rest in DIRECTIVE.findall(text):
             if name == 'NIFT_PRODUCTION_TU' and kind == 'undef':
                 problems.append(f'undefines the production marker NIFT_PRODUCTION_TU in: {rel}')
-            elif test_only(name, makefile_names) and (rel, directive_text(kind, name, rest)) not in DEFAULTS:
+            elif test_only(name, makefile_names) and not allowed_default(rel, directive_text(kind, name, rest)):
                 problems.append(f'{kind}s the test-only switch {name} in: {rel} (test builds set it on their '
                                 'command line)')
     for p in problems[:3]:

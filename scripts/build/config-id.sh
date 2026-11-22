@@ -18,15 +18,26 @@
 # B18: pipefail in every shell that sources this file (compile-object.sh, write-signature.sh,
 # check-config.sh); none of their pipelines' statuses decided anything before.
 set -o pipefail
-declare -A NIFT_VERSION_SHA 2>/dev/null || true
+# Indexed arrays keep the compiler cache compatible with Bash 3.2.
+NIFT_VERSION_PATHS=()
+NIFT_VERSION_HASHES=()
+NIFT_VERSION_COUNT=0
 config_text() {
   local cc=$1; shift
   local path; path=$(command -v "$cc" 2>/dev/null || echo "$cc")
   path=$(readlink -f "$path" 2>/dev/null || echo "$path")
-  local vsha=${NIFT_VERSION_SHA[$path]:-}
+  local i vsha=
+  for ((i = 0; i < NIFT_VERSION_COUNT; i++)); do
+    if [ "${NIFT_VERSION_PATHS[i]}" = "$path" ]; then
+      vsha=${NIFT_VERSION_HASHES[i]}
+      break
+    fi
+  done
   if [ -z "$vsha" ]; then
     vsha=$("$cc" --version 2>&1 | sha256sum | cut -d' ' -f1)
-    NIFT_VERSION_SHA[$path]=$vsha
+    NIFT_VERSION_PATHS[NIFT_VERSION_COUNT]=$path
+    NIFT_VERSION_HASHES[NIFT_VERSION_COUNT]=$vsha
+    NIFT_VERSION_COUNT=$((NIFT_VERSION_COUNT + 1))
   fi
   printf 'nift-object-config-v4\ncompiler %s\nresolved %s\nversion-sha256 %s\n' "$cc" "$path" "$vsha"
   local skip=0 a d=${NIFT_TEST_DIR:-}
