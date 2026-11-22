@@ -184,7 +184,7 @@ private:
     bool call(const Node& node, std::uint16_t dst);
     bool call_value(const Node& node, NodeId callee, bool member, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);
-    // CP14 built-in over a fresh window (receiver kNoNode: free function); B4 Dynamic: compiler_dispatch.cpp
+    bool length_call(const Node& node, NodeId receiver_node, bool size, std::uint16_t dst);
     int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
     int dynamic_method_call(const Node&, NodeId, std::string_view, std::uint16_t);
     bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);

@@ -128,6 +128,11 @@ jobs:
               except (subprocess.SubprocessError, OSError) as error:
                   print(f"{name}={value}: probe launch failed: {error}")
           PYLIMITS
+            # Link the same prepared parser and value objects used by Nift.
+            if c++ -std=c++17 -O2 -Isrc tests/runtime2/literals/prepared_probe.cpp \
+                src/Ast.o src/RuntimeValue.o -o .build/prepared-literal-probe; then
+              .build/prepared-literal-probe
+            fi
           fi
           mkdir -p .build/platform-subset
           python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \

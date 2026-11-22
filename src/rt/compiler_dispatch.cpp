@@ -8,6 +8,7 @@
 
 #include "rt/builtin_bind.h"
 #include "rt/op_admission.h"
+#include "rt/vm_ops.h"
 
 // rt-lint: cold-file compile-time admission of dynamic method dispatch
 
@@ -50,6 +51,40 @@ int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::st
     const bool flagged = true;
 #endif
     return builtin_call(node, *admitted.spec, receiver, dst, flagged) ? 1 : 0;
+}
+
+bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size, std::uint16_t dst) {
+    // A direct stream read can return null at EOF. As a script print
+    // operand the length operator can use its own error position. Other
+    // contexts can require statement or function-frame attribution.
+    bool stream_line_length = false;
+    const Node& length_receiver = ast_.at(receiver_node);
+    if (!size && print_arg_ == &node && !in_function_ && !session_ && !(fb_->flags() & kInstrReturnCall) &&
+        kinds(receiver_node) == (kKindString | kKindNull) && length_receiver.kind == NodeKind::Call) {
+        const Node& read = ast_.at(length_receiver.a);
+        if (read.kind == NodeKind::Member) {
+            const natives::BuiltinSpec* spec = nullptr;
+            stream_line_length = bind_method(kinds(read.a), text(ast_.at(read.b)), spec) == MethodBinding::Bound &&
+                                 spec->id == natives::BuiltinId::StreamReadLine;
+        }
+    }
+    if (!stream_line_length &&
+        !kinds_within(receiver_node, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
+                      "type:length"))
+        return false;
+    // Legacy's prepared `length()` counts an object's members; the canonical
+    // one rejects an object (D-018).
+    if (!size && (kinds(receiver_node) & (kKindObject | kKindUnknown)) && loop_reachable())
+        return fail(node, "context:object-length");
+    const std::uint16_t mark = fb_->top();
+    std::uint16_t receiver = 0;
+    if (!reg_any(receiver_node, receiver)) return false;
+    fb_->set_offset(site(node));
+    const auto mode = stream_line_length ? LengthMode::StreamLine : size ? LengthMode::Size : LengthMode::Length;
+    const std::size_t at = fb_->emit(OpCode::Length, dst, receiver, static_cast<std::uint16_t>(mode));
+    fb_->note(at, std::string(text(node)));
+    fb_->release_to(mark);
+    return true;
 }
 
 } // namespace nift::rt::detail
