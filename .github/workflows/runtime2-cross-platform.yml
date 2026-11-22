@@ -1,0 +1,117 @@
+name: Runtime 2.0 cross-platform VM subset
+
+# D-077 #4 (owner 2026-11-12 04:25): the documented Linux / macOS / Windows VM test subset of the first
+# cross-platform certification (docs/runtime-2/platform-subsets.md; the table is
+# tests/runtime2/platform_subset.py). Dispatch only: it never runs on push or pull_request. Pushing the candidate
+# and dispatching this workflow each need explicit owner approval (D-077 #6). FreeBSD is not in the first
+# certification (D-077 #4).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime2-cross-platform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  subset:
+    name: ${{ matrix.id }} Runtime 2.0 VM subset
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    # A hung suite must fail the job, never hold a runner. The subset is a fraction of test-rt-vm (about 52 min
+    # locally on Linux for the whole target).
+    timeout-minutes: 150
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      # Action versions are the ones the existing certified workflows use (checkpoint-10-cross-platform.yml,
+      # v44-cross-platform.yml). Pin them to commit SHAs before the push (a lookup this preparation did not do:
+      # no GitHub access was authorised).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      # setup-python only on Windows: its teardown has hung on macOS runners (v44-cross-platform.yml); Linux and
+      # macOS use the runner's python3.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make diffutils mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
+      - name: GNU timeout on macOS (diagnostics/run.sh, file_copy_move_freedom.sh)
+        if: runner.os == 'macOS'
+        run: |
+          brew list coreutils >/dev/null 2>&1 || brew install coreutils
+          echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Platform subset table self-check
+        if: runner.os != 'Windows'
+        run: python3 tests/runtime2/platform_subset.py --check
+      - name: Build Nift and the subset's unit binaries
+        if: runner.os != 'Windows'
+        run: |
+          make -j2
+          make -j2 .build/rt-parse-dump .build/rt-parser-unit .build/rt-legacy-oracle \
+            .build/rt/vm-unit .build/rt/vm-globals-unit .build/rt/vm-modules-unit .build/rt/vm-prepared-parse
+      - name: Build Nift and the subset's unit binaries on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          python --version
+          python tests/runtime2/platform_subset.py --check
+          make -j2
+          make -j2 .build/rt-parse-dump.exe .build/rt-parser-unit.exe .build/rt-legacy-oracle.exe \
+            .build/rt/vm-unit.exe .build/rt/vm-globals-unit.exe .build/rt/vm-modules-unit.exe \
+            .build/rt/vm-prepared-parse.exe
+      - name: VM subset (Linux, macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .build/platform-subset
+          python3 tests/runtime2/platform_subset.py --platform '${{ matrix.id }}' --nift "$PWD/nift" --build .build \
+            2>&1 | tee '.build/platform-subset/${{ matrix.id }}.txt'
+      - name: VM subset on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          MSYS: winsymlinks:nativestrict
+        run: |
+          set -o pipefail
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          mkdir -p .build/platform-subset
+          python tests/runtime2/platform_subset.py --platform windows --nift "$PWD/nift.exe" --build .build \
+            2>&1 | tee .build/platform-subset/windows.txt
+      - name: Subset make targets (embedding, value layer, kind bits, source map)
+        if: runner.os != 'Windows'
+        run: make test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+      # D-090: the certification guard is a required gate. It checks the certify plan, which is platform independent,
+      # so it runs on the Linux job only (platform-subsets.md gives the macOS and Windows reasons).
+      - name: Certification guard (required gate, D-090)
+        if: runner.os == 'Linux'
+        run: make test-runtime2-certification-guard
+      - name: Subset make targets on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          make test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: runtime2-platform-subset-${{ matrix.id }}
+          path: .build/platform-subset/
+          if-no-files-found: warn
