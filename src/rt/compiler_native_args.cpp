@@ -5,7 +5,7 @@
 namespace nift::rt::detail {
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
     const NodeId* args = ast_.list(node);
-    // CP15 W8: no bytes kind in CP12's inference; bytes built-ins are refused.
+    // The managed stream reads are admitted. Other Bytes natives still follow the CP15 W8 refusal.
     if (bytes_builtin(spec)) return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
         for (std::uint32_t k = 0; k < node.count; ++k) {

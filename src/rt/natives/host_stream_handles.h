@@ -7,6 +7,8 @@ namespace nift::rt::natives {
 Status stream_read(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status stream_read_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status stream_read_all(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+Status stream_read_bytes(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+Status stream_read_all_bytes(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status stream_eof(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status stream_write(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status stream_write_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

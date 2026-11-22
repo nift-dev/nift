@@ -68,7 +68,7 @@ bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size
                                  spec->id == natives::BuiltinId::StreamReadLine;
         }
     }
-    if (!stream_line_length &&
+    if (!stream_line_length && kinds(receiver_node) != kKindBytes &&
         !kinds_within(receiver_node, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
                       "type:length"))
         return false;

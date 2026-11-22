@@ -204,4 +204,15 @@ Status file_remove(const Context& context, const Value* args, std::uint32_t argc
     return Status::Ok;
 }
 
+Status file_eof(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+    std::shared_ptr<FileResource> file;
+    Status status = Status::Ok;
+    if (!resource_arg(context, args, argc, "eof", file, error, status)) return status;
+    if (!file->open) { error = "eof: file is not open"; return Status::Error; }
+    if (file->mode != "r" && file->mode != "rw") { error = "eof: file is not open for reading"; return Status::Error; }
+    if (!no_args(argc, "eof", error)) return Status::Error;
+    out = Value::boolean(file->cursor >= file->working.size());
+    return Status::Ok;
+}
+
 } // namespace nift::rt::natives

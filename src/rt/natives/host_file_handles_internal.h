@@ -125,14 +125,20 @@ inline bool string_arg(const Value& value, std::string& out) {
     return true;
 }
 
-inline bool render_arg(const Value& value, std::string& out) {
-    if (value.is(Kind::String)) { out.assign(string_view_of(value)); return true; }
-    if (value.is(Kind::Bytes)) {
-        const auto& bytes = *value.heap_as<BytesObject>();
-        out.assign(bytes.data.begin(), bytes.data.end());
+inline bool render_arg(const Value& value, std::string& scratch, std::string_view& out) {
+    if (value.is(Kind::String)) {
+        out = string_view_of(value);
         return true;
     }
-    return append_rendered(value, out);
+    if (value.is(Kind::Bytes)) {
+        const auto& data = bytes_of(value);
+        out = data.empty() ? std::string_view("") :
+                             std::string_view(reinterpret_cast<const char*>(data.data()), data.size());
+        return true;
+    }
+    if (!append_rendered(value, scratch)) return false;
+    out = scratch;
+    return true;
 }
 
 inline bool read_whole_path(const Context& context, HostCall& call, std::string_view name, std::string& data,

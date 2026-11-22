@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace nift::rt::natives {
@@ -116,6 +117,23 @@ private:
     bool grow(std::size_t extra);
     const Context& context_;
     std::string text_;
+};
+
+// Like BudgetedText, but owns a binary result until the native publishes it.
+class BudgetedBytes {
+public:
+    explicit BudgetedBytes(const Context& context) : context_(context) {}
+    BudgetedBytes(const BudgetedBytes&) = delete;
+    BudgetedBytes& operator=(const BudgetedBytes&) = delete;
+    std::size_t size() const noexcept { return data_.size(); }
+    std::size_t capacity() const noexcept { return data_.capacity(); }
+    bool reserve(std::size_t capacity);
+    bool append(std::string_view part);
+    std::vector<std::uint8_t> take() { return std::move(data_); }
+
+private:
+    const Context& context_;
+    std::vector<std::uint8_t> data_;
 };
 
 // Legacy generated_object_key (CP171): strings as-is, numbers and booleans

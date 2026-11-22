@@ -228,8 +228,12 @@ Status file_write(const Context& context, const Value* args, std::uint32_t argc,
     if (!file->open) { error = "write: file is not open"; return Status::Error; }
     if (file->mode == "r") { error = "write: file is not open for writing"; return Status::Error; }
     if (argc != 2) { error = "write: expected one value"; return Status::Error; }
-    std::string data;
-    if (!render_arg(args[1], data)) { error = "write: value is not directly renderable"; return Status::Error; }
+    std::string scratch;
+    std::string_view data;
+    if (!render_arg(args[1], scratch, data)) {
+        error = "write: value is not directly renderable";
+        return Status::Error;
+    }
     const std::size_t base = std::min(file->cursor, file->working.size());
     const std::size_t overlap = std::min(data.size(), file->working.size() - base);
     if (overlap != data.size() || file->working.compare(base, overlap, data) != 0) file->prepare_mutation();
@@ -252,9 +256,11 @@ Status file_write_line(const Context& context, const Value* args, std::uint32_t 
     if (!file->open) { error = "write_line: file is not open"; return Status::Error; }
     if (file->mode == "r") { error = "write_line: file is not open for writing"; return Status::Error; }
 #endif
-    std::string probe;
 #if !(defined(NIFT_FILE_MODE_MUTANT) && NIFT_FILE_MODE_MUTANT == 4)
-    if (!render_arg(args[1], probe)) return error = "write_line: value is not directly renderable", Status::Error;
+    std::string scratch;
+    std::string_view probe;
+    if (args[1].is(Kind::Bytes) || !render_arg(args[1], scratch, probe))
+        return error = "write_line: value is not directly renderable", Status::Error;
 #endif
     Value newline = make_string("\n");
     Value armed[2] = {args[0], args[1]};
@@ -349,17 +355,6 @@ Status file_seek(const Context& context, const Value* args, std::uint32_t argc, 
     }
     file->cursor = static_cast<std::size_t>(position);
     out = Value::null();
-    return Status::Ok;
-}
-
-Status file_eof(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
-    std::shared_ptr<FileResource> file;
-    Status status = Status::Ok;
-    if (!resource_arg(context, args, argc, "eof", file, error, status)) return status;
-    if (!file->open) { error = "eof: file is not open"; return Status::Error; }
-    if (file->mode != "r" && file->mode != "rw") { error = "eof: file is not open for reading"; return Status::Error; }
-    if (!no_args(argc, "eof", error)) return Status::Error;
-    out = Value::boolean(file->cursor >= file->working.size());
     return Status::Ok;
 }
 

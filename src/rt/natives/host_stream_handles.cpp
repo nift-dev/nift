@@ -30,6 +30,10 @@ Status stream_invalid_setting(const Context& context, const nift::readlimit::Set
     return Status::Error;
 }
 
+Value stream_read_value(std::string text) { return make_string(std::move(text)); }
+Value stream_read_value(std::vector<std::uint8_t> bytes) { return make_bytes(std::move(bytes)); }
+
+template <typename Buffer>
 Status stream_read_impl(const Context& context, StreamResource& stream, std::size_t requested, bool all,
                         std::string_view operation, Value& out, std::string& error) {
     const nift::readlimit::Setting setting = nift::readlimit::current();
@@ -51,7 +55,7 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
         all ? limit : std::min<std::uint64_t>(static_cast<std::uint64_t>(requested), limit);
     const bool probe = all || static_cast<std::uint64_t>(requested) > limit;
 
-    BudgetedText data(context);
+    Buffer data(context);
     char buffer[64 * 1024];
     std::uint64_t total = 0;
     while (total < max_bytes) {
@@ -97,16 +101,36 @@ Status stream_read_impl(const Context& context, StreamResource& stream, std::siz
                                                                   limit),
                                 "limit.exceeded", error);
     }
-    std::string text = data.take();
-    // Move the buffer into the StringObject: copying here would keep both the
-    // temporary and the result live. Charge the retained capacity, not just
-    // the logical size.
-    const std::size_t retained = text.capacity();
+    auto result = data.take();
+    // Publish the same allocation. Charge its retained capacity, including
+    // any unused bytes, before transferring ownership to the VM heap.
+    const std::size_t retained = result.capacity();
     if (!reserve_result(context, retained))
         return stream_limit(context, std::string(operation) + ": file exceeds the memory budget",
                             "limit.exceeded", error);
-    out = make_string(std::move(text));
+    out = stream_read_value(std::move(result));
     return Status::Ok;
+}
+
+Status read_byte_stream(const Context& context, const Value* args, std::uint32_t argc, bool all,
+                        Value& out, std::string& error) {
+    const std::string operation = all ? "read_all_bytes" : "read_bytes";
+    std::shared_ptr<StreamResource> stream;
+    Status status = Status::Ok;
+    if (!stream_arg(context, args, argc, operation, stream, error, status)) return status;
+    if (stream->kind != StreamResource::Kind::Input || !stream->open || !stream->input) {
+        error = operation + ": expected input stream";
+        return Status::Error;
+    }
+    if (stream->input->bad()) return stream_read_failure(context, operation, error);
+    std::size_t count = 0;
+    if (all) {
+        if (!no_args(argc, "read_all_bytes", error)) return Status::Error;
+    } else if (argc != 2 || !number_to_size(args[1], count)) {
+        error = argc == 2 ? "read_bytes: invalid byte count" : "read_bytes: expected byte count on input stream";
+        return Status::Error;
+    }
+    return stream_read_impl<BudgetedBytes>(context, *stream, count, all, operation, out, error);
 }
 
 } // namespace
@@ -130,7 +154,7 @@ Status stream_read(const Context& context, const Value* args, std::uint32_t argc
         count = static_cast<std::size_t>(requested);
         all = false;
     } else if (argc > 2) { error = "read: expected zero or one byte count"; return Status::Error; }
-    return stream_read_impl(context, *stream, count, all, "read", out, error);
+    return stream_read_impl<BudgetedText>(context, *stream, count, all, "read", out, error);
 }
 
 Status stream_read_all(const Context& context, const Value* args, std::uint32_t argc, Value& out,
@@ -143,7 +167,17 @@ Status stream_read_all(const Context& context, const Value* args, std::uint32_t 
         return Status::Error;
     }
     if (!no_args(argc, "read_all", error)) return Status::Error;
-    return stream_read_impl(context, *stream, 0, true, "read_all", out, error);
+    return stream_read_impl<BudgetedText>(context, *stream, 0, true, "read_all", out, error);
+}
+
+Status stream_read_bytes(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+                         std::string& error) {
+    return read_byte_stream(context, args, argc, false, out, error);
+}
+
+Status stream_read_all_bytes(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+                             std::string& error) {
+    return read_byte_stream(context, args, argc, true, out, error);
 }
 
 Status stream_read_line(const Context& context, const Value* args, std::uint32_t argc, Value& out,
@@ -210,17 +244,25 @@ Status stream_eof(const Context& context, const Value* args, std::uint32_t argc,
     return Status::Ok;
 }
 
-Status stream_write(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+static Status stream_write_argument(const Context& context, const Value* args, std::uint32_t argc,
+                                    Value& out, std::string& error, bool line_argument) {
     std::shared_ptr<StreamResource> stream;
     Status status = Status::Ok;
     if (!stream_arg(context, args, argc, "write", stream, error, status)) return status;
+    const bool bytes_in_line = line_argument && argc == 2 && args[1].is(Kind::Bytes);
     if (stream->kind != StreamResource::Kind::Output || !stream->open || !stream->output) {
-        error = "write: stream is not open for writing";
+        error = bytes_in_line ? "write_line: expected one value on output stream" :
+                                "write: stream is not open for writing";
         return Status::Error;
     }
     if (argc != 2) { error = "write: expected one value"; return Status::Error; }
-    std::string data;
-    if (!render_arg(args[1], data)) { error = "write: value is not directly renderable"; return Status::Error; }
+    if (bytes_in_line) { error = "write_line: value is not directly renderable"; return Status::Error; }
+    std::string scratch;
+    std::string_view data;
+    if (!render_arg(args[1], scratch, data)) {
+        error = "write: value is not directly renderable";
+        return Status::Error;
+    }
 #if !(defined(NIFT_OUTPUT_ORDER_MUTANT) && NIFT_OUTPUT_ORDER_MUTANT == 5)  // test-only: no publish before write
     if (stream->std_stream) context.publish_output();  // D-073 #3: a write may overflow into the descriptor
 #endif
@@ -234,12 +276,16 @@ Status stream_write(const Context& context, const Value* args, std::uint32_t arg
     return Status::Ok;
 }
 
+Status stream_write(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+    return stream_write_argument(context, args, argc, out, error, false);
+}
+
 Status stream_write_line(const Context& context, const Value* args, std::uint32_t argc, Value& out,
                          std::string& error) {
     if (argc != 2) { error = "write_line: expected one value"; return Status::Error; }
     Value newline = make_string("\n");
     Value first[2] = {args[0], args[1]};
-    Status status = stream_write(context, first, 2, out, error);
+    Status status = stream_write_argument(context, first, 2, out, error, true);
     if (status != Status::Ok) return status;
     Value second[2] = {args[0], newline};
     return stream_write(context, second, 2, out, error);

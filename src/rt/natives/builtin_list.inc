@@ -227,3 +227,7 @@ NIFT_RT_BUILTIN(StackContains, "contains", Stack, 1, 1, kBool, Fixed, false, 100
 NIFT_RT_BUILTIN(StackSize, "size", Stack, 0, 0, kInt, Fixed, false, 60)
 NIFT_RT_BUILTIN(StackEmpty, "empty", Stack, 0, 0, kBool, Fixed, false, 60)
 NIFT_RT_BUILTIN(FnSame, "same", None, 2, 2, kBool, Fixed, true, 100)
+
+// Managed input-stream byte results. Free Bytes factories remain deferred.
+NIFT_RT_BUILTIN(StreamReadBytes, "read_bytes", Stream, 1, 1, kBytes, Fixed, true, 100)
+NIFT_RT_BUILTIN(StreamReadAllBytes, "read_all_bytes", Stream, 0, 0, kBytes, Fixed, true, 100)

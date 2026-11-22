@@ -190,6 +190,24 @@ bool BudgetedText::grow(std::size_t extra) {
     return reserve(needed > doubled ? needed : (doubled < kMaxResultBytes ? doubled : needed));
 }
 
+bool BudgetedBytes::reserve(std::size_t capacity) {
+    if (capacity <= data_.capacity()) return true;
+    if (!reserve_result(context_, size_add(capacity, data_.capacity()))) return false;
+    std::vector<std::uint8_t> fresh;
+    fresh.reserve(capacity);
+    if (fresh.capacity() > capacity &&
+        !reserve_result(context_, size_add(fresh.capacity(), data_.capacity()))) return false;
+    fresh.insert(fresh.end(), data_.begin(), data_.end());
+    data_.swap(fresh);
+    return true;
+}
+
+bool BudgetedBytes::append(std::string_view part) {
+    if (!reserve(size_add(data_.size(), part.size()))) return false;
+    data_.insert(data_.end(), part.begin(), part.end());
+    return true;
+}
+
 std::string_view render_scalar(const Value& value, char (&buffer)[64]) {
     switch (value.kind()) {
         case Kind::Bool: return value.as_bool() ? std::string_view("true") : std::string_view("false");

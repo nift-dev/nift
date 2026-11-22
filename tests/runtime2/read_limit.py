@@ -22,7 +22,7 @@ failures, case by case (docs/runtime-2/host-deps-test-contract.md has the table 
     VM default: exit 1 before any part runs, the exact documented diagnostic at the callee's position. A
     refusal-contract pass is not evidence that the capability works on the VM; the summary counts it as
     deferred;
-  - a case refused for an unapproved reason (host-handle-flow, statement:Command, type:length: PENDING-OWNER)
+  - a case refused for an unapproved reason (host-handle-flow, statement:Command: PENDING-OWNER)
     keeps its original VM-default case, which stays FAILED; its safety invariant keeps coverage through the
     legacy channel and, where the VM supports an equivalent form, through that form;
   - a case that cannot run here is NOT RUN (exit 2 when nothing failed), never a pass.
@@ -30,6 +30,7 @@ failures, case by case (docs/runtime-2/host-deps-test-contract.md has the table 
 Usage: NIFT_BIN=/path/to/nift python3 tests/runtime2/read_limit.py
 """
 import collections
+import hashlib
 import os
 import resource
 import shutil
@@ -80,12 +81,6 @@ deferred_cases = collections.Counter()
 # where review evidence shows that the reason misnames the operation, that is a finding about a production diagnostic
 # (not changed here), and the case is still FAILED. docs/runtime-2/host-deps-test-contract.md has the evidence.
 OUTSTANDING = [
-    ("ifstream(/dev/zero).read_all_bytes", "host-handle-flow",
-     "stream byte read (read_all_bytes); finding F-HD1: refused through the generic host-handle-flow fallback, whose ID "
-     "names the compiler mechanism, not the operation"),
-    ("ifstream(/dev/zero).read_bytes(huge)", "host-handle-flow", "stream byte read (read_bytes); finding F-HD1"),
-    ("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)", "host-handle-flow",
-     "stream byte read (read_bytes) in a loop; finding F-HD1"),
     ("ifstream(/dev/zero) >> token", "statement:Command",
      "stream extraction `s >> t`; finding F-HD2: the VM classifies a `>>` statement (also `x >> 1` on a number) as a "
      "shell command line, while legacy performs stream extraction"),
@@ -349,16 +344,41 @@ def cases(work, address_space, rss_bound):
                % (LIMIT // 2), work, address_space=address_space)
     check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
-    # D-077 #3: the four cases above that the VM refuses as host-handle-flow (read_all_bytes, read_bytes, read_val,
-    # read_bytes streaming) and the `>>` extraction it refuses as statement:Command are unapproved refusals
-    # (PENDING-OWNER): they stay FAILED. Their read-limit invariants keep coverage on the legacy channel, and the
-    # streaming invariant through the VM-supported read(n) as well.
+    # D-077 #3: read_val and `>>` extraction still have unapproved refusals.
+    # Keep all the original legacy assertions and the equivalent VM text read.
     proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
     check(VM_EQUIVALENT + EQUIVALENT_NAMES[1],
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
 
-    def unapproved_on_legacy():
+    packet = b"\x00\xff\xc3\xa9a"
+    (work / "stream-bytes.bin").write_bytes(packet)
+    binary_source = ('s := ifstream("stream-bytes.bin")\n'
+                     'zero := s.read_bytes(0)\nhead := s.read_bytes(2)\ntail := s.read_all_bytes()\n'
+                     'print(is_bytes(zero))\nprint(zero.length())\nprint(head.length())\nprint(tail.length())\n'
+                     'print(sha256(head))\nprint(sha256(tail))\nclose(s)\n')
+    expected = ["true", "0", "2", "3", hashlib.sha256(packet[:2]).hexdigest(), hashlib.sha256(packet[2:]).hexdigest()]
+    binary = run(binary_source, work, limit=small, env_extra={"NIFT_VM": "require"})
+    check("stream byte reads preserve length, kind and exact contents across zero-length and partial reads",
+          binary.returncode == 0 and not binary.stderr and binary.stdout.splitlines() == expected,
+          binary.stdout + binary.stderr)
+
+    write_source = ('s := ifstream("stream-bytes.bin")\nchunk := s.read_all_bytes()\nclose(s)\n'
+                    't := ofstream("stream-bytes-out.bin")\nt.%s(chunk)\nclose(t)\n')
+    written_path = work / "stream-bytes-out.bin"
+    raw = run(write_source % "write", work, limit=small, env_extra={"NIFT_VM": "require"})
+    check("stream write preserves exact bytes",
+          raw.returncode == 0 and written_path.is_file() and written_path.read_bytes() == packet,
+          raw.stdout + raw.stderr)
+    line = run(write_source % "write_line", work, limit=small, env_extra={"NIFT_VM": "require"})
+    vm_line_bytes = written_path.read_bytes() if written_path.is_file() else None
+    legacy_line = run(write_source % "write_line", work, limit=small, env_extra={"NIFT_VM": "0"})
+    check("stream write_line refuses bytes without writing",
+          line.returncode == legacy_line.returncode == 1 and line.stdout == legacy_line.stdout == "" and
+          line.stderr == legacy_line.stderr and "write_line: value is not directly renderable" in line.stderr and
+          vm_line_bytes == b"" and written_path.is_file() and written_path.read_bytes() == b"", line.stderr)
+
+    def stream_controls_on_legacy():
         exceed("ifstream(/dev/zero).read_all_bytes", "read_all_bytes", 's := ifstream("/dev/zero")\nx := s.read_all_bytes()',
                work, address_space, rss_bound)
         exceed("ifstream(/dev/zero).read_bytes(huge)", "read_bytes",
@@ -371,7 +391,7 @@ def cases(work, address_space, rss_bound):
                    'close(s)\nprint(n)\n' % (LIMIT // 2), work, address_space=address_space)
         check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
               proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
-    legacy_channel(unapproved_on_legacy)
+    legacy_channel(stream_controls_on_legacy)
 
     # --- streaming handles files larger than the limit -----------------------
     big = work / "big.txt"

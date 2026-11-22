@@ -29,10 +29,15 @@ Receiver receiver_family(KindSet kinds) {
 
 namespace {
 
+bool stream_bytes_builtin(const BuiltinSpec& spec) {
+    using natives::BuiltinId;
+    return spec.id == BuiltinId::StreamReadBytes || spec.id == BuiltinId::StreamReadAllBytes;
+}
+
 const BuiltinSpec* first_method(std::string_view name) {
     for (std::size_t i = 0; i < natives::builtin_count(); ++i) {
         const BuiltinSpec& spec = natives::builtin_spec(static_cast<natives::BuiltinId>(i));
-        if (spec.receiver != Receiver::None && spec.name == name) return &spec;
+        if (spec.receiver != Receiver::None && spec.name == name && !stream_bytes_builtin(spec)) return &spec;
     }
     return nullptr;
 }
@@ -41,6 +46,15 @@ const BuiltinSpec* first_method(std::string_view name) {
 
 MethodBinding bind_method(KindSet kinds, std::string_view name, const BuiltinSpec*& spec) {
     spec = nullptr;
+    // Only a proven stream gets the new methods. Other receivers retain
+    // their existing method refusal and never enter generic dispatch.
+    if (kinds == kKindStream) {
+        const BuiltinSpec* stream = natives::find_builtin(Receiver::Stream, name);
+        if (stream && stream_bytes_builtin(*stream)) {
+            spec = stream;
+            return MethodBinding::Bound;
+        }
+    }
     const BuiltinSpec* any_name = first_method(name);
     if (!any_name) return MethodBinding::NotBuiltin;
     if (kinds == 0) {
@@ -93,8 +107,8 @@ bool pure_method_name(std::string_view name) { return first_method(name) != null
 bool presentation_builtin(const BuiltinSpec& spec) { return spec.receiver == Receiver::Any; }
 
 bool bytes_builtin(const BuiltinSpec& spec) {
-    // `Selected` results (validate, copy, deepcopy) are their arguments'
-    // kinds, which never include bytes; only fixed results can be bytes.
+    // The managed stream methods are the only admitted Bytes producers.
+    if (stream_bytes_builtin(spec)) return false;
     return (spec.rule == natives::ResultRule::Fixed && (spec.result & natives::kBytes) != 0) ||
            spec.receiver == Receiver::Bytes;
 }

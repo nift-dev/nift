@@ -372,29 +372,4 @@ bool push_value(Value& array, const Value& value, Fault& fault, const Note* note
     return refused(fault, out);
 }
 
-bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out, Fault& fault) {
-    if (mode == LengthMode::StreamLine && value.is(Kind::Null))
-        return raise(fault, StopReason::Error, "unknown value or malformed expression: " + note_text(note));
-    const bool size = mode == LengthMode::Size;
-    if (value.is(Kind::Array)) {
-        out = Value::integer(static_cast<std::int64_t>(array_size(value)));
-        return true;
-    }
-    if (value.is(Kind::Object)) {
-        // size() counts members; length() rejects an object.
-        if (!size)
-            return raise(fault, StopReason::Error, "unknown value or malformed expression: " + note_text(note));
-        out = Value::integer(static_cast<std::int64_t>(object_size(value)));
-        return true;
-    }
-    if (!size && value.is(Kind::String)) {
-        std::int64_t count = 0;
-        for (char c : string_view_of(value))
-            if ((static_cast<unsigned char>(c) & 0xc0u) != 0x80u) ++count;
-        out = Value::integer(count);
-        return true;
-    }
-    return internal(fault, "length/size");
-}
-
 } // namespace nift::rt
