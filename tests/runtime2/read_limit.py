@@ -22,7 +22,7 @@ failures, case by case (docs/runtime-2/host-deps-test-contract.md has the table 
     VM default: exit 1 before any part runs, the exact documented diagnostic at the callee's position. A
     refusal-contract pass is not evidence that the capability works on the VM; the summary counts it as
     deferred;
-  - a case refused for an unapproved reason (host-handle-flow, statement:Command: PENDING-OWNER)
+  - a case refused for an unapproved reason (host-handle-flow: PENDING-OWNER)
     keeps its original VM-default case, which stays FAILED; its safety invariant keeps coverage through the
     legacy channel and, where the VM supports an equivalent form, through that form;
   - a case that cannot run here is NOT RUN (exit 2 when nothing failed), never a pass.
@@ -81,9 +81,6 @@ deferred_cases = collections.Counter()
 # where review evidence shows that the reason misnames the operation, that is a finding about a production diagnostic
 # (not changed here), and the case is still FAILED. docs/runtime-2/host-deps-test-contract.md has the evidence.
 OUTSTANDING = [
-    ("ifstream(/dev/zero) >> token", "statement:Command",
-     "stream extraction `s >> t`; finding F-HD2: the VM classifies a `>>` statement (also `x >> 1` on a number) as a "
-     "shell command line, while legacy performs stream extraction"),
     ("ifstream(/dev/zero).read_val", "host-handle-flow",
      "stream value read (read_val), not a byte read: classification not established, stays open"),
 ]
@@ -344,12 +341,39 @@ def cases(work, address_space, rss_bound):
                % (LIMIT // 2), work, address_space=address_space)
     check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
-    # D-077 #3: read_val and `>>` extraction still have unapproved refusals.
+    # D-077 #3: read_val still has an unapproved refusal.
     # Keep all the original legacy assertions and the equivalent VM text read.
     proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
     check(VM_EQUIVALENT + EQUIVALENT_NAMES[1],
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
+
+    (work / "stream-tokens.txt").write_bytes(b"  alpha\tbravo   ")
+    extract = ('s := ifstream("stream-tokens.txt")\nt := "seed"\n'
+               's >> t\nprint(t)\ns >> t\nprint(t)\ns >> t\nprint(t)\nclose(s)\n')
+    tokens = run(extract, work, limit=small, env_extra={"NIFT_VM": "require"})
+    check("stream extraction consumes tokens and leaves its string destination unchanged at EOF",
+          tokens.returncode == 0 and tokens.stdout == "alpha\nbravo\nbravo\n" and not tokens.stderr,
+          tokens.stdout + tokens.stderr)
+
+    closed = 's := ifstream("stream-tokens.txt")\nt := "seed"\nclose(s)\ns >> t\nprint("UNREACHED")\n'
+    vm_closed = run(closed, work, limit=small, env_extra={"NIFT_VM": "require"})
+    legacy_closed = run(closed, work, limit=small, env_extra={"NIFT_VM": "0"})
+    check("stream extraction after close has the exact legacy fatal error",
+          vm_closed.returncode == legacy_closed.returncode == 1 and
+          vm_closed.stdout == legacy_closed.stdout == "" and vm_closed.stderr == legacy_closed.stderr and
+          ":4:1: stream is closed or invalid" in vm_closed.stderr, vm_closed.stderr)
+
+    shell = run('x := 1\nt := "seed"\nx >> t\n', work, limit=small, env_extra={"NIFT_VM": "require"})
+    check("a non-stream command spelling keeps its existing refusal",
+          shell.returncode == 1 and not shell.stdout and
+          ":3:1: not compiled for the VM (statement:Command)" in shell.stderr, shell.stderr)
+
+    reassigned = run('fn(f()) { return 1 }\ns := ifstream("stream-tokens.txt")\nt := ""\nt = f\ns >> t\n',
+                     work, limit=small, env_extra={"NIFT_VM": "require"})
+    check("stream extraction with a reassigned destination stays refused",
+          reassigned.returncode == 1 and not reassigned.stdout and
+          ":5:1: not compiled for the VM (statement:Command)" in reassigned.stderr, reassigned.stderr)
 
     packet = b"\x00\xff\xc3\xa9a"
     (work / "stream-bytes.bin").write_bytes(packet)

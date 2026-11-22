@@ -9,6 +9,7 @@
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_ops.h"
 #include "rt/natives/host_stream_handles.h"
+#include "rt/natives/host_stream_extract.h"
 #include "rt/natives/json_methods.h"
 #include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
@@ -55,7 +56,7 @@ constexpr NativeFn kFunctions[] = {
     atomic_load, atomic_store, atomic_exchange, atomic_fetch_add, atomic_fetch_sub, atomic_compare_exchange,
     fn_map, fn_set, fn_stack, coll_get, coll_contains, coll_size, coll_empty, coll_contains, coll_size, coll_empty,
     coll_top, coll_front, coll_contains, coll_size, coll_empty, fn_same,
-    stream_read_bytes, stream_read_all_bytes,
+    stream_read_bytes, stream_read_all_bytes, stream_extract_string,
 };
 
 constexpr BuiltinSpec kSpecs[] = {
@@ -219,7 +220,7 @@ std::string_view recoverable_code(BuiltinId id) {
         case BuiltinId::FileRemove: return "io.remove_failed";
         case BuiltinId::HandleIfstream: case BuiltinId::HandleOfstream: return "stream.open_failed";
         case BuiltinId::StreamRead: case BuiltinId::StreamReadAll: case BuiltinId::StreamReadLine:
-        case BuiltinId::StreamReadBytes: case BuiltinId::StreamReadAllBytes:
+        case BuiltinId::StreamReadBytes: case BuiltinId::StreamReadAllBytes: case BuiltinId::StreamExtractString:
             return "stream.read_failed";
         case BuiltinId::StreamWrite: case BuiltinId::StreamWriteLine: return "stream.write_failed";
         case BuiltinId::StreamFlush: return "stream.flush_failed";

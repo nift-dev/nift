@@ -164,12 +164,13 @@ inline constexpr std::uint8_t kVariadic = 255;
 // appended group without moving existing instruction IDs.
 static_assert(static_cast<std::uint16_t>(BuiltinId::FnSame) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::StreamReadBytes));
-static_assert(static_cast<std::uint16_t>(BuiltinId::StreamReadAllBytes) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::StreamExtractString) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {
     return (id >= BuiltinId::HostOpen && id <= BuiltinId::StreamEof) ||
-           id == BuiltinId::StreamReadBytes || id == BuiltinId::StreamReadAllBytes;
+           id == BuiltinId::StreamReadBytes || id == BuiltinId::StreamReadAllBytes ||
+           id == BuiltinId::StreamExtractString;
 }
 
 // The whole table, indexed by BuiltinId.

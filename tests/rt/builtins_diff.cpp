@@ -496,6 +496,8 @@ int main(int argc, char** argv) {
     //   CP23 shared concurrency (mutex ... compare_exchange): registry-backed, no legacy
     //     counterpart; the cp23 suites.
     //   D-063 collections (map ... same): VM-only reference values; the collections suite.
+    //   D-149 managed stream bytes and extraction: use typed Host handles and perform I/O.
+    //     read_limit.py checks legacy parity and allocation bounds on these paths.
     // The asserts pin each section's bounds, so a built-in added anywhere but inside an existing
     // section (in particular one appended at the end) fails to compile until it is classified.
     constexpr auto at = [](BuiltinId id) { return static_cast<std::size_t>(id); };
@@ -507,7 +509,9 @@ int main(int argc, char** argv) {
                   "the CP23 shared block must follow the CP17 W13 handle block");
     static_assert(at(BuiltinId::AtomicCompareExchange) + 1 == at(BuiltinId::FnMap),
                   "the D-063 collections block must follow the CP23 shared block");
-    static_assert(at(BuiltinId::FnSame) + 1 == at(BuiltinId::Count),
+    static_assert(at(BuiltinId::FnSame) + 1 == at(BuiltinId::StreamReadBytes),
+                  "the D-149 managed stream block must follow the collections block");
+    static_assert(at(BuiltinId::StreamExtractString) + 1 == at(BuiltinId::Count),
                   "classify a new built-in: add it to the pure block or to an excluded section above");
     const std::size_t pure_builtins = at(BuiltinId::HostOpen);
     std::vector<Case> cases;

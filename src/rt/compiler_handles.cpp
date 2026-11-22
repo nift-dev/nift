@@ -1,4 +1,5 @@
 #include "rt/compiler_handles.h"
+#include <algorithm>
 
 #include "rt/builtin_bind.h"
 
@@ -202,6 +203,53 @@ bool check_handle_flow(const Ast& ast, NodeId root, const UnitKinds& kinds, std:
         return true;
     }
     return false;
+}
+
+bool UnitCompiler::command_or_stream_extraction(const Node& node) {
+    const auto refuse = [&] { return fail(node, "statement:Command"); };
+    if (session_ || in_function_ || loop_reachable()) return refuse();
+    const auto command = text(node);
+    const auto shift = command.find(">>");  // rt-lint: allow-string-compare compile time
+    if (shift == std::string_view::npos) return refuse();
+
+    // The surface scan keeps shell syntax opaque. Only two existing local
+    // names of the proven stream/string types can mean a stream extraction.
+    const auto trim = [](std::string_view name) {
+        const auto first = name.find_first_not_of(" \t");
+        if (first == std::string_view::npos) return std::string_view();
+        return name.substr(first, name.find_last_not_of(" \t") + 1 - first);
+    };
+    const auto source_name = trim(command.substr(0, shift));
+    const auto target_name = trim(command.substr(shift + 2));
+    const Binding* source = scopes_.find(source_name);
+    const Binding* target = scopes_.find(target_name);
+    const auto direct = [](const Binding* binding) {
+        return binding && !binding->cell && !binding->upvalue && !binding->global && !binding->loop_binding &&
+               !binding->location_source && !binding->invocation;
+    };
+    if (!direct(source) || !direct(target) || source->decl_kinds != kKindStream ||
+        target->decl_kinds != kKindString || !target->string_literal_initializer || target->decl_may_double ||
+        target->const_scalar || target->readonly)
+        return refuse();
+    // An ordinary assignment can install a tagged value in a legacy
+    // string binding. This statement only writes proved ordinary strings.
+    const auto overwrites_either = [&](const auto& assigned) {
+        return assigned.count(source_name) || assigned.count(target_name);
+    };
+    if (overwrites_either(assigned_) ||
+        std::any_of(assigned_fn_.begin(), assigned_fn_.end(), overwrites_either))
+        return refuse();
+
+    const auto base = fb_->top();
+    if (!operand_window(base, 2)) return false;
+    fb_->emit(OpCode::Move, base, source->reg);
+    fb_->emit(OpCode::Move, static_cast<std::uint16_t>(base + 1), target->reg);
+    const auto native = static_cast<std::uint16_t>(kFirstBuiltin +
+                        static_cast<std::uint16_t>(natives::BuiltinId::StreamExtractString));
+    fb_->note(fb_->emit(OpCode::CallNative, base, native, 2), "extraction");
+    fb_->emit(OpCode::Move, target->reg, base);
+    fb_->release_to(base);
+    return builder_ok();
 }
 
 } // namespace nift::rt::detail

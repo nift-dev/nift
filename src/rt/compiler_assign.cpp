@@ -66,6 +66,7 @@ bool UnitCompiler::declare(const Node& node) {
     std::uint16_t text_type = 0;
     const TextType& inferred = text_type_at(node.b);
     binding.decl_kinds = kinds(node.b);
+    binding.string_literal_initializer = init.kind == NodeKind::String;
     binding.decl_text_double = inferred.kind == TextType::Kind::Known && inferred.known == 3;
     binding.decl_may_double = may_double(inferred, scope_index());
     if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;

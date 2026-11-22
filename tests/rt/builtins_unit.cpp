@@ -90,8 +90,12 @@ void table() {
     CHECK(find_builtin(Receiver::Array, "index_of") == nullptr);  // arrays spell it indexOf
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
     // builtin_list.inc: 89 CP14/CP15 built-ins, 31 CP16 Host built-ins, 31 CP17 W13 file/stream
-    // handle built-ins, 19 CP23 shared-concurrency built-ins and 16 D-063 collection built-ins.
-    CHECK(builtin_count() == 186);
+    // handle built-ins, 19 CP23 shared-concurrency built-ins, 16 D-063 collection built-ins and
+    // 3 managed stream operations added under D-149.
+    CHECK(builtin_count() == 189);
+    CHECK(host_builtin(BuiltinId::StreamReadBytes));
+    CHECK(host_builtin(BuiltinId::StreamReadAllBytes));
+    CHECK(host_builtin(BuiltinId::StreamExtractString));
     CHECK(find_builtin(Receiver::Number, "to_string") && find_builtin(Receiver::Any, "stringify"));
     CHECK(find_builtin(Receiver::Number, "to_double") == nullptr);  // Q4: context-dependent in legacy
 }

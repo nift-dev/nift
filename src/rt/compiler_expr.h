@@ -27,7 +27,6 @@ class UnitCompiler {
 public:
     UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                  const std::vector<bool>& loop_called, const GlobalPlan* globals = nullptr);
-    // Compiles main (proto 0) and every function (proto k + 1) into `program`.
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
     std::uint32_t offset() const { return offset_; } bool positioned() const { return positioned_; }
@@ -85,6 +84,7 @@ private:
     bool finish(std::unique_ptr<Proto>& out);
     bool statements(const Node& block);
     bool statement(NodeId id);
+    bool command_or_stream_extraction(const Node& node);
     bool declare(const Node& node);
     bool assignment_expr(const Node& node, std::uint16_t dst);
     void assignment_value(std::uint16_t dst, std::uint16_t operand);  // P1: a register or a constant operand

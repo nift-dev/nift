@@ -36,6 +36,7 @@ struct Binding {
     // parameter's arguments) and whether the declaring text may give the
     // binding type double; 0xff = unknown.
     std::uint32_t decl_kinds = 0x7ff;  // CP12 KindSet (widened for CP23 shared kinds)
+    bool string_literal_initializer = false;
     bool decl_text_double = false;  // the declaring text is always typed double
     bool decl_may_double = false;   // ... or may be (a binding it names may be double)
     // CP12b globals: a top-level binding a function reaches as a free name
