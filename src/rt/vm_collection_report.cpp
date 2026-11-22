@@ -30,7 +30,7 @@ bool block_view(VmResult& result,const Note* note,const SourceMap* map) {
     auto& display=result.diagnostic_frames.front().site;
     display.source=failure.path;display.line=failure.line-body.line+1;
     display.column=failure.column-(failure.line==body.line?body.column-1:0);
-    result.report_origin = {display.source, static_cast<std::uint32_t>(display.line),
+    result.report_origin = {failure.path, static_cast<std::uint32_t>(display.line),
                             static_cast<std::uint32_t>(display.column)};
     return true;
 }

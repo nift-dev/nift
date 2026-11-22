@@ -60,15 +60,18 @@ jobs:
         if: runner.os != 'Windows'
         run: python3 tests/runtime2/platform_subset.py --check
       - name: Build Nift and the subset's unit binaries
+        id: build-unix
         if: runner.os != 'Windows'
         run: |
           make -j2
           make -j2 .build/rt-parse-dump .build/rt-parser-unit .build/rt-legacy-oracle \
             .build/rt/vm-unit .build/rt/vm-globals-unit .build/rt/vm-modules-unit .build/rt/vm-prepared-parse
       - name: Build Nift and the subset's unit binaries on Windows
+        id: build-windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
+          set -e
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           python --version
           python tests/runtime2/platform_subset.py --check
@@ -95,20 +98,21 @@ jobs:
           mkdir -p .build/platform-subset
           python tests/runtime2/platform_subset.py --platform windows --nift "$PWD/nift.exe" --build .build \
             2>&1 | tee .build/platform-subset/windows.txt
+      # A failed VM entry should leave its job red and still let independent gates run.
       - name: Subset make targets (embedding, value layer, kind bits, source map)
-        if: runner.os != 'Windows'
-        run: make test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+        if: ${{ !cancelled() && steps.build-unix.outcome == 'success' }}
+        run: make -k test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
       # D-090: the certification guard is a required gate. It checks the certify plan, which is platform independent,
       # so it runs on the Linux job only (platform-subsets.md gives the macOS and Windows reasons).
       - name: Certification guard (required gate, D-090)
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.build-unix.outcome == 'success' }}
         run: make test-runtime2-certification-guard
       - name: Subset make targets on Windows
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
         shell: msys2 {0}
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
-          make test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
+          make -k test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:

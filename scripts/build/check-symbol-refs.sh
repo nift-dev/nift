@@ -14,7 +14,7 @@
 # relative to their object directory (.build/<set>/ is dropped).
 # Tooling review F5: it fails closed: on no object, on an nm failure or any nm
 # diagnostic other than "no symbols", and on an object nm reports empty that
-# holds LTO sections (bytecode nm could not read) or that readelf cannot read.
+# holds LTO sections (bytecode nm could not read) or that the platform section reader cannot read.
 # Its granularity is (object, symbol): inside an object that is allowed a
 # symbol (every builder user is allowed Construction::array_push, for
 # example) it cannot tell a builder's use from an in-place or forged one;
@@ -24,24 +24,40 @@ allow=$1; shift
 [ $# -gt 0 ] || { echo "error: check-symbol-refs.sh: no objects to check" >&2; exit 1; }
 RESTRICTED='^nift::rt::(Storage::|Construction::|mutation::Protocol::(sort_storage|sort_items|commit_permutation|commit_array)\()'
 want=$(grep -v '^#' "$allow" | grep -v '^$' | sort -u)
-errs=$(mktemp); trap 'rm -f "$errs" "$errs.u" "$errs.e"' EXIT
+symbol_reader=(nm)
+section_reader=(readelf -SW)
+lto_section='\.gnu\.lto_'
+case "$(uname -s)" in
+  Darwin)
+    symbol_reader=(xcrun nm)
+    section_reader=(xcrun otool -l)
+    lto_section='^[[:space:]]*segname[[:space:]]+__LLVM([[:space:]]|$)'
+    ;;
+  MSYS*|MINGW*|UCRT*|CYGWIN*) section_reader=(objdump -h) ;;
+esac
+errs=$(mktemp) || exit 1; trap 'rm -f "$errs" "$errs.u" "$errs.e" "$errs.sections"' EXIT
 for o in "$@"; do
   rel=$(echo "$o" | sed -E 's|^\.build/[^/]+/||')
-  if ! nm -u -C "$o" > "$errs.u" 2> "$errs.e"; then
+  if ! "${symbol_reader[@]}" -u -C "$o" > "$errs.u" 2> "$errs.e"; then
     echo "error: check-symbol-refs.sh: nm failed on $o: $(head -1 "$errs.e")" >&2; exit 1
   fi
   if grep -qv ': no symbols$' "$errs.e"; then
     echo "error: check-symbol-refs.sh: nm on $o: $(head -1 "$errs.e")" >&2; exit 1
   fi
   if [ ! -s "$errs.u" ]; then
-    sections=$(readelf -SW "$o" 2>/dev/null) || { echo "error: check-symbol-refs.sh: cannot read $o" >&2; exit 1; }
-    if grep -q '\.gnu\.lto_' <<< "$sections"; then
+    if ! "${section_reader[@]}" "$o" > "$errs.sections" 2> "$errs.e" ||
+       [ ! -s "$errs.sections" ] || [ -s "$errs.e" ]; then
+      echo "error: check-symbol-refs.sh: cannot read $o: $(head -1 "$errs.e")" >&2
+      exit 1
+    fi
+    if grep -Eq "$lto_section" "$errs.sections"; then
       echo "error: check-symbol-refs.sh: $o is LTO bytecode nm did not read" >&2; exit 1
     fi
   fi
   # re-review N1: every class nm -u lists is a reference (U, and the weak w and
   # v, which a static link binds to the strong definition)
-  sed -nE 's/^ *[A-Za-z] //p' "$errs.u" | grep -E "$RESTRICTED" | sed -E 's/\(.*//' | sed "s|^|$rel |" >> "$errs"
+  # Darwin nm -u prints the demangled names without a type prefix.
+  sed -E 's/^ *[A-Za-z] //' "$errs.u" | grep -E "$RESTRICTED" | sed -E 's/\(.*//' | sed "s|^|$rel |" >> "$errs"
 done
 have=$(sort -u "$errs")
 extra=$(comm -13 <(echo "$want") <(echo "$have"))
