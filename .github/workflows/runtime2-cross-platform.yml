@@ -7,12 +7,17 @@ name: Runtime 2.0 cross-platform VM subset
 # certification (D-077 #4).
 on:
   workflow_dispatch:
+    inputs:
+      isolated_revision:
+        description: Queue this commit separately while an earlier revision is still running
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: runtime2-cross-platform-${{ github.ref }}
+  group: runtime2-cross-platform-${{ github.ref }}${{ inputs.isolated_revision && format('-{0}', github.sha) || '' }}
   cancel-in-progress: false
 
 jobs:
