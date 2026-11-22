@@ -16,13 +16,14 @@ The repaired suite answers two questions separately, and each answer must be abl
      - limit removed: the same program with the limit raised past the input is NOT accepted by
        limit_error() (a build without the check would pass the input through the same way).
 
-Only regular files in a temporary directory and `head -c N /dev/zero` (a read) are used: no device is opened
-for writing. A mutated build of the legacy read path is not part of this file (the existing
+D-150 adds a direct bounded read from /dev/zero and a regular-file token. All device access is read-only.
+A mutated build of the legacy read path is not part of this file (the existing
 read_limit_mutants.sh mutates the VM natives and runs read_limit_controls.py; it needs a build).
 
 Usage: NIFT_BIN=/path/to/nift python3 -B tests/runtime2/read_limit_contract_controls.py
 """
 import os
+from copy import copy
 import shutil
 import sys
 import tempfile
@@ -54,6 +55,44 @@ def on_legacy(fn):
     out = []
     rl.legacy_channel(lambda: out.append(fn()))
     return out[0]
+
+
+def read_val_controls(work):
+    name, reason = rl.READ_VAL_CASE, "host-handle-flow"
+    script = rl.fatal_limit_script(rl.READ_VAL_BODY)
+    vm = rl.run_read_val_refusal(script, work, SMALL)
+    outcome("D-150 refusal includes exact diagnostic and zero execution",
+            not contract_fails(name, reason, vm, script))
+    outcome("D-150 does not approve other cases with the shared refusal reason",
+            contract_fails("unrelated handle case", reason, vm, script))
+    changed = copy(vm)
+    changed.stderr = vm.stderr.replace("(host-handle-flow)", "(callable:read)", 1)
+    outcome("D-150 rejects a changed refusal reason", contract_fails(name, reason, changed, script))
+    shifted = script.replace("x := s.read_val()", "x :=  s.read_val()")
+    outcome("D-150 rejects a changed source position",
+            contract_fails(name, reason, rl.run_read_val_refusal(shifted, work, SMALL), script))
+    missing_stats = copy(vm)
+    missing_stats.vm_stats = {}
+    outcome("D-150 rejects a refusal with missing execution evidence",
+            contract_fails(name, reason, missing_stats, script))
+
+    legacy = on_legacy(lambda: rl.run(script, work, limit=SMALL))
+    outcome("D-150 legacy executes the stream read and raises its fatal limit error",
+            rl.read_val_legacy_contract(legacy, script, "/dev/zero", SMALL), legacy.stderr)
+    outcome("D-150 rejects execution in place of refusal", contract_fails(name, reason, legacy, script))
+    outcome("D-150 rejects a VM refusal in place of legacy execution",
+            not rl.read_val_legacy_contract(vm, script, "/dev/zero", SMALL))
+
+    token = work / "read-val.txt"
+    token.write_bytes(b'"' + b"a" * SMALL + b'"')
+    finite = rl.fatal_limit_script(f's := ifstream("{token}")\nx := s.read_val()')
+    limited = on_legacy(lambda: rl.run(finite, work, limit=SMALL))
+    outcome("D-150 finite legacy control reaches the fatal limit",
+            rl.read_val_legacy_contract(limited, finite, token, SMALL), limited.stderr)
+    unlimited = on_legacy(lambda: rl.run(finite, work, limit=2 * SMALL))
+    outcome("D-150 rejects legacy execution with the limit removed",
+            unlimited.returncode == 0 and unlimited.stdout == "AFTER\n" and not unlimited.stderr and
+            not rl.read_val_legacy_contract(unlimited, finite, token, SMALL), unlimited.stderr)
 
 
 def main():
@@ -114,6 +153,7 @@ def main():
                 what = "control: the limit error" if want else "limit removed: detected"
                 outcome("%s invariant (%s), %s" % (op, channel, what), got == want,
                         "exit %d %r" % (proc.returncode, (proc.stdout + proc.stderr)[-200:]))
+        read_val_controls(work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     bad = [n for n, ok in results if not ok]

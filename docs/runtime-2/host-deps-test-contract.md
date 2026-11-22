@@ -3,7 +3,21 @@
 This is a tests-only change; no production code changed. It was prepared on `prep/cert-r2` (base C137 `040a6726`)
 for independent review, as D-077 #3 requires ("Require independent review of the test changes").
 
-## D-078 update (owner 2026-11-12, attachment 2ea1c509): status of the suite
+## D-150 decision on stream `read_val()`
+
+D-150 resolves the D-078 #4 classification for case 12, `ifstream(/dev/zero).read_val`, under CP16 W20.
+The VM-default channel requires exit 1, the exact `host-handle-flow` diagnostic at the original call site,
+empty stdout, the no-execution note, and statistics showing zero VM and legacy executions.
+The explicit legacy channel runs the original 64 MiB workload and checks the fatal, uncatchable
+`read_val` limit error and the original address-space and peak RSS bounds.
+
+The suite requires both channels to pass. VM coverage for this case is the verified refusal contract.
+Read-limit enforcement and caller-scope evaluation for `read_val()` remain legacy functionality.
+The approval applies to this specific case. The shared refusal reason grants no approval to other operations.
+The controls reject a changed reason, a shifted position, missing execution evidence, execution in place of refusal,
+a refusal in place of legacy execution, and a legacy run that reads past the configured limit.
+
+## Historical D-078 update (owner 2026-11-12, attachment 2ea1c509)
 
 **`test-runtime2-host-deps` is FAILED**, with six outstanding cases (D-078 #4: no blanket deferral). read_limit.py
 prints them as `OUTSTANDING` lines, each with the reason the VM emits and the operation it actually refuses.

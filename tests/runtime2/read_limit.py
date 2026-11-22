@@ -22,15 +22,15 @@ failures, case by case (docs/runtime-2/host-deps-test-contract.md has the table 
     VM default: exit 1 before any part runs, the exact documented diagnostic at the callee's position. A
     refusal-contract pass is not evidence that the capability works on the VM; the summary counts it as
     deferred;
-  - a case refused for an unapproved reason (host-handle-flow: PENDING-OWNER)
-    keeps its original VM-default case, which stays FAILED; its safety invariant keeps coverage through the
-    legacy channel and, where the VM supports an equivalent form, through that form;
+  - D-150 approves the VM refusal only for the /dev/zero stream read_val case.
+    Its fatal limit and RSS checks run under explicit legacy execution;
   - a case that cannot run here is NOT RUN (exit 2 when nothing failed), never a pass.
 
 Usage: NIFT_BIN=/path/to/nift python3 tests/runtime2/read_limit.py
 """
 import collections
 import hashlib
+import json
 import os
 import resource
 import shutil
@@ -62,7 +62,11 @@ DEFERRED = {
                      "the call `run()` is not supported by the Runtime 2.0 VM yet", "run("),
     "callable:cmd": ("D-065 #2: run() and cmd() deferred from the initial release",
                      "the call `cmd()` is not supported by the Runtime 2.0 VM yet", "cmd("),
+    "host-handle-flow": ("D-150: /dev/zero stream read_val only (CP16 W20)",
+                         "this flow of host handles is not supported by the Runtime 2.0 VM yet", "s.read_val("),
 }
+READ_VAL_CASE = "ifstream(/dev/zero).read_val"
+READ_VAL_BODY = 's := ifstream("/dev/zero")\nx := s.read_val()'
 # Case-name tags (review of the cert-prep work, C4 / F-P2-1): a tag is a PREFIX, never a suffix. certify's case-ID
 # table (scripts/certify_fingerprints.py READ_LIMIT_TABLE) matches a name prefix followed by a space, so a suffixed
 # name would map onto the original case's ID. Every tagged name starts with "[": no table entry with fixed leading
@@ -77,14 +81,6 @@ EQUIVALENT_NAMES = ("read_line: line of exactly the limit, printed and measured 
 # scripts run before each check (a refusal contract re-runs them under the VM default).
 CHANNEL = {"legacy": False, "record": None, "pending": []}
 deferred_cases = collections.Counter()
-# D-078 #4 (owner 2026-11-12, attachment 2ea1c509): no blanket deferral. The cases below keep their original VM-default
-# check and stay FAILED. This records, per case, the refusal reason the VM emits and the operation actually refused;
-# where review evidence shows that the reason misnames the operation, that is a finding about a production diagnostic
-# (not changed here), and the case is still FAILED. docs/runtime-2/host-deps-test-contract.md has the evidence.
-OUTSTANDING = [
-    ("ifstream(/dev/zero).read_val", "host-handle-flow",
-     "stream value read (read_val), not a byte read: classification not established, stays open"),
-]
 
 
 def not_run_case(name, why):
@@ -121,7 +117,7 @@ def baseline_vm():
     return peak or 64 * MiB, hwm or 16 * MiB
 
 
-def run(script_text, cwd, limit=LIMIT, address_space=None, env_extra=None, timeout=60, stdin=None):
+def run(script_text, cwd, limit=LIMIT, address_space=None, env_extra=None, timeout=60, stdin=None, vm_default=False):
     script = Path(cwd) / "case.f"
     script.write_text(script_text)
     env = dict(os.environ)
@@ -135,6 +131,8 @@ def run(script_text, cwd, limit=LIMIT, address_space=None, env_extra=None, timeo
         env["NIFT_READ_LIMIT"] = str(limit)
     if env_extra:
         env.update(env_extra)
+    if vm_default:
+        env.pop("NIFT_VM", None)
 
     cap = address_space or 4 << 30   # always bounded (standing rule)
 
@@ -207,9 +205,38 @@ def refusal_contract(name, reason, proc, script):
     first = next((l for l in proc.stderr.splitlines() if l.startswith("error: ")), "")
     ok = (proc.returncode == 1 and proc.stdout == "" and first.endswith(want) and
           "the program was not executed: no part of it ran" in proc.stderr)
+    if reason == "host-handle-flow":
+        stats = getattr(proc, "vm_stats", {})
+        ok = (ok and name == READ_VAL_CASE and stats.get("outcome") == "require-error" and
+              stats.get("reason") == reason and (stats.get("line"), stats.get("column")) == pos and
+              all(stats.get(key) == 0 for key in ("execute_us", "vm_executions", "legacy_executions")))
     deferred_cases[reason] += 1
     check(REFUSAL_CONTRACT % reason + name, ok,
           "want %r; got exit %d stdout %r first %r" % (want, proc.returncode, proc.stdout[:80], first))
+
+
+def run_read_val_refusal(script, work, limit, address_space=None):
+    with tempfile.TemporaryDirectory(dir=work) as folder:
+        stats = Path(folder) / "stats.json"
+        proc = run(script, work, limit=limit, address_space=address_space,
+                   env_extra={"NIFT_VM_STATS": str(stats)}, vm_default=True)
+        try:
+            record = json.loads(stats.read_text())
+        except (OSError, ValueError):
+            record = None
+        proc.vm_stats = record if isinstance(record, dict) else {}
+        return proc
+
+
+def read_val_legacy_contract(proc, script, target, limit):
+    pos = refusal_position(script, DEFERRED["host-handle-flow"][2])
+    if pos is None:
+        return False
+    expected = ("case.f:%d:%d: read_val: a value in %s exceeds the read limit of %d bytes (NIFT_READ_LIMIT)"
+                % (*pos, target, limit))
+    lines = proc.stderr.splitlines()
+    return (limit_error(proc, "read_val", limit) and proc.returncode == 1 and proc.stdout == "" and
+            len(lines) == 1 and lines[0].startswith("error: ") and lines[0].endswith(expected))
 
 
 def deferred(reason, body):
@@ -246,9 +273,6 @@ def main():
         print("DEFERRED capabilities, checked only as VM refusal contracts (not evidence that they work on the VM): " +
               deferred_note)
     print("")  # a blank line: certify collects the lines under a FAIL line up to the next blank line
-    for name, reason, operation in OUTSTANDING:
-        print("OUTSTANDING (FAILED unless it passed above; D-078 #4): %s: emitted reason %s; operation: %s" %
-              (name, reason, operation))
     if failures:
         print("%d failure(s)" % len(failures))
         return 1
@@ -260,16 +284,23 @@ def main():
     return 0
 
 
+def fatal_limit_script(body):
+    return 'try {\n%s\n} catch(e) { print("CAUGHT " + e.message) }\nprint("AFTER")\n' % body
+
+
 def exceed(name, operation, body, work, address_space, rss_bound, limit=LIMIT):
-    """`body` must exceed the limit; wrapped in try/catch to prove the error
-    is not catchable, followed by a print that must never run."""
-    script = 'try {\n%s\n} catch(e) { print("CAUGHT " + e.message) }\nprint("AFTER")\n' % body
+    """Wrap the read in try/catch and check that execution stops at the fatal error."""
+    script = fatal_limit_script(body)
     proc = run(script, work, limit=limit, address_space=address_space)
-    check("%s: fatal %s limit error (exit %d)" % (name, operation, proc.returncode), limit_error(proc, operation, limit),
+    fatal = (read_val_legacy_contract(proc, script, "/dev/zero", limit) if name == READ_VAL_CASE
+             else limit_error(proc, operation, limit))
+    check("%s: fatal %s limit error (exit %d)" % (name, operation, proc.returncode), fatal,
           (proc.stdout + proc.stderr)[-400:])
     if proc.peak_rss is not None:
         check("%s: peak RSS %d MiB within %d MiB" % (name, proc.peak_rss // MiB, rss_bound // MiB),
-              proc.peak_rss <= rss_bound)
+              proc.peak_rss <= rss_bound and (name != READ_VAL_CASE or proc.peak_rss > 0))
+    elif name == READ_VAL_CASE:
+        check(name + ": peak RSS unavailable", False)
 
 
 def cases(work, address_space, rss_bound):
@@ -340,13 +371,14 @@ def cases(work, address_space, rss_bound):
     exceed("ifstream(/dev/zero).read(huge)", "read", 's := ifstream("/dev/zero")\nx := s.read(%d)' % (8 * LIMIT),
            work, address_space, rss_bound)
     exceed("ifstream(/dev/zero) >> token", "extraction", 's := ifstream("/dev/zero")\nt := ""\ns >> t', work, address_space, rss_bound)
-    exceed("ifstream(/dev/zero).read_val", "read_val", 's := ifstream("/dev/zero")\nx := s.read_val()', work, address_space, rss_bound)
+    read_val_script = fatal_limit_script(READ_VAL_BODY)
+    refusal_contract(READ_VAL_CASE, "host-handle-flow",
+                     run_read_val_refusal(read_val_script, work, LIMIT, address_space), read_val_script)
     # Bounded reads below the limit keep working on an endless device.
     proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read_bytes(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
     check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
           proc.returncode == 0 and proc.stdout.strip() == str(8 * LIMIT), (proc.stdout + proc.stderr)[-300:])
-    # D-077 #3: read_val still has an unapproved refusal.
     # Keep all the original legacy assertions and the equivalent VM text read.
     proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read(%d).length(); k = k + 1 }\nclose(s)\nprint(n)\n'
                % (LIMIT // 2), work, address_space=address_space)
@@ -414,8 +446,7 @@ def cases(work, address_space, rss_bound):
                's := ifstream("/dev/zero")\nx := s.read_bytes(%d)' % (8 * LIMIT), work, address_space, rss_bound)
         exceed("ifstream(/dev/zero) >> token", "extraction", 's := ifstream("/dev/zero")\nt := ""\ns >> t', work,
                address_space, rss_bound)
-        exceed("ifstream(/dev/zero).read_val", "read_val", 's := ifstream("/dev/zero")\nx := s.read_val()', work,
-               address_space, rss_bound)
+        exceed(READ_VAL_CASE, "read_val", READ_VAL_BODY, work, address_space, rss_bound)
         proc = run('s := ifstream("/dev/zero")\nn := 0\nk := 0\nwhile(k < 16) { n = n + s.read_bytes(%d).length(); k = k + 1 }\n'
                    'close(s)\nprint(n)\n' % (LIMIT // 2), work, address_space=address_space)
         check("read_bytes(limit/2) x 16 from /dev/zero (8 x limit streamed)",
