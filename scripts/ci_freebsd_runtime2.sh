@@ -35,7 +35,7 @@ else
 fi
 grep -E '^FreeBSD outcomes:|^BLOCKED |^NOT RUN ' "$out/subset.txt" | tee -a "$summary" || true
 for gate in test-v45-embed-contracts test-rt-value test-runtime2-kind-bits test-rt-source-map test-runtime2-certification-guard; do
-  if gmake -k "$gate" >"$out/$gate.log" 2>&1; then
+  if NIFT_CERTIFICATION_REQUIRE_HISTORY=1 gmake -k "$gate" >"$out/$gate.log" 2>&1; then
     printf 'PASS %s\n' "$gate" | tee -a "$summary"
   else
     tail -40 "$out/$gate.log"

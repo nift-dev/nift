@@ -35,6 +35,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           path: nift
+          fetch-depth: 0 # The certification guard executes historical negative controls.
       # The package dogfoods resolve the nift-packages repos as a sibling
       # nift-packages/ directory, pinned to the same set as v44-cross-platform.yml.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

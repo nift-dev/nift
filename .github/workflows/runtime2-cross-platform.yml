@@ -48,6 +48,8 @@ jobs:
       # v44-cross-platform.yml). Pin them to commit SHAs before the push (a lookup this preparation did not do:
       # no GitHub access was authorised).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0 # The Linux certification guard executes historical negative controls.
       # setup-python only on Windows: its teardown has hung on macOS runners (v44-cross-platform.yml); Linux and
       # macOS use the runner's python3.
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -189,6 +191,8 @@ jobs:
       # so it runs on the Linux job only (platform-subsets.md gives the macOS and Windows reasons).
       - name: Certification guard (required gate, D-090)
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.build-unix.outcome == 'success' }}
+        env:
+          NIFT_CERTIFICATION_REQUIRE_HISTORY: '1'
         run: make test-runtime2-certification-guard
       - name: Subset make targets on Windows
         if: ${{ !cancelled() && steps.build-windows.outcome == 'success' }}
