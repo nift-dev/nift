@@ -120,9 +120,11 @@ inline bool grow_unknown(const Context& context, Buffer& data, std::size_t neede
 #if defined(__FreeBSD__) && defined(_LIBCPP_VERSION)
     if constexpr (std::is_same_v<Buffer, BudgetedText>) {
         // Grow on power-of-two jemalloc boundaries, counting libc++'s
-        // terminator. A capacity just above a boundary uses a larger class.
+        // terminator. The initial 64 KiB reserve may have library padding.
+        // Start growing at an exact 128 KiB block so that padding does not
+        // move every subsequent allocation into a larger size class.
         constexpr std::size_t first_block = std::size_t{128} << 10;
-        const auto block = std::max(first_block, size_mul(size_add(old, 1), 2));
+        const auto block = old < first_block - 1 ? first_block : size_mul(size_add(old, 1), 2);
         doubled = block == kSizeOverflow ? kSizeOverflow : block - 1;
     }
 #endif
@@ -189,14 +191,9 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
 #else
     const std::size_t growth_limit = kSizeOverflow;
 #endif
-    constexpr std::size_t chunk_bytes = 64 * 1024;
-    std::size_t initial = hint ? static_cast<std::size_t>(hint) : std::min(headroom, chunk_bytes);
+    std::size_t initial = hint ? static_cast<std::size_t>(hint)
+                               : (headroom < (std::size_t(64) << 10) ? headroom : (std::size_t(64) << 10));
     if (!hint && initial > cap) initial = cap;
-#if defined(__FreeBSD__) && defined(_LIBCPP_VERSION)
-    if constexpr (std::is_same_v<Buffer, std::string>) {
-        if (!hint && initial == chunk_bytes) --initial;  // include the string's terminator
-    }
-#endif
 #if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
     if (initial && !reserve_result(context, initial)) {
         error = std::string(operation) + ": file exceeds the memory budget";
@@ -204,7 +201,7 @@ inline ReadOutcome read_whole(const Context& context, const fs::path& path, Buff
     }
 #endif
     std::uint64_t total = 0;
-    char chunk[chunk_bytes];
+    char chunk[64 * 1024];
     if constexpr (std::is_same_v<Buffer, std::string>) {
         BudgetedText data(context);
         bool tail_reserved = false;
