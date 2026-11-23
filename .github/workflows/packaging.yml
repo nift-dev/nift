@@ -426,7 +426,9 @@ jobs:
         shell: pwsh
         run: |
           $root = Join-Path $env:RUNNER_TEMP "nift-4.13.0-replay"
-          Expand-Archive -Path replay/nift-4.13.0-windows-x86_64.zip -DestinationPath $root
+          $archives = @(Get-ChildItem (Join-Path $env:GITHUB_WORKSPACE replay) -Recurse -File -Filter "nift-4.13.0-windows-x86_64.zip")
+          if ($archives.Count -ne 1) { throw "expected one retained Windows ZIP, found $($archives.Count)" }
+          Expand-Archive -LiteralPath $archives[0].FullName -DestinationPath $root
           $exe = Join-Path $root "nift-4.13.0-windows-x86_64/nift.exe"
           $project = New-Item -ItemType Directory (Join-Path $root project)
           Set-Location $project
