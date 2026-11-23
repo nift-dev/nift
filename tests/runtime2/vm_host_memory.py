@@ -19,13 +19,15 @@ from pathlib import Path
 from rss_measure import peak_rss_bytes, time_args
 
 
-def run_case(command, cwd, env, input_bytes):
+def run_case(command, cwd, env, input_bytes, stdin=None):
+    if stdin is None and input_bytes is None:
+        stdin = subprocess.DEVNULL
     return subprocess.run(command, cwd=cwd, env=env, input=input_bytes,
-                          stdin=subprocess.DEVNULL if input_bytes is None else None,
+                          stdin=stdin,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
 
 
-def timed(nift, cwd, env, input_bytes=None, *, sample_short=False):
+def timed(nift, cwd, env, input_bytes=None, *, sample_short=False, stdin=None):
     timing = shutil.which("/usr/bin/time")
     darwin = sys.platform == "darwin"
     command = [timing, *time_args(darwin)]
@@ -36,7 +38,7 @@ def timed(nift, cwd, env, input_bytes=None, *, sample_short=False):
         # short children at teardown without changing those longer fixtures.
         if sample_short:
             command.append("NIFT_TEST_RSS_SAMPLE=1")
-    proc = run_case([*command, nift, "case.f"], cwd, env, input_bytes)
+    proc = run_case([*command, nift, "case.f"], cwd, env, input_bytes, stdin)
     rss = peak_rss_bytes(proc.stderr, darwin)
     if freebsd:
         # A sampled RSS can miss a short allocation spike inside the command.
@@ -44,6 +46,29 @@ def timed(nift, cwd, env, input_bytes=None, *, sample_short=False):
         native = re.search(rb"PEAK_LARGE_BYTES (\d+)", proc.stderr)
         rss = max(rss, int(native.group(1))) if rss is not None and native else None
     return ((rss + 1023) // 1024 if rss is not None else None), proc
+
+
+def timed_pipe(nift, cwd, env, mib):
+    # Keep 50 MiB of test-driver input out of its address space when starting a
+    # FreeBSD RSS measurement. Nift still reads an unknown-size stdin pipe.
+    read_fd, write_fd = os.pipe()
+
+    def feed():
+        try:
+            with os.fdopen(write_fd, "wb") as writer:
+                chunk = b"x" * (64 << 10)
+                for _ in range(mib * 16):
+                    writer.write(chunk)
+        except BrokenPipeError:
+            pass  # The expected budget refusal closes the read end early.
+
+    worker = threading.Thread(target=feed)
+    worker.start()
+    try:
+        with os.fdopen(read_fd, "rb") as reader:
+            return timed(nift, cwd, env, stdin=reader)
+    finally:
+        worker.join()
 
 
 def build_peak_tracker(root, failures):
@@ -168,7 +193,10 @@ def main():
         # 50 MiB under 60 MB is refused cleanly (deliberate contract change).
         large = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
         (root / "case.f").write_text('print(open("/dev/stdin").length())\n')
-        peak, proc = timed(nift, root, large, input_bytes=b"x" * (50 << 20))
+        if sys.platform.startswith("freebsd"):
+            peak, proc = timed_pipe(nift, root, large, 50)
+        else:
+            peak, proc = timed(nift, root, large, input_bytes=b"x" * (50 << 20))
         if proc.returncode == 1 and b"memory budget" in proc.stderr and peak is not None and peak <= 72 * 1024:
             print(f"PEAK stdin-50m-refused {peak} KiB")
             passed += 1
