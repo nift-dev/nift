@@ -17,6 +17,10 @@
 #include <type_traits>
 #include <vector>
 
+#ifdef __FreeBSD__
+#include <malloc_np.h>
+#endif
+
 namespace nift::rt::natives {
 
 namespace fs = std::filesystem;
@@ -42,6 +46,13 @@ inline std::size_t final_slack(std::size_t size) {
     return std::max<std::size_t>(std::size_t(64) << 10, size / 8);
 }
 
+#ifdef __FreeBSD__
+inline std::size_t stream_allocation_size(std::size_t request) noexcept {
+    const std::size_t usable = nallocx(request, 0);
+    return usable ? usable : kSizeOverflow;
+}
+#endif
+
 inline bool finalize_text(const Context& context, std::string& text) {
     if (text.capacity() - text.size() <= final_slack(text.size())) return true;
 #if defined(NIFT_HOST_MUTANT) && NIFT_HOST_MUTANT == 10
@@ -49,9 +60,19 @@ inline bool finalize_text(const Context& context, std::string& text) {
 #else
     const std::size_t charged = size_add(text.capacity(), text.size());
 #endif
+    if (!reserve_result(context, charged)) return false;
+#ifdef __FreeBSD__
+    // The existing string capacity excludes its terminator. Bound the new
+    // libc++ allocation with room for its terminator and internal alignment.
+    // Keep the existing buffer if allocating both jemalloc blocks would
+    // exceed the budget. The retained capacity remains charged at handoff.
+    const auto existing = stream_allocation_size(size_add(text.capacity(), 1));
+    const auto exact_size = stream_allocation_size(size_add(text.size(), 16));
+    if (!reserve_result(context, size_add(existing, exact_size)))
+        return reserve_result(context, existing);
+#endif
     if (const char* probe = std::getenv("NIFT_HOST_TRIM_PROBE"); probe && *probe)
         std::fprintf(stderr, "NIFT_TRIM charge=%zu capacity=%zu size=%zu\n", charged, text.capacity(), text.size());
-    if (!reserve_result(context, charged)) return false;
     std::string exact(text.data(), text.size());
     text = std::move(exact);
     return true;
@@ -65,9 +86,15 @@ inline bool finalize_bytes(const Context& context, Buffer& data) {
 #else
     const std::size_t charged = size_add(data.capacity(), data.size());
 #endif
+    if (!reserve_result(context, charged)) return false;
+#ifdef __FreeBSD__
+    const auto existing = stream_allocation_size(data.capacity());
+    const auto exact_size = data.empty() ? 0 : stream_allocation_size(data.size());
+    if (!reserve_result(context, size_add(existing, exact_size)))
+        return reserve_result(context, existing);
+#endif
     if (const char* probe = std::getenv("NIFT_HOST_TRIM_PROBE"); probe && *probe)
         std::fprintf(stderr, "NIFT_TRIM charge=%zu capacity=%zu size=%zu\n", charged, data.capacity(), data.size());
-    if (!reserve_result(context, charged)) return false;
     Buffer exact(data.begin(), data.end());
     data = std::move(exact);
     return true;

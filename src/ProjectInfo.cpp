@@ -1547,8 +1547,7 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
         // Script writes are recovery-relevant even if it later fails.
         mark_mutation();
         const auto source_bytes = filesystem::read_file(source);
-        if (host.observe_dependencies)
-            host.observe_dependency_hash(source, filesystem::hash_bytes(source_bytes), "item hook");
+        host.observe_dependency(source, source_bytes);
         auto rr=script.run_script(source_bytes,source,true);
         if(!rr.ok){report_build_error(rr.error,out_error);return false;}
         hook_dependencies.insert(relative(source));hook_dependencies.insert(rr.dependencies.begin(),rr.dependencies.end());
@@ -1568,7 +1567,11 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     PageSiteRecord site_record;
     if(custom){attempt.written_pages=1;if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
     else {
+        // Parse inline metadata and render from the same observed bytes.
+        // Hooks still read after any preceding hook edits.
+        host.use_render_source_snapshot = hashing;
         Parser parser(host,info);result=parser.render();
+        host.use_render_source_snapshot = false;
         auto warnings=parser.site_warnings();
         site_record.unknown_values=parser.site_unknown_values();
         for(const auto& w:warnings)site_record.warnings.push_back(relative(w.source_file)+":"+std::to_string(w.line)+":"+std::to_string(w.column)+": "+w.message+" ["+w.kind+"]");

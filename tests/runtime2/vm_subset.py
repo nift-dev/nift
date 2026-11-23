@@ -326,6 +326,10 @@ EQUALITY_BUDGET = 50_000_000
 # with the default allocator. Keep the VM budget and use an RSS ceiling that
 # allows the measured native baseline and still rejects the regression.
 PROCESS_ALLOWANCE = (24 if sys.platform == "darwin" else 8) << 20
+# FreeBSD 14 amd64, default allocator: current flat equality measured
+# 75.1 MB, the historical work-list regression 107.6 MB, with identical
+# 33.55 MB VM heap peaks. Keep the separate 50 MB VM budget.
+FREEBSD_FLAT_ALLOWANCE = 32 << 20
 
 
 def equality_process(nift, cwd, env, script):
@@ -351,7 +355,12 @@ def equality_memory(nift, work):
     failures = []
     if os.name == "nt" or "ASAN_OPTIONS" in os.environ:
         return failures  # RSS is meaningless under ASan
+    freebsd14_amd64 = (sys.platform.startswith("freebsd") and
+                       os.uname().release.startswith("14.") and os.uname().machine == "amd64")
     for name, source, expected in EQUALITY_MEMORY:
+        allowance = (FREEBSD_FLAT_ALLOWANCE
+                     if name == "flat" and freebsd14_amd64
+                     else PROCESS_ALLOWANCE)
         d = tempfile.mkdtemp(dir=work)
         with open(os.path.join(d, "p.f"), "w") as f:
             f.write(source)
@@ -362,9 +371,9 @@ def equality_memory(nift, work):
             failures.append(f"equality-memory-{name}: exit {status}, out {out[:60]!r}, err {err[-200:]!r}")
         elif rss is None:
             failures.append(f"equality-memory-{name}: native peak RSS unavailable: {err[-200:]!r}")
-        elif rss > EQUALITY_BUDGET + PROCESS_ALLOWANCE:
+        elif rss > EQUALITY_BUDGET + allowance:
             failures.append(f"equality-memory-{name}: peak RSS {rss} bytes exceeds the budget "
-                            f"{EQUALITY_BUDGET} + {PROCESS_ALLOWANCE}")
+                            f"{EQUALITY_BUDGET} + {allowance}")
             stats_path = os.path.join(d, ".nift-rss-stats.json")
             stats_env = {**env, "NIFT_VM_STATS": stats_path}
             stats_status, stats_out, stats_err, stats_rss = equality_process(nift, d, stats_env, "p.f")

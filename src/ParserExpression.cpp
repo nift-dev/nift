@@ -4385,7 +4385,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // (sized by stat); a source beyond the read limit is a limit error.
             { std::uint64_t limit = 0; if (!read_limit("inject", limit, error)) return false; std::error_code size_error; if (fs::is_regular_file(path, size_error)) { const auto size = fs::file_size(path, size_error); if (!size_error && size > limit) return fail_read_limit("inject", path.generic_string(), limit, error); } }
             auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
-            result_.dependencies.insert(host_.relative(path)); if (host_.observe_dependencies) host_.observe_dependency_hash(path, filesystem::hash_bytes(*injected), "inject"); input_stack_.push_back(path);
+            result_.dependencies.insert(host_.relative(path)); host_.observe_dependency(path,*injected); input_stack_.push_back(path);
             // JSON is the overwhelmingly common structured-data inject case.  Do
             // not feed a multi-megabyte JSON document through the generic Nift
             // expression classifier: that repeatedly scans the complete source

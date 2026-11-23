@@ -14,6 +14,7 @@
 class ProjectInfoHost : public RenderHost {
 public:
     explicit ProjectInfoHost(ProjectInfo& project) : project_(project) {}
+    bool use_render_source_snapshot = false;
 
     const std::filesystem::path& root() const override { return project_.root; }
     std::string listing_fingerprint(const std::string& key) const override { return project_.listing_fingerprint_cached(key); }
@@ -54,18 +55,14 @@ public:
     bool page_project_metadata(const TrackedInfo& info, nift::RuntimeValue& out, std::string&) const override {
         const auto model = project_.content_model_value();
         if (!model) return false;
-        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model, nullptr,
-            [this, &info](const auto& path, const auto& bytes) {
-                if (!observe_dependencies) return;
-                const auto supplied = filesystem::hash_bytes(bytes);
-                const auto reread = filesystem::hash_path_streamed(path);
-                if (supplied != reread) {
-                    std::fprintf(stderr, "front-matter read differs page=%s path=%s bytes=%zu supplied=%llu reread=%llu\n",
-                                 info.name.c_str(), path.string().c_str(), bytes.size(),
-                                 static_cast<unsigned long long>(supplied), static_cast<unsigned long long>(reread));
-                }
-                observe_dependency_hash(path, supplied, "project front matter");
-            });
+        const std::string unavailable;
+        const std::string* snapshot = nullptr;
+        if (use_render_source_snapshot) {
+            const auto source = read_shared_source(content_path(info));
+            snapshot = source.content ? source.content : &unavailable;
+        }
+        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model,
+            nullptr, [this](const auto& path, const auto& bytes) { observe_dependency(path, bytes); }, snapshot);
         if (!model->errors.empty()) metadata["_error"] = json::Document(model->errors.front());
         out = nift::runtime_from_json(metadata);
         return true;
@@ -177,16 +174,7 @@ public:
     HostSource read_shared_source(const std::filesystem::path& path) const override {
         const std::string* content = project_.read_shared_source(path);
         if (content == nullptr) return {nift::HostStatus::NotFound, nullptr, ""};
-        if (observe_dependencies) {
-            const auto cached = project_.observed_source_hash(content);
-            const auto measured = filesystem::hash_bytes(*content);
-            if (cached != measured) {
-                std::fprintf(stderr, "source cache hash mismatch path=%s cached=%llu measured=%llu\n",
-                             path.string().c_str(), static_cast<unsigned long long>(cached),
-                             static_cast<unsigned long long>(measured));
-            }
-            observe_dependency_hash(path, cached, "project source cache");
-        }
+        if (observe_dependencies) observe_dependency_hash(path, project_.observed_source_hash(content));
         return {nift::HostStatus::Found, content, ""};
     }
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
@@ -194,7 +182,7 @@ public:
         auto value = project_.read_shared_json(path, error);
         if (value && observe_dependencies) {
             if (auto bytes = project_.read_shared_source(path))
-                observe_dependency_hash(path, project_.observed_source_hash(bytes), "project JSON cache");
+                observe_dependency_hash(path, project_.observed_source_hash(bytes));
         }
         return value;
     }
@@ -203,7 +191,7 @@ public:
         auto value = project_.read_shared_runtime_json(path, error);
         if (value && observe_dependencies) {
             if (auto bytes = project_.read_shared_source(path))
-                observe_dependency_hash(path, project_.observed_source_hash(bytes), "project JSON cache");
+                observe_dependency_hash(path, project_.observed_source_hash(bytes));
         }
         return value;
     }

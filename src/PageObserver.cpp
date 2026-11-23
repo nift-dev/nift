@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 
 void PageObserver::record_hash(const fs::path& path, std::string_view bytes) {
     if (host_.observe_dependencies)
-        host_.observe_dependency_hash(path, filesystem::hash_bytes_update(filesystem::kHashBytesSeed, bytes.data(), bytes.size()), "observed byte range");
+        host_.observe_dependency_hash(path, filesystem::hash_bytes_update(filesystem::kHashBytesSeed, bytes.data(), bytes.size()));
 }
 
 void PageObserver::presence(const fs::path& path, bool exists, std::string_view kind) {
@@ -53,19 +53,19 @@ void PageObserver::stream_open(const fs::path& path) {
     result_.dependencies.insert(host_.relative(path));
     // Hashed at open: an edit made while the page streams the file leaves the
     // recorded snapshot different from the file, so the next build rebuilds.
-    if (snapshot_wanted()) host_.observe_dependency_hash(path, filesystem::hash_path_streamed(path), "stream open");
+    if (snapshot_wanted()) host_.observe_dependency_hash(path, filesystem::hash_path_streamed(path));
 }
 
 void PageObserver::streamed_read(const fs::path& path, std::uint64_t, const std::uint64_t* hash) {
     if (!mode_.observing) return;
     result_.dependencies.insert(host_.relative(path));
-    if (hash) host_.observe_dependency_hash(path, *hash, "streamed read");
+    if (hash) host_.observe_dependency_hash(path, *hash);
 }
 
 void PageObserver::metadata_read(const fs::path& path) {
     if (!mode_.observing) return;
     result_.dependencies.insert(host_.relative(path));
-    host_.observe_dependency_hash(path, filesystem::hash_path(path), "metadata read");
+    host_.observe_dependency_hash(path, filesystem::hash_path(path));
 }
 
 void PageObserver::written(const fs::path& path) {

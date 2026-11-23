@@ -12,7 +12,9 @@ export PATH="$out/bin:$PATH"
     git show -s --format='commit %H tree %T'
 } | tee "$out/summary.md"
 memory=0
-python3 -u tests/runtime2/freebsd_memory_diagnostic.py 2>&1 | tee "$out/memory.txt" || memory=$?
+for suite in vm_subset vm_host_memory; do
+    python3 -u "tests/runtime2/$suite.py" --nift "$NIFT_BIN" 2>&1 | tee "$out/$suite.txt" || memory=$?
+done
 host=0
 python3 -u tests/runtime2/host_deps.py 2>&1 | tee "$out/host-deps.txt" || host=$?
 printf '%s %s\n' "$memory" "$host" > "$out/guest-status.txt"

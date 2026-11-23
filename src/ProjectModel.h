@@ -9,12 +9,14 @@
 #include <map>
 #include <set>
 
-inline json::Document compute_tracked_metadata(const std::filesystem::path& root, const Config& config, const TrackedInfo& info, const content_model::Model& model, std::string* body_out = nullptr, const std::function<void(const std::filesystem::path&,const std::string&)>& observe = {}) {
+inline json::Document compute_tracked_metadata(const std::filesystem::path& root, const Config& config, const TrackedInfo& info, const content_model::Model& model, std::string* body_out = nullptr, const std::function<void(const std::filesystem::path&,const std::string&)>& observe = {}, const std::string* source_snapshot = nullptr) {
     json::Document metadata = json::Document::make_object();
     std::string fm_error; std::string body;
     const std::filesystem::path source = project_read::content_path_of(root, config, info);
-    const std::string source_text = filesystem::file_exists(source) ? filesystem::read_file(source) : std::string{};
-    if (observe && filesystem::file_exists(source)) observe(source,source_text);
+    const std::string direct = !source_snapshot && filesystem::file_exists(source)
+        ? filesystem::read_file(source) : std::string{};
+    const std::string& source_text = source_snapshot ? *source_snapshot : direct;
+    if (!source_snapshot && observe && filesystem::file_exists(source)) observe(source,source_text);
     auto inline_fm = frontmatter::parse_inline(source_text);
     body = inline_fm.present ? inline_fm.body : source_text;
     if (info.frontmatter && inline_fm.present) metadata["_error"] = json::Document("multiple front matter sources");
