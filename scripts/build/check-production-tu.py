@@ -48,6 +48,7 @@ headers are refused as outside the repository.
 The text check is conservative: such a directive inside a string literal or a
 disabled #if block fails too.
 """
+from functools import lru_cache
 import hashlib
 import os
 import re
@@ -125,6 +126,22 @@ def deps_of(depfile, out):
     return names
 
 
+@lru_cache(maxsize=26)
+def msys_drive_root(drive):
+    return subprocess.check_output(['cygpath', '-u', drive + ':/'], text=True).strip()
+
+
+def compiler_path(path):
+    # MSYS Python uses POSIX paths, while native UCRT GCC emits drive paths.
+    # Translate before resolving symlinks and applying the existing allowlist.
+    if sys.platform in ('msys', 'cygwin'):
+        drive_path = re.fullmatch(r'([A-Za-z]):[/\\](.*)', path)
+        if drive_path:
+            drive, tail = drive_path.groups()
+            path = os.path.join(msys_drive_root(drive.upper()), tail.replace('\\', '/').lstrip('/'))
+    return os.path.realpath(path)
+
+
 def system_dirs(compiler, lang, cache_dir):
     # B18: `command -v` only resolves the path for the cache key; when it finds nothing the
     # compiler name itself is the key (the probe below then fails if the compiler is missing).
@@ -132,7 +149,7 @@ def system_dirs(compiler, lang, cache_dir):
     real = os.path.realpath((found.stdout.strip() if found.returncode == 0 else '') or compiler)
     stamp = os.stat(real).st_mtime_ns if os.path.exists(real) else 0
     key = hashlib.sha256(f'{real}\0{stamp}\0{lang}'.encode()).hexdigest()[:16]
-    cache = os.path.join(cache_dir, f'sysdirs-{key}.txt')
+    cache = os.path.join(cache_dir, f'sysdirs-v2-{key}.txt')
     try:
         return [l.rstrip('\n') for l in open(cache)]
     except OSError:
@@ -148,7 +165,7 @@ def system_dirs(compiler, lang, cache_dir):
         elif line.startswith('End of search list'):
             break
         elif on and line.startswith(' '):
-            dirs.append(os.path.realpath(line.strip().split(' (')[0]))
+            dirs.append(compiler_path(line.strip().split(' (')[0]))
     if not dirs:
         raise SystemExit(f'error: {compiler} reports no system include directories')
     os.makedirs(cache_dir, exist_ok=True)
@@ -287,7 +304,7 @@ def main():
     problems = []
     makefile_names, _ = makefile_switches(root)
     for dep in deps_of(depfile, out):
-        real = os.path.realpath(dep)
+        real = compiler_path(dep)
         # On Windows, relpath raises when compiler headers and the checkout
         # are on different drives. Such headers still need the system check.
         try:

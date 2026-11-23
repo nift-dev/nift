@@ -104,7 +104,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
+          install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads diffutils python
       - name: Build Nift
         if: runner.os != 'Windows'
         run: make -C nift -j2
@@ -115,12 +115,12 @@ jobs:
       - name: v4.4 execution shell + language foundation
         timeout-minutes: 6
         if: runner.os != 'Windows'
-        run: make -C nift test-v44-execution-shell test-v44-language-foundation
+        run: NIFT_VM=0 make -C nift test-v44-execution-shell test-v44-language-foundation
       - name: v4.4 execution shell + language foundation on Windows
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v44-execution-shell test-v44-language-foundation
+        run: NIFT_VM=0 make -C nift test-v44-execution-shell test-v44-language-foundation
       - name: FS-TYPE filesystem type inspection
         timeout-minutes: 6
         if: runner.os != 'Windows'
@@ -135,12 +135,12 @@ jobs:
       - name: v4.4 shell restricted (glob/history/completion/PTY/restriction)
         timeout-minutes: 6
         if: runner.os != 'Windows'
-        run: make -C nift test-v44-shell-restricted
+        run: NIFT_VM=0 make -C nift test-v44-shell-restricted
       - name: v4.4 shell restricted on Windows (glob/history/completion/restriction)
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v44-shell-restricted
+        run: NIFT_VM=0 make -C nift test-v44-shell-restricted
       - name: CP19 shell dispatch (classifier, regressions, completion, 4 mutants)
         timeout-minutes: 15
         if: runner.os != 'Windows'
@@ -159,12 +159,12 @@ jobs:
       - name: v4.4 automation + hooks
         timeout-minutes: 6
         if: runner.os != 'Windows'
-        run: make -C nift test-v44-automation test-v44-hooks
+        run: NIFT_VM=0 make -C nift test-v44-automation test-v44-hooks
       - name: v4.4 automation + hooks on Windows
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v44-automation test-v44-hooks
+        run: NIFT_VM=0 make -C nift test-v44-automation test-v44-hooks
       - name: v4.5 native runtime wall
         timeout-minutes: 6
         if: runner.os != 'Windows'

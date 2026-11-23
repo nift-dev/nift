@@ -56,7 +56,7 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
     case I::AtomicStore: case I::AtomicExchange: case I::AtomicFetchAdd: case I::AtomicFetchSub:
     case I::AtomicCompareExchange:
         return BuiltinEffect::Shared;
-    case I::Count: break;
+    case I::FnMinify: case I::Count: break;
     }
     return BuiltinEffect::Unclassified;
 }

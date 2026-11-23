@@ -41,7 +41,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make diffutils mingw-w64-ucrt-x86_64-gcc
+          install: make diffutils mingw-w64-ucrt-x86_64-gcc python
       - name: Check out the immutable E2 baseline
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -110,7 +110,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make diffutils mingw-w64-ucrt-x86_64-gcc
+          install: make diffutils mingw-w64-ucrt-x86_64-gcc python
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           pattern: sidecar-native-*

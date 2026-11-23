@@ -24,7 +24,7 @@ namespace nift::rt {
 struct ParallelTaskRecord;
 struct ParallelWait;
 struct ParallelWaitRegistration;
-struct ParallelRuntime;
+class ParallelRuntime;
 class ProgramTransferMap;
 
 // Test-only deliberate defects (`-DNIFT_CORO_MUTANT=n`, tests/runtime2/cp22):

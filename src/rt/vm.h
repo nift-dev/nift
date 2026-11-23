@@ -49,7 +49,7 @@
 
 namespace nift::rt {
 
-struct ParallelRuntime;
+class ParallelRuntime;
 struct ParallelOutput;
 struct ParallelTaskRecord;
 struct ParallelWait;

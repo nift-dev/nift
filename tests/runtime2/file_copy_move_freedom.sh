@@ -53,10 +53,10 @@ g := f.copy("$W/elsewhere/fsroot-copy.txt")
 print("copied")
 EOF
 out="$("$NIFT" "$W/project/s.f" --fs-root="$W/project" 2>&1)"
-if echo "$out" | grep -q "path escapes configured filesystem root" && [ ! -e "$W/elsewhere/fsroot-copy.txt" ]; then
+if grep -q "path escapes configured filesystem root" <<< "$out" && [ ! -e "$W/elsewhere/fsroot-copy.txt" ]; then
   pass "--fs-root still restricts file().copy"
 else bad "--fs-root did not restrict file().copy: $out"; fi
-out="$("$NIFT" "$W/project/s.f" 2>&1)"; echo "$out" | grep -q copied && pass "standalone external file().copy" || bad "standalone copy: $out"
+out="$("$NIFT" "$W/project/s.f" 2>&1)"; grep -q copied <<< "$out" && pass "standalone external file().copy" || bad "standalone copy: $out"
 
 # Cross-device moves (EXDEV) fall back to copy + rename + unlink, for
 # file().move() and mv(), when /dev/shm is a different filesystem.
@@ -81,7 +81,7 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
   printf 'f := file("%s")\ng := f.move("%s")\nnative::mv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"
   out="$("$NIFT" "$W/x.f" 2>&1)"
   if [ "$out" = "$S/xa.txt" ] && [ "$(cat "$S/xa.txt")" = xdev-a ] && [ "$(cat "$S/xb.txt")" = xdev-b ] && [ ! -e "$W/xa.txt" ] && [ ! -e "$W/xb.txt" ] \
-     && mode=$(file_mode "$S/xa.txt") && [ "$mode" = 640 ] && ! ls -A "$S" | grep -q nift-tmp; then
+     && mode=$(file_mode "$S/xa.txt") && [ "$mode" = 640 ] && entries=$(ls -A "$S") && [[ "$entries" != *nift-tmp* ]]; then
     pass "cross-device file().move and mv() (to $cross_device_root)"
   else bad "cross-device move: $out; $(ls -la "$S" | tr '\n' ' ')"; fi
   rm -rf "$S"
@@ -94,7 +94,7 @@ cp .nift/tracked.json "$W/tracked.before"
 for api in 'a := file("data/abs.txt"); b := a.copy(".nift/tracked.json")' 'cp("data/abs.txt", ".nift/tracked.json")' 'touch(".nift/x")' 'o := ofstream(".nift/y"); close(o)'; do
   printf '<p>@script { %s; return "wrote" }</p>\n' "$api" > content/index.html
   out="$("$NIFT" build 2>&1)"; rc=$?
-  if [ $rc -ne 0 ] && echo "$out" | grep -q "refusing to write Nift build metadata" && cmp -s .nift/tracked.json "$W/tracked.before" && [ ! -e .nift/x ] && [ ! -e .nift/y ]; then
+  if [ $rc -ne 0 ] && grep -q "refusing to write Nift build metadata" <<< "$out" && cmp -s .nift/tracked.json "$W/tracked.before" && [ ! -e .nift/x ] && [ ! -e .nift/y ]; then
     pass "refused: $api"
   else bad "write into .nift not refused ($api): rc=$rc $out"; fi
 done

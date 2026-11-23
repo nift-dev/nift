@@ -34,7 +34,7 @@ refused() { # name, script body
   cp "$W/other.good" public/other.html
   printf '<p>X:@script { %s; return "wrote" }</p>\n' "$2" > content/index.html
   out="$(bounded "$NIFT" build 2>&1)"; rc=$?
-  if [ $rc -ne 0 ] && echo "$out" | grep -q "the build output of tracked page 'other'" && cmp -s public/other.html "$W/other.good"; then
+  if [ $rc -ne 0 ] && grep -q "the build output of tracked page 'other'" <<< "$out" && cmp -s public/other.html "$W/other.good"; then
     pass "refused: $1"
   else
     bad "not refused: $1 (rc=$rc, other.html $(cmp -s public/other.html "$W/other.good" && echo intact || echo CHANGED)): $(echo "$out" | grep -m2 -i 'error\|refus')"
@@ -69,7 +69,7 @@ allowed "path outside the project" "cp(\"payload.txt\", \"$W/outside/copy.txt\")
 allowed "the page's own output (rewritten by the build afterwards)" 'cp("payload.txt", "public/index.html")' 'grep -q "X:wrote" public/index.html'
 allowed "an unowned file next to the outputs, removed" 'rm("public/extra.txt")' '[ ! -e public/extra.txt ]'
 cmp -s public/other.html "$W/other.good" && pass "other page's output intact after all cases" || bad "other page's output changed"
-st="$(bounded "$NIFT" status 2>&1)"; echo "$st" | grep -q "up to date" && pass "status consistent afterwards" || bad "status: $st"
+st="$(bounded "$NIFT" status 2>&1)"; grep -q "up to date" <<< "$st" && pass "status consistent afterwards" || bad "status: $st"
 
 # .nift/ metadata stays refused (spelling-independent too).
 ln -s .nift linked-meta
@@ -77,7 +77,7 @@ for body in 'cp("payload.txt", ".nift/tracked.json")' 'cp("payload.txt", "linked
   cp .nift/tracked.json "$W/tracked.good"; cp .nift/config.json "$W/config.good"
   printf '<p>@script { %s; return "x" }</p>\n' "$body" > content/index.html
   out="$(bounded "$NIFT" build 2>&1)"; rc=$?
-  if [ $rc -ne 0 ] && echo "$out" | grep -q "refusing to write Nift build metadata" && cmp -s .nift/tracked.json "$W/tracked.good" && cmp -s .nift/config.json "$W/config.good"; then
+  if [ $rc -ne 0 ] && grep -q "refusing to write Nift build metadata" <<< "$out" && cmp -s .nift/tracked.json "$W/tracked.good" && cmp -s .nift/config.json "$W/config.good"; then
     pass "refused metadata write: $body"
   else bad "metadata write not refused: $body (rc=$rc)"; fi
 done
@@ -109,8 +109,8 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
   printf 'try { native::mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
   # SIGXFSZ ignored so the over-size write fails with EFBIG instead of killing nift.
   out="$( trap '' XFSZ; test_run_bounded 200 "$NIFT" "$W/m1.f" 2>&1 )"
-  if echo "$out" | grep -q "CAUGHT io.move_failed" && bytes=$(file_size "$W/big.bin") &&
-     [ "$bytes" = 300000 ] && [ ! -e "$S/big.bin" ] && ! ls -A "$S" | grep -q nift-tmp; then
+  if grep -q "CAUGHT io.move_failed" <<< "$out" && bytes=$(file_size "$W/big.bin") &&
+     [ "$bytes" = 300000 ] && [ ! -e "$S/big.bin" ] && entries=$(ls -A "$S") && [[ "$entries" != *nift-tmp* ]]; then
     pass "cross-device move: failed copy leaves the original intact"
   else bad "cross-device move copy failure: $out; $(ls -la "$S" | tr '\n' ' ')"; fi
   # (b) the copy succeeds but the source cannot be removed: reported as a partial result.
@@ -137,7 +137,7 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
         bad "cross-device rename test shim could not be built"
       fi
     fi
-    if echo "$out" | grep -q "CAUGHT move: copied to $S/f.txt but could not remove the source $W/ro/f.txt" &&
+    if grep -q "CAUGHT move: copied to $S/f.txt but could not remove the source $W/ro/f.txt" <<< "$out" &&
        [ "$(cat "$W/ro/f.txt")" = keep ] && [ "$(cat "$S/f.txt")" = keep ]; then
       pass "cross-device move: undeletable source is reported as a partial result"
     else bad "cross-device move partial: $out"; fi

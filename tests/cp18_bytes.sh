@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Historical CLI contract. Runtime 2.0 has independent bytes admission tests.
+export NIFT_VM=0
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 NIFT=${NIFT:-$ROOT/nift}
 TMP=$(mktemp -d)

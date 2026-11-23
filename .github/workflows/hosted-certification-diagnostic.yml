@@ -36,7 +36,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make mingw-w64-ucrt-x86_64-gcc
+          install: make mingw-w64-ucrt-x86_64-gcc diffutils python
       - name: Build and expose compiler diagnostics on macOS
         if: runner.os == 'macOS'
         shell: bash
@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          NIFT="$PWD/nift" bash -x tests/v44_executable_script_smoke.sh > hosted-test.log 2>&1
+          NIFT_VM=0 NIFT="$PWD/nift" bash -x tests/v44_executable_script_smoke.sh > hosted-test.log 2>&1
           rc=$?
           set -e
           cat hosted-test.log
@@ -84,7 +84,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set +e
-          NIFT="$PWD/nift.exe" bash -x tests/v44_executable_script_smoke.sh > hosted-test.log 2>&1
+          NIFT_VM=0 NIFT="$PWD/nift.exe" bash -x tests/v44_executable_script_smoke.sh > hosted-test.log 2>&1
           rc=$?
           set -e
           cat hosted-test.log

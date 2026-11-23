@@ -30,6 +30,8 @@ on:
 permissions:
   contents: read
 
+# CP17–CP21 are historical interpreter and embedding contracts. Runtime 2.0
+# bytes admission is verified independently by the VM subset.
 jobs:
   linux:
     name: Linux ${{ matrix.id }} bytes semantics
@@ -73,7 +75,7 @@ jobs:
           msystem: UCRT64
           update: true
           path-type: inherit
-          install: make autoconf automake libtool mingw-w64-ucrt-x86_64-gcc python
+          install: make autoconf automake libtool mingw-w64-ucrt-x86_64-gcc python diffutils
       - name: macOS Clang bytes suites
         if: runner.os == 'macOS'
         run: make -j2 CC=clang CXX=clang++ test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes
