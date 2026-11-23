@@ -9,6 +9,14 @@
 set -u -o pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+if [[ "${NIFT_CERTIFICATION_REQUIRE_HISTORY:-0}" == 1 ]]; then
+  for commit in 2bedfb33 0d853db4; do
+    if ! git cat-file -e "$commit:scripts/certify.py" 2>/dev/null; then
+      echo "FAIL certification guard required historical control unavailable: $commit"
+      exit 1
+    fi
+  done
+fi
 REQUIRED=(test-all test-conformance test-host-seam test-c-abi test-c-abi-c-smoke test-embed test-bindings
           test-runtime2-vm-corpus test-runtime2-rt-diff test-runtime2-rt-diff-selftest test-runtime2-modified-race test-runtime2-dynamic-reads test-runtime2-fs-freedom test-rt-value test-rt-lint
           test-rt-parser test-sha256 test-site-dx
@@ -898,14 +906,15 @@ toy3 bc 0 FAILED-BASELINE "LEGACY-ONLY"
 # C1 (confirmation of C20, toy11): a missing prerequisite is not a missing target, and a harness-
 # blocked baseline is no evidence: both are applicable and differing, never "not applicable"
 toy "$TOY/bd/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r2" test-sha256 "$SHA_FAIL"
-sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bd/r2/Makefile"
+sed -i.bak 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bd/r2/Makefile" || exit 1
 toy3 bd 1 FAILED-NEW "weekend/r2: applicable"
 SHA_BLOCKED='echo "bash tests/sha256_builtins.sh"; echo "SKIP UNVERIFIED COMPARATOR COVERAGE: x"; exit 1'
 toy "$TOY/be/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r2" test-sha256 "$SHA_BLOCKED"
 toy3 be 1 FAILED-NEW "weekend/r2: applicable, cannot run there"
 # every regression baseline blocked or unbuildable, v4.12.0 equal: never LEGACY-ONLY
 toy "$TOY/bf/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/v4" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/r1" test-sha256 "$SHA_BLOCKED"
-toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"; sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile"
+toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"
+sed -i.bak 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile" || exit 1
 toy3 bf 1 FAILED-NEW "17f7964c: applicable, cannot run there"
 # owner 03:27: a read_limit.py failure outside the approved case-ID table blocks, even when the
 # baseline prints the identical line
@@ -1145,7 +1154,7 @@ echo "PASS certification guard C42 step 5: classification read both stored resul
 echo "PASS certification guard C42 step 6: SIGTERM mid-classification lost nothing; the resumed classification kept attempt cls-1 and completed in cls-2"
 # negative control: the C41 runner keeps its logs under .build/certify; make distclean loses them (step 3 fails)
 if git cat-file -e 2bedfb33:scripts/certify.py 2>/dev/null; then
-    git show 2bedfb33:scripts/certify.py > "$TOY/c41-certify.py"
+    git show 2bedfb33:scripts/certify.py > "$TOY/c41-certify.py" || exit 1
     mk6 "$TOY/old6" "$TOY/c41-certify.py"
     (cd "$TOY/old6" && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/certify.py --jobs 1 --targets test-ev-a \
         --unprivileged-user '' --baseline '' > "$TOY/old6.out" 2>&1)
@@ -1196,7 +1205,7 @@ echo "PASS certification guard C42 isolation: test-build-reuse (DESTRUCTIVE) ran
 # F2: the 0d853db4 runner (before the H2 repair) launders control (a) into FAILED-BASELINE, exit 0;
 # the tree's runner (above) does not. Needs that commit in this repository.
 if git cat-file -e 0d853db4:scripts/certify.py 2>/dev/null; then
-    git show 0d853db4:scripts/certify.py > "$TOY/old-certify.py"
+    git show 0d853db4:scripts/certify.py > "$TOY/old-certify.py" || exit 1
     CERTIFY_PY="$TOY/old-certify.py" toy "$TOY/o/cand" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 1'
     CERTIFY_PY="$TOY/old-certify.py" toy "$TOY/o/base" test-rt-multi 'echo "running tests/known.sh"; echo "FAIL known: 1 of 10"; exit 1' 'echo ok' 'echo "running tests/later.sh"; exit 0'
     toyrun o test-rt-multi reg 0 FAILED-BASELINE
