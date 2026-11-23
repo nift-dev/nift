@@ -1,4 +1,5 @@
 #pragma once
+// D-158 in-memory Minify++ adapter for the Runtime 2.0 native table.
 
 #include "rt/natives/builtin.h"
 

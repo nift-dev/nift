@@ -257,6 +257,14 @@ D158_UPSTREAM = {
 }
 
 
+# Replayed undefined lookups and a write to an undeclared binding. Retain the
+# refusal and report a new site or unit instead of approving the whole family.
+D158_UNDEFINED = {
+    "rt-diff-corpus/eval/values.eval|<eval>": {1},
+    "semantics/assign_undeclared.f|assign_undeclared.f": {2},
+    "smoke/v46_b4_cp1_characterization/007-bad-import/bad-import.f|bad-import.f": {1},
+}
+
 def report(args):
     d = args.dir
     cls = load_classification(args.classification)
@@ -405,6 +413,12 @@ def report(args):
     for reason in sorted(seen):
         by_status[(row_for(reason) or {}).get("status", "?")].append(reason)
     owner = by_status.get("PENDING-OWNER", [])
+    defined_scope = {unit_of(uid) for uid in D158_UNDEFINED}
+    undefined_drift = sorted(
+        {uid for uid in full.get("unresolved-name", ())
+         if not refusal_lines.get((uid, "unresolved-name"), set()) <= D158_UNDEFINED.get(uid, set())}
+        | (refused_units.get("unresolved-name", set()) - defined_scope)
+    )
     if args.check:
         print("INVENTORY: G1 %s: %d reason(s) seen, %s" % (
             "FAIL" if problems else "PASS", len(seen),
@@ -417,6 +431,10 @@ def report(args):
     if args.check and problems:
         return 1
     blocked = False
+    if args.check and undefined_drift:
+        print("INVENTORY: BLOCKED: unreviewed unresolved-name sites: " +
+              "; ".join(undefined_drift), file=sys.stderr)
+        blocked = True
     # REVIEW-C136-SLOT3 F-A: a deferred site is not a refusal (the unit runs on the VM), so a retired or
     # implemented-accepted reason is "seen again" only as a refusal. Deferred sites still need a row (G1), keep their
     # row's status for PENDING-OWNER, and are listed in the report's deferred-site section.
