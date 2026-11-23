@@ -17,11 +17,21 @@ existing VM job retains the portable regression phase and also runs this table
 under the unprivileged guest user. An explicit dispatch with `runtime2_vm=false`
 runs the established regression suite independently.
 
+The inherited suite runs with `NIFT_VM=0` to exercise its legacy contracts.
+The Runtime 2.0 subset runs independently with its existing VM settings.
+
 The first FreeBSD scope exercises 86 subset entries and five independent make
 gates. The three exclusions name Linux-specific procfs or fixture requirements
 in the table. The isolated guest mounts a separate tmpfs for the cross-device
 move assertions. The FreeBSD summary counts PASS, FAIL, NOT RUN, EXCLUDED and
 BLOCKED separately, and a required entry that cannot run fails qualification.
+
+The owner approved a 32 MiB process allowance for flat equality on FreeBSD
+14 amd64, in addition to its 50,000,000-byte VM heap budget. The native probe
+measured about 75.1 MB for production and 107.6 MB for the historical equality
+work list at the same VM heap peak. Stream trims retain their native peak
+ceiling. If a FreeBSD allocator size class makes the two trim allocations
+exceed the budget, the runtime may keep the current charged buffer.
 
 ## Source of truth and how a run reports
 

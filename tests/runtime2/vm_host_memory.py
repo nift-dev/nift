@@ -28,8 +28,17 @@ def run_case(command, cwd, env, input_bytes):
 def timed(nift, cwd, env, input_bytes=None):
     timing = shutil.which("/usr/bin/time")
     darwin = sys.platform == "darwin"
-    proc = run_case([timing, *time_args(darwin), nift, "case.f"], cwd, env, input_bytes)
+    command = [timing, *time_args(darwin)]
+    freebsd = sys.platform.startswith("freebsd")
+    if freebsd:
+        command += ["/usr/bin/env", f"LD_PRELOAD={cwd / 'peak.so'}", "NIFT_TEST_RSS_SAMPLE=1"]
+    proc = run_case([*command, nift, "case.f"], cwd, env, input_bytes)
     rss = peak_rss_bytes(proc.stderr, darwin)
+    if freebsd:
+        # A sampled RSS can miss a short allocation spike inside the command.
+        # Independently enforce the same limits on tracked large allocations.
+        native = re.search(rb"PEAK_LARGE_BYTES (\d+)", proc.stderr)
+        rss = max(rss, int(native.group(1))) if rss is not None and native else None
     return ((rss + 1023) // 1024 if rss is not None else None), proc
 
 
@@ -114,6 +123,7 @@ def main():
         if not timing:
             print("FAIL vm_host_memory: /usr/bin/time unavailable")
             return 1
+        tracker = build_peak_tracker(root, failures) if sys.platform.startswith("freebsd") else None
 
         # open: 60 MB regular file, 1 MB budget.
         with open(root / "big.bin", "wb") as handle:
@@ -250,7 +260,8 @@ def main():
         # 31-34 MiB must refuse cleanly; any success after a refusal fails.
         # Each run also records the native large-block peak when the tracker
         # builds (it must stay within the budget plus 96 KiB).
-        tracker = build_peak_tracker(root, failures)
+        if tracker is None:
+            tracker = build_peak_tracker(root, failures)
         (root / "case.f").write_text('s := open("/dev/stdin"); print(s.length())\n')
         sweep_env = dict(large, **tracker)
         refused_at = None
