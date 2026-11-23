@@ -73,13 +73,14 @@ jobs:
         env:
           NIFT_IDENTITY_MSYS2: ${{ steps.msys2.outputs.msys2-location }}
         run: |
+          $python = (Get-Command python -CommandType Application).Source
           if ($IsWindows) {
             $env:NIFT_IDENTITY_CXX = Join-Path $env:NIFT_IDENTITY_MSYS2 'ucrt64/bin/g++.exe'
             if (!(Test-Path $env:NIFT_IDENTITY_CXX)) { throw 'UCRT compiler missing' }
             $env:PATH = "$env:NIFT_IDENTITY_MSYS2\ucrt64\bin;$env:NIFT_IDENTITY_MSYS2\usr\bin;$env:PATH"
             $suffix = '.exe'
           } else { $suffix = '' }
-          python tests/run_identity_certification.py --e3b "./.build/e3b-source/nift$suffix" --e2 "./.build/e2-source/nift$suffix" --publisher .build/stage1b-publisher
+          & $python tests/run_identity_certification.py --e3b "./.build/e3b-source/nift$suffix" --e2 "./.build/e2-source/nift$suffix" --publisher .build/stage1b-publisher
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
@@ -132,13 +133,14 @@ jobs:
         env:
           NIFT_IDENTITY_MSYS2: ${{ steps.msys2.outputs.msys2-location }}
         run: |
+          $python = (Get-Command python -CommandType Application).Source
           if ($IsWindows) {
             $env:NIFT_IDENTITY_CXX = Join-Path $env:NIFT_IDENTITY_MSYS2 'ucrt64/bin/g++.exe'
             if (!(Test-Path $env:NIFT_IDENTITY_CXX)) { throw 'UCRT compiler missing' }
             $env:PATH = "$env:NIFT_IDENTITY_MSYS2\ucrt64\bin;$env:NIFT_IDENTITY_MSYS2\usr\bin;$env:PATH"
             $suffix = '.exe'
           } else { $suffix = '' }
-          python tests/sidecar_platform_contracts.py --nift "./nift$suffix" --imports .build/sidecar-imports --output .build/sidecar-crossover.json --export .build/sidecar-export.json
+          & $python tests/sidecar_platform_contracts.py --nift "./nift$suffix" --imports .build/sidecar-imports --output .build/sidecar-crossover.json --export .build/sidecar-export.json
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()

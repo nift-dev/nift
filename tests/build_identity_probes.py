@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Build diagnostic-only standalone/native failure controls after ordinary make."""
-import re
+import argparse, re
 from pathlib import Path
 import subprocess, shlex, os, shutil
-root=Path(__file__).resolve().parent.parent;out=root/'.build/identity';out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
+suite_root = Path(__file__).resolve().parent.parent
+parser = argparse.ArgumentParser()
+parser.add_argument('--project-root', type=Path, default=suite_root)
+root = parser.parse_args().project_root.resolve()
+out=root/'.build/identity';out.mkdir(parents=True,exist_ok=True);suffix='.exe' if os.name=='nt' else ''
 compiler=os.environ.get('NIFT_IDENTITY_CXX') or shutil.which('g++')
 if not compiler:raise RuntimeError('ordinary native compiler not found')
 compiler=compiler.replace('\\','/')
 print('identity control compiler:',compiler,flush=True)
 flags=['-std=c++17','-O2','-Wall','-Wextra','-pedantic','-pthread','-Isrc']
 static=['-static','-static-libgcc','-static-libstdc++'] if os.name=='nt' else []
-for source,filename,extra in [('tests/identity_catalogue_probe.cpp','probe',['src/FileSystem.cpp','-DNIFT_TEST_IDENTITY_PUBLICATION']),('tests/identity_spelling_differential.cpp','spelling',[])]:
+for source,filename,extra in [('tests/identity_catalogue_probe.cpp','probe',['src/FileSystem.cpp','-DNIFT_TEST_IDENTITY_PUBLICATION']),(str(suite_root/'tests/identity_spelling_differential.cpp'),'spelling',[])]:
  unicode=['-municode'] if os.name=='nt' and filename=='probe' else []
  subprocess.run([compiler,*flags,source,*extra,*static,*unicode,'-o',str(out/(filename+suffix))],cwd=root,check=True)
 # The native runner may export a different prefixed MinGW CXX. The ordinary

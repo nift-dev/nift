@@ -122,7 +122,7 @@ tests/runtime2/cp19/proof.mk	detected	-	@test -n "$(CP19_LEGACY_ORACLE)" || { ec
 tests/runtime2/cp19/session.cpp	detected	-	const auto result = session.execute("print(\"MUST-NOT-RUN\")", "budget-unit", output);
 tests/runtime2/cp19/session_classify_cli.py	detected	-	root=Path(td);stats=root/'stats';(root/'.niftrc').write_text('print("RC-MUST-NOT-RUN")')
 tests/runtime2/cp19/session_classify_cli.py	detected	-	source='print("SCRIPT-MUST-NOT-RUN")\ncommand /usr/bin/touch marker\ncommand /usr/bin/printf "%s" "$[print(\"INTERPOLATION-MUST-NOT-RUN\")]"\nexit\n'
-tests/runtime2/cp19/session_classify_cli.py	detected	-	r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN");bytes([65]);unknown(1)\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
+tests/runtime2/cp19/session_classify_cli.py	detected	-	r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN");"A".encode("utf-8");unknown(1)\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
 tests/runtime2/cp19/session_classify_cli.py	detected	-	r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN")\nprint("AFTER-INTERNAL")\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
 tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shell short-circuit cases), not a message	('skip_or',['-i'],'x:=0\ncommand /usr/bin/true || command /usr/bin/printf "%s\\n" "$[(x+=1)]"\nx\nexit\n','',2),
 tests/runtime2/cp19/session_cli.py	justified	a case name (skip_or/skip_and: shell short-circuit cases), not a message	('skip_and',['-i'],'x:=0\ncommand /usr/bin/false && command /usr/bin/printf "%s\\n" "$[(x+=1)]"\nx\nexit\n','',2),

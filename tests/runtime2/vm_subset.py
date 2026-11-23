@@ -182,6 +182,10 @@ while (i < 1) {
 
 # (name, program, expected fallback reason prefix)
 UNSUPPORTED = [
+    ("file-write-invalid-byte-literal", 'f := file("data"); f.open("rw"); f.write(bytes([256]))\n',
+     "builtin-arg-fault-context"),
+    ("file-write-computed-byte", 'n := 65; f := file("data"); f.open("rw"); f.write(bytes([n]))\n',
+     "builtin-arg-fault-context"),
     # Statements and declarations outside the subset.
     # CP25-R: const scalars compile outside loop code; objects stay refused.
     ("const", 'const c := {"a": 1}\nprint(c.a)\n', "declare-const"),

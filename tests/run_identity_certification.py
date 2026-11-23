@@ -12,7 +12,7 @@ def test(name,script,*args):call(name,[sys.executable,'tests/'+script,'--nift',s
 publisher = a.publisher.resolve()
 publisher_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=publisher, text=True).strip()
 assert publisher_sha == '6593892fc6d2ca3d98190fb33af1b14ee31763f5', publisher_sha
-call('historical-build-probes', [sys.executable, 'tests/build_identity_probes.py'], cwd=publisher)
+call('historical-build-probes', [sys.executable, 'tests/build_identity_probes.py', '--project-root', str(publisher)])
 historical_tools = publisher / '.build/identity'
 historical_nift = publisher / ('nift' + suffix)
 probe = historical_tools / ('probe' + suffix)

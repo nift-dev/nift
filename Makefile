@@ -2467,14 +2467,14 @@ test-libffi-source:
 	"$(PYTHON)" scripts/check_vendored_libffi.py
 
 test-gate6ar-ffi: $(TARGET) test-ffi-abi
-	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
 
 test-v45-ffi: $(TARGET)
 	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_contract.sh
 	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_scalar.sh
 	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_memory_callback.sh
 	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_package.sh
-	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
 
 test-libffi-static-archive: libnift_c.a
 	bash tests/libffi_static_consumer.sh

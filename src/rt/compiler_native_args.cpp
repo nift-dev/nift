@@ -1,8 +1,27 @@
 #include "rt/compiler_native_args.h"
 #include "rt/builtin_bind.h"
 #include "rt/compiler_handles.h"
+#include <charconv>
 // rt-lint: cold-file shared native argument evaluation and error restrictions
 namespace nift::rt::detail {
+namespace {
+bool literal_octets(const Ast& ast, const Node& array) {
+    if (array.kind != NodeKind::Array) return false;
+    const auto* items = ast.list(array);
+    for (std::uint32_t i = 0; i < array.count; ++i) {
+        const auto& item = ast.at(items[i]);
+        if (item.kind != NodeKind::Number) return false;
+        const auto spelling = ast.text(item);
+        if (spelling.size() > 1 && spelling.front() == '0') return false;
+        unsigned value = 0;
+        const auto end = spelling.data() + spelling.size();
+        const auto parsed = std::from_chars(spelling.data(), end, value);
+        if (parsed.ec != std::errc{} || parsed.ptr != end || value > 255) return false;
+    }
+    return true;
+}
+} // namespace
+
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
     const NodeId* args = ast_.list(node);
     if (spec.id == natives::BuiltinId::FnMinify &&
@@ -41,8 +60,26 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
     // must be a string"), in loop code the fault itself. Refused there when
     // the argument can fault; later arguments are unobservable (above), and
     // methods that accept any value (may_fail false) report the fault too.
-    if (receiver != kNoNode && spec.may_fail && !loop_reachable() && node.count > 0 && may_fault(args[0]))
-        return fail(ast_.at(args[0]), "builtin-arg-fault-context");
+    if (receiver != kNoNode && spec.may_fail && !loop_reachable() && node.count > 0 && may_fault(args[0])) {
+        const auto& arg = ast_.at(args[0]);
+        // file().write(bytes([literal octets])) can only fail constructing
+        // the argument on a resource limit. Keep the guard for constructors
+        // with user code or values that could raise a language error.
+        if (spec.id == natives::BuiltinId::FileWrite && arg.kind == NodeKind::Call && arg.count == 1 &&
+            kinds(args[0]) == kKindBytes && plan_.structs.empty()) {
+            const auto& callee = ast_.at(arg.a);
+            if (callee.kind == NodeKind::Ident) {
+                const auto name = text(callee);
+                const auto* constructor = bind_function(name);
+                NativeInfo native{};
+                if (constructor && constructor->id == natives::BuiltinId::FnBytes &&
+                    !find_binding(name) && !plan_.index.count(name) && !lookup_native(name, native) &&
+                    literal_octets(ast_, ast_.at(ast_.list(arg)[0])))
+                    return true;
+            }
+        }
+        return fail(arg, "builtin-arg-fault-context");
+    }
     return true;
 }
 // D-063. same() (D-040 #4, owner ruling 2026-11-01) compares identity; and

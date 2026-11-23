@@ -7,6 +7,8 @@
 # native calls, sort/group, JSON ops, maps, string methods, for-ranges and
 # big-integer handling.
 set -euo pipefail
+# Exercise the historical prepared evaluator against its checked-in oracle.
+export NIFT_VM=0
 # Portable timeout: GNU timeout where present, otherwise perl alarm (macOS has
 # no GNU timeout by default).
 timed() {

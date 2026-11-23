@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# This historical FFI contract uses legacy template and FFI syntax.
+export NIFT_VM=0
 NIFT=${NIFT:-./nift}
 mkdir -p .build
 FIXTURE="$(bash tests/ffi/build_fixture.sh .build)"
