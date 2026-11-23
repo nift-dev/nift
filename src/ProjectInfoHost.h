@@ -166,7 +166,16 @@ public:
     HostSource read_shared_source(const std::filesystem::path& path) const override {
         const std::string* content = project_.read_shared_source(path);
         if (content == nullptr) return {nift::HostStatus::NotFound, nullptr, ""};
-        if (observe_dependencies) observe_dependency_hash(path, project_.observed_source_hash(content));
+        if (observe_dependencies) {
+            const auto cached = project_.observed_source_hash(content);
+            const auto measured = filesystem::hash_bytes(*content);
+            if (cached != measured) {
+                std::fprintf(stderr, "source cache hash mismatch path=%s cached=%llu measured=%llu\n",
+                             path.string().c_str(), static_cast<unsigned long long>(cached),
+                             static_cast<unsigned long long>(measured));
+            }
+            observe_dependency_hash(path, cached, "project source cache");
+        }
         return {nift::HostStatus::Found, content, ""};
     }
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
@@ -174,7 +183,7 @@ public:
         auto value = project_.read_shared_json(path, error);
         if (value && observe_dependencies) {
             if (auto bytes = project_.read_shared_source(path))
-                observe_dependency_hash(path, project_.observed_source_hash(bytes));
+                observe_dependency_hash(path, project_.observed_source_hash(bytes), "project JSON cache");
         }
         return value;
     }
@@ -183,7 +192,7 @@ public:
         auto value = project_.read_shared_runtime_json(path, error);
         if (value && observe_dependencies) {
             if (auto bytes = project_.read_shared_source(path))
-                observe_dependency_hash(path, project_.observed_source_hash(bytes));
+                observe_dependency_hash(path, project_.observed_source_hash(bytes), "project JSON cache");
         }
         return value;
     }

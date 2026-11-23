@@ -32,18 +32,21 @@ public:
     bool observe_dependencies = false;
     void observe_dependency(const std::filesystem::path& path, const std::string& bytes) const {
         if (!observe_dependencies) return;
-        observe_dependency_hash(path, filesystem::hash_bytes(bytes));
+        observe_dependency_hash(path, filesystem::hash_bytes(bytes), "whole bytes");
     }
-    void observe_dependency_hash(const std::filesystem::path& path, std::uint64_t hash) const {
+    void observe_dependency_hash(const std::filesystem::path& path, std::uint64_t hash,
+                                 const char* site = "unspecified") const {
         if (!observe_dependencies) return;
         std::lock_guard<std::mutex> lock(observation_mutex_);
         const auto key = relative(path);
         auto [it, inserted] = observations_.emplace(key, std::to_string(hash));
+        if (inserted) observation_sites_.emplace(key, site);
         if (!inserted && it->second != std::to_string(hash)) {
             if (observation_conflicts_.insert(key).second) {
-                std::fprintf(stderr, "observed hash conflict root=%s key=%s prior=%s next=%llu\n",
-                             root().string().c_str(), key.c_str(), it->second.c_str(),
-                             static_cast<unsigned long long>(hash));
+                std::fprintf(stderr, "observed hash conflict root=%s key=%s prior=%s [%s] next=%llu [%s] path=%s reread=%llu\n",
+                             root().string().c_str(), key.c_str(), it->second.c_str(), observation_sites_.at(key),
+                             static_cast<unsigned long long>(hash), site, path.string().c_str(),
+                             static_cast<unsigned long long>(filesystem::hash_path_streamed(path)));
             }
         }
     }
@@ -60,6 +63,7 @@ private:
     mutable std::mutex observation_mutex_;
     mutable std::map<std::string,std::string> observations_;
     mutable std::set<std::string> observation_conflicts_;
+    mutable std::map<std::string,const char*> observation_sites_;
 
 public:
     virtual ~RenderHost() = default;
