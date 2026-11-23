@@ -12,14 +12,31 @@
 # PTY_PLATFORM may override `uname -s`; the fake-`script` structural check below
 # uses that to verify the Darwin argument order without a macOS runner.
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:?NIFT_BIN must point to the nift binary}"
 
 if ! command -v script >/dev/null 2>&1; then
   echo "progress PTY smoke test SKIPPED ('script' unavailable): the PTY ordering guarantee is NOT verified" >&2
-  exit 77
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "progress PTY smoke test SKIPPED ('python3' unavailable): the PTY ordering guarantee is NOT verified" >&2
   exit 77
 fi
 
@@ -34,7 +51,7 @@ JSON
 
 printf '%s' '<!doctype html><title>$[page.title]</title><body>@json(d, '"'"'data/big.json'"'"')@for(x : d.rows){<i>$[x.i]</i>}@content</body>' > "$P/templates/template.html"
 
-python3 - "$P" <<'EOF'
+"${PYTHON_CMD[@]}" - "$P" <<'EOF'
 import json, sys
 root = sys.argv[1]
 json.dump({"rows": [{"i": i} for i in range(600)]}, open(root + "/data/big.json", "w"))
@@ -61,7 +78,7 @@ pty_invoke() {
   for arg in "$@"; do wrapper+=" $(printf '%q' "$arg")"; done
   wrapper+=" ; } ; __status=\$? ; printf '\\n__NIFT_PROGRESS_EXIT__=%s\\n' \"\$__status\" ; exit \"\$__status\""
   case "$platform" in
-    Darwin)
+    Darwin|FreeBSD)
       script -q "$transcript" /bin/sh -c "$wrapper" >"$TMP/pty.out" 2>&1 || true
       ;;
     *)
@@ -74,7 +91,7 @@ pty_invoke() {
 # plus the child exit code (from the explicit marker) to "$TMP/screen.txt".
 # $1 = transcript file.
 pty_reconstruct() {
-  python3 - "$1" "$TMP/screen.txt" <<'EOF'
+  "${PYTHON_CMD[@]}" - "$1" "$TMP/screen.txt" <<'EOF'
 import re, sys
 transcript, out = sys.argv[1], sys.argv[2]
 data = open(transcript, "rb").read().decode("utf-8", "replace")
@@ -219,7 +236,7 @@ template: templates/template.html
 ---
 @path('../../escape')
 EOF
-python3 - "$P" <<'EOF'
+"${PYTHON_CMD[@]}" - "$P" <<'EOF'
 import json, sys
 root = sys.argv[1]
 t = json.load(open(root + "/.nift/tracked.json"))
@@ -227,7 +244,7 @@ t["tracked"].append({"name": "bad", "title": "Bad", "template": "templates/templ
 json.dump(t, open(root + "/.nift/tracked.json", "w"))
 EOF
 run_pty "$TMP/bad.transcript" build --all
-screen_line | grep -q 'error:' || { echo "FAIL: no error diagnostics on failure path"; exit 1; }
+grep -q 'error:' "$TMP/screen.txt" || { echo "FAIL: no error diagnostics on failure path"; exit 1; }
 FAILURE_SUMMARY="$(screen_line | grep -F 'built successfully' | tail -1)"
 test -n "$FAILURE_SUMMARY" || { echo "FAIL: no partial-success summary in PTY screen"; exit 1; }
 echo "$FAILURE_SUMMARY" | grep -q 'building' \
@@ -239,7 +256,7 @@ test "$(exit_code)" = "1" || { echo "FAIL: failure build exited $(exit_code), ex
 
 # --- NO_COLOR interactive behaviour -----------------------------------------
 rm -f "$P/content/bad.html"
-python3 - "$P" <<'EOF'
+"${PYTHON_CMD[@]}" - "$P" <<'EOF'
 import json, sys
 root = sys.argv[1]
 t = json.load(open(root + "/.nift/tracked.json"))
@@ -249,7 +266,7 @@ EOF
 rm -rf "$P/public" "$P/.nift/public"
 rm -f "$P/.nift/.unfinished"
 NO_COLOR=1 run_pty "$TMP/nocolor.transcript" build --all
-NO_COLOR_RESULT="$(python3 - "$TMP/nocolor.transcript" <<'EOF'
+NO_COLOR_RESULT="$("${PYTHON_CMD[@]}" - "$TMP/nocolor.transcript" <<'EOF'
 import re, sys
 data = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
 sgr = re.findall(r"\x1b\[[0-9;]*m", data)

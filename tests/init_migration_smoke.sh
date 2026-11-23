@@ -6,6 +6,27 @@
 # AGENTS block is created/augmented/replaced safely and idempotently, and plain
 # init is unchanged.
 set -u
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 ROOT="$(pwd)"
 MIG_FIXTURE="$ROOT/tests/fixtures/MIGRATION.md"
@@ -19,7 +40,7 @@ fail() { echo "init-migration FAIL: $*" >&2; exit 1; }
 blocks() { grep -c "$1" "$2" 2>/dev/null || echo 0; }
 
 # Embedded literals must decode to the fixtures.
-python3 - "$MIG_FIXTURE" "$HAND_FIXTURE" <<'PY' || fail "embedded canonical literals mismatch"
+"${PYTHON_CMD[@]}" - "$MIG_FIXTURE" "$HAND_FIXTURE" <<'PY' || fail "embedded canonical literals mismatch"
 import re, sys
 from pathlib import Path
 def decode(path, symbol):
@@ -76,7 +97,7 @@ grep -qi 'byte deterministic' "$P/MIGRATION.md" || fail "MIGRATION.md lacks nond
 grep -qi 'placeholder material' "$P/README.md" || fail "README.md lacks placeholder note"
 
 # Public methodology and resumable ordering, within the existing migration gate.
-python3 - "$P" <<'PY_CHECK'
+"${PYTHON_CMD[@]}" - "$P" <<'PY_CHECK'
 from pathlib import Path
 import sys
 root = Path(sys.argv[1])

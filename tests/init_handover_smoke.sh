@@ -8,6 +8,27 @@
 # under the output directory, and all compatible named init options are
 # order-independent.
 set -u
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 FIXTURE="$(pwd)/tests/fixtures/HANDOVER.md"
 CANONICAL_SHA="$(sha256sum "$FIXTURE" | cut -d' ' -f1)"
@@ -33,7 +54,7 @@ check_handover() {
 # Embedded literal in src/handover_content.h must decode to exactly the fixture,
 # completing embedded == fixture == generated.
 check_embedded_matches_fixture() {
-    python3 - "$FIXTURE" <<'PY' || fail "src/handover_content.h does not decode to tests/fixtures/HANDOVER.md"
+    "${PYTHON_CMD[@]}" - "$FIXTURE" <<'PY' || fail "src/handover_content.h does not decode to tests/fixtures/HANDOVER.md"
 import re, sys
 from pathlib import Path
 fixture = Path(sys.argv[1]).read_bytes()

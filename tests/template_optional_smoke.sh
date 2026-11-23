@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-template-optional.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -19,7 +40,7 @@ EOF
 # Omission makes content the parsed top-level Nift source.
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '<main>Home</main>' "$P/public/index.html"
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["template"] == "", d
@@ -28,7 +49,7 @@ PY
 
 # Switching to a real template adds the dependency and preserves @content.
 printf '<body>@content</body>\n' >"$P/templates/page.html"
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))
@@ -40,7 +61,7 @@ grep -Fq '<body><main>Home</main>' "$P/public/index.html"
 grep -Fq '"templates/page.html"' "$P/.nift/public/index.info.json"
 
 # Switching back removes the old template relationship cleanly.
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))
@@ -54,7 +75,7 @@ printf '<body>changed</body>\n' >"$P/templates/page.html"
 ! grep -Fq 'needs rebuilding' "$P/status.log"
 
 # The historical empty-string form remains a compatible template-less alias.
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p))
@@ -68,7 +89,7 @@ PY
 S="$TMP/scaffold"
 mkdir "$S"
 (cd "$S" && "$NIFT_BIN" init >/dev/null)
-python3 -S - "$S/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$S/.nift/tracked.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 assets = [item for item in d["tracked"] if item["name"].startswith("assets/")]

@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT=${NIFT_BIN:-${NIFT:-./nift}}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
@@ -16,7 +37,7 @@ fail_case(){
 }
 run_bounded(){
   local name=$1 stdin_path=$2; shift 2
-  python3 - "$name" "$stdin_path" "$@" <<'PY'
+  "${PYTHON_CMD[@]}" - "$name" "$stdin_path" "$@" <<'PY'
 import subprocess
 import sys
 
@@ -80,7 +101,7 @@ while(i < 50) {
 NIFT
 # Named callables are not visible inside this loop in the current parser scope model;
 # use an unrolled fixture to keep the churn test about teardown rather than lexical scope.
-python3 - "$TMP/churn.f" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/churn.f" <<'PY'
 import sys
 p=sys.argv[1]
 lines=['fn(worker(x)) { return x }', '@fn[async](aworker(x)) { return x }']

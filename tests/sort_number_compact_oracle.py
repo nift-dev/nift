@@ -22,7 +22,7 @@ for(bool desc:{false,true}){std::vector<Key> keys;std::vector<size_t> order(v.si
 std::cout<<"PASS actual candidate comparator "<<pairs<<" Number pairs, both directions, full stable index order; key bytes="<<sizeof(Key)<<"\\n";}
 '''
 (p/'special-oracle.cpp').write_text(code)
-commands=[['g++','-std=c++17','-O2','-I'+str(r/'src'),'-I'+str(r/'include'),str(p/'special-oracle.cpp'),str(r/'src/RuntimeValue.cpp'),'-o',str(p/'special-oracle')],[str(p/'special-oracle')]]
+commands=[['c++','-std=c++17','-O2','-I'+str(r/'src'),'-I'+str(r/'include'),str(p/'special-oracle.cpp'),str(r/'src/RuntimeValue.cpp'),'-o',str(p/'special-oracle')],[str(p/'special-oracle')]]
 rows=[]
 for c in commands:
  q=subprocess.run(c,capture_output=True,text=True)

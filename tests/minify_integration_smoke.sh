@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/minifypp-integration.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -24,7 +45,7 @@ JSON
 
 # Global extension minification applies only to matching outputs.
 P="$TMP/global"; mkproj "$P"
-python3 -S - "$P/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/config.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["config"]["minify-exts"]=[".html"]; json.dump(d,open(p,"w"))
 PY
@@ -35,7 +56,7 @@ grep -Fq '"minify": true' "$P/.nift/public/index.info.json"
 grep -Fq '"minify": false' "$P/.nift/public/assets/style.info.json"
 
 # Per-file true opts CSS in; false opts HTML out even with global HTML minification.
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p))
 for x in d["tracked"]:
@@ -50,13 +71,13 @@ grep -Fq '"minify": false' "$P/.nift/public/index.info.json"
 grep -Fq '"minify": true' "$P/.nift/public/assets/style.info.json"
 
 # Changing only minification config must be a rebuild reason.
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p))
 for x in d["tracked"]: x.pop("minify",None)
 json.dump(d,open(p,"w"))
 PY
-python3 -S - "$P/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/config.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["config"]["minify-exts"]=[".html",".css"]; json.dump(d,open(p,"w"))
 PY
@@ -68,7 +89,7 @@ grep -Fq '.x{color:red;margin:0 1rem;}' "$P/public/assets/style.css"
 # Minified page metadata records a minifier format version so future safer/
 # stronger minifier revisions can force regeneration without changing templates.
 grep -Fq '"minify-version": 1' "$P/.nift/public/index.info.json"
-python3 -S - "$P/.nift/public/index.info.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["minify-version"]=999; json.dump(d,open(p,"w"))
 PY
@@ -77,7 +98,7 @@ grep -Fq 'minifier version changed' "$P/version-status.log"
 (cd "$P" && "$NIFT_BIN" build >/dev/null)
 
 # Removing a global extension should rebuild back to unminified source output.
-python3 -S - "$P/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/config.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["config"]["minify-exts"]=[]; json.dump(d,open(p,"w"))
 PY
@@ -86,7 +107,7 @@ grep -Fq '<div>   Hello   world </div>' "$P/public/index.html"
 
 # Invalid config and tracked overrides fail cleanly.
 P="$TMP/badconfig"; mkproj "$P"
-python3 -S - "$P/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/config.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["config"]["minify-exts"]=".html"; json.dump(d,open(p,"w"))
 PY
@@ -94,7 +115,7 @@ if (cd "$P" && "$NIFT_BIN" status >bad.log 2>&1); then echo "string minify-exts 
 grep -Fq 'minify-exts must be an array' "$P/bad.log"
 
 P="$TMP/badext"; mkproj "$P"
-python3 -S - "$P/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/config.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["config"]["minify-exts"]=[".wat"]; json.dump(d,open(p,"w"))
 PY
@@ -102,7 +123,7 @@ if (cd "$P" && "$NIFT_BIN" status >bad.log 2>&1); then echo "unsupported minify 
 grep -Fq 'unsupported minify-exts entry' "$P/bad.log"
 
 P="$TMP/badtracked"; mkproj "$P"
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["tracked"][0]["minify"]="yes"; json.dump(d,open(p,"w"))
 PY
@@ -114,7 +135,7 @@ P="$TMP/failure-preserve"; mkproj "$P"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 cp "$P/public/index.html" "$P/old"
 cp "$P/.nift/public/index.info.json" "$P/oldinfo"
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p))
 d["tracked"][0]["output-ext"]=".txt"; d["tracked"][0]["minify"]=True
@@ -190,7 +211,7 @@ P="$TMP/parallel"; mkdir -p "$P/.nift" "$P/content/page" "$P/templates" "$P/publ
 cat >"$P/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":12,"incremental-mode":"modified","minify-exts":[".html"]}}
 JSON
-python3 -S - "$P/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 json.dump({"tracked":[{"name":f"page/{i}","title":f"P{i}","template":"templates/template.html"} for i in range(80)]},open(sys.argv[1],"w"))
 PY

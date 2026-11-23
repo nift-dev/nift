@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
+
 NIFT_BIN=${NIFT_BIN:-"$(pwd)/nift"}
 EXPECTED_VERSION="$($NIFT_BIN version | sed -n 's/^Nift v//p')"
 [[ -n "$EXPECTED_VERSION" ]] || { echo "could not determine Nift version" >&2; exit 1; }
@@ -30,7 +52,7 @@ grep -q '<title>index</title>' "$TMP/php/public/index.php"
 test ! -e "$TMP/php/content/assets"
 test -f "$TMP/php/public/assets/css/style.css"
 test -f "$TMP/php/public/assets/js/script.js"
-python3 - "$TMP/php/.nift/tracked.json" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/php/.nift/tracked.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f:
     names = {entry['name'] for entry in json.load(f)['tracked']}
@@ -41,7 +63,7 @@ run_init text --ext=.txt
 test -f "$TMP/text/content/index.txt"
 test -f "$TMP/text/public/index.txt"
 test ! -e "$TMP/text/content/assets"
-python3 - "$TMP/text/.nift/config.json" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/text/.nift/config.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f:
     cfg=json.load(f)['config']
@@ -55,7 +77,7 @@ for target in vercel netlify amplify azure firebase render cloudflare github-pag
   (cd "$TMP/$target" && "$NIFT_BIN" build >/dev/null)
 done
 
-python3 - "$TMP" vercel netlify amplify azure firebase render cloudflare github-pages supabase <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP" vercel netlify amplify azure firebase render cloudflare github-pages supabase <<'PY'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 for target in sys.argv[2:]:
@@ -75,7 +97,7 @@ printf 'node_modules/\n' > "$TMP/vercel-existing-ignore/.gitignore"
 grep -qxF 'node_modules/' "$TMP/vercel-existing-ignore/.gitignore"
 grep -qxF '.vercel/output/static/' "$TMP/vercel-existing-ignore/.gitignore"
 
-python3 - "$TMP/vercel/.nift/config.json" "$TMP/vercel/.vercel/output/config.json" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/vercel/.nift/config.json" "$TMP/vercel/.vercel/output/config.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f: cfg=json.load(f)['config']
 with open(sys.argv[2], encoding='utf-8') as f: vercel=json.load(f)
@@ -85,7 +107,7 @@ PY
 test -f "$TMP/vercel/.vercel/output/static/index.html"
 grep -qxF '.vercel/output/static/' "$TMP/vercel/.gitignore"
 
-python3 - "$TMP/amplify/.nift/config.json" "$TMP/amplify/.amplify-hosting/deploy-manifest.json" "$EXPECTED_VERSION" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/amplify/.nift/config.json" "$TMP/amplify/.amplify-hosting/deploy-manifest.json" "$EXPECTED_VERSION" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f: cfg=json.load(f)['config']
 with open(sys.argv[2], encoding='utf-8') as f: manifest=json.load(f)
@@ -104,7 +126,7 @@ grep -q 'publish = "public"' "$TMP/netlify/netlify.toml"
 test -f "$TMP/azure/content/staticwebapp.config.json"
 test -f "$TMP/azure/public/staticwebapp.config.json"
 
-python3 - "$TMP/firebase/firebase.json" <<'PY'
+"${PYTHON_CMD[@]}" - "$TMP/firebase/firebase.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f: cfg=json.load(f)
 assert cfg['hosting']['public'] == 'public'

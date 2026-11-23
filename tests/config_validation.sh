@@ -8,6 +8,28 @@
 # typo key are both rejected with a clear `unknown config key '<name>'` error.
 set -u
 
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
+
 NIFT_BIN=${NIFT_BIN:-"$(pwd)/nift"}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -15,7 +37,7 @@ trap 'rm -rf "$TMP"' EXIT
 make_project() {
   local dir=$1 extra=$2
   mkdir -p "$TMP/$dir/.nift" "$TMP/$dir/content" "$TMP/$dir/templates" "$TMP/$dir/public"
-  python3 - "$TMP/$dir/.nift/config.json" "$extra" <<'PY'
+  "${PYTHON_CMD[@]}" - "$TMP/$dir/.nift/config.json" "$extra" <<'PY'
 import json, sys
 cfg = {
     "content-dir": "content/",

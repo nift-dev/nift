@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  PYTHON_CMD=()
+  for candidate in /usr/local/bin/python3.[0-9]*; do
+    if [ -x "$candidate" ] && [ -f "$candidate" ]; then
+      PYTHON_CMD=("$candidate")
+      break
+    fi
+  done
+  if [ "${#PYTHON_CMD[@]}" -eq 0 ]; then
+    printf '%s\n' "error: Python 3 is required to run this script" >&2
+    exit 1
+  fi
+fi
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-collection-ops.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -57,7 +78,7 @@ FOR=$[p.title]
 EOF2
 (cd "$D" && "$NIFT_BIN" build >/dev/null)
 OUT="$D/public/index.html"
-python3 - "$OUT" <<'PYJSON'
+"${PYTHON_CMD[@]}" - "$OUT" <<'PYJSON'
 import json,pathlib,sys
 s=pathlib.Path(sys.argv[1]).read_text(); dec=json.JSONDecoder()
 def val(label):
