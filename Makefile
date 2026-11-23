@@ -1249,7 +1249,7 @@ $(RT_VM_RUN): tests/rt/vm_run.cpp $(RT_VM_DEPS) $(RT_UNIT_OBJECTS)
 RT_VM_SUITE_STATUS = $(TEST_DIR)/test-rt-vm.suites
 RT_VM_SUITE_LOGS = $(TEST_DIR)/test-rt-vm-logs
 RT_VM_SUITE = bash tests/runtime2/suite_status.sh run "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
-RT_VM_SUITES = rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint legacy-names vm-parity \
+RT_VM_SUITES = darwin-address-limit rt-vm-unit rt-vm-globals rt-vm-modules rt-vm-prepared rt-lint legacy-names vm-parity \
 	vm-adversarial-timeout-selftest vm-adversarial vm-subset vm-subset-gen vm-builtins vm-host \
 	vm-records-coverage vm-path-wording vm-known-refused vm-engine-selection vm-former-replay vm-d018 \
 	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
@@ -1260,8 +1260,9 @@ test-rt-vm-invalidate:
 	@bash tests/runtime2/suite_status.sh invalidate "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
 test-rt-vm-verify:
 	@bash tests/runtime2/suite_status.sh verify "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)"
-test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(DARWIN_ADDRESS_LIMIT)
+test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT) $(RT_VM_GLOBALS) $(RT_VM_MODULES) $(RT_VM_RUN) $(RT_VM_PREPARED) $(TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT)
 	@bash tests/runtime2/suite_status.sh reset "$(RT_VM_SUITE_STATUS)" "$(RT_VM_SUITE_LOGS)" "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) darwin-address-limit -- $(if $(DARWIN_ADDRESS_LIMIT),$(MAKE) $(DARWIN_ADDRESS_LIMIT),echo "Darwin address-limit setup is not applicable")
 	-@$(RT_VM_SUITE) rt-vm-unit -- "$(RT_VM_UNIT)"
 	-@$(RT_VM_SUITE) rt-vm-globals -- "$(RT_VM_GLOBALS)"
 	-@$(RT_VM_SUITE) rt-vm-modules -- "$(RT_VM_MODULES)"
@@ -2466,14 +2467,14 @@ test-libffi-source:
 	"$(PYTHON)" scripts/check_vendored_libffi.py
 
 test-gate6ar-ffi: $(TARGET) test-ffi-abi
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
 
 test-v45-ffi: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_contract.sh
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_scalar.sh
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_memory_callback.sh
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_package.sh
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_contract.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_scalar.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_memory_callback.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_package.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
 
 test-libffi-static-archive: libnift_c.a
 	bash tests/libffi_static_consumer.sh
@@ -4269,10 +4270,10 @@ test-evaluated-operand-differential: $(TARGET)
 # v4.12 function-call semantic certification (permanent).
 .PHONY: test-call-semantics
 test-call-semantics: $(TARGET)
-	"$(PYTHON)" tests/v412_nested_index_oracle.py "$(CURDIR)/$(TARGET)"
-	"$(PYTHON)" tests/v412_method_error_oracle.py --negative-control "$(CURDIR)/$(TARGET)"
-	"$(PYTHON)" tests/v412_call_semantic_contract.py --candidate "$(CURDIR)/$(TARGET)"
-	"$(PYTHON)" tests/v412_method_error_oracle.py "$(CURDIR)/$(TARGET)"
+	NIFT_VM=0 "$(PYTHON)" tests/v412_nested_index_oracle.py "$(CURDIR)/$(TARGET)"
+	NIFT_VM=0 "$(PYTHON)" tests/v412_method_error_oracle.py --negative-control "$(CURDIR)/$(TARGET)"
+	NIFT_VM=0 "$(PYTHON)" tests/v412_call_semantic_contract.py --candidate "$(CURDIR)/$(TARGET)"
+	NIFT_VM=0 "$(PYTHON)" tests/v412_method_error_oracle.py "$(CURDIR)/$(TARGET)"
 .PHONY: test-release-cert
 test-release-cert: $(TARGET)
 	"$(PYTHON)" scripts/release_certify.py --root "$(CURDIR)" --jobs "$(shell nproc)"

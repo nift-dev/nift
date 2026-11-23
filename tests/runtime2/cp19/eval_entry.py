@@ -74,6 +74,7 @@ def main():
             '{"a":1,"b":[true,null,"x"]}',
             '[1,2,2].unique()', '[1,[2,3]].flatten()', '[1,2,3].sum()',
             '{"x":1,"y":2}.keys()', '{"x":1}.get("x")',
+            'is_bytes(bytes())', 'sha256(bytes([0, 65, 255]))',
             'pwd()', 'open("input.txt")', 'exists("input.txt")',
             'getenv("CP19_NOT_SET")', 'print("EXACTLY-ONCE")',
             'setenv("NIFT_VM","classify")',
@@ -116,9 +117,7 @@ def main():
         # and it counts as expected only when its CP25-R inventory status is approved or deferred-named
         # (classification.tsv via approved_refusal.py); otherwise the case fails, naming its reason.
         pinned = {'missing': 'unresolved-name', '1 +': 'opaque:legacy-runtime-error',
-                  '[3,1,2].sort()': 'opaque:legacy-runtime-error', 'bytes([65,66])': 'builtin-bytes:bytes',
-                  '{"nested":bytes([65])}': 'builtin-bytes:bytes', 'timer()': 'callable:timer',
-                  'bytes("hi")': 'builtin-bytes:bytes'}
+                  '[3,1,2].sort()': 'opaque:legacy-runtime-error', 'timer()': 'callable:timer'}
         for expression in pinned:
             expected, _ = run(['eval', expression], '0')
             actual, rows = run(['eval', expression], '1')
@@ -138,7 +137,7 @@ def main():
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 0), rows
 
         # Host side effects inside a refused unit must not occur during classification.
-        expression = '[touch("marker"), bytes([65])]'
+        expression = '[touch("marker"), timer()]'
         for mode in ('require', 'classify', 'classify-all'):
             result, rows = run(['eval', expression], mode)
             assert not (root / 'marker').exists(), (mode, result, rows)

@@ -354,6 +354,20 @@ void batch_b() {
     CHECK(err(call(BuiltinId::FnBytes, {arr({i(256)})}), "bytes: array values must be integers from 0 to 255"));
     CHECK(err(call(BuiltinId::FnBytes, {arr({d(1.5)})}), "bytes: array values must be integers from 0 to 255"));
     CHECK(err(call(BuiltinId::FnBytes, {s("ab")}), "bytes: expected an array of integers"));
+    const Value bytes_input = arr({i(0), i(65), i(255)});
+    const auto before_refusal = live_heap_bytes();
+    auto denied = call(BuiltinId::FnBytes, {bytes_input}, before_refusal);
+    CHECK(denied.status == Status::Memory && denied.out.is(Kind::Null));
+    CHECK(live_heap_bytes() == before_refusal);
+    CHECK(call(BuiltinId::FnBytes, {bytes_input}, before_refusal + 1024).status == Status::Ok);
+    const Value decimal_input = arr({make_decimal("1." + std::string(2048, '0'), 1.0)});
+    const auto before_decimal = live_heap_bytes();
+    auto denied_decimal = call(BuiltinId::FnBytes, {decimal_input}, before_decimal + 1024);
+    CHECK(denied_decimal.status == Status::Memory && denied_decimal.out.is(Kind::Null));
+    CHECK(live_heap_bytes() == before_decimal);
+    auto accepted_decimal = call(BuiltinId::FnBytes, {decimal_input}, before_decimal + 32768);
+    CHECK(accepted_decimal.status == Status::Ok &&
+          bytes_of(accepted_decimal.out) == std::vector<std::uint8_t>({1}));
     CHECK(err(call(BuiltinId::FnBytes, {arr({}), arr({})}), "bytes: expected zero arguments or one byte array"));
     CHECK(ok(call(BuiltinId::BytesLength, {b.out}), "int | [4]"));
     CHECK(ok(call(BuiltinId::BytesEmpty, {b.out}), "bool | [false]"));

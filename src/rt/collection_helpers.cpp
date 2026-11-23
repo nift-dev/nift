@@ -195,10 +195,13 @@ bool collection_step(CollectionMethod method,std::uint16_t phase,Value* s,const 
             Construction::object_set(key,s[Result],atom("matched"),make_array());
             // rt-lint: storage-ok fresh, the native's new result
             Construction::object_set(key,s[Result],atom("unmatched"),make_array());}
-        if(method==M::SortBy){const std::size_t width=array_size(s[Directions]);
-            if(width&&n>std::size_t(-1)/width/sizeof(Value))return raise(fault,StopReason::Internal,
-            "memory budget exceeded");if(!budget(context,n*width*sizeof(Value),fault))return false;
-            s[Keys]=make_array(n*width);}
+        if (method == M::SortBy) {
+            const std::size_t width = array_size(s[Directions]);
+            if (width && n > std::size_t(-1) / width / sizeof(Value))
+                return raise(fault, StopReason::Internal, "memory budget exceeded");
+            if (!budget(context, n * width * sizeof(Value), fault)) return false;
+            s[Keys] = make_array(n * width);
+        }
         if(method==M::UniqueBy){std::size_t capacity=16;while(capacity<n*2)capacity*=2;if(!budget(context,
             capacity*sizeof(std::uint64_t)+n*sizeof(Value),fault))return false;
             s[Keys]=make_array(n);

@@ -129,7 +129,8 @@ bool nift_secure_random_fill(unsigned char* data, std::size_t count, std::string
         return false;
     }
 #elif defined(__APPLE__) || defined(__FreeBSD__)
-    if (count != 0) ::arc4random_buf(data, count);
+    static_cast<void>(error);
+    ::arc4random_buf(data, count);
 #endif
     return true;
 }

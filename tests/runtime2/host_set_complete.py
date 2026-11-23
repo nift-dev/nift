@@ -7,7 +7,7 @@ Unclassified one. This check enumerates every BuiltinId of src/rt/natives/builti
 filter a name list) and fails when:
 
   - an id is not classified, or classified twice, or the classification names an id that does not exist;
-  - the Host class differs from the R1 host block natives::host_builtin() (HostOpen .. StreamEof);
+  - the Host class differs from the native host predicate (the R1 block and appended stream natives);
   - a built-in that touches the file system, the environment, processes, the clock or console input
     (EFFECTFUL below: names, and every File and Stream method) is not Host;
   - a Shared built-in (synchronisation, channels) is classified Pure.
@@ -69,11 +69,13 @@ def check(list_path):
     for i in classes:
         if i not in names and i != "Count":
             problems.append("classification names an unknown id: %s" % i)
-    m = re.search(r"id >= BuiltinId::(\w+) && id <= BuiltinId::(\w+)", open(HEADER).read())
+    classifier = open(HEADER).read().split("bool host_builtin(BuiltinId id)", 1)[1].split("}", 1)[0]
+    m = re.search(r"id >= BuiltinId::(\w+) && id <= BuiltinId::(\w+)", classifier)
     block = set(names[names.index(m.group(1)):names.index(m.group(2)) + 1])
+    block.update(re.findall(r"id == BuiltinId::(\w+)", classifier))
     host = {i for i, c in classes.items() if c == ["Host"]}
     if host != block:
-        problems.append("Host class differs from the R1 host block: extra %s, missing %s" %
+        problems.append("Host class differs from natives::host_builtin(): extra %s, missing %s" %
                         (sorted(host - block), sorted(block - host)))
     for i, name, receiver in ids:
         c = classes.get(i, [])
@@ -92,7 +94,7 @@ def main():
         problems, n = check(LIST)
         for p in problems:
             print("FAIL host set: " + p)
-        print("%s host set: %d built-ins, each classified Pure, Host or Shared; Host = the R1 block" %
+        print("%s host set: %d built-ins, each classified Pure, Host or Shared; Host matches the native predicate" %
               ("FAIL" if problems else "PASS", n))
         return 1 if problems else 0
     with tempfile.TemporaryDirectory(prefix="host-set-") as d:

@@ -37,6 +37,8 @@ FN_LOOP = "fn(w0()) {{\n{body}  return 0\n}}\ni0 := 0\nwhile (i0 < 2) {{ print(w
 BODIES = {
     "literals": 'print(1)\nprint(-7)\nprint(2.5)\nprint(.5)\nprint(1e3)\nprint("s")\nprint(\'q\')\n'
                 "print(true)\nprint(false)\nprint(null)\nprint(9007199254740991)\nprint(0.0)\nprint(1e300)\n",
+    "bytes-constructor": 'print(is_bytes(bytes()))\nprint(is_bytes(bytes([0, 65, 255])))\n'
+                         'print(sha256(bytes([0, 65, 255])))\n',
     "arithmetic": "print(1 + 2 * 3 - 4 / 8)\nprint(7 % 3)\nprint(-7 % 3)\nprint(0.1 + 0.2)\nprint(10 / 4)\n"
                   'print("a" + 1 + 2.5 + true + null)\nprint(-(3))\nprint(+4)\n',
     "comparison": 'print(1 < 2)\nprint(2 <= 2)\nprint(3 > 4)\nprint(3 >= 4)\nprint(1 == 1.0)\nprint("a" != "b")\n'

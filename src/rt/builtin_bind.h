@@ -74,8 +74,7 @@ bool pure_method_name(std::string_view name);
 // stringify / prettify / highlight (W6: presentation chains are refused).
 bool presentation_builtin(const natives::BuiltinSpec& spec);
 
-// CP15 W8: a built-in that produces bytes or is a method of bytes (refused,
-// `builtin-bytes:<name>`, until CP12's kind set has a bytes bit).
+// CP15 W8: a Bytes native still refused by the VM (builtin-bytes:<name>).
 bool bytes_builtin(const natives::BuiltinSpec& spec);
 // CP15 W10/W11: `validate`, `copy`, `deepcopy` take only provably plain
 // arguments (no Unknown kinds; the VM has no struct/handle values) and no

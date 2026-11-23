@@ -22,6 +22,10 @@ APPROVED_STDERR={
  'closed-write-factory-count':'error: <ORACLE_ROOT>/case.f:1:73: write: file is not open\n',
  'readonly-write-factory-count':'error: <ORACLE_ROOT>/case.f:1:85: write: file is not open for writing\n',
 }
+# D-166 approves one case: the historical API spelling already errors before
+# mutation. Keep the complete legacy oracle and require the VM to refuse it
+# before execution, with the same empty output and unchanged files.
+WRITE_BYTES_REFUSAL = 'mutate-write_bytes(bytes([0,255,65]))'
 for row in rows:
  with tempfile.TemporaryDirectory(prefix='nift-file-buffer-oracle-') as directory:
   root=Path(directory).resolve();(root/'sub/sub').mkdir(parents=True)
@@ -30,6 +34,21 @@ for row in rows:
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   actual=dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),files={f.relative_to(root).as_posix():f.read_bytes().hex() for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
   expected={key:row[key] for key in actual}
+  if os.environ.get('NIFT_VM') != '0' and row['name'] == WRITE_BYTES_REFUSAL:
+   assert actual['exit'] == expected['exit'] == 1, (row['name'],actual)
+   diagnostic = actual['stderr'].splitlines()[0]
+   assert diagnostic.startswith('error: <ORACLE_ROOT>/case.f:1:30: not compiled for the VM (host-handle-flow): '), (row['name'],actual)
+   assert 'note: the program was not executed: no part of it ran' in actual['stderr'], (row['name'],actual)
+   assert actual['stdout'] == expected['stdout'] == '' and actual['files'] == expected['files'], (row['name'],actual)
+   legacy=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='0'),
+                         capture_output=True,text=True,encoding='utf-8',timeout=60)
+   legacy_actual=dict(exit=legacy.returncode,stdout=normalize(legacy.stdout,root),
+                      stderr=normalize(legacy.stderr,root),
+                      files={f.relative_to(root).as_posix():f.read_bytes().hex()
+                             for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
+   assert legacy_actual == expected, (row['name'],legacy_actual,expected)
+   print('PASS',row['name'],'(VM pre-execution refusal; legacy error and file bytes exact)',flush=True)
+   continue
   if os.environ.get('NIFT_VM')!='0' and row['name'] in APPROVED_STDERR:
    assert row['stderr'].endswith(': script failed\n'),(row['name'],'the approval is for legacy\'s dropped message only')
    expected['stderr']=APPROVED_STDERR[row['name']]

@@ -3,6 +3,7 @@
 #include "Sha256.h"
 #include "rt/aggregate.h"
 #include "rt/decimal.h"
+#include "rt/heap.h"
 #include "rt/natives/support.h"
 #include "rt/number.h"
 #include "rt/string.h"
@@ -79,14 +80,32 @@ bool strict_utf8(std::string_view value) {
     return true;
 }
 
-Status fn_bytes(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+Status fn_bytes(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc > 1) return fail(error, "bytes: expected zero arguments or one byte array");
+    if (argc == 1 && !args[0].is(Kind::Array))
+        return fail(error, "bytes: expected an array of integers");
+    const auto count = argc == 1 ? array_items(args[0]).size() : 0;
+    if (count > kMaxResultBytes - sizeof(BytesObject)) return Status::Memory;
+    const auto result_size = sizeof(BytesObject) + count;
+    if (!reserve_result(context, result_size)) return Status::Memory;
+
     std::vector<std::uint8_t> data;
     if (argc == 1) {
-        if (!args[0].is(Kind::Array)) return fail(error, "bytes: expected an array of integers");
         const auto& items = array_items(args[0]);
-        data.reserve(items.size());
+        data.reserve(count);
         for (const Value& item : items) {
+            if (item.is(Kind::Decimal)) {
+                // Exact conversion normalizes the coefficient and exponent
+                // with temporary strings. Budget that scratch alongside the
+                // already allocated result buffer before converting.
+                constexpr std::size_t scratch_overhead = 512;
+                constexpr std::size_t scratch_multiplier = 8;
+                const auto size = decimal_spelling(item).size();
+                if (result_size > kMaxResultBytes - scratch_overhead ||
+                    size > (kMaxResultBytes - result_size - scratch_overhead) / scratch_multiplier ||
+                    !reserve_result(context, result_size + scratch_overhead + scratch_multiplier * size))
+                    return Status::Memory;
+            }
             std::uint8_t byte = 0;
             if (!byte_value(item, byte)) return fail(error, "bytes: array values must be integers from 0 to 255");
             data.push_back(byte);

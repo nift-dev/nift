@@ -6,12 +6,12 @@ ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argu
 binary=str(Path(a.nift).resolve());a.out.parent.mkdir(parents=True,exist_ok=True);records=[]
 cases=[
  ('literal-type-refusal','x:=5\nprint("FORBIDDEN");1*"bad"\nx\nexit\n','5\n','type:mul'),
- ('loop-nested-compilation-atomicity','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")};bytes([65])\na.stringify()\nexit\n','[[1]]\n','builtin-bytes:bytes'),
+ ('loop-nested-compilation-atomicity','a:=[[1]]\nprint("FORBIDDEN");for(v:a){v.push("bad")};"A".encode("utf-8")\na.stringify()\nexit\n','[[1]]\n','builtin-bytes:encode'),
  # D-NEXT-refsem #1 (review round 2): the closure pushes into its captured array
  # directly (it pushed through a loop binding over a nested array,
  # `for(row:a){row.push(v)}`, which the Phase A guard refuses before the
  # statement under test); `warm` types the parameter, as in session_callable_cli.
- ('capture-nested-compilation-atomicity','fn(makec()){a:=[1];return v=>{a.push(v);return a.stringify()}};c:=makec();warm:=c(0)\nprint("FORBIDDEN");c("bad");bytes([65])\nc(2)\nexit\n','"[1,0,2]"\n','builtin-bytes:bytes'),
+ ('capture-nested-compilation-atomicity','fn(makec()){a:=[1];return v=>{a.push(v);return a.stringify()}};c:=makec();warm:=c(0)\nprint("FORBIDDEN");c("bad");"A".encode("utf-8")\nc(2)\nexit\n','"[1,0,2]"\n','builtin-bytes:encode'),
  ('captured-struct','x:=5\nstruct(Point){x:=1};print("FORBIDDEN");fn(makep()){p:=Point();return ()=>p.x};f:=makep()\nx\nexit\n','5\n','session:captured-struct'),
  ('lambda-rebind-spelling','f:=v=>v+1\nprint("FORBIDDEN");f=v=>v*2\nf(3)\nexit\n','4\n','session:lambda-assignment-spelling'),
  ('struct-outer-shadow','v:=99\nstruct(Counter){v:=0;fn(get()){return v}};print("FORBIDDEN");c:=Counter()\nv\nexit\n','99\n','session:struct-dynamic-shadow'),
@@ -20,11 +20,11 @@ cases=[
  ('local-dynamic-shadow','x:=1;fn(readx()){return x}\nprint("FORBIDDEN");fn(caller()){x:=7;return readx()}\nx\nreadx()\nexit\n','1\n1\n','session:dynamic-shadow'),
  ('parameter-dynamic-shadow','x:=1;fn(readx()){return x}\nprint("FORBIDDEN");fn(caller(x)){return readx()}\nx\nreadx()\nexit\n','1\n1\n','session:dynamic-shadow'),
  ('dynamic-flow','o:={"set":v=>v+1};x:=5\nprint("FORBIDDEN");o.set(4)\nx\nexit\n','5\n','session:legacy-method-precedence'),
- ('transaction','x:=5;f:=()=>x\nleaked:=77;print("FORBIDDEN");bytes([65])\nf()\nx\nexit\n','5\n5\n','builtin-bytes:bytes'),
+ ('transaction','x:=5;f:=()=>x\nleaked:=77;print("FORBIDDEN");"A".encode("utf-8")\nf()\nx\nexit\n','5\n5\n','builtin-bytes:encode'),
  ('receiver','a:=[3,1,2]\nfn(cmpv(a0,b0)){a.push(9);return a0<b0}\na.sort(cmpv)\na.stringify()\nexit\n','[3,1,2]\n','method:sort'),
  ('new-function-before-declaration','fn(g0()){return 1};o:={"invoke":()=>g0()}\nprint("FORBIDDEN");newg();fn(newg()){return 2}\no.invoke()\nexit\n','1\n','fn-called-before-declaration'),
  ('prepared-loop','x:=0\nprint("FORBIDDEN");while((x+=1)<3){print(x)}\nx\nexit\n','0\n','prepared-unpreparable'),
- ('first-refusal','leaked:=77;print("FORBIDDEN");bytes([65])\nx:=5\nx\nexit\n','5\n','builtin-bytes:bytes'),
+ ('first-refusal','leaked:=77;print("FORBIDDEN");"A".encode("utf-8")\nx:=5\nx\nexit\n','5\n','builtin-bytes:encode'),
 ]
 for name,source,expected,reason in cases:
  # A real witness that earlier statements ran: every input starts with EARLY.

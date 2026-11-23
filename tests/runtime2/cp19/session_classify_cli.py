@@ -20,14 +20,14 @@ for mode in ['classify','classify-all']:
 with tempfile.TemporaryDirectory(prefix='cp19-inventory-') as td:
  root=Path(td);stats=root/'stats'
  env={k:v for k,v in os.environ.items() if not k.startswith('NIFT_')};env.update(HOME=td,NIFT_VM='classify-all',NIFT_VM_STATS=str(stats),NO_COLOR='1')
- r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN");bytes([65]);unknown(1)\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
+ r=subprocess.run([binary,'-i'],input='print("MUST-NOT-RUN");"A".encode("utf-8");unknown(1)\nexit\n',cwd=td,env=env,text=True,capture_output=True,timeout=30)
  rows=[json.loads(x) for x in stats.read_text().splitlines()]
  record=dict(case='independent-refusal-inventory',status=r.returncode,stdout=r.stdout,stderr=r.stderr,stats=rows);records.append(record)
  a.out.write_text(json.dumps(records,indent=2)+'\n')
  assert (r.returncode,r.stdout,r.stderr)==(0,'','') and len(rows)==1,record
  row=rows[0];assert row['vm_executions']==row['legacy_executions']==0 and row['inventory_complete'],record
  reasons={x['reason'] for x in row['reasons'] if not x['consequential']}
- assert 'builtin-bytes:bytes' in reasons and 'callable:unknown' in reasons,record
+ assert 'builtin-bytes:encode' in reasons and 'callable:unknown' in reasons,record
 for mode in ['1','require']:
  with tempfile.TemporaryDirectory(prefix='cp19-session-budget-') as td:
   root=Path(td);stats=root/'stats'

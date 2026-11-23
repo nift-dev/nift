@@ -230,6 +230,11 @@ SUPPORTED_TOP = [
 
 # Legacy error messages of bound natives, at top level.
 ERRORS = [
+    ("bytes-type", 'print(bytes("wrong"))\n'),
+    ("bytes-negative", 'print(bytes([-1]))\n'),
+    ("bytes-overflow", 'print(bytes([256]))\n'),
+    ("bytes-fraction", 'print(bytes([1.5]))\n'),
+    ("bytes-bool", 'print(bytes([true]))\n'),
     ("substr-pos", 's := "ab"\nprint(s.substr(-1))\n'),
     ("substr-len", 's := "ab"\nprint(s.substr(1, "q"))\n'),
     ("split-delim", 's := "ab"\nr := s.split(1)\nprint(r.size())\n'),
@@ -297,7 +302,7 @@ UNSUPPORTED = [
     # Batch B (CP15) and C (CP16) names.
     # CP15 W8: bytes have no CP12 kind bit; W9: a literal of constants that
     # is not JSON; W10: a quoted-literal validate argument (J-Q2).
-    ("w8-bytes", "b := bytes([1, 2])\nprint(1)\n", "builtin-bytes:bytes"),
+    ("w8-bytes", 'b := "A".encode("utf-8")\nprint(1)\n', "builtin-bytes:encode"),
     ("w8-encode", 's := "a"\nb := s.encode("utf-8")\nprint(1)\n', "builtin-bytes:encode"),
     # W9 option A: a literal that is not JSON is compiled as a Nift literal,
     # so the CP10/CP11 guards refuse exactly what they refused before.

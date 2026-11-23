@@ -327,7 +327,7 @@ REFUSED = [
      'print(o.k.stringify())\n', 'path-in-call-argument'),
     ('path-copy-push', 'fn(f(s)) {\n  t := s\n  t.push(2)\n  return 0\n}\no := {"k": [1]}\nf(o.k)\n'
      'print(o.k.stringify())\n', 'path-in-call-argument'),
-    ('path-unknown-kind', 'fn(f(s)) {\n  return 0\n}\no := {"k": bytes("ab")}\nf(o.k)\n', 'builtin-bytes:bytes'),
+    ('path-unknown-kind', 'fn(f(s)) {\n  return 0\n}\no := {"k": "A".encode("utf-8")}\nf(o.k)\n', 'builtin-bytes:encode'),
     ('path-mixed-iter', 'fn(f(s)) {\n  return 0\n}\na := [1, [2]]\ni := 0\nwhile (i < 2) {\n  f(a[i])\n  i += 1\n}\n',
      'path-in-call-argument'),
     ('path-root-reassigned', 'fn(f(s)) {\n  return 0\n}\no := {"k": 1}\nf(o.k)\no = {"k": [1]}\nf(o.k)\n',

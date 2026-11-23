@@ -107,8 +107,8 @@ bool pure_method_name(std::string_view name) { return first_method(name) != null
 bool presentation_builtin(const BuiltinSpec& spec) { return spec.receiver == Receiver::Any; }
 
 bool bytes_builtin(const BuiltinSpec& spec) {
-    // The managed stream methods are the only admitted Bytes producers.
-    if (stream_bytes_builtin(spec)) return false;
+    // The constructor and managed stream reads may produce Bytes.
+    if (spec.id == natives::BuiltinId::FnBytes || stream_bytes_builtin(spec)) return false;
     return (spec.rule == natives::ResultRule::Fixed && (spec.result & natives::kBytes) != 0) ||
            spec.receiver == Receiver::Bytes;
 }
