@@ -32,6 +32,38 @@ std::string read_file(const fs::path& path) {
 }
 
 std::optional<std::string> read_file_checked(const fs::path& path) {
+#ifdef __FreeBSD__
+    // Keep file identity and size tied to the same descriptor. Native parallel
+    // renders have observed an empty or unrelated file through std::ifstream.
+    std::error_code type_error;
+    if (!fs::is_regular_file(path, type_error)) return std::nullopt;
+    int fd;
+    do fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return std::nullopt;
+    struct CloseFile {
+        int fd;
+        ~CloseFile() { ::close(fd); }
+    } close_file{fd};
+
+    struct stat status{};
+    int inspected;
+    do inspected = ::fstat(fd, &status);
+    while (inspected < 0 && errno == EINTR);
+    std::string contents;
+    if (inspected < 0 || !S_ISREG(status.st_mode) || status.st_size < 0 ||
+        static_cast<std::uintmax_t>(status.st_size) > contents.max_size()) return std::nullopt;
+    contents.resize(static_cast<std::size_t>(status.st_size));
+    for (std::size_t offset = 0; offset < contents.size();) {
+        const auto count = std::min(contents.size() - offset,
+                                    static_cast<std::size_t>(std::numeric_limits<ssize_t>::max()));
+        const ssize_t got = ::read(fd, contents.data() + offset, count);
+        if (got < 0 && errno == EINTR) continue;
+        if (got <= 0) return std::nullopt;
+        offset += static_cast<std::size_t>(got);
+    }
+    return contents;
+#else
     std::error_code type_error;
     if (!fs::is_regular_file(path, type_error)) return std::nullopt;
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -44,6 +76,7 @@ std::optional<std::string> read_file_checked(const fs::path& path) {
     file.read(contents.data(), size);
     if (!file && !file.eof()) return std::nullopt;
     return contents;
+#endif
 }
 
 static void ensure_parent_directory(const fs::path& path) {
