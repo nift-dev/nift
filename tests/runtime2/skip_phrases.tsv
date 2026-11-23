@@ -10,8 +10,8 @@ Makefile	detected	-	@echo "test-v45-adversarial-runtime: skipped (POSIX timeout 
 Makefile	detected	-	if [ $$st -eq 77 ]; then echo "test-serve: SKIPPED (unsupported platform or python3 unavailable; nothing was tested)"; \
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
 Makefile	detected	-	V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
-Makefile	detected	-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
-Makefile	detected	-	@if command -v python3 >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: python3 unavailable)"; fi
+Makefile	detected	-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
+Makefile	detected	-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/cp19_completion.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: completion PTY needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(SHELL_DISPATCH_MUTANT)" $(PYTHON) -u tests/shell_dispatch.py --mutant-kind m1; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
@@ -51,7 +51,7 @@ tests/handover_live_check.sh	detected	-	[ "${NIFT_LIVE_TESTS:-0}" = "1" ] || { e
 tests/memory_10k_benchmark.py	detected	-	Outcome contract (BH2): this guard emits exactly one of PASS / FAIL / SKIP /
 tests/migration_live_check.sh	detected	-	[ "${NIFT_LIVE_TESTS:-0}" = "1" ] || { echo "migration live check skipped (NIFT_LIVE_TESTS != 1)"; exit 0; }
 tests/ownership_unit.cpp	detected	-	std::printf("  [SKIP] process-death path (POSIX fork/kill) not run on Windows\n");
-tests/package_combined_dogfood.sh	detected	-	echo "SKIP combined dogfood (python3 unavailable)"
+tests/package_combined_dogfood.sh	detected	-	echo "SKIP combined dogfood ("${PYTHON_CMD[@]}" unavailable)"
 tests/package_combined_dogfood.sh	detected	-	echo "SKIP combined dogfood (dirty sqlite self-dependency rejected)"
 tests/package_refs_smoke.sh	detected	-	echo "SKIP package refs/local lock (git unavailable)"
 tests/package_sqlite_dogfood.sh	detected	-	echo "SKIP package_sqlite_dogfood (dirty sqlite self-dependency rejected)"
@@ -59,7 +59,6 @@ tests/package_transaction_smoke.py	detected	-	print("SKIP package transactions (
 tests/pagination_ordering_smoke.sh	detected	-	echo "Pagination ordering smoke test SKIPPED (strace unavailable): the ordering guarantee is NOT verified" >&2
 tests/path_alias_smoke.sh	detected	-	printf 'unused\n' >"$P/public/assets/skipped.txt"
 tests/progress_pty_smoke.sh	detected	-	echo "progress PTY smoke test SKIPPED ('script' unavailable): the PTY ordering guarantee is NOT verified" >&2
-tests/progress_pty_smoke.sh	detected	-	echo "progress PTY smoke test SKIPPED ('python3' unavailable): the PTY ordering guarantee is NOT verified" >&2
 tests/requirements_smoke.sh	detected	-	printf 'y\n' >"$P/public/assets/skipped.txt"
 tests/rt/case_conversion_unit.cpp	detected	-	if (!checked) std::fprintf(stderr, "note: no UTF-8 locale installed; locale-independence check skipped\n");
 tests/rt/host_observer_native.cpp	detected	-	std::printf("N1 native post-open read-failure code mapping: SKIP (Linux /proc/self/mem unavailable)\n");
@@ -187,3 +186,6 @@ tests/runtime2/suite_status.sh	justified	C140c (D-083) count line: reports how m
 tests/runtime2/suite_status.sh	justified	C140c (D-083) a FAIL line, never a skip: printed when a suite did not run, and the summary returns 1	[ $notrun -gt 0 ] && echo "FAIL test-rt-vm: $notrun suite(s) did not run"
 tests/runtime2/save_safety.py	detected	D-091 #5 addition 2: a fixture the system does not permit (mknod c 1 3 without privilege) is reported NOT-RUN, excluded from the pass count, never a pass	print("NOT-RUN save-safety %s %s: fixture not permitted here (%s)" % ("vm" if vm else "legacy", name, e))
 tests/runtime2/save_safety.py	justified	the summary counts the NOT-RUN fixtures separately from the passes; each is also printed as a NOT-RUN line, which the markers catch	print("save-safety: %d/%d pass, %d not run" % (total - len(failing), total, len(notrun)))
+scripts/ci_freebsd.sh	justified	FreeBSD regression aggregate; individual entries and exit codes are reported separately	[ "$nr" -gt 0 ] && echo "- NOT RUN on FreeBSD ($nr, NOT a pass):$notrun"
+scripts/ci_freebsd.sh	justified	FreeBSD regression aggregate; individual entries and exit codes are reported separately	[ -n "$notverified" ] && echo "- not verified on this host (exit 77, NOT a pass):$notverified"
+tests/runtime2/platform_subset.py	justified	FreeBSD subset aggregate, including zero counts; individual outcomes and exit codes determine the verdict	print("FreeBSD outcomes: PASS %d, FAIL %d, NOT RUN %d, EXCLUDED %d, BLOCKED %d" %
