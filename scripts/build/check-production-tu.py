@@ -288,9 +288,16 @@ def main():
     makefile_names, _ = makefile_switches(root)
     for dep in deps_of(depfile, out):
         real = os.path.realpath(dep)
-        rel = os.path.relpath(real, root)
-        if rel.startswith('..' + os.sep) or rel == '..':
-            if not any(real == d or real.startswith(d + os.sep) for d in sysdirs):
+        # On Windows, relpath raises when compiler headers and the checkout
+        # are on different drives. Such headers still need the system check.
+        try:
+            rel = os.path.relpath(real, root)
+        except ValueError:
+            rel = None
+        if rel is None or rel.startswith('..' + os.sep) or rel == '..':
+            canonical = os.path.normcase(real)
+            if not any(canonical == d or canonical.startswith(d + os.sep)
+                       for d in map(os.path.normcase, sysdirs)):
                 problems.append(f'depends on {dep} ({real}), outside the repository and the compiler\'s system '
                                 'include directories')
             continue
