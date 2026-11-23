@@ -86,7 +86,8 @@ jobs:
             pw useradd niftci -m -s /bin/sh
             chown -R niftci "$PWD"
             regression=0
-            su niftci -c "cd '$PWD/nift' && sh scripts/ci_freebsd.sh" || regression=$?
+            # The inherited suite asserts the pre-VM interpreter's contracts.
+            su niftci -c "cd '$PWD/nift' && NIFT_VM=0 sh scripts/ci_freebsd.sh" || regression=$?
             runtime=0
             if [ "${{ github.event_name != 'workflow_dispatch' || inputs.runtime2_vm }}" = true ]; then
               mkdir -p /mnt/nift-runtime2

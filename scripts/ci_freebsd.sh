@@ -24,6 +24,7 @@ c++ --version > "$OUT/compiler.txt" 2>&1 || true
 echo "- compiler: $(sed -n 1p "$OUT/compiler.txt")" >> "$SUMMARY"
 echo "- commit: $(git rev-parse HEAD 2>/dev/null || echo unknown)" >> "$SUMMARY"
 echo "- user: $(id -un) (unprivileged), locale: $LC_ALL" >> "$SUMMARY"
+echo "- inherited regression interpreter: \`NIFT_VM=${NIFT_VM:-default}\`" >> "$SUMMARY"
 
 start=$(date +%s)
 if ! gmake -j"$JOBS" nift > "$OUT/build.log" 2>&1; then
