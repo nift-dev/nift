@@ -443,6 +443,13 @@ jobs:
           if ($build -ne 0) {
             Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue |
               Where-Object { $_.Message -match 'nift\.exe' } | Select-Object -First 3 | Format-List Message
+            $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits/10/Debuggers"
+            $debugger = Join-Path $kits "x64/cdb.exe"
+            if (Test-Path $debugger) {
+              & $debugger -g -G -c "sxe -c `".ecxr; k; q`" 0xc0000374; g" $exe build --all
+            } else {
+              Write-Host "Windows SDK console debugger unavailable"
+            }
             throw "build exited $build"
           }
           & $exe status
