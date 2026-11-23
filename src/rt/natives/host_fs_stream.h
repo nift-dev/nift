@@ -120,11 +120,11 @@ inline bool grow_unknown(const Context& context, Buffer& data, std::size_t neede
 #if defined(__FreeBSD__) && defined(_LIBCPP_VERSION)
     if constexpr (std::is_same_v<Buffer, BudgetedText>) {
         // Grow on power-of-two jemalloc boundaries, counting libc++'s
-        // terminator. The initial 64 KiB reserve may have library padding.
-        // Start growing at an exact 128 KiB block so that padding does not
-        // move every subsequent allocation into a larger size class.
+        // terminator. Ignore library padding on the initial 64 KiB reserve
+        // and advance a whole block if the next read fills that block.
         constexpr std::size_t first_block = std::size_t{128} << 10;
-        const auto block = old < first_block - 1 ? first_block : size_mul(size_add(old, 1), 2);
+        auto block = old < first_block - 1 ? first_block : size_mul(size_add(old, 1), 2);
+        if (needed >= block) block = size_mul(block, 2);
         doubled = block == kSizeOverflow ? kSizeOverflow : block - 1;
     }
 #endif
