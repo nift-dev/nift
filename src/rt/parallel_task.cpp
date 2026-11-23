@@ -50,7 +50,7 @@ const Proto* ProgramTransferMap::proto_of(std::uint32_t index) const {
     return index < by_index_.size() ? by_index_[index] : nullptr;
 }
 
-std::shared_ptr<ParallelRuntime> ParallelRuntime::from_environment() {
+std::shared_ptr<ParallelRuntime> ParallelRuntime::from_environment(std::size_t root_heap_budget) {
     std::size_t limit = std::thread::hardware_concurrency();
     limit = std::max<std::size_t>(1, std::min<std::size_t>(8, limit));
     const char* text = std::getenv("NIFT_VM_PARALLEL_WORKERS");
@@ -60,7 +60,7 @@ std::shared_ptr<ParallelRuntime> ParallelRuntime::from_environment() {
         if (end != text && *end == '\0' && parsed > 0 && parsed <= 256)
             limit = static_cast<std::size_t>(parsed);
     }
-    return std::make_shared<ParallelRuntime>(limit);
+    return std::make_shared<ParallelRuntime>(limit, kTaskCapacity, kBlockedCapacity, root_heap_budget);
 }
 
 namespace {
@@ -69,10 +69,12 @@ thread_local std::size_t timer_help_depth = 0;
 constexpr std::size_t kTimerHelpDepth = 32;
 }
 
-ParallelRuntime::ParallelRuntime(std::size_t limit, std::size_t task_capacity, std::size_t blocking_capacity)
+ParallelRuntime::ParallelRuntime(std::size_t limit, std::size_t task_capacity, std::size_t blocking_capacity,
+                                 std::size_t root_heap_budget)
     : blocking_capacity_(std::max<std::size_t>(1, std::min(kBlockedCapacity, blocking_capacity))),
       limit_(std::max<std::size_t>(1, std::min<std::size_t>(256, limit))),
-      capacity_(std::max<std::size_t>(1, std::min(kTaskCapacity, task_capacity))) {
+      capacity_(std::max<std::size_t>(1, std::min(kTaskCapacity, task_capacity))),
+      root_heap_budget_(root_heap_budget) {
     (void)shared_detail::registry(); // initialize allocating CV state before any noexcept teardown
     workers_.reserve(limit_ + blocking_capacity_);
 }
@@ -109,8 +111,8 @@ bool ParallelRuntime::submit(std::shared_ptr<ParallelTaskRecord> record, std::st
     // explicit refusal; blocking workers release CPU permits.
     if (active_ >= capacity_) { error = "parallel task admission limit exceeded"; return false; }
     // C140 (b): every unfinished isolate's charge counts against the root heap budget, awaited or not.
-    const std::size_t budget = record->options.heap_budget, charge = record->reserved_bytes;
-    if (charge > budget || reserved_ > budget - charge) {
+    const std::size_t charge = record->reserved_bytes;
+    if (charge > root_heap_budget_ || reserved_ > root_heap_budget_ - charge) {
         record->failure_code = "limit.exceeded"; error = "parallel task memory budget exceeded"; return false;
     }
     queue_.push_back(record);

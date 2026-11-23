@@ -57,7 +57,7 @@ Vm::Vm(const Program& program, VmOptions options)
             options_.cooperative_tasks = true;
     }
     if (program.has_coroutines && !options_.cooperative_tasks && !options_.parallel)
-        options_.parallel = ParallelRuntime::from_environment();
+        options_.parallel = ParallelRuntime::from_environment(options_.heap_budget);
     if (options_.parallel && !options_.current_task && !options_.parallel_output)
         options_.parallel_output = std::make_shared<ParallelOutput>();
     program_has_collection_boundaries_ = program.has_collection_boundaries;

@@ -25,6 +25,11 @@ symbols (including 70,000 unrelated source names), captured closures, graph iden
 cyclic imported heap reclamation, 20,000-deep graphs, a 64-task saturated pool,
 reuse, queued cancellation, outstanding-work destruction, nested one-permit
 progress, mutex cancellation, and output happens-before boundaries.
+The pool captures the root VM's heap budget at creation and uses it for the
+sum of unfinished isolate admission charges. Each isolate retains its own heap
+budget for execution and timer helping. `admission_unit` exercises both a small
+isolate budget with an ample root budget and the reverse.
+
 `contention_unit` checks per-producer FIFO across four OS senders, eight-thread
 mutex/atomic increments and 100 close/cancel races. All worker handle boxes
 are reconstructed on their owning threads.

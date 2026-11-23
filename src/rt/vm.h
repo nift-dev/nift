@@ -62,9 +62,11 @@ inline constexpr std::size_t kMaxEvidenceLines = 4096;
 inline constexpr std::size_t kLegacyMaxDepth = 64;
 
 struct VmOptions {
+    static constexpr std::size_t kDefaultHeapBudget = std::size_t(1) << 30;
+
     std::size_t max_frames = 100000;
     std::size_t max_registers = std::size_t(16) << 20;      // 16M values, 256 MiB
-    std::size_t heap_budget = std::size_t(1) << 30;  // live rt heap + register and frame stacks (bytes)
+    std::size_t heap_budget = kDefaultHeapBudget;  // live rt heap + register and frame stacks (bytes)
     std::size_t flush_threshold = std::size_t(64) << 10;
     // Called with the buffered output when it exceeds flush_threshold (and
     // by the caller at the end). Null: everything stays in the buffer.

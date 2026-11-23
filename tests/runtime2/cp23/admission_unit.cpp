@@ -70,6 +70,23 @@ void small_heap_isolates() {
  pool->wait_idle();for(auto& r:records)CHECK(r->snapshot_state()==ParallelTaskState::Done);
  pool.reset();records.clear();shared_collect();CHECK(shared_registry_live_for_test()==0);
 }
+void small_root_budget_refuses_larger_isolate() {
+ CompileLimits limits;limits.parallel_tasks=true;
+ auto code=rt_vm_tool::compile("fn[async](f()){return 7}",limits);
+ CHECK(code.program!=nullptr);if(!code.program)return;
+ std::shared_ptr<const Program> program(std::move(code.program));
+ auto pool=ParallelRuntime::from_environment(32u<<10);
+ auto map=std::make_shared<ProgramTransferMap>(*program);
+ auto record=std::make_shared<ParallelTaskRecord>();
+ record->program=program;record->proto_map=map;record->runtime=pool;
+ record->input.entry_proto=1;record->input.proto_map=map.get();
+ record->options.heap_budget=8u<<20;
+ std::string why;
+ CHECK(!start_parallel_task(record,why));
+ CHECK(record->failure_code=="limit.exceeded");
+ CHECK(why=="parallel task memory budget exceeded");
+ CHECK(pool->active()==0);CHECK(pool->worker_count()==0);
+}
 void blocking_limit() {
  CompileLimits limits;limits.parallel_tasks=true;
  auto code=rt_vm_tool::compile("fn[async](f(c)){recv(c);return 1};fn[async](snd(c)){send(c,99);return 1};fn[async](awaitit(p)){return await p}",limits);
@@ -119,6 +136,7 @@ int main(){
  std::setbuf(stdout,nullptr);
  timer_releases_cpu();
  small_heap_isolates();
+ small_root_budget_refuses_larger_isolate();
  blocking_limit();
  for(std::size_t p:{1,2,4,8}){
   for(int n:{200,10000}){

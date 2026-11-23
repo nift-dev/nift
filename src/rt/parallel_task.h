@@ -125,7 +125,8 @@ private:
 // NIFT_VM_PARALLEL_WORKERS overrides CPU permits. Admission is bounded.
 class ParallelRuntime : public std::enable_shared_from_this<ParallelRuntime> {
 public:
-    static std::shared_ptr<ParallelRuntime> from_environment();
+    static std::shared_ptr<ParallelRuntime> from_environment(
+        std::size_t root_heap_budget = VmOptions::kDefaultHeapBudget);
     // Neutral queued/unfinished records, independent of CPU topology. The
     // default covers CP22's 10,000-sleeper workload with bounded headroom.
     static constexpr std::size_t kTaskCapacity = 16384;
@@ -134,7 +135,8 @@ public:
     // C140 (b): fixed per-isolate charge (VM state and worker stack touched; about 65 KB measured per nested level).
     static constexpr std::size_t kIsolateOverhead = std::size_t(64) << 10;
     explicit ParallelRuntime(std::size_t limit, std::size_t task_capacity = kTaskCapacity,
-                             std::size_t blocking_capacity = kBlockedCapacity);
+                             std::size_t blocking_capacity = kBlockedCapacity,
+                             std::size_t root_heap_budget = VmOptions::kDefaultHeapBudget);
     ~ParallelRuntime();
     bool submit(std::shared_ptr<ParallelTaskRecord> record, std::string& error);
     // Compatibility admission hooks for direct embedding probes.
@@ -231,6 +233,7 @@ private:
     std::uint32_t limit_offset_ = 0;
     std::size_t blocking_capacity_ = kBlockedCapacity;
     std::size_t limit_ = 8, capacity_ = kTaskCapacity;
+    const std::size_t root_heap_budget_;
     bool stopping_ = false;
 };
 
