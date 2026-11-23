@@ -54,7 +54,18 @@ public:
     bool page_project_metadata(const TrackedInfo& info, nift::RuntimeValue& out, std::string&) const override {
         const auto model = project_.content_model_value();
         if (!model) return false;
-        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model, nullptr, [this](const auto& path,const auto& bytes){ observe_dependency(path,bytes); });
+        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model, nullptr,
+            [this, &info](const auto& path, const auto& bytes) {
+                if (!observe_dependencies) return;
+                const auto supplied = filesystem::hash_bytes(bytes);
+                const auto reread = filesystem::hash_path_streamed(path);
+                if (supplied != reread) {
+                    std::fprintf(stderr, "front-matter read differs page=%s path=%s bytes=%zu supplied=%llu reread=%llu\n",
+                                 info.name.c_str(), path.string().c_str(), bytes.size(),
+                                 static_cast<unsigned long long>(supplied), static_cast<unsigned long long>(reread));
+                }
+                observe_dependency_hash(path, supplied, "project front matter");
+            });
         if (!model->errors.empty()) metadata["_error"] = json::Document(model->errors.front());
         out = nift::runtime_from_json(metadata);
         return true;

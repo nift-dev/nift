@@ -1547,7 +1547,8 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
         // Script writes are recovery-relevant even if it later fails.
         mark_mutation();
         const auto source_bytes = filesystem::read_file(source);
-        host.observe_dependency(source, source_bytes);
+        if (host.observe_dependencies)
+            host.observe_dependency_hash(source, filesystem::hash_bytes(source_bytes), "item hook");
         auto rr=script.run_script(source_bytes,source,true);
         if(!rr.ok){report_build_error(rr.error,out_error);return false;}
         hook_dependencies.insert(relative(source));hook_dependencies.insert(rr.dependencies.begin(),rr.dependencies.end());
