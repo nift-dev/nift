@@ -1,5 +1,5 @@
 from pathlib import Path
-import subprocess,tempfile,json,os
+import csv,hashlib,subprocess,tempfile,json,os
 def native_path(path):
  if os.environ.get('MSYSTEM'):
   return subprocess.check_output(['cygpath','-m',str(path)],text=True).strip()
@@ -26,34 +26,87 @@ APPROVED_STDERR={
 # mutation. Keep the complete legacy oracle and require the VM to refuse it
 # before execution, with the same empty output and unchanged files.
 WRITE_BYTES_REFUSAL = 'mutate-write_bytes(bytes([0,255,65]))'
+with (Path(__file__).resolve().parent/'data/v410-file-buffer-d172.tsv').open(newline='') as pins:
+ pin_rows = list(csv.DictReader(pins,delimiter='\t'))
+D172 = {pin['case']:pin for pin in pin_rows}
+assert len(D172) == len(pin_rows) == 32
+assert sorted(pin['kind'] for pin in pin_rows) == ['flow'] * 6 + ['nesting'] * 26
+assert set(D172) <= {row['name'] for row in rows}
+
+def check_refusal(actual, expected, diagnostic):
+ assert actual['exit'] == 1 and actual['stdout'] == '' and actual['files'] == expected['files'], actual
+ assert actual['stderr'].splitlines()[0] == diagnostic, actual
+ assert 'note: the program was not executed: no part of it ran' in actual['stderr'], actual
+
+def run_case(root,path,mode):
+ q = subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM=mode),
+                    capture_output=True,text=True,encoding='utf-8',timeout=60)
+ return dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),
+             files={f.relative_to(root).as_posix():f.read_bytes().hex()
+                    for f in root.rglob('*') if f.is_file() and f!=path})
+
+def check_depth_boundaries():
+ for token,base,last,output in [('id(','f.exists()',29,'true'),('type(','"x"',30,'string'),
+                                ('html_escape(','"x"',30,'x'),('min(','1',30,'1')]:
+  with tempfile.TemporaryDirectory(prefix='nift-file-depth-') as directory:
+   root=Path(directory).resolve()
+   path=root/'case.f'
+   (root/'data').touch()
+   for depth in (last,last+1):
+    path.write_text('f:=file("data");fn(id(x)){return x};print('+token*depth+base+')'*depth+')\n')
+    actual=run_case(root,path,'require')
+    if depth==last:
+     assert (actual['exit'],actual['stdout'],actual['stderr']) == (0,output+'\n',''), actual
+    else:
+     diagnostic=('error: <ORACLE_ROOT>/case.f:1:37: not compiled for the VM (opaque:nesting-limit): '
+                 'source the VM parser does not structure (nesting-limit) is not supported by the Runtime 2.0 VM yet')
+     check_refusal(actual, {'files':{'data':''}}, diagnostic)
+   print(f'PASS VM depth boundary {token} {last}/{last+1}',flush=True)
+
+def check_adjacent_postfix():
+ with tempfile.TemporaryDirectory(prefix='nift-file-postfix-') as directory:
+  root=Path(directory).resolve()
+  path=root/'case.f'
+  path.write_text('print(" x ".trim().trim())\n')
+  actual=run_case(root,path,'require')
+  assert actual == dict(exit=0,stdout='x\n',stderr='',files={}), actual
+  print('PASS compact nested trim control',flush=True)
+
 def check_row(row):
  with tempfile.TemporaryDirectory(prefix='nift-file-buffer-oracle-') as directory:
   root=Path(directory).resolve();(root/'sub/sub').mkdir(parents=True)
   for name in ['data','sub/data','sub/sub/data']:(root/name).write_bytes(b'ABCDEFGH')
   path=root/'case.f';path.write_text(row['source']+'\n')
-  q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
-  actual=dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),files={f.relative_to(root).as_posix():f.read_bytes().hex() for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
+  mode = os.environ.get('NIFT_VM','require')
+  actual=run_case(root,path,mode)
   expected={key:row[key] for key in actual}
-  if os.environ.get('NIFT_VM') != '0' and row['name'] == WRITE_BYTES_REFUSAL:
-   assert actual['exit'] == expected['exit'] == 1, (row['name'],actual)
-   diagnostic = actual['stderr'].splitlines()[0]
-   assert diagnostic.startswith('error: <ORACLE_ROOT>/case.f:1:30: not compiled for the VM (host-handle-flow): '), (row['name'],actual)
-   assert 'note: the program was not executed: no part of it ran' in actual['stderr'], (row['name'],actual)
-   assert actual['stdout'] == expected['stdout'] == '' and actual['files'] == expected['files'], (row['name'],actual)
-   legacy=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='0'),
-                         capture_output=True,text=True,encoding='utf-8',timeout=60)
-   legacy_actual=dict(exit=legacy.returncode,stdout=normalize(legacy.stdout,root),
-                      stderr=normalize(legacy.stderr,root),
-                      files={f.relative_to(root).as_posix():f.read_bytes().hex()
-                             for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
-   assert legacy_actual == expected, (row['name'],legacy_actual,expected)
-   print('PASS',row['name'],'(VM pre-execution refusal; legacy error and file bytes exact)',flush=True)
-   return
+  if mode != '0' and (row['name'] == WRITE_BYTES_REFUSAL or row['name'] in D172):
+   if row['name'] == WRITE_BYTES_REFUSAL:
+    diagnostic=actual['stderr'].splitlines()[0]
+    assert diagnostic.startswith('error: <ORACLE_ROOT>/case.f:1:30: not compiled for the VM (host-handle-flow): '), actual
+   else:
+    pin=D172[row['name']]
+    assert hashlib.sha256(row['source'].encode()).hexdigest() == pin['source_sha256'], row['name']
+    diagnostic=pin['diagnostic']
+    assert expected['exit'] == 0, expected
+   # The oracle records the final legacy files, which may differ from setup.
+   # Refusal must leave every fixture at its initial bytes.
+   untouched={'files':{name:b'ABCDEFGH'.hex() for name in ('data','sub/data','sub/sub/data')}}
+   check_refusal(actual,untouched,diagnostic)
+   line=diagnostic.replace('/case.f:1:','/case.f:2:',1)
+   path.write_text('print("D172-MUST-NOT-RUN")\n'+row['source']+'\n')
+   check_refusal(run_case(root,path,mode),untouched,line)
+   path.write_text(row['source']+'\n')
+   legacy=run_case(root,path,'0')
+   assert legacy == expected, (row['name'],legacy,expected)
+   print('PASS',row['name'],'(approved VM pre-execution refusal; exact legacy execution)',flush=True)
+   return 'refusal'
   if os.environ.get('NIFT_VM')!='0' and row['name'] in APPROVED_STDERR:
    assert row['stderr'].endswith(': script failed\n'),(row['name'],'the approval is for legacy\'s dropped message only')
    expected['stderr']=APPROVED_STDERR[row['name']]
   assert actual==expected,(row['name'],actual,expected)
   print('PASS',row['name'],flush=True)
+  return 'execution'
 def check_append_controls():
  with tempfile.TemporaryDirectory(prefix='nift-file-append-') as directory:
   root = Path(directory).resolve()
@@ -80,12 +133,14 @@ def check_append_controls():
 
 if os.environ.get('NIFT_VM') != '0':
  check_append_controls()
-failures = 0
+ check_depth_boundaries()
+ check_adjacent_postfix()
+failures = refusals = 0
 for row in rows:
  try:
-  check_row(row)
+  refusals += check_row(row) == 'refusal'
  except AssertionError as error:
   print('FAIL',row['name'],error,flush=True)
   failures += 1
-print(f'file-buffer oracle: {len(rows)-failures}/{len(rows)} exact contracts passed',flush=True)
+print(f'file-buffer oracle: {len(rows)-failures-refusals} execution matches, {refusals} approved refusals, {failures} failures ({len(rows)} rows)',flush=True)
 raise SystemExit(bool(failures))

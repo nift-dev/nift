@@ -3500,15 +3500,15 @@ test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
 	$(LOAD_SENSITIVE_DEFER) NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_struct_variadic_methods_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp3_variadic_lambdas_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp4_spread_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp5_generalized_native_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp6_cp7_glob_filesystem_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_struct_variadic_methods_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp3_variadic_lambdas_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp4_spread_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp5_generalized_native_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp6_cp7_glob_filesystem_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp8_structured_wildcards_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp9_map_markup_smoke.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp10_filesystem_authority_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp9_map_markup_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp10_filesystem_authority_smoke.sh
 
 # Remaining v4.4 shell/restriction/package surface. Kept as a separate target so
 # the package tests can run with NIFT and the sibling sqlite package injected.

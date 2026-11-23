@@ -17,8 +17,28 @@ historical_tools = publisher / '.build/identity'
 historical_nift = publisher / ('nift' + suffix)
 probe = historical_tools / ('probe' + suffix)
 call('spelling', [str(historical_tools / ('spelling' + suffix))])
+historical_script = publisher / 'tests/identity_publication_contracts.py'
+if os.name == 'nt':
+    # Adapt only the pinned test's ACL setup. Its recursive icacls invocation
+    # can deny traversal before finishing and leave the temporary tree locked.
+    source = historical_script.read_text(encoding='utf-8')
+    start = source.index(' # Real inaccessible parent.')
+    end = source.index(' # A fresh parent containment observation', start)
+    original = source[start:end]
+    probe_assertion = "  r=run(probe,root,'native',str(root),'data/plain.txt');assert r.returncode==0,(r.stdout,r.stderr)"
+    status_assertion = "  equal_status(root,'actual inaccessible parent parity')"
+    assert probe_assertion in original.splitlines() and status_assertion in original.splitlines()
+    preamble = ("import sys\n"
+                f"sys.path[:0] = [{str(historical_script.parent)!r}, {str(root / 'tests')!r}]\n"
+                "from identity_windows_acl import denied_read, assert_denied\n")
+    replacement = (' blocked=root/"data"\n with denied_read(blocked):\n  assert_denied(blocked)\n'
+                   + probe_assertion + '\n' + status_assertion + '\n')
+    historical_script = out / 'historical_publication_windows.py'
+    adapted = preamble + source[:start] + replacement + source[end:]
+    compile(adapted, str(historical_script), 'exec')
+    historical_script.write_text(adapted, encoding='utf-8')
 call('historical-publication', [
-    sys.executable, 'tests/identity_publication_contracts.py', '--nift', str(historical_nift),
+    sys.executable, str(historical_script), '--nift', str(historical_nift),
     '--baseline', str(pathlib.Path(a.e3b).resolve()), '--probe', str(probe),
     '--fault-nift', str(historical_tools / ('nift-fault' + suffix)),
     '--output', str(out / 'historical-publication.json'),

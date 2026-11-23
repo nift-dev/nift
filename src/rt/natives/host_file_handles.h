@@ -3,6 +3,7 @@
 // as file()/ifstream()/ofstream() and their methods; until then they are
 // exercised by the native unit tests and the VM host layer directly.
 #include "rt/natives/host_ops.h"
+#include "rt/natives/host_file_edits.h"
 
 namespace nift::rt::natives {
 
@@ -25,16 +26,6 @@ Status file_close(const Context&, const Value* args, std::uint32_t argc, Value& 
 Status file_read(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_read_all(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_read_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
-Status file_append(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_prepend(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_insert(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_insert_before(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_insert_after(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_replace(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_replace_once(const Context&, const Value*, std::uint32_t, Value&, std::string&);
-Status file_write_val(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
-Status file_write(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
-Status file_write_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_flush(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_save(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_revert(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

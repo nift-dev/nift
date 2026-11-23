@@ -1,4 +1,4 @@
-#include "rt/natives/host_file_handles.h"
+#include "rt/natives/host_file_edits.h"
 // rt-lint: cold-file managed file buffer edits, per-call host I/O
 
 #include "rt/natives/host_file_handles_internal.h"
