@@ -46,7 +46,7 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
     case I::FileSave: case I::FileRevert: case I::FilePath: case I::FileExists: case I::FileModified:
     case I::FileTell: case I::FileSeek: case I::FileEof: case I::FileCopy: case I::FileMove: case I::FileRemove:
     case I::StreamClose: case I::StreamRead: case I::StreamReadAll: case I::StreamReadLine: case I::StreamWrite:
-    case I::StreamReadBytes: case I::StreamReadAllBytes: case I::StreamExtractString:
+    case I::StreamReadBytes: case I::StreamReadAllBytes: case I::StreamExtractString: case I::FileWriteVal:
     case I::StreamWriteLine: case I::StreamFlush: case I::StreamEof:
         return BuiltinEffect::Host;
     // Shared: synchronisation and channels (may block or observe other tasks).

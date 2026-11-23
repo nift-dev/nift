@@ -514,7 +514,8 @@ int main(int argc, char** argv) {
     static_assert(at(BuiltinId::StreamExtractString) + 1 == at(BuiltinId::FnMinify));
     // D-158: the in-memory minifier has cross-platform parity, error and
     // refusal cases in tests/runtime2/vm_subset.py.
-    static_assert(at(BuiltinId::FnMinify) + 1 == at(BuiltinId::Count),
+    static_assert(at(BuiltinId::FnMinify) + 1 == at(BuiltinId::FileWriteVal));
+    static_assert(at(BuiltinId::FileWriteVal) + 1 == at(BuiltinId::Count),
                   "classify a new built-in: add it to the pure block or to an excluded section above");
     const std::size_t pure_builtins = at(BuiltinId::HostOpen);
     std::vector<Case> cases;

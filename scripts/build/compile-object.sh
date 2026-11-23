@@ -55,7 +55,7 @@ if [ "$production" = 1 ]; then
   src=; prev=
   for arg in "$@"; do [ "$prev" = -c ] && src=$arg; prev=$arg; done
   lang=c++; case "$src" in *.c) lang=c ;; esac
-  if ! python3 "$(dirname "$0")/check-production-tu.py" "$out" "$tmp.d" "$1" "$lang"; then
+  if ! python3 "$(dirname "$0")/check-production-tu.py" "$out" "$tmp.d" "$1" "$lang" "$@"; then
     rm -f "$tmp" "$tmp.d"
     exit 1
   fi

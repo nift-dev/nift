@@ -1,6 +1,8 @@
 #include "rt/compiler_native_args.h"
 #include "rt/builtin_bind.h"
 #include "rt/compiler_handles.h"
+#include "rt/literal.h"
+#include "rt/string.h"
 #include <charconv>
 // rt-lint: cold-file shared native argument evaluation and error restrictions
 namespace nift::rt::detail {
@@ -45,6 +47,21 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
     // W1: legacy checks arity before or between argument evaluations (Q10).
     if (node.count < spec.min_args || (spec.max_args != natives::kVariadic && node.count > spec.max_args))
         return fail(node, "builtin-arity:" + std::string(spec.name));
+    if (spec.id == natives::BuiltinId::FileWriteVal) {
+        const auto value_kinds = kinds(args[0]);
+        const auto& arg = ast_.at(args[0]);
+        if (!value_kinds || (value_kinds & ~kKindScalar))
+            return fail(arg, "file-write-val-kind");
+        if (value_kinds & kKindString) {
+            // Legacy can interpret a string obtained from a file or other
+            // runtime source as an internal tagged reference. Only admit
+            // strings whose decoded literal is known to be plain.
+            Value value;
+            if (arg.kind != NodeKind::String || !decode_string_literal(text(arg), value) ||
+                !value.is(Kind::String) || string_view_of(value).substr(0, 6) == "\x1f" "nift:")
+                return fail(arg, "file-write-val-kind");
+        }
+    }
     const auto literal_write = write_literal_argument(ast_, node, spec);
     if (literal_write != kNoNode) return fail(ast_.at(literal_write), "host-literal-arg");
     // W2 / W4: legacy validates lazily and may never evaluate later arguments.

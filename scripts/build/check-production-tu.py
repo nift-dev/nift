@@ -3,7 +3,7 @@
 the checks compile-object.sh --production runs on a production object after it
 compiles.
 
-    check-production-tu.py OUT DEPFILE COMPILER LANG
+    check-production-tu.py OUT DEPFILE COMPILER LANG [COMPILER ARGS...]
 
 DEPFILE is the compiler's -MD dependency list for OUT (every header the
 compiler read, system headers included). Each dependency is parsed with make's
@@ -17,6 +17,8 @@ included, to its real path:
     command's flags); anything else fails (a header outside the repository,
     through an absolute include, an -isystem/-I path or a symlink, is not
     reviewed and not scanned);
+  * Clang's default ASan ignorelist is accepted only at the compiler-reported
+    resource path share/asan_ignorelist.txt, outside the repository;
   * every real path inside the repository is scanned for preprocessor
     directives as the compiler reads them: a leading UTF-8 byte order mark
     dropped, every line splice removed (a backslash, optional horizontal
@@ -140,6 +142,19 @@ def compiler_path(path):
             drive, tail = drive_path.groups()
             path = os.path.join(msys_drive_root(drive.upper()), tail.replace('\\', '/').lstrip('/'))
     return os.path.realpath(path)
+
+
+def compiler_asan_ignorelist(compiler, dep):
+    """Clang's own ASan policy is reported by -MD alongside system headers."""
+    name = 'asan_ignorelist.txt'
+    if os.path.basename(dep) != name:
+        return False
+    probe = subprocess.run([compiler, '-print-resource-dir'], capture_output=True, text=True)
+    resource = probe.stdout.strip()
+    if probe.returncode != 0 or not resource:
+        return False
+    expected = compiler_path(os.path.join(resource, 'share', name))
+    return os.path.isfile(expected) and os.path.normcase(compiler_path(dep)) == os.path.normcase(expected)
 
 
 def system_dirs(compiler, lang, cache_dir):
@@ -299,6 +314,8 @@ def main():
     if sys.argv[1:2] == ['--args']:
         return check_args(sys.argv[2], sys.argv[3:], os.path.realpath('.'))
     out, depfile, compiler, lang = sys.argv[1:5]
+    asan = any(arg.startswith('-fsanitize=') and 'address' in arg.split('=', 1)[1].split(',')
+               for arg in sys.argv[5:])
     root = os.path.realpath('.')
     sysdirs = system_dirs(compiler, lang, os.path.join(root, '.build', 'obj-config'))
     problems = []
@@ -314,7 +331,7 @@ def main():
         if rel is None or rel.startswith('..' + os.sep) or rel == '..':
             canonical = os.path.normcase(real)
             if not any(canonical == d or canonical.startswith(d + os.sep)
-                       for d in map(os.path.normcase, sysdirs)):
+                       for d in map(os.path.normcase, sysdirs)) and not (asan and compiler_asan_ignorelist(compiler, dep)):
                 problems.append(f'depends on {dep} ({real}), outside the repository and the compiler\'s system '
                                 'include directories')
             continue

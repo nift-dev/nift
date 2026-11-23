@@ -25,6 +25,7 @@ Status file_close(const Context&, const Value* args, std::uint32_t argc, Value& 
 Status file_read(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_read_all(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_read_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+Status file_write_val(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_write(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_write_line(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status file_flush(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

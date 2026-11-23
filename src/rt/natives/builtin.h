@@ -167,12 +167,14 @@ static_assert(static_cast<std::uint16_t>(BuiltinId::FnSame) + 1 ==
 static_assert(static_cast<std::uint16_t>(BuiltinId::StreamExtractString) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::FnMinify));
 static_assert(static_cast<std::uint16_t>(BuiltinId::FnMinify) + 1 ==
+                  static_cast<std::uint16_t>(BuiltinId::FileWriteVal));
+static_assert(static_cast<std::uint16_t>(BuiltinId::FileWriteVal) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {
     return (id >= BuiltinId::HostOpen && id <= BuiltinId::StreamEof) ||
            id == BuiltinId::StreamReadBytes || id == BuiltinId::StreamReadAllBytes ||
-           id == BuiltinId::StreamExtractString;
+           id == BuiltinId::StreamExtractString || id == BuiltinId::FileWriteVal;
 }
 
 // The whole table, indexed by BuiltinId.

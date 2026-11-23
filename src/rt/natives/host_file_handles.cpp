@@ -2,6 +2,7 @@
 // rt-lint: cold-file handle factory and methods, per-call host I/O
 
 #include "rt/natives/host_file_handles_internal.h"
+#include "rt/natives/format_methods.h"
 
 namespace nift::rt::natives {
 using namespace host_handle_detail;
@@ -221,6 +222,17 @@ Status file_read_line(const Context& context, const Value* args, std::uint32_t a
     return Status::Ok;
 }
 
+namespace {
+void write_buffer(FileResource& file, std::string_view data) {
+    const std::size_t base = std::min(file.cursor, file.working.size());
+    const std::size_t overlap = std::min(data.size(), file.working.size() - base);
+    if (overlap != data.size() || file.working.compare(base, overlap, data) != 0) file.prepare_mutation();
+    file.working.replace(base, overlap, data);
+    file.cursor = base + data.size();
+    file.update_dirty();
+}
+} // namespace
+
 Status file_write(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     std::shared_ptr<FileResource> file;
     Status status = Status::Ok;
@@ -234,12 +246,57 @@ Status file_write(const Context& context, const Value* args, std::uint32_t argc,
         error = "write: value is not directly renderable";
         return Status::Error;
     }
-    const std::size_t base = std::min(file->cursor, file->working.size());
-    const std::size_t overlap = std::min(data.size(), file->working.size() - base);
-    if (overlap != data.size() || file->working.compare(base, overlap, data) != 0) file->prepare_mutation();
-    file->working.replace(base, overlap, data);
-    file->cursor = base + data.size();
-    file->update_dirty();
+    write_buffer(*file, data);
+    out = Value::null();
+    return Status::Ok;
+}
+
+Status file_write_val(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+                      std::string& error) {
+    if (argc != 2) return fail(error, "write_val: expected one value");
+    std::shared_ptr<FileResource> file;
+    Status status = Status::Ok;
+    if (!resource_arg(context, args, argc, "write_val", file, error, status)) return status;
+    if (!file->open) return fail(error, "write_val: file is not open");
+    if (file->mode == "r") return fail(error, "write_val: file is not open for writing");
+
+    const auto& value = args[1];
+    std::size_t text_bound = 64;
+    switch (value.kind()) {
+    case Kind::String: {
+        const auto size = string_view_of(value).size();
+        // Up to six characters per byte, two quotes and the newline.
+        if (size >= (kMaxResultBytes - 3) / 6) return Status::Memory;
+        text_bound = size * 6 + 3;
+        break;
+    }
+    case Kind::Decimal:
+        text_bound = size_add(decimal_spelling(value).size(), 1);
+        break;
+    case Kind::Null: case Kind::Bool: case Kind::Int: case Kind::Double:
+        break;
+    default:
+        return fail(error, "write_val: unsupported for this value");
+    }
+    if (!reserve_result(context, text_bound)) return Status::Memory;
+    std::string serialized;
+    serialized.reserve(text_bound);
+    bool internal = false;
+    if (!serialize(value, false, serialized, error, internal))
+        return internal ? Status::Internal : Status::Error;
+    serialized.push_back('\n');
+    const auto base = std::min(file->cursor, file->working.size());
+    const auto overlap = std::min(serialized.size(), file->working.size() - base);
+    const auto required = size_add(base, serialized.size());
+    const bool changes = overlap != serialized.size() || file->working.compare(base, overlap, serialized) != 0;
+    std::size_t scratch = serialized.capacity();
+    if (changes && file->saved_is_working && file->working.size() > file->saved.capacity())
+        scratch = size_add(scratch, std::max(file->working.size(),
+                                            size_add(file->saved.capacity(), file->saved.capacity())));
+    if (required > file->working.capacity())
+        scratch = size_add(scratch, std::max(required, size_add(file->working.capacity(), file->working.capacity())));
+    if (!reserve_result(context, scratch)) return Status::Memory;
+    write_buffer(*file, serialized);
     out = Value::null();
     return Status::Ok;
 }

@@ -182,6 +182,10 @@ while (i < 1) {
 
 # (name, program, expected fallback reason prefix)
 UNSUPPORTED = [
+    ("file-write-val-dynamic-string", 's := open("source"); f := file("data"); f.open("rw"); f.write_val(s)\n',
+     "file-write-val-kind"),
+    ("file-write-val-bytes", 'f := file("data"); f.open("rw"); f.write_val(bytes([65]))\n',
+     "file-write-val-kind"),
     ("file-write-invalid-byte-literal", 'f := file("data"); f.open("rw"); f.write(bytes([256]))\n',
      "builtin-arg-fault-context"),
     ("file-write-computed-byte", 'n := 65; f := file("data"); f.open("rw"); f.write(bytes([n]))\n',
