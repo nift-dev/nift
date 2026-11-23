@@ -116,7 +116,18 @@ inline bool grow_unknown(const Context& context, Buffer& data, std::size_t neede
     (void)reserved;
     if (needed > cap) return false;
     const std::size_t old = data.capacity();
-    const std::size_t doubled = size_mul(old, 2);
+    std::size_t doubled = size_mul(old, 2);
+#if defined(__FreeBSD__) && defined(_LIBCPP_VERSION)
+    if constexpr (std::is_same_v<Buffer, BudgetedText>) {
+        // Grow on power-of-two jemalloc boundaries, counting libc++'s
+        // terminator. Ignore library padding on the initial 64 KiB reserve
+        // and advance a whole block if the next read fills that block.
+        constexpr std::size_t first_block = std::size_t{128} << 10;
+        auto block = old < first_block - 1 ? first_block : size_mul(size_add(old, 1), 2);
+        if (needed >= block) block = size_mul(block, 2);
+        doubled = block == kSizeOverflow ? kSizeOverflow : block - 1;
+    }
+#endif
     std::size_t target = doubled < needed ? needed : doubled;
     // B01: past half the read limit, straight to the limit (ReadLimit.h growth_target), so a
     // buffer of unknown final size holds at most 1.5 x the limit while it grows (old <= limit / 2
