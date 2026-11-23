@@ -1156,9 +1156,19 @@ echo "PASS certification guard C42 step 6: SIGTERM mid-classification lost nothi
 if git cat-file -e 2bedfb33:scripts/certify.py 2>/dev/null; then
     git show 2bedfb33:scripts/certify.py > "$TOY/c41-certify.py" || exit 1
     mk6 "$TOY/old6" "$TOY/c41-certify.py"
-    (cd "$TOY/old6" && PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/certify.py --jobs 1 --targets test-ev-a \
+    legacy_path=$PATH
+    # C41 predates optional Debian provenance. For this FreeBSD toy run,
+    # report no package owner while leaving the archived runner unchanged.
+    if [[ "$(uname -s)" == FreeBSD ]] && ! command -v dpkg >/dev/null; then
+        mkdir -p "$TOY/c41-bin" || exit 1
+        printf '#!/bin/sh\nexit 1\n' > "$TOY/c41-bin/dpkg" || exit 1
+        chmod +x "$TOY/c41-bin/dpkg" || exit 1
+        legacy_path="$TOY/c41-bin:$PATH"
+    fi
+    (cd "$TOY/old6" && PATH="$legacy_path" PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/certify.py --jobs 1 --targets test-ev-a \
         --unprivileged-user '' --baseline '' > "$TOY/old6.out" 2>&1)
-    [ -s "$TOY/old6/.build/certify/test-ev-a.log" ] || fail6 "negative control: the C41 runner wrote no .build/certify log"
+    [ -s "$TOY/old6/.build/certify/test-ev-a.log" ] ||
+        fail6 "negative control: the C41 runner wrote no .build/certify log ($(tail -12 "$TOY/old6.out"))"
     (cd "$TOY/old6" && make -s distclean)
     if [ -e "$TOY/old6/.build/certify/test-ev-a.log" ]; then fail6 "negative control: the old layout survived distclean"; fi
     echo "PASS certification guard C42 negative control: with the old layout (.build/certify, the 2bedfb33 runner) step 3 fails: distclean deleted the log"
