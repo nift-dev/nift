@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export LC_ALL=C.UTF-8 LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1
-export NIFT_CERTIFICATION_REQUIRE_HISTORY=1
 out="$PWD/.build/freebsd-ci"
-mkdir -p "$out/bin"
-for pair in make:gmake timeout:gtimeout; do
-    ln -sf "$(command -v "${pair#*:}")" "$out/bin/${pair%%:*}"
+mkdir -p "$out"
+gmake -j2 nift > "$out/build.log" 2>&1
+for attempt in 1 2 3; do
+    python3 -u tests/runtime2/vm_host_memory_previous_probe.py --nift "$PWD/nift" \
+        2>&1 | tee "$out/previous-$attempt.log" || true
 done
-export PATH="$out/bin:$PATH"
 result=0
-gtimeout --kill-after=30s 18m gmake -k test-runtime2-certification-guard \
-    2>&1 | tee "$out/guard.log" || result=$?
+for attempt in 1 2 3 4 5 6; do
+    python3 -u tests/runtime2/vm_host_memory.py --nift "$PWD/nift" \
+        2>&1 | tee "$out/streamed-$attempt.log" || result=$?
+done
 printf '%s\n' "$result" > "$out/guest-status.txt"

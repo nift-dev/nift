@@ -8,6 +8,7 @@ checked for each case so a late check is visible even when it errors.
 import argparse
 import os
 import re
+import resource
 import shutil
 import subprocess
 import sys
@@ -48,18 +49,26 @@ def timed(nift, cwd, env, input_bytes=None, *, sample_short=False, stdin=None):
     return ((rss + 1023) // 1024 if rss is not None else None), proc
 
 
-def timed_pipe(nift, cwd, env, mib):
-    # Keep 50 MiB of test-driver input out of its address space when starting a
-    # FreeBSD RSS measurement. Nift still reads an unknown-size stdin pipe.
+def feed_stream(writer, mib):
+    if not sys.platform.startswith("freebsd"):
+        writer.write(b"x" * (mib << 20))
+        return
+    # Keep test input out of the FreeBSD driver's resident set, including for
+    # earlier fixtures whose freed pages could remain mapped at the next fork.
+    chunk = b"x" * (64 << 10)
+    for _ in range(mib * 16):
+        writer.write(chunk)
+
+
+def timed_pipe(nift, cwd, env, mib, *, sample_short=False):
+    # Nift still reads an unknown-size anonymous stdin pipe.
     read_fd, write_fd = os.pipe()
     producer_errors = []
 
     def feed():
         try:
             with os.fdopen(write_fd, "wb") as writer:
-                chunk = b"x" * (64 << 10)
-                for _ in range(mib * 16):
-                    writer.write(chunk)
+                feed_stream(writer, mib)
         except BrokenPipeError:
             pass  # The expected budget refusal closes the read end early.
         except OSError as error:
@@ -69,7 +78,7 @@ def timed_pipe(nift, cwd, env, mib):
     worker.start()
     try:
         with os.fdopen(read_fd, "rb") as reader:
-            result = timed(nift, cwd, env, stdin=reader)
+            result = timed(nift, cwd, env, stdin=reader, sample_short=sample_short)
     finally:
         worker.join()
     if producer_errors:
@@ -171,7 +180,10 @@ def main():
 
         # Unknown-size read: 50 MB on /dev/stdin.
         (root / "case.f").write_text('print(open("/dev/stdin").length())\n')
-        peak, proc = timed(nift, root, budget, input_bytes=b"x" * (50 << 20), sample_short=True)
+        if sys.platform.startswith("freebsd"):
+            peak, proc = timed_pipe(nift, root, budget, 50, sample_short=True)
+        else:
+            peak, proc = timed(nift, root, budget, input_bytes=b"x" * (50 << 20), sample_short=True)
         if check("stdin", peak, proc,
                  failures):
             passed += 1
@@ -183,7 +195,7 @@ def main():
             def writer():
                 try:
                     with open(fifo, "wb", buffering=0) as out:
-                        out.write(b"x" * (50 << 20))
+                        feed_stream(out, 50)
                 except (BrokenPipeError, OSError):
                     pass
             thread = threading.Thread(target=writer, daemon=True)
@@ -195,6 +207,7 @@ def main():
                      proc, failures):
                 passed += 1
 
+        print(f"Test driver max RSS before large pipe: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss} KiB")
         # R5a: unknown-size streams are capped at 9/17 of the headroom, so
         # 50 MiB under 60 MB is refused cleanly (deliberate contract change).
         large = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
@@ -215,7 +228,7 @@ def main():
             def writer2():
                 try:
                     with open(fifo2, "wb", buffering=0) as out_file:
-                        out_file.write(b"x" * (50 << 20))
+                        feed_stream(out_file, 50)
                 except (BrokenPipeError, OSError):
                     pass
             thread2 = threading.Thread(target=writer2, daemon=True)
