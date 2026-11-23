@@ -40,6 +40,10 @@ on:
       - '.github/workflows/packaging.yml'
   workflow_dispatch:
     inputs:
+      windows_archive_replay:
+        description: Replay the retained D-158 Windows diagnostic ZIP in PowerShell
+        type: boolean
+        default: false
       candidate_smoke:
         description: Use a scratch package version for release-candidate diagnostics
         type: boolean
@@ -54,6 +58,7 @@ env:
 
 jobs:
   native-matrix:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_archive_replay
     name: native ${{ matrix.target }} (build + enforced clean-consumer smoke)
     strategy:
       fail-fast: false
@@ -244,6 +249,7 @@ jobs:
           if-no-files-found: error
 
   language-packages:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_archive_replay
     name: language packages (build-only, non-publishing)
     runs-on: ubuntu-latest
     steps:
@@ -402,3 +408,40 @@ jobs:
           name: nift-language-packages
           path: pkg-artifacts/
           if-no-files-found: error
+
+  windows-archive-replay:
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_archive_replay
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: nift-archive-diagnostic-windows-x86_64
+          run-id: 45139811121
+          github-token: ${{ github.token }}
+          path: replay
+      - name: Replay exact ZIP and record raw Windows exit status
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "nift-4.13.0-replay"
+          Expand-Archive -Path replay/nift-4.13.0-windows-x86_64.zip -DestinationPath $root
+          $exe = Join-Path $root "nift-4.13.0-windows-x86_64/nift.exe"
+          $project = New-Item -ItemType Directory (Join-Path $root project)
+          Set-Location $project
+          & $exe version
+          if ($LASTEXITCODE -ne 0) { throw "version exited $LASTEXITCODE" }
+          & $exe init
+          if ($LASTEXITCODE -ne 0) { throw "init exited $LASTEXITCODE" }
+          Set-Content index.html x
+          & $exe build --all
+          $build = $LASTEXITCODE
+          Write-Host "PowerShell native build exit: $build"
+          if ($build -ne 0) {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'nift\.exe' } | Select-Object -First 3 | Format-List Message
+            throw "build exited $build"
+          }
+          & $exe status
+          if ($LASTEXITCODE -ne 0) { throw "status exited $LASTEXITCODE" }
