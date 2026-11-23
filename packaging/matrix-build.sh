@@ -20,19 +20,19 @@ TARGET="${1:?usage: matrix-build.sh <os>-<arch> <version> [--require-smoke]}"
 VERSION="${2:?usage: matrix-build.sh <os>-<arch> <version> [--require-smoke]}"
 REQUIRE_SMOKE=0
 [ "${3:-}" = "--require-smoke" ] && REQUIRE_SMOKE=1
-OS="${TARGET%%-*}"
-ARCH="${TARGET#*-}"
+target_os="${TARGET%%-*}"
+target_arch="${TARGET#*-}"
 OUT="$ROOT/dist/$VERSION/$TARGET"
 mkdir -p "$OUT"
 
 # Per-target native library filenames (exact; failure if any is missing).
-case "$OS" in
+case "$target_os" in
   linux)   NATIVE_FILES="libnift_c.a libnift_c.so"; SHARED_FILE="libnift_c.so" ;;
   macos)   NATIVE_FILES="libnift_c.a libnift_c.dylib"; SHARED_FILE="libnift_c.dylib" ;;
   windows) NATIVE_FILES="libnift_c.a libnift_c.so"; SHARED_FILE="libnift_c.so" ;;  # Makefile emits .so names on mingw; DLL/import-lib layout is a release-layout item
-  *) echo "unsupported target OS: $OS" >&2; exit 2 ;;
+  *) echo "unsupported target OS: $target_os" >&2; exit 2 ;;
 esac
-case "$OS:$ARCH" in
+case "$target_os:$target_arch" in
   linux:*)  PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
   macos:*)  PC_LIBS='-L${libdir} -Wl,-force_load,${libdir}/libnift_c.a -lc++ -lm' ;;
   windows:*) PC_LIBS='-L${libdir} -lnift_c -lstdc++ -static' ;;
@@ -40,11 +40,11 @@ case "$OS:$ARCH" in
 esac
 
 # CLI binary (nift or nift.exe).
-if [ "$OS" = windows ] && [ -f "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
+if [ "$target_os" = windows ] && [ -f "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
 elif [ -x "$ROOT/nift" ]; then CLI_SOURCE="$ROOT/nift"
 elif [ -x "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
 else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
-cp "$CLI_SOURCE" "$OUT/nift-$OS-$ARCH"
+cp "$CLI_SOURCE" "$OUT/nift-$target_os-$target_arch"
 
 # Native bundle with target-correct .pc; FAIL if any required native file is absent.
 make embed
@@ -60,9 +60,9 @@ sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in 
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
 cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$STAGE/share/licenses/nift/"
 cp third_party/bitcoin-sha256/COPYING "$STAGE/share/licenses/nift/LICENSE-bitcoin-sha256"
-bash scripts/audit_no_dynamic_libffi.sh "$OUT/nift-$OS-$ARCH" "$STAGE/lib/$SHARED_FILE"
+bash scripts/audit_no_dynamic_libffi.sh "$OUT/nift-$target_os-$target_arch" "$STAGE/lib/$SHARED_FILE"
 bash scripts/audit_private_libffi.sh "$STAGE/lib/$SHARED_FILE"
-tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib share install-embed.sh
+tar czf "$OUT/nift-embed-$target_os-$target_arch.tar.gz" -C "$STAGE" include lib share install-embed.sh
 
 # Portable checksum helper (sha256sum on Linux, shasum -a 256 on macOS).
 chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
@@ -84,10 +84,10 @@ detect_arch() {
 }
 
 RUNNER="$TARGET"
-if [ "$OS-$ARCH" = "$(detect_os)-$(detect_arch)" ]; then
+if [ "$target_os-$target_arch" = "$(detect_os)-$(detect_arch)" ]; then
   CONSUMER="$(mktemp -d /tmp/nift-matrix-consumer.XXXXXX)"
   trap 'rm -rf "$STAGE" "$CONSUMER"' EXIT
-  tar xzf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$CONSUMER"
+  tar xzf "$OUT/nift-embed-$target_os-$target_arch.tar.gz" -C "$CONSUMER"
   mkdir -p "$CONSUMER/prefix/include/nift" "$CONSUMER/prefix/lib/pkgconfig"
   cp -r "$CONSUMER/include/nift/." "$CONSUMER/prefix/include/nift/"
   for f in $NATIVE_FILES; do
@@ -155,22 +155,22 @@ CONSUMER_BIN="$CONSUMER/consumer"
     objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -iE 'dll|nift' || true
     DEP="$(objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
   fi
-  if [ "$OS" = "linux" ] && [ -n "$DEP" ]; then
+  if [ "$target_os" = "linux" ] && [ -n "$DEP" ]; then
     echo "FAIL: Linux consumer links a Nift shared library (static is the default)" >&2
     exit 1
   fi
   [ -z "$DEP" ] && DEP="none (statically linked)"
   echo "NIFT_DEPENDENCY=$DEP"
-  if [ "$OS" = "macos" ]; then
+  if [ "$target_os" = "macos" ]; then
     echo "--- macOS dynamic library install name (must be relocatable) ---"
     otool -D "$ROOT/libnift_c.dylib" 2>/dev/null | tail -n +2 || echo "(install name unavailable)"
   fi
   echo "SMOKE_EXECUTED=1"
   echo "SMOKE PASS: $TARGET native bundle installs, links and renders from a clean consumer; Nift dependency: $DEP"
-  case "$OS" in
+  case "$target_os" in
     linux|macos)
       echo "=== installer smoke (build-only; local HTTP server) ==="
-      bash "$ROOT/packaging/installer-smoke.sh" "$TARGET" "$OUT/nift-embed-$OS-$ARCH.tar.gz"
+      bash "$ROOT/packaging/installer-smoke.sh" "$TARGET" "$OUT/nift-embed-$target_os-$target_arch.tar.gz"
       ;;
   esac
 else
