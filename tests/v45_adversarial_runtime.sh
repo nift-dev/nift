@@ -106,7 +106,7 @@ import sys
 p=sys.argv[1]
 lines=['fn(worker(x)) { return x }', '@fn[async](aworker(x)) { return x }']
 for i in range(50):
-    lines += [f't{i} := thread(worker, {i})', f't{i}.join()', f'f{i} := aworker({i})', f'r{i} := await f{i}']
+    lines += [f't{i} := thread(worker, {i})', f't{i}.join()', f'future_task_{i} := aworker({i})', f'r{i} := await future_task_{i}']
 open(p,'w').write('\n'.join(lines)+'\n')
 PY
 run_bounded runtime_churn "" "$NIFT" "$TMP/churn.f"

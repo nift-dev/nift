@@ -53,10 +53,11 @@ NIFT
 if $NIFT "$TMP/error.f" >"$TMP/out" 2>"$TMP/err"; then echo 'async error unexpectedly succeeded' >&2; exit 1; fi
 grep -q 'future:' "$TMP/err"
 
-# Old public library-style spellings are deliberately gone.
-if $NIFT -e 'fn(id(x)){return x}; p := async(id, 1)' >/dev/null 2>"$TMP/err"; then exit 1; fi
+# Preserve the legacy removal diagnostics. Runtime 2.0 checks its own exact
+# refusal reasons in tests/runtime2/reason_ids.py.
+if NIFT_VM=0 $NIFT -e 'fn(id(x)){return x}; p := async(id, 1)' >/dev/null 2>"$TMP/err"; then exit 1; fi
 grep -q 'was removed' "$TMP/err"
-if $NIFT -e '@fn[async](id(x)){return x}; p := id(1); x := await(p)' >/dev/null 2>"$TMP/err"; then exit 1; fi
+if NIFT_VM=0 $NIFT -e '@fn[async](id(x)){return x}; p := id(1); x := await(p)' >/dev/null 2>"$TMP/err"; then exit 1; fi
 grep -q 'was removed' "$TMP/err"
 
 echo 'v4.5 async/future smoke passed'
