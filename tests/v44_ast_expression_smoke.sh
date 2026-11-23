@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# This suite pairs the historical AST unit with the legacy expression evaluator.
+export NIFT_VM=0
 # Portable timeout: GNU timeout where present, otherwise perl alarm (macOS has
 # no GNU timeout by default).
 timed() {
