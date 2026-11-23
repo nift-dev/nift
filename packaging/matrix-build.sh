@@ -47,7 +47,7 @@ else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
 cp "$CLI_SOURCE" "$OUT/nift-$OS-$ARCH"
 
 # Native bundle with target-correct .pc; FAIL if any required native file is absent.
-make embed >/dev/null 2>&1
+make embed
 STAGE="$(mktemp -d /tmp/nift-matrix.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig" "$STAGE/share/licenses/nift"

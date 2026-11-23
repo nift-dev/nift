@@ -39,10 +39,18 @@ on:
       - 'Makefile'
       - '.github/workflows/packaging.yml'
   workflow_dispatch:
+    inputs:
+      candidate_smoke:
+        description: Use a scratch package version for release-candidate diagnostics
+        type: boolean
+        default: false
 
 # Build-only: NO environment is attached, so no publishing job can run.
 permissions:
   contents: read
+
+env:
+  NIFT_SMOKE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_smoke && '0.0.0' || '' }}
 
 jobs:
   native-matrix:
@@ -78,7 +86,9 @@ jobs:
           make embed
           NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe
           VERSION="$("$NIFT_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
-          echo "NIFT_BIN=$NIFT_BIN VERSION=$VERSION"
+          [ -n "$VERSION" ]
+          echo "NIFT_BIN=$NIFT_BIN source version=$VERSION"
+          VERSION="${NIFT_SMOKE_VERSION:-$VERSION}"
           set +e
           bash -x packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke > /tmp/matrix.out 2>&1
           rc=$?
@@ -200,6 +210,7 @@ jobs:
         run: |
           make -j2
           VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          VERSION="${NIFT_SMOKE_VERSION:-$VERSION}"
           rm -rf bindings/python/native
           mkdir -p bindings/python/native
           cp -r src bindings/python/native/src
@@ -223,6 +234,7 @@ jobs:
           make node-binding
           python3 scripts/check_node_package_licenses.py
           VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          VERSION="${NIFT_SMOKE_VERSION:-$VERSION}"
           ( cd bindings/csharp/src/Nift && dotnet pack -v q --nologo -p:Version="$VERSION" -o /tmp/nugetdist )
           python3 - "$VERSION" <<'PY'
           import json, sys
@@ -269,6 +281,7 @@ jobs:
           python3 -m venv /tmp/pyvenv
           /tmp/pyvenv/bin/pip install --no-index "$WHEEL"
           VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          VERSION="${NIFT_SMOKE_VERSION:-$VERSION}"
           cd /tmp
           /tmp/pyvenv/bin/python -c "import nift, importlib.metadata; assert importlib.metadata.version('nift') == '$VERSION'; e=nift.Engine.new(); r=e.render_text('<p>hi</p>'); assert r.ok and r.output=='<p>hi</p>'; print('python clean-consumer version+render OK (', importlib.metadata.version('nift'), ')')"
       - name: Clean-consumer npm install/load/render
