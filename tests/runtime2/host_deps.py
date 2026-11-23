@@ -359,6 +359,8 @@ def scenario(mode, work):
         sequence_step(mode, root, ext)
         compare(mode, name, root, oracle)
     mid_stream(mode, root, oracle)
+    if mode != "modified":
+        mid_stream(mode, root, oracle, edit_source=True)
     move_source(mode, root)
 
 
@@ -398,18 +400,30 @@ Z:@script { sz := ifstream("data/stream.txt"); a := sz.read_line(); if(exists(".
 """
 
 
-def mid_stream(mode, root, oracle):
+def mid_stream(mode, root, oracle, edit_source=False):
     """The file changes after the page opened it and before it finished
     reading. The next build must not report the page up to date."""
-    ctl = root.parent / "ctl"
+    label = "inline metadata source edit" if edit_source else "edit during streaming"
+    control_dir = "ctl-source" if edit_source else "ctl"
+    stream_file = "data/source-stream.txt" if edit_source else "data/stream.txt"
+    ctl = root.parent / control_dir
     ctl.mkdir(exist_ok=True)
-    write(root / "data" / "stream.txt", "s1\ns2\n")
-    # A second tracked page keeps this scenario independent of index.
-    nift(root, "track", "streamed", "Streamed")
-    write(root / "content" / "streamed.html", MID_PAGE)
+    write(root / stream_file, "s1\ns2\n")
+    # A separate tracked page isolates the stream and inline metadata cases.
+    page = "inline-metadata" if edit_source else "streamed"
+    source = root / "content" / (page + ".html")
+    text = MID_PAGE
+    if edit_source:
+        text = text.replace("../ctl/", "../ctl-source/").replace("data/stream.txt", stream_file)
+        text = "---\ntitle: snapshot-1\n---\n" + text + '\nF:@script { return frontmatter.title }\n'
+    nift(root, "track", page, page)
+    write(source, text)
     nift(root, "build")
+    if edit_source:
+        (root / stream_file).write_text("render-1\nrender-2\n")
     (ctl / "sync").write_text("")
-    command = address_limited(PRIV + [NIFT, "build"], 4 << 30)
+    build_args = ["build", "--all"] if edit_source else ["build"]
+    command = address_limited(PRIV + [NIFT, *build_args], 4 << 30)
     proc = subprocess.Popen(command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                             preexec_fn=bounded)
     deadline = time.monotonic() + 30
@@ -421,9 +435,19 @@ def mid_stream(mode, root, oracle):
         failures.append((mode, "mid-stream setup"))
         print("FAIL [%s] mid-stream: page never reached the sync point\n%s%s" % (mode, out, err))
         return
-    (root / "data" / "stream.txt").write_text("t1\nt2\n")
+    if edit_source:
+        source.write_text(text.replace("snapshot-1", "snapshot-2"))
+    else:
+        (root / "data" / "stream.txt").write_text("t1\nt2\n")
     (ctl / "edited").write_text("")
-    out, err = proc.communicate(timeout=60)
+    try:
+        out, err = proc.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        out, err = proc.communicate()
+        failures.append((mode, label + " timed out"))
+        print("FAIL [%s] %s timed out\n%s%s" % (mode, label, out, err))
+        return
     (ctl / "opened").unlink()
     if proc.returncode != 0:
         failures.append((mode, "mid-stream build"))
@@ -435,11 +459,22 @@ def mid_stream(mode, root, oracle):
         return
     status = nift(root, "status").stdout
     if UP_TO_DATE.search(status):
-        failures.append((mode, "mid-stream edit"))
-        print("FAIL [%s] edit during streaming: page reported up to date with stale output" % mode)
+        failures.append((mode, label))
+        print("FAIL [%s] %s: page reported up to date with stale output" % (mode, label))
     else:
-        print("PASS [%s] edit during streaming: page needs rebuilding" % mode)
-    compare(mode, "after edit during streaming", root, oracle)
+        print("PASS [%s] %s: page needs rebuilding" % (mode, label))
+    if edit_source:
+        output = root / "public" / (page + ".html")
+        rendered = output.read_text()
+        if "Z:render-1|render-2" not in rendered or "F:snapshot-1" not in rendered:
+            print("FAIL [%s] inline metadata did not use the source snapshot in the interrupted render" % mode)
+            failures.append((mode, "inline metadata changed during a render"))
+        compare(mode, "after " + label, root, oracle)
+        if "F:snapshot-2" not in output.read_text():
+            print("FAIL [%s] next render did not use the edited inline metadata" % mode)
+            failures.append((mode, "inline metadata edit was not rendered"))
+    else:
+        compare(mode, "after " + label, root, oracle)
 
 
 def main():

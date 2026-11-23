@@ -14,6 +14,7 @@
 class ProjectInfoHost : public RenderHost {
 public:
     explicit ProjectInfoHost(ProjectInfo& project) : project_(project) {}
+    bool use_render_source_snapshot = false;
 
     const std::filesystem::path& root() const override { return project_.root; }
     std::string listing_fingerprint(const std::string& key) const override { return project_.listing_fingerprint_cached(key); }
@@ -54,7 +55,14 @@ public:
     bool page_project_metadata(const TrackedInfo& info, nift::RuntimeValue& out, std::string&) const override {
         const auto model = project_.content_model_value();
         if (!model) return false;
-        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model, nullptr, [this](const auto& path,const auto& bytes){ observe_dependency(path,bytes); });
+        const std::string unavailable;
+        const std::string* snapshot = nullptr;
+        if (use_render_source_snapshot) {
+            const auto source = read_shared_source(content_path(info));
+            snapshot = source.content ? source.content : &unavailable;
+        }
+        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model,
+            nullptr, [this](const auto& path, const auto& bytes) { observe_dependency(path, bytes); }, snapshot);
         if (!model->errors.empty()) metadata["_error"] = json::Document(model->errors.front());
         out = nift::runtime_from_json(metadata);
         return true;

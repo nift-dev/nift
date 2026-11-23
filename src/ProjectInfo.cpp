@@ -1567,7 +1567,11 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     PageSiteRecord site_record;
     if(custom){attempt.written_pages=1;if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
     else {
+        // Parse inline metadata and render from the same observed bytes.
+        // Hooks still read after any preceding hook edits.
+        host.use_render_source_snapshot = hashing;
         Parser parser(host,info);result=parser.render();
+        host.use_render_source_snapshot = false;
         auto warnings=parser.site_warnings();
         site_record.unknown_values=parser.site_unknown_values();
         for(const auto& w:warnings)site_record.warnings.push_back(relative(w.source_file)+":"+std::to_string(w.line)+":"+std::to_string(w.column)+": "+w.message+" ["+w.kind+"]");
