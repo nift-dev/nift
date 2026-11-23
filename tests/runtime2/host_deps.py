@@ -129,14 +129,14 @@ def clean_oracle(root, oracle):
         path.relative_to(root): path.read_bytes()
         for path in (root / "content").glob("*.html")
     }
-    for step in ("before", "after"):
-        if step == "after":
-            if os.getenv("NIFT_DIAG_SERIAL"):
+    if os.getenv("NIFT_DIAG_SERIAL"):
         config = oracle / ".nift" / "config.json"
         settings = json.loads(config.read_text())
         settings["config"]["build-threads"] = 1
         config.write_text(json.dumps(settings))
-    nift(oracle, "build", "--all")
+    for step in ("before", "after"):
+        if step == "after":
+            nift(oracle, "build", "--all")
         for rel, original in sources.items():
             copy = (oracle / rel).read_bytes()
             if copy != original:
