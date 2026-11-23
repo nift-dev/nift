@@ -96,7 +96,10 @@ jobs:
               chown niftci /mnt/nift-runtime2
               su niftci -c "cd '$PWD/nift' && NIFT_TEST_CROSS_DEVICE_ROOT=/mnt/nift-runtime2 bash scripts/ci_freebsd_runtime2.sh" || runtime=$?
             fi
-            [ "$regression" -eq 0 ] && [ "$runtime" -eq 0 ]
+            printf '%s %s\n' "$regression" "$runtime" > "$PWD/nift/.build/freebsd-ci/guest-status.txt"
+      - name: Check guest results after copying logs
+        run: |
+          test "$(cat nift/.build/freebsd-ci/guest-status.txt)" = '0 0'
       - name: Summary
         if: always()
         run: |
@@ -110,4 +113,5 @@ jobs:
         with:
           name: freebsd-ci-logs
           path: nift/.build/freebsd-ci/
+          include-hidden-files: true
           if-no-files-found: warn

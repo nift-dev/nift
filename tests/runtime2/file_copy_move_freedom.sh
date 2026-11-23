@@ -61,7 +61,12 @@ out="$("$NIFT" "$W/project/s.f" 2>&1)"; echo "$out" | grep -q copied && pass "st
 # Cross-device moves (EXDEV) fall back to copy + rename + unlink, for
 # file().move() and mv(), when /dev/shm is a different filesystem.
 cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
-if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] && [ "$(stat -c %d "$cross_device_root")" != "$(stat -c %d "$W")" ]; then
+device_id() {
+  if [ "$(uname -s)" = FreeBSD ]; then stat -f %d "$1"; else stat -c %d "$1"; fi
+}
+if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
+   source_device=$(device_id "$cross_device_root") && work_device=$(device_id "$W") &&
+   [ "$source_device" != "$work_device" ]; then
   S="$(mktemp -d "$cross_device_root/nift-xdev-XXXXXX")"
   echo xdev-a > "$W/xa.txt"; echo xdev-b > "$W/xb.txt"; chmod 640 "$W/xa.txt"
   printf 'f := file("%s")\ng := f.move("%s")\nnative::mv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"

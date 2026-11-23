@@ -93,7 +93,12 @@ fi
 
 # R5: cross-filesystem move partial-failure semantics.
 cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
-if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] && [ "$(stat -c %d "$cross_device_root")" != "$(stat -c %d "$W")" ]; then
+device_id() {
+  if [ "$(uname -s)" = FreeBSD ]; then stat -f %d "$1"; else stat -c %d "$1"; fi
+}
+if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
+   source_device=$(device_id "$cross_device_root") && work_device=$(device_id "$W") &&
+   [ "$source_device" != "$work_device" ]; then
   S="$(mktemp -d "$cross_device_root/nift-xdev-XXXXXX")"
   # (a) the copy fails (file size limit): the original stays, no temporary is left.
   head -c 300000 /dev/zero > "$W/big.bin"

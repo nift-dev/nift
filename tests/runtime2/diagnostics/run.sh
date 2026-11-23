@@ -186,7 +186,9 @@ run_scripts() {  # run_scripts DIR
     b="$(basename "$f")"; b="${b%.f}"; b="${b%.args}"
     [ -n "$FILTER" ] && ! [[ "$b" =~ $FILTER ]] && continue
     rm -rf "$W/case" "$W/home" "$W/tmp"; mkdir -p "$W/case" "$W/home" "$W/tmp"
-    (cd "$dir" && find . -type f ! -name '*.stdout' ! -name '*.stderr' ! -name '*.exit' ! -name '*.files' ! -name '*.tsv' -exec cp --parents {} "$W/case/" \;)
+    (cd "$dir" && find . -type f ! -name '*.stdout' ! -name '*.stderr' ! -name '*.exit' ! -name '*.files' ! -name '*.tsv' \
+      -exec sh -c 'dest=$1; shift; for file do mkdir -p "$dest/${file%/*}" && cp "$file" "$dest/$file" || exit 1; done' \
+        sh "$W/case" {} +) || exit 2
     local real; real="$(fixture_path "$W/case")" || exit 2
     if [ "${f%.args}" != "$f" ]; then
       argv=()

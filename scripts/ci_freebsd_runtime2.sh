@@ -9,7 +9,7 @@ fi
 export LC_ALL=C.UTF-8 LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1
 out="$PWD/.build/freebsd-ci/runtime2"
 mkdir -p "$out/bin"
-for pair in make:gmake stat:gstat timeout:gtimeout; do
+for pair in make:gmake timeout:gtimeout; do
   program=$(command -v "${pair#*:}")
   ln -sf "$program" "$out/bin/${pair%%:*}"
 done

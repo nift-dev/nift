@@ -1385,7 +1385,7 @@ def make_print(root, expr, env):
 
 def compiler_identity(cmd):
     """C21 (release audit): the compiler itself, not a wrapper: real path, ELF or not, sha256, and
-    the Debian package and version that own it."""
+    the Debian package and version that own it on Linux when available."""
     real = os.path.realpath(shutil.which(cmd) or cmd)
     out = {"path": real, "elf": None, "sha256": None, "package": None, "version": None}
     try:
@@ -1393,6 +1393,8 @@ def compiler_identity(cmd):
             out["elf"] = fh.read(4) == b"\x7fELF"
         out["sha256"] = sha256_of(real)
     except OSError:
+        return out
+    if sys.platform != "linux" or not shutil.which("dpkg") or not shutil.which("dpkg-query"):
         return out
     owner = subprocess.run(["dpkg", "-S", real], capture_output=True, text=True)
     if owner.returncode == 0 and ":" in owner.stdout:
