@@ -37,9 +37,13 @@ int main(int argc,char** argv) {
         first=Value();
         run(session,"f = file("+quoted(root/"new")+")");
         run(session,"g.write(\"changed\")"); run(session,"g.revert()");
-        run(session,"g.close()"); run(session,"g.close()");
+        run(session,"g.close()");
+        // D-039 amendment: closing a file() closes only its buffer.
+        auto repeated=run(session,"g.close()",StopReason::Error);
+        CHECK(repeated.execution.message=="close: file is not open"); CHECK(!repeated.execution.catchable);
         auto result=run(session,"g.read_all()",StopReason::Error);
-        CHECK(result.execution.code=="runtime.handle_closed"); CHECK(result.execution.catchable);
+        CHECK(result.execution.message=="read_all: file is not open"); CHECK(!result.execution.catchable);
+        run(session,"g.open(\"r\")"); run(session,"g.close()");
         first=session.value("g");
         CHECK(session.finish().reason==StopReason::None);
         auto* box=first.heap_as<HandleBoxObject>();
@@ -51,7 +55,10 @@ int main(int argc,char** argv) {
     {
         VmSession session;run(session,"s:=ifstream("+quoted(p)+")");
         run(session,"line:=s.read_line()"); CHECK(string_view_of(session.value("line"))=="original");
-        run(session,"s.close()"); CHECK(session.finish().reason==StopReason::None);
+        run(session,"s.close()"); run(session,"s.close()");
+        auto closed=run(session,"s.read_line()",StopReason::Error);
+        CHECK(closed.execution.code=="runtime.handle_closed"); CHECK(closed.execution.catchable);
+        CHECK(session.finish().reason==StopReason::None);
     }
     {
         VmSession session;run(session,"f:=file("+quoted(p)+");f.open(\"rw\")");
