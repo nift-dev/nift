@@ -352,7 +352,7 @@ def main():
         for i in range(20000):
             (names / f"n{i:05d}").touch()
         (root / "case.f").write_text('l := native::ls("names"); print(l.length())\n')
-        peak, proc = timed(nift, root, budget)
+        peak, proc = timed(nift, root, budget, sample_short=True)
         if check("ls", peak, proc,
                  failures):
             passed += 1
@@ -364,7 +364,7 @@ def main():
             (big_dir / f"f{i:06d}").touch()
         deep_glob = 'l := native::ls("deep/a/b/c/d/e/f/g/h/*"); print(l.length())\n'
         (root / "case.f").write_text(deep_glob)
-        peak, proc = timed(nift, root, budget)
+        peak, proc = timed(nift, root, budget, sample_short=True)
         if check("glob", peak, proc,
                  failures):
             passed += 1
