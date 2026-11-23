@@ -83,6 +83,7 @@ static void ensure_parent_directory(const fs::path& path) {
     const fs::path parent = path.parent_path();
     if (parent.empty()) return;
 
+#ifndef _WIN32
     // Build workers tend to alternate between a very small number of output and
     // metadata directories. A tiny path cache avoids allocating/normalising a
     // string and hashing it for every generated file.
@@ -93,9 +94,13 @@ static void ensure_parent_directory(const fs::path& path) {
     std::size_t& recent_count = recent.count;
     for (std::size_t i = 0; i < recent_count; ++i)
         if (recent_parents[i] == parent) return;
+#endif
 
+    // Windows workers can fault when the CRT destroys the cached paths at
+    // thread exit. Check/create the parent directly, with no owned TLS path.
     std::error_code error;
     fs::create_directories(parent, error);
+#ifndef _WIN32
     if (!error) {
         if (recent_count < recent_parents.size()) recent_parents[recent_count++] = parent;
         else {
@@ -103,6 +108,7 @@ static void ensure_parent_directory(const fs::path& path) {
             recent_parents.back() = parent;
         }
     }
+#endif
 }
 
 static bool temporary_owner_pid(std::string_view name, unsigned long long& pid) {
