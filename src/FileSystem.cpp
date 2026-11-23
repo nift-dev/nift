@@ -232,6 +232,10 @@ static void remove_stale_temporaries(const fs::path& path) {
     const native_path_view parent_view =
         sep == std::string::npos ? native_path_view() : native_path_view(native).substr(0, sep);
 
+    // Windows archive testing found heap corruption at the destructor of
+    // the worker-local recovery cache. Use the existing shared epoch map
+    // on Windows to avoid that TLS cleanup path.
+#ifndef _WIN32
     // Micro-cache avoids path normalization, hashing and locking on the hot
     // repeated-write path. The epoch is part of the key so persistent threads
     // cannot accidentally turn once-per-build recovery back into once-per-process.
@@ -244,6 +248,7 @@ static void remove_stale_temporaries(const fs::path& path) {
     for (std::size_t i = 0; i < recent_count; ++i)
         if (recent_parents[i].epoch == epoch && native_path_view(recent_parents[i].parent) == parent_view)
             return;
+#endif
 
     const fs::path parent = sep == std::string::npos ? fs::path(".") : fs::path(parent_view);
     // Build-derived paths are already absolute and normalized, so the parent
@@ -275,12 +280,14 @@ static void remove_stale_temporaries(const fs::path& path) {
         }
     }
 
+#ifndef _WIN32
     RecentParent recent{native_path_string(parent_view), epoch};
     if (recent_count < recent_parents.size()) recent_parents[recent_count++] = std::move(recent);
     else {
         for (std::size_t i = 1; i < recent_parents.size(); ++i) recent_parents[i - 1] = std::move(recent_parents[i]);
         recent_parents.back() = std::move(recent);
     }
+#endif
 }
 
 #ifdef NIFT_TEST_RECOVERY_STATS
