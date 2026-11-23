@@ -25,13 +25,17 @@ def run_case(command, cwd, env, input_bytes):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
 
 
-def timed(nift, cwd, env, input_bytes=None):
+def timed(nift, cwd, env, input_bytes=None, *, sample_short=False):
     timing = shutil.which("/usr/bin/time")
     darwin = sys.platform == "darwin"
     command = [timing, *time_args(darwin)]
     freebsd = sys.platform.startswith("freebsd")
     if freebsd:
-        command += ["/usr/bin/env", f"LD_PRELOAD={cwd / 'peak.so'}", "NIFT_TEST_RSS_SAMPLE=1"]
+        command += ["/usr/bin/env", f"LD_PRELOAD={cwd / 'peak.so'}"]
+        # The long workloads already reach a statistics tick. Sample the
+        # short children at teardown without changing those longer fixtures.
+        if sample_short:
+            command.append("NIFT_TEST_RSS_SAMPLE=1")
     proc = run_case([*command, nift, "case.f"], cwd, env, input_bytes)
     rss = peak_rss_bytes(proc.stderr, darwin)
     if freebsd:
@@ -129,14 +133,14 @@ def main():
         with open(root / "big.bin", "wb") as handle:
             handle.truncate(60 << 20)
         (root / "case.f").write_text('print(open("big.bin").length())\n')
-        peak, proc = timed(nift, root, budget)
+        peak, proc = timed(nift, root, budget, sample_short=True)
         if check("open", peak, proc,
                  failures):
             passed += 1
 
         # Unknown-size read: 50 MB on /dev/stdin.
         (root / "case.f").write_text('print(open("/dev/stdin").length())\n')
-        peak, proc = timed(nift, root, budget, input_bytes=b"x" * (50 << 20))
+        peak, proc = timed(nift, root, budget, input_bytes=b"x" * (50 << 20), sample_short=True)
         if check("stdin", peak, proc,
                  failures):
             passed += 1
@@ -154,7 +158,7 @@ def main():
             thread = threading.Thread(target=writer, daemon=True)
             thread.start()
             (root / "case.f").write_text('print(open("feed.fifo").length())\n')
-            peak, proc = timed(nift, root, budget)
+            peak, proc = timed(nift, root, budget, sample_short=True)
             thread.join(timeout=5)
             if check("fifo", peak,
                      proc, failures):
@@ -347,7 +351,7 @@ def main():
         # budget + 96 KiB + tolerance.
         base_env = dict(os.environ, NIFT_VM="require", NIFT_VM_HEAP_BUDGET="60000000")
         (root / "case.f").write_text('print(1)\n')
-        base_peak, base = timed(nift, root, base_env)
+        base_peak, base = timed(nift, root, base_env, sample_short=True)
         if base.returncode != 0 or base.stdout.strip() != b"1" or base_peak is None:
             failures.append("glob baseline: expected successful output and peak RSS")
         tolerance = 8 << 10  # allocator/stdio tolerance, stated in the report
@@ -401,7 +405,7 @@ def main():
         for label, body in (("env", "e := env(); print(type(e))\n"),
                             ("getenv", 'v := getenv("BIGVAR"); print(v != null)\n')):
             (root / "case.f").write_text(body)
-            peak, proc = timed(nift, root, small)
+            peak, proc = timed(nift, root, small, sample_short=True)
             if check(label, peak,
                      proc, failures):
                 passed += 1
