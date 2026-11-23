@@ -487,10 +487,16 @@ jobs:
           if ($env:FAILED_SMOKE -eq "true") {
             $cdb = Join-Path (Split-Path $gflags) "cdb.exe"
             if (!(Test-Path $cdb)) { throw "Windows SDK cdb unavailable" }
-            Invoke-Nift init
-            Set-Content index.html x
-            & $cdb -g -G -c 'sxe -c ".ecxr; k; q" 0xc0000374; g' $exe build --all
-            Write-Host "CDB control exit $LASTEXITCODE"
+            $debug = "sxe -c `".ecxr; k; q`" 0xc0000374; g"
+            & $cdb -g -G -c $debug $exe init
+            Write-Host "CDB init control exit $LASTEXITCODE"
+            if (Test-Path .nift/config.json) {
+              Set-Content index.html x
+              & $cdb -g -G -c $debug $exe build --all
+              Write-Host "CDB build control exit $LASTEXITCODE"
+            }
+            $fresh = New-Item -ItemType Directory (Join-Path $root instrumented)
+            Set-Location $fresh
           }
           & $gflags /p /enable nift.exe /full
           if ($LASTEXITCODE -ne 0) { throw "cannot enable full PageHeap" }
@@ -501,7 +507,7 @@ jobs:
               throw "full PageHeap status was not verified"
             }
             if ((Invoke-Nift version) -ne "Nift v4.13.0") { throw "wrong extracted version" }
-            if ($env:FAILED_SMOKE -ne "true") { Invoke-Nift init }
+            Invoke-Nift init
             $config = Get-Content .nift/config.json -Raw | ConvertFrom-Json
             $config.config.'build-threads' = 4
             $config | ConvertTo-Json -Depth 10 | Set-Content .nift/config.json
