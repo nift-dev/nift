@@ -487,7 +487,7 @@ jobs:
           if ($env:FAILED_SMOKE -eq "true") {
             $cdb = Join-Path (Split-Path $gflags) "cdb.exe"
             if (!(Test-Path $cdb)) { throw "Windows SDK cdb unavailable" }
-            $debug = "sxe -c `".ecxr; k; q`" 0xc0000374; g"
+            $debug = "sxe -c `".ecxr; k; q`" 0xc0000374; sxe -c `".ecxr; k; q`" av; .ecxr; k; g"
             & $cdb -g -G -c $debug $exe init
             Write-Host "CDB init control exit $LASTEXITCODE"
             if (Test-Path .nift/config.json) {
