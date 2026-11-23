@@ -12,6 +12,7 @@
 #include "../../rt/storage_access.h"  // tooling 2: the construction shims (tests only)
 #include "rt_test.h"
 #include "rt_vm_tool.h"
+#include <atomic>
 #include <cstdio>
 #include <thread>
 using namespace nift::rt;
@@ -72,6 +73,47 @@ void neutral_cycles() {
   decoded=Value(); shared_collect(); CHECK(weak.expired());
  }
 }
+void pending_task_cycle() {
+ EmptyMap map; SharedOpError error; std::string why;
+ auto task=std::make_shared<ParallelTaskRecord>();
+ std::weak_ptr<ParallelTaskRecord> weak=task;
+ Value channel=shared_make_channel(1,error);
+ Value future=Value::adopt(new FutureObject());
+ future.heap_as<FutureObject>()->parallel=task;
+ CHECK(shared_channel_send(channel,future,&map,{},error));  // publishes the Pending identity
+ CHECK(task->input.seed_graph.encode(channel,map,why)==TransferStatus::Ok);
+ task.reset(); future=Value(); channel=Value();
+ shared_collect();
+ CHECK(shared_registry_live_for_test()==1);
+ auto completing=weak.lock();
+ CHECK(completing!=nullptr);
+ if (!completing) return;
+ {
+  std::lock_guard<std::mutex> lock(completing->mutex);
+  CHECK(!completing->input.seed_graph.empty());
+  completing->state=ParallelTaskState::Done;
+ }
+ completing.reset();
+ shared_collect();
+ CHECK(weak.expired());
+ CHECK(shared_registry_live_for_test()==0);
+}
+
+void completion_root_handoff() {
+ std::atomic<bool> stop{false};
+ std::thread collector([&] { while (!stop.load(std::memory_order_relaxed)) shared_collect(); });
+ // Passing the producer future to relay registers its neutral identity.
+ // The self-retaining channel must then survive each task-result handoff.
+ vm_case("fn[async](make_chan()){c:=channel(1);send(c,c);return c};"
+         "fn[async](relay(a)){return await a};"
+         "fn[async](roundtrip()){a:=make_chan();return await relay(a)};"
+         "r:=await roundtrip();c:=recv(r);close(c);print(42)", "42\n", 2);
+ stop.store(true, std::memory_order_relaxed);
+ collector.join();
+ shared_collect();
+ CHECK(shared_registry_live_for_test()==0);
+}
+
 void pool_lifetime() {
  CompileLimits limits; limits.parallel_tasks=true;
  auto code=rt_vm_tool::compile("fn[async](f(c)){recv(c);return 1}",limits);
@@ -187,7 +229,7 @@ void cyclic_heap() {
 }
 }
 int main() {
- neutral_cycles(); cyclic_heap(); deep_graph(); large_symbol_context(); callable_domain(); pool_lifetime(); cancel_before_dispatch();
+ neutral_cycles(); pending_task_cycle(); completion_root_handoff(); cyclic_heap(); deep_graph(); large_symbol_context(); callable_domain(); pool_lifetime(); cancel_before_dispatch();
  vm_case("m:=mutex(0);m.lock();fn[async](p()){m.lock();m.unlock();return 1};a:=p();sleep(20);cancel(a);try{await a}catch(e){print(e.code)};m.unlock()", "runtime.cancelled\n");
  vm_case("fn[async](slow()){sleep(40);return 0};fn[async](fast()){print(\"before\");return 0};a:=slow();b:=fast();await b;print(\"after\");await a", "before\nafter\n");
  vm_case("c:=channel(0);fn[async](p()){print(\"before\");send(c,1);sleep(20);return 0};a:=p();recv(c);print(\"after\");await a", "before\nafter\n");

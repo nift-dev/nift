@@ -75,10 +75,10 @@ void ParallelRuntime::starve(std::uint32_t offset) noexcept {
         for (const auto& record : spare_) {  // never ran, never will: failed with the limit, waiters woken
             {
                 std::lock_guard<std::mutex> lock(record->mutex);
-                record->state = kStarveCancels ? ParallelTaskState::Cancelled : ParallelTaskState::Failed;
                 record->failure_reason = StopReason::Error; record->failure_catchable = false;
                 record->failure_code = kStarveCancels ? "runtime.cancelled" : "limit.exceeded";
                 record->failure_starved = !kStarveCancels; record->failure_offset = record->spawn_offset;
+                record->state = kStarveCancels ? ParallelTaskState::Cancelled : ParallelTaskState::Failed;
             }
             notify_parallel_wait_states(record); record->cv.notify_all();
         }

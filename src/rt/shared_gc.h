@@ -11,6 +11,7 @@ struct SharedGcNode {
     SharedGcNode* work_next = nullptr;
     std::size_t incoming = 0;
     bool marked = false;
+    bool pending_task = false;  // task state captured once per collection
     std::shared_ptr<void> pin;
 };
 void shared_note_edges() noexcept;

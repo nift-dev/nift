@@ -53,6 +53,10 @@ struct ParallelTaskRecord {
     SharedGcNode gc;
     mutable std::mutex mutex;
     std::condition_variable cv;
+    // Written last under mutex on terminal publication. After this transition
+    // the worker no longer touches the input or completion graphs or failure
+    // payload. The shared collector clears graph edges only for unreachable
+    // terminal records, under the registry mutex.
     ParallelTaskState state = ParallelTaskState::Pending;
     TransferGraph result;
     bool has_result = false;

@@ -19,11 +19,8 @@ template<class Visit> void edges(SharedGcNode& n, Visit visit) {
         graph_edges(e.value, visit);
         for (const auto& item : e.buffer) graph_edges(item->value, visit);
     } else {
+        if (n.pending_task) return;
         auto& t = *static_cast<ParallelTaskRecord*>(n.object);
-        // Pending tasks are roots. Their graph pins are deliberately not
-        // subtracted, so concurrent execution cannot hide an external owner.
-        std::lock_guard<std::mutex> lock(t.mutex);
-        if (t.state == ParallelTaskState::Pending) return;
         graph_edges(t.input.seed_graph, visit);
         graph_edges(t.input.constants_graph, visit);
         graph_edges(t.result, visit);
@@ -53,10 +50,16 @@ void shared_collect() noexcept {
         if (!p) return;
         auto& n = p->gc;
         n.kind = kind; n.object = p.get(); n.incoming = 0; n.marked = false;
+        n.pending_task = kind == SharedGcNode::Kind::Task &&
+            static_cast<ParallelTaskRecord*>(n.object)->snapshot_state() == ParallelTaskState::Pending;
         n.work_next = nullptr; n.all_next = all; n.pin = p; all = &n;
     };
     for (auto& pair : r.entries) pin(pair.second, SharedGcNode::Kind::Entry);
     for (auto& pair : r.tasks) pin(pair.second, SharedGcNode::Kind::Task);
+    // Use the same state decision for counting, marking and sweeping. The
+    // task mutex publishes immutable terminal graphs. A task observed Pending
+    // stays opaque for this epoch even if it completes during the scan; its
+    // graph pins are not subtracted from their targets' root counts.
     for (auto* n = all; n; n = n->all_next) edges(*n, [](auto& child) { ++child.incoming; });
     SharedGcNode* todo = nullptr;
     const auto mark = [&](SharedGcNode& n) {
@@ -64,7 +67,7 @@ void shared_collect() noexcept {
         n.marked = true; n.work_next = todo; todo = &n;
     };
     for (auto* n = all; n; n = n->all_next)
-        if (static_cast<std::size_t>(n->pin.use_count()) > n->incoming + 1) mark(*n);
+        if (n->pending_task || static_cast<std::size_t>(n->pin.use_count()) > n->incoming + 1) mark(*n);
     while (todo) {
         auto* n = todo; todo = todo->work_next;
         edges(*n, mark);

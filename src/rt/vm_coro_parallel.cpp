@@ -4,7 +4,7 @@
 #include "rt/aggregate.h"
 #include "rt/heap_account.h"
 #include "rt/parallel_task.h"
-#include "rt/shared_state.h"
+#include "rt/shared_state_internal.h"
 
 #include <algorithm>
 #include <chrono>
@@ -19,8 +19,19 @@ namespace {
 
 void mark_failed(const std::shared_ptr<ParallelTaskRecord>& record, std::string message) {
     std::lock_guard<std::mutex> lock(record->mutex);
-    record->state = ParallelTaskState::Failed;
     record->failure_message = std::move(message);
+    record->state = ParallelTaskState::Failed;
+}
+
+TransferStatus decode_parallel_graph(const TransferGraph& graph, const TransferProtoMap& map,
+                                     Value& value, std::string& error) {
+    if (graph.shared_backings().empty() && graph.task_backings().empty())
+        return graph.decode(map, value, error);
+    // Decoding promotes neutral edges to isolate roots. The collector must
+    // see the old source or the new roots, even if the source is then dropped.
+    // Take the registry lock only after releasing the record's task mutex.
+    std::lock_guard<std::recursive_mutex> lock(shared_detail::registry().mutex);
+    return graph.decode(map, value, error);
 }
 
 } // namespace
@@ -72,7 +83,6 @@ bool Vm::Coro::create_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->wait_state = coro.parallel_wait;
     record->owner_task = coro.current;
     record->wait_states.push_back(coro.parallel_wait);
-    parallel_task_identity(record);
     if (coro.trace) record->label = nift::trace::child_label(thread ? "thread" : "async");
     for (std::size_t i = 0; i < vm.program_.protos.size(); ++i) {  // C140a: where it was spawned (cold, per spawn)
         const auto& code = vm.program_.protos[i]->code;
@@ -125,6 +135,10 @@ bool Vm::Coro::create_parallel(Vm& vm, const Instr& in, const Proto* callee,
     record->options.cooperative_tasks = false;
     record->options.parallel = coro.parallel;
     record->options.program_keepalive = record->program;
+    // Publish the identity only once the spawn input is constructed, but
+    // before a worker can run. The future is still local until admission
+    // ends, so an exception here cannot leave a graph referencing this task.
+    parallel_task_identity(record);
     bool started = false;
     std::size_t listed = 0;  // C140a F3: listed before the start (nothing throws after it); unlisted unless started
     const auto unlist = [&] {
@@ -158,12 +172,15 @@ void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
     (void)vm;
     std::unique_lock<std::mutex> lock(record->mutex);
     if (future->state != FutureState::Pending || record->state == ParallelTaskState::Pending) return;
-    lock.unlock();  // completion payload is immutable; never decode under a task lock
+    // The caller retains an external record root. Decode can take the
+    // registry lock, so release the task mutex after observing publication.
+    lock.unlock();
     if (record->state == ParallelTaskState::Done) {
         std::string error;
         Value value;
         const TransferProtoMap* map = vm.transfer_map_ ? vm.transfer_map_ : record->proto_map.get();
-        if (!record->has_result || (map && record->result.decode(*map, value, error) == TransferStatus::Ok)) {
+        if (!record->has_result ||
+            (map && decode_parallel_graph(record->result, *map, value, error) == TransferStatus::Ok)) {
             future->result = std::move(value);
             future->state = FutureState::Done;
         } else {
@@ -183,7 +200,7 @@ void Vm::Coro::resolve_parallel(Vm& vm, FutureObject* future,
         std::string error;
         Value value;
         const TransferProtoMap* map = vm.transfer_map_ ? vm.transfer_map_ : record->proto_map.get();
-        if (map && record->error_value.decode(*map, value, error) == TransferStatus::Ok &&
+        if (map && decode_parallel_graph(record->error_value, *map, value, error) == TransferStatus::Ok &&
             value.is(Kind::Error)) {
             future->error = std::move(value);
         } else {

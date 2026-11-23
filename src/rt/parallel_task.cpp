@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
+#include <new>
 #include <system_error>
 #include <thread>
 
@@ -157,11 +158,17 @@ void ParallelRuntime::execute_record(std::shared_ptr<ParallelTaskRecord> record,
     try { run_parallel_task(record); }
     catch (...) {
         record->options.current_task.reset();
-        { std::lock_guard<std::mutex> lock(record->mutex);
-          record->state = ParallelTaskState::Failed;
-          record->failure_message = "task failed";
-          record->failure_code.clear(); record->failure_catchable = false;
-          record->failure_reason = StopReason::Internal; }
+        {
+            std::lock_guard<std::mutex> lock(record->mutex);
+            if (record->state == ParallelTaskState::Pending) {
+                try { record->failure_message = "task failed"; }
+                catch (const std::bad_alloc&) { record->failure_message.clear(); }
+                record->failure_code.clear();
+                record->failure_catchable = false;
+                record->failure_reason = StopReason::Internal;
+                record->state = ParallelTaskState::Failed;
+            }
+        }
         notify_parallel_wait_states(record); record->cv.notify_all();
     }
     const std::size_t charge = record->reserved_bytes;
@@ -220,10 +227,12 @@ std::size_t ParallelRuntime::executing() const { std::lock_guard<std::mutex> loc
 std::size_t ParallelRuntime::blocked() const { std::lock_guard<std::mutex> lock(mutex_); return blocked_; }
 std::size_t ParallelRuntime::worker_count() const { std::lock_guard<std::mutex> lock(mutex_); return workers_.size(); }
 bool ParallelRuntime::cancel_queued(const std::shared_ptr<ParallelTaskRecord>& record) {
+    std::string message;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto at = std::find(queue_.begin(), queue_.end(), record);
         if (at == queue_.end()) return false;
+        message = "cancelled";  // finish fallible preparation before taking ownership from the queue
         queue_.erase(at); --active_;
 #if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 6)  // test-only: un-awaited cancel keeps it
         release_locked(record->reserved_bytes);
@@ -231,8 +240,9 @@ bool ParallelRuntime::cancel_queued(const std::shared_ptr<ParallelTaskRecord>& r
     }
     {
         std::lock_guard<std::mutex> lock(record->mutex);
-        record->cancelled = true; record->state = ParallelTaskState::Cancelled;
-        record->failure_message = "cancelled"; record->failure_catchable = false;
+        record->cancelled = true;
+        record->failure_message = std::move(message); record->failure_catchable = false;
+        record->state = ParallelTaskState::Cancelled;
     }
     notify_parallel_wait_states(record); record->cv.notify_all(); cv_.notify_all();
     return true;
@@ -349,21 +359,22 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
         std::lock_guard<std::mutex> lock(record->mutex);
         const bool succeeded = outcome.status == IsolateTaskStatus::Ok &&
                                outcome.result.reason == StopReason::None && !cancelled_completion;
+        ParallelTaskState terminal;
         if (succeeded) {
-            record->state = ParallelTaskState::Done;
-            record->result = std::move(outcome.return_value);
+            terminal = ParallelTaskState::Done;
+            std::swap(record->result, outcome.return_value);
             record->has_result = outcome.has_return_value;
         } else if (cancelled_completion) {
-            record->state = ParallelTaskState::Cancelled;
+            terminal = ParallelTaskState::Cancelled;
             record->failure_message = "task cancelled";
             record->failure_code = "runtime.cancelled";
-            record->failure_catchable = true;
+            record->failure_catchable = outcome.has_error_value;
             if (outcome.has_error_value) {
-                record->error_value = std::move(outcome.error_value);
+                std::swap(record->error_value, outcome.error_value);
                 record->has_error_value = true;
             }
         } else {
-            record->state = ParallelTaskState::Failed;
+            terminal = ParallelTaskState::Failed;
             record->failure_reason = outcome.result.reason == StopReason::Internal
                                          ? StopReason::Internal : StopReason::Error;
             record->failure_message =
@@ -373,14 +384,13 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
             record->failure_error_origin = outcome.result.error_origin;
             record->failure_in_loop_path = outcome.result.error_in_loop_path;
             record->failure_catchable = outcome.result.catchable && outcome.has_error_value;
-            record->error_value = std::move(outcome.error_value);
+            std::swap(record->error_value, outcome.error_value);
             record->has_error_value = outcome.has_error_value;
         }
         record->output = std::move(outcome.output);
-    }
-    {
-        std::lock_guard<std::mutex> lock(record->mutex);
-        record->failure_catchable = record->failure_catchable && record->has_error_value;
+        // Publish only after the complete wire payload is available. Swapped
+        // out graphs are destroyed with outcome, outside the task mutex.
+        record->state = terminal;
     }
     record->cv.notify_all();
     notify_parallel_wait_states(record);
