@@ -48,6 +48,10 @@ on:
         description: Exact source commit of the ZIP to verify
         required: false
         type: string
+      archive_failed_smoke:
+        description: Verify an archive retained by a failed smoke and capture a stack
+        type: boolean
+        default: false
       windows_archive_replay:
         description: Replay the retained D-158 Windows diagnostic ZIP in PowerShell
         type: boolean
@@ -432,6 +436,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARCHIVE_RUN: ${{ inputs.archive_run }}
           ARCHIVE_COMMIT: ${{ inputs.archive_commit }}
+          FAILED_SMOKE: ${{ inputs.archive_failed_smoke }}
         run: |
           if ($env:ARCHIVE_RUN -notmatch '^[0-9]+$' -or $env:ARCHIVE_COMMIT -notmatch '^[0-9a-f]{40}$') {
             throw "expected a run ID and exact commit SHA"
@@ -442,18 +447,26 @@ jobs:
             throw "archive provenance mismatch"
           }
           $job = @($run.jobs | Where-Object { $_.name -like 'native windows-x86_64*' })
-          if ($job.Count -ne 1 -or $job[0].conclusion -ne "success") {
+          if ($job.Count -ne 1) { throw "expected one Windows packaging job" }
+          if ($env:FAILED_SMOKE -eq "true") {
+            $smoke = @($job[0].steps | Where-Object { $_.name -like 'Verify extracted macOS and Windows*' })
+            if ($smoke.Count -ne 1 -or $smoke[0].conclusion -ne "failure") {
+              throw "expected a failed Windows archive smoke"
+            }
+          } elseif ($job[0].conclusion -ne "success") {
             throw "expected a successful Windows packaging job"
           }
           Write-Host "Verified source $($run.headSha), packaging run $env:ARCHIVE_RUN"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: nift-package-windows-x86_64
+          name: ${{ inputs.archive_failed_smoke && 'nift-archive-diagnostic-windows-x86_64' || 'nift-package-windows-x86_64' }}
           run-id: ${{ inputs.archive_run }}
           github-token: ${{ github.token }}
           path: replay
       - name: Verify multi-worker build and stale temporary recovery
         shell: pwsh
+        env:
+          FAILED_SMOKE: ${{ inputs.archive_failed_smoke }}
         run: |
           $ErrorActionPreference = "Stop"
           $root = Join-Path $env:RUNNER_TEMP "nift-4.13.0-pageheap"
@@ -471,6 +484,14 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "nift $args exited $LASTEXITCODE" }
             $output
           }
+          if ($env:FAILED_SMOKE -eq "true") {
+            $cdb = Join-Path (Split-Path $gflags) "cdb.exe"
+            if (!(Test-Path $cdb)) { throw "Windows SDK cdb unavailable" }
+            Invoke-Nift init
+            Set-Content index.html x
+            & $cdb -g -G -c 'sxe -c ".ecxr; k; q" 0xc0000374; g' $exe build --all
+            Write-Host "CDB control exit $LASTEXITCODE"
+          }
           & $gflags /p /enable nift.exe /full
           if ($LASTEXITCODE -ne 0) { throw "cannot enable full PageHeap" }
           try {
@@ -480,7 +501,7 @@ jobs:
               throw "full PageHeap status was not verified"
             }
             if ((Invoke-Nift version) -ne "Nift v4.13.0") { throw "wrong extracted version" }
-            Invoke-Nift init
+            if ($env:FAILED_SMOKE -ne "true") { Invoke-Nift init }
             $config = Get-Content .nift/config.json -Raw | ConvertFrom-Json
             $config.config.'build-threads' = 4
             $config | ConvertTo-Json -Depth 10 | Set-Content .nift/config.json
