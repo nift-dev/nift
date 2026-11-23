@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fresh-process exhaustive bounded allocation sites, one-shot or persistent.
-The binary verifies internal-stop semantics, owned-heap balance and registry
-release. Any signal/timeout/setup failure fails the campaign."""
+The binary verifies internal stops or the fatal spawn resource limit, along
+with owned-heap balance and registry release. Any signal/timeout/setup failure fails the campaign."""
 import argparse,hashlib,json,pathlib,subprocess
 p=argparse.ArgumentParser();p.add_argument('--binary',type=pathlib.Path,required=True);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--persistent',action='store_true');p.add_argument('--mode',choices=['awaited','unawaited','cycle','cancelled','timers','waiting'],default='awaited');args=p.parse_args();args.binary=args.binary.resolve()
 report={'binary':str(args.binary),'binary_sha256':hashlib.sha256(args.binary.read_bytes()).hexdigest(),'persistent':args.persistent,'mode':args.mode,'runs':[],'passed':False}

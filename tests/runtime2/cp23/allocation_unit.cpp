@@ -1,6 +1,7 @@
 // One real allocation fails per run, separately on the submitting thread and
 // worker threads. Fresh processes make termination/hangs/leaks observable.
 #include "rt/parallel_task.h"
+#include "rt/parallel_task_start.h"
 #include "rt/shared_state.h"
 #include "rt/heap_account.h"
 #include "rt/heap.h"
@@ -9,6 +10,7 @@
 #include "rt/transfer_heap.h"
 #include "rt_vm_tool.h"
 #include <atomic>
+#include <string_view>
 #include <cstdlib>
 #include <cstdio>
 #include <new>
@@ -22,6 +24,13 @@ std::atomic<long> source_sites{0}, worker_sites{0};
 long fail_site=-1;
 bool fail_worker=false, persistent=false;
 thread_local long sites=0;
+
+// These fixtures spawn through assignments to calls of their async functions.
+bool is_spawn_offset(std::string_view source, std::size_t offset) {
+ if (offset<2 || offset>=source.size() || source.substr(offset-2,2)!=":=") return false;
+ const auto call=source.substr(offset);
+ return call.compare(0,2,"f(")==0 || call.compare(0,5,"slow(")==0 || call.compare(0,7,"reader(")==0;
+}
 }
 void* operator new(std::size_t n) {
  if (armed.load(std::memory_order_relaxed)) {
@@ -70,20 +79,26 @@ int main(int argc,char** argv) {
  const auto before=live_heap_bytes()-heap_charged_bytes();
  sites=0;armed=true;
  StopReason reason=StopReason::None;
+ bool spawn_resource_limit=false;
  try {
   if(cycle){
    TransferHeapBoundary boundary;Value out;std::string error;
    if(graph.decode(protos,out,error)!=TransferStatus::Ok)return 15;
   } else {
   VmOptions options;options.parallel=std::make_shared<ParallelRuntime>(1);options.source_map=&map;
-  Vm vm(*compiled.program,options);std::string output;reason=vm.run(output).reason;
+  Vm vm(*compiled.program,options);std::string output;auto result=vm.run(output);
+  reason=result.reason;
+  // D-081 F3 permits source-side spawn construction to fail with a fatal resource limit.
+  spawn_resource_limit=!fail_worker && reason==StopReason::Error && !result.catchable &&
+    result.code=="limit.exceeded" && result.message==kParallelResourcesExhausted &&
+    is_spawn_offset(source,result.offset);
   }
  } catch (const std::bad_alloc&) {reason=StopReason::Internal;}
  armed=false;
  const auto after=live_heap_bytes()-heap_charged_bytes();
- std::printf("site=%ld role=%s hit=%d source=%ld worker=%ld reason=%d live_before=%zu live_after=%zu registry=%zu\n",fail_site,fail_worker?"worker":"source",int(hit.load()),source_sites.load(),worker_sites.load(),int(reason),before,after,shared_registry_live_for_test());
+ std::printf("site=%ld role=%s hit=%d source=%ld worker=%ld reason=%d live_before=%zu live_after=%zu registry=%zu spawn_resource_limit=%d\n",fail_site,fail_worker?"worker":"source",int(hit.load()),source_sites.load(),worker_sites.load(),int(reason),before,after,shared_registry_live_for_test(),int(spawn_resource_limit));
  if (after!=before || shared_registry_live_for_test()!=0) return 11;
  if (fail_site>=0 && !hit) return 12;
- if (hit && reason!=StopReason::Internal) return 13;
+ if (hit && reason!=StopReason::Internal && !spawn_resource_limit) return 13;
  return 0;
 }
