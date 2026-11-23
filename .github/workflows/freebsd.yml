@@ -41,7 +41,11 @@ jobs:
             pw useradd niftci -m -s /bin/sh
             chown -R niftci "$PWD"
             su niftci -c "cd '$PWD/nift' && mkdir -p .build/freebsd-ci && gmake -j2 nift >.build/freebsd-ci/build.log 2>&1"
-            su niftci -c "cd '$PWD/nift' && bash scripts/ci_freebsd_memory_diagnostic.sh"
+            mkdir -p /mnt/nift-runtime2
+            mount -t tmpfs -o size=64m tmpfs /mnt/nift-runtime2
+            trap 'umount /mnt/nift-runtime2' EXIT
+            chown niftci /mnt/nift-runtime2
+            su niftci -c "cd '$PWD/nift' && NIFT_TEST_CROSS_DEVICE_ROOT=/mnt/nift-runtime2 bash scripts/ci_freebsd_memory_diagnostic.sh"
       - name: Check guest results after copying logs
         run: |
           test "$(cat nift/.build/freebsd-ci/guest-status.txt)" = '0 0'

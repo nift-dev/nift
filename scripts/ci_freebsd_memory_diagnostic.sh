@@ -17,4 +17,7 @@ for suite in vm_subset vm_host_memory; do
 done
 host=0
 python3 -u tests/runtime2/host_deps.py 2>&1 | tee "$out/host-deps.txt" || host=$?
+for suite in file_copy_move_freedom build_write_ownership; do
+    bash "tests/runtime2/$suite.sh" 2>&1 | tee "$out/$suite.txt" || host=$?
+done
 printf '%s %s\n' "$memory" "$host" > "$out/guest-status.txt"

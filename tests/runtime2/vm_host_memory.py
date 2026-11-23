@@ -52,6 +52,7 @@ def timed_pipe(nift, cwd, env, mib):
     # Keep 50 MiB of test-driver input out of its address space when starting a
     # FreeBSD RSS measurement. Nift still reads an unknown-size stdin pipe.
     read_fd, write_fd = os.pipe()
+    producer_errors = []
 
     def feed():
         try:
@@ -61,14 +62,19 @@ def timed_pipe(nift, cwd, env, mib):
                     writer.write(chunk)
         except BrokenPipeError:
             pass  # The expected budget refusal closes the read end early.
+        except OSError as error:
+            producer_errors.append(error)
 
     worker = threading.Thread(target=feed)
     worker.start()
     try:
         with os.fdopen(read_fd, "rb") as reader:
-            return timed(nift, cwd, env, stdin=reader)
+            result = timed(nift, cwd, env, stdin=reader)
     finally:
         worker.join()
+    if producer_errors:
+        raise producer_errors[0]
+    return result
 
 
 def build_peak_tracker(root, failures):

@@ -64,6 +64,15 @@ cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
 device_id() {
   if [ "$(uname -s)" = FreeBSD ]; then stat -f %d "$1"; else stat -c %d "$1"; fi
 }
+file_mode() {
+  if [ "$(uname -s)" = FreeBSD ]; then
+    local raw
+    raw=$(stat -f %p "$1") || return
+    printf '%o\n' "$((8#$raw & 07777))"
+  else
+    stat -c %a "$1"
+  fi
+}
 if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
    source_device=$(device_id "$cross_device_root") && work_device=$(device_id "$W") &&
    [ "$source_device" != "$work_device" ]; then
@@ -72,8 +81,8 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
   printf 'f := file("%s")\ng := f.move("%s")\nnative::mv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"
   out="$("$NIFT" "$W/x.f" 2>&1)"
   if [ "$out" = "$S/xa.txt" ] && [ "$(cat "$S/xa.txt")" = xdev-a ] && [ "$(cat "$S/xb.txt")" = xdev-b ] && [ ! -e "$W/xa.txt" ] && [ ! -e "$W/xb.txt" ] \
-     && [ "$(stat -c %a "$S/xa.txt")" = 640 ] && ! ls -A "$S" | grep -q nift-tmp; then
-    pass "cross-device file().move and mv() (to /dev/shm)"
+     && mode=$(file_mode "$S/xa.txt") && [ "$mode" = 640 ] && ! ls -A "$S" | grep -q nift-tmp; then
+    pass "cross-device file().move and mv() (to $cross_device_root)"
   else bad "cross-device move: $out; $(ls -la "$S" | tr '\n' ' ')"; fi
   rm -rf "$S"
 elif [ -n "${NIFT_TEST_CROSS_DEVICE_ROOT:-}" ]; then bad "configured cross-device fixture is unavailable";
