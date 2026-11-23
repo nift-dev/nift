@@ -22,7 +22,7 @@ a.push([3])
 print(x[0])
 print(y[0])
 F
-rc=0; out=$($NIFT "$T/destruct.f" 2>&1) || rc=$?
+rc=0; out=$(NIFT_VM=0 "$NIFT" "$T/destruct.f" 2>&1) || rc=$?
 [ "$rc" = 0 ] && [ "$out" = "1
 2" ] || fail "destruct: exit $rc: $out"
 
@@ -53,7 +53,7 @@ while(i < 3000) {
 }
 print(pts.size())
 F
-rc=0; out=$($NIFT "$T/structarr.f" 2>&1) || rc=$?
+rc=0; out=$(NIFT_VM=0 "$NIFT" "$T/structarr.f" 2>&1) || rc=$?
 [ "$rc" = 0 ] && [ "$out" = "3000" ] || fail "structarr: exit $rc: $out"
 
 # 4. Map of struct handles with growth; identity via == and same().
@@ -70,7 +70,7 @@ m.set("k", p1)
 print(m.get("k") == p1)
 print(same(m.get("k"), p1))
 F
-rc=0; out=$($NIFT "$T/mapstruct.f" 2>&1) || rc=$?
+rc=0; out=$(NIFT_VM=0 "$NIFT" "$T/mapstruct.f" 2>&1) || rc=$?
 [ "$rc" = 0 ] && [ "$out" = "true
 true" ] || fail "mapstruct: exit $rc: $out"
 

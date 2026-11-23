@@ -34,10 +34,15 @@ bool stream_bytes_builtin(const BuiltinSpec& spec) {
     return spec.id == BuiltinId::StreamReadBytes || spec.id == BuiltinId::StreamReadAllBytes;
 }
 
+bool appended_file_builtin(const BuiltinSpec& spec) {
+    return spec.id >= natives::BuiltinId::FileWriteVal && spec.id <= natives::BuiltinId::FileReplaceOnce;
+}
+
 const BuiltinSpec* first_method(std::string_view name) {
     for (std::size_t i = 0; i < natives::builtin_count(); ++i) {
         const BuiltinSpec& spec = natives::builtin_spec(static_cast<natives::BuiltinId>(i));
-        if (spec.receiver != Receiver::None && spec.name == name && !stream_bytes_builtin(spec)) return &spec;
+        if (spec.receiver != Receiver::None && spec.name == name && !stream_bytes_builtin(spec) &&
+            !appended_file_builtin(spec)) return &spec;
     }
     return nullptr;
 }
@@ -52,6 +57,13 @@ MethodBinding bind_method(KindSet kinds, std::string_view name, const BuiltinSpe
         const BuiltinSpec* stream = natives::find_builtin(Receiver::Stream, name);
         if (stream && stream_bytes_builtin(*stream)) {
             spec = stream;
+            return MethodBinding::Bound;
+        }
+    }
+    if (kinds == kKindFile) {
+        const auto* file = natives::find_builtin(Receiver::File, name);
+        if (file && appended_file_builtin(*file)) {
+            spec = file;
             return MethodBinding::Bound;
         }
     }

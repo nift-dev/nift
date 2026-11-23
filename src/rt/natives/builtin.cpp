@@ -58,6 +58,7 @@ constexpr NativeFn kFunctions[] = {
     fn_map, fn_set, fn_stack, coll_get, coll_contains, coll_size, coll_empty, coll_contains, coll_size, coll_empty,
     coll_top, coll_front, coll_contains, coll_size, coll_empty, fn_same,
     stream_read_bytes, stream_read_all_bytes, stream_extract_string, fn_minify, file_write_val,
+    file_append, file_prepend, file_insert, file_insert_before, file_insert_after, file_replace, file_replace_once,
 };
 
 constexpr BuiltinSpec kSpecs[] = {

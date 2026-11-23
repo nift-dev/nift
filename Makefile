@@ -4291,7 +4291,7 @@ RT_BUILTINS_CORE := $(addprefix src/rt/,value.cpp string.cpp aggregate.cpp aggre
 RT_BUILTINS_SOURCES := $(wildcard src/rt/natives/*.cpp)
 # CP17 file/stream handle natives render scalar values (legacy file.write) and
 # are Host natives, not part of the pure-builtin isolation contract.
-RT_HOST_HANDLE_SOURCES := src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_ops.cpp \
+RT_HOST_HANDLE_SOURCES := src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_edits.cpp src/rt/natives/host_file_ops.cpp \
 	src/rt/natives/host_stream_handles.cpp src/rt/natives/host_stream_extract.cpp
 RT_ISOLATION_SOURCES := $(filter-out $(RT_HOST_HANDLE_SOURCES),$(RT_BUILTINS_SOURCES))
 # The isolated bench still links the built-in table, which names the Host

@@ -26,7 +26,7 @@ APPROVED_STDERR={
 # mutation. Keep the complete legacy oracle and require the VM to refuse it
 # before execution, with the same empty output and unchanged files.
 WRITE_BYTES_REFUSAL = 'mutate-write_bytes(bytes([0,255,65]))'
-for row in rows:
+def check_row(row):
  with tempfile.TemporaryDirectory(prefix='nift-file-buffer-oracle-') as directory:
   root=Path(directory).resolve();(root/'sub/sub').mkdir(parents=True)
   for name in ['data','sub/data','sub/sub/data']:(root/name).write_bytes(b'ABCDEFGH')
@@ -48,10 +48,44 @@ for row in rows:
                              for f in root.rglob('*') if f.is_file() and f.name!='case.f'})
    assert legacy_actual == expected, (row['name'],legacy_actual,expected)
    print('PASS',row['name'],'(VM pre-execution refusal; legacy error and file bytes exact)',flush=True)
-   continue
+   return
   if os.environ.get('NIFT_VM')!='0' and row['name'] in APPROVED_STDERR:
    assert row['stderr'].endswith(': script failed\n'),(row['name'],'the approval is for legacy\'s dropped message only')
    expected['stderr']=APPROVED_STDERR[row['name']]
   assert actual==expected,(row['name'],actual,expected)
   print('PASS',row['name'],flush=True)
-print('PASS',len(rows),'exact buffer/factory/cwd/reentry/file-effect contracts')
+def check_append_controls():
+ with tempfile.TemporaryDirectory(prefix='nift-file-append-') as directory:
+  root = Path(directory).resolve()
+  data = root/'data'
+  script = root/'case.f'
+  def run(source, original, budget=None):
+   data.write_bytes(original)
+   script.write_text(source+'\n')
+   env = dict(os.environ,NIFT_VM='require')
+   env.pop('NIFT_VM_HEAP_BUDGET',None)
+   if budget is not None:
+    env['NIFT_VM_HEAP_BUDGET'] = str(budget)
+   result = subprocess.run([str(binary),native_path(script)],cwd=root,env=env,
+                           capture_output=True,text=True,timeout=60)
+   return result,data.read_bytes()
+  result, actual = run('f:=file("data");f.open("rw");f.seek(2);f.append("xy");print(f.tell());f.save();f.close()',b'ABCDEFGH')
+  assert (result.returncode,result.stdout,result.stderr,actual) == (0,'2\n','',b'ABCDEFGHxy'), (result,actual)
+  result, actual = run('f:=file("data");f.open("r");f.append("xy")',b'ABCDEFGH')
+  assert result.returncode == 1 and 'append: file is not open for writing' in result.stderr and actual == b'ABCDEFGH', (result,actual)
+  original = b'A' * 65536
+  result, actual = run('f:=file("data");f.open("rw");print("opened");f.append("xy");f.save()',original,100000)
+  assert result.returncode == 70 and result.stdout == 'opened\n' and 'memory budget exceeded' in result.stderr and actual == original, result
+  print('PASS append controls: exact bytes, unchanged cursor, read-only error and allocation stop',flush=True)
+
+if os.environ.get('NIFT_VM') != '0':
+ check_append_controls()
+failures = 0
+for row in rows:
+ try:
+  check_row(row)
+ except AssertionError as error:
+  print('FAIL',row['name'],error,flush=True)
+  failures += 1
+print(f'file-buffer oracle: {len(rows)-failures}/{len(rows)} exact contracts passed',flush=True)
+raise SystemExit(bool(failures))

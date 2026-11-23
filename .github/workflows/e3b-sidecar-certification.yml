@@ -73,7 +73,7 @@ jobs:
         env:
           NIFT_IDENTITY_MSYS2: ${{ steps.msys2.outputs.msys2-location }}
         run: |
-          $python = (Get-Command python -CommandType Application).Source
+          $python = (Get-Command python -CommandType Application | Select-Object -First 1).Source
           if ($IsWindows) {
             $env:NIFT_IDENTITY_CXX = Join-Path $env:NIFT_IDENTITY_MSYS2 'ucrt64/bin/g++.exe'
             if (!(Test-Path $env:NIFT_IDENTITY_CXX)) { throw 'UCRT compiler missing' }
@@ -133,7 +133,7 @@ jobs:
         env:
           NIFT_IDENTITY_MSYS2: ${{ steps.msys2.outputs.msys2-location }}
         run: |
-          $python = (Get-Command python -CommandType Application).Source
+          $python = (Get-Command python -CommandType Application | Select-Object -First 1).Source
           if ($IsWindows) {
             $env:NIFT_IDENTITY_CXX = Join-Path $env:NIFT_IDENTITY_MSYS2 'ucrt64/bin/g++.exe'
             if (!(Test-Path $env:NIFT_IDENTITY_CXX)) { throw 'UCRT compiler missing' }

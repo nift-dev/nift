@@ -27,7 +27,7 @@ CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"
 OUT=.build/read-limit-mutants
 rm -rf "$OUT"; mkdir -p "$OUT"
 export PYTHONDONTWRITEBYTECODE=1
-TUS=(src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_ops.cpp src/rt/natives/host_fs_nav.cpp
+TUS=(src/rt/natives/host_file_handles.cpp src/rt/natives/host_file_edits.cpp src/rt/natives/host_file_ops.cpp src/rt/natives/host_fs_nav.cpp
      src/rt/natives/host_fs_read.cpp src/rt/natives/host_fs_write.cpp src/rt/natives/host_stream_handles.cpp)
 # Every TU that includes the mutated code is rebuilt (a TU left out would keep production code).
 for tu in $(grep -lE 'rt/natives/(host_fs_stream|host_fs_internal|host_file_handles_internal|host_fs_observe)\.h' \

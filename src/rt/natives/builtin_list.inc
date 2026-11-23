@@ -236,3 +236,10 @@ NIFT_RT_BUILTIN(StreamExtractString, "", Stream, 1, 1, kString, Fixed, true, 100
 
 NIFT_RT_BUILTIN(FnMinify, "minify", None, 2, 2, kObject, Fixed, true, 300)
 NIFT_RT_BUILTIN(FileWriteVal, "write_val", File, 1, 1, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileAppend, "append", File, 1, 1, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FilePrepend, "prepend", File, 1, 1, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileInsert, "insert", File, 2, 2, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileInsertBefore, "insert_before", File, 2, 2, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileInsertAfter, "insert_after", File, 2, 2, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileReplace, "replace", File, 2, 2, kInt, Fixed, true, 100)
+NIFT_RT_BUILTIN(FileReplaceOnce, "replace_once", File, 2, 2, kNull, Fixed, true, 100)

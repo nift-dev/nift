@@ -145,7 +145,14 @@ bool handle_position_allowed(const Ast& ast, NodeId id, const std::vector<NodeId
 
 NodeId write_literal_argument(const Ast& ast, const Node& call, const natives::BuiltinSpec& spec) {
     if (spec.id != natives::BuiltinId::FileWrite && spec.id != natives::BuiltinId::FileWriteLine &&
-        spec.id != natives::BuiltinId::FileWriteVal && spec.id != natives::BuiltinId::StreamWrite && spec.id != natives::BuiltinId::StreamWriteLine)
+        spec.id != natives::BuiltinId::FileWriteVal && spec.id != natives::BuiltinId::StreamWrite &&
+        spec.id != natives::BuiltinId::StreamWriteLine &&
+        spec.id != natives::BuiltinId::FileAppend &&
+        spec.id != natives::BuiltinId::FilePrepend &&
+        spec.id != natives::BuiltinId::FileInsert &&
+        spec.id != natives::BuiltinId::FileInsertBefore &&
+        spec.id != natives::BuiltinId::FileInsertAfter && spec.id != natives::BuiltinId::FileReplace &&
+        spec.id != natives::BuiltinId::FileReplaceOnce)
         return kNoNode;
     const NodeId* args = ast.list(call);
     for (std::uint32_t k = 0; k < call.count; ++k)

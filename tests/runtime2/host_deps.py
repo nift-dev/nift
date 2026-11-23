@@ -135,6 +135,17 @@ def compare(mode, step, root, oracle):
     else:
         failures.append((mode, step))
         print("FAIL [%s] %s: incremental build differs from a clean build" % (mode, step))
+        # Record the fixture bytes in both trees before resynchronizing. This
+        # distinguishes a copy/input discrepancy from missing rendered output.
+        for name in ("data/open.txt", "data/link-stream.txt", "content/index.html"):
+            for label, project in (("incremental", root), ("clean", oracle)):
+                path = project / name
+                try:
+                    raw = path.read_bytes()
+                except OSError as error:
+                    print("    %s input %s: %s" % (label, name, error))
+                    continue
+                print("    %s input %s: %d bytes, prefix %r" % (label, name, len(raw), raw[:80]))
         for key in sorted(set(incremental) | set(expected)):
             if incremental.get(key) != expected.get(key):
                 mine = incremental.get(key, b"").decode(errors="replace").splitlines()
