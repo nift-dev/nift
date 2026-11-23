@@ -420,6 +420,8 @@ def d158_refusals(nift, work):
         ("overwrite", 'minify("source.js", {"in_place": true})', "minify-path-mode"),
         ("unqualified-list", 'ls(".").stringify()', "native-unqualified"),
         ("undefined", 'print(missing_value)', "unresolved-name"),
+        ("shebang-nested", 'fn(f()) {\n#! comment\nreturn 7\n}\nprint(f())', "shebang-nested-comment"),
+        ("shebang-loop", 'for (x : [1, 2]) {\n#! inert\nprint(x)\n}', "shebang-nested-comment"),
         ("shebang-semicolon", '#! inert; print(99)', "opaque:template-text"),
     ):
         with tempfile.TemporaryDirectory(dir=work) as case:

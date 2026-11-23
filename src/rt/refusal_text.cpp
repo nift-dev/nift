@@ -92,6 +92,7 @@ constexpr Family kFamilies[] = {
     {"jump-", "this break or continue placement"},
     {"error-result-expression", "a statement whose result is an Error value"},
     {"expression-statement", "this expression statement"},
+    {"shebang-nested-comment", "a shebang comment inside a function or block"},
     {"shebang-statement", "a shebang line after the first line"},
     {"non-transferable", "a value that cannot cross into the VM"},
     {"host-handle-flow", "this flow of host handles"},

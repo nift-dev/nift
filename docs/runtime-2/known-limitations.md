@@ -43,9 +43,9 @@ Nift 4.x. Website builds keep the existing template renderer (D-053).
   Run those scripts with `NIFT_VM=0 nift …`.
 - The VM supports in-memory `minify(source, format)` with a string format.
   File-path and options forms require explicit legacy execution.
-- A plain mid-file `#!` comment has no runtime effect. First-line executable
-  shebang behavior is preserved. Semicolon-separated or multiline forms can
-  have different legacy behavior and remain refused by the VM.
+- A plain top-level mid-file `#!` comment has no runtime effect. First-line executable
+  shebang behavior is preserved. Nested, semicolon-separated, or
+  multiline forms can have different legacy behavior and remain refused by the VM.
 
 ## Named deferrals (owner, 2026-11-10 13:26; D-065)
 

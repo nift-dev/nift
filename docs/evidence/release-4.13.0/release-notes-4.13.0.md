@@ -11,7 +11,7 @@ with source locations. Use `NIFT_VM=0` for scripts that require documented
 legacy behavior. The affected host names use the `native::` qualifier in
 Runtime 2.0. The approved `ifstream(...).read_val()` refusal remains in effect.
 
-In-memory `minify(source, format)` and plain mid-file shebang comments work under
+In-memory `minify(source, format)` and plain top-level mid-file shebang comments work under
 Runtime 2.0. Use `NIFT_VM=0` for supported legacy scripts that require bare
 shell-command statements, stored or indirectly invoked async function values,
 or the file forms of `minify()`.

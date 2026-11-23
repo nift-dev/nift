@@ -91,6 +91,7 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
     const Node& node = ast_.at(program);
     const NodeId* list = ast_.list(node);
     for (std::uint32_t k = 0; k < node.count; ++k) {
+        if (ast_.at(list[k]).kind == NodeKind::Comment) continue;
         if (ast_.at(list[k]).kind == NodeKind::FnDecl || ast_.at(list[k]).kind == NodeKind::StructDecl)
             { if (session_ && ast_.at(list[k]).kind == NodeKind::FnDecl && !session_function(list[k])) return false;
               continue; }  // planned by plan_unit (CP12b: struct declarations too)
@@ -136,7 +137,9 @@ bool UnitCompiler::statement(NodeId id) {
     fb_->set_offset(node.begin);
     bool ok = false;
     switch (node.kind) {
-        case NodeKind::Comment: ok = true; break;
+        // Legacy may change the prepared/textual path around a nested
+        // shebang. Only compile_main's direct comments are no-ops.
+        case NodeKind::Comment: ok = fail(node, "shebang-nested-comment"); break;
         case NodeKind::Declare:
             ok = declare(node) && builder_ok();
             textual_statement_ = saved_textual;
