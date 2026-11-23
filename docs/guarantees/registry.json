@@ -1,7 +1,7 @@
 {
   "baseline": {
-    "development_version": "4.12.0",
-    "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign. Baseline advanced for the v4.11.0 release (released 4.11.0 at c8d9c26; development now 4.12.0).",
+    "development_version": "4.13.0",
+    "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign. Baseline advanced for the v4.11.0 release (released 4.11.0 at c8d9c26; current development version 4.13.0).",
     "release_commit": "c8d9c266518d115e4f289c5c6a2b94ddd7ee9968",
     "released_version": "4.11.0"
   },
