@@ -31,7 +31,15 @@ with (Path(__file__).resolve().parent/'data/v410-file-buffer-d172.tsv').open(new
 D172 = {pin['case']:pin for pin in pin_rows}
 assert len(D172) == len(pin_rows) == 32
 assert sorted(pin['kind'] for pin in pin_rows) == ['flow'] * 6 + ['nesting'] * 26
-assert set(D172) <= {row['name'] for row in rows}
+with (Path(__file__).resolve().parent/'data/v410-file-buffer-d173.tsv').open(newline='') as pins:
+ pin_rows = list(csv.DictReader(pins,delimiter='\t'))
+D173 = {pin['case']:pin for pin in pin_rows}
+assert len(D173) == len(pin_rows) == 27
+assert sorted(pin['kind'] for pin in pin_rows) == ['invalid-call'] * 4 + ['legacy-replace-depth'] * 2 + ['ownership'] * 7 + ['parser-limit'] * 8 + ['postfix'] * 6
+assert not D172.keys() & D173.keys()
+assert D172.keys() | D173.keys() <= {row['name'] for row in rows}
+REFUSALS = D172 | D173
+INITIAL_FILES = {name:b'ABCDEFGH'.hex() for name in ('data','sub/data','sub/sub/data')}
 
 def check_refusal(actual, expected, diagnostic):
  assert actual['exit'] == 1 and actual['stdout'] == '' and actual['files'] == expected['files'], actual
@@ -80,21 +88,25 @@ def check_row(row):
   mode = os.environ.get('NIFT_VM','require')
   actual=run_case(root,path,mode)
   expected={key:row[key] for key in actual}
-  if mode != '0' and (row['name'] == WRITE_BYTES_REFUSAL or row['name'] in D172):
+  if mode != '0' and (row['name'] == WRITE_BYTES_REFUSAL or row['name'] in REFUSALS):
    if row['name'] == WRITE_BYTES_REFUSAL:
     diagnostic=actual['stderr'].splitlines()[0]
     assert diagnostic.startswith('error: <ORACLE_ROOT>/case.f:1:30: not compiled for the VM (host-handle-flow): '), actual
    else:
-    pin=D172[row['name']]
+    pin=REFUSALS[row['name']]
     assert hashlib.sha256(row['source'].encode()).hexdigest() == pin['source_sha256'], row['name']
     diagnostic=pin['diagnostic']
-    assert expected['exit'] == 0, expected
+    assert expected['exit'] == (0 if pin['kind'] in ('flow','nesting','postfix') else 1), expected
+    if pin['kind'] in ('parser-limit','legacy-replace-depth','invalid-call'):
+     assert expected['stdout'] == '' and expected['files'] == INITIAL_FILES, expected
+    if pin['kind'] == 'parser-limit':
+     assert 'expression nesting exceeds parser limit' in expected['stderr'], expected
    # The oracle records the final legacy files, which may differ from setup.
    # Refusal must leave every fixture at its initial bytes.
-   untouched={'files':{name:b'ABCDEFGH'.hex() for name in ('data','sub/data','sub/sub/data')}}
+   untouched={'files':INITIAL_FILES}
    check_refusal(actual,untouched,diagnostic)
    line=diagnostic.replace('/case.f:1:','/case.f:2:',1)
-   path.write_text('print("D172-MUST-NOT-RUN")\n'+row['source']+'\n')
+   path.write_text('print("MUST-NOT-RUN")\n'+row['source']+'\n')
    check_refusal(run_case(root,path,mode),untouched,line)
    path.write_text(row['source']+'\n')
    legacy=run_case(root,path,'0')
@@ -104,6 +116,11 @@ def check_row(row):
   if os.environ.get('NIFT_VM')!='0' and row['name'] in APPROVED_STDERR:
    assert row['stderr'].endswith(': script failed\n'),(row['name'],'the approval is for legacy\'s dropped message only')
    expected['stderr']=APPROVED_STDERR[row['name']]
+  if mode != '0' and row['name'] == 'duplicate-replace-once-error':
+   cleanup = 'managed file left open: <ORACLE_ROOT>/data (unsaved changes discarded)\n'
+   assert expected == dict(exit=1,stdout='',stderr='error: '+cleanup,files=INITIAL_FILES), expected
+   assert run_case(root,path,'0') == expected, expected
+   expected['stderr'] = 'error: <ORACLE_ROOT>/case.f:1:1: '+cleanup
   assert actual==expected,(row['name'],actual,expected)
   print('PASS',row['name'],flush=True)
   return 'execution'

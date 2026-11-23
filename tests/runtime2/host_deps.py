@@ -126,6 +126,32 @@ def clean_oracle(root, oracle):
     return tree(oracle)
 
 
+def diagnose_open_output(root, oracle, incremental, expected):
+    def open_line(output):
+        return next((line for line in output.get("public/index.html", b"").splitlines()
+                     if line.startswith(b"O:")), None)
+
+    if open_line(incremental) == open_line(expected):
+        return
+    # Keep the original failing outputs. Replay only after collecting them.
+    for label, project in (("incremental", root), ("clean", oracle)):
+        fd, probe_name = tempfile.mkstemp(prefix="open-probe-", suffix=".f", dir=project)
+        probe = Path(probe_name)
+        try:
+            with os.fdopen(fd, "w") as source:
+                source.write('print(open("data/open.txt"))\n')
+            for engine in ("require", "0"):
+                result = nift(project, str(probe), env=dict(os.environ, NIFT_VM=engine), check=False)
+                print("    %s standalone open VM=%s: exit=%s stdout=%r stderr=%r" %
+                      (label, engine, result.returncode, result.stdout[:512], result.stderr[:512]))
+        finally:
+            probe.unlink()
+    for label, project in (("incremental", root), ("clean", oracle)):
+        replay = nift(project, "build", "--all", check=False)
+        print("    %s full replay: exit=%s output=%r stdout=%r stderr=%r" %
+              (label, replay.returncode, open_line(tree(project)), replay.stdout[-512:], replay.stderr[-512:]))
+
+
 def compare(mode, step, root, oracle):
     nift(root, "build")
     incremental = tree(root)
@@ -156,6 +182,7 @@ def compare(mode, step, root, oracle):
                         print("      incremental %r\n      clean       %r" % (a, b))
                 if len(mine) != len(theirs):
                     print("      %d vs %d lines" % (len(mine), len(theirs)))
+        diagnose_open_output(root, oracle, incremental, expected)
         # Resynchronise so every later step is judged on its own edit.
         nift(root, "build", "--all")
     status = nift(root, "status").stdout
