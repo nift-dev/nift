@@ -193,6 +193,8 @@ jobs:
           test -n "$version"
           python3 scripts/check_version_consistency.py --expected "$version"
           root="nift-$version-$TARGET"
+          out="$PWD/dist/$version/$TARGET/release-archive"
+          mkdir -p "$out"
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           cp "$binary" README.md LICENSE THIRD_PARTY_NOTICES.md "$work/"
@@ -212,15 +214,28 @@ jobs:
               tar -czf "$archive" "$root"
               tar -xzf "$archive" -C extracted
             fi
+            cp "$archive" "$out/"
             exe="$PWD/extracted/$root/$binary"
             test "$("$exe" version)" = "Nift v$version"
             cd project
-            "$exe" init
-            "$exe" build --all
-            "$exe" status
+            smoke() {
+              echo "Extracted archive: $*"
+              "$exe" "$@" || { rc=$?; echo "FAIL: extracted $binary $* exited $rc" >&2; exit "$rc"; }
+            }
+            smoke init
+            printf 'x\n' > index.html
+            smoke build --all
+            smoke status
+            echo "ARCHIVE_SMOKE_EXECUTED=1"
           )
-          mkdir -p "dist/$version/$TARGET/release-archive"
-          cp "$work/$root".* "dist/$version/$TARGET/release-archive/"
+
+      - name: Preserve extracted-archive diagnostic artifact on failure
+        if: failure() && hashFiles(format('dist/*/{0}/release-archive/*', matrix.target)) != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nift-archive-diagnostic-${{ matrix.target }}
+          path: dist/*/${{ matrix.target }}/release-archive/
+          if-no-files-found: error
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
