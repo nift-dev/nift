@@ -42,7 +42,7 @@ def build_peak_tracker(root, failures):
         failures.append("peak tracker compiler unavailable")
         return {}
     options = ["-dynamiclib"] if darwin else ["-shared", "-fPIC"]
-    libraries = [] if darwin else ["-ldl"]
+    libraries = [] if darwin or sys.platform.startswith("freebsd") else ["-ldl"]
     build = subprocess.run([compiler, *options, "-O2", "-o", str(target), str(source), *libraries],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if build.returncode != 0:

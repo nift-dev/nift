@@ -60,8 +60,9 @@ out="$("$NIFT" "$W/project/s.f" 2>&1)"; echo "$out" | grep -q copied && pass "st
 
 # Cross-device moves (EXDEV) fall back to copy + rename + unlink, for
 # file().move() and mv(), when /dev/shm is a different filesystem.
-if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -c %d "$W")" ]; then
-  S="$(mktemp -d /dev/shm/nift-xdev-XXXXXX)"
+cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
+if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] && [ "$(stat -c %d "$cross_device_root")" != "$(stat -c %d "$W")" ]; then
+  S="$(mktemp -d "$cross_device_root/nift-xdev-XXXXXX")"
   echo xdev-a > "$W/xa.txt"; echo xdev-b > "$W/xb.txt"; chmod 640 "$W/xa.txt"
   printf 'f := file("%s")\ng := f.move("%s")\nnative::mv("%s", "%s")\nprint(g.path())\n' "$W/xa.txt" "$S/xa.txt" "$W/xb.txt" "$S/xb.txt" > "$W/x.f"
   out="$("$NIFT" "$W/x.f" 2>&1)"
@@ -70,6 +71,7 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -
     pass "cross-device file().move and mv() (to /dev/shm)"
   else bad "cross-device move: $out; $(ls -la "$S" | tr '\n' ' ')"; fi
   rm -rf "$S"
+elif [ -n "${NIFT_TEST_CROSS_DEVICE_ROOT:-}" ]; then bad "configured cross-device fixture is unavailable";
 else echo "SKIP cross-device move (/dev/shm missing or on the same filesystem)"; fi
 
 # Writes into the project's .nift/ are refused loudly during a build

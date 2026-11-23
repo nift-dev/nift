@@ -10,12 +10,25 @@ Owner, 2026-11-12 04:25 (D-077 #4):
 - There are no blanket skips: every exclusion names the construct that does not exist, or does not mean the same,
   on that platform.
 
+## D-152 FreeBSD release qualification
+
+FreeBSD 14 amd64 is required for the Runtime 2.0 release candidate. Its
+existing VM job retains the portable regression phase and also runs this table
+under the unprivileged guest user. An explicit dispatch with `runtime2_vm=false`
+runs the established regression suite independently.
+
+The first FreeBSD scope exercises 86 subset entries and five independent make
+gates. The three exclusions name Linux-specific procfs or fixture requirements
+in the table. The isolated guest mounts a separate tmpfs for the cross-device
+move assertions. The FreeBSD summary counts PASS, FAIL, NOT RUN, EXCLUDED and
+BLOCKED separately, and a required entry that cannot run fails qualification.
+
 ## Source of truth and how a run reports
 
 - **The table is data.** It is `tests/runtime2/platform_subset.py` (`ENTRIES`, `MAKE_TARGETS`). The table below is
   its `--markdown` output, and `--check` verifies it:
   - every exclusion has a concrete reason, never a platform name alone;
-  - nothing is excluded on all three platforms;
+  - nothing is excluded on every platform;
   - every script it names exists;
   - **every test script of `make test-rt-vm`'s recipe is in the table**. A new suite cannot be left out silently:
     `--check` fails on it (negative control run: an extra script in a copy of the recipe is reported).
@@ -107,102 +120,102 @@ once the candidate fix lands.
 
 ## The subset
 
-| Entry | Area | Linux | macOS | Windows | Note |
-|---|---|---|---|---|---|
-| `rt-vm-unit` | compiler/execution | run | run | run |  |
-| `rt-vm-globals-unit` | compiler/execution | run | run | run |  |
-| `rt-vm-modules-unit` | compiler/execution | run | run | run |  |
-| `rt-vm-prepared-parse` | compiler/execution | run | run | run |  |
-| `rt-lint` | compiler/execution | run | run | run | source lint, platform independent |
-| `legacy-names` | compiler/execution | run | run | run |  |
-| `vm_parity` | core semantics | run | run | **excluded**: Windows: rt-diff runs each case in its own POSIX session and kills the process group (start_new_session, os.killpg), and vm_parity bounds the child with RLIMIT_AS/RLIMIT_FSIZE through preexec_fn | the VM-vs-legacy corpus differential; on Windows the per-suite entries below cover the VM |
-| `vm_adversarial_timeout_selftest` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script; it also relies on SIGKILL of the fake |  |
-| `vm_adversarial` | core semantics | run | run | run | its machine-wide flock is a no-op where fcntl is missing (Windows) |
-| `vm_subset` | core semantics | run | run | run | its RSS check is skipped where os.wait4 is missing (Windows), by the suite itself |
-| `vm_subset_gen` | core semantics | run | run | run |  |
-| `vm_builtins` | core semantics | run | run | run |  |
-| `vm_host` | file operations | run | run | **excluded**: Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); Python's subprocess has no preexec_fn on Windows; it also creates POSIX symlinks | macOS already runs it in v44-cross-platform |
-| `vm_records_coverage` | core semantics | run | run | run |  |
-| `vm_path_wording` | core semantics | run | run | run |  |
-| `vm_known_refused` | core semantics | run | run | run |  |
-| `vm_engine_selection` | core semantics | run | run | run |  |
-| `vm_former_replay` | core semantics | run | run | run |  |
-| `vm_d018` | core semantics | run | run | run |  |
-| `vm_context_consistency` | core semantics | run | run | run |  |
-| `vm_policy_negative` | core semantics | run | run | run |  |
-| `vm_review_cp12` | core semantics | run | run | run |  |
-| `vm_golden` | core semantics | run | run | run |  |
-| `vm_int_bounds` | core semantics | run | run | run |  |
-| `vm_inventory` | core semantics | run | run | run |  |
-| `vm_chain` | core semantics | run | run | run |  |
-| `vm_modules` | core semantics | run | run | run |  |
-| `module_host_order` | file operations | run | run | **excluded**: Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); Python's subprocess has no preexec_fn on Windows |  |
-| `vm_structs` | core semantics | run | run | run |  |
-| `vm_globals` | core semantics | run | run | run |  |
-| `semantics_modules` | core semantics | run | run | run |  |
-| `semantics_modules-structs` | core semantics | run | run | run |  |
-| `modules_d041` | core semantics | run | run | run |  |
-| `cp12b_inventory-selftest` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (the NIFT_VM=classify-all wrapper) |  |
-| `safety` | memory/mutation safety | run | run | run |  |
-| `safety-fuzz-selftest` | memory/mutation safety | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (fake nift binaries that must fire each check) |  |
-| `safety-fuzz` | memory/mutation safety | run | run | run |  |
-| `b3_structs` | memory/mutation safety | run | run | run |  |
-| `b4_dispatch` | memory/mutation safety | run | run | run |  |
-| `b5-evalorder` | memory/mutation safety | run | run | run |  |
-| `b5-evalorder-controls` | memory/mutation safety | run | run | run |  |
-| `b5-operators` | memory/mutation safety | run | run | run |  |
-| `b5-operators-controls` | memory/mutation safety | run | run | run |  |
-| `refsem_a` | memory/mutation safety | run | run | run |  |
-| `cycle_refusal_routes` | memory/mutation safety | run | run | run |  |
-| `collections` | memory/mutation safety | run | run | run |  |
-| `closures_s1` | memory/mutation safety | run | run | run |  |
-| `for_s2` | memory/mutation safety | run | run | run |  |
-| `vm_host_memory` | memory/mutation safety | run | run | **excluded**: Windows: the cases read from a FIFO created with os.mkfifo, which Windows does not have |  |
-| `cp22-legacy` | core semantics | run | run | run |  |
-| `cp22-vm` | core semantics | run | run | run | the normal binary only: the CP13B switch binary is Linux-campaign only (see the doc) |
-| `cp22-refuse` | core semantics | run | run | run |  |
-| `cp22-default` | core semantics | run | run | run |  |
-| `cp22-vm-only` | core semantics | run | run | run |  |
-| `cp22-trace` | core semantics | run | run | run |  |
-| `cp22-binding` | core semantics | run | run | run |  |
-| `cp22-controls` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (a dead `#!/bin/sh` callee) |  |
-| `cp22-print_order` | core semantics | run | run | run | the output-order repair adds Windows std-stream identity code: CI-verified only |
-| `cp23-compatibility` | core semantics | run | run | run |  |
-| `coro_module` | core semantics | run | run | run |  |
-| `named_deferrals` | core semantics | run | **excluded**: macOS: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything | **excluded**: Windows: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything |  |
-| `deadcode_admission` | core semantics | run | run | run |  |
-| `args_cmd` | core semantics | run | run | run | creates one symlink: windows-latest runs as an administrator, so os.symlink works there |
-| `import_depth` | core semantics | run | run | run |  |
-| `precise_positions` | core semantics | run | run | run |  |
-| `capture_origins` | core semantics | run | run | run |  |
-| `literals` | core semantics | run | run | run |  |
-| `literals-decimal` | core semantics | run | run | run |  |
-| `vm_default` | core semantics | run | run | **excluded**: Windows: the suite drives nift through a pseudo-terminal (pty.fork) and SIGKILL |  |
-| `packages` | core semantics | run | run | **excluded**: Windows: the suite takes an fcntl lock, creates POSIX symlinks and SIGKILLs a stuck child |  |
-| `diagnostics` | core semantics | run | run | run | needs GNU timeout(1): the workflow puts coreutils' gnubin on PATH on macOS |
-| `diagnostics-changes-old` | core semantics | run | run | run |  |
-| `diagnostics-changes-new` | core semantics | run | run | run |  |
-| `diagnostics-codes` | core semantics | run | run | run |  |
-| `diagnostics-json` | core semantics | run | run | run |  |
-| `d040_witnesses` | core semantics | run | run | run | needs rt-parse-dump |
-| `cp25r-differential` | core semantics | run | run | run |  |
-| `cp25r-post-cert-refusals` | core semantics | run | run | run | D-077 #1 refusal contracts; a missing corpus is NOT RUN (exit 2), never a pass |
-| `approved_refusal-selftest` | core semantics | run | run | run |  |
-| `rt_parser_corpus` | compiler/execution | run | run | **excluded**: Windows: the deep-nesting check runs the parser under `ulimit -s 1024` (bash), which MSYS2 cannot set for a native process | needs rt-parser-unit, rt-parse-dump and rt-legacy-oracle |
-| `fs_freedom` | file operations | run | run | run | symlinks: the workflow sets MSYS=winsymlinks:nativestrict on Windows |
-| `dynamic_reads` | file operations | run | run | run |  |
-| `dynamic_reads_review` | file operations | run | run | run |  |
-| `host_deps` | file operations | run | run | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite |  |
-| `file_copy_move_freedom` | file operations | run | run | **excluded**: Windows: every run is wrapped in `ulimit -f/-v` and GNU `timeout`; MSYS2 bash cannot set RLIMIT_AS (-v) | macOS: CI-verified (Darwin may reject `ulimit -v`) |
-| `build_write_ownership` | file operations | run | run | **excluded**: Windows: every run is wrapped in `ulimit -f/-v` and GNU `timeout`; MSYS2 bash cannot set RLIMIT_AS (-v) | macOS: CI-verified (Darwin may reject `ulimit -v`) |
-| `read_limit` | file operations | run | **excluded**: macOS: the harness reads /proc (VmPeak/VmHWM of the child, leftover producers by cmdline, zombies), which Darwin does not have, and RLIMIT_AS is not enforced by the Darwin kernel, so the address-space bound proves nothing | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite; it also needs /proc, mkfifo, /dev/zero and /dev/full | D-077 #3 contract; Linux certifies the read limit |
-| `read_limit_controls` | file operations | run | **excluded**: macOS: the harness reads /proc (VmPeak/VmHWM of the child, leftover producers by cmdline, zombies), which Darwin does not have, and RLIMIT_AS is not enforced by the Darwin kernel, so the address-space bound proves nothing; the paced FIFO uses FIONREAD (termios) | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite; it also needs mkfifo, fcntl/termios and /dev/zero |  |
-| `read_limit_contract_controls` | file operations | run | run | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite | macOS: CI-verified (Darwin may ignore RLIMIT_AS; the controls do not depend on it) |
-| `make test-v45-embed-contracts` | embedding | run | run | run | already run on all three in v44-cross-platform |
-| `make test-rt-value` | memory/mutation safety | run | run | run | value layer, heap budget and OOM units |
-| `make test-runtime2-kind-bits` | compiler/execution | run | run | run |  |
-| `make test-rt-source-map` | compiler/execution | run | run | run |  |
-| `make test-runtime2-certification-guard` | certification integrity | run | **excluded**: macOS: the guard reads the GNU make database of the whole certify plan through scripts/certify.py; it certifies the plan itself, which is platform independent, so the Linux job runs it (D-090) | **excluded**: Windows: scripts/certify.py imports the POSIX-only pwd module and the guard drives GNU make -p and bash over the POSIX plan; the plan is platform independent and the Linux job runs it (D-090) | required (D-090); FAILED since C140c (three unlisted skip phrases in tests/runtime2/suite_status.sh); expected PASS once the candidate fix lands |
+| Entry | Area | Linux | macOS | Windows | FreeBSD | Note |
+|---|---|---|---|---|---|---|
+| `rt-vm-unit` | compiler/execution | run | run | run | run |  |
+| `rt-vm-globals-unit` | compiler/execution | run | run | run | run |  |
+| `rt-vm-modules-unit` | compiler/execution | run | run | run | run |  |
+| `rt-vm-prepared-parse` | compiler/execution | run | run | run | run |  |
+| `rt-lint` | compiler/execution | run | run | run | run | source lint, platform independent |
+| `legacy-names` | compiler/execution | run | run | run | run |  |
+| `vm_parity` | core semantics | run | run | **excluded**: Windows: rt-diff runs each case in its own POSIX session and kills the process group (start_new_session, os.killpg), and vm_parity bounds the child with RLIMIT_AS/RLIMIT_FSIZE through preexec_fn | run | the VM-vs-legacy corpus differential; on Windows the per-suite entries below cover the VM |
+| `vm_adversarial_timeout_selftest` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script; it also relies on SIGKILL of the fake | run |  |
+| `vm_adversarial` | core semantics | run | run | run | run | its machine-wide flock is a no-op where fcntl is missing (Windows) |
+| `vm_subset` | core semantics | run | run | run | run | its RSS check is skipped where os.wait4 is missing (Windows), by the suite itself |
+| `vm_subset_gen` | core semantics | run | run | run | run |  |
+| `vm_builtins` | core semantics | run | run | run | run |  |
+| `vm_host` | file operations | run | run | **excluded**: Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); Python's subprocess has no preexec_fn on Windows; it also creates POSIX symlinks | run | macOS already runs it in v44-cross-platform |
+| `vm_records_coverage` | core semantics | run | run | run | run |  |
+| `vm_path_wording` | core semantics | run | run | run | run |  |
+| `vm_known_refused` | core semantics | run | run | run | run |  |
+| `vm_engine_selection` | core semantics | run | run | run | run |  |
+| `vm_former_replay` | core semantics | run | run | run | run |  |
+| `vm_d018` | core semantics | run | run | run | run |  |
+| `vm_context_consistency` | core semantics | run | run | run | run |  |
+| `vm_policy_negative` | core semantics | run | run | run | run |  |
+| `vm_review_cp12` | core semantics | run | run | run | run |  |
+| `vm_golden` | core semantics | run | run | run | run |  |
+| `vm_int_bounds` | core semantics | run | run | run | run |  |
+| `vm_inventory` | core semantics | run | run | run | run |  |
+| `vm_chain` | core semantics | run | run | run | run |  |
+| `vm_modules` | core semantics | run | run | run | run |  |
+| `module_host_order` | file operations | run | run | **excluded**: Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); Python's subprocess has no preexec_fn on Windows | run |  |
+| `vm_structs` | core semantics | run | run | run | run |  |
+| `vm_globals` | core semantics | run | run | run | run |  |
+| `semantics_modules` | core semantics | run | run | run | run |  |
+| `semantics_modules-structs` | core semantics | run | run | run | run |  |
+| `modules_d041` | core semantics | run | run | run | run |  |
+| `cp12b_inventory-selftest` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (the NIFT_VM=classify-all wrapper) | run |  |
+| `safety` | memory/mutation safety | run | run | run | run |  |
+| `safety-fuzz-selftest` | memory/mutation safety | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (fake nift binaries that must fire each check) | run |  |
+| `safety-fuzz` | memory/mutation safety | run | run | run | run |  |
+| `b3_structs` | memory/mutation safety | run | run | run | run |  |
+| `b4_dispatch` | memory/mutation safety | run | run | run | run |  |
+| `b5-evalorder` | memory/mutation safety | run | run | run | run |  |
+| `b5-evalorder-controls` | memory/mutation safety | run | run | run | run |  |
+| `b5-operators` | memory/mutation safety | run | run | run | run |  |
+| `b5-operators-controls` | memory/mutation safety | run | run | run | run |  |
+| `refsem_a` | memory/mutation safety | run | run | run | run |  |
+| `cycle_refusal_routes` | memory/mutation safety | run | run | run | run |  |
+| `collections` | memory/mutation safety | run | run | run | run |  |
+| `closures_s1` | memory/mutation safety | run | run | run | run |  |
+| `for_s2` | memory/mutation safety | run | run | run | run |  |
+| `vm_host_memory` | memory/mutation safety | run | run | **excluded**: Windows: the cases read from a FIFO created with os.mkfifo, which Windows does not have | run |  |
+| `cp22-legacy` | core semantics | run | run | run | run |  |
+| `cp22-vm` | core semantics | run | run | run | run | the normal binary only: the CP13B switch binary is Linux-campaign only (see the doc) |
+| `cp22-refuse` | core semantics | run | run | run | run |  |
+| `cp22-default` | core semantics | run | run | run | run |  |
+| `cp22-vm-only` | core semantics | run | run | run | run |  |
+| `cp22-trace` | core semantics | run | run | run | run |  |
+| `cp22-binding` | core semantics | run | run | run | run |  |
+| `cp22-controls` | core semantics | run | run | **excluded**: Windows: the harness writes a `#!/bin/sh` fake executable and chmods it; Windows cannot exec a shebang script (a dead `#!/bin/sh` callee) | run |  |
+| `cp22-print_order` | core semantics | run | run | run | run | the output-order repair adds Windows std-stream identity code: CI-verified only |
+| `cp23-compatibility` | core semantics | run | run | run | run |  |
+| `coro_module` | core semantics | run | run | run | run |  |
+| `named_deferrals` | core semantics | run | **excluded**: macOS: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything | **excluded**: Windows: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything | **excluded**: FreeBSD: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` executable) and on any other platform prints one SKIP line and exits 0 without checking anything |  |
+| `deadcode_admission` | core semantics | run | run | run | run |  |
+| `args_cmd` | core semantics | run | run | run | run | creates one symlink: windows-latest runs as an administrator, so os.symlink works there |
+| `import_depth` | core semantics | run | run | run | run |  |
+| `precise_positions` | core semantics | run | run | run | run |  |
+| `capture_origins` | core semantics | run | run | run | run |  |
+| `literals` | core semantics | run | run | run | run |  |
+| `literals-decimal` | core semantics | run | run | run | run |  |
+| `vm_default` | core semantics | run | run | **excluded**: Windows: the suite drives nift through a pseudo-terminal (pty.fork) and SIGKILL | run |  |
+| `packages` | core semantics | run | run | **excluded**: Windows: the suite takes an fcntl lock, creates POSIX symlinks and SIGKILLs a stuck child | run |  |
+| `diagnostics` | core semantics | run | run | run | run | needs GNU timeout(1): the workflow puts coreutils' gnubin on PATH on macOS |
+| `diagnostics-changes-old` | core semantics | run | run | run | run |  |
+| `diagnostics-changes-new` | core semantics | run | run | run | run |  |
+| `diagnostics-codes` | core semantics | run | run | run | run |  |
+| `diagnostics-json` | core semantics | run | run | run | run |  |
+| `d040_witnesses` | core semantics | run | run | run | run | needs rt-parse-dump |
+| `cp25r-differential` | core semantics | run | run | run | run |  |
+| `cp25r-post-cert-refusals` | core semantics | run | run | run | run | D-077 #1 refusal contracts; a missing corpus is NOT RUN (exit 2), never a pass |
+| `approved_refusal-selftest` | core semantics | run | run | run | run |  |
+| `rt_parser_corpus` | compiler/execution | run | run | **excluded**: Windows: the deep-nesting check runs the parser under `ulimit -s 1024` (bash), which MSYS2 cannot set for a native process | run | needs rt-parser-unit, rt-parse-dump and rt-legacy-oracle |
+| `fs_freedom` | file operations | run | run | run | run | symlinks: the workflow sets MSYS=winsymlinks:nativestrict on Windows |
+| `dynamic_reads` | file operations | run | run | run | run |  |
+| `dynamic_reads_review` | file operations | run | run | run | run |  |
+| `host_deps` | file operations | run | run | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite | run |  |
+| `file_copy_move_freedom` | file operations | run | run | **excluded**: Windows: every run is wrapped in `ulimit -f/-v` and GNU `timeout`; MSYS2 bash cannot set RLIMIT_AS (-v) | run | macOS: CI-verified (Darwin may reject `ulimit -v`) |
+| `build_write_ownership` | file operations | run | run | **excluded**: Windows: every run is wrapped in `ulimit -f/-v` and GNU `timeout`; MSYS2 bash cannot set RLIMIT_AS (-v) | run | macOS: CI-verified (Darwin may reject `ulimit -v`) |
+| `read_limit` | file operations | run | **excluded**: macOS: the harness reads /proc (VmPeak/VmHWM of the child, leftover producers by cmdline, zombies), which Darwin does not have, and RLIMIT_AS is not enforced by the Darwin kernel, so the address-space bound proves nothing | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite; it also needs /proc, mkfifo, /dev/zero and /dev/full | **excluded**: FreeBSD: the full harness requires Linux /proc/self/status, /proc/meminfo, /proc/self/mem and per-PID procfs checks | D-077 #3 contract; Linux certifies the read limit |
+| `read_limit_controls` | file operations | run | **excluded**: macOS: the harness reads /proc (VmPeak/VmHWM of the child, leftover producers by cmdline, zombies), which Darwin does not have, and RLIMIT_AS is not enforced by the Darwin kernel, so the address-space bound proves nothing; the paced FIFO uses FIONREAD (termios) | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite; it also needs mkfifo, fcntl/termios and /dev/zero | **excluded**: FreeBSD: this harness imports Linux procfs producer, zombie and VmHWM checks from read_limit.py |  |
+| `read_limit_contract_controls` | file operations | run | run | **excluded**: Windows: every run is bounded by RLIMIT_AS/RLIMIT_FSIZE (the POSIX-only `resource` module, through preexec_fn); the bound is the point of the suite | run | macOS: CI-verified (Darwin may ignore RLIMIT_AS; the controls do not depend on it) |
+| `make test-v45-embed-contracts` | embedding | run | run | run | run | already run on all three in v44-cross-platform |
+| `make test-rt-value` | memory/mutation safety | run | run | run | run | value layer, heap budget and OOM units |
+| `make test-runtime2-kind-bits` | compiler/execution | run | run | run | run |  |
+| `make test-rt-source-map` | compiler/execution | run | run | run | run |  |
+| `make test-runtime2-certification-guard` | certification integrity | run | **excluded**: macOS: the guard reads the GNU make database of the whole certify plan through scripts/certify.py; it certifies the plan itself, which is platform independent, so the Linux job runs it (D-090) | **excluded**: Windows: scripts/certify.py imports the POSIX-only pwd module and the guard drives GNU make -p and bash over the POSIX plan; the plan is platform independent and the Linux job runs it (D-090) | run | required (D-090); FAILED since C140c (three unlisted skip phrases in tests/runtime2/suite_status.sh); expected PASS once the candidate fix lands |
 
 ## Already covered on Windows and macOS by the existing workflows
 
@@ -284,5 +297,3 @@ them on Linode:
 1. Whether to add the `nift-regression-suite` `runtime-2` contracts on macOS as well. Today
    `runtime2-regression-suite.yml` runs them on ubuntu only.
 2. Whether `nightly-deep.yml` (parser fuzz with sanitizers) is dispatched once on the frozen tip.
-3. When FreeBSD is qualified after the baseline, whether the same table gains a `freebsd` column. The table and
-   `--check` are written to take one.

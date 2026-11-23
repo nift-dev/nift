@@ -9,6 +9,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      runtime2_vm:
+        description: Run the Runtime 2.0 VM subset and independent gates
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -21,7 +26,7 @@ jobs:
   freebsd:
     name: FreeBSD 14 amd64 build and regression
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -77,12 +82,27 @@ jobs:
           # The VM runs commands as root; the build and tests run as an
           # unprivileged user so permission-dependent suites are exercised.
           run: |
+            set -eu
             pw useradd niftci -m -s /bin/sh
             chown -R niftci "$PWD"
-            su niftci -c "cd '$PWD/nift' && sh scripts/ci_freebsd.sh"
+            regression=0
+            su niftci -c "cd '$PWD/nift' && sh scripts/ci_freebsd.sh" || regression=$?
+            runtime=0
+            if [ "${{ github.event_name != 'workflow_dispatch' || inputs.runtime2_vm }}" = true ]; then
+              mkdir -p /mnt/nift-runtime2
+              mount -t tmpfs -o size=64m tmpfs /mnt/nift-runtime2
+              trap 'umount /mnt/nift-runtime2' EXIT
+              chown niftci /mnt/nift-runtime2
+              su niftci -c "cd '$PWD/nift' && NIFT_TEST_CROSS_DEVICE_ROOT=/mnt/nift-runtime2 bash scripts/ci_freebsd_runtime2.sh" || runtime=$?
+            fi
+            [ "$regression" -eq 0 ] && [ "$runtime" -eq 0 ]
       - name: Summary
         if: always()
-        run: cat nift/.build/freebsd-ci/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no summary (VM step failed before testing)" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          cat nift/.build/freebsd-ci/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no summary (VM step failed before testing)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f nift/.build/freebsd-ci/runtime2/summary.txt ]; then
+            cat nift/.build/freebsd-ci/runtime2/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

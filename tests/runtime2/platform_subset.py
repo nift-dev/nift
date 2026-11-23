@@ -33,7 +33,7 @@ import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
-PLATFORMS = ("linux", "macos", "windows")
+PLATFORMS = ("linux", "macos", "windows", "freebsd")
 
 # Reasons reused below (each names the construct that does not exist or does not mean the same on that platform).
 W_PREEXEC = ("Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); "
@@ -140,7 +140,7 @@ ENTRIES = [
     ("named_deferrals", "core semantics", "{py} tests/runtime2/named_deferrals.py --nift {nift}",
      {p: "%s: named_deferrals.py pins its refusals with Linux-only programs (FFI through libc.so.6, an `echo` "
          "executable) and on any other platform prints one SKIP line and exits 0 without checking anything" % n
-      for p, n in (("macos", "macOS"), ("windows", "Windows"))}, ""),
+      for p, n in (("macos", "macOS"), ("windows", "Windows"), ("freebsd", "FreeBSD"))}, ""),
     ("deadcode_admission", "core semantics", "{py} -B tests/runtime2/deadcode_admission.py --nift {nift}", {}, ""),
     ("args_cmd", "core semantics", "{py} tests/runtime2/args_cmd/args_cmd.py --nift {nift}", {},
      "creates one symlink: windows-latest runs as an administrator, so os.symlink works there"),
@@ -180,10 +180,12 @@ ENTRIES = [
     ("build_write_ownership", "file operations", "bash tests/runtime2/build_write_ownership.sh", {"windows": W_ULIMIT},
      "macOS: CI-verified (Darwin may reject `ulimit -v`)"),
     ("read_limit", "file operations", "{py} tests/runtime2/read_limit.py",
-     {"macos": M_PROC, "windows": W_RLIMIT + "; it also needs /proc, mkfifo, /dev/zero and /dev/full"},
+     {"macos": M_PROC, "windows": W_RLIMIT + "; it also needs /proc, mkfifo, /dev/zero and /dev/full",
+      "freebsd": "FreeBSD: the full harness requires Linux /proc/self/status, /proc/meminfo, /proc/self/mem and per-PID procfs checks"},
      "D-077 #3 contract; Linux certifies the read limit"),
     ("read_limit_controls", "file operations", "{py} -B tests/runtime2/read_limit_controls.py",
      {"macos": M_PROC + "; the paced FIFO uses FIONREAD (termios)",
+      "freebsd": "FreeBSD: this harness imports Linux procfs producer, zombie and VmHWM checks from read_limit.py",
       "windows": W_RLIMIT + "; it also needs mkfifo, fcntl/termios and /dev/zero"}, ""),
     ("read_limit_contract_controls", "file operations", "{py} -B tests/runtime2/read_limit_contract_controls.py",
      {"windows": W_RLIMIT}, "macOS: CI-verified (Darwin may ignore RLIMIT_AS; the controls do not depend on it)"),
@@ -299,13 +301,13 @@ def recipe_problems(text, makefile="Makefile"):
 
 
 def markdown():
-    out = ["| Entry | Area | Linux | macOS | Windows | Note |", "|---|---|---|---|---|---|"]
+    out = ["| Entry | Area | Linux | macOS | Windows | FreeBSD | Note |", "|---|---|---|---|---|---|---|"]
     for eid, area, cmd, excl, note in ENTRIES:
         cells = ["**excluded**: %s" % excl[p] if p in excl else "run" for p in PLATFORMS]
-        out.append("| `%s` | %s | %s | %s | %s | %s |" % (eid, area, cells[0], cells[1], cells[2], note.replace("|", "\\|")))
+        out.append("| " + " | ".join((f"`{eid}`", area, *cells, note.replace("|", "\\|"))) + " |")
     for target, area, excl, note in MAKE_TARGETS:
         cells = ["**excluded**: %s" % excl[p] if p in excl else "run" for p in PLATFORMS]
-        out.append("| `make %s` | %s | %s | %s | %s | %s |" % (target, area, cells[0], cells[1], cells[2], note))
+        out.append("| " + " | ".join((f"`make {target}`", area, *cells, note)) + " |")
     return "\n".join(out) + "\n"
 
 
@@ -341,7 +343,7 @@ def main():
 
 def run_table(entries, a):
     skipped_assertions = None if a.list else skip_classifier()
-    failed, partial, ran, excluded = [], [], 0, 0
+    failed, partial, blocked, ran, excluded = [], [], [], 0, 0
     only = set(a.only.split(",")) if a.only else None
     for eid, area, cmd, excl, _note in entries:
         if only is not None and eid not in only:
@@ -362,13 +364,24 @@ def run_table(entries, a):
             # Absolute: Windows resolves a relative executable against the parent's directory, not cwd.
             argv[0] = os.path.join(REPO, argv[0])
             if not os.path.exists(argv[0]):
+                if a.platform == "freebsd":
+                    print("BLOCKED %s: unit binary %s was not built" % (eid, argv[0]))
+                    blocked.append(eid)
+                    continue
                 print("FAIL %s: unit binary %s was not built (a missing build is a failure, not a skip)" % (eid, argv[0]))
                 failed.append(eid)
                 continue
         env = dict(os.environ, NIFT_BIN=a.nift, PYTHONDONTWRITEBYTECODE="1")
         # Review L3/N1: an entry that exits 0 with an unexpected skip (certify's classification) is PARTIAL, never
         # PASS. Its output is passed through unchanged.
-        proc = subprocess.Popen(argv, cwd=REPO, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        try:
+            proc = subprocess.Popen(argv, cwd=REPO, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except OSError as error:
+            if a.platform != "freebsd":
+                raise
+            print("BLOCKED %s: %s" % (eid, error))
+            blocked.append(eid)
+            continue
         out = []
         for raw in proc.stdout:
             text = raw.decode(errors="replace")
@@ -380,7 +393,11 @@ def run_table(entries, a):
         status, notes = classify(a.platform, eid, rc, "".join(out), skipped_assertions)
         for n in notes:
             print(n)
-        print("%s %s (exit %d)" % (status, eid, rc), flush=True)
+        label = status
+        if a.platform == "freebsd" and (status == "PARTIAL" or rc == 77):
+            label = "NOT RUN"
+            status = "PARTIAL"
+        print("%s %s (exit %d)" % (label, eid, rc), flush=True)
         if status == "FAIL":
             failed.append(eid)
         elif status == "PARTIAL":
@@ -390,7 +407,10 @@ def run_table(entries, a):
     print("platform subset %s: %d run, %d excluded with a recorded reason, %d failed%s, %d partial%s" %
           (a.platform, ran, excluded, len(failed), (": " + ", ".join(failed)) if failed else "",
            len(partial), (": " + ", ".join(partial)) if partial else ""))
-    if failed:
+    if a.platform == "freebsd":
+        print("FreeBSD outcomes: PASS %d, FAIL %d, NOT RUN %d, EXCLUDED %d, BLOCKED %d" %
+              (ran - len(failed) - len(partial), len(failed), len(partial), excluded, len(blocked)))
+    if failed or blocked:
         return 1
     return 2 if partial else 0
 

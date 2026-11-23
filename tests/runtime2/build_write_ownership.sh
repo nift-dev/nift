@@ -92,8 +92,9 @@ else
 fi
 
 # R5: cross-filesystem move partial-failure semantics.
-if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -c %d "$W")" ]; then
-  S="$(mktemp -d /dev/shm/nift-xdev-XXXXXX)"
+cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
+if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] && [ "$(stat -c %d "$cross_device_root")" != "$(stat -c %d "$W")" ]; then
+  S="$(mktemp -d "$cross_device_root/nift-xdev-XXXXXX")"
   # (a) the copy fails (file size limit): the original stays, no temporary is left.
   head -c 300000 /dev/zero > "$W/big.bin"
   printf 'try { native::mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
@@ -114,5 +115,6 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(stat -c %d /dev/shm)" != "$(stat -
     chmod 755 "$W/ro"
   else echo "SKIP partial cross-device move (root without setpriv)"; fi
   rm -rf "$S"
+elif [ -n "${NIFT_TEST_CROSS_DEVICE_ROOT:-}" ]; then bad "configured cross-device fixture is unavailable";
 else echo "SKIP cross-device move cases (/dev/shm missing or on the same filesystem)"; fi
 exit $fail

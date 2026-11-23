@@ -3,7 +3,11 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __FreeBSD__
+#include <malloc_np.h>
+#else
 #include <malloc.h>
+#endif
 static size_t live, peak; static void*(*rm)(size_t); static void(*rf)(void*); static void*(*rr)(void*,size_t);
 static void init(void){ if(!rm){ rm=dlsym(RTLD_NEXT,"malloc"); rf=dlsym(RTLD_NEXT,"free"); rr=dlsym(RTLD_NEXT,"realloc"); } }
 #define BIG (256u<<10)
