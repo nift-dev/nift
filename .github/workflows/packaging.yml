@@ -495,17 +495,10 @@ jobs:
               & $cdb -g -G -c $debug $exe build --all
               Write-Host "CDB build control exit $LASTEXITCODE"
             }
-            $fresh = New-Item -ItemType Directory (Join-Path $root instrumented)
-            Set-Location $fresh
           }
-          & $gflags /p /enable nift.exe /full
-          if ($LASTEXITCODE -ne 0) { throw "cannot enable full PageHeap" }
-          try {
-            $settings = & $gflags /p | Out-String
-            Write-Host $settings
-            if ($LASTEXITCODE -ne 0 -or $settings -notmatch '(?im)^.*nift\.exe.*full traces') {
-              throw "full PageHeap status was not verified"
-            }
+          function Invoke-RecoveryFixture($mode) {
+            $fixture = New-Item -ItemType Directory (Join-Path $root "fixture-$mode")
+            Set-Location $fixture
             if ((Invoke-Nift version) -ne "Nift v4.13.0") { throw "wrong extracted version" }
             Invoke-Nift init
             $config = Get-Content .nift/config.json -Raw | ConvertFrom-Json
@@ -534,6 +527,20 @@ jobs:
               }
             }
             Invoke-Nift status
+          }
+          if ($env:FAILED_SMOKE -ne "true") {
+            Invoke-RecoveryFixture "normal"
+            Write-Host "NATIVE_BUILD_RECOVERY_PASS"
+          }
+          & $gflags /p /enable nift.exe /full
+          if ($LASTEXITCODE -ne 0) { throw "cannot enable full PageHeap" }
+          try {
+            $settings = & $gflags /p | Out-String
+            Write-Host $settings
+            if ($LASTEXITCODE -ne 0 -or $settings -notmatch '(?im)^.*nift\.exe.*full traces') {
+              throw "full PageHeap status was not verified"
+            }
+            Invoke-RecoveryFixture "pageheap"
             Write-Host "PAGEHEAP_BUILD_RECOVERY_PASS"
           } finally {
             & $gflags /p /disable nift.exe
