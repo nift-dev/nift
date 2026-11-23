@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include "Types.h"
 #include "FileSystem.h"
 #include <map>
@@ -38,7 +39,13 @@ public:
         std::lock_guard<std::mutex> lock(observation_mutex_);
         const auto key = relative(path);
         auto [it, inserted] = observations_.emplace(key, std::to_string(hash));
-        if (!inserted && it->second != std::to_string(hash)) observation_conflicts_.insert(key);
+        if (!inserted && it->second != std::to_string(hash)) {
+            if (observation_conflicts_.insert(key).second) {
+                std::fprintf(stderr, "observed hash conflict root=%s key=%s prior=%s next=%llu\n",
+                             root().string().c_str(), key.c_str(), it->second.c_str(),
+                             static_cast<unsigned long long>(hash));
+            }
+        }
     }
     std::map<std::string,std::string> dependency_observations(std::string& conflict) const {
         std::lock_guard<std::mutex> lock(observation_mutex_);
