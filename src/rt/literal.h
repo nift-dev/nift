@@ -27,6 +27,8 @@ NegativeLiteral decode_negative_number_literal(std::string_view text, Value& out
 // quoted quote); an unknown escape drops the backslash; a `$` that does not
 // start `$[` is data. Raw control/NUL bytes and `$[` are refused (the parser
 // emits StringParts for interpolation), except with `raw_markers` (a raw call argument, F5): kept as text.
-bool decode_string_literal(std::string_view text, Value& out, bool raw_markers = false);
+// Object values admitted by the parser may retain an unescaped interior quote.
+bool decode_string_literal(std::string_view text, Value& out, bool raw_markers = false,
+                           bool object_quoted_value = false);
 
 } // namespace nift::rt

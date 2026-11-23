@@ -81,6 +81,7 @@ private:
     NodeId sequence(NodeKind kind, Tok close, std::uint32_t begin, bool allow_spread,
                     Literals literals = Literals::Interpolate);
     NodeId object(std::uint32_t begin);
+    NodeId quoted_object_value();
     NodeId lambda_if_any(std::uint32_t begin, bool async);
     NodeId lambda_body(NodeId lambda);
     NodeId lambda_assignment(NodeId left);

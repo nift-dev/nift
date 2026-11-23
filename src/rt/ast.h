@@ -59,6 +59,7 @@ enum : std::uint16_t {
     kFlagDeferredBody = 1u << 12,  // FnDecl written as template `@fn`: body translated at call time
     kFlagTemplateImport = 1u << 13, // Import written as `@import(...)` (its run-time messages say "@import")
     kFlagRawLiteral = 1u << 14,    // String: a direct call argument passed raw, `$[...]` kept as text (F5, D-102)
+    kFlagObjectQuotedValue = 1u << 15, // String: double-quoted object value with interior quotes (D-159)
     kFlagAmbiguousLiteralArg = 1u << 15, // Call: write/write_line/write_val with a direct `$[` literal (C145)
 };
 

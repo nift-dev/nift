@@ -40,7 +40,13 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     const char expected = node.kind == NodeKind::Member ? '.' : node.kind == NodeKind::Index ? '[' : '(';
     if (left.end >= src.size() || src[left.end] != expected) return fail(node, "postfix-spelling");
     if (node.kind == NodeKind::Member && ast_.at(node.b).begin != left.end + 1) return fail(node, "postfix-spelling");
-    if (node.kind != NodeKind::Call && !is_receiver(left.kind)) return fail(node, "postfix-receiver");
+    if (node.kind != NodeKind::Call && !is_receiver(left.kind)) {
+        const bool scalar = left.kind == NodeKind::Number || left.kind == NodeKind::True ||
+                            left.kind == NodeKind::False || left.kind == NodeKind::Null;
+        if (!scalar || node.kind != NodeKind::Member ||
+            src.substr(left.end, 12) != ".to_string()")  // rt-lint: allow-string-compare compile time
+            return fail(node, "postfix-receiver");
+    }
     // A member read (not a method's callee: no `(` follows) on a call result
     // or literal: legacy's missing-member message depends on the context
     // ("JSON value 'f()' has no member 'k'" in textual code, "value has no

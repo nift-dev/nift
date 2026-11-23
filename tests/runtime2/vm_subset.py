@@ -104,6 +104,33 @@ def supported():
         ("d158-mid-file-shebang", '#!/usr/bin/env nift\nprint(1)\n#! print(99) is comment text\nprint(2)\n'),
         ("d158-sort-by", 'print([3,1,2].sort_by(x=>x).stringify())\n'),
         ("d158-to-string", 'x:=42; print(x.to_string())\n'),
+        ("d159-object-quotes", r'''v := "x"
+print({"a": "pre " + v + " post"}.a)
+print({"a": "x" + "y"}.a)
+print({"a": "hello"}.a)
+print({"a": 'single'}.a)
+print({"a": "esc \" inside"}.a)
+print({"a": 1 + 2}.a)
+print({"a": ""}.a)
+print({"a": "say "hi" now"}.a)
+print({"nested": {"k": "v"}}.nested.k)
+'''),
+        ("d159-literal-conversion", '''print("hello".to_string())
+print(true.to_string())
+print(false.to_string())
+print(42.to_string())
+print(4.5.to_string())
+print(null.to_string())
+'''),
+        ("d159-prepared-object-and-scalar", r'''i := 0
+while (i < 1) {
+    print({"a": "say "hi" now"}.a)
+    print({"a": "esc \" inside"}.a)
+    print(true.to_string())
+    print(1 + 42.to_string())
+    i += 1
+}
+'''),
     ]
     for method in ("catch", "error", "throw"):
         out.append((f"d158-method-{method}",
@@ -447,6 +474,38 @@ def d158_refusals(nift, work):
     return failures
 
 
+def d159_refusals(nift, work):
+    cases = (
+        ("bare-reserved", 'fn(throw(x)) { return x + 4 }\ncallable := throw\nprint(callable(2))',
+         b"fn-name-reserved", b"p.f:2:1:", b"before\n6\n"),
+        ("spaced-throw", 'fn(throw(x)) { return x + 4 }\nprint(throw (1))',
+         b"opaque:legacy-runtime-error", b"p.f:3:1:", b"before\n5\n"),
+        ("unclosed-quote", 'print({"a": "say "hi" now}.a)',
+         b"unterminated string literal", b"p.f:2:21:", None),
+        ("position-after-quote", 'print({"a": "say "hi" now"}.a)\nprint(missing_value)',
+         b"unresolved-name", b"p.f:3:7:", None),
+        ("quote-before-comma", 'print({"a": "a "b" c", "v": 3}.a)',
+         b"opaque:legacy-runtime-error", b"p.f:2:1:", None),
+        ("unrelated-scalar-method", 'print(false.length())',
+         b"opaque:legacy-runtime-error", b"p.f:2:1:", None),
+        ("scalar-call-argument", 'print(true.to_string(1))',
+         b"opaque:legacy-runtime-error", b"p.f:2:1:", None),
+    )
+    failures = []
+    for name, body, reason, position, legacy in cases:
+        with tempfile.TemporaryDirectory(dir=work) as case:
+            with open(os.path.join(case, "p.f"), "w") as script:
+                script.write('print("before")\n' + body + "\n")
+            (stdout, stderr, rc), _ = run(nift, case, "require")
+            if rc != 1 or stdout or reason not in stderr or position not in stderr:
+                failures.append(f"D-159 {name}: expected refusal at {position!r}, got {stdout!r} {stderr!r}")
+            if legacy is not None:
+                actual, _ = run(nift, case, "0")
+                if actual != (legacy, b"", 0):
+                    failures.append(f"D-159 {name}: legacy witness changed: {actual!r}")
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -459,6 +518,7 @@ def main():
         with cf.ThreadPoolExecutor(a.jobs) as pool:
             failures = [f for f in pool.map(lambda it: check(nift, work, *it), items) if f]
         failures += d158_refusals(nift, work)
+        failures += d159_refusals(nift, work)
         failures += equality_memory(nift, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)

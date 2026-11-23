@@ -86,7 +86,8 @@ NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
     if (node == kNoNode) return kNoNode;
     const bool name_base = name_base_;
     const bool member_base = name_base || collection_base_;
-    // `true.length()`, `1e2[0]`: legacy has no postfix on these literals.
+    // Admit the zero-argument conversion without opening other scalar postfix forms.
+    constexpr std::string_view conversion = ".to_string()";
     const NodeKind head = ast_.at(node).kind;
     const bool scalar_head = head == NodeKind::Number || head == NodeKind::True || head == NodeKind::False ||
                              head == NodeKind::Null;
@@ -98,7 +99,11 @@ NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
     std::uint32_t last_dot = 0;
     bool safe = false;
     while (is(Tok::LParen) || is(Tok::Dot) || is(Tok::QuestionDot) || is(Tok::LBracket) || is(Tok::QuestionBracket)) {
-        if (tok_.begin != prev_end_ || scalar_head) return fail(OpaqueReason::LegacyRuntimeError);
+        if (tok_.begin != prev_end_) return fail(OpaqueReason::LegacyRuntimeError);
+        if (scalar_head && (links >= 2 ||
+            (links == 0 && (end_ - tok_.begin < conversion.size() ||
+                            src_.substr(tok_.begin, conversion.size()) != conversion))))
+            return fail(OpaqueReason::LegacyRuntimeError);
         ++links;
         if (++expression_depth() > kMaxExpressionDepth) return fail(OpaqueReason::NestingLimit);
         if (is(Tok::LParen)) {

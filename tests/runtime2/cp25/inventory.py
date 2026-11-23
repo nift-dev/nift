@@ -265,6 +265,20 @@ D158_UNDEFINED = {
     "smoke/v46_b4_cp1_characterization/007-bad-import/bad-import.f|bad-import.f": {1},
 }
 
+# D-158 replayed the legacy errors. D-159 separately defers the spaced
+# contextual call. Any new opaque occurrence still needs a disposition.
+D159_OPAQUE = {
+    "semantics/power_operator.f|power_operator.f": {1},
+    "semantics/strings_index.f|strings_index.f": {1},
+    "semantics/strings_interp_nested_quote.f|strings_interp_nested_quote.f": {2},
+    "smoke/v44_scalar_conversion_smoke/002-a/a.f|a.f": {22, 23, 24},
+    "smoke/v46_b4_cp1_characterization/001-names/names.f|names.f": {17},
+    "vm-corpus/cp04/strings_math.f|strings_math.f": {8},
+    "vm-corpus/cp11/fallback_postfix_space.f|fallback_postfix_space.f": {2},
+    "vm-corpus/cp11/review2_m4_formfeed.f|review2_m4_formfeed.f": {2},
+    "vm-corpus/cp11/review2_m4_vtab.f|review2_m4_vtab.f": {2},
+}
+
 def report(args):
     d = args.dir
     cls = load_classification(args.classification)
@@ -320,8 +334,19 @@ def report(args):
     seen = set(full) | set(fallback)
     refused |= set(fallback)
 
+    opaque = "opaque:legacy-runtime-error"
+    opaque_drift = (
+        {uid for uid in full.get(opaque, ())
+         if not refusal_lines.get((uid, opaque), set()) <= D159_OPAQUE.get(uid, set())}
+        | (refused_units.get(opaque, set()) - {unit_of(uid) for uid in D159_OPAQUE})
+    )
+
     def row_for(reason):
         """An exact row, else the family row `<prefix>:*` of an approved family (FAMILIES)."""
+        if reason == opaque and not opaque_drift:
+            return {**cls[reason], "status": "approved",
+                    "approval": "D-158 and D-159 observed sites only",
+                    "disposition": "Legacy errors and the deferred spaced throw call. New sites require review."}
         if reason in cls:
             return cls[reason]
         prefix = reason.split(":")[0]

@@ -14,7 +14,10 @@ Runtime 2.0. The approved `ifstream(...).read_val()` refusal remains in effect.
 In-memory `minify(source, format)` and plain top-level mid-file shebang comments work under
 Runtime 2.0. Use `NIFT_VM=0` for supported legacy scripts that require bare
 shell-command statements, stored or indirectly invoked async function values,
-or the file forms of `minify()`.
+the file forms of `minify()`, nested `#!` comments, or the deferred
+contextual callable spellings. Direct scalar literals support
+`.to_string()`, and the VM preserves the tested escaped and embedded
+quote forms in single-member object literals.
 
 ## Parallel tasks and platform support
 

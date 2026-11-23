@@ -257,6 +257,44 @@ bool ExprParser::raw_argument() const {
     return after == Tok::Comma || after == Tok::RParen;
 }
 
+// The legacy object fallback accepts one quoted word inside double-quoted
+// text. Admit only the adjacent String / Ident / String shape and require
+// a single-member object. Expressions still go through the ordinary parser.
+NodeId ExprParser::quoted_object_value() {
+    if (!is(Tok::String) || src_[tok_.begin] != '"') return kNoNode;
+    Lexer probe = lex_;
+    Token last = tok_;
+    Token next = probe.next();
+    bool interior = false;
+    if (next.kind == Tok::Ident && next.begin == last.end) {
+        const Token tail = probe.next();
+        if (tail.kind != Tok::String || tail.begin != next.end || src_[tail.begin] != '"')
+            return kNoNode;
+        const auto word = src_.substr(next.begin, next.end - next.begin);
+        for (const char c : word)
+            if (!is_ident_char(c)) return kNoNode;
+        last = tail;
+        next = probe.next();
+        interior = true;
+    }
+    if (next.kind != Tok::RBrace) return kNoNode;
+
+    const auto body = src_.substr(tok_.begin + 1, last.end - tok_.begin - 2);
+    if (body.find("$[") != std::string_view::npos) return kNoNode;
+    bool escaped = false;
+    for (std::size_t i = 0; i < body.size(); ++i) {
+        if (body[i] != '\\') continue;
+        if (interior || ++i == body.size() || body[i] != '"') return kNoNode;
+        escaped = true;
+    }
+    if (!interior && !escaped) return kNoNode;
+
+    const NodeId value = ast_.add(NodeKind::String, tok_.begin, last.end);
+    ast_.at(value).flags |= kFlagObjectQuotedValue;
+    resume_at(last.end);
+    return value;
+}
+
 // { "key": value, ... }: keys must be double-quoted (legacy run-time error
 // otherwise). Escapes in keys, duplicate keys and a trailing comma are
 // run-time errors or decoded differently by legacy's JSON fast path: Opaque.
@@ -277,9 +315,12 @@ NodeId ExprParser::object(std::uint32_t begin) {
         advance();
         if (!is(Tok::Colon)) return bad();
         advance();
-        const NodeId value = unit();
-        if (value == kNoNode) { --nesting_; return kNoNode; }
-        if (!verbatim_literal_ok(ast_, value)) return bad();
+        NodeId value = props.empty() ? quoted_object_value() : kNoNode;
+        if (value == kNoNode) {
+            value = unit();
+            if (value == kNoNode) { --nesting_; return kNoNode; }
+            if (!verbatim_literal_ok(ast_, value)) return bad();
+        }
         const NodeId prop = node2(NodeKind::Property, Op::None, ast_.at(key).begin, key, value);
         props.push_back(prop);
         if (is(Tok::Comma)) {
