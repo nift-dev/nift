@@ -63,7 +63,6 @@ inline constexpr std::size_t kLegacyMaxDepth = 64;
 
 struct VmOptions {
     static constexpr std::size_t kDefaultHeapBudget = std::size_t(1) << 30;
-
     std::size_t max_frames = 100000;
     std::size_t max_registers = std::size_t(16) << 20;      // 16M values, 256 MiB
     std::size_t heap_budget = kDefaultHeapBudget;  // live rt heap + register and frame stacks (bytes)
@@ -80,10 +79,8 @@ struct VmOptions {
     // Callable values still require their Program lifetime, as elsewhere.
     Value* return_value = nullptr;
     std::vector<Value>* session_globals = nullptr;  // stable cells/types, owned by the session
-    // CP22: a top-level `return` value is appended to the output where it
-    // happens (legacy prints it before tasks still running then finish) rather
-    // than returned in VmResult::return_text. The CLI sets it; embedders keep
-    // the value separate.
+    // CP22: append top-level return to CLI output before remaining tasks finish.
+    // Embedders keep the value separate in VmResult::return_text.
     bool return_in_output = false;
     // CP23: capture the TopReturn value without rendering it. The isolate task
     // wrapper transfers any Value, including ones the renderer does not print.
