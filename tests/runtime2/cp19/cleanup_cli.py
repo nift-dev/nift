@@ -46,7 +46,8 @@ for mode in ['default', '0', '1', 'require']:
                     s.prompt()
                 has_job = case in ['background-file', 'stopped-file', 'both', 'job']
                 if has_job:
-                    command = "sh -c 'echo $$ > child.pid; "
+                    # Rename publishes the complete PID before the test can observe it.
+                    command = "sh -c 'echo $$ > child.pid.tmp && mv child.pid.tmp child.pid || exit 1; "
                     if case == 'background-file':
                         command += "exec sleep 60' &"
                     else:
