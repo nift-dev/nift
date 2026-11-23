@@ -281,6 +281,7 @@ D159_OPAQUE = {
 
 def report(args):
     d = args.dir
+    opaque = "opaque:legacy-runtime-error"
     cls = load_classification(args.classification)
     deferrals = load_deferrals(args.deferrals)
     full = collections.defaultdict(set)      # reason -> units (classify-all, non-consequential)
@@ -301,6 +302,7 @@ def report(args):
                 refused_units[reason_key(it["reason"])].add(unit_of(r["id"]))
     fallback = collections.defaultdict(set)  # reason -> entries leaving the VM (execute)
     unit_reasons = collections.defaultdict(set)  # execute entry -> its non-VM reasons (scope roots, D-077 #1)
+    opaque_fallback = set()
     entries = fb_entries = 0
     for line in open(os.path.join(d, "execute.jsonl")):
         r = json.loads(line)
@@ -309,9 +311,13 @@ def report(args):
         for e in r["executions"]:
             if e["outcome"] not in ("vm", "vm-error"):
                 left = True
-                fallback[reason_key(e["reason"])].add(r["entry"])
-                refused_units[reason_key(e["reason"])].add(unit_of(r["entry"]))
-                unit_reasons[unit_of(r["entry"])].add(reason_key(e["reason"]))
+                reason = reason_key(e["reason"])
+                unit = unit_of(r["entry"])
+                fallback[reason].add(r["entry"])
+                refused_units[reason].add(unit)
+                unit_reasons[unit].add(reason)
+                if reason == opaque:
+                    opaque_fallback.add(f'{unit}|{e.get("path")}')
         fb_entries += left
     upstream = []
     for uid, (root, methods) in D158_UPSTREAM.items():
@@ -334,12 +340,11 @@ def report(args):
     seen = set(full) | set(fallback)
     refused |= set(fallback)
 
-    opaque = "opaque:legacy-runtime-error"
-    opaque_drift = (
-        {uid for uid in full.get(opaque, ())
-         if not refusal_lines.get((uid, opaque), set()) <= D159_OPAQUE.get(uid, set())}
-        | (refused_units.get(opaque, set()) - {unit_of(uid) for uid in D159_OPAQUE})
-    )
+    verified_opaque = {
+        uid for uid, lines in D159_OPAQUE.items()
+        if (observed := refusal_lines.get((uid, opaque))) and observed <= lines
+    }
+    opaque_drift = (full.get(opaque, set()) | opaque_fallback) - verified_opaque
 
     def row_for(reason):
         """An exact row, else the family row `<prefix>:*` of an approved family (FAMILIES)."""
@@ -453,6 +458,9 @@ def report(args):
         if owner:
             print("INVENTORY: BLOCKED: %d PENDING-OWNER reason(s), not adjudicated: %s" % (len(owner), ", ".join(owner)),
                   file=sys.stderr)
+        if opaque_drift:
+            print("INVENTORY: opaque sites without matching classify-all evidence: " +
+                  "; ".join(sorted(opaque_drift)), file=sys.stderr)
     if args.check and problems:
         return 1
     blocked = False
