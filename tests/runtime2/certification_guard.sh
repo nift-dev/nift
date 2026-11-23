@@ -898,14 +898,15 @@ toy3 bc 0 FAILED-BASELINE "LEGACY-ONLY"
 # C1 (confirmation of C20, toy11): a missing prerequisite is not a missing target, and a harness-
 # blocked baseline is no evidence: both are applicable and differing, never "not applicable"
 toy "$TOY/bd/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/bd/r2" test-sha256 "$SHA_FAIL"
-sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bd/r2/Makefile"
+sed -i.bak 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bd/r2/Makefile" || exit 1
 toy3 bd 1 FAILED-NEW "weekend/r2: applicable"
 SHA_BLOCKED='echo "bash tests/sha256_builtins.sh"; echo "SKIP UNVERIFIED COMPARATOR COVERAGE: x"; exit 1'
 toy "$TOY/be/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r1" test-sha256 "$SHA_FAIL"; toy "$TOY/be/r2" test-sha256 "$SHA_BLOCKED"
 toy3 be 1 FAILED-NEW "weekend/r2: applicable, cannot run there"
 # every regression baseline blocked or unbuildable, v4.12.0 equal: never LEGACY-ONLY
 toy "$TOY/bf/cand" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/v4" test-sha256 "$SHA_FAIL"; toy "$TOY/bf/r1" test-sha256 "$SHA_BLOCKED"
-toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"; sed -i 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile"
+toy "$TOY/bf/r2" test-sha256 "$SHA_FAIL"
+sed -i.bak 's/^test-sha256: nift$/test-sha256: nift tests\/missing-input.txt/' "$TOY/bf/r2/Makefile" || exit 1
 toy3 bf 1 FAILED-NEW "17f7964c: applicable, cannot run there"
 # owner 03:27: a read_limit.py failure outside the approved case-ID table blocks, even when the
 # baseline prints the identical line

@@ -12,7 +12,8 @@
 #
 # Every nift run is bounded in disk, memory and time.
 set -u -o pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/child_address_limit.sh"
+test_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 2
+source "$test_dir/child_address_limit.sh"
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 fail=0
 pass() { echo "PASS $1"; }
@@ -96,6 +97,9 @@ cross_device_root="${NIFT_TEST_CROSS_DEVICE_ROOT:-/dev/shm}"
 device_id() {
   if [ "$(uname -s)" = FreeBSD ]; then stat -f %d "$1"; else stat -c %d "$1"; fi
 }
+file_size() {
+  if [ "$(uname -s)" = FreeBSD ]; then stat -f %z "$1"; else stat -c %s "$1"; fi
+}
 if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
    source_device=$(device_id "$cross_device_root") && work_device=$(device_id "$W") &&
    [ "$source_device" != "$work_device" ]; then
@@ -105,7 +109,8 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
   printf 'try { native::mv("%s", "%s/big.bin") } catch(e) { print("CAUGHT " + e.code) }\n' "$W/big.bin" "$S" > "$W/m1.f"
   # SIGXFSZ ignored so the over-size write fails with EFBIG instead of killing nift.
   out="$( trap '' XFSZ; test_run_bounded 200 "$NIFT" "$W/m1.f" 2>&1 )"
-  if echo "$out" | grep -q "CAUGHT io.move_failed" && [ "$(stat -c %s "$W/big.bin")" = 300000 ] && [ ! -e "$S/big.bin" ] && ! ls -A "$S" | grep -q nift-tmp; then
+  if echo "$out" | grep -q "CAUGHT io.move_failed" && bytes=$(file_size "$W/big.bin") &&
+     [ "$bytes" = 300000 ] && [ ! -e "$S/big.bin" ] && ! ls -A "$S" | grep -q nift-tmp; then
     pass "cross-device move: failed copy leaves the original intact"
   else bad "cross-device move copy failure: $out; $(ls -la "$S" | tr '\n' ' ')"; fi
   # (b) the copy succeeds but the source cannot be removed: reported as a partial result.
@@ -114,7 +119,26 @@ if [ -d "$cross_device_root" ] && [ -w "$cross_device_root" ] &&
     printf 'try { native::mv("%s", "%s/f.txt") } catch(e) { print("CAUGHT " + e.message) }\n' "$W/ro/f.txt" "$S" > "$W/m2.f"
     PRIV=(); [ "$(id -u)" = 0 ] && PRIV=(setpriv --bounding-set -dac_override,-dac_read_search)
     out="$(bounded "${PRIV[@]}" "$NIFT" "$W/m2.f" 2>&1)"
-    if echo "$out" | grep -q "CAUGHT move: copied to $S/f.txt but could not remove the source $W/ro/f.txt" && [ -f "$W/ro/f.txt" ] && [ "$(cat "$S/f.txt")" = keep ]; then
+    if [ "$(uname -s)" = FreeBSD ]; then
+      # FreeBSD checks source-directory permissions before reporting EXDEV.
+      # Verify the real rejection, then isolate the later fallback failure
+      # by injecting EXDEV for this one rename on the two actual devices.
+      if [ "$out" = "CAUGHT move: Permission denied" ] &&
+         [ "$(cat "$W/ro/f.txt")" = keep ] && [ ! -e "$S/f.txt" ]; then
+        pass "cross-device move: native early permission denial leaves both paths intact"
+      else
+        bad "cross-device move early permission denial: $out"
+      fi
+      shim="$W/cross-device-rename.so"
+      if cc -shared -fPIC "$test_dir/cross_device_rename.c" -o "$shim"; then
+        out="$(bounded "${PRIV[@]}" env LD_PRELOAD="$shim" NIFT_TEST_EXDEV_SOURCE="$W/ro/f.txt" \
+          NIFT_TEST_EXDEV_DESTINATION="$S/f.txt" "$NIFT" "$W/m2.f" 2>&1)"
+      else
+        bad "cross-device rename test shim could not be built"
+      fi
+    fi
+    if echo "$out" | grep -q "CAUGHT move: copied to $S/f.txt but could not remove the source $W/ro/f.txt" &&
+       [ "$(cat "$W/ro/f.txt")" = keep ] && [ "$(cat "$S/f.txt")" = keep ]; then
       pass "cross-device move: undeletable source is reported as a partial result"
     else bad "cross-device move partial: $out"; fi
     chmod 755 "$W/ro"
