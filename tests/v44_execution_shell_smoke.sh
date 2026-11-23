@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Historical v4.4 script and shell contract; VM host behavior has its own gate.
+export NIFT_VM=0
 NIFT=${NIFT:-./nift}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 # Paths written into shell stdin bypass MSYS argv conversion. Native Windows
