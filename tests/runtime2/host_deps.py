@@ -122,7 +122,21 @@ def clean_oracle(root, oracle):
     (oracle / ".nift").mkdir()
     for name in ("config.json", "tracked.json"):
         shutil.copy2(root / ".nift" / name, oracle / ".nift" / name)
-    nift(oracle, "build", "--all")
+    sources = {
+        path.relative_to(root): path.read_bytes()
+        for path in (root / "content").glob("*.html")
+    }
+    for step in ("before", "after"):
+        if step == "after":
+            nift(oracle, "build", "--all")
+        for rel, original in sources.items():
+            copy = (oracle / rel).read_bytes()
+            if copy != original:
+                raise RuntimeError(
+                    f"oracle content mismatch {step} render for {rel}: "
+                    f"expected {len(original)} bytes {hashlib.sha256(original).hexdigest()}, "
+                    f"got {len(copy)} bytes {hashlib.sha256(copy).hexdigest()}"
+                )
     return tree(oracle)
 
 

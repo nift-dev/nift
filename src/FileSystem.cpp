@@ -31,7 +31,7 @@ std::string read_file(const fs::path& path) {
     return read_file_checked(path).value_or(std::string());
 }
 
-std::optional<std::string> read_file_checked(const fs::path& path) {
+static std::optional<std::string> read_file_stream(const fs::path& path) {
     std::error_code type_error;
     if (!fs::is_regular_file(path, type_error)) return std::nullopt;
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -44,6 +44,29 @@ std::optional<std::string> read_file_checked(const fs::path& path) {
     file.read(contents.data(), size);
     if (!file && !file.eof()) return std::nullopt;
     return contents;
+}
+
+std::optional<std::string> read_file_checked(const fs::path& path) {
+    const auto result = read_file_stream(path);
+#ifdef __FreeBSD__
+    const auto name = path.string();
+    if (name.find("/host-deps-") != std::string::npos &&
+        name.find("/oracle/content/") != std::string::npos) {
+        std::string direct;
+        int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            char chunk[4096];
+            ssize_t n;
+            while ((n = ::read(fd, chunk, sizeof(chunk))) > 0) direct.append(chunk, n);
+            ::close(fd);
+            if (n == 0 && (!result || *result != direct)) {
+                std::fprintf(stderr, "oracle stream mismatch %s stream=%zu descriptor=%zu\n",
+                             name.c_str(), result ? result->size() : 0, direct.size());
+            }
+        }
+    }
+#endif
+    return result;
 }
 
 static void ensure_parent_directory(const fs::path& path) {
