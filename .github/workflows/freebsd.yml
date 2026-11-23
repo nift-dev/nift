@@ -14,12 +14,16 @@ on:
         description: Run the Runtime 2.0 VM subset and independent gates
         type: boolean
         default: true
+      isolated_revision:
+        description: Run this candidate beside an active FreeBSD revision
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: freebsd-${{ github.ref }}
+  group: freebsd-${{ github.ref }}${{ inputs.isolated_revision && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 jobs:
