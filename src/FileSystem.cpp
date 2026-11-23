@@ -31,7 +31,7 @@ std::string read_file(const fs::path& path) {
     return read_file_checked(path).value_or(std::string());
 }
 
-static std::optional<std::string> read_file_stream(const fs::path& path) {
+[[maybe_unused]] static std::optional<std::string> read_file_stream(const fs::path& path) {
     std::error_code type_error;
     if (!fs::is_regular_file(path, type_error)) return std::nullopt;
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -46,8 +46,56 @@ static std::optional<std::string> read_file_stream(const fs::path& path) {
     return contents;
 }
 
+static std::optional<std::string> read_file_native(const fs::path& path) {
+#ifdef __FreeBSD__
+    // Keep file identity and size tied to the same descriptor. Native parallel
+    // renders have observed an empty or unrelated file through std::ifstream.
+    std::error_code type_error;
+    if (!fs::is_regular_file(path, type_error)) return std::nullopt;
+    int fd;
+    do fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return std::nullopt;
+    struct CloseFile {
+        int fd;
+        ~CloseFile() { ::close(fd); }
+    } close_file{fd};
+
+    struct stat status{};
+    int inspected;
+    do inspected = ::fstat(fd, &status);
+    while (inspected < 0 && errno == EINTR);
+    std::string contents;
+    if (inspected < 0 || !S_ISREG(status.st_mode) || status.st_size < 0 ||
+        static_cast<std::uintmax_t>(status.st_size) > contents.max_size()) return std::nullopt;
+    contents.resize(static_cast<std::size_t>(status.st_size));
+    for (std::size_t offset = 0; offset < contents.size();) {
+        const auto count = std::min(contents.size() - offset,
+                                    static_cast<std::size_t>(std::numeric_limits<ssize_t>::max()));
+        const ssize_t got = ::read(fd, contents.data() + offset, count);
+        if (got < 0 && errno == EINTR) continue;
+        if (got <= 0) return std::nullopt;
+        offset += static_cast<std::size_t>(got);
+    }
+    return contents;
+#else
+    std::error_code type_error;
+    if (!fs::is_regular_file(path, type_error)) return std::nullopt;
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) return std::nullopt;
+    const std::streamoff size = file.tellg();
+    if (size < 0) return std::nullopt;
+    if (size == 0) return std::string();
+    std::string contents(static_cast<std::size_t>(size), '\0');
+    file.seekg(0);
+    file.read(contents.data(), size);
+    if (!file && !file.eof()) return std::nullopt;
+    return contents;
+#endif
+}
+
 std::optional<std::string> read_file_checked(const fs::path& path) {
-    const auto result = read_file_stream(path);
+    const auto result = read_file_native(path);
 #ifdef __FreeBSD__
     const auto name = path.string();
     if (name.find("/host-deps-") != std::string::npos &&
@@ -60,7 +108,7 @@ std::optional<std::string> read_file_checked(const fs::path& path) {
             while ((n = ::read(fd, chunk, sizeof(chunk))) > 0) direct.append(chunk, n);
             ::close(fd);
             if (n == 0 && (!result || *result != direct)) {
-                std::fprintf(stderr, "oracle stream mismatch %s stream=%zu descriptor=%zu\n",
+                std::fprintf(stderr, "oracle native reader mismatch %s candidate=%zu reference=%zu\n",
                              name.c_str(), result ? result->size() : 0, direct.size());
             }
         }

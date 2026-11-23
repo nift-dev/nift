@@ -74,7 +74,7 @@ def nift(cwd, *args, env=None, check=True):
     proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
                           preexec_fn=bounded)
     for line in proc.stderr.splitlines():
-        if line.startswith(("ORACLE_TRACE ", "oracle stream mismatch ")):
+        if line.startswith(("ORACLE_TRACE ", "oracle native reader mismatch ")):
             print(line, flush=True)
     if check and proc.returncode != 0:
         raise RuntimeError("nift %s failed in %s:\n%s%s" % (" ".join(args), cwd, proc.stdout, proc.stderr))

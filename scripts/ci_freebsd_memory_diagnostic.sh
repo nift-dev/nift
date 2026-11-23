@@ -13,8 +13,7 @@ export PATH="$out/bin:$PATH"
 } | tee "$out/summary.md"
 memory=0
 host=0
-for attempt in 1 2 3 4; do
-    if [[ "$attempt" == 4 ]]; then export NIFT_DIAG_SERIAL=1; fi
+for attempt in 1 2 3 4 5 6 7 8; do
     python3 -u tests/runtime2/host_deps.py 2>&1 | tee "$out/host-deps-$attempt.txt" || host=$?
 done
 for suite in file_copy_move_freedom build_write_ownership; do
