@@ -275,8 +275,8 @@ D159_OPAQUE = {
     "smoke/v46_b4_cp1_characterization/001-names/names.f|names.f": {17},
     "vm-corpus/cp04/strings_math.f|strings_math.f": {8},
     "vm-corpus/cp11/fallback_postfix_space.f|fallback_postfix_space.f": {2},
-    "vm-corpus/cp11/review2_m4_formfeed.f|review2_m4_formfeed.f": {2},
-    "vm-corpus/cp11/review2_m4_vtab.f|review2_m4_vtab.f": {2},
+    "vm-corpus/cp11/review2_m4_formfeed.f|review2_m4_formfeed.f": {1},
+    "vm-corpus/cp11/review2_m4_vtab.f|review2_m4_vtab.f": {1},
 }
 
 def report(args):
