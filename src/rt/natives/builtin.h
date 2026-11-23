@@ -165,6 +165,8 @@ inline constexpr std::uint8_t kVariadic = 255;
 static_assert(static_cast<std::uint16_t>(BuiltinId::FnSame) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::StreamReadBytes));
 static_assert(static_cast<std::uint16_t>(BuiltinId::StreamExtractString) + 1 ==
+                  static_cast<std::uint16_t>(BuiltinId::FnMinify));
+static_assert(static_cast<std::uint16_t>(BuiltinId::FnMinify) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {

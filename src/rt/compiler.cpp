@@ -136,7 +136,7 @@ bool UnitCompiler::statement(NodeId id) {
     fb_->set_offset(node.begin);
     bool ok = false;
     switch (node.kind) {
-        case NodeKind::Comment: ok = fail(node, "shebang-statement"); break;  // only `#!` statements reach the AST
+        case NodeKind::Comment: ok = true; break;
         case NodeKind::Declare:
             ok = declare(node) && builder_ok();
             textual_statement_ = saved_textual;

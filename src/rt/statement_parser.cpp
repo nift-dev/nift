@@ -110,7 +110,15 @@ bool StatementParser::general_stmt(std::uint32_t& i, std::uint32_t end, std::vec
         error_.offset = opener;
         return false;
     }
-    if (!stmt.empty()) out.push_back(classify_statement(start, start + static_cast<std::uint32_t>(stmt.size())));
+    if (shebang && i < end && src_[i] == ';') {
+        // Legacy can execute the rest of a semicolon-delimited line. Keep
+        // this spelling outside the plain comment contract.
+        const NodeId id = ast_.add(NodeKind::TemplateStmt, start, i);
+        ast_.at(id).a = make_opaque(ast_, start, i, OpaqueReason::TemplateText);
+        out.push_back(id);
+    } else if (!stmt.empty()) {
+        out.push_back(classify_statement(start, start + static_cast<std::uint32_t>(stmt.size())));
+    }
     if (i < end) ++i;
     return true;
 }

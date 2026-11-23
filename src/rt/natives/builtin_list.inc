@@ -233,3 +233,5 @@ NIFT_RT_BUILTIN(StreamReadBytes, "read_bytes", Stream, 1, 1, kBytes, Fixed, true
 NIFT_RT_BUILTIN(StreamReadAllBytes, "read_all_bytes", Stream, 0, 0, kBytes, Fixed, true, 100)
 // Internal operator entry. No source method name can bind it.
 NIFT_RT_BUILTIN(StreamExtractString, "", Stream, 1, 1, kString, Fixed, true, 100)
+
+NIFT_RT_BUILTIN(FnMinify, "minify", None, 2, 2, kObject, Fixed, true, 300)

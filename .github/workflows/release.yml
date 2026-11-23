@@ -278,7 +278,11 @@ jobs:
             echo "FAIL: GitHub release $GITHUB_REF_NAME already exists; stop for explicit recovery review" >&2
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-file "$NOTES"
+          title_args=()
+          if [ "$version" = "4.13.0" ]; then
+            title_args=(--title "Nift v4.13.0 — Runtime 2.0")
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag "${title_args[@]}" --notes-file "$NOTES"
 
   rehearse:
     if: github.event_name == 'workflow_dispatch'

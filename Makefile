@@ -288,7 +288,7 @@ test-runtime-value: $(RUNTIME_VALUE_TEST)
 # tests against the legacy RuntimeValue, lint, sanitizer build and benchmarks.
 # CP15: the natives also link the vendored SHA-256 and the JSON Schema validator
 # (neither uses RuntimeValue).
-RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp) src/Sha256.cpp src/JsonSchema.cpp
+RT_VALUE_SOURCES := $(wildcard src/rt/*.cpp src/rt/natives/*.cpp) src/Sha256.cpp src/JsonSchema.cpp src/EmbeddedMinify.cpp
 RT_VALUE_HEADERS := $(wildcard src/rt/*.h src/rt/natives/*.h src/rt/natives/*.inc) tests/rt/rt_test.h tests/rt/legacy_oracle.h
 # CP16 host built-ins: VM natives call HostCall, and the shared helpers they
 # reuse live outside src/rt. Added here so every RT unit that links the native

@@ -11,6 +11,7 @@
 #include "rt/natives/host_stream_handles.h"
 #include "rt/natives/host_stream_extract.h"
 #include "rt/natives/json_methods.h"
+#include "rt/natives/minify_builtin.h"
 #include "rt/natives/number_methods.h"
 #include "rt/natives/format_methods.h"
 #include "rt/natives/object_methods.h"
@@ -56,7 +57,7 @@ constexpr NativeFn kFunctions[] = {
     atomic_load, atomic_store, atomic_exchange, atomic_fetch_add, atomic_fetch_sub, atomic_compare_exchange,
     fn_map, fn_set, fn_stack, coll_get, coll_contains, coll_size, coll_empty, coll_contains, coll_size, coll_empty,
     coll_top, coll_front, coll_contains, coll_size, coll_empty, fn_same,
-    stream_read_bytes, stream_read_all_bytes, stream_extract_string,
+    stream_read_bytes, stream_read_all_bytes, stream_extract_string, fn_minify,
 };
 
 constexpr BuiltinSpec kSpecs[] = {

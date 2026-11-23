@@ -1,6 +1,11 @@
 # Nift release notes
 
-## v4.12.0 — release in preparation
+## v4.13.0 — Runtime 2.0
+
+Runtime 2.0 is the headline feature of Nift v4.13.0. See the
+[v4.13.0 draft release notes](docs/evidence/release-4.13.0/release-notes-4.13.0.md).
+
+## v4.12.0 — historical release
 
 Nift v4.12 completes the transparent prepared-execution filesystem pipeline and
 adds a Linux metadata fast path. Eligible filesystem traversal and build

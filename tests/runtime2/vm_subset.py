@@ -95,6 +95,20 @@ def supported():
             out.append((f"{name}-loop", LOOP.format(body=indented)))
             out.append((f"{name}-fn-top", FN_TOP.format(body=indented)))
             out.append((f"{name}-fn-loop", FN_LOOP.format(body=indented)))
+    out += [
+        ("d158-minify-js", 'r := minify("const x = 1;   const y = 2;", "js")\n'
+         'print(r.ok); print(r.output); print(r.error); print(r.format); print(r.written)\n'),
+        ("d158-minify-css", 'print(minify("body { color: red; }", "css").output)\n'),
+        ("d158-minify-unsupported-format", 'print(minify("hello", "unknown").stringify())\n'),
+        ("d158-minify-invalid-json", 'print(minify("[", "json").stringify())\n'),
+        ("d158-mid-file-shebang", '#!/usr/bin/env nift\nprint(1)\n#! print(99) is comment text\nprint(2)\n'),
+        ("d158-sort-by", 'print([3,1,2].sort_by(x=>x).stringify())\n'),
+        ("d158-to-string", 'x:=42; print(x.to_string())\n'),
+    ]
+    for method in ("catch", "error", "throw"):
+        out.append((f"d158-method-{method}",
+                    f"struct(named) {{ fn({method}(x)) {{ return x + 1 }} }}\n"
+                    f"item := named()\nprint(item.{method}(4))\n"))
     out.append(("functions-top", FUNCTIONS + CALLS))
     # gcd declares `t := b` (a binding reference): refused in loop-called functions.
     loop_fns = "".join(l + "\n" for l in FUNCTIONS.splitlines() if not l.startswith("fn(gcd("))
@@ -399,6 +413,38 @@ def equality_memory(nift, work):
     return failures
 
 
+def d158_refusals(nift, work):
+    failures = []
+    for name, expression, reason in (
+        ("path", 'minify("source.js")', "minify-path-mode"),
+        ("overwrite", 'minify("source.js", {"in_place": true})', "minify-path-mode"),
+        ("unqualified-list", 'ls(".").stringify()', "native-unqualified"),
+        ("undefined", 'print(missing_value)', "unresolved-name"),
+        ("shebang-semicolon", '#! inert; print(99)', "opaque:template-text"),
+    ):
+        with tempfile.TemporaryDirectory(dir=work) as case:
+            source = os.path.join(case, "source.js")
+            with open(source, "w") as script:
+                script.write("const x = 1;")
+            with open(os.path.join(case, "p.f"), "w") as script:
+                script.write('print("before")\n' + expression + "\n")
+            (stdout, stderr, rc), _ = run(nift, case, "require")
+            with open(source) as script:
+                original = script.read()
+            if (rc != 1 or stdout or reason.encode() not in stderr
+                    or (name == "undefined" and b"p.f:2:7:" not in stderr)
+                    or original != "const x = 1;"
+                    or os.path.exists(os.path.join(case, "source.min.js"))):
+                failures.append(f"D-158 {name}: expected pre-execution refusal, got {stdout!r} {stderr!r}")
+    with tempfile.TemporaryDirectory(dir=work) as case:
+        with open(os.path.join(case, "p.f"), "w") as script:
+            script.write('print(native::ls(".").stringify())\n')
+        (stdout, stderr, rc), st = run(nift, case, "require")
+        if rc or stderr or not st or st["outcome"] != "vm" or stdout.strip() != b'["p.f"]':
+            failures.append(f"D-158 qualified list: {stdout!r} {stderr!r} {st}")
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nift", required=True)
@@ -410,6 +456,7 @@ def main():
     try:
         with cf.ThreadPoolExecutor(a.jobs) as pool:
             failures = [f for f in pool.map(lambda it: check(nift, work, *it), items) if f]
+        failures += d158_refusals(nift, work)
         failures += equality_memory(nift, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)

@@ -91,8 +91,9 @@ void table() {
     CHECK(find_builtin(Receiver::Object, "length") == nullptr);   // context-dependent in legacy (refused)
     // builtin_list.inc: 89 CP14/CP15 built-ins, 31 CP16 Host built-ins, 31 CP17 W13 file/stream
     // handle built-ins, 19 CP23 shared-concurrency built-ins, 16 D-063 collection built-ins and
-    // 3 managed stream operations added under D-149.
-    CHECK(builtin_count() == 189);
+    // 3 managed stream operations added under D-149 and the D-158 minifier.
+    CHECK(builtin_count() == 190);
+    CHECK(!host_builtin(BuiltinId::FnMinify));
     CHECK(host_builtin(BuiltinId::StreamReadBytes));
     CHECK(host_builtin(BuiltinId::StreamReadAllBytes));
     CHECK(host_builtin(BuiltinId::StreamExtractString));

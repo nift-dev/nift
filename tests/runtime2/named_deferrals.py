@@ -24,6 +24,12 @@ import tempfile
 MODULE = "fn(add(a, b)) { return a + b }\nexport(add)\n"
 # name -> (files, reason, legacy stdout, needs a project)
 CASES = {
+    "stored async function (D-158)": (
+        {"main.f": 'fn[async](f(x)) { return x }\nprint("before")\no := {"f": f}\nprint("stored")\n'},
+        "coro-async-value", "before\nstored\n", False),
+    "bare command (D-158)": (
+        {"main.f": 'print("before")\nprintf hi\nprint("done")\n'},
+        "statement:Command", "before\nhidone\n", False),
     "delayed import inside a function": (
         {"m.f": MODULE, "main.f": 'print("before")\nfn(f()) { import("./m.f"); return add(2, 3) }\nprint(f())\n'},
         "import-nested", "before\n5\n", False),

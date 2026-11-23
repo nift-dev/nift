@@ -236,6 +236,27 @@ def unit_of(uid):
     return (uid or "").split("|")[0]
 
 
+# D-158: these historical method sightings follow a reproduced upstream
+# refusal. Retain the original classifier output and separate the sightings
+# in the report. A changed root or a real run refusing the method still blocks.
+D158_UPSTREAM = {
+    "probes/sort-aggregate-2000.f|sort-aggregate-2000.f": ("callable:inject", {"method:sort_by": {2}}),
+    "probes/sort-multi-2000.f|sort-multi-2000.f": ("callable:inject", {"method:sort_by": {2}}),
+    "rt-diff-corpus/workspaces/script-outside|main.f": ("native-unqualified", {"method:stringify": {3}}),
+    "smoke/v44_cp2_variadic_functions_smoke/001-ok/ok.f|ok.f": ("fn-flags", {"method:to_string": {5}}),
+    "smoke/v44_executable_script_smoke/003-r/r.f|r.f": ("callable:run", {"method:to_string": {2}}),
+    "smoke/v44_scalar_conversion_smoke/002-a/a.f|a.f": (
+        "opaque:legacy-runtime-error", {"method:to_string": {4, 5, 6, 7, 8, 10, 11, 12, 14, 16, 17, 26}}
+    ),
+    "smoke/v44_scalar_conversion_smoke/003-o/o.f|o.f": (
+        "builtin-receiver:to_string", {"method:to_string": {1}}
+    ),
+    "smoke/v46_b4_cp1_characterization/001-names/names.f|names.f": (
+        "opaque:legacy-runtime-error", {"method:catch": {21}, "method:error": {20}, "method:throw": {22}}
+    ),
+}
+
+
 def report(args):
     d = args.dir
     cls = load_classification(args.classification)
@@ -245,6 +266,7 @@ def report(args):
     deferred = collections.defaultdict(set)  # slot 3: reason -> units with a deferred site of it (5.4)
     refused = set()  # reasons seen as a refusal (not only as a deferred site): REVIEW-C136-SLOT3 F-A
     refused_units = collections.defaultdict(set)  # reason -> units refusing with it (not deferred sites): D-077 #1
+    refusal_lines = collections.defaultdict(set)
     for line in open(os.path.join(d, "classify-all.jsonl")):
         r = json.loads(line)
         for it in r.get("reasons") or []:
@@ -253,6 +275,7 @@ def report(args):
                 deferred[reason_key(it["reason"])].add(r["id"])
             elif not it.get("consequential"):
                 refused.add(reason_key(it["reason"]))
+                refusal_lines[r["id"], reason_key(it["reason"])].add(it.get("line"))
                 refused_units[reason_key(it["reason"])].add(unit_of(r["id"]))
     fallback = collections.defaultdict(set)  # reason -> entries leaving the VM (execute)
     unit_reasons = collections.defaultdict(set)  # execute entry -> its non-VM reasons (scope roots, D-077 #1)
@@ -268,6 +291,24 @@ def report(args):
                 refused_units[reason_key(e["reason"])].add(unit_of(r["entry"]))
                 unit_reasons[unit_of(r["entry"])].add(reason_key(e["reason"]))
         fb_entries += left
+    upstream = []
+    for uid, (root, methods) in D158_UPSTREAM.items():
+        unit = unit_of(uid)
+        if root not in unit_reasons[unit]:
+            continue
+        for method, reviewed_lines in methods.items():
+            lines = refusal_lines.get((uid, method))
+            if (not lines or not lines <= reviewed_lines or method in unit_reasons[unit]
+                    or uid in deferred[method]):
+                continue
+            upstream.append((uid, root, method))
+            full[method].discard(uid)
+            if not any(unit_of(other) == unit for other in full[method]):
+                refused_units[method].discard(unit)
+            if not full[method]:
+                del full[method]
+            if not refused_units[method]:
+                refused.discard(method)
     seen = set(full) | set(fallback)
     refused |= set(fallback)
 
@@ -312,6 +353,10 @@ def report(args):
             e = deferrals.get(r) or {}
             out.append("- `%s`: %s (%s); scope %d unit(s)" % (r, e.get("capability", "?"), e.get("decision", "?"),
                                                             len(e.get("scope") or {})))
+    if upstream:
+        out += ["", "## D-158 method sightings after a verified upstream refusal", ""]
+        out += ["- `%s` in `%s` follows `%s`." % (method, unit, root)
+                for unit, root, method in upstream]
     if conseq:
         out += ["", "Consequential classify-all reasons (may be spurious, not classified): " +
                 ", ".join("`%s` %d" % (r, len(u)) for r, u in sorted(conseq.items()) if r not in full)]

@@ -151,7 +151,8 @@ $sdist
 $(basename "$wheels")
 $npm_tgz
 $nupkg
-SHA256SUMS"
+SHA256SUMS
+THIRD_PARTY_NOTICES.md"
 ACTUAL_SET="$(cd "$STAGE_OUT" && for f in *; do [ -f "$f" ] && echo "$f"; done | sort)"
 EXPECTED_SORTED="$(printf '%s\n' "$EXPECTED_SET" | sort)"
 [ "$ACTUAL_SET" = "$EXPECTED_SORTED" ] || {

@@ -34,6 +34,19 @@ refusal text changed. Historical evidence, checksums and older records keep the 
 The legacy interpreter remains available: with `NIFT_VM=0`, these constructs run as they did in
 Nift 4.x. Website builds keep the existing template renderer (D-053).
 
+## Nift v4.13.0 compatibility decisions
+
+- Async function values cannot be stored or indirectly invoked on the VM
+  (`coro-async-value`). Use explicit legacy execution for scripts that require
+  this value flow.
+- Bare shell-command statements in scripts are refused (`statement:Command`).
+  Run those scripts with `NIFT_VM=0 nift …`.
+- The VM supports in-memory `minify(source, format)` with a string format.
+  File-path and options forms require explicit legacy execution.
+- A plain mid-file `#!` comment has no runtime effect. First-line executable
+  shebang behavior is preserved. Semicolon-separated or multiline forms can
+  have different legacy behavior and remain refused by the VM.
+
 ## Named deferrals (owner, 2026-11-10 13:26; D-065)
 
 The VM does not yet run the constructs below. Nothing is removed: each one keeps working on

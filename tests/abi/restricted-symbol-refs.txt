@@ -52,6 +52,7 @@ src/rt/natives/host_env.o nift::rt::Construction::object_set
 src/rt/natives/host_fs_nav.o nift::rt::Construction::array_push
 src/rt/natives/host_fs_read.o nift::rt::Construction::object_set
 src/rt/natives/json_methods.o nift::rt::Construction::object_set
+src/rt/natives/minify_builtin.o nift::rt::Construction::object_set
 src/rt/natives/object_methods.o nift::rt::Construction::object_set
 src/rt/natives/support.o nift::rt::Construction::array_storage
 src/rt/parallel_task_start.o nift::rt::Construction::array_push

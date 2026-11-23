@@ -180,6 +180,47 @@ jobs:
             objdump -p "$CONSUMER" 2>/dev/null | grep -iE 'nift.*dll' && { echo "FAIL: windows go consumer links shared nift" >&2; exit 1; } || true
           fi
           echo "GO_STATIC_OK: no Nift shared-library dependency"
+      - name: Verify extracted macOS and Windows release-layout archives
+        if: github.event_name == 'workflow_dispatch' && !inputs.candidate_smoke && (runner.os == 'macOS' || runner.os == 'Windows')
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          binary=nift
+          if [ "$RUNNER_OS" = Windows ]; then binary=nift.exe; fi
+          version="$(./"$binary" version | sed -nE 's/^Nift v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p')"
+          test -n "$version"
+          python3 scripts/check_version_consistency.py --expected "$version"
+          root="nift-$version-$TARGET"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          cp "$binary" README.md LICENSE THIRD_PARTY_NOTICES.md "$work/"
+          mkdir "$work/$root" "$work/extracted" "$work/project"
+          mv "$work/$binary" "$work/README.md" "$work/LICENSE" "$work/THIRD_PARTY_NOTICES.md" "$work/$root/"
+          (
+            cd "$work"
+            if [ "$RUNNER_OS" = Windows ]; then
+              archive="$root.zip"
+              powershell.exe -NoProfile -Command "Compress-Archive -Path '$root' -DestinationPath '$archive'"
+              powershell.exe -NoProfile -Command "Expand-Archive -Path '$archive' -DestinationPath 'extracted'"
+              if objdump -p "extracted/$root/$binary" | grep -Ei 'DLL Name: (libgcc|libstdc\+\+|libwinpthread)'; then
+                exit 1
+              fi
+            else
+              archive="$root.tar.gz"
+              tar -czf "$archive" "$root"
+              tar -xzf "$archive" -C extracted
+            fi
+            exe="$PWD/extracted/$root/$binary"
+            test "$("$exe" version)" = "Nift v$version"
+            cd project
+            "$exe" init
+            "$exe" build --all
+            "$exe" status
+          )
+          mkdir -p "dist/$version/$TARGET/release-archive"
+          cp "$work/$root".* "dist/$version/$TARGET/release-archive/"
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

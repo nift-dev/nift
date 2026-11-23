@@ -5,6 +5,9 @@
 namespace nift::rt::detail {
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
     const NodeId* args = ast_.list(node);
+    if (spec.id == natives::BuiltinId::FnMinify &&
+        (node.count != 2 || kinds(args[1]) != kKindString))
+        return fail(node, "minify-path-mode");
     // The managed stream reads are admitted. Other Bytes natives still follow the CP15 W8 refusal.
     if (bytes_builtin(spec)) return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))

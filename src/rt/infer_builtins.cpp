@@ -86,6 +86,14 @@ TyRef builtin_result(const Ast& ast_, const natives::BuiltinSpec& spec, const Ty
         case BuiltinId::ArrChunk: return array_of(array_of(elements(recv)));
         case BuiltinId::FnRange: return array_of(kinds_ty(kKindInt));
         case BuiltinId::HostLs: return array_of(kinds_ty(kKindString));
+        case BuiltinId::FnMinify: {
+            auto t = std::make_shared<Ty>();
+            t->kinds = kKindObject;
+            t->fields["ok"] = kinds_ty(kKindBool);
+            for (const char* key : {"output", "error", "format", "written"})
+                t->fields[key] = kinds_ty(kKindString);
+            return t;
+        }
         case BuiltinId::HostStat: {
             auto t = std::make_shared<Ty>();
             t->kinds = kKindObject;

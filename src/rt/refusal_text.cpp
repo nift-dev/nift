@@ -74,6 +74,7 @@ constexpr Family kFamilies[] = {
     {"free-name", "a name that is not declared in this scope"},
     {"unresolved-name", "a name the VM cannot resolve"},
     {"fn-name-reserved", "a function named like a built-in"},
+    {"minify-path-mode", "minify without two arguments and a proven string format"},
     {"native-unqualified", "calling cat, cp, mv, rm, ls, mkdir or touch without `native::`"},
     {"param-name-reserved", "a parameter named like a built-in"},
     {"binding-name-reserved", "a binding named like a built-in"},
