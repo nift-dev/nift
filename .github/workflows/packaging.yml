@@ -40,6 +40,14 @@ on:
       - '.github/workflows/packaging.yml'
   workflow_dispatch:
     inputs:
+      archive_run:
+        description: Successful build-only packaging run that produced the ZIP
+        required: false
+        type: string
+      archive_commit:
+        description: Exact source commit of the ZIP to verify
+        required: false
+        type: string
       windows_archive_replay:
         description: Replay the retained D-158 Windows diagnostic ZIP in PowerShell
         type: boolean
@@ -410,47 +418,97 @@ jobs:
           if-no-files-found: error
 
   windows-archive-replay:
+    name: Verify extracted Windows recovery with full PageHeap
     if: github.event_name == 'workflow_dispatch' && inputs.windows_archive_replay
     runs-on: windows-latest
+    timeout-minutes: 15
     permissions:
       actions: read
       contents: read
     steps:
+      - name: Verify exact archive provenance
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_RUN: ${{ inputs.archive_run }}
+          ARCHIVE_COMMIT: ${{ inputs.archive_commit }}
+        run: |
+          if ($env:ARCHIVE_RUN -notmatch '^[0-9]+$' -or $env:ARCHIVE_COMMIT -notmatch '^[0-9a-f]{40}$') {
+            throw "expected a run ID and exact commit SHA"
+          }
+          $run = gh run view $env:ARCHIVE_RUN -R $env:GITHUB_REPOSITORY --json headSha,workflowName,jobs | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.headSha -ne $env:ARCHIVE_COMMIT -or
+              $run.workflowName -ne "packaging matrix (build-only, non-publishing)") {
+            throw "archive provenance mismatch"
+          }
+          $job = @($run.jobs | Where-Object { $_.name -like 'native windows-x86_64*' })
+          if ($job.Count -ne 1 -or $job[0].conclusion -ne "success") {
+            throw "expected a successful Windows packaging job"
+          }
+          Write-Host "Verified source $($run.headSha), packaging run $env:ARCHIVE_RUN"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: nift-archive-diagnostic-windows-x86_64
-          run-id: 45139811121
+          name: nift-package-windows-x86_64
+          run-id: ${{ inputs.archive_run }}
           github-token: ${{ github.token }}
           path: replay
-      - name: Replay exact ZIP and record raw Windows exit status
+      - name: Verify multi-worker build and stale temporary recovery
         shell: pwsh
         run: |
-          $root = Join-Path $env:RUNNER_TEMP "nift-4.13.0-replay"
+          $ErrorActionPreference = "Stop"
+          $root = Join-Path $env:RUNNER_TEMP "nift-4.13.0-pageheap"
           $archives = @(Get-ChildItem (Join-Path $env:GITHUB_WORKSPACE replay) -Recurse -File -Filter "nift-4.13.0-windows-x86_64.zip")
           if ($archives.Count -ne 1) { throw "expected one retained Windows ZIP, found $($archives.Count)" }
+          Get-FileHash -Algorithm SHA256 -LiteralPath $archives[0].FullName | Format-List
           Expand-Archive -LiteralPath $archives[0].FullName -DestinationPath $root
           $exe = Join-Path $root "nift-4.13.0-windows-x86_64/nift.exe"
+          $gflags = Join-Path ${env:ProgramFiles(x86)} "Windows Kits/10/Debuggers/x64/gflags.exe"
+          if (!(Test-Path $gflags)) { throw "Windows SDK gflags unavailable" }
           $project = New-Item -ItemType Directory (Join-Path $root project)
           Set-Location $project
-          & $exe version
-          if ($LASTEXITCODE -ne 0) { throw "version exited $LASTEXITCODE" }
-          & $exe init
-          if ($LASTEXITCODE -ne 0) { throw "init exited $LASTEXITCODE" }
-          Set-Content index.html x
-          & $exe build --all
-          $build = $LASTEXITCODE
-          Write-Host "PowerShell native build exit: $build"
-          if ($build -ne 0) {
-            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue |
-              Where-Object { $_.Message -match 'nift\.exe' } | Select-Object -First 3 | Format-List Message
-            $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits/10/Debuggers"
-            $debugger = Join-Path $kits "x64/cdb.exe"
-            if (Test-Path $debugger) {
-              & $debugger -g -G -c "sxe -c `".ecxr; k; q`" 0xc0000374; g" $exe build --all
-            } else {
-              Write-Host "Windows SDK console debugger unavailable"
-            }
-            throw "build exited $build"
+          function Invoke-Nift {
+            $output = & $exe @args
+            if ($LASTEXITCODE -ne 0) { throw "nift $args exited $LASTEXITCODE" }
+            $output
           }
-          & $exe status
-          if ($LASTEXITCODE -ne 0) { throw "status exited $LASTEXITCODE" }
+          & $gflags /p /enable nift.exe /full
+          if ($LASTEXITCODE -ne 0) { throw "cannot enable full PageHeap" }
+          try {
+            $settings = & $gflags /p | Out-String
+            Write-Host $settings
+            if ($LASTEXITCODE -ne 0 -or $settings -notmatch '(?im)^.*nift\.exe.*full traces') {
+              throw "full PageHeap status was not verified"
+            }
+            if ((Invoke-Nift version) -ne "Nift v4.13.0") { throw "wrong extracted version" }
+            Invoke-Nift init
+            $config = Get-Content .nift/config.json -Raw | ConvertFrom-Json
+            $config.config.'build-threads' = 4
+            $config | ConvertTo-Json -Depth 10 | Set-Content .nift/config.json
+            foreach ($id in 1..8) {
+              Invoke-Nift track "page$id"
+              Set-Content "content/page$id.html" "Page $id"
+            }
+            foreach ($epoch in 1..3) {
+              $stale = "public/page1.html.nift-tmp-4294967296-$epoch"
+              $live = "public/page1.html.nift-tmp-$PID-$epoch"
+              Set-Content $stale "stale"
+              Set-Content $live "live"
+              Set-Content content/page1.html "Page 1 epoch $epoch"
+              Invoke-Nift build --all
+              if (Test-Path $stale) { throw "stale output temporary survived" }
+              if (!(Test-Path $live)) { throw "live-owner output temporary was removed" }
+              if ((Get-Content public/page1.html -Raw) -notmatch "Page 1 epoch $epoch") {
+                throw "rebuilt page contents did not match"
+              }
+            }
+            foreach ($id in 2..8) {
+              if ((Get-Content "public/page$id.html" -Raw) -notmatch "Page $id") {
+                throw "incorrect output for page $id"
+              }
+            }
+            Invoke-Nift status
+            Write-Host "PAGEHEAP_BUILD_RECOVERY_PASS"
+          } finally {
+            & $gflags /p /disable nift.exe
+            if ($LASTEXITCODE -ne 0) { throw "cannot disable PageHeap" }
+          }
