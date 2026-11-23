@@ -2681,7 +2681,13 @@ c.arg_is_location=[&](const std::string& call_name,const std::string& arg)->bool
                     // The read is the authority: missing/unreadable content
                     // yields nullptr -> the typed content error, with no
                     // separate readability probe (performance-regression repair).
-                    const auto cached = host_.read_shared_source(content_path);if(nift::trace::enabled())trace_host("read-source",content_path,cached.status==nift::HostStatus::Error?"error":cached.content?"ok":"missing");
+                    const auto cached = host_.read_shared_source(content_path);
+                    if (content_path.string().find("/oracle/content/") != std::string::npos)
+                        std::fprintf(stderr, "ORACLE_TRACE @content target=%s path=%s size=%zu hash=%llu\n",
+                            tracked_info_.name.c_str(), content_path.c_str(),
+                            cached.content ? cached.content->size() : 0,
+                            cached.content ? static_cast<unsigned long long>(filesystem::hash_bytes(*cached.content)) : 0);
+                    if(nift::trace::enabled())trace_host("read-source",content_path,cached.status==nift::HostStatus::Error?"error":cached.content?"ok":"missing");
                     if (cached.status == nift::HostStatus::Error) { fail(source_path, source, i, cached.error); break; }
                     if (!cached.content) { fail(source_path, source, i, "content file is not readable"); break; }
                     content_source = frontmatter::parse_inline(*cached.content).body;

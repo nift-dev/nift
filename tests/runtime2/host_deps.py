@@ -73,6 +73,9 @@ def nift(cwd, *args, env=None, check=True):
     command = address_limited(PRIV + [NIFT, *args], 4 << 30)
     proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
                           preexec_fn=bounded)
+    for line in proc.stderr.splitlines():
+        if line.startswith(("ORACLE_TRACE ", "oracle stream mismatch ")):
+            print(line, flush=True)
     if check and proc.returncode != 0:
         raise RuntimeError("nift %s failed in %s:\n%s%s" % (" ".join(args), cwd, proc.stdout, proc.stderr))
     return proc
@@ -128,7 +131,12 @@ def clean_oracle(root, oracle):
     }
     for step in ("before", "after"):
         if step == "after":
-            nift(oracle, "build", "--all")
+            if os.getenv("NIFT_DIAG_SERIAL"):
+        config = oracle / ".nift" / "config.json"
+        settings = json.loads(config.read_text())
+        settings["config"]["build-threads"] = 1
+        config.write_text(json.dumps(settings))
+    nift(oracle, "build", "--all")
         for rel, original in sources.items():
             copy = (oracle / rel).read_bytes()
             if copy != original:

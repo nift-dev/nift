@@ -399,23 +399,30 @@ std::string ProjectInfo::relative(const fs::path& path) const {
 
 const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
     const std::string key = build_cache_key(path, has_build_dependencies);
+    const bool trace_source = key.find("/oracle/content/") != std::string::npos;
+    auto trace_read = [&](const char* stage, const std::string* bytes) {
+        if (trace_source) std::fprintf(stderr, "ORACLE_TRACE %s %s size=%zu hash=%llu\n",
+            stage, key.c_str(), bytes ? bytes->size() : 0,
+            bytes ? static_cast<unsigned long long>(filesystem::hash_bytes(*bytes)) : 0);
+        return bytes;
+    };
     if (has_build_dependencies) {
         // Keep an in-flight read from publishing old output bytes after a
         // producer has invalidated that identity at scheduler completion.
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         const auto existing = shared_source_cache_.find(key);
-        if (existing != shared_source_cache_.end()) return existing->second.get();
+        if (existing != shared_source_cache_.end()) return trace_read("dag-cache", existing->second.get());
         const auto read = filesystem::read_file_checked(path);
         if (!read) return nullptr;
         auto contents = std::make_unique<const std::string>(*read);
         const auto result = contents.get();
         shared_source_cache_.emplace(key, std::move(contents));
-        return result;
+        return trace_read("dag-read", result);
     }
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         const auto it = shared_source_cache_.find(key);
-        if (it != shared_source_cache_.end()) return it->second.get();
+        if (it != shared_source_cache_.end()) return trace_read("cache", it->second.get());
     }
 
     // The read is the authority: nullptr for missing/unreadable/non-regular
@@ -431,7 +438,7 @@ const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
         auto [it, inserted] = shared_source_cache_.emplace(key, std::move(contents));
         if (!inserted) result = it->second.get();
     }
-    return result;
+    return trace_read("read", result);
 }
 
 std::uint64_t ProjectInfo::observed_source_hash(const std::string* bytes) const {
@@ -1588,6 +1595,10 @@ bool ProjectInfo::build_one_attempt(TrackedInfo& info, std::optional<BuildError>
     // files Nift writes after rendering are not edits the render could miss.
 
     const fs::path output = output_path(info);
+    if (output.string().find("/oracle/public/") != std::string::npos)
+        std::fprintf(stderr, "ORACLE_TRACE publish target=%s input=%s output=%s size=%zu hash=%llu\n",
+                     info.name.c_str(), content.c_str(), output.c_str(), result.output.size(),
+                     static_cast<unsigned long long>(filesystem::hash_bytes(result.output)));
     const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
     std::string normalized_extension = extension;
     std::transform(normalized_extension.begin(), normalized_extension.end(), normalized_extension.begin(),
