@@ -31,8 +31,53 @@ on:
       - '.github/workflows/nightly-deep.yml'
       - '.github/workflows/distribution-verification.yml'
   workflow_dispatch:
+    inputs:
+      runtime2_website:
+        description: Compare ordinary website builds with the v4.12.0 release source
+        type: boolean
+        default: false
 
 jobs:
+  runtime2-website:
+    if: github.event_name == 'workflow_dispatch' && inputs.runtime2_website
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: candidate
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ce8cd36a92ecfdc8b15b00df41a6c3bb9a31c0eb
+          path: baseline
+      - name: Build and record both revisions on the same runner
+        run: |
+          c++ --version
+          uname -a
+          lscpu
+          git -C baseline show -s --format='baseline %H tree %T'
+          git -C candidate show -s --format='candidate %H tree %T'
+          make -C baseline -j2 nift
+          make -C candidate -j2 nift .build/cp13b/nift-switch
+          baseline/nift version
+          candidate/nift version
+      - name: Compare exact output and interleaved full rebuild timings
+        run: |
+          cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+          python3 candidate/tests/runtime2/cp19/website_performance.py \
+            --base baseline/nift --nift candidate/nift \
+            --switch candidate/.build/cp13b/nift-switch --out website-results --cpu "$cpu"
+          cat website-results/summary.json
+      - name: Preserve timing and output-parity evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: runtime2-website-comparison
+          path: |
+            website-results/*.json
+            website-results/*-stdout.txt
+            website-results/*-stderr.txt
+
   scaling:
     runs-on: ubuntu-latest
     steps:
