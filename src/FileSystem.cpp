@@ -806,6 +806,17 @@ NativeLeafState dependency_leaf_native(const fs::path::value_type* path) {
 #endif
 }
 
+bool direct_package_store(const fs::path& project) {
+    // Check both components without following them. On Windows, MinGW's
+    // weakly_canonical can leave native links and junctions unresolved.
+    const fs::path metadata = project / ".nift";
+    for (const fs::path& component : {metadata, metadata / "packages"}) {
+        const auto state = dependency_leaf_native(component.c_str());
+        if (state != NativeLeafState::Plain && state != NativeLeafState::Missing) return false;
+    }
+    return true;
+}
+
 fs::file_time_type modified_time(const fs::path& path) {
     std::error_code error;
     const auto value = fs::last_write_time(path, error);

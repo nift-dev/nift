@@ -488,10 +488,10 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         const fs::path project = fs::absolute(fs::current_path()).lexically_normal();
         package_reader=std::make_unique<PackageTransaction>(project);if(!package_reader->acquire_read(error))return false;
         const fs::path packages = fs::absolute(project/".nift"/"packages").lexically_normal();
-        std::error_code package_ec, project_ec;
-        const fs::path canonical_project = fs::weakly_canonical(project,project_ec);
-        const fs::path canonical_packages = fs::weakly_canonical(packages,package_ec);
-        if (project_ec || package_ec || canonical_packages != (canonical_project/".nift"/"packages").lexically_normal()) { error="package store must stay inside the project"; return false; }
+        if (!filesystem::direct_package_store(project)) {
+            error="package store must stay inside the project";
+            return false;
+        }
         fs::path root = (packages/argument).lexically_normal();
         if (root.parent_path() != packages) { error="package path escapes .nift/packages: "+argument; return false; }
         package_metadata::Manifest manifest;

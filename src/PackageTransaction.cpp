@@ -214,6 +214,10 @@ bool PackageTransaction::lock_identity_valid() const {
 
 bool PackageTransaction::acquire(std::string& error) {
     if (locked_) return true;
+    if (!filesystem::direct_package_store(project_root_)) {
+        error = "package store must stay inside the project";
+        return false;
+    }
     std::error_code ec;
     fs::create_directories(package_root_, ec);
     if (ec) { error = "cannot create package transaction directories: " + ec.message(); return false; }
@@ -231,6 +235,10 @@ bool PackageTransaction::acquire(std::string& error) {
 
 bool PackageTransaction::acquire_read(std::string& error) {
     if (locked_) return !exclusive_;
+    if (!filesystem::direct_package_store(project_root_)) {
+        error = "package store must stay inside the project";
+        return false;
+    }
     std::error_code ec;fs::create_directories(nift_root_,ec);
     if(ec){error="cannot create package lock directory: "+ec.message();return false;}
     if(!open_and_lock(nift_root_/".packages-transaction.lock",false,lock_file_)){error="cannot acquire package read lock";return false;}
@@ -244,6 +252,10 @@ bool PackageTransaction::acquire_read(std::string& error) {
 bool PackageTransaction::acquire_read_existing_store(std::string& error, bool& store_present) {
     store_present = false;
     if (locked_) { store_present = true; return !exclusive_; }
+    if (!filesystem::direct_package_store(project_root_)) {
+        error = "package store must stay inside the project";
+        return false;
+    }
     std::error_code ec;
     const fs::file_status status = fs::symlink_status(nift_root_, ec);
     if (status.type() == fs::file_type::not_found) return true;

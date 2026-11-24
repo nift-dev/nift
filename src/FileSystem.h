@@ -55,6 +55,7 @@ bool file_readable(const std::filesystem::path& path);
 bool has_parent_component(std::string path);
 bool valid_extension(const std::string& extension);
 bool valid_package_name(const std::string& name);
+bool direct_package_store(const std::filesystem::path& project);
 // Resolve native symlinks/junctions for shared build-cache identity.
 std::optional<std::filesystem::path> resolved_path(const std::filesystem::path& path);
 bool path_within(const std::filesystem::path& base, const std::filesystem::path& candidate);

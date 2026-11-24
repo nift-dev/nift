@@ -51,6 +51,21 @@ if make_native_symlink "$t/external-store" "$t/root-link-site/.nift/packages"; t
     [[ "$(cat "$t/external-store/demo/sentinel")" == external ]]
 fi
 
+mkdir -p "$t/metadata-link-site" "$t/external-metadata/packages"
+printf 'external metadata\n' > "$t/external-metadata/sentinel"
+if make_native_symlink "$t/external-metadata" "$t/metadata-link-site/.nift"; then
+    printf 'import("demo")\n' > "$t/metadata-link-site/import.f"
+    for mode in 0 require; do
+        if output=$(cd "$t/metadata-link-site" && NIFT_VM="$mode" "$NIFT_ABS" import.f 2>&1); then
+            echo 'symlinked package metadata unexpectedly accepted' >&2
+            exit 1
+        fi
+        grep -q 'package store must stay inside the project' <<<"$output"
+        [[ ! -e "$t/external-metadata/.packages-transaction.lock" ]]
+        [[ "$(cat "$t/external-metadata/sentinel")" == 'external metadata' ]]
+    done
+fi
+
 mkdir -p "$t/inner-link-site/.nift" "$t/inner-link-site/victim/demo"
 printf 'internal\n' > "$t/inner-link-site/victim/demo/sentinel"
 printf '{"dependencies":{"demo":{"source":"unused","ref":"local"}}}\n' > "$t/inner-link-site/manifest.json"

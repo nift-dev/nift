@@ -24,6 +24,11 @@ static void record(const char* kind, pid_t requested, pid_t observed, int rc) {
 }
 __attribute__((constructor)) static void ready(void) {
     record("ready", 0, tcgetpgrp(STDIN_FILENO), 0);
+#ifdef __APPLE__
+    // This dylib audits the Nift process. Do not inject it into its external
+    // commands, some of which reject DYLD_INSERT_LIBRARIES.
+    if (getenv("CP21_TTY_AUDIT")) unsetenv("DYLD_INSERT_LIBRARIES");
+#endif
 }
 #ifdef __APPLE__
 // dyld binds references from the executable through this interpose entry.

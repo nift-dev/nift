@@ -518,12 +518,7 @@ static fs::path package_root(){ return fs::absolute(fs::current_path()/".nift"/"
 static bool package_store_root(fs::path& root, std::string& error) {
     const fs::path project = fs::absolute(fs::current_path()).lexically_normal();
     root = package_root();
-    std::error_code ec;
-    const fs::path canonical_project = fs::weakly_canonical(project, ec);
-    if (ec) { error = "cannot resolve the project package store: " + ec.message(); return false; }
-    const fs::path expected = (canonical_project/".nift"/"packages").lexically_normal();
-    const fs::path canonical_root = fs::weakly_canonical(root, ec);
-    if (ec || canonical_root != expected) {
+    if (!filesystem::direct_package_store(project)) {
         error = "package store must stay inside the project: " + root.generic_string();
         return false;
     }

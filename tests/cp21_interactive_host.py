@@ -345,7 +345,7 @@ def ctrl_c(s, r):
 
 
 def ctrl_z(s, r):
-    s.line("/bin/sh -c 'printf \"READY-%s\\n\" Z; read line; printf \"GOT:%s\\n\" \"$line\"; exec sleep 5'")
+    s.line(f"{PROBE} --read-and-wait")
     s.until_text("READY-Z")
     os.write(s.fd, b"\x1a")
     s.prompt()

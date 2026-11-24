@@ -69,10 +69,7 @@ PackageResolution PackageReader::resolve(const std::string& name) {
         out.error = "package is not installed: " + name;
         return out;
     }
-    std::error_code package_ec, project_ec;
-    const fs::path canonical_project = fs::weakly_canonical(project_, project_ec);
-    const fs::path canonical_packages = fs::weakly_canonical(packages, package_ec);
-    if (project_ec || package_ec || canonical_packages != (canonical_project/".nift"/"packages").lexically_normal()) {
+    if (!filesystem::direct_package_store(project_)) {
         out.error = "package store must stay inside the project";
         return out;
     }
