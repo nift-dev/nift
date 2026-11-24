@@ -169,6 +169,17 @@ The test independently preserves both outputs and checks identical exit status,
 diagnostics and file contents. This is a value-copy call; filesystem copying
 uses `native::cp` in the VM.
 
+D-181 approves exact pre-execution refusals for 30 recorded filesystem-recipe
+witnesses. The [case manifest](../../tests/data/v410-filesystem-d181-refusals.json)
+pins each historical oracle and each VM refusal diagnostic. Thirteen
+lazy-operand `move` witnesses and one spread witness are deferred. Fifteen
+historical arity witnesses and one assignment-timing witness retain an
+explicit refusal. The assignment witness prints `b` and then fails under
+explicit legacy execution. The VM refuses the whole script before execution
+and emits no program output. This is an approved v4.13.0 compatibility
+difference.
+
+
 ## Operand order of operators and compound assignment (combined B3-B5 candidate, D2)
 
 Operands are evaluated once, left to right (owner rulings 2026-11-08 03:27/03:29): a binary

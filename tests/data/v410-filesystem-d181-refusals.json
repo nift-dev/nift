@@ -1,0 +1,152 @@
+{
+  "move-order": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:131: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "abbbb4217b56c6f1918084786d60c8583dcba0f166593d208cb7c1c8c19ef592"
+  },
+  "move-argument-mutates-source": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:100: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "41f4d44d33373f362ae68453a7a15e48c20fa02faee3f5c1d75b6fb0b6c274f9"
+  },
+  "move-first-source-error": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:132: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "f38c39ce7ab285324d2bf11731afc6adb584cfa8259318819f3a439d51d3b026"
+  },
+  "move-first-destination-error": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:130: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "4ed0f7dc5628b0a13b0025c06440fa90dbc594373d160844301b966050249d04"
+  },
+  "move-wrong-arity": {
+    "reason": "builtin-arity:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:68: not compiled for the VM (builtin-arity:move): `move()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "6a26b8be22aa48b4a17a40447aa4b619e7e79b4dacaf59dd98722be4a6c98a41"
+  },
+  "move-cwd-boundary": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:156: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "a92009fc73edaa56e9375261ed2939a12eece0b13920dda8c22a6b7df2709f16"
+  },
+  "copy-order": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:120: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "d8fefb819c63f3a37d619d44deea46402ce94c5fd2ab3387363d297f50f0d349"
+  },
+  "copy-argument-mutates-source": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:88: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "7dfed16d33cca83285d13f04926143f87ed2108d0fe1fbe58e8e7993dc2f04bd"
+  },
+  "copy-first-source-error": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:121: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "198020f3191b7d19440007cfb9a1baf99922b14bb3baea4123f039d92df1ab62"
+  },
+  "copy-first-destination-error": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:119: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "75037a95f9a79a89f2a15cd8d0f9ffa73b12bd229113bd204c35025a21de6e7f"
+  },
+  "copy-cwd-boundary": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:147: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "e8880e120d5db3b09326c06ecb8f3505e561df1304dad4457616c0eea579b6ed"
+  },
+  "move-unmatched-source": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:139: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "f18f61967f0ba26ffdc5cec86b7fc5f6f67c8a066d5babc0c9539314b9544158"
+  },
+  "move-array-source": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:137: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "01849b6a6a72c6d45256dd64fbf471e4e5faf8041e81038c2b70a96f520867d4"
+  },
+  "move-bad-source-array": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:135: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "1eab6571ea0c2f0c7470753aaa42fe790b1fbe6ca1259d098c04a8d5fa48821c"
+  },
+  "move-second-destination-error": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:114: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "b1491e676b42d5f41b37301ee1eda2ae10d21e07d7035865553037ee962a9080"
+  },
+  "move-second-source-error": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:157: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "cd9c3275fa098be267b1f3f74ee110ae596414766c0616474c7f47085f5c449a"
+  },
+  "move-spread": {
+    "reason": "builtin-arity:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:78: not compiled for the VM (builtin-arity:move): `move()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "1ed5bbb45db47ece707100009725b7b269554a286ba89b7eab4fe2f4df3f9582"
+  },
+  "copy-unmatched-source": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:128: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "833ec02c470eff4175d49237dc3843eace3b4257ee33cbc30088949090085047"
+  },
+  "copy-array-source": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:126: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "5f876dfa3bfc32f0c31959c3a38f4f1d63626f7a5b12ebcf3b311e4b6ef2779d"
+  },
+  "copy-bad-source-array": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:124: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "1f4338dd3ce6ad77f767bb2fd1159b59476abffae876d07a4682b2aad2a97e94"
+  },
+  "copy-second-destination-error": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:105: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "defafa2fc124b8f2014a64d23cac74bbb2a8910aed24eea222b7afd6b8439e04"
+  },
+  "copy-second-source-error": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:146: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "ac3fd8f037712a6c113b85b42ba68e5feef1972b0a7b70ced8ef3231275a7242"
+  },
+  "copy-spread": {
+    "reason": "spread",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:83: not compiled for the VM (spread): the spread operator is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "ce82e6f3e1281b8fc8985b1573e0ec825e1054cfafc3e92a7c5b4b3dcdb30377"
+  },
+  "move-loop-location": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:87: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "340c36aba3569b7c659b23396d92325b2a923ec3d177b8918cc19118d15971db"
+  },
+  "move-index-probe-order": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:154: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "07c570faf92d9b7e49c081074ed1d4cbacbacbd1a5ac078ac27fd1ac3734bef0"
+  },
+  "move-root-path-replacement": {
+    "reason": "builtin-lazy-args:move",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:121: not compiled for the VM (builtin-lazy-args:move): lazily evaluated arguments of `move()` is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "fc2ef5a269ca341d2c020b85312df9ae0a3f49dafb8ec9a4cf76f43dbe51e85b"
+  },
+  "copy-loop-location": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:80: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "4cc0efe6fe99f9a4171513ce03a0032e7b0382484930ae46df95ed0cec083786"
+  },
+  "copy-index-probe-order": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:134: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "cde7af2e8772c64576f9da113a37314b68d0b9a3b12ef59b1b852e2d2648c7b5"
+  },
+  "copy-root-path-replacement": {
+    "reason": "builtin-arity:copy",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:109: not compiled for the VM (builtin-arity:copy): `copy()` with this number of arguments is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "b4696a8db71932c7d7fd7e0af3203d38a43bffc3d12fb2de084c2030f216ec3b"
+  },
+  "pure#48": {
+    "reason": "context:assignment-error",
+    "diagnostic": "error: <ORACLE_ROOT>/case.f:1:58: not compiled for the VM (context:assignment-error): a context-dependent legacy behaviour (assignment-error) is not supported by the Runtime 2.0 VM yet",
+    "oracle_sha256": "d9b5b2da012b94f2a9aa5edc6a60d124a4b0dbd8f7e8b211a786d13586ff7329"
+  }
+}

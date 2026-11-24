@@ -1,5 +1,5 @@
 from pathlib import Path
-import subprocess,tempfile,json,os,sys,hashlib
+import subprocess,tempfile,json,os,sys,hashlib,re
 sys.path.insert(0,str(Path(__file__).resolve().parent/'runtime2'))
 import approved_refusal
 def native_path(path):
@@ -49,23 +49,98 @@ EXPECTED_PURE_REFUSAL={
  54: 'unresolved-name', 56: 'opaque:legacy-runtime-error',
 }
 failures=[]
+accepted_refusals=0
+executed=0
+d181_seen=set()
 def fail(case,text):
  if text.startswith(case+': '):text=text[len(case)+2:]
  failures.append('%s: %s'%(case,text));print('FAIL %s: %s'%(case,text),flush=True)
 pending=approved_refusal.pending_differences('test-v410-filesystem-recipe-parity')
 def judge_refusal(case,reason,pins,argv,cwd,legacy):
+ global accepted_refusals
  problem=approved_refusal.pinned_problem(case,pins,reason)
  if problem is None:problem=approved_refusal.check(case,argv,cwd,reason,legacy)
  if problem:fail(case,problem+' [status %s]'%approved_refusal.status(reason));return False
+ accepted_refusals+=1
  print('PASS',case,'(VM default: pinned refusal %s, status %s; legacy channel exact)'%(reason,approved_refusal.status(reason)),flush=True)
  return True
 p=Path(__file__).resolve().parent/'data';binary=Path(os.environ.get('NIFT','./nift')).resolve();rows=json.loads((p/'v410-filesystem-contracts.json').read_text())
+d181_pins=json.loads((p/'v410-filesystem-d181-refusals.json').read_text())
+assert len(d181_pins)==30, d181_pins
+
+def snapshot(root):
+ return {item.relative_to(root).as_posix(): (
+  ('link',os.readlink(item)) if item.is_symlink() else
+  ('directory',None) if item.is_dir() else ('file',item.read_bytes()))
+  for item in root.rglob('*')}
+
+def d181_problem(pin,result,stats,before,after,root,source):
+ if before!=after:
+  return 'filesystem changed'
+ if result.stdout or stats.get('vm_executions')!=0 or stats.get('legacy_executions')!=0:
+  return 'unexpected execution'
+ diagnostic=normalize(result.stderr,root).splitlines()
+ position=re.fullmatch(r'error: <ORACLE_ROOT>/case\.f:(\d+):(\d+): (.*)',diagnostic[0]) if diagnostic else None
+ if (result.returncode!=1 or not position or stats.get('outcome')!='require-error' or stats.get('reason')!=pin['reason']
+     or 'note: the program was not executed: no part of it ran' not in diagnostic):
+  return 'incorrect refusal diagnostic'
+ line,column=map(int,position.groups()[:2])
+ if (line,column)!=(stats.get('line'),stats.get('column')) or not 1<=line<=len(source.splitlines()):
+  return 'incorrect refusal diagnostic'
+ # Cwd-boundary witnesses expand the pinned root token inside the source.
+ # Convert its byte length back to the oracle's coordinate space.
+ root_bytes=native_path(root).encode()
+ prefix=source.splitlines()[line-1].replace('<ORACLE_ROOT>',native_path(root)).encode()[:column-1]
+ column=len(prefix.replace(root_bytes,b'<ORACLE_ROOT>'))+1
+ if f'error: <ORACLE_ROOT>/case.f:{line}:{column}: {position[3]}'!=pin['diagnostic']:
+  return 'incorrect refusal diagnostic'
+ return None
+
+def check_d181(case,row,root,path):
+ global accepted_refusals
+ pin=d181_pins[case]
+ assert hashlib.sha256(json.dumps(row,sort_keys=True).encode()).hexdigest()==pin['oracle_sha256'], case
+ argv=[str(binary),native_path(path)]
+ before=snapshot(root)
+ with tempfile.TemporaryDirectory(prefix='d181-stats-') as directory:
+  stats_path=Path(directory)/'stats.jsonl'
+  env=dict(os.environ,NIFT_VM_STATS=native_path(stats_path))
+  env.pop('NIFT_VM',None)
+  result=subprocess.run(argv,cwd=root,env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
+  stats_rows=stats_path.read_text().splitlines() if stats_path.exists() else []
+  assert len(stats_rows)==1,(case,stats_rows)
+  stats=json.loads(stats_rows[0])
+ after=snapshot(root)
+ problem=d181_problem(pin,result,stats,before,after,root,row['source'])
+ assert problem is None, (case,problem,result,stats)
+ if case=='pure#48':
+  assert d181_problem(pin,result,dict(stats,vm_executions=1),before,after,root,row['source'])=='unexpected execution'
+  assert d181_problem(pin,result,dict(stats,legacy_executions=1),before,after,root,row['source'])=='unexpected execution'
+  assert d181_problem(pin,result,stats,before,dict(after,unexpected=('file',b'x')),root,row['source'])=='filesystem changed'
+  wrong_position=dict(pin,diagnostic=pin['diagnostic'].replace(':1:58:',':1:59:'))
+  assert d181_problem(wrong_position,result,stats,before,after,root,row['source'])=='incorrect refusal diagnostic'
+  assert d181_problem(dict(pin,reason='wrong-reason'),result,stats,before,after,root,row['source'])=='incorrect refusal diagnostic'
+ legacy=subprocess.run(argv,cwd=root,env=dict(os.environ,NIFT_VM='0'),capture_output=True,
+                       text=True,encoding='utf-8',timeout=60)
+ assert (legacy.returncode,normalize(legacy.stdout,root),normalize(legacy.stderr,root))==(row['exit'],row['stdout'],row['stderr']), (case,legacy)
+ if 'files' in row:
+  files={item.relative_to(root).as_posix():item.read_text() for item in root.rglob('*') if item.is_file() and item!=path}
+  assert files==row['files'], (case,files)
+ else:
+  assert snapshot(root)==before,case
+ d181_seen.add(case)
+ accepted_refusals+=1
+ print('PASS',case,'(D-181 exact refusal and independent legacy oracle)',flush=True)
+
 for row in rows:
  with tempfile.TemporaryDirectory(prefix='nift-filesystem-oracle-') as directory:
   root=Path(directory).resolve();(root/'one').mkdir();(root/'two').mkdir()
   initial_files={'a':b'A','b':b'B','one/a':b'ONE','two/a':b'TWO'}
   for file,data in initial_files.items(): (root/file).write_bytes(data)
   source=row['source'].replace('<ORACLE_ROOT>',native_path(root));path=root/'case.f';path.write_text(source+'\n')
+  if row['name'] in d181_pins and os.environ.get('NIFT_VM')!='0':
+   check_d181(row['name'],row,root,path)
+   continue
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   reason=approved_refusal.refusal_reason(q.stderr)
   if row['name'] in STAT_REFUSALS and os.environ.get('NIFT_VM')!='0':
@@ -84,6 +159,7 @@ for row in rows:
    problem=approved_refusal.check(row['name'],[str(binary),native_path(path)],root,'fn-name-reserved',stat_legacy,
                                   rows={'fn-name-reserved':{'status':'approved'}})
    assert problem is None, problem
+   accepted_refusals+=1
    print('PASS',row['name'],'(exact reserved-name refusal; legacy channel exact)',flush=True)
    continue
   if reason is not None:
@@ -112,6 +188,7 @@ for row in rows:
   if actual!=expected:
    note=' (unapproved VM/legacy difference, PENDING-OWNER: tests/runtime2/cp25/pending_differences.tsv)' if row['name'] in pending else ''
    fail(row['name'],'VM %r != recorded %r%s'%(actual,expected,note));continue
+  executed+=1
   print('PASS',row['name'],flush=True)
 
 rows=json.loads((p/'v410-filesystem-pure-contracts.json').read_text())
@@ -119,6 +196,10 @@ with tempfile.TemporaryDirectory(prefix='nift-pure-oracle-') as directory:
  root=Path(directory).resolve()
  for i,row in enumerate(rows):
   path=root/'case.f';path.write_text(row['source']+'\n')
+  case='pure#%d'%i
+  if case in d181_pins and os.environ.get('NIFT_VM')!='0':
+   check_d181(case,row,root,path)
+   continue
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   reason=approved_refusal.refusal_reason(q.stderr)
   if reason is not None:
@@ -127,7 +208,9 @@ with tempfile.TemporaryDirectory(prefix='nift-pure-oracle-') as directory:
    continue
   actual=(q.returncode,q.stdout,normalize(q.stderr,root))
   if actual!=(row['exit'],row['stdout'],row['stderr']):fail('pure#%d'%i,'VM %r != recorded %r'%(actual,(row['exit'],row['stdout'],row['stderr'])))
+  else:executed+=1
 if os.environ.get('NIFT_VM')!='0':
+ assert d181_seen==d181_pins.keys(),d181_pins.keys()-d181_seen
  with tempfile.TemporaryDirectory(prefix='nift-grouped-postfix-') as directory:
   root=Path(directory).resolve();path=root/'case.f'
   for source in ('p:="a/b";print((p) .split("/").last())',
@@ -200,4 +283,5 @@ if failures:
  print('FAIL filesystem recipe parity: %d failing case(s):'%len(failures))
  for f in failures:print('  '+f)
  sys.exit(1)
-print('PASS all filesystem and pure-string contracts')
+assert executed+accepted_refusals==97,(executed,accepted_refusals)
+print(f'PASS all 97 filesystem and pure-string contracts: {executed} executed, {accepted_refusals} approved refusals')
