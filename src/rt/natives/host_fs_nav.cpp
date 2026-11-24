@@ -32,10 +32,11 @@ Status host_ls(const Context& context, const Value* args, std::uint32_t argc, Va
         const bool absolute = !has_arg || fs::path(raw).is_absolute();
         std::error_code base_error;
         const fs::path base = fs::current_path(base_error);
-        if (base_error)
-            return fail_host(call, host::HostStatus::Fatal,
-                             host_error("runtime.invalid_operation", "ls: cannot get current path: " + base_error.message()),
-                             error);
+        if (base_error) {
+            auto diagnostic = host_error("runtime.invalid_operation",
+                                         "ls: cannot get current path: " + base_error.message());
+            return fail_host(call, host::HostStatus::Fatal, std::move(diagnostic), error);
+        }
         const fs::path canonical_base = absolute ? fs::path() : fs::weakly_canonical(base, base_error);
         const Status budget = collect_glob_paths(context, call.target().path, "ls", matches, error,
                                                  !absolute, canonical_base);

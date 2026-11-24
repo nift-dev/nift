@@ -133,7 +133,7 @@ std::string_view UnitCompiler::type_text(const Node& node) const {
     return src.substr(node.begin, end - node.begin);
 }
 
-bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint16_t& operand) {
+bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint16_t& operand, bool allow_unbound) {
     if (type.kind == TextType::Kind::Known)
         return fb_->constant(Value::integer(type.known), operand) || builder_ok();
     if (type.kind == TextType::Kind::Binding) {
@@ -150,10 +150,13 @@ bool UnitCompiler::text_type_of(const TextType& type, const Node& at, std::uint1
         if (type.binding == "true" || type.binding == "false" ||  // rt-lint: allow-string-compare compile time
             type.binding == "null" || plan_.index.count(type.binding))  // rt-lint: allow-string-compare compile time
             return fb_->constant(Value::integer(-1), operand) || builder_ok();
+        if (allow_unbound)
+            return fb_->constant(Value::integer(-1), operand) || builder_ok();
         return fail(at, "text-type-name");
     }
     std::uint16_t left = 0, right = 0;
-    if (!text_type_of(*type.left, at, left) || !text_type_of(*type.right, at, right) || !temp(operand)) return false;
+    if (!text_type_of(*type.left, at, left, allow_unbound) ||
+        !text_type_of(*type.right, at, right, allow_unbound) || !temp(operand)) return false;
     fb_->emit(OpCode::TypeMeet, operand, left, right);
     return true;
 }

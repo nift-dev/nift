@@ -223,7 +223,7 @@ private:
     bool comparison_chain_ok(const Node& node);
     bool element_target_ok(const Node& target);
     std::string_view type_text(const Node& node) const;
-    bool text_type_of(const TextType& type, const Node& at, std::uint16_t& operand);
+    bool text_type_of(const TextType& type, const Node& at, std::uint16_t& operand, bool allow_unbound = false);
     bool text_type_operand(NodeId value, std::uint16_t& operand);
     bool pass_param_types(std::size_t f, std::uint32_t argc, const NodeId* args, std::uint16_t base);
     // compiler_rules.cpp: legacy contexts and kind checks (CP12, D-018) Code legacy runs on its prepared evaluator: a

@@ -69,7 +69,12 @@ bool UnitCompiler::declare(const Node& node) {
     binding.string_literal_initializer = init.kind == NodeKind::String;
     binding.decl_text_double = inferred.kind == TextType::Kind::Known && inferred.known == 3;
     binding.decl_may_double = may_double(inferred, scope_index());
-    if (!text_type_of(inferred, ast_.at(node.b), text_type)) return false;
+    // The legacy text probe can see lambda-body operands while typing the
+    // initializer. A name absent from the enclosing top-level scope has no
+    // type at declaration time, even if it will exist when invoked.
+    const bool lambda_initializer = init.kind == NodeKind::Lambda && !in_function_ && !in_lambda_ &&
+                                    !session_ && !loop_reachable() && (!module_names_ || module_names_->empty());
+    if (!text_type_of(inferred, init, text_type, lambda_initializer)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);
     if (binding.cell) {
