@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <fstream>
 #include <string>
@@ -29,6 +30,29 @@ using SeenFn = int (*)();
 void check(const char* name, bool ok) {
     std::printf("%s %s\n", ok ? "PASS" : "FAIL", name);
     if (!ok) ++failures;
+}
+
+// The scanner tests descriptors created by this fixture, including its
+// deliberately racy terminal duplicate. Start before opening any such fd.
+bool close_inherited_descriptors() {
+    DIR* directory = ::opendir("/proc/self/fd");
+    if (!directory) return false;
+    const int listing = ::dirfd(directory);
+    bool ok = true;
+    for (;;) {
+        errno = 0;
+        const dirent* entry = ::readdir(directory);
+        if (!entry) {
+            if (errno != 0) ok = false;
+            break;
+        }
+        char* end = nullptr;
+        const long fd = std::strtol(entry->d_name, &end, 10);
+        if (*end == '\0' && fd > STDERR_FILENO && fd != listing &&
+            ::close(static_cast<int>(fd)) != 0)
+            ok = false;
+    }
+    return ::closedir(directory) == 0 && ok;
 }
 
 bool make_controlling_tty() {
@@ -63,6 +87,10 @@ std::string read_file(const std::string& path) {
 
 int main(int argc, char** argv) {
     if (argc < 3) return 2;
+    if (!close_inherited_descriptors()) {
+        std::printf("SETUP_FAIL cannot isolate inherited descriptors\n");
+        return 2;
+    }
     const char* scanner = argv[1];
     const char* supervisor = argv[2];
     const bool unrelated_flag = argc > 3 && std::string(argv[3]) == "--unrelated-child";

@@ -93,7 +93,7 @@ mkdir -p "$t/site/.nift/packages/changed/src"
 printf '{"name":"other","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/changed/manifest.json"
 printf 'value := 1\nexport(value)\n' > "$t/site/.nift/packages/changed/src/main.f"
 printf 'import("changed")\n' > "$t/site/changed.f"
-if (cd "$t/site" && "$NIFT_ABS" changed.f >/dev/null 2>&1); then
+if (cd "$t/site" && NIFT_VM=0 "$NIFT_ABS" changed.f >/dev/null 2>&1); then
     echo 'mismatched installed package name unexpectedly imported' >&2
     exit 1
 fi
@@ -101,7 +101,7 @@ fi
 mkdir -p "$t/site/.nift/packages/escaped"
 printf '{"name":"escaped","version":"0.1.0","entry":"../../../../escape.f"}\n' > "$t/site/.nift/packages/escaped/manifest.json"
 printf 'import("escaped")\n' > "$t/site/escaped.f"
-if (cd "$t/site" && "$NIFT_ABS" escaped.f >/dev/null 2>&1); then
+if (cd "$t/site" && NIFT_VM=0 "$NIFT_ABS" escaped.f >/dev/null 2>&1); then
     echo 'escaped installed package entry unexpectedly imported' >&2
     exit 1
 fi
@@ -110,7 +110,7 @@ mkdir -p "$t/site/.nift/packages/linked/src"
 printf '{"name":"linked","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/linked/manifest.json"
 if make_native_symlink "$t/escape.f" "$t/site/.nift/packages/linked/src/main.f"; then
     printf 'import("linked")\n' > "$t/site/linked.f"
-    if (cd "$t/site" && "$NIFT_ABS" linked.f >/dev/null 2>&1); then
+    if (cd "$t/site" && NIFT_VM=0 "$NIFT_ABS" linked.f >/dev/null 2>&1); then
         echo 'symlink-escaped installed package entry unexpectedly imported' >&2
         exit 1
     fi
@@ -122,7 +122,7 @@ mkdir -p "$t/site/.nift/packages/iso/src"
 printf '{"name":"iso","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/iso/manifest.json"
 printf 'secret_helper := "hidden"\n@fn(public_fn(x)){ return x + 1 }\nexport(public_fn)\n' > "$t/site/.nift/packages/iso/src/main.f"
 printf '@import("iso")\nprint(public_fn(1))\n' > "$t/site/t.f"
-[ "$(cd "$t/site" && "$NIFT_ABS" t.f)" = "2" ] || exit 1
+[ "$(cd "$t/site" && NIFT_VM=0 "$NIFT_ABS" t.f)" = "2" ] || exit 1
 printf '@import("iso")\nprint(secret_helper)\n' > "$t/site/t2.f"
-if (cd "$t/site" && "$NIFT_ABS" t2.f >/dev/null 2>&1); then echo "private binding leaked into importer" >&2; exit 1; fi
+if (cd "$t/site" && NIFT_VM=0 "$NIFT_ABS" t2.f >/dev/null 2>&1); then echo "private binding leaked into importer" >&2; exit 1; fi
 echo 'PASS v4.4 package hardening'

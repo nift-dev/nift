@@ -134,12 +134,13 @@ def clean_oracle(root, oracle, trace):
     return tree(oracle)
 
 
-def diagnose_open_output(root, oracle, incremental, expected):
+def diagnose_open_output(root, oracle, incremental, expected, expected_open=None):
     def open_line(output):
         return next((line for line in output.get("public/index.html", b"").splitlines()
                      if line.startswith(b"O:")), None)
 
-    if open_line(incremental) == open_line(expected):
+    if (open_line(incremental) == open_line(expected) and
+            (expected_open is None or open_line(expected) == expected_open)):
         return
     # Keep the original failing outputs. Replay only after collecting them.
     for label, project in (("incremental", root), ("clean", oracle)):
@@ -168,15 +169,19 @@ def compare(mode, step, root, oracle):
         compare_builds(mode, step, root, oracle)
 
 
-def compare_builds(mode, step, root, oracle, incremental_trace=None, clean_trace=None):
+def compare_builds(mode, step, root, oracle, incremental_trace=None, clean_trace=None, expected_open=None):
     nift(root, "build", trace=incremental_trace)
     incremental = tree(root)
     expected = clean_oracle(root, oracle, clean_trace)
-    if incremental == expected:
+    if incremental == expected and (expected_open is None or
+                                   expected_open in expected.get("public/index.html", b"").splitlines()):
         print("PASS [%s] %s: incremental == clean" % (mode, step))
     else:
         failures.append((mode, step))
-        print("FAIL [%s] %s: incremental build differs from a clean build" % (mode, step))
+        if incremental == expected:
+            print("FAIL [%s] %s: both builds lack %r" % (mode, step, expected_open))
+        else:
+            print("FAIL [%s] %s: incremental build differs from a clean build" % (mode, step))
         # Record the fixture bytes in both trees before resynchronizing. This
         # distinguishes a copy/input discrepancy from missing rendered output.
         for name in ("data/open.txt", "data/link-stream.txt", "content/index.html"):
@@ -195,12 +200,20 @@ def compare_builds(mode, step, root, oracle, incremental_trace=None, clean_trace
                 print("    %s:" % key)
                 for line in difflib.unified_diff(mine, theirs, "incremental", "clean", n=1, lineterm=""):
                     print("      " + line)
+        for label, project in (("incremental", root), ("clean", oracle)):
+            receipt = project / ".nift/public/index.info.json"
+            try:
+                observation = json.loads(receipt.read_text()).get("dependency-hashes", {}).get("data/open.txt")
+            except (OSError, ValueError) as error:
+                print("    %s original build dependency receipt: %s" % (label, error))
+            else:
+                print("    %s original build open.txt dependency hash: %r" % (label, observation))
         for label, trace in (("incremental", incremental_trace), ("clean", clean_trace)):
             if trace is not None:
                 trace.seek(0)
                 records = [line.strip() for line in trace if b"data/open.txt" in line]
                 print("    %s original build open.txt host trace: %r" % (label, records[:20]))
-        diagnose_open_output(root, oracle, incremental, expected)
+        diagnose_open_output(root, oracle, incremental, expected, expected_open)
         # Resynchronise so every later step is judged on its own edit.
         nift(root, "build", "--all")
     status = nift(root, "status").stdout
@@ -533,9 +546,43 @@ def mid_stream(mode, root, oracle, edit_source=False):
         compare(mode, "after " + label, root, oracle)
 
 
+def stress_clean_open():
+    # Exercise the original template and clean-copy route, changing the two
+    # unrelated inputs associated with the archived failures. Tracing is
+    # varied because extra I/O may affect the timing of an intermittent bug.
+    for mode in ("modified", "hash"):
+        for workers in (1, 3):
+            for traced in (False, True):
+                with tempfile.TemporaryDirectory(prefix="host-deps-clean-open-") as directory:
+                    work = Path(directory)
+                    root, ext = setup(work, mode)
+                    oracle = work / "oracle"
+                    config = root / ".nift/config.json"
+                    settings = json.loads(config.read_text())
+                    settings["config"]["build-threads"] = workers
+                    config.write_text(json.dumps(settings))
+                    (root / "data/open.txt").write_bytes(b"open-2\n")
+                    nift(root, "build", "--all")
+                    for i in range(6):
+                        edit(root / "data/async-missing.txt", f"present-{i}\n")
+                        edit(root / "data/async.txt", f"async-{i}\n")
+                        edit(ext / "stream-target.txt", f"stream-{i}\n")
+                        sequence_step(mode, root, ext)
+                        step = f"open stress workers={workers} traced={traced} round={i+1}"
+                        if traced:
+                            with tempfile.TemporaryFile() as incremental, tempfile.TemporaryFile() as clean:
+                                compare_builds(mode, step, root, oracle, incremental, clean, b"O:open-2")
+                        else:
+                            compare_builds(mode, step, root, oracle, expected_open=b"O:open-2")
+
+
 def main():
     if not os.path.exists(NIFT):
         sys.exit("nift binary not found: " + NIFT)
+    if sys.platform.startswith("freebsd") or "--stress-only" in sys.argv:
+        stress_clean_open()
+    if "--stress-only" in sys.argv:
+        return int(bool(failures))
     for mode in MODES:
         work = Path(tempfile.mkdtemp(prefix="host-deps-%s-" % mode))
         try:

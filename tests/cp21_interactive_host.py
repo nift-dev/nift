@@ -113,7 +113,7 @@ def children(pid):
 
 class Pty:
     def __init__(self, binary, extra_env=None):
-        self.root = tempfile.mkdtemp(prefix="cp21-test-")
+        self.root = os.path.realpath(tempfile.mkdtemp(prefix="cp21-test-"))
         self.buf = b""
         self.transcript = b""
         self.pid, self.fd = pty.fork()
@@ -162,7 +162,7 @@ class Pty:
             self.buf += data
         if predicate():
             return True
-        raise Timeout(what)
+        raise Timeout(f"{what}; output={self.output()[-300:]!r}")
 
     def until_text(self, needle, timeout=4.0):
         if isinstance(needle, str):

@@ -327,7 +327,7 @@ with tempfile.TemporaryDirectory() as raw:
     run(unchanged, "add", source)
     (unchanged / "same.f").write_text(
         'import("demo")\nprint(unchanged_value())\nprint(current_path())\n', encoding="utf-8")
-    same = run(unchanged, "same.f")
+    same = run(unchanged, "same.f", env={"NIFT_VM": "0"})
     assert same.stdout.splitlines() == [
         "before", (unchanged / ".nift/packages/demo/src/asset.txt").as_posix()
     ]
@@ -339,7 +339,7 @@ with tempfile.TemporaryDirectory() as raw:
     (unchanged / "child-update.f").write_text(
         f'import("demo")\nr := run({json.dumps(NIFT)}, "update", "demo")\n'
         'print(r.exit_code)\nprint(current_path())\n', encoding="utf-8")
-    child = run(unchanged, "child-update.f", ok=False)
+    child = run(unchanged, "child-update.f", env={"NIFT_VM": "0"}, ok=False)
     assert child.stdout.splitlines() == ["0"]
     assert "stale package ownership" in child.stderr
     assert "child-update" in (unchanged / ".nift/packages/demo/src/helper.f").read_text(encoding="utf-8")
@@ -355,6 +355,7 @@ with tempfile.TemporaryDirectory() as raw:
             f'import("demo")\nworker := thread({callable_name})\n'
             f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
         reader = subprocess.Popen([NIFT, "worker.f"], cwd=site,
+                                  env=dict(os.environ, NIFT_VM="0"),
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.time() + 10
         while not marker.exists() and time.time() < deadline:
@@ -391,6 +392,7 @@ with tempfile.TemporaryDirectory() as raw:
             f'import("localdemo")\nworker := thread(delayed_local)\n'
             f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
         reader = subprocess.Popen([NIFT, "local.f"], cwd=local_site,
+                                  env=dict(os.environ, NIFT_VM="0"),
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.time() + 10
         while not marker.exists() and time.time() < deadline:

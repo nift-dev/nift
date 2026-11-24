@@ -108,6 +108,18 @@ if os.environ.get('NIFT_VM')!='0':
    assert approved_refusal.refusal_reason(q.stderr)=='opaque:legacy-runtime-error', (source,q)
    assert 'note: the program was not executed: no part of it ran' in q.stderr and set(root.iterdir())=={path}, (source,q)
  print('PASS grouped postfix irregular-spacing controls')
+ with tempfile.TemporaryDirectory(prefix='nift-stat-provider-') as directory:
+  root=Path(directory).resolve();path=root/'case.f';data=root/'a'
+  data.write_bytes(b'A')
+  path.write_text('n:=0;fn(fixture_path()){n+=1;print(n);return "a"};'
+                  'j:=0;while(j<2){s:=stat(fixture_path());print(s.exists);j+=1};print(n)\n')
+  for engine,stdout in (('require','1\ntrue\n2\ntrue\n2\n'),
+                        ('0','1\n2\ntrue\n3\n4\ntrue\n4\n')):
+   q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM=engine),
+                    capture_output=True,text=True,encoding='utf-8',timeout=60)
+   assert (q.returncode,q.stdout,q.stderr)==(0,stdout,''), (engine,q)
+   assert set(root.iterdir())=={path,data} and data.read_bytes()==b'A', engine
+ print('PASS stat provider effects with an admissible name')
 if failures:
  print('FAIL filesystem recipe parity: %d failing case(s):'%len(failures))
  for f in failures:print('  '+f)

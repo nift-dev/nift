@@ -19,6 +19,6 @@ cat > "$tmp/site/test.f" <<'F'
 @import("demo")
 print(public_add(3, 4))
 F
-out=$(cd "$tmp/site" && "$NIFT_ABS" test.f)
+out=$(cd "$tmp/site" && NIFT_VM=0 "$NIFT_ABS" test.f)
 [ "$out" = 11 ] || { printf '%s\n' "$out" >&2; exit 1; }
 echo 'PASS package exported callables use private module helpers'
