@@ -5,7 +5,7 @@ def probe(source,expected,outputs=()):
  with tempfile.TemporaryDirectory() as d:
   root=Path(d);(root/'out').mkdir()
   for name in ['a','b','c']:(root/name).write_text(name)
-  q=subprocess.run([binary,'-'],input=source,cwd=root,text=True,encoding='utf-8',capture_output=True,env={**os.environ,'NIFT_TEST_FS_RECIPE_STATS':'1'},timeout=60)
+  q=subprocess.run([binary,'-'],input=source,cwd=root,text=True,encoding='utf-8',capture_output=True,env={**os.environ,'NIFT_VM':'0','NIFT_TEST_FS_RECIPE_STATS':'1'},timeout=60)
   assert q.returncode==0 and q.stdout==expected,(q.returncode,q.stdout,q.stderr)
   for name in outputs:assert (root/'out'/name).read_text()==name,name
   match=re.fullmatch(r'fs-plan (.*)\n',q.stderr);assert match,q.stderr
