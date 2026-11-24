@@ -39,3 +39,9 @@ remains reverted because it changed a reached closure error into a refusal.
 
 The focused loop sanitizer gate passed all 57 cases outside the sandbox.
 The earlier sandbox run failed when LeakSanitizer could not inspect threads.
+
+The nested returned factory now stays pending until callable inference
+finds its selector. The companion receiver proof preserves the existing
+reached `push` error for an unchanged numeric closure result. The 55
+closure differential cases and 1,163 safety oracle cases pass. The
+sort-factory gate still reports named precedence and module ownership.

@@ -35,6 +35,37 @@ bool UnitCompiler::expression_statement(const Node& node) {
             const NodeId arg = ast_.list(expr)[0];
             // B5 (D-NEXT-refsem-b): the pushed value is shared, whatever it is
             // written as (a place, a call result, a literal).
+            // Keep the reached type error of a closure result after the
+            // factory worklist refines it from unknown to numeric.
+            const KindSet receiver_kinds = kinds(callee.a);
+            if (!session_ && !in_function_ && !loop_reachable() && holder && !holder->cell &&
+                !holder->global && !holder->upvalue && !assigned_.count(text(receiver)) &&
+                receiver_kinds != 0 && (receiver_kinds & ~kKindNumber) == 0) {
+                const Node* origin = nullptr;
+                bool has_command = false;
+                for (NodeId id = 0; id < ast_.size(); ++id) {
+                    const Node& candidate = ast_.at(id);
+                    has_command |= candidate.kind == NodeKind::Command;
+                    if (candidate.kind == NodeKind::Declare && candidate.a == holder->decl_node) origin = &candidate;
+                }
+                if (origin && !has_command) {
+                    const Node& declaration = *origin;
+                    const Node& init = ast_.at(declaration.b);
+                    if (init.kind == NodeKind::Call && kinds(init.a) == kKindFunction) {
+                        const auto targets = kinds_.callable_targets.find(init.a);
+                        const auto unknown = kinds_.callable_unknown.find(init.a);
+                        bool closures = targets != kinds_.callable_targets.end() && !targets->second.empty() &&
+                            unknown != kinds_.callable_unknown.end() && !unknown->second;
+                        if (closures) for (NodeId target : targets->second)
+                            closures &= ast_.at(target).kind == NodeKind::Lambda;
+                        if (closures && unobservable_argument(arg)) {
+                            std::uint16_t scratch = 0;
+                            return temp(scratch) && legacy_fatal(expr,
+                                "unknown value or malformed expression: " + std::string(text(expr)), scratch);
+                        }
+                    }
+                }
+            }
             if (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
                 !kinds_within(callee.a, kKindArray, receiver, "type:push"))
                 return false;

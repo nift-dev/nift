@@ -375,7 +375,9 @@ TyRef Inference::call(const Node& n) {
     const TyRef callee_ty = expr(n.a);
     std::vector<TyRef> values(n.count);
     for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);
-    if (session_ && !callee_ty->any && callee_ty->kinds == 0) return empty_ty();
+    // Keep pending factory calls at bottom until the callable worklist revisits them.
+    if (!callee_ty->any && callee_ty->kinds == 0 &&
+        (session_ || (callee_ty->callables.empty() && !callee_ty->untracked_callable))) return empty_ty();
     if (session_ && !callee_ty->any && !(callee_ty->kinds & (kKindFunction | kKindUnknown)) &&
         callee.kind == NodeKind::Ident && find(ast_.text(callee))) return empty_ty();
     if (const auto unknown = session_unknown_call(n, callee_ty)) return session_effects(unknown, n);
