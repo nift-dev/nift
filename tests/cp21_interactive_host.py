@@ -563,8 +563,9 @@ SCENARIOS = {
 def run_scenario(binary, name, extra_env=None):
     extra_env = dict(extra_env or {})
     if name == "background_owner" and TTY_AUDIT:
-        existing = extra_env.get("LD_PRELOAD", os.environ.get("LD_PRELOAD", ""))
-        extra_env["LD_PRELOAD"] = TTY_AUDIT + (":" + existing if existing else "")
+        preload = "DYLD_INSERT_LIBRARIES" if sys.platform == "darwin" else "LD_PRELOAD"
+        existing = extra_env.get(preload, os.environ.get(preload, ""))
+        extra_env[preload] = TTY_AUDIT + (":" + existing if existing else "")
     s = Pty(binary, extra_env)
     # The path is known before exec through HOME; no inherited audit fd.
     r = Result()
@@ -598,8 +599,9 @@ def main():
     args = parser.parse_args()
     binary = os.path.abspath(args.nift)
     PROBE = os.path.abspath(args.probe)
-    if sys.platform.startswith("linux"):
-        TTY_AUDIT = str(Path(PROBE).parent / "cp21-tty-audit.so")
+    if LINUX or sys.platform == "darwin":
+        extension = "dylib" if sys.platform == "darwin" else "so"
+        TTY_AUDIT = str(Path(PROBE).parent / f"cp21-tty-audit.{extension}")
         if not Path(TTY_AUDIT).is_file():
             print("FAIL missing terminal audit library " + TTY_AUDIT)
             return 1

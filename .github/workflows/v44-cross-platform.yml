@@ -194,6 +194,8 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
+        env:
+          MSYS: winsymlinks:nativestrict
         run: |
           export PATH="$PATH:$(cygpath -u "$pythonLocation")"
           python3 --version

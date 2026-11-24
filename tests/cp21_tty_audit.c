@@ -25,14 +25,27 @@ static void record(const char* kind, pid_t requested, pid_t observed, int rc) {
 __attribute__((constructor)) static void ready(void) {
     record("ready", 0, tcgetpgrp(STDIN_FILENO), 0);
 }
+#ifdef __APPLE__
+// dyld binds references from the executable through this interpose entry.
+static int audit_tcsetpgrp(int fd, pid_t pgrp) {
+    int rc = tcsetpgrp(fd, pgrp);
+#else
 int tcsetpgrp(int fd, pid_t pgrp) {
     static int (*real)(int, pid_t);
     if (!real) real = dlsym(RTLD_NEXT, "tcsetpgrp");
     if (!real) { errno = ENOSYS; return -1; }
     int rc = real(fd, pgrp);
+#endif
     int saved = errno;
     pid_t observed = tcgetpgrp(fd);
     record("handoff", pgrp, observed, rc);
     errno = saved;
     return rc;
 }
+#ifdef __APPLE__
+__attribute__((used, section("__DATA,__interpose")))
+static const struct {
+    int (*replacement)(int, pid_t);
+    int (*original)(int, pid_t);
+} tty_interpose = {audit_tcsetpgrp, tcsetpgrp};
+#endif

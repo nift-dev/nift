@@ -176,8 +176,11 @@ print(open("cwd.txt").trim())
     try:
         symlink.symlink_to(outside, target_is_directory=True)
     except OSError:
+        if "winsymlinks:nativestrict" in os.environ.get("MSYS", "").split():
+            raise
         print("  (package symlink escape skipped: native symlinks unavailable)")
     else:
+        assert symlink.is_symlink(), symlink
         package_failure('resolve_package("escape-link/file.txt")', "path must stay inside the owning package")
         package_failure('resolve_module("../escape-link/file.txt")', "path must stay inside the owning package")
 
