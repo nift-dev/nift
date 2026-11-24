@@ -163,6 +163,12 @@ generator: `tests/runtime2/b5/gen/gen_evalorder.py`.
 | a captured loop binding rebound by the argument: `for (b : [[1], [2]]) { g := () => { b = [7]; return 4 }; b.push(g()); print(b.stringify()) }` | `[7,4]` twice (its prepared loop evaluator reads late); insert/remove and the element store: the contract's result | `[7]` twice: the element gets the push, the rebinding stays (the first H-A repair printed `[1,4] [2,4]`). **Previously admitted with the legacy-equal `[7,4]` twice on 17f7964c**: a changed output, APPROVED 2026-11-07 22:13 (owner D1.2) |
 | `b := [1, 2]; fn(g()) { b = [7, 8]; return 0 }; b.remove(g())` (no other reference to the original) | `remove: index out of range` | removes from the original (retained); `b` is `[7,8]` |
 
+For the D-179 filesystem-recipe witness, one-argument `copy(value)` evaluates
+its operand once in the VM. The historical loop evaluates that operand twice.
+The test independently preserves both outputs and checks identical exit status,
+diagnostics and file contents. This is a value-copy call; filesystem copying
+uses `native::cp` in the VM.
+
 ## Operand order of operators and compound assignment (combined B3-B5 candidate, D2)
 
 Operands are evaluated once, left to right (owner rulings 2026-11-08 03:27/03:29): a binary

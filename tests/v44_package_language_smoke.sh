@@ -23,7 +23,7 @@ mk()
 mko()
 print("ok")
 F
-[ "$("$NIFT_ABS" "$t/b.f")" = "ok" ] || exit 1
+[ "$(NIFT_VM=0 "$NIFT_ABS" "$t/b.f")" = "ok" ] || exit 1
 # A bare object VALUE still requires member selection.
 cat > "$t/c.f" <<'F'
 o := {"a": 1}

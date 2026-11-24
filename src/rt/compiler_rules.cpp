@@ -38,6 +38,22 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     const std::string_view src = ast_.source();
     const Node& left = ast_.at(node.a);
     const char expected = node.kind == NodeKind::Member ? '.' : node.kind == NodeKind::Index ? '[' : '(';
+    // The parser returns the inner AST node for a grouped receiver. Its
+    // span ends before the closing parentheses, even when the dot is
+    // adjacent to the group. Admit the verified string methods only.
+    if (node.kind == NodeKind::Member && node.begin < left.begin &&
+        left.end < ast_.at(node.b).begin && kinds(node.a) == kKindString) {
+        const Node& member = ast_.at(node.b);
+        const auto name = ast_.text(member);
+        const auto opening = src.substr(node.begin, left.begin - node.begin);
+        const auto closing = src.substr(left.end, member.begin - left.end - 1);
+        if ((name == "split" || name == "stringify") &&  // rt-lint: allow-string-compare compile time
+            opening.size() == closing.size() &&
+            opening.find_first_not_of('(') == std::string_view::npos &&
+            closing.find_first_not_of(')') == std::string_view::npos &&
+            src[member.begin - 1] == '.' && node.end < src.size() && src[node.end] == '(')
+            return true;
+    }
     if (left.end >= src.size() || src[left.end] != expected) return fail(node, "postfix-spelling");
     if (node.kind == NodeKind::Member && ast_.at(node.b).begin != left.end + 1) return fail(node, "postfix-spelling");
     if (node.kind != NodeKind::Call && !is_receiver(left.kind)) {

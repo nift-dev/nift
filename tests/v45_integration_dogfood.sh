@@ -39,7 +39,7 @@ print(count)
 print(ffi_call(lib, "nift_ffi_add_i64", "i64(i64,i64)", 40, 2))
 NIFT
 chmod +x "$T/site/tool.f"
-out=$(cd "$T/site" && NIFT_DOGFOOD=ok "$BIN" --platform=android tool.f a b)
+out=$(cd "$T/site" && NIFT_VM=0 NIFT_DOGFOOD=ok "$BIN" --platform=android tool.f a b)
 printf '%s\n' "$out" > "$T/direct.out"
 [ "$(sed -n '1p' "$T/direct.out")" = tool.f ]
 [ "$(sed -n '2p' "$T/direct.out")" = a,b ]
@@ -51,7 +51,7 @@ case "$(sed -n '4p' "$T/direct.out")" in linux|macos|windows) ;; *) exit 1;; esa
 [ "$(sed -n '8p' "$T/direct.out")" = 200 ]
 [ "$(sed -n '9p' "$T/direct.out")" = 42 ]
 # Shebang uses PATH and preserves direct script cmd/args semantics.
-PATH="$(dirname "$BIN"):$PATH" shebang=$(cd "$T/site" && NIFT_DOGFOOD=ok ./tool.f z)
+PATH="$(dirname "$BIN"):$PATH" shebang=$(cd "$T/site" && NIFT_VM=0 NIFT_DOGFOOD=ok ./tool.f z)
 [ "$(sed -n '1p' <<<"$shebang")" = ./tool.f ] || [ "$(sed -n '1p' <<<"$shebang")" = tool.f ]
 [ "$(sed -n '2p' <<<"$shebang")" = z ]
 # stdin-as-source remains one-shot and receives <stdin> cmd.

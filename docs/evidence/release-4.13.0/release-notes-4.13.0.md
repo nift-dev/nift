@@ -33,6 +33,9 @@ their historical oracle. In particular, the five documented nested string
 replacement separately before passing it to `replace()`, or use `NIFT_VM=0`
 where legacy conditional argument evaluation is needed.
 
+Compact grouped string receivers support `split()` and `stringify()`. A
+one-argument `copy(value)` evaluates its operand once in the VM.
+
 The separate external Nift regression suite recorded 57/94 passes with the VM
 default and 94/94 with explicit legacy execution.
 

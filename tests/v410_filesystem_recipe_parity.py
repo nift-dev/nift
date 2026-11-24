@@ -33,24 +33,8 @@ EXPECTED_REFUSAL={
 }
 # Pure-string contracts by index.
 EXPECTED_PURE_REFUSAL={
- 0: 'postfix-spelling', 1: 'postfix-spelling', 2: 'postfix-spelling',
- 3: 'postfix-spelling', 4: 'postfix-spelling', 5: 'postfix-spelling',
- 6: 'postfix-spelling', 7: 'postfix-spelling', 8: 'postfix-spelling',
- 9: 'postfix-spelling', 10: 'postfix-spelling', 11: 'postfix-spelling',
- 12: 'postfix-spelling', 13: 'postfix-spelling', 14: 'postfix-spelling',
- 15: 'postfix-spelling', 16: 'postfix-spelling', 17: 'postfix-spelling',
- 18: 'postfix-spelling', 19: 'postfix-spelling', 20: 'postfix-spelling',
- 21: 'postfix-spelling', 22: 'postfix-spelling', 23: 'postfix-spelling',
- 24: 'postfix-spelling', 25: 'postfix-spelling', 26: 'postfix-spelling',
- 27: 'postfix-spelling', 28: 'postfix-spelling', 29: 'postfix-spelling',
- 30: 'postfix-spelling', 31: 'postfix-spelling', 32: 'postfix-spelling',
- 33: 'postfix-spelling', 34: 'postfix-spelling', 35: 'postfix-spelling',
- 36: 'postfix-spelling', 37: 'postfix-spelling', 38: 'postfix-spelling',
- 39: 'postfix-spelling', 40: 'postfix-spelling', 41: 'postfix-spelling',
- 42: 'postfix-spelling', 43: 'postfix-spelling', 44: 'postfix-spelling',
- 45: 'postfix-spelling', 46: 'postfix-spelling', 47: 'postfix-spelling',
  48: 'context:assignment-error', 52: 'builtin-arity:split', 53: 'builtin-arity:last',
- 54: 'unresolved-name', 56: 'opaque:legacy-runtime-error', 57: 'postfix-spelling',
+ 54: 'unresolved-name', 56: 'opaque:legacy-runtime-error',
 }
 failures=[]
 def fail(case,text):
@@ -82,6 +66,17 @@ for row in rows:
    continue
   files={f.relative_to(root).as_posix():f.read_text() for f in root.rglob('*') if f.is_file() and f.name!='case.f'}
   actual=dict(exit=q.returncode,stdout=normalize(q.stdout,root),stderr=normalize(q.stderr,root),files=files);expected={k:row[k] for k in actual}
+  if row['name']=='copy-wrong-arity' and os.environ.get('NIFT_VM')!='0':
+   # D-179: this single-argument value copy must evaluate its operand once.
+   # Independently retain the historical second evaluation and file state.
+   assert row['source']=='n:=0; fn(src()) { n+=1; print(n); return "a" }; j:=0; while(j<1) { copy(src()); j+=1 }'
+   legacy=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='0'),
+                         capture_output=True,text=True,encoding='utf-8',timeout=60)
+   legacy_files={f.relative_to(root).as_posix():f.read_text() for f in root.rglob('*') if f.is_file() and f!=path}
+   assert (legacy.returncode,legacy.stdout,normalize(legacy.stderr,root),legacy_files)==(
+    expected['exit'],'1\n2\n',expected['stderr'],expected['files']), legacy
+   assert expected['stdout']=='1\n2\n', expected
+   expected['stdout']='1\n'
   if actual!=expected:
    note=' (unapproved VM/legacy difference, PENDING-OWNER: tests/runtime2/cp25/pending_differences.tsv)' if row['name'] in pending else ''
    fail(row['name'],'VM %r != recorded %r%s'%(actual,expected,note));continue
@@ -100,6 +95,19 @@ with tempfile.TemporaryDirectory(prefix='nift-pure-oracle-') as directory:
    continue
   actual=(q.returncode,q.stdout,normalize(q.stderr,root))
   if actual!=(row['exit'],row['stdout'],row['stderr']):fail('pure#%d'%i,'VM %r != recorded %r'%(actual,(row['exit'],row['stdout'],row['stderr'])))
+if os.environ.get('NIFT_VM')!='0':
+ with tempfile.TemporaryDirectory(prefix='nift-grouped-postfix-') as directory:
+  root=Path(directory).resolve();path=root/'case.f'
+  for source in ('p:="a/b";print((p) .split("/").last())',
+                 'print(("a"+"b") .stringify())',
+                 'p:="a/b";print((p).split ("/").last())'):
+   path.write_text('print("REFUSAL_EXECUTION_SENTINEL")\n'+source+'\n')
+   q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='require'),
+                    capture_output=True,text=True,encoding='utf-8',timeout=60)
+   assert (q.returncode,q.stdout)==(1,''), (source,q)
+   assert approved_refusal.refusal_reason(q.stderr)=='opaque:legacy-runtime-error', (source,q)
+   assert 'note: the program was not executed: no part of it ran' in q.stderr and set(root.iterdir())=={path}, (source,q)
+ print('PASS grouped postfix irregular-spacing controls')
 if failures:
  print('FAIL filesystem recipe parity: %d failing case(s):'%len(failures))
  for f in failures:print('  '+f)

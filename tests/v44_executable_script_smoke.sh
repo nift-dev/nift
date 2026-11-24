@@ -54,7 +54,7 @@ cat > "$t/parent.f" <<'NIFT'
 print("parent-done")
 NIFT
 chmod +x "$t/parent.f"
-out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" parent.f)
+out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_VM=0 "$NIFT_ABS" parent.f)
 grep -q "^arg:a$" <<<"$out" || { echo "$out" >&2; exit 1; }
 grep -q "^parent-done$" <<<"$out" || exit 1
 
@@ -63,7 +63,7 @@ cat > "$t/r.f" <<'NIFT'
 r := run("./hello.f", "one", "two")
 print("exit=" + r.exit_code.to_string())
 NIFT
-out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" r.f)
+out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_VM=0 "$NIFT_ABS" r.f)
 grep -q "^exit=0$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
 # executable permission failure: chmod -x must NOT fall back to direct nift script execution.
@@ -79,11 +79,11 @@ chmod +x "$t/hello.f"
 cat > "$t/c.f" <<'NIFT'
 ./hello.f
 NIFT
-if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" c.f >/dev/null 2>&1); then echo "command-style not blocked" >&2; exit 1; fi
+if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 NIFT_VM=0 "$NIFT_ABS" c.f >/dev/null 2>&1); then echo "command-style not blocked" >&2; exit 1; fi
 cat > "$t/r2.f" <<'NIFT'
 run("./hello.f")
 NIFT
-if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" r2.f >/dev/null 2>&1); then echo "run() not blocked" >&2; exit 1; fi
+if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 NIFT_VM=0 "$NIFT_ABS" r2.f >/dev/null 2>&1); then echo "run() not blocked" >&2; exit 1; fi
 
 # paths with spaces and Unicode
 # Non-ASCII paths/args are POSIX-clean; on Windows the MSYS2 -> native-binary
@@ -133,11 +133,11 @@ fixtool one
 fixtool one two three
 print("cc-done")
 NIFT
-out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" cc.f 2>&1) || { echo "script command-style: $out" >&2; exit 1; }
+out=$(cd "$t" && PATH="$t/bin:$PATH" NIFT_VM=0 "$NIFT_ABS" cc.f 2>&1) || { echo "script command-style: $out" >&2; exit 1; }
 grep -q 'fixtool-ran one' <<<"$out" || { echo "$out" >&2; exit 1; }
 grep -q '^cc-done$' <<<"$out" || exit 1
 # command-style in script land is blocked by --no-process
-if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
+if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 NIFT_VM=0 "$NIFT_ABS" cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
 
 
 # v4.5 shebang certification: invocation identity, cwd, args and environment.
