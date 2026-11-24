@@ -27,6 +27,8 @@ tool.write_text("#!/bin/sh\necho stub-fixtool\n", encoding="utf-8")
 tool.chmod(0o755)
 
 env = os.environ.copy()
+# This historical completion fixture defines a legacy session function.
+env["NIFT_VM"] = "0"
 env["HOME"] = str(WORK)
 env["PATH"] = str(BIN) + ":" + env.get("PATH", "/usr/bin:/bin")
 

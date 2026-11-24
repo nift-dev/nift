@@ -165,7 +165,7 @@ def exists(d, n):
     return os.path.exists(os.path.join(d, n))
 
 
-def check(nift, quiet=False):
+def check(nift, quiet=False, label_prefix=""):
     failing = []
     for front, runner in FRONTS.items():
         for vm in (True, False):
@@ -188,7 +188,7 @@ def check(nift, quiet=False):
                     if problems:
                         failing.append(label)
                     if problems or not quiet:
-                        print("%s %s%s" % ("FAIL" if problems else "PASS", label,
+                        print("%s%s %s%s" % (label_prefix, "FAIL" if problems else "PASS", label,
                                            (": %s; out %r" % ("; ".join(problems), out[-200:])) if problems else ""))
                 finally:
                     shutil.rmtree(d, ignore_errors=True)
@@ -201,7 +201,7 @@ def check(nift, quiet=False):
                     if not ok:
                         failing.append(label)
                     if not ok or not quiet:
-                        print("%s %s%s" % ("PASS" if ok else "FAIL", label,
+                        print("%s%s %s%s" % (label_prefix, "PASS" if ok else "FAIL", label,
                                            "" if ok else ": launched %s; out %r" % (launched(d), out[-200:])))
                 finally:
                     shutil.rmtree(d, ignore_errors=True)
@@ -214,12 +214,12 @@ def check(nift, quiet=False):
                     if not ok:
                         failing.append(label)
                     if not ok or not quiet:
-                        print("%s %s%s" % ("PASS" if ok else "FAIL", label,
+                        print("%s%s %s%s" % (label_prefix, "PASS" if ok else "FAIL", label,
                                            "" if ok else ": launched %s; out %r" % (launched(d), out[-200:])))
                 finally:
                     shutil.rmtree(d, ignore_errors=True)
     total = len(FRONTS) * 2 * (len(CALLS) + len(COMMANDS) + len(BUILTIN_COMMANDS))
-    print("shell-call-syntax: %d/%d pass" % (total - len(failing), total))
+    print("%sshell-call-syntax: %d/%d pass" % (label_prefix, total - len(failing), total))
     return failing
 
 
@@ -251,7 +251,7 @@ def mutants(nift):
                 print("FAIL shell-call-syntax mutant %d: harness: build failed: %s" % (n, (b.stderr or b.stdout)[-400:]))
                 bad += 1
                 continue
-            failing = check(os.path.join(out, "nift"), quiet=True)
+            failing = check(os.path.join(out, "nift"), quiet=True, label_prefix=f"mutant {n} observation: ")
             missed = [c for c in expected if c not in failing]
             if missed:
                 print("FAIL shell-call-syntax mutant %d: not caught by %s" % (n, missed))

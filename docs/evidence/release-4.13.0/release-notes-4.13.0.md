@@ -19,6 +19,23 @@ contextual callable spellings. Direct scalar literals support
 `.to_string()`, and the VM preserves the tested escaped and embedded
 quote forms in single-member object literals.
 
+Runtime 2.0 supports `bytes()` and the tested literal byte-array writes to
+managed files. It also supports the admitted scalar `write_val()` forms and
+the managed buffer methods `append`, `prepend`, `insert`, `insert_before`,
+`insert_after`, `replace`, and `replace_once`. The historical managed-file
+`read_val()` token-evaluation case remains available through explicit legacy
+execution.
+
+The local Checkpoint 10 file-buffer oracle recorded 37 executed VM matches
+and 65 approved exact pre-execution refusals. All 102 legacy witnesses matched
+their historical oracle. In particular, the five documented nested string
+`replace()` inputs retain their existing refusals. Evaluate a supported
+replacement separately before passing it to `replace()`, or use `NIFT_VM=0`
+where legacy conditional argument evaluation is needed.
+
+The separate external Nift regression suite recorded 57/94 passes with the VM
+default and 94/94 with explicit legacy execution.
+
 ## Parallel tasks and platform support
 
 Parallel-task admission uses the root heap budget, with separate accounting

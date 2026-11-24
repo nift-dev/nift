@@ -14,7 +14,7 @@ import os, pty, select, subprocess, sys, time
 # macOS runners (the interactive completion PTY test covers the shell's PTY
 # path there and passes). The foreground-inheritance contract is verified on
 # Linux; the macOS foreground hang is tracked as a known issue.
-if os.name == "nt" or sys.platform == "darwin":
+if os.name == "nt" or sys.platform in ("darwin", "msys", "cygwin"):
     print("SKIP v4.4 shell foreground TTY (POSIX PTY test; macOS foreground execution hangs)")
     sys.exit(77)
 
