@@ -15,16 +15,18 @@ a = p.parse_args()
 rows = []
 with tempfile.TemporaryDirectory(prefix='cp21-m1-controls-') as td:
     root = Path(td)
+    dead = root / 'dead'
+    dead.write_text('#!/bin/sh\nexit 1\n')
     early = root / 'early'
     early.write_text('#!/bin/sh\nprintf "~$ "\nexit 0\n')
     stalled = root / 'stalled'
     stalled.write_text('#!/bin/sh\nprintf "~$ "\nread command\nsleep 6\n')
-    for f in [early, stalled]:
+    for f in (dead, early, stalled):
         f.chmod(0o755)
     for case, binary, reason in [
         ('normal', a.normal, 'expected only'),
         ('unrelated-mutant2', a.unrelated, 'expected only'),
-        ('dead', '/bin/false', 'no behavioural evidence'),
+        ('dead', str(dead), 'no behavioural evidence'),
         ('premature-exit', str(early), 'no behavioural evidence'),
         ('timeout', str(stalled), 'no behavioural evidence'),
     ]:

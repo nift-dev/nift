@@ -1,5 +1,5 @@
 from pathlib import Path
-import subprocess,tempfile,json,os,sys
+import subprocess,tempfile,json,os,sys,hashlib
 sys.path.insert(0,str(Path(__file__).resolve().parent/'runtime2'))
 import approved_refusal
 def native_path(path):
@@ -31,6 +31,18 @@ EXPECTED_REFUSAL={
  'move-loop-location': 'builtin-lazy-args:move', 'move-index-probe-order': 'builtin-lazy-args:move', 'move-root-path-replacement': 'builtin-lazy-args:move',
  'copy-loop-location': 'builtin-arity:copy', 'copy-index-probe-order': 'builtin-arity:copy', 'copy-root-path-replacement': 'builtin-arity:copy',
 }
+# Owner item 5, combined-b3-b5.md section 85, names these exact seven
+# historical stat witnesses. The wider reserved-name feature remains
+# post-certification. Keep the general inventory acceptance gate intact.
+STAT_REFUSALS={
+ 'stat-prepared': (9,'b32d829af13ea6e77a6f681d5ffb4aa408c827e93a3b29bd0fd5a3217e5406cc'),
+ 'stat-compatibility': (9,'ee2998e55223988419b8440f918439afc3e66a8624134949f3d285fe1612907d'),
+ 'stat-wrong-arity': (9,'0ebf14eb60e630c3149529a91998cb3be99a60c52cd02c64268511581fd752d7'),
+ 'stat-wrong-type': (9,'3ecf6131306b1d404360b99130aec5d700cdc9fca0fcba96981cbc4a232e445b'),
+ 'stat-first-error': (7,'ba643606a862c8ca02b15195582befc03e8fe0264918a88f17837d817a119262'),
+ 'named-stat-prepared': (1,'ee2ef289addd692b6ac148c9e25bc61e2c2476038c185ac1bb3e66aeb12ae1b2'),
+ 'named-stat-compatibility': (1,'abe12bc9b497157dacb5b7663adb3a24276f273cc2ae39597420d7c7dc57cc74'),
+}
 # Pure-string contracts by index.
 EXPECTED_PURE_REFUSAL={
  48: 'context:assignment-error',
@@ -55,6 +67,24 @@ for row in rows:
   source=row['source'].replace('<ORACLE_ROOT>',native_path(root));path=root/'case.f';path.write_text(source+'\n')
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   reason=approved_refusal.refusal_reason(q.stderr)
+  if row['name'] in STAT_REFUSALS and os.environ.get('NIFT_VM')!='0':
+   column,digest=STAT_REFUSALS[row['name']]
+   expected_files={f.relative_to(root).as_posix():f.read_bytes() for f in root.rglob('*') if f.is_file() and f!=path}
+   assert expected_files=={'a':b'A','b':b'B','one/a':b'ONE','two/a':b'TWO'}, expected_files
+   assert hashlib.sha256(row['source'].encode()).hexdigest()==digest, row['name']
+   diagnostic=(f'error: <ORACLE_ROOT>/case.f:1:{column}: not compiled for the VM (fn-name-reserved): '
+               'a function named like a built-in is not supported by the Runtime 2.0 VM yet')
+   assert normalize(q.stderr,root).splitlines()[0]==diagnostic, q
+   def stat_legacy(lq):
+    files={f.relative_to(root).as_posix():f.read_text() for f in root.rglob('*') if f.is_file() and f!=path}
+    got=dict(exit=lq.returncode,stdout=normalize(lq.stdout,root),stderr=normalize(lq.stderr,root),files=files)
+    expected={k:row[k] for k in got}
+    return None if got==expected else repr((got,expected))
+   problem=approved_refusal.check(row['name'],[str(binary),native_path(path)],root,'fn-name-reserved',stat_legacy,
+                                  rows={'fn-name-reserved':{'status':'approved'}})
+   assert problem is None, problem
+   print('PASS',row['name'],'(exact reserved-name refusal; legacy channel exact)',flush=True)
+   continue
   if reason is not None:
    if [f for f in root.rglob('*') if f.is_file() and f.name!='case.f' and f.relative_to(root).as_posix() not in ('a','b','one/a','two/a')]:
     fail(row['name'],'files changed by a refused program');continue

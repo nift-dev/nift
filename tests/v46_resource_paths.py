@@ -12,6 +12,12 @@ import tempfile
 NIFT = pathlib.Path(sys.argv[1]).resolve()
 
 
+def native_path(path):
+    if os.environ.get("MSYSTEM") and os.name != "nt":
+        return subprocess.check_output(["cygpath", "-m", str(path)], text=True).strip()
+    return path.as_posix()
+
+
 def run(args, cwd, *, source=None, ok=True, env=None, engine="0"):
     result = subprocess.run(
         [str(NIFT), *args], cwd=cwd, input=source, text=True,
@@ -57,19 +63,19 @@ print(module_path("../ordinary-authority.txt"))
     assert "note: the program was not executed: no part of it ran" in refusal.stderr
     result = run(["main.f"], local)
     assert result.stdout.splitlines() == [
-        local.as_posix(),
-        (local / "missing" / "leaf.txt").as_posix(),
-        nested.as_posix(),
-        (nested / "missing" / "leaf.txt").as_posix(),
-        (root / "ordinary-authority.txt").as_posix(),
-    ]
+        native_path(local),
+        native_path(local / "missing" / "leaf.txt"),
+        native_path(nested),
+        native_path(nested / "missing" / "leaf.txt"),
+        native_path(root / "ordinary-authority.txt"),
+    ], result.stdout
 
     site = root / "site"
     package = site / ".nift" / "packages" / "paths"
     source_dir = package / "src"
     child_dir = source_dir / "nested"
     child_dir.mkdir(parents=True)
-    package_source = package.as_posix()
+    package_source = native_path(package)
     write(site / "manifest.json", json.dumps({
         "dependencies": {"paths": {"source": package_source, "ref": "local"}}
     }) + "\n")
@@ -136,15 +142,15 @@ print(open("cwd.txt").trim())
 """)
     result = run(["main.f"], site)
     assert result.stdout.splitlines() == [
-        source_dir.as_posix(), package.as_posix(), source_dir.as_posix(),
-        (source_dir / "missing" / "leaf.txt").as_posix(), package.as_posix(),
-        (package / "new" / "parent" / "file.txt").as_posix(),
-        (source_dir / "method.txt").as_posix(),
-        (source_dir / "lambda.txt").as_posix(),
-        (source_dir / "callback.txt").as_posix(), child_dir.as_posix(),
-        (package / "nested-resource.txt").as_posix(),
-        (source_dir / "worker.txt").as_posix(), (source_dir / "future.txt").as_posix(),
-        source_dir.as_posix(), "cwd-semantics",
+        native_path(source_dir), native_path(package), native_path(source_dir),
+        native_path(source_dir / "missing" / "leaf.txt"), native_path(package),
+        native_path(package / "new" / "parent" / "file.txt"),
+        native_path(source_dir / "method.txt"),
+        native_path(source_dir / "lambda.txt"),
+        native_path(source_dir / "callback.txt"), native_path(child_dir),
+        native_path(package / "nested-resource.txt"),
+        native_path(source_dir / "worker.txt"), native_path(source_dir / "future.txt"),
+        native_path(source_dir), "cwd-semantics",
     ]
 
     def package_failure(expression, diagnostic):
@@ -182,7 +188,7 @@ print(open("cwd.txt").trim())
     assert "no file-backed source" in repl.stderr, repl.stderr
 
     restricted = os.environ.copy()
-    restricted["NIFT_FS_ROOT"] = str(local)
+    restricted["NIFT_FS_ROOT"] = native_path(local)
     write(local / "restricted.f", 'print(module_path("../escape"))\n')
     failed = run(["restricted.f"], local, ok=False, env=restricted)
     assert "path escapes configured filesystem root" in failed.stderr
@@ -194,6 +200,6 @@ print(open("cwd.txt").trim())
           'authority_worker := thread(worker_authority)\nworker_result := authority_worker.join()\n'
           'print(worker_result[0])\nprint(worker_result[1])\n')
     anchored = run(["snapshot.f", "--fs-root=."], local)
-    assert anchored.stdout.splitlines() == [local.as_posix(), "anchored", local.as_posix(), "anchored"]
+    assert anchored.stdout.splitlines() == [native_path(local), "anchored", native_path(local), "anchored"]
 
 print("PASS v4.6 explicit module/package resource paths")
