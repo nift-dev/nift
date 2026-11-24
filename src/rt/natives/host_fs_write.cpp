@@ -63,6 +63,21 @@ Status host_remove(const Context& context, const Value* args, std::uint32_t argc
     return Status::Ok;
 }
 
+namespace {
+
+Status collect_destination(const Context& context, const Value& value, std::string_view operation,
+                           std::vector<fs::path>& destinations, std::string& error) {
+    bool globbed = false;
+    const Status status = collect_paths(context, value, operation, destinations, globbed, error);
+    // Legacy reports an invalid destination as a single diagnostic. Keep
+    // resource limits distinct from an invalid path or destination value.
+    if (status == Status::Error || (status == Status::Ok && destinations.size() != 1))
+        return fail(error, std::string(operation) + ": destination must be one path");
+    return status;
+}
+
+} // namespace
+
 Status host_cp(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc < 2) return fail(error, "copy: expected source(s) and destination");
     std::vector<fs::path> sources;
@@ -71,14 +86,8 @@ Status host_cp(const Context& context, const Value* args, std::uint32_t argc, Va
         if (collect_paths(context, args[i], "copy", sources, globbed, error) != Status::Ok) return Status::Error;
     if (sources.empty()) return fail(error, "copy: glob matched no source files");
     std::vector<fs::path> destinations;
-    bool destination_glob = false;
-    if (collect_paths(context, args[argc - 1], "copy", destinations, destination_glob, error) != Status::Ok) {
-        if (error.find("path escapes configured filesystem root") != std::string::npos)
-            error = "copy: destination must be one path";
-        return Status::Error;
-    }
-    (void)globbed;
-    if (destinations.size() != 1) return fail(error, "copy: destination must be one path");
+    const Status destination_status = collect_destination(context, args[argc - 1], "copy", destinations, error);
+    if (destination_status != Status::Ok) return destination_status;
     const fs::path& destination = destinations.front();
     std::error_code ec;
     const bool destination_directory = fs::is_directory(destination, ec);
@@ -109,14 +118,8 @@ Status host_mv(const Context& context, const Value* args, std::uint32_t argc, Va
         if (collect_paths(context, args[i], "move", sources, globbed, error) != Status::Ok) return Status::Error;
     if (sources.empty()) return fail(error, "move: glob matched no source files");
     std::vector<fs::path> destinations;
-    bool destination_glob = false;
-    if (collect_paths(context, args[argc - 1], "move", destinations, destination_glob, error) != Status::Ok) {
-        if (error.find("path escapes configured filesystem root") != std::string::npos)
-            error = "move: destination must be one path";
-        return Status::Error;
-    }
-    (void)globbed;
-    if (destinations.size() != 1) return fail(error, "move: destination must be one path");
+    const Status destination_status = collect_destination(context, args[argc - 1], "move", destinations, error);
+    if (destination_status != Status::Ok) return destination_status;
     const fs::path& destination = destinations.front();
     std::error_code directory_error;
     const bool destination_directory = fs::is_directory(destination, directory_error);
