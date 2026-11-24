@@ -94,9 +94,7 @@ m.set("a", 2)
 m.set("b", 3)
 print(m.map((k,v) => v + 1).join(","))' > "$t/map-callback.f"
 approved_refusal "$B" "map callback" collection-callback:map D-063 "$t/map-callback.f" '3,4'
-ok array_comparator 'a := [3,1,2]
-a.sort((x,y) => x < y)
-print(a.join(","))' '1,2,3'
+python3 "$(dirname "$0")/runtime2/cp14b/historical_callbacks.py" --nift "$B"
 ok reference 'a := [[1]]
 f := x => x
 b := f(a[0])
@@ -188,7 +186,6 @@ done
 
 err non_callable 'a := [1].map(2)' 'callback must be callable'
 err selector_result 'a := [1].sort_by(x => [x])' 'key must be scalar'
-err comparator_result 'a := [2,1]; a.sort((x,y) => x + y)' 'comparator must return bool'
 err division 'a := [1].map(x => x / 0)' 'lambda body error: division by zero'
 err overflow 'f := x => x + 1; print(f(9223372036854775807))' 'signed 64-bit integer overflow'
 err nested_failure 'a := [1].map(x => [x].map(y => y / 0)[0])' 'division by zero'

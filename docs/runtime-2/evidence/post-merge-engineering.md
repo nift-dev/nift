@@ -246,3 +246,33 @@ parallel aggregate. The language binding steps, including the explicit
 aggregate binding target, completed beforehand. Treat this aggregate as
 incomplete and rerun it. The log does not establish an aggregate product
 failure.
+
+### Hosted follow-up for 0d0fc741
+
+All three Checkpoint 10 jobs passed the corrected selector stage. Linux
+then rejected the historical aggregate path argument at `p.f:3:9` in the
+v4.8 callback gate. macOS and Windows stopped earlier at the comparator
+sort in the same gate, with the exact `method:sort` refusal. The historical
+comparator witnesses now use the existing CP14B profile probe. Verified
+builds must execute both VM witnesses. Other builds must produce the
+exact refusal with no VM execution and match explicit legacy during
+fallback. Both paths passed locally, with the refusal profile exercised
+using a build that declines comparator sort. Explicit legacy also passed.
+
+The macOS historical job stopped in the execution-shell smoke before the
+terminal mutation tests. Its background child reported EPERM when creating
+its process group. The parent and child both set that group. The child now
+preserves the original failure unless a fresh kernel query confirms it
+is already in the requested group. Fault injection on Linux returned
+EPERM with the expected group installed and with a mismatched group.
+The first child ran and the second retained the original setup error and
+exit 126. The historical shell smoke passed locally. The Darwin
+failure's exact kernel sequence still needs hosted verification.
+
+The live aggregate element argument remains unsupported. The current
+cell forwarding shares a lexical cell, and the pre-B5 selector cell was
+removed. Loading or forwarding the aggregate value cannot represent an
+array slot that may later be replaced. A correct implementation needs
+an owned root and a checked slot re-resolution without retaining a
+pointer into the array storage. The existing live-slot oracle remains
+mandatory. No refusal was approved for the failing callback fixture.

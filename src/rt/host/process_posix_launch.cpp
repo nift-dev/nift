@@ -54,7 +54,14 @@ std::string pipe_error() { return std::string("cannot create pipe: ") + std::str
         }
         ::close(pid_pipe[1]);
     } else {
-        if (s.req.own_group && ::setpgid(0, target_pgid) != 0) child_fail(report[1], ExecSetup, errno, 126, SetupGroup);
+        if (s.req.own_group && ::setpgid(0, target_pgid) != 0) {
+            const int group_error = errno;
+            const pid_t expected_group = target_pgid == 0 ? ::getpid() : target_pgid;
+            // The parent also installs the process group after fork. Darwin
+            // can reject the child's redundant setpgid on its group leader.
+            if (::getpgrp() != expected_group)
+                child_fail(report[1], ExecSetup, group_error, 126, SetupGroup);
+        }
         if (l.want_handoff && i == 0) {
             child_take_terminal(report[1]);
 #if !defined(NIFT_CP21_D1_MUTANT) || NIFT_CP21_D1_MUTANT == 0
