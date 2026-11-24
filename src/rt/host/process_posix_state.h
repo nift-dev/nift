@@ -31,6 +31,7 @@ struct StageRt {
     pid_t pid = -1;
     int pidfd = -1;
     bool reaped = false;
+    bool drained_stop = false;  // Pending stop consumed before a continuation attempt.
     bool exec_failed = false;
     StageResult result;
 };

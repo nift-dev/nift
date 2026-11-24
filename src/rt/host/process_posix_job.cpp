@@ -11,6 +11,7 @@
 #include "rt/host/process_posix_state.h"
 #include "rt/host/process_terminal.h"
 
+#include <cerrno>
 #include <csignal>
 #include <sys/wait.h>
 #include <termios.h>
@@ -22,18 +23,24 @@ using namespace posix;
 
 namespace {
 
-// Every live stage is stopped. waitid(WNOWAIT) only observes the state; the
-// stop status stays available to the shell's later wait/exit path.
+bool stage_stopped(const StageRt& stage) {
+    siginfo_t info{};
+    const int result = ::waitid(P_PID, static_cast<id_t>(stage.pid), &info,
+                                WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT);
+    if (result != 0) return errno == EINTR && stage.drained_stop;
+    if (info.si_pid == stage.pid) return info.si_code == CLD_STOPPED;
+    // If SIGCONT failed after draining a stop notification, remember the
+    // stopped member until a continuation or exit supersedes the record.
+    return stage.drained_stop;
+}
+
+// Observe stop status without consuming it until we are about to resume.
 bool all_live_stopped(const State& s) {
     bool any = false;
     for (const auto& stage : s.st) {
         if (stage.pid <= 0 || stage.reaped) continue;
         any = true;
-        siginfo_t info{};
-        if (::waitid(P_PID, static_cast<id_t>(stage.pid), &info,
-                     WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT) != 0 ||
-            info.si_pid != stage.pid || info.si_code != CLD_STOPPED)
-            return false;
+        if (!stage_stopped(stage)) return false;
     }
     return any;
 }
@@ -44,10 +51,7 @@ bool ProcessGroup::has_stopped_members() const {
     std::lock_guard<std::mutex> lock(s_->mu);
     for (const auto& stage : s_->st) {
         if (stage.pid <= 0 || stage.reaped) continue;
-        siginfo_t info{};
-        if (::waitid(P_PID, static_cast<id_t>(stage.pid), &info, WSTOPPED | WCONTINUED | WNOHANG | WNOWAIT) == 0 &&
-            info.si_pid == stage.pid && info.si_code == CLD_STOPPED)
-            return true;
+        if (stage_stopped(stage)) return true;
     }
     return false;
 }
@@ -72,7 +76,23 @@ bool ProcessGroup::continue_group() {
     State& s = *s_;
     OpLock op(s);
     if (s.detached || s.finished || s.pgid <= 0) return false;
-    return ::kill(-static_cast<pid_t>(s.pgid), SIGCONT) == 0;
+    // WNOWAIT leaves each reported stop queued. Drain the old stop before
+    // resuming so the next foreground wait cannot return it as a new stop
+    // before Darwin publishes a continuation event. WSTOPPED cannot reap
+    // an exit. A stop that occurs after SIGCONT is still observed normally.
+    for (auto& stage : s.st) {
+        if (stage.pid <= 0 || stage.reaped) continue;
+        siginfo_t info{};
+        int result;
+        do {
+            result = ::waitid(P_PID, static_cast<id_t>(stage.pid), &info, WSTOPPED | WNOHANG);
+        } while (result != 0 && errno == EINTR);
+        if (result != 0 && errno != ECHILD) return false;
+        if (result == 0 && info.si_pid == stage.pid && info.si_code == CLD_STOPPED) stage.drained_stop = true;
+    }
+    if (::kill(-static_cast<pid_t>(s.pgid), SIGCONT) != 0) return false;
+    for (auto& stage : s.st) stage.drained_stop = false;
+    return true;
 }
 
 bool ProcessGroup::give_terminal() {
