@@ -27,6 +27,61 @@ namespace fs = std::filesystem;
 
 namespace {
 
+void remove_staging_tree(const fs::path& path, std::error_code& error) {
+#ifdef _WIN32
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        const DWORD code = GetLastError();
+        if (code != ERROR_FILE_NOT_FOUND && code != ERROR_PATH_NOT_FOUND)
+            error.assign(static_cast<int>(code), std::system_category());
+        return;
+    }
+    const bool directory = (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    const bool reparse = (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+    if (directory && !reparse) {
+        for (fs::directory_iterator it(path, error), end; !error && it != end; it.increment(error)) {
+            remove_staging_tree(it->path(), error);
+            if (error) return;
+        }
+        if (error) return;
+    }
+    // Git can leave read-only objects in a checkout. On Windows, a
+    // file's attributes are shared by hardlinks. Inspect the leaf through
+    // a no-follow handle and leave multiply linked files untouched.
+    if (!directory && !reparse && (attributes & FILE_ATTRIBUTE_READONLY) != 0) {
+        const HANDLE file = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                        nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        if (file == INVALID_HANDLE_VALUE) {
+            error.assign(static_cast<int>(GetLastError()), std::system_category());
+            return;
+        }
+        BY_HANDLE_FILE_INFORMATION identity{};
+        FILE_BASIC_INFO info{};
+        DWORD code = ERROR_SUCCESS;
+        if (!GetFileInformationByHandle(file, &identity)) code = GetLastError();
+        else if (identity.nNumberOfLinks != 1 ||
+                 (identity.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)) != 0)
+            code = ERROR_ACCESS_DENIED;
+        else if (!GetFileInformationByHandleEx(file, FileBasicInfo, &info, sizeof(info))) code = GetLastError();
+        else {
+            info.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
+            if (info.FileAttributes == 0) info.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+            if (!SetFileInformationByHandle(file, FileBasicInfo, &info, sizeof(info))) code = GetLastError();
+        }
+        CloseHandle(file);
+        if (code != ERROR_SUCCESS) {
+            error.assign(static_cast<int>(code), std::system_category());
+            return;
+        }
+    }
+    const BOOL removed = directory ? RemoveDirectoryW(path.c_str()) : DeleteFileW(path.c_str());
+    if (!removed) error.assign(static_cast<int>(GetLastError()), std::system_category());
+#else
+    fs::remove_all(path, error);
+#endif
+}
+
 bool open_and_lock(const fs::path& path, bool exclusive, void*& file) {
 #ifdef _WIN32
     HANDLE handle = CreateFileW(path.wstring().c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -198,7 +253,7 @@ PackageTransaction::PackageTransaction(fs::path project_root)
 PackageTransaction::~PackageTransaction() {
     if (locked_ && !journal_published_ && !staging_root_.empty()) {
         std::error_code ignored;
-        fs::remove_all(staging_root_, ignored);
+        remove_staging_tree(staging_root_, ignored);
     }
     release();
 }
@@ -360,7 +415,7 @@ bool PackageTransaction::recover(std::string& error) {
     std::error_code ec;std::vector<fs::path> abandoned;
     for (fs::directory_iterator it(package_root_, ec), end; !ec && it != end; it.increment(ec)) if(it->path().filename().string().rfind(".txn-",0)==0)abandoned.push_back(it->path());
     if (ec) { error = "cannot inspect package transaction staging: " + ec.message(); return false; }
-    for(const auto& path:abandoned){fs::remove_all(path,ec);if(ec){error="cannot remove abandoned package staging: "+ec.message();return false;}}
+    for(const auto& path:abandoned){remove_staging_tree(path,ec);if(ec){error="cannot remove abandoned package staging: "+ec.message();return false;}}
     return true;
 }
 
@@ -483,7 +538,7 @@ bool PackageTransaction::apply_journal(const json::Document& journal, std::strin
     if (ec) { error = "cannot remove package transaction journal: " + ec.message(); return false; }
     journal_published_ = false;
     crash_at("during-cleanup");
-    fs::remove_all(transaction_root, ec);
+    remove_staging_tree(transaction_root, ec);
     if (ec) { error = "cannot clean package transaction directory: " + ec.message(); return false; }
     staging_root_.clear();
     return true;

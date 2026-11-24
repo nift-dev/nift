@@ -1,12 +1,25 @@
 /* CP21 portable foreground-ownership probe used by the PTY contract. */
+#define _POSIX_C_SOURCE 200809L
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+static void report_resume(int signo) {
+    (void)signo;
+    static const char message[] = "RESUMED-Z\n";
+    const ssize_t written = write(STDOUT_FILENO, message, sizeof message - 1);
+    (void)written;
+}
+
 int main(int argc, char** argv) {
     if (argc == 2 && strcmp(argv[1], "--read-and-wait") == 0) {
         char line[128];
+        struct sigaction on_continue = {0};
+        on_continue.sa_handler = report_resume;
+        on_continue.sa_flags = SA_RESTART;
+        if (sigemptyset(&on_continue.sa_mask) != 0 || sigaction(SIGCONT, &on_continue, NULL) != 0) return 1;
         puts("READY-Z");
         fflush(stdout);
         if (!fgets(line, sizeof line, stdin)) return 1;

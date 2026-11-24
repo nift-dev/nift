@@ -363,8 +363,11 @@ def ctrl_z(s, r):
     if not r.check("ctrl-z-stopped-state", "[1] Stopped" in out, out):
         return
     s.line("fg 1")
-    os.write(s.fd, b"HELLO-Z\r")
     try:
+        # Wait for the foreground job's SIGCONT acknowledgement before
+        # sending input. A shell prompt redraw alone proves no handoff.
+        s.until_text("RESUMED-Z", 3.0)
+        os.write(s.fd, b"HELLO-Z\r")
         s.until_text("GOT:HELLO-Z", 3.0)
         resumed = True
     except Timeout:
