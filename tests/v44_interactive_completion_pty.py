@@ -10,7 +10,7 @@ import os, pty, select, subprocess, sys, time
 
 # The interactive raw-mode line editor is Unix-only; Windows `plain `nift` shell` uses
 # line-based input until the platform backend lands. Skip there.
-if os.name == "nt":
+if os.name == "nt" or sys.platform in ("msys", "cygwin") or os.environ.get("MSYSTEM"):
     print("SKIP v4.4 interactive completion PTY (Windows uses line-based input)")
     sys.exit(77)
 

@@ -15,12 +15,25 @@ def normalize(value,root):
 import gzip
 p=Path(__file__).resolve().parent/'data';binary=Path(os.environ.get('NIFT','./nift')).resolve()
 with gzip.open(p/'v410-large-string-oracle.json.gz','rt',encoding='utf-8') as f:rows=json.load(f)
+# The six historical diagnostics below depend on legacy parser or factory
+# evaluation. Keep their byte-for-byte witnesses in the historical engine.
+# The compatible rows still exercise the VM.
+legacy_diagnostics = {
+ 'shape-.to_upper().replace("A","x",)',
+ 'shape-.to_upper().replace(,"A","x")',
+ 'shape-.to_upper(,).replace("A","x")',
+ 'receiver-factory', 'argument-factory', 'nested-error',
+}
+assert legacy_diagnostics <= {row['name'] for row in rows}
 with tempfile.TemporaryDirectory(prefix='nift-large-string-oracle-') as directory:
  root=Path(directory).resolve()
  for row in rows:
   file=root/'case.f';file.write_text(row['source']+'\n',encoding='utf-8')
-  q=subprocess.run([str(binary),native_path(file)],cwd=root,text=True,encoding='utf-8',capture_output=True,timeout=60)
-  actual=(q.returncode,q.stdout,normalize(q.stderr,root))
-  assert actual==(row['exit'],row['stdout'],row['stderr']),(row['name'],actual)
+  modes = ('0',) if row['name'] in legacy_diagnostics else ('0','require')
+  for mode in modes:
+   q=subprocess.run([str(binary),native_path(file)],cwd=root,env=dict(os.environ,NIFT_VM=mode),
+                    text=True,encoding='utf-8',capture_output=True,timeout=60)
+   actual=(q.returncode,q.stdout,normalize(q.stderr,root))
+   assert actual==(row['exit'],row['stdout'],row['stderr']),(row['name'],mode,actual)
   print('PASS',row['name'])
 print('PASS',len(rows),'exact payload/factory/diagnostic contracts')

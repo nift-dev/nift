@@ -84,17 +84,25 @@ def barrier(binary,base,kind):
  try:
   wait(p,'ready',proc)
   if kind=='interrupt':
-   assert (p/'public/a.html').exists();assert not metadata(p,'a').exists();proc.kill();proc.communicate();assert (p/'.nift/.unfinished').exists()
-   r=subprocess.run([binary,'build'],cwd=p,capture_output=True,text=True);assert r.returncode!=0
+   marker=p/'.nift/.unfinished'
+   assert (p/'public/a.html').exists() and marker.exists() and not metadata(p,'a').exists()
+   r=subprocess.run([binary,'build'],cwd=p,capture_output=True,text=True,timeout=10)
+   assert r.returncode!=0 and 'another build appears to be running' in r.stderr,(r.stdout,r.stderr)
+   assert marker.exists() and not metadata(p,'a').exists()
+   proc.kill();proc.communicate()
+   assert marker.exists() and not metadata(p,'a').exists()
    (p/'finish').touch()
    deadline=time.monotonic()+10
    while True:
-    r=subprocess.run([binary,'build','--repair'],cwd=p,capture_output=True,text=True)
+    r=subprocess.run([binary,'build'],cwd=p,capture_output=True,text=True,timeout=15)
     if r.returncode==0:break
+    # A surviving hook may still hold the inherited lock until it exits.
     assert 'another build appears to be running' in r.stderr,(r.stdout,r.stderr)
-    assert time.monotonic()<deadline
+    assert time.monotonic()<deadline,(r.stdout,r.stderr)
     time.sleep(.01)
-   assert metadata(p,'a').exists();return dict(kind=kind,passed=True)
+   assert 'unfinished build detected' in r.stderr,(r.stdout,r.stderr)
+   assert metadata(p,'a').exists() and not marker.exists()
+   return dict(kind=kind,passed=True)
   consumed=hash_bytes(d.read_bytes());d.write_text('NEW\n@content' if kind=='native' else 'NEW');(p/'finish').touch();out,err=proc.communicate(timeout=15)
   if kind=='external':assert proc.returncode!=0 and 'changed during build' in out+err,(out,err);assert not metadata(p,'a').exists()
   else:

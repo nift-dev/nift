@@ -25,6 +25,7 @@ import sys
 import tempfile
 import threading
 import hashlib
+import difflib
 import json
 import re
 import resource
@@ -69,10 +70,17 @@ def bounded():
         resource.setrlimit(kind, (value, value))
 
 
-def nift(cwd, *args, env=None, check=True):
+def nift(cwd, *args, env=None, check=True, trace=None):
     command = address_limited(PRIV + [NIFT, *args], 4 << 30)
+    trace_fds = ()
+    if trace is not None:
+        trace.seek(0)
+        trace.truncate()
+        trace_fds = (trace.fileno(),)
+        env = dict(os.environ if env is None else env, NIFT_TRACE_HOST=str(trace_fds[0]),
+                   NIFT_TRACE_HOST_VERSION="2")
     proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120, env=env,
-                          preexec_fn=bounded)
+                          preexec_fn=bounded, pass_fds=trace_fds)
     if check and proc.returncode != 0:
         raise RuntimeError("nift %s failed in %s:\n%s%s" % (" ".join(args), cwd, proc.stdout, proc.stderr))
     return proc
@@ -94,7 +102,7 @@ def tree(root):
     return out
 
 
-def clean_oracle(root, oracle):
+def clean_oracle(root, oracle, trace):
     if oracle.exists():
         shutil.rmtree(oracle)
     oracle.mkdir()
@@ -122,7 +130,7 @@ def clean_oracle(root, oracle):
     (oracle / ".nift").mkdir()
     for name in ("config.json", "tracked.json"):
         shutil.copy2(root / ".nift" / name, oracle / ".nift" / name)
-    nift(oracle, "build", "--all")
+    nift(oracle, "build", "--all", trace=trace)
     return tree(oracle)
 
 
@@ -153,9 +161,17 @@ def diagnose_open_output(root, oracle, incremental, expected):
 
 
 def compare(mode, step, root, oracle):
-    nift(root, "build")
+    if sys.platform.startswith("freebsd"):
+        with tempfile.TemporaryFile() as incremental_trace, tempfile.TemporaryFile() as clean_trace:
+            compare_builds(mode, step, root, oracle, incremental_trace, clean_trace)
+    else:
+        compare_builds(mode, step, root, oracle)
+
+
+def compare_builds(mode, step, root, oracle, incremental_trace=None, clean_trace=None):
+    nift(root, "build", trace=incremental_trace)
     incremental = tree(root)
-    expected = clean_oracle(root, oracle)
+    expected = clean_oracle(root, oracle, clean_trace)
     if incremental == expected:
         print("PASS [%s] %s: incremental == clean" % (mode, step))
     else:
@@ -177,11 +193,13 @@ def compare(mode, step, root, oracle):
                 mine = incremental.get(key, b"").decode(errors="replace").splitlines()
                 theirs = expected.get(key, b"").decode(errors="replace").splitlines()
                 print("    %s:" % key)
-                for a, b in zip(mine, theirs):
-                    if a != b:
-                        print("      incremental %r\n      clean       %r" % (a, b))
-                if len(mine) != len(theirs):
-                    print("      %d vs %d lines" % (len(mine), len(theirs)))
+                for line in difflib.unified_diff(mine, theirs, "incremental", "clean", n=1, lineterm=""):
+                    print("      " + line)
+        for label, trace in (("incremental", incremental_trace), ("clean", clean_trace)):
+            if trace is not None:
+                trace.seek(0)
+                records = [line.strip() for line in trace if b"data/open.txt" in line]
+                print("    %s original build open.txt host trace: %r" % (label, records[:20]))
         diagnose_open_output(root, oracle, incremental, expected)
         # Resynchronise so every later step is judged on its own edit.
         nift(root, "build", "--all")

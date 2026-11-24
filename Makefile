@@ -3661,7 +3661,7 @@ test-cp19-s1-dispatch-unit: $(SHELL_DISPATCH_UNIT)
 # C144 (D-101): function-call syntax in the interactive and piped shell is Nift, never a program launch (both
 # engines, three front ends, a fake PATH with markers), with NIFT_C144_MUTANT 1-3 and a no-mutation control.
 .PHONY: test-runtime2-shell-call-syntax
-test-runtime2-shell-call-syntax: $(TARGET) $(SHELL_DISPATCH_UNIT)
+test-runtime2-shell-call-syntax: $(TARGET) $(SHELL_DISPATCH_UNIT) $(DARWIN_ADDRESS_LIMIT)
 	$(SHELL_DISPATCH_UNIT)
 	env $(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/shell_call_syntax.py --nift "$(CURDIR)/$(TARGET)" --mutants
 test-cp19-s1-dispatch: test-runtime2-shell-call-syntax

@@ -10,7 +10,7 @@ Makefile	detected	-	@echo "test-v45-adversarial-runtime: skipped (POSIX timeout 
 Makefile	detected	-	if [ $$st -eq 77 ]; then echo "test-serve: SKIPPED (unsupported platform or python3 unavailable; nothing was tested)"; \
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
 Makefile	detected	-	V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
-Makefile	detected	-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
+Makefile	detected	-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then NIFT_VM=0 $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
 Makefile	detected	-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/shell_dispatch.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: shell dispatch needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi
 Makefile	detected	-	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) -u tests/cp19_completion.py; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: completion PTY needs POSIX)"; else exit $$st; fi; else echo "  (skipped: python3 unavailable)"; fi

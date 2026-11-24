@@ -79,6 +79,8 @@ def env():
     result["HOME"] = str(ROOT)
     result["PATH"] = str(BIN) + ":" + result.get("PATH", "/usr/bin:/bin")
     result["STUB_LOG"] = str(STUB_LOG)
+    # This historical dispatch suite exercises legacy functions and interpolation.
+    result["NIFT_VM"] = "0"
     result.pop("NIFT_NO_PROCESS", None)
     return result
 

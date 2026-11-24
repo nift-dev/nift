@@ -172,9 +172,15 @@ def check_append_controls():
   assert (result.returncode,result.stdout,result.stderr,actual) == (0,'2\n','',b'ABCDEFGHxy'), (result,actual)
   result, actual = run('f:=file("data");f.open("r");f.append("xy")',b'ABCDEFGH')
   assert result.returncode == 1 and 'append: file is not open for writing' in result.stderr and actual == b'ABCDEFGH', (result,actual)
-  original = b'A' * 65536
-  result, actual = run('f:=file("data");f.open("rw");print("opened");f.append("xy");f.save()',original,100000)
-  assert result.returncode == 70 and result.stdout == 'opened\n' and 'memory budget exceeded' in result.stderr and actual == original, result
+  # Force allocation beyond any small-string capacity. The old two-byte
+  # append could fit in spare capacity after a read on libc++.
+  original = b'ABCDEFGH'
+  payload = 'z' * 65536
+  source = 'f:=file("data");f.open("rw");payload:="'+payload+'";print("ready");f.append(payload);f.save();f.close()'
+  result, actual = run(source,original,100000)
+  assert result.returncode == 70 and result.stdout == 'ready\n' and 'memory budget exceeded' in result.stderr and actual == original, result
+  result, actual = run(source,original,1000000)
+  assert (result.returncode,result.stdout,result.stderr,actual) == (0,'ready\n','',original+payload.encode()), result
   print('PASS append controls: exact bytes, unchanged cursor, read-only error and allocation stop',flush=True)
 
 if os.environ.get('NIFT_VM') != '0':

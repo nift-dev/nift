@@ -12,10 +12,10 @@ import tempfile
 NIFT = pathlib.Path(sys.argv[1]).resolve()
 
 
-def run(args, cwd, *, source=None, ok=True, env=None):
+def run(args, cwd, *, source=None, ok=True, env=None, engine="0"):
     result = subprocess.run(
         [str(NIFT), *args], cwd=cwd, input=source, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={**(os.environ if env is None else env), "NIFT_VM":engine},
     )
     if ok and result.returncode != 0:
         raise AssertionError(f"command failed: {args}\n{result.stderr}")
@@ -48,6 +48,13 @@ print(child_dir())
 print(child_missing())
 print(module_path("../ordinary-authority.txt"))
 """)
+    write(local / "vm-refusal.f", 'print("RESOURCE_PATH_SENTINEL")\nprint(module_path())\n')
+    refusal = run(["vm-refusal.f"], local, ok=False, engine="require")
+    assert refusal.returncode == 1 and refusal.stdout == "", refusal
+    assert refusal.stderr.splitlines()[0].endswith(
+        "vm-refusal.f:2:7: not compiled for the VM (callable:module_path): "
+        "the call `module_path()` is not supported by the Runtime 2.0 VM yet"), refusal.stderr
+    assert "note: the program was not executed: no part of it ran" in refusal.stderr
     result = run(["main.f"], local)
     assert result.stdout.splitlines() == [
         local.as_posix(),

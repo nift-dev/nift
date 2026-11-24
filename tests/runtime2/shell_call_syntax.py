@@ -25,6 +25,8 @@ import sys
 import tempfile
 import time
 
+from child_address_limit import address_limited
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 FAKE = ["cat", "cp", "mv", "rm", "ls", "mkdir", "touch", "native", "foo", "echo", "read", "sleep", "test", "len",
@@ -73,7 +75,10 @@ BUILTIN_COMMANDS = {
 
 
 def limits():
-    resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
+    if sys.platform != "darwin":
+        _, hard = resource.getrlimit(resource.RLIMIT_AS)
+        ceiling = min(hard, 2 << 30) if hard != resource.RLIM_INFINITY else 2 << 30
+        resource.setrlimit(resource.RLIMIT_AS, (ceiling, ceiling))
     resource.setrlimit(resource.RLIMIT_FSIZE, (64 << 20, 64 << 20))
 
 
@@ -100,7 +105,7 @@ def env_for(d, vm):
 
 def piped(nift, d, vm, args, lines):
     try:
-        p = subprocess.run([nift] + args, cwd=d, env=env_for(d, vm), input="\n".join(lines) + "\n",
+        p = subprocess.run(address_limited([nift] + args, 2 << 30), cwd=d, env=env_for(d, vm), input="\n".join(lines) + "\n",
                            capture_output=True, text=True, timeout=60, preexec_fn=limits)
     except subprocess.TimeoutExpired:
         return "timeout"
@@ -112,7 +117,8 @@ def tty(nift, d, vm, lines):
     if pid == 0:
         os.chdir(d)
         limits()
-        os.execve(nift, [nift], env_for(d, vm))
+        command = address_limited([nift], 2 << 30)
+        os.execve(command[0], command, env_for(d, vm))
     out = b""
 
     def drain(seconds):
