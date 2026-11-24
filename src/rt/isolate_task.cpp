@@ -97,6 +97,7 @@ bool clone_proto(const Proto& source, Proto& clone, const ProgramIndex& source_i
     clone.collection_expression_view = source.collection_expression_view;
     clone.name = source.name;
     clone.is_async = source.is_async;
+    clone.variadic = source.variadic;
     clone.nparams = source.nparams;
     clone.nregs = source.nregs;
     clone.code = source.code;

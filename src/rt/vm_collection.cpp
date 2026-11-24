@@ -28,10 +28,12 @@ bool Vm::op_collection_call(const Instr& in,Value*& R,const Value*& K,const Prot
     if(!function||!function->code)return raise(fault,StopReason::Error,"transformation: callback must be callable");
     const auto* callee=static_cast<const Proto*>(function->code);
     if(!(in.c&kConstantBit)&&callee->collection_entry)callee=callee->collection_entry;
-    if((in.c&0x1fffu)!=callee->nparams)return raise(fault,StopReason::Error,"callback argument count mismatch");
+    const auto argc = static_cast<std::uint16_t>(in.c & 0x1fffu);
+    if (!callee->accepts_arity(argc)) return raise(fault,StopReason::Error,"callback argument count mismatch");
     const std::size_t callee_base=base+in.a;
     if((frames_.size()>=next_frame_check_||callee_base+callee->nregs+1u>stack_.size())&&
        !call_slow(callee,function->is_lambda?nullptr:function->name.c_str(),callee_base,fault))return false;
+    if (!pack_variadic_args(*callee, argc, stack_.data() + callee_base, fault)) return false;
     if (callee->session_source)
         for (const auto type : callee->session_param_types)
             if (type != 0xffff) stack_[callee_base + type] = Value::integer(-1);

@@ -15,7 +15,9 @@ bool UnitCompiler::collection_callback_shape(const Node& site,NodeId callback,st
     if(targets==kinds_.callable_targets.end()||targets->second.empty())return fail(site,reason);
     for(NodeId id:targets->second) {
         const Node& lambda=ast_.at(id);
-        if(lambda.kind!=NodeKind::Lambda||!(lambda.flags&kFlagBlockBody)||lambda.count!=argc)continue;
+        if(lambda.kind!=NodeKind::Lambda||!(lambda.flags&kFlagBlockBody))continue;
+        const bool variadic = lambda.count && (ast_.at(ast_.list(lambda)[lambda.count-1]).flags & kFlagVariadic);
+        if(variadic ? argc<lambda.count-1 : argc!=lambda.count)continue;
         const Node& body=ast_.at(lambda.b);
         if(body.count!=1)return fail(site,reason);
         const Node& n=ast_.at(ast_.list(body)[0]);

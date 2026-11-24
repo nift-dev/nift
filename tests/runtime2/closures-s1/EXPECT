@@ -26,7 +26,8 @@ g12_cell_not_observable.f vm
 g4_closure_restore.f vm
 g1_aggregate_cycle.f cycle  # B5: admitted; storing the closure that returns `a` into `a` closes a cycle (refused, owner 2026-11-01; legacy copies: "array")
 g1_aggregate_cycle_cell.f cycle  # D-040/D-NEXT-refsem #4: cycle through a captured array, the guard admits it
-g13_lambda_variadic.f fallback:lambda-variadic
+g13_lambda_variadic.f vm
+g13_lambda_variadic_short.f vm-error
 g13_spread_callable.f fallback:spread
 g14_binding_function_type.f vm-error
 g15_shadow_toplevel_block.f vm

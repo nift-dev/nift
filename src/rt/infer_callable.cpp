@@ -26,6 +26,12 @@ std::size_t Inference::lambda_unit(NodeId node) {
         const auto seed = session_->parameter_seeds.find(ast_.list(ast_.at(node))[k]);
         if (seed != session_->parameter_seeds.end()) info.params[k] = seed->second;
     }
+    if (!info.params.empty() && (ast_.at(ast_.list(ast_.at(node))[info.params.size()-1]).flags & kFlagVariadic)) {
+        auto rest = std::make_shared<Ty>();
+        rest->kinds = kKindArray;
+        rest->elem = top_ty();
+        info.params.back() = std::move(rest);
+    }
     info.returns = empty_ty();
     info.collection_returns = empty_ty();
     info.scopes = scopes_;
@@ -62,7 +68,10 @@ TyRef Inference::call_callables(const TyRef& callee, const std::vector<TyRef>& v
             const std::size_t id = static_cast<std::size_t>(unit) - plan_.functions.size() - 1;
             LambdaInfo& info = lambdas_[id];
             if (session_) session_call_edge(unit, info.params.size(), values.size());
-            for (std::size_t k = 0; k < values.size() && k < info.params.size(); ++k)
+            const Node& lambda = ast_.at(info.node);
+            const bool variadic = lambda.count && (ast_.at(ast_.list(lambda)[lambda.count-1]).flags & kFlagVariadic);
+            const std::size_t fixed = info.params.size() - (variadic ? 1 : 0);
+            for (std::size_t k = 0; k < values.size() && k < fixed; ++k)
                 grew = merge(info.params[k], values[k]) || grew;
             info.callers.insert(current_unit());
             out = unite(out, async_result(ast_.at(info.node).flags, info.returns));

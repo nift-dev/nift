@@ -62,7 +62,9 @@ struct Proto {
     bool collection_expression_view = false;
     std::string name;
     bool is_async = false;  // CP22: calling it spawns a task (fn[async], async lambdas)
+    bool variadic = false;  // The last parameter receives a fresh array of trailing arguments.
     std::uint16_t nparams = 0;
+    bool accepts_arity(std::uint16_t count) const { return variadic ? count >= nparams - 1 : count == nparams; }
     std::uint16_t nregs = 0;
     std::vector<Instr> code;
     std::vector<std::uint32_t> offsets;

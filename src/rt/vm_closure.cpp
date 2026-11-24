@@ -234,7 +234,7 @@ bool Vm::op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 6
 #define CALL_ARITY_OK true
 #else
-#define CALL_ARITY_OK (in.c == code->nparams)
+#define CALL_ARITY_OK (code->accepts_arity(in.c))
 #endif
     if (!(CALL_ARITY_OK)) {
         const Note* note = note_at(proto, &in);
@@ -256,6 +256,7 @@ bool Vm::op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*
     if ((frames_.size() >= next_frame_check_ || callee_base + code->nregs + 1u > stack_.size()) &&
         !call_slow(code, error_name, callee_base, fault))
         return false;
+    if (!pack_variadic_args(*code, in.c, stack_.data() + callee_base, fault)) return false;
     frames_.push_back(Frame{pc + 1, base, proto, closure_, (in.flags & kInstrReturnCall) != 0});
     closure_ = f;
     base = callee_base;

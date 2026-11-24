@@ -1,2 +1,7 @@
 f := (...xs) => xs.length()
+print(f())
 print(f(1, 2))
+g := (first_arg,...rest_args) => first_arg + rest_args.length()
+print(g(7))
+print(g(7, 8, 9, 10))
+print([4,5].map(g).stringify())

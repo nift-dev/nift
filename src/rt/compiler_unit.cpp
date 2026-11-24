@@ -61,6 +61,10 @@ void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
 UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
                            const std::vector<bool>& loop_called, const GlobalPlan* globals)
     : globals_(globals), ast_(ast), plan_(plan), kinds_(kinds), root_(root), loop_called_(loop_called) {
+    for (NodeId id = 0; id < ast_.size() && !variadic_parameters_; ++id) {
+        const Node& node = ast_.at(id);
+        variadic_parameters_ = node.kind == NodeKind::Param && (node.flags & kFlagVariadic);
+    }
     const std::size_t count = plan.functions.size();
     observable_.resize(count);
     std::vector<std::unordered_set<std::string_view>> names(count);

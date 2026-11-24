@@ -48,7 +48,7 @@ private:
     bool session_order_call_types(const Node&, NodeId, std::uint16_t, bool&);
     bool session_call_types(const Node& node, NodeId callee, std::uint16_t base);
     bool session_publish(std::string_view name, const Binding& binding);
-    bool expression_result_ = false;
+    bool expression_result_ = false, variadic_parameters_ = false;
     struct Loop {
         std::size_t start = 0;
         std::vector<std::size_t> breaks;

@@ -194,11 +194,32 @@ bool Vm::native(const Instr& in, const Proto* proto, Value* R, std::string& outp
     return builtin(in, proto, R, fault);  // CP14 built-ins; reports an unknown id
 }
 
+bool Vm::pack_variadic_args(const Proto& callee, std::uint16_t argc, Value* args, Fault& fault) {
+    if (!callee.variadic) return true;
+    const std::uint16_t first = callee.nparams - 1;
+    if (argc < first) return internal(fault, "variadic argument window");
+    const std::size_t count = argc - first;
+    if (!mutation::reserve(heap_limit_, sizeof(ArrayObject) + count * sizeof(Value))) return memory_exceeded(fault);
+    build::Array rest(count);
+    for (std::uint16_t index = first; index < argc; ++index)
+        rest.push(std::move(args[index]));
+    args[first] = std::move(rest).publish();
+    return memory_ok(fault);
+}
+
 bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, const Value* K,
               std::string& output, Fault& fault) {
     Value out;
     switch (in.op) {
         case OpCode::Nop: return true;
+        case OpCode::CheckVariadicArity: {
+            const Value& callable = R[in.a];
+            if (!callable.is(Kind::Function)) return true;
+            const auto* code = static_cast<const Proto*>(callable.heap_as<FunctionObject>()->code);
+            if (code && code->variadic && !code->accepts_arity(in.b))
+                return raise(fault, StopReason::Error, "lambda argument count mismatch");
+            return true;
+        }
         case OpCode::Div: if (!arith_slow(in, OpCode::Div, RK(in.b), RK(in.c), out, fault)) return false; break;
         case OpCode::Not: out = Value::boolean(!truth(R[in.b])); break;
         case OpCode::Truth: out = Value::boolean(truth(R[in.b])); break;

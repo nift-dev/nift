@@ -74,6 +74,7 @@ namespace nift::rt {
     X(CellLoad)   /* R[a] = cell(R[b]).value                                   */                    \
     X(CellStore)  /* check/cell-store R[b] into cell R[a]; text type RK[c]      */                    \
     X(Closure)    /* R[a] = closure(protos[b], cells R[a+1 .. a+c])             */                    \
+    X(CheckVariadicArity) /* R[a] callable, b provided operands, before evaluation */ \
     X(CallValue)  /* R[a] = R[b](R[a] .. R[a+c-1]); callee frame base = a       */                    \
     X(GetUpvalue) /* R[a] = value of closure cell b                            */                    \
     X(GetUpvalueCell) /* R[a] = the cell Value of closure upvalue b            */                    \

@@ -256,6 +256,7 @@ private:
                  const Instr*& pc, Fault& fault);
     bool op_call_value(const Instr& in, Value*& R, const Value*& K, const Proto*& proto, std::size_t& base,
                        const Instr*& pc, Fault& fault);
+    bool pack_variadic_args(const Proto& callee, std::uint16_t argc, Value* args, Fault& fault);
     bool op_undefined(const Instr& in, Fault& fault, const Proto* proto);
     bool op_get_global_checked(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     void op_mark_global(const Instr& in);

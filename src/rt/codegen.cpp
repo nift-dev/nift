@@ -74,7 +74,7 @@ bool writes_register_a(OpCode op) {
         case OpCode::NewSourceSlot: case OpCode::TryBegin: case OpCode::TryEnd: case OpCode::CollectionSort:
         case OpCode::CollectionStep: case OpCode::CollectionCall: case OpCode::ArrayMutate: case OpCode::KeyedMutate:
         case OpCode::SessionRender: case OpCode::SessionNumeric: case OpCode::CallValueAny: case OpCode::Yield:
-        case OpCode::TaskEnd: return false;
+        case OpCode::TaskEnd: case OpCode::CheckVariadicArity: return false;
         default: return true;
     }
 }
@@ -148,6 +148,7 @@ void FunctionBuilder::drop_unread_types() {
     for (std::uint16_t reg : kept_types_) mark_register(read, reg);
     for (const Instr& in : code) {
         switch (in.op) {
+            case OpCode::CheckVariadicArity: mark_register(read, in.a); break;
             case OpCode::CheckType: mark_register(read, in.b); break;
             case OpCode::CheckAssign: case OpCode::TypeMeet:
                 mark_register(read, in.b);

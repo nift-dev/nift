@@ -78,7 +78,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);
         if (param.kind != NodeKind::Param) return fail(param, "lambda-param");
-        if (param.flags & kFlagVariadic) return fail(param, "lambda-variadic");
+        if ((param.flags & kFlagVariadic) && (session_ || plan_.coroutines)) return fail(param, "lambda-variadic");
         if (reserved_name(text(param))) return fail(param, "param-name-reserved");
     }
     std::vector<std::string_view> names;
@@ -301,6 +301,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         ok = finish(out);
         if (ok) {
             out->collection_expression_view = collection_view;
+            out->variadic = lambda.count != 0 && (ast_.at(params[lambda.count-1]).flags & kFlagVariadic);
             if (session_ && !session_lambda_definition(task, *out)) return false;
             if (session_) for (std::uint32_t k = 0; k < lambda.count; ++k) {
                 out->session_params.push_back(kinds(params[k]));
@@ -353,6 +354,10 @@ bool UnitCompiler::call_value(const Node& node, NodeId callee_id, bool member, s
     // Sessions keep their own session:legacy-method-precedence refusal (D-106: not changed here).
     if (member && !session_ && legacy_field_call_refused(text(ast_.at(callee.b))))
         return fail(callee, "legacy-method-precedence");
+    if (variadic_parameters_ && node.count != 0 && !session_ && !plan_.coroutines) {
+        fb_->set_offset(site(node));
+        fb_->emit(OpCode::CheckVariadicArity, callee_reg, static_cast<std::uint16_t>(node.count));
+    }
     const std::uint16_t base = fb_->top();
     if (!operand_window(base, node.count)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k) {

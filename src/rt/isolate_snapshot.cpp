@@ -44,6 +44,7 @@ bool snapshot_isolate_program(const Program& source, const TransferProtoMap& map
     for (std::size_t i = 0; i < count; ++i) {
         const auto& src = *source.protos[first + i]; auto& dst = *copy->protos[i];
         dst.name = src.name; dst.is_async = src.is_async;
+        dst.variadic = src.variadic;
         dst.nparams = src.nparams; dst.nregs = src.nregs;
         dst.collection_expression_view = src.collection_expression_view;
         dst.code = src.code; dst.offsets = src.offsets;
