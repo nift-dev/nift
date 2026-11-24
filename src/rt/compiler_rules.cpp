@@ -1,7 +1,10 @@
 #include "rt/compiler_rules.h"
 
+#include "rt/compiler_native_args.h"
 #include "rt/prepared_parse.h"
 #include "rt/text_type.h"
+
+#include <algorithm>
 
 namespace nift::rt::detail {
 
@@ -33,7 +36,8 @@ bool is_receiver(NodeKind kind) {
 
 // CP10 accepts some postfix spellings legacy reads differently (whitespace
 // before `.`/`[`/`(`, postfix on literals, calls on non-name callees,
-// trailing commas); only the plain spellings are compiled.
+// trailing commas). Admit irregular spellings only where their shape and
+// legacy behavior are established.
 bool UnitCompiler::plain_postfix(const Node& node) {
     const std::string_view src = ast_.source();
     const Node& left = ast_.at(node.a);
@@ -54,7 +58,28 @@ bool UnitCompiler::plain_postfix(const Node& node) {
             src[member.begin - 1] == '.' && node.end < src.size() && src[node.end] == '(')
             return true;
     }
-    if (left.end >= src.size() || src[left.end] != expected) return fail(node, "postfix-spelling");
+    if (left.end >= src.size() || src[left.end] != expected) {
+        if (node.kind == NodeKind::Call && left.kind == NodeKind::Member &&
+            ast_.at(left.a).kind == NodeKind::Ident && left.begin == ast_.at(left.a).begin &&
+            kinds(left.a) == kKindString && node.count == 1 &&
+            text(ast_.at(left.b)) == "split") {  // rt-lint: allow-string-compare compile time
+            const auto open = src.find_first_not_of(" \t", left.end);
+            const Node& receiver = ast_.at(left.a);
+            const auto name = text(receiver);
+            const Binding* binding = find_binding(name);
+            // A String kind can still contain a legacy runtime tag. Reuse
+            // the plain-literal proof and reject any possible reassignment.
+            // An effectful delimiter can be retried by legacy's loop evaluator.
+            const Node& delimiter = ast_.at(ast_.list(node)[0]);
+            if (open < node.end && src[open] == '(' && binding &&
+                delimiter.kind == NodeKind::String && delimiter.count == 0 &&
+                plain_readonly_arity_string(ast_, receiver, binding) && !assigned_.count(name) &&
+                std::none_of(assigned_fn_.begin(), assigned_fn_.end(),
+                             [&](const auto& names) { return names.count(name); }))
+                return true;
+        }
+        return fail(node, "postfix-spelling");
+    }
     if (node.kind == NodeKind::Member && ast_.at(node.b).begin != left.end + 1) return fail(node, "postfix-spelling");
     if (node.kind != NodeKind::Call && !is_receiver(left.kind)) {
         const bool scalar = left.kind == NodeKind::Number || left.kind == NodeKind::True ||

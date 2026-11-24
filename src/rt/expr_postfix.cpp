@@ -99,7 +99,19 @@ NodeId ExprParser::postfix(NodeId node, std::uint32_t begin) {
     std::uint32_t last_dot = 0;
     bool safe = false;
     while (is(Tok::LParen) || is(Tok::Dot) || is(Tok::QuestionDot) || is(Tok::LBracket) || is(Tok::QuestionBracket)) {
-        if (tok_.begin != prev_end_) return fail(OpaqueReason::LegacyRuntimeError);
+        if (tok_.begin != prev_end_) {
+            // Legacy accepts horizontal spacing before the delimiter of a
+            // split call on a bare binding. Leave grouped and chained receivers
+            // and all other irregular postfix forms on the conservative path.
+            const Node& callee = ast_.at(node);
+            const bool bare_split = is(Tok::LParen) && name_base && links == 1 &&
+                                    callee.kind == NodeKind::Member &&
+                                    ast_.at(callee.a).kind == NodeKind::Ident &&
+                                    ast_.text(ast_.at(callee.b)) == "split";  // rt-lint: allow-string-compare parse
+            const auto gap = src_.substr(prev_end_, tok_.begin - prev_end_);
+            if (!bare_split || gap.find_first_not_of(" \t") != std::string_view::npos)
+                return fail(OpaqueReason::LegacyRuntimeError);
+        }
         if (scalar_head && (links >= 2 ||
             (links == 0 && (end_ - tok_.begin < conversion.size() ||
                             src_.substr(tok_.begin, conversion.size()) != conversion))))

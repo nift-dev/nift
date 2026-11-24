@@ -140,6 +140,26 @@ if os.environ.get('NIFT_VM')!='0':
    assert approved_refusal.refusal_reason(q.stderr)=='opaque:legacy-runtime-error', (source,q)
    assert 'note: the program was not executed: no part of it ran' in q.stderr and set(root.iterdir())=={path}, (source,q)
  print('PASS grouped postfix irregular-spacing controls')
+ with tempfile.TemporaryDirectory(prefix='nift-spaced-split-') as directory:
+  root=Path(directory).resolve();path=root/'case.f'
+  path.write_text('p:="a/b"; print(p.split\t("/").last())\n')
+  for mode in ('0','require'):
+   q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM=mode),
+                    capture_output=True,text=True,encoding='utf-8',timeout=60)
+   assert (q.returncode,q.stdout,q.stderr)==(0,'b\n',''), (mode,q)
+  path.write_text('p:="a/b"; fn(d()) { print("argument"); return open("missing") }; '
+                  'j:=0; while(j<1) { print(p.split (d()).last()); j+=1 }\n')
+  q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='require'),
+                   capture_output=True,text=True,encoding='utf-8',timeout=60)
+  assert (q.returncode,q.stdout)==(1,''), q
+  assert approved_refusal.refusal_reason(q.stderr)=='postfix-spelling', q
+  (root/'tagged').write_bytes(b'\x1fnift:file:7')
+  path.write_text('print("REFUSAL_EXECUTION_SENTINEL"); p:=open("tagged"); print(p.split ("/").last())\n')
+  q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='require'),
+                   capture_output=True,text=True,encoding='utf-8',timeout=60)
+  assert (q.returncode,q.stdout)==(1,''), q
+  assert approved_refusal.refusal_reason(q.stderr)=='postfix-spelling', q
+ print('PASS spaced split tab, faulting-delimiter and tagged-source controls')
  with tempfile.TemporaryDirectory(prefix='nift-stat-provider-') as directory:
   root=Path(directory).resolve();path=root/'case.f';data=root/'a'
   data.write_bytes(b'A')
