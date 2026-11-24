@@ -73,7 +73,10 @@ print(c["1"])
 print([1,2].any(x => x > 1))
 print([1,2].all(x => x > 0))
 print([1,2].find(x => x > 1))' $'1,2,3\n2,4\n2,3\n6\n1,3\n1\n2,3\n1,2\n1\n3\n2\ntrue\ntrue\n2'
-ok handle_and_comparator 's := set()
+# D-063 bounds VM collection support. Retain the complete historical
+# witness, and exercise the map refusal independently of the first set call.
+. "$(dirname "$0")/runtime2/approved_refusal.sh"
+printf '%s\n' 's := set()
 s.add(3)
 s.add(1)
 print(s.map(x => x + 1).join(","))
@@ -83,7 +86,17 @@ print(a.join(","))
 m := map()
 m.set("a", 2)
 m.set("b", 3)
-print(m.map((k,v) => v + 1).join(","))' $'4,2\n1,2,3\n3,4'
+print(m.map((k,v) => v + 1).join(","))' > "$t/keyed-callbacks.f"
+approved_refusal "$B" "set callback and historical comparator witness" collection-callback:map D-063 \
+    "$t/keyed-callbacks.f" $'4,2\n1,2,3\n3,4'
+printf '%s\n' 'm := map()
+m.set("a", 2)
+m.set("b", 3)
+print(m.map((k,v) => v + 1).join(","))' > "$t/map-callback.f"
+approved_refusal "$B" "map callback" collection-callback:map D-063 "$t/map-callback.f" '3,4'
+ok array_comparator 'a := [3,1,2]
+a.sort((x,y) => x < y)
+print(a.join(","))' '1,2,3'
 ok reference 'a := [[1]]
 f := x => x
 b := f(a[0])
