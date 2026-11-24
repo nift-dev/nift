@@ -6,7 +6,11 @@ real_python=$(command -v python3)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fail=0
-for mode in --fault-delay --fault-cont --fault-handoff --fault-restore; do
+modes=(tests/cp21_interactive_host.py)
+if [ "$(uname -s)" = Linux ]; then
+    modes+=(--fault-delay --fault-cont --fault-handoff --fault-restore)
+fi
+for mode in "${modes[@]}"; do
     cat >"$tmp/python3" <<SHIM
 #!/usr/bin/env bash
 for arg in "\$@"; do
@@ -18,7 +22,7 @@ done
 exec "$real_python" "\$@"
 SHIM
     chmod +x "$tmp/python3"
-    log="$tmp/${mode#--}.log"
+    log="$tmp/${mode##*/}.log"
     set +e
     PATH="$tmp:$PATH" make -C "$root" test-cp21-interactive-host >"$log" 2>&1
     rc=$?

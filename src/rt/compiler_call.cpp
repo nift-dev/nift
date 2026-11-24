@@ -250,15 +250,6 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
 // the value's), but an aggregate is shared, so only an argument that is
 // itself a path whose kinds are certainly scalar is admitted (not empty, no
 // aggregate, not Unknown); every other path in call arguments is refused.
-// Its failures use legacy's location wording: the whole argument text, at
-// its start (`f(a[1].k.b)`: `JSON value 'a[1].k.b' has no member 'k'`, see
-// get_member; index messages quote the same text). Member on a non-object and index on a
-// non-container cannot occur: those receivers are refused (type:member,
-// type:index).
-// Assumption: no write outside this unit changes an element's or member's
-// kind. That holds because a unit with import, export or module bindings is
-// refused as a whole (statement:Import, statement:Export); it must still
-// hold when live exports arrive (CP12B, D-046).
 bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     if (call_args_ == 0) return true;
     const bool top = path_arg_ != kNoNode && &node == &ast_.at(path_arg_);
@@ -337,6 +328,15 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     std::string location;
     if (!argument_path(node, location)) return false;
     if (error_member_access(node, dst, node.a)) return true;
+    const Node& receiver = ast_.at(node.a);
+    const Binding* parameter = in_lambda_ && receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
+    const bool numeric_parameter = !session_ && return_read_offset_ == kNoNode &&
+        parameter && parameter->decl_node != kNoNode &&
+        ast_.at(parameter->decl_node).kind == NodeKind::Param && kinds(node.a) != 0 &&
+        (kinds(node.a) & ~kKindNumber) == 0;
+    if (numeric_parameter)
+        return expr_to(node.a, dst) &&
+               legacy_fatal(node, "value has no member: " + std::string(text(ast_.at(node.b))), dst);
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;

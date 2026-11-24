@@ -26,3 +26,16 @@ fixture supplies an owned command, checks its marker and checks continuation.
 FreeBSD run 45328750459 passed 48 exact-output comparisons and 86 applicable
 VM checks. The original intermittent `open-2` omission remains without a
 confirmed root cause. Preserve the mandatory exact-output assertion.
+
+Historical run 45417780659 passed Windows and Linux. macOS passed the
+revised shell smoke and reached the CP21 Make failure control. The control
+now injects a failure in the common driver on both platforms and injects
+the four Linux-specific fault branches only where Make runs them.
+
+The numeric lambda member diagnostic matches the historical module case
+and the direct and callback probes. Lambda block return operands retain
+their separate diagnostic path. The nested factory inference prototype
+remains reverted because it changed a reached closure error into a refusal.
+
+The focused loop sanitizer gate passed all 57 cases outside the sandbox.
+The earlier sandbox run failed when LeakSanitizer could not inspect threads.
