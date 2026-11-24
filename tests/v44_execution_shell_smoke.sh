@@ -61,9 +61,15 @@ grep -q '^err$' <<<"$err_out" || { echo "err-redirect: $err_out" >&2; exit 1; }
 test -s "$t/err.txt" || { echo "stderr redirect file missing or empty" >&2; exit 1; }
 echo "MARK interp"
 # $[...] interpolation in command arguments and ; command separation.
-interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" 2>/dev/null || true)
+mkdir -p "$t/status-bin"
+printf '#!/bin/sh\necho fixture-nonzero\nexit 1\n' > "$t/status-bin/false"
+chmod +x "$t/status-bin/false"
+printf '@echo off\necho fixture-nonzero\nexit /b 1\n' > "$t/status-bin/false.cmd"
+interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' |
+  PATH="$t/status-bin:$PATH" "$NIFT" 2>&1 || true)
 grep -q 'hello world' <<<"$interp_out" || { echo "interp: $interp_out" >&2; exit 1; }
 grep -q 'onetwo' <<<"$interp_out" || { echo "interp-one-two: $interp_out" >&2; exit 1; }
+grep -q 'fixture-nonzero' <<<"$interp_out" || { echo "interp-false: $interp_out" >&2; exit 1; }
 grep -q 'three' <<<"$interp_out" || { echo "interp-three: $interp_out" >&2; exit 1; }
 echo "MARK fn"
 # Function-call interpolation in command arguments (e.g. $[project_root()])

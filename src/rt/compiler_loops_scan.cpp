@@ -188,11 +188,16 @@ struct ShrinkScan {
         const Node& n = ast.at(id);
         const Node& callee = ast.at(n.a);
         if (callee.kind == NodeKind::Member) {
-            // A proved array's push only appends, even if it reallocates.
-            // The operands must still be checked for possible shrinkage.
-            const bool append = kinds.of(callee.a) == kKindArray &&
-                                ast.text(ast.at(callee.b)) == "push";  // rt-lint: allow-string-compare compile time
-            if (!append) { found = true; return; }
+            // These proved array methods cannot remove elements. A sort
+            // still requires a known read-only selector and all operands
+            // must be scanned for effects before the method can run.
+            const auto method = ast.text(ast.at(callee.b));
+            const bool nonshrinking = kinds.of(callee.a) == kKindArray &&
+                (method == "push" ||  // rt-lint: allow-string-compare compile time
+                 (method == "stringify" && n.count == 0) ||  // rt-lint: allow-string-compare compile time
+                 (method == "sort_by" && n.count == 1 &&  // rt-lint: allow-string-compare compile time
+                  read_only_callable(ast.list(n)[0])));
+            if (!nonshrinking) { found = true; return; }
         } else if (callee.kind == NodeKind::Ident) {
             NativeInfo info;
             if (!lookup_native(ast.text(callee), info) && !read_only_callable(n.a)) { found = true; return; }
