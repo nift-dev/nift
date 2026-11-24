@@ -149,32 +149,56 @@ struct CaptureScan {
 } // namespace
 
 
-// Could a body change the source array's length (or an object's keys)? A plain
-// non-captured local cannot be mutated by a call (arguments are copies), so
-// only direct writes and methods on it matter; cells/globals/upvalues are
-// conservatively treated as mutable.
+// Could a body remove elements or replace the source? Unknown calls may
+// mutate an alias. Cells, globals and upvalues retain the conservative result.
 struct ShrinkScan {
     const Ast& ast;
+    const UnitKinds& kinds;
     std::string_view name;
     bool found = false;
+
+    bool read_only_expression(NodeId id) const {
+        const Node& n = ast.at(id);
+        switch (n.kind) {
+            case NodeKind::Ident: case NodeKind::Number: case NodeKind::True:
+            case NodeKind::False: case NodeKind::Null: return true;
+            case NodeKind::String: return n.count == 0;
+            case NodeKind::Member: return read_only_expression(n.a);
+            case NodeKind::Index: case NodeKind::Binary:
+                return read_only_expression(n.a) && read_only_expression(n.b);
+            default: return false;
+        }
+    }
+
+    bool read_only_callable(NodeId id) const {
+        const auto unknown = kinds.callable_unknown.find(id);
+        if (kinds.of(id) != kKindFunction || unknown == kinds.callable_unknown.end() || unknown->second)
+            return false;
+        const auto targets = kinds.callable_targets.find(id);
+        if (targets == kinds.callable_targets.end() || targets->second.empty()) return false;
+        for (NodeId target : targets->second) {
+            const Node& lambda = ast.at(target);
+            if (lambda.kind != NodeKind::Lambda || (lambda.flags & (kFlagBlockBody | kFlagAsync)) ||
+                !read_only_expression(lambda.b)) return false;
+        }
+        return true;
+    }
 
     void call(NodeId id) {
         const Node& n = ast.at(id);
         const Node& callee = ast.at(n.a);
         if (callee.kind == NodeKind::Member) {
-            const Node& receiver = ast.at(callee.a);
-            if (receiver.kind == NodeKind::Ident && ast.text(receiver) == name) {
-                found = true;  // any method on the source may change its length
-                return;
-            }
-        }
-        const NodeId callee_id = n.a;
-        const Node& callee_node = ast.at(callee_id);
-        if (callee_node.kind == NodeKind::Ident) {
+            // A proved array's push only appends, even if it reallocates.
+            // The operands must still be checked for possible shrinkage.
+            const bool append = kinds.of(callee.a) == kKindArray &&
+                                ast.text(ast.at(callee.b)) == "push";  // rt-lint: allow-string-compare compile time
+            if (!append) { found = true; return; }
+        } else if (callee.kind == NodeKind::Ident) {
             NativeInfo info;
-            if (!lookup_native(ast.text(callee_node), info)) found = true;  // user call may mutate a main binding
-        } else if (callee_node.kind != NodeKind::Lambda) {
-            found = true;  // indirect/callable-value calls are conservative too
+            if (!lookup_native(ast.text(callee), info) && !read_only_callable(n.a)) { found = true; return; }
+        } else if (callee.kind != NodeKind::Lambda) {
+            found = true;
+            return;
         }
         node(n.a);
         const NodeId* args = ast.list(n);
@@ -231,7 +255,7 @@ bool UnitCompiler::for_body_writes(const Node& body, std::string_view name) cons
 bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const {
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
-    ShrinkScan scan{ast_, name};
+    ShrinkScan scan{ast_, kinds_, name};
     scan.node(node_id(body));
     return scan.found;
 }
