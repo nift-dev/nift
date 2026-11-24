@@ -147,12 +147,27 @@ import("async-owner")
 future := same_name()
 print(await future)
 F
-if (cd "$site" && "$NIFT_ABS" exact-async-owner.f >/dev/null 2>"$t/exact-async.err"); then
-  fail 'async worker mutated a same-name callable in another module'
-elif [ -n "$(refusal_of "$t/exact-async.err")" ] && [ "$(refusal_of "$t/exact-async.err")" != coro-module-private-async ]; then
-  fail "module-private async callables: refused with $(refusal_of "$t/exact-async.err") (inventory status $(status_of "$(refusal_of "$t/exact-async.err")"))"
-elif [ -z "$(refusal_of "$t/exact-async.err")" ] && ! grep -F 'module-private async callables are unsupported' "$t/exact-async.err" >/dev/null; then
-  fail "module-private async callables: stderr [$(cat "$t/exact-async.err")]"
+if (cd "$site" && NIFT_VM=0 "$NIFT_ABS" exact-async-owner.f >"$t/exact-async.out" 2>"$t/exact-async.err"); then
+  fail 'legacy async worker mutated a same-name callable in another module'
+elif [ -s "$t/exact-async.out" ] || ! grep -F 'module-private async callables are unsupported' "$t/exact-async.err" >/dev/null; then
+  fail "legacy module-private async callables: stderr [$(cat "$t/exact-async.err")]"
+fi
+# Keep the historical same-name case above. Use a distinct child export here
+# to reach the private async guard independently of linking collisions.
+cat > "$site/.nift/packages/async-owner/src/child.f" <<'F'
+@fn[async](child_task()) { return "child" }
+export(child_task)
+F
+cat > "$site/.nift/packages/async-owner/src/main.f" <<'F'
+import("./child.f")
+@fn[async](same_name()) { return child_task() }
+export(same_name)
+F
+if (cd "$site" && "$NIFT_ABS" exact-async-owner.f >"$t/exact-async.out" 2>"$t/exact-async.err"); then
+  fail 'VM executed a module-private async callable'
+elif [ -s "$t/exact-async.out" ] || [ "$(refusal_of "$t/exact-async.err")" != coro-module-private-async ] ||
+     ! grep -F 'note: the program was not executed: no part of it ran' "$t/exact-async.err" >/dev/null; then
+  fail "VM module-private async callables: stderr [$(cat "$t/exact-async.err")]"
 fi
 cat > "$site/main.f" <<'F'
 import("worker")

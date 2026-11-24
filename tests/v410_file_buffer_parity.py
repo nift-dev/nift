@@ -38,7 +38,14 @@ assert len(D173) == len(pin_rows) == 27
 assert sorted(pin['kind'] for pin in pin_rows) == ['invalid-call'] * 4 + ['legacy-replace-depth'] * 2 + ['ownership'] * 7 + ['parser-limit'] * 8 + ['postfix'] * 6
 assert not D172.keys() & D173.keys()
 assert D172.keys() | D173.keys() <= {row['name'] for row in rows}
-REFUSALS = D172 | D173
+with (Path(__file__).resolve().parent/'data/v410-file-buffer-d174.tsv').open(newline='') as pins:
+ pin_rows = list(csv.DictReader(pins,delimiter='\t'))
+D174 = {pin['case']:pin for pin in pin_rows}
+assert len(D174) == len(pin_rows) == 5
+assert all(pin['kind'] == 'nested-replace' for pin in pin_rows)
+assert D174.keys() <= {row['name'] for row in rows}
+assert not D174.keys() & (D172.keys() | D173.keys())
+REFUSALS = D172 | D173 | D174
 INITIAL_FILES = {name:b'ABCDEFGH'.hex() for name in ('data','sub/data','sub/sub/data')}
 
 def check_refusal(actual, expected, diagnostic):
@@ -80,6 +87,28 @@ def check_adjacent_postfix():
   assert actual == dict(exit=0,stdout='x\n',stderr='',files={}), actual
   print('PASS compact nested trim control',flush=True)
 
+def check_replace_boundaries():
+ with tempfile.TemporaryDirectory(prefix='nift-file-replace-') as directory:
+  root=Path(directory).resolve()
+  path=root/'case.f'
+  expected=dict(exit=0,stdout='y\n',stderr='',files={})
+  path.write_text('r:="x".replace("x","y");print("x".replace("x",r))\n')
+  for engine in ('0','require'):
+   assert run_case(root,path,engine) == expected
+  for depth in (1,2,20,21):
+   path.write_text('f:=file("data");fn(id(x)){return x};print('+'"x".replace("x",'*depth+'"y"'+')'*(depth+1)+'\n')
+   assert run_case(root,path,'0') == expected
+   result=run_case(root,path,'require')
+   if depth == 1:
+    assert result == expected, result
+   else:
+    diagnostic = (
+     'error: <ORACLE_ROOT>/case.f:1:59: not compiled for the VM (builtin-lazy-args:replace): '
+     'lazily evaluated arguments of `replace()` is not supported by the Runtime 2.0 VM yet'
+     if depth < 21 else D174['stack-method-argument-40']['diagnostic'])
+    check_refusal(result,expected,diagnostic)
+  print('PASS nested replace boundaries and precomputed replacement',flush=True)
+
 def check_row(row):
  with tempfile.TemporaryDirectory(prefix='nift-file-buffer-oracle-') as directory:
   root=Path(directory).resolve();(root/'sub/sub').mkdir(parents=True)
@@ -96,7 +125,7 @@ def check_row(row):
     pin=REFUSALS[row['name']]
     assert hashlib.sha256(row['source'].encode()).hexdigest() == pin['source_sha256'], row['name']
     diagnostic=pin['diagnostic']
-    assert expected['exit'] == (0 if pin['kind'] in ('flow','nesting','postfix') else 1), expected
+    assert expected['exit'] == (0 if pin['kind'] in ('flow','nesting','postfix','nested-replace') else 1), expected
     if pin['kind'] in ('parser-limit','legacy-replace-depth','invalid-call'):
      assert expected['stdout'] == '' and expected['files'] == INITIAL_FILES, expected
     if pin['kind'] == 'parser-limit':
@@ -106,7 +135,7 @@ def check_row(row):
    untouched={'files':INITIAL_FILES}
    check_refusal(actual,untouched,diagnostic)
    line=diagnostic.replace('/case.f:1:','/case.f:2:',1)
-   path.write_text('print("MUST-NOT-RUN")\n'+row['source']+'\n')
+   path.write_text('print("REFUSAL_EXECUTION_SENTINEL")\n'+row['source']+'\n')
    check_refusal(run_case(root,path,mode),untouched,line)
    path.write_text(row['source']+'\n')
    legacy=run_case(root,path,'0')
@@ -152,6 +181,7 @@ if os.environ.get('NIFT_VM') != '0':
  check_append_controls()
  check_depth_boundaries()
  check_adjacent_postfix()
+ check_replace_boundaries()
 failures = refusals = 0
 for row in rows:
  try:

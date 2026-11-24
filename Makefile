@@ -3515,15 +3515,15 @@ test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 # autoconf exit 77 (platform skip) from a v44 test is an acknowledged skip,
 # not a failure: POSIX-only tests report it on platforms without the facility.
 V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
-PORTABLE_TIMEOUT ?= "$(PYTHON)" -c "import subprocess,sys; subprocess.call(sys.argv[1:], timeout=120)"
+PORTABLE_TIMEOUT ?= "$(PYTHON)" -c "import subprocess,sys; sys.exit(subprocess.call(sys.argv[1:], timeout=120))"
 
 test-v44-shell-restricted: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_shell_glob.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp21_history_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
-	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
+	@if command -v "$(PYTHON)" >/dev/null 2>&1; then NIFT_VM=0 $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
 	@if command -v "$(PYTHON)" >/dev/null 2>&1; then $(PORTABLE_TIMEOUT) "$(PYTHON)" -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET) $(V44_SKIP_77); else echo "  (skipped: $(PYTHON) unavailable)"; fi
-	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
+	NIFT_VM=0 bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 CP19_EXPR_UNIT := $(TEST_DIR)/cp19/expression-unit$(EXEEXT)
 CP19_EXPR_OBJECTS := $(RT_VALUE_SOURCES:.cpp=.o) src/RuntimeValue.o

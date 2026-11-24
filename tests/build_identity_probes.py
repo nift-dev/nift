@@ -14,7 +14,11 @@ compiler=compiler.replace('\\','/')
 print('identity control compiler:',compiler,flush=True)
 flags=['-std=c++17','-O2','-Wall','-Wextra','-pedantic','-pthread','-Isrc']
 static=['-static','-static-libgcc','-static-libstdc++'] if os.name=='nt' else []
-for source,filename,extra in [('tests/identity_catalogue_probe.cpp','probe',['src/FileSystem.cpp','-DNIFT_TEST_IDENTITY_PUBLICATION']),(str(suite_root/'tests/identity_spelling_differential.cpp'),'spelling',[])]:
+# Windows uses the maintained observation harness against the selected
+# checkout's FileSystem.cpp and publisher. MinGW's symlink_status and the
+# native no-follow probe can legitimately disagree under a denied ACL.
+probe_source = str(suite_root/'tests/identity_catalogue_probe.cpp') if os.name=='nt' else 'tests/identity_catalogue_probe.cpp'
+for source,filename,extra in [(probe_source,'probe',['src/FileSystem.cpp','-DNIFT_TEST_IDENTITY_PUBLICATION']),(str(suite_root/'tests/identity_spelling_differential.cpp'),'spelling',[])]:
  unicode=['-municode'] if os.name=='nt' and filename=='probe' else []
  subprocess.run([compiler,*flags,source,*extra,*static,*unicode,'-o',str(out/(filename+suffix))],cwd=root,check=True)
 # The native runner may export a different prefixed MinGW CXX. The ordinary

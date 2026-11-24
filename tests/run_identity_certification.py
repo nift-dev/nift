@@ -32,7 +32,7 @@ if os.name == 'nt':
                 f"sys.path[:0] = [{str(historical_script.parent)!r}, {str(root / 'tests')!r}]\n"
                 "from identity_windows_acl import denied_read, assert_denied\n")
     replacement = (' blocked=root/"data"\n with denied_read(blocked):\n  assert_denied(blocked)\n'
-                   + probe_assertion + '\n' + status_assertion + '\n')
+                   + probe_assertion.replace("'native'", "'native-denied'") + '\n' + status_assertion + '\n')
     historical_script = out / 'historical_publication_windows.py'
     adapted = preamble + source[:start] + replacement + source[end:]
     compile(adapted, str(historical_script), 'exec')
