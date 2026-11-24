@@ -63,14 +63,15 @@ p=Path(__file__).resolve().parent/'data';binary=Path(os.environ.get('NIFT','./ni
 for row in rows:
  with tempfile.TemporaryDirectory(prefix='nift-filesystem-oracle-') as directory:
   root=Path(directory).resolve();(root/'one').mkdir();(root/'two').mkdir()
-  for file,data in [('a','A'),('b','B'),('one/a','ONE'),('two/a','TWO')]: (root/file).write_text(data)
+  initial_files={'a':b'A','b':b'B','one/a':b'ONE','two/a':b'TWO'}
+  for file,data in initial_files.items(): (root/file).write_bytes(data)
   source=row['source'].replace('<ORACLE_ROOT>',native_path(root));path=root/'case.f';path.write_text(source+'\n')
   q=subprocess.run([str(binary),native_path(path)],cwd=root,capture_output=True,text=True,encoding='utf-8',timeout=60)
   reason=approved_refusal.refusal_reason(q.stderr)
   if row['name'] in STAT_REFUSALS and os.environ.get('NIFT_VM')!='0':
    column,digest=STAT_REFUSALS[row['name']]
-   expected_files={f.relative_to(root).as_posix():f.read_bytes() for f in root.rglob('*') if f.is_file() and f!=path}
-   assert expected_files=={'a':b'A','b':b'B','one/a':b'ONE','two/a':b'TWO'}, expected_files
+   actual_files={f.relative_to(root).as_posix():f.read_bytes() for f in root.rglob('*') if f.is_file() and f!=path}
+   assert actual_files==initial_files, actual_files
    assert hashlib.sha256(row['source'].encode()).hexdigest()==digest, row['name']
    diagnostic=(f'error: <ORACLE_ROOT>/case.f:1:{column}: not compiled for the VM (fn-name-reserved): '
                'a function named like a built-in is not supported by the Runtime 2.0 VM yet')
@@ -86,7 +87,8 @@ for row in rows:
    print('PASS',row['name'],'(exact reserved-name refusal; legacy channel exact)',flush=True)
    continue
   if reason is not None:
-   if [f for f in root.rglob('*') if f.is_file() and f.name!='case.f' and f.relative_to(root).as_posix() not in ('a','b','one/a','two/a')]:
+   actual_files={f.relative_to(root).as_posix():f.read_bytes() for f in root.rglob('*') if f.is_file() and f!=path}
+   if actual_files!=initial_files:
     fail(row['name'],'files changed by a refused program');continue
    def legacy(lq,row=row,root=root):
     files={f.relative_to(root).as_posix():f.read_text() for f in root.rglob('*') if f.is_file() and f.name!='case.f'}
