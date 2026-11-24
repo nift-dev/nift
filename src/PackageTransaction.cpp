@@ -221,12 +221,22 @@ bool valid_transaction_id(const std::string& id) {
 }
 
 bool real_directory(const fs::path& path) {
+    if (filesystem::dependency_leaf_native(path.c_str()) != filesystem::NativeLeafState::Plain) return false;
     std::error_code ec;
     const auto status = fs::symlink_status(path, ec);
     return !ec && status.type() == fs::file_type::directory;
 }
 
 bool journal_file_state(const fs::path& path, bool& present, std::string& error) {
+    const auto leaf = filesystem::dependency_leaf_native(path.c_str());
+    if (leaf == filesystem::NativeLeafState::Error) {
+        error = "cannot inspect package transaction journal";
+        return false;
+    }
+    if (leaf == filesystem::NativeLeafState::Symlink || leaf == filesystem::NativeLeafState::Reparse) {
+        error = "package transaction journal is not a regular file";
+        return false;
+    }
     std::error_code ec;
     const auto status=fs::symlink_status(path,ec);
     if(status.type()==fs::file_type::not_found){present=false;return true;}

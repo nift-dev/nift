@@ -209,8 +209,8 @@ with tempfile.TemporaryDirectory() as raw:
     else:
         rejected = run(symlink_journal, "install", ok=False)
         assert rejected.returncode != 0
-        assert "not a regular file" in rejected.stderr
-        assert external_journal.exists()
+        assert "not a regular file" in rejected.stderr, rejected.stderr
+        assert external_journal.read_text(encoding="utf-8") == '{"version":1}\n'
 
     dangling_site = root / "dangling-journal"
     dangling_site.mkdir()
@@ -223,7 +223,7 @@ with tempfile.TemporaryDirectory() as raw:
     else:
         rejected = run(dangling_site, "install", ok=False)
         assert rejected.returncode != 0
-        assert "not a regular file" in rejected.stderr
+        assert "not a regular file" in rejected.stderr, rejected.stderr
         assert dangling.is_symlink()
 
     symlink_stage = root / "symlink-stage"
