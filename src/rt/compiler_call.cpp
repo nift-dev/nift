@@ -252,18 +252,6 @@ bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     path_chain_ = node.a;
     return true;
 }
-// Argument k written without parentheses of its own: legacy quotes the
-// argument's text, `(o.k)` included, which is not the path's.
-bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
-    const std::string_view src = ast_.source();
-    std::uint32_t at = ast_.at(ast_.list(call)[k]).begin;
-    while (at > 0 && (src[at - 1] == ' ' || src[at - 1] == '\t' || src[at - 1] == '\n' || src[at - 1] == '\r')) --at;
-    if (at == 0) return false;
-    if (k > 0) return src[at - 1] == ',';
-    std::uint32_t open = ast_.at(call.a).end;
-    while (open < src.size() && src[open] != '(') ++open;
-    return at - 1 == open;
-}
 // The outermost member/index chain `node` belongs to (D1, path wording):
 // legacy resolves a postfix path operand as one text and quotes all of it in
 // an index message (`a[5].y`: 'a[5].y'); a method call or parentheses end the
@@ -355,7 +343,14 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool bad_boolean_key = in_lambda_ && !session_ && !loop_reachable() &&
                                  return_read_offset_ == kNoNode && object_kinds == kKindArray &&
                                  (key_node == NodeKind::True || key_node == NodeKind::False);
-    if (!array && !object && !bad_boolean_key && !unknown_defers(object_kinds | key_kinds))
+    const Node& receiver = ast_.at(node.a);
+    const Binding* parameter = in_lambda_ && receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
+    const bool null_parameter = parameter && parameter->decl_node != kNoNode &&
+        ast_.at(parameter->decl_node).kind == NodeKind::Param && !session_ && !loop_reachable() &&
+        return_read_offset_ == kNoNode && object_kinds == kKindNull && key_node == NodeKind::Number;
+    const Node* null_call = null_parameter && (!module_names_ || module_names_->empty())
+        ? direct_null_index_call(ast_, root_, node_id(node)) : nullptr;
+    if (!array && !object && !bad_boolean_key && !null_call && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
@@ -377,6 +372,11 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     fb_->set_flags(saved_flags);
     --index_depth_;
     if (!key_ok) return false;
+    if (null_call) {
+        const bool ok = legacy_fatal(*null_call, "invalid index", dst);
+        fb_->release_to(mark);
+        return ok;
+    }
     if (bad_boolean_key) {
         const bool ok = legacy_fatal(node, "JSON array indices must be non-negative integers in '" +
                                      std::string(location.empty() ? text(chain) : location) + "'", dst);

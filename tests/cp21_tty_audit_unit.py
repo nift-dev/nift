@@ -25,16 +25,25 @@ with tempfile.TemporaryDirectory() as td:
         p.write_text(ready + suffix)
         assert not c.background_tty_stolen(c.read_tty_audit(p, 10)), suffix
         checks += 1
-    p.write_text(ready + 'handoff 10 10 11 11 0\nhandoff 10 10 10 10 0\n')
-    records = c.read_tty_audit(p, 10)
-    assert c.background_tty_stolen(records)
-    assert c.audit_shell_restored(records)
-    assert not c.audit_shell_restored(records[:-1])
+    handoff = 'handoff 10 10 11 11 0\n'
+    stopped = 'stopped 10 10 11 11 0\n'
+    restore = 'handoff 10 10 10 10 0\n'
+    for sequence in [ready, ready + handoff, ready + handoff + stopped + restore,
+                     ready + stopped + 'input 10 10 0 11 0\n']:
+        p.write_text(sequence)
+        assert c.audit_shell_restored(c.read_tty_audit(p, 10)) is None
+        checks += 1
+    for input_owner, expected, suffix in [(10, True, ''), (11, False, restore)]:
+        p.write_text(ready + handoff + stopped + f'input 10 10 0 {input_owner} 0\n' + suffix)
+        records = c.read_tty_audit(p, 10)
+        assert c.background_tty_stolen(records)
+        assert c.audit_shell_restored(records) is expected
+        checks += 2
+    p.write_text(ready + handoff + stopped + 'input 10 10 0 -1 0\n')
     try:
-        c.audit_shell_restored(records[:1])
+        c.audit_shell_restored(c.read_tty_audit(p, 10))
     except OSError:
-        pass
+        checks += 1
     else:
-        raise AssertionError('missing child handoff accepted')
-    checks += 4
+        raise AssertionError('invalid tty owner accepted')
 print('PASS CP21 terminal audit evidence guards:', checks)

@@ -214,3 +214,35 @@ element-path fixtures still expose differences. The full matrix determines
 their effect on certification. The 97 filesystem contracts remain at
 59 executions and 38 approved refusals. The 102-row original oracle
 remains unchanged.
+
+### Certification follow-up for 1db7e2c6
+
+The four-platform VM subset and build-only packaging passed. The first red
+Checkpoint 10 assertion on Linux, macOS and Windows was the same known-null
+lambda index in `test-v49-selector-parity`. The VM now raises the historical
+error at the exact direct call site. Admission requires a single direct
+null-literal invocation whose origin is known. A wrapped invocation keeps
+its precise refusal. All 69 local selector checks pass.
+
+The aggregate element-path case remains a real semantic blocker. An
+identity call using `a[0]` returns a live location in legacy. Replacing
+`a[0]` makes that returned location read the new value. Merely admitting
+the aggregate and loading its original object would instead read the old
+value. The new control pins both the historical result and the VM refusal.
+The downstream callback and object-member gates still expose reserved
+declarations and the computed-key case. The unchanged recipe and
+file-buffer contracts do not authorize any of these forms.
+
+The macOS historical run passed the normal CP21 scenario. The mutant 4
+fixture reported restored ownership and then hit PTY EIO. Its last-handoff
+check could observe later cleanup. The fixture now observes the kernel stop and terminal owner at the shell's
+first subsequent input attempt, before cleanup. Missing stop, missing
+input, failed handoff and invalid owner evidence cannot count as a mutant
+kill. The 22 audit guards and all five Linux PTY mutants pass. Darwin
+interposition and the mutant result require the hosted run.
+
+The Test Integrity log records a runner shutdown and exit 143 during the
+parallel aggregate. The language binding steps, including the explicit
+aggregate binding target, completed beforehand. Treat this aggregate as
+incomplete and rerun it. The log does not establish an aggregate product
+failure.

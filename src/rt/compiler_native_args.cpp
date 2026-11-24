@@ -200,4 +200,52 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
     return constant_of(node, value, is_constant) && is_constant;
 }
 
+// Argument k written without parentheses of its own: legacy quotes the
+// argument's text, `(o.k)` included, which is not the path's.
+bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {
+    const std::string_view src = ast_.source();
+    std::uint32_t at = ast_.at(ast_.list(call)[k]).begin;
+    while (at > 0 && (src[at - 1] == ' ' || src[at - 1] == '\t' || src[at - 1] == '\n' || src[at - 1] == '\r')) --at;
+    if (at == 0) return false;
+    if (k > 0) return src[at - 1] == ',';
+    std::uint32_t open = ast_.at(call.a).end;
+    while (open < src.size() && src[open] != '(') ++open;
+    return at - 1 == open;
+}
+// Wrapped and collection calls can have different legacy error origins.
+const Node* direct_null_index_call(const Ast& ast, NodeId root, NodeId indexed) {
+    const Node& program = ast.at(root);
+    NodeId binding = kNoNode;
+    for (std::uint32_t k = 0; k < program.count; ++k) {
+        const Node& stmt = ast.at(ast.list(program)[k]);
+        if (stmt.kind != NodeKind::Declare || ast.at(stmt.a).kind != NodeKind::Ident) continue;
+        const Node& init = ast.at(stmt.b);
+        if (init.kind == NodeKind::Lambda && !(init.flags & (kFlagAsync | kFlagBlockBody)) && init.b == indexed)
+            binding = stmt.a;
+    }
+    if (binding == kNoNode) return nullptr;
+    const auto name = ast.text(ast.at(binding));
+    NodeId use = kNoNode;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const Node& node = ast.at(id);
+        if (node.kind == NodeKind::Opaque || node.kind == NodeKind::Command ||
+            node.kind == NodeKind::TemplateStmt) return nullptr;
+        if (id == binding || (node.kind != NodeKind::Ident && node.kind != NodeKind::Param) ||
+            ast.text(node) != name) continue;
+        if (use != kNoNode || node.kind != NodeKind::Ident) return nullptr;
+        use = id;
+    }
+    for (std::uint32_t k = 0; k < program.count; ++k) {
+        const Node& stmt = ast.at(ast.list(program)[k]);
+        if (stmt.kind != NodeKind::ExprStmt) continue;
+        const Node& print = ast.at(stmt.a);
+        if (print.kind != NodeKind::Call || print.count != 1 || ast.at(print.a).kind != NodeKind::Ident ||
+            ast.text(ast.at(print.a)) != "print") continue;
+        const Node& call = ast.at(ast.list(print)[0]);
+        if (call.kind == NodeKind::Call && call.a == use && call.count == 1 &&
+            ast.at(ast.list(call)[0]).kind == NodeKind::Null) return &call;
+    }
+    return nullptr;
+}
+
 } // namespace nift::rt::detail

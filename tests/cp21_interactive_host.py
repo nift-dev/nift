@@ -283,7 +283,7 @@ def read_tty_audit(path, shell_pid):
     records = []
     for line in path.read_text().splitlines():
         parts = line.split()
-        if len(parts) != 6 or parts[0] not in ("ready", "handoff"):
+        if len(parts) != 6 or parts[0] not in ("ready", "handoff", "stopped", "input"):
             raise OSError("malformed terminal audit")
         pid, group, requested, observed, rc = map(int, parts[1:])
         if pid == shell_pid:
@@ -295,12 +295,32 @@ def read_tty_audit(path, shell_pid):
 
 
 def audit_shell_restored(records):
-    # Require a real handoff to a child before interpreting terminal ownership.
-    if not background_tty_stolen(records):
-        raise OSError("terminal audit missing child ownership prerequisite")
-    handoffs = [row for row in records if row[0] == "handoff"]
-    _, shell_group, requested, observed, status = handoffs[-1]
-    return status == 0 and requested == observed == shell_group
+    child_group = None
+    stopped_group = None
+    for kind, shell_group, requested, observed, status in records:
+        if status != 0:
+            continue
+        if kind == "handoff" and requested > 0 and requested != shell_group and observed == requested:
+            child_group = requested
+            stopped_group = None
+        elif kind == "stopped" and requested == observed == child_group:
+            stopped_group = child_group
+        elif kind == "input" and stopped_group is not None:
+            if observed not in (shell_group, stopped_group):
+                raise OSError("terminal audit has no foreground owner at shell input")
+            return observed == shell_group
+    return None
+
+
+def wait_for_stop_input_audit(s, timeout=4.0):
+    deadline = time.monotonic() + timeout
+    path = Path(s.root) / "tty-audit"
+    while time.monotonic() < deadline:
+        restored = audit_shell_restored(read_tty_audit(path, s.pid))
+        if restored is not None:
+            return restored
+        time.sleep(0.02)
+    raise Timeout("terminal audit missing stopped child or next shell input")
 
 
 def background_owner(s, r):
@@ -357,16 +377,18 @@ def ctrl_z(s, r):
     s.line(f"{PROBE} --read-and-wait")
     s.until_text("READY-Z")
     os.write(s.fd, b"\x1a")
-    s.prompt()
-    r.witness("ctrl-z-returned")
-    if LINUX:
-        restored = shell_owns_tty(s) is True
-    elif TTY_AUDIT:
-        restored = audit_shell_restored(read_tty_audit(Path(s.root) / "tty-audit", s.pid))
+    if TTY_AUDIT and not LINUX:
+        # A redraw can precede a failed tty read and cleanup can restore the
+        # terminal later. Use the durable sample taken before that first read.
+        restored = wait_for_stop_input_audit(s)
     else:
-        restored = None
+        s.prompt()
+        restored = shell_owns_tty(s) is True if LINUX else None
+    r.witness("ctrl-z-returned")
     if restored is not None and not r.check("ctrl-z-restores-terminal", restored):
         return
+    if TTY_AUDIT and not LINUX:
+        s.prompt()
     s.line("jobs")
     s.prompt()
     out = s.output()

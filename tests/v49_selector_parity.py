@@ -61,11 +61,13 @@ cases = [
  ('bare ordinary aggregate remains a value', 'fn(add(x)) { x.push(9) }\na := [1]\nadd(a); print(a.stringify())', '[1]\n'),
  ('member iteration snapshot growth', 'a := [{"v":2}]\nfor(row : a) { f := x => row.v; row["v"] = 7; a.push({"v":9}); print(f(0)) }', '2\n'),
  ('negative index', 'f := x => x[-1]\nprint(f([2,7]))', None),
+ ('live element argument', 'a := [[1]]\nfn(id(x)) { return x }\nb := id(a[0])\na[0] = [9]\nprint(b.stringify())', None),
  ('effectful Boolean index', 'fn(key()) { print("key"); return true }\nf := x => x[key()]\nprint(f([1]))', None),
  ('index type error', 'f := x => x[true]\nprint(f([2]))', None),
  ('missing capture', 'f := x => unknown_name\nprint(f(1))', None),
  ('arity error', 'f := x => x\nprint(f())', None),
  ('bounds error', 'f := x => x[99]\nprint(f([1]))', None),
+ ('wrapped null index', 'f := x => x[0]\ng := y => f(y)\nprint(g(null))', None),
  ('null indexed', 'f := x => x[0]\nprint(f(null))', None),
 ]
 # B5: stored and returned arrays/objects share references. Iteration
@@ -103,11 +105,13 @@ errors = {
  'missing member': 'value has no member: missing',
  'null member': 'value has no member: v',
  'negative index': "JSON array indices must be non-negative integers in 'x[-1]'",
+ 'live element argument': 'selector.f:3:9: not compiled for the VM (path-in-call-argument)',
  'effectful Boolean index': 'selector.f:2:11: not compiled for the VM (type:index)',
  'index type error': "JSON array indices must be non-negative integers in 'x[true]'",
  'missing capture': 'unknown value or malformed expression: unknown_name',
  'arity error': 'lambda argument count mismatch',
  'bounds error': "JSON array index 99 is out of range in 'x[99]'",
+ 'wrapped null index': 'selector.f:1:11: not compiled for the VM (type:index)',
  'null indexed': 'invalid index',
 }
 with tempfile.TemporaryDirectory() as directory:
@@ -126,6 +130,18 @@ with tempfile.TemporaryDirectory() as directory:
    original = subprocess.run([str(Path(baseline).resolve()),str(path)],capture_output=True,text=True,encoding="utf-8")
    if (candidate.returncode,candidate.stdout,candidate.stderr) != (original.returncode,original.stdout,original.stderr):
     raise SystemExit(f'FAIL A/B {name}: {candidate} != {original}')
+  if name == 'live element argument':
+   legacy = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8",
+                           env=dict(os.environ, NIFT_VM='0'))
+   if (legacy.returncode,legacy.stdout,legacy.stderr) != (0,'[9]\n',''):
+    raise SystemExit(f'FAIL historical live element argument: {legacy}')
+   if candidate.returncode != 1 or candidate.stdout or 'the program was not executed' not in candidate.stderr:
+    raise SystemExit(f'FAIL live element argument must refuse before execution: {candidate}')
+  if name == 'null indexed':
+   legacy = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8",
+                           env=dict(os.environ, NIFT_VM='0'))
+   if (candidate.returncode,candidate.stdout,candidate.stderr) != (legacy.returncode,legacy.stdout,legacy.stderr):
+    raise SystemExit(f'FAIL null-index diagnostic location: {candidate} != {legacy}')
   if name == 'non-callable local shadow' and (candidate.returncode != 1 or candidate.stdout != 'argument\n'):
    raise SystemExit(f'FAIL argument evaluation before non-callable error: {candidate}')
   if name == 'effectful Boolean index' and (candidate.stdout or 'the program was not executed' not in candidate.stderr):

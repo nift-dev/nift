@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <stdatomic.h>
+#include <sys/wait.h>
+#endif
 
 static void record(const char* kind, pid_t requested, pid_t observed, int rc) {
     const char* path = getenv("CP21_TTY_AUDIT");
@@ -53,4 +57,42 @@ static const struct {
     int (*replacement)(int, pid_t);
     int (*original)(int, pid_t);
 } tty_interpose = {audit_tcsetpgrp, tcsetpgrp};
+
+// Capture the first shell input attempt after the kernel reports a stopped
+// child. Cleanup may restore the tty later and hide a failed hand-back.
+static _Atomic int stopped;
+static int audit_waitid(idtype_t type, id_t id, siginfo_t* info, int options) {
+    int rc = waitid(type, id, info, options);
+    int saved = errno;
+    if (rc == 0 && info && info->si_pid > 0 && info->si_code == CLD_STOPPED) {
+        pid_t group = getpgid(info->si_pid);
+        if (group > 0) {
+            record("stopped", group, tcgetpgrp(STDIN_FILENO), 0);
+            atomic_store(&stopped, 1);
+        }
+    }
+    errno = saved;
+    return rc;
+}
+
+static ssize_t audit_read(int fd, void* buffer, size_t size) {
+    if (fd == STDIN_FILENO && atomic_exchange(&stopped, 0)) {
+        int saved = errno;
+        record("input", 0, tcgetpgrp(fd), 0);
+        errno = saved;
+    }
+    return read(fd, buffer, size);
+}
+
+__attribute__((used, section("__DATA,__interpose")))
+static const struct {
+    int (*replacement)(idtype_t, id_t, siginfo_t*, int);
+    int (*original)(idtype_t, id_t, siginfo_t*, int);
+} stop_interpose = {audit_waitid, waitid};
+
+__attribute__((used, section("__DATA,__interpose")))
+static const struct {
+    ssize_t (*replacement)(int, void*, size_t);
+    ssize_t (*original)(int, void*, size_t);
+} read_interpose = {audit_read, read};
 #endif
