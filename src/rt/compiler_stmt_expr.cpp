@@ -118,4 +118,24 @@ bool UnitCompiler::expression_statement(const Node& node) {
     return temp(scratch) && expr_to(node.a, scratch);
 }
 
+bool UnitCompiler::inc_dec(const Node& node) {
+    const Node& target = ast_.at(node.a);
+    if (const StructFieldInfo* field = struct_target(target))
+        return field_update(node, target_receiver(target), *field);
+    if (!reason_.empty()) return false;
+    if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
+    const Binding* binding = find_binding(text(target));
+    if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
+    if (binding->const_array) return fail(target, "declare-const");
+    if (binding->readonly) return fail(target,
+        session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
+    if (binding->struct_id >= 0) return fail(target, "struct-assign");
+    const Binding b = *binding;
+    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
+    if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
+    if (b.const_scalar) return const_write(node, nullptr, nullptr, b, true);  // CP25: after the numeric check
+    return compound_op(node, b);
+}
+
+
 } // namespace nift::rt::detail

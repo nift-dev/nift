@@ -14,7 +14,7 @@ namespace nift::rt::detail {
 
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
     if (reserved_name(name) && !invocation_shadows_.count(node_id(at))) return fail(at, "binding-name-reserved");
-    if (plan_.index.count(name)) return fail(at, "binding-shadows-fn");
+    if (session_ && plan_.index.count(name)) return fail(at, "binding-shadows-fn");
     // The type register comes first so the value register is the newest one
     // (a call initialiser then returns in place).
     binding.typed = true;  // every binding: assignments check it, bare references propagate it
@@ -47,6 +47,20 @@ bool UnitCompiler::declare(const Node& node) {
         return fail(node, "declare-const");
     if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
     const std::string_view name = text(target);
+    const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
+    if (parameter && parameter->decl_node != kNoNode &&
+        ast_.at(parameter->decl_node).kind == NodeKind::Param &&
+        !session_ && !loop_reachable() && scopes_.declared_here(name)) {
+        // Textual lambda declarations check for a duplicate before evaluating
+        // their initializer. The diagnostic is reached only when called.
+        const auto mark = fb_->top();
+        std::uint16_t scratch = 0;
+        if (!temp(scratch) ||
+            !legacy_fatal(target, "binding already declared in this scope: " + std::string(name), scratch))
+            return false;
+        fb_->release_to(mark);
+        return builder_ok();
+    }
     std::uint16_t reg = 0;
     Binding binding;
     if (!new_binding(name, target, reg, binding)) return false;
@@ -307,25 +321,6 @@ bool UnitCompiler::compound_assign(const Node& node) {
     }
     // CP25: legacy computes the operation (its errors first), then rejects the write.
     if (b.const_scalar) return const_write(node, &ast_.at(node.b), nullptr, b, true);
-    return compound_op(node, b);
-}
-
-bool UnitCompiler::inc_dec(const Node& node) {
-    const Node& target = ast_.at(node.a);
-    if (const StructFieldInfo* field = struct_target(target))
-        return field_update(node, target_receiver(target), *field);
-    if (!reason_.empty()) return false;
-    if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
-    const Binding* binding = find_binding(text(target));
-    if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
-    if (binding->const_array) return fail(target, "declare-const");
-    if (binding->readonly) return fail(target,
-        session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
-    if (binding->struct_id >= 0) return fail(target, "struct-assign");
-    const Binding b = *binding;
-    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, 0, false);
-    if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
-    if (b.const_scalar) return const_write(node, nullptr, nullptr, b, true);  // CP25: after the numeric check
     return compound_op(node, b);
 }
 

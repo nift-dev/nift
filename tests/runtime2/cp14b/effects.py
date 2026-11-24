@@ -16,8 +16,25 @@ CASES={
 'recursive-same-site':('fn(work(n)) { a:=[3,2,1]; a.sort((x,y)=>{ if(n>0) { work(n-1) }; return x<y }); print(a.stringify()); return true }; work(2)',False),
 'future-boundary':('fn(boom(x)) { throw error("stop") }; try { [1].unique_by(boom) } catch(e) { print(e.message) }; a:=[2,1]; a.sort((x,y)=>x<y); print(a.stringify())',False),
 'completed-boundary':('a:=[2,1]; a.sort((x,y)=>x<y); fn(boom(x)) { throw error("stop") }; try { [1].unique_by(boom) } catch(e) { print(e.message) }; print(a.stringify())',False),
-'disjoint-value-copy':('a:=[3,1,2]; b:=a; fn(cmp(x,y)) { b.push(9); return x<y }; a.sort(cmp); print(a.stringify())',False),
+'aliased-receiver':('a:=[3,1,2]; b:=a; fn(cmp(x,y)) { b.push(9); return x<y }; a.sort(cmp); print(a.stringify())',False),
+'disjoint-array':('a:=[3,1,2]; b:=[3,1,2]; fn(cmp(x,y)) { b.push(9); return x<y }; a.sort(cmp); print(a.stringify()); print(b.size() > 3)',False),
 }
+def record_sort(count, *, prefix="", callback="", missing_field=False):
+    records = [{"key": value} for value in range(count, 0, -1)]
+    if missing_field:
+        records[-1] = {"other": 0}
+    return (f"a := {json.dumps(records)}\n{prefix}"
+            f"fn(cmp(x,y)) {{ {callback} print(x.stringify()); return x.key < y.key }}\n"
+            'a.sort(cmp); print(a.stringify())')
+
+CASES.update({
+    "record-boundary-16": (record_sort(16), False),
+    "record-boundary-17": (record_sort(17), False),
+    "record-alias-before-sort": (record_sort(17, prefix="b := a\n"), True),
+    "record-write-in-comparator": (record_sort(17, callback="x.key = 0;"), True),
+    "record-missing-field": (record_sort(17, missing_field=True), True),
+})
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--legacy',required=True);p.add_argument('--output',required=True);a=p.parse_args();results=[]
     import comparator_profile as cprof
@@ -34,12 +51,24 @@ def main():
                 st=vm['stats'][-1] if vm['stats'] else {}
                 ok=vm['exit']==1 and not vm['out'] and st.get('reason')=='method:sort' and st.get('vm_executions')==0 and st.get('legacy_executions')==0
                 legacy=None
-            elif name=='disjoint-value-copy':
-                # D-040 copies are independent; legacy aliases are not executed
-                # here because mutating that alias would invalidate its sort.
-                legacy=None;ok=vm['exit']==0 and vm['out']=='[1,2,3]\n'
+            elif name=='aliased-receiver':
+                # Preserve the original input. Under B2, b aliases the receiver
+                # and its mutation is blocked while the comparator is running.
+                legacy=None
+                st=vm['stats'][-1] if vm['stats'] else {}
+                ok=(vm['exit']==1 and not vm['out'] and st.get('outcome')=='vm-error'
+                    and st.get('code')=='runtime.sort_receiver_mutated' and st.get('catchable') is True
+                    and st.get('vm_executions')==1 and st.get('legacy_executions')==0)
             else:
                 legacy=run(a.legacy,'0',source,root);ok=all(vm[k]==legacy[k] for k in ['out','err','exit'])
+            if name.startswith("record-boundary-"):
+                st=vm['stats'][-1] if vm['stats'] else {}
+                ok=(ok and vm['exit']==0 and st.get('outcome')=='vm'
+                    and st.get('vm_executions')==1 and st.get('legacy_executions')==0)
+            if name=='disjoint-array':
+                st=vm['stats'][-1] if vm['stats'] else {}
+                ok=(ok and vm['exit']==0 and vm['out']=='[1,2,3]\ntrue\n'
+                    and st.get('vm_executions')==1 and st.get('legacy_executions')==0)
             results.append(dict(name=name,source=source,pass_=bool(ok),vm=vm,legacy=legacy));print('PASS' if ok else 'FAIL',name)
     print(cprof.banner(prof,unverified,'effects'))
     Path(a.output).write_text(json.dumps(results,indent=2)+'\n');return 0 if all(r['pass_'] for r in results) else 1

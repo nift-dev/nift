@@ -430,6 +430,9 @@ def section_d():
     for names in (("q", "p"), ("first_long", "s", "kk", "a2", "zeta", "m"), ("m1", "zz9", "b", "cc_c", "d", "e")):
         lib = "".join("%s := %d\n" % (n, k) for k, n in enumerate(names)) + 'fn(h()) { return 1 }\nexport(h)\n'
         entry = "".join("%s := %d\n" % (n, k) for k, n in enumerate(reversed(names))) + 'import("lib.f")\nprint(h())\n'
+        # D-182 plain private bindings may now share entry spellings. Keep a
+        # scope-sensitive collision at every name to exercise the position rule.
+        lib += 'fn(local_probe(%s)) { return 0 }\n' % ','.join(names)
         refused("D clash reported at the first in text (%s)" % ",".join(names), {"lib.f": lib, "m.f": entry},
                 "import-name-clash", "lib.f:1:1")
 

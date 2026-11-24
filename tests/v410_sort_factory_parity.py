@@ -24,7 +24,7 @@ contract = json.loads(Path(__file__).with_name('v410_sort_factory_cases.json').r
 # occurs ([2,1].sort_by at column 7), not at the try statement (1:1).
 # The VM-default refusal expected per case (review of C83-C99, P2-1); any other refused case fails.
 EXPECTED_REFUSAL = {'dynamic-capture-dependency': 'free-name', 'root-path-growth': 'for-capture-vanishing',
-                    'unused-timer-observable': 'callable:timer', 'module-ownership': 'import-name-clash',
+                    'unused-timer-observable': 'callable:timer',
                     'nested-returned-factory': 'method:sort_by', 'location-parent-growth-sort': 'for-capture-vanishing',
                     'module-definition-error': 'type:member'}
 APPROVED = {
@@ -67,6 +67,11 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
                 fail(case['name'], 'approved difference no longer matches the oracle')
                 continue
             expected = (case['exit'], case['stdout'], case['stderr'].replace(before, after))
+        if case['name'] in ('named-precedence', 'module-ownership'):
+            if execute(binary, dict(os.environ, NIFT_VM='0')) != oracle:
+                fail(case['name'], 'explicit legacy differs from the oracle')
+        if case['name'] == 'named-precedence':
+            expected = (0, 'int\n', '')  # D-182: a nearer lexical parameter wins.
         if baseline and execute(baseline) != oracle:
             fail(case['name'], 'baseline differs from the oracle')
         actual = execute(binary)

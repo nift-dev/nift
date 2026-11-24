@@ -8,11 +8,16 @@
 
 namespace nift::rt {
 
+bool Scopes::declared_here(std::string_view name) const {
+    if (scopes_.empty()) return false;
+    for (const auto& entry : scopes_.back())
+        if (entry.first == name) return true;
+    return false;
+}
+
 bool Scopes::declare(std::string_view name, const Binding& binding) {
-    auto& scope = scopes_.back();
-    for (const auto& entry : scope)
-        if (entry.first == name) return false;
-    scope.emplace_back(name, binding);
+    if (declared_here(name)) return false;
+    scopes_.back().emplace_back(name, binding);
     return true;
 }
 

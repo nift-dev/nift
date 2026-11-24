@@ -10,7 +10,8 @@
 //     legacy runs it once too) and initialises in place, at its import;
 //   - an exported binding is the module's binding itself (D-046 #2);
 //   - names stay apart: the names declared outside functions, and the
-//     function names, of different units are disjoint, and a unit uses
+//     function names, of different units are disjoint in the linked text.
+//     Proven private entry/module binding collisions are renamed. A unit uses
 //     another unit's such name only where it imports it (legacy isolates
 //     module scopes; module functions resolve names lexically, D-046 #4);
 //   - a module has no top-level `return` (legacy ends only the module);

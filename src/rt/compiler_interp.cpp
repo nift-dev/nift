@@ -223,7 +223,10 @@ KindSet UnitCompiler::interpolation_kind_impl(NodeId id, std::unordered_set<std:
             if (callee.kind == NodeKind::Ident) {
                 const std::string_view name = text(callee);
                 const auto fn = plan_.index.find(name);
-                if (fn != plan_.index.end()) return interpolation_function_kind(fn->second - 1u, active);
+                if (fn != plan_.index.end()) {
+                    if (kinds_.bindings.count(node.a)) return kinds(node_id(node));
+                    return interpolation_function_kind(fn->second - 1u, active);
+                }
                 const natives::BuiltinSpec* spec = bind_function(name);
                 if (spec) return native_result_kinds(*spec);
                 return kKindUnknown;  // print, user callable value, unknown

@@ -287,7 +287,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);
         const std::string_view name = text(param);
-        if (plan_.index.count(name)) return fail(param, "param-shadows-fn");
+        if (session_ && plan_.index.count(name)) return fail(param, "param-shadows-fn");
         Binding binding;
         binding.reg = regs[k];
         binding.decl_node = node_id(param);

@@ -5861,6 +5861,7 @@ test-runtime2-platform-subset-table:
 certify-targets: test-runtime2-platform-subset-table
 .PHONY: test-cp25r cp25r-inventory
 test-cp25r: $(TARGET)
+	NIFT_VM=require NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp3_variadic_lambdas_smoke.sh
 	bash tests/runtime2/cp25/differential.sh "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)"
 	$(PYTHON) tests/runtime2/cp25/post_cert_refusals.py --nift "$(CURDIR)/$(TARGET)" --negative-control root

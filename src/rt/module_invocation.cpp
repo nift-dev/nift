@@ -1,4 +1,5 @@
 #include "rt/module_invocation.h"
+#include "rt/reserved_names.h"
 
 #include <algorithm>
 #include <utility>
@@ -132,6 +133,44 @@ bool named(const std::vector<std::string_view>& names, std::string_view name) {
 }
 
 } // namespace
+
+// Rename a private, plain top-level declaration only when every use with
+// its spelling belongs to that declaration. Leave richer binding forms to
+// the existing collision check until they have a binding-aware source map.
+bool plain_private_binding(const Ast& ast, NodeId root, std::string_view name) {
+    const Node& program = ast.at(root);
+    NodeId declaration = kNoNode;
+    for (std::uint32_t i = 0; i < program.count; ++i) {
+        const Node& statement = ast.at(ast.list(program)[i]);
+        if (statement.kind != NodeKind::Declare || statement.a == kNoNode ||
+            ast.at(statement.a).kind != NodeKind::Ident ||
+            ast.text(ast.at(statement.a)) != name) continue;
+        if (declaration != kNoNode) return false;
+        declaration = statement.a;
+    }
+    if (declaration == kNoNode || reserved_name(name)) return false;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const Node& node = ast.at(id);
+        switch (node.kind) {
+            case NodeKind::Declare:
+                if (node.a != kNoNode && node.a != declaration && ast.text(ast.at(node.a)) == name) return false;
+                break;
+            case NodeKind::FnDecl: case NodeKind::Lambda:
+                if (node.kind == NodeKind::FnDecl && node.a != kNoNode && ast.text(ast.at(node.a)) == name)
+                    return false;
+                if (node.flags & kFlagDeferredBody) return false;
+                for (std::uint32_t i = 0; i < node.count; ++i)
+                    if (ast.text(ast.at(ast.list(node)[i])) == name) return false;
+                break;
+            case NodeKind::ForBinding: case NodeKind::Try: case NodeKind::Pattern:
+            case NodeKind::StructDecl: case NodeKind::EnumDecl: case NodeKind::Opaque:
+            case NodeKind::Command: case NodeKind::TemplateStmt:
+                return false;
+            default: break;
+        }
+    }
+    return true;
+}
 
 InvocationPlan plan_invocation(const std::vector<InvocationUnit>& units, const ModuleGraph& graph,
                                const std::vector<std::string_view>& names) {

@@ -176,6 +176,9 @@ private:
 
     const Ast& ast_;
     NodeId root_;
+    // AST-only comparator proof, including negative results, per sort receiver.
+    std::unordered_map<NodeId, std::pair<NodeId, TyRef>> sort_record_proofs_;
+
     const UnitPlan& plan_;
     GlobalSlots globals_;
     const SessionCompileContext* session_ = nullptr;

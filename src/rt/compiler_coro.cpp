@@ -153,7 +153,8 @@ private:
         const Node& n = ast_.at(id);
         // A named async function is only ever called directly (legacy L14:
         // as a value its future fails with "invalid async callable").
-        if (n.kind == NodeKind::Ident && value_position(id, parent) && is_async_function(ast_.text(n)) &&
+        if (n.kind == NodeKind::Ident && value_position(id, parent) && !kinds_.bindings.count(id) &&
+            is_async_function(ast_.text(n)) &&
             !(ast_.at(parent).kind == NodeKind::Call && ast_.at(parent).a == id)) {
             reason = "coro-async-value";
             return false;

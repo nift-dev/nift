@@ -14,7 +14,7 @@ constexpr bool kComparatorProfileVerified=true;
 #else
 constexpr bool kComparatorProfileVerified=false;
 #endif
-namespace { bool forbidden=false; unsigned attempts=0,drains=0; }
+namespace { bool forbidden=false; unsigned attempts=0,drains=0,steps=0; }
 void* operator new(std::size_t n) {
     if(forbidden){++attempts;throw std::bad_alloc();}
     if(void* p=std::malloc(n?n:1))return p;
@@ -27,6 +27,7 @@ void operator delete(void* p,std::size_t)noexcept{std::free(p);}
 void operator delete[](void* p,std::size_t)noexcept{std::free(p);}
 namespace nift::rt {
 void collection_drain_allocation_guard(bool enabled){forbidden=enabled;if(enabled)++drains;}
+void collection_drain_observe_step() noexcept {++steps;}
 }
 int main() {
     using namespace nift::rt;
@@ -55,5 +56,6 @@ int main() {
         }
     } catch(...) {forbidden=false;std::fputs("exception escaped allocation guard\n",stderr);return 1;}
     if(!drains||attempts){std::fprintf(stderr,"drains=%u allocation attempts=%u\n",drains,attempts);return 1;}
-    std::printf("PASS %u caught-hook entries, zero allocation attempts\n",drains);
+    if (!steps) { std::fputs("FAIL caught hook performed no sort drain steps\n", stderr); return 1; }
+    std::printf("PASS %u caught-hook entries, %u sort drain steps, zero allocation attempts\n",drains,steps);
 }

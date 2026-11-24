@@ -76,6 +76,7 @@ public:
     void pop() { scopes_.pop_back(); }
     // False when `name` is already declared in the innermost scope.
     bool declare(std::string_view name, const Binding& binding);
+    bool declared_here(std::string_view name) const;
     const Binding* find(std::string_view name) const;
     bool update(std::string_view name, const Binding& binding);
     bool empty() const { return scopes_.empty(); }

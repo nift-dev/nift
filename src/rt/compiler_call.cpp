@@ -126,25 +126,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
-bool UnitCompiler::may_fault(NodeId id) const {
-    if (id == kNoNode) return false;
-    const Node& n = ast_.at(id);
-    if (n.kind == NodeKind::Member || n.kind == NodeKind::Index || n.kind == NodeKind::Call) return true;
-    if (n.kind == NodeKind::Binary && (n.op == Op::Div || n.op == Op::Mod)) return true;
-    if (may_fault(n.a) || may_fault(n.b) || may_fault(n.c)) return true;
-    const NodeId* list = ast_.list(n);
-    for (std::uint32_t k = 0; k < n.count; ++k)
-        if (may_fault(list[k])) return true;
-    return false;
-}
-// CP14 W2/W4: an argument legacy may skip must be unobservable.
-bool UnitCompiler::unobservable_argument(NodeId id) {
-    const Node& node = ast_.at(id);
-    if (node.kind == NodeKind::Ident) return scopes_.find(text(node)) != nullptr;
-    Value value;
-    bool is_constant = false;
-    return constant_of(node, value, is_constant) && is_constant;
-}
 // CP14: a call of a built-in over a fresh window (receiver, arguments), D-018.
 bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
                                 std::uint16_t dst, bool dynamic) {
@@ -330,11 +311,11 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (error_member_access(node, dst, node.a)) return true;
     const Node& receiver = ast_.at(node.a);
     const Binding* parameter = in_lambda_ && receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
-    const bool numeric_parameter = !session_ && return_read_offset_ == kNoNode &&
+    const bool scalar_parameter_without_members = !session_ && return_read_offset_ == kNoNode &&
         parameter && parameter->decl_node != kNoNode &&
         ast_.at(parameter->decl_node).kind == NodeKind::Param && kinds(node.a) != 0 &&
-        (kinds(node.a) & ~kKindNumber) == 0;
-    if (numeric_parameter)
+        ((kinds(node.a) & ~kKindNumber) == 0 || kinds(node.a) == kKindNull);
+    if (scalar_parameter_without_members)
         return expr_to(node.a, dst) &&
                legacy_fatal(node, "value has no member: " + std::string(text(ast_.at(node.b))), dst);
     if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
@@ -368,7 +349,13 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const KindSet object_kinds = kinds(node.a), key_kinds = kinds(node.b);
     const bool array = (object_kinds & ~kKindArray) == 0 && (key_kinds & ~kKindNumber) == 0;
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
-    if (!array && !object && !unknown_defers(object_kinds | key_kinds))  // Unknown is neither (review D1)
+    // A literal boolean is an invalid array key. The textual evaluator
+    // can retry a location key, so an effectful boolean is still refused.
+    const NodeKind key_node = ast_.at(node.b).kind;
+    const bool bad_boolean_key = in_lambda_ && !session_ && !loop_reachable() &&
+                                 return_read_offset_ == kNoNode && object_kinds == kKindArray &&
+                                 (key_node == NodeKind::True || key_node == NodeKind::False);
+    if (!array && !object && !bad_boolean_key && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;
@@ -390,6 +377,12 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     fb_->set_flags(saved_flags);
     --index_depth_;
     if (!key_ok) return false;
+    if (bad_boolean_key) {
+        const bool ok = legacy_fatal(node, "JSON array indices must be non-negative integers in '" +
+                                     std::string(location.empty() ? text(chain) : location) + "'", dst);
+        fb_->release_to(mark);
+        return ok;
+    }
     fb_->set_offset(site(node));
     const std::size_t at = fb_->emit(OpCode::GetIndex, dst, object_reg, key);
     fb_->note(at, location.empty() ? std::string(text(chain)) : std::move(location));

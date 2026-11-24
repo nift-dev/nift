@@ -11,6 +11,7 @@
 namespace nift::rt {
 #ifdef NIFT_COLLECTION_ALLOC_TEST
 void collection_drain_allocation_guard(bool);
+void collection_drain_observe_step() noexcept;
 struct DrainAllocationGuard {
     DrainAllocationGuard(){collection_drain_allocation_guard(true);}
     ~DrainAllocationGuard(){collection_drain_allocation_guard(false);}
@@ -136,7 +137,12 @@ bool Vm::drain_collection_boundaries(const Fault&,std::size_t retained_depth,
             Value* place=source(stack_.data(),R,in);if(!place)return false;
             s[Source]=std::move(*place);
             bool ok=true;
-            do {if(!collection_sort_resume(s,false,true)){ok=false;break;}}while(s[More].as_bool());
+            do {
+                if (!collection_sort_resume(s, false, true)) { ok = false; break; }
+#ifdef NIFT_COLLECTION_ALLOC_TEST
+                collection_drain_observe_step();
+#endif
+            } while (s[More].as_bool());
             *place=std::move(s[Source]);
             if(!ok)return false;
         }

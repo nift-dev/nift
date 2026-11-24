@@ -36,15 +36,19 @@ m := map()
 m.set("k", 6)
 c := m
 print(c.get("k"))' $'4\n6'
-ok callables 'fn(g()) { return 1 }
+callable_source='fn(g()) { return 1 }
 g := () => 2
 h := g
 print(h())
 print(g())
 fn(pass(f)) { return f }
 l := pass(x => x)
-print(l(8))' $'1\n2\n8'
-ok builtin_names 'print := 7
+print(l(8))'
+NIFT_VM=0 ok callables-legacy "$callable_source" $'1\n2\n8'
+if [[ ${NIFT_VM:-} != 0 ]]; then
+    ok callables-vm "$callable_source" $'2\n2\n8'
+fi
+builtin_source='print := 7
 map := 8
 size := 9
 print(print)
@@ -52,7 +56,21 @@ print(map)
 print(size)
 print(true)
 print(false)
-print(null)' $'7\n8\n9\ntrue\nfalse\nnull'
+print(null)'
+NIFT_VM=0 ok builtin_names_legacy "$builtin_source" $'7\n8\n9\ntrue\nfalse\nnull'
+if [[ ${NIFT_VM:-} != 0 ]]; then
+    # D-182 keeps the reserved-name rule. Pin only this historical fixture.
+    printf '%s\n' "$builtin_source" >"$t/p.f"
+    status=0
+    NIFT_VM=require "$B" "$t/p.f" >"$t/o" 2>"$t/e" || status=$?
+    if [[ $status != 1 || -s "$t/o" ]] ||
+        ! grep -Fq 'p.f:1:1: not compiled for the VM (binding-name-reserved): a binding named like a built-in is not supported by the Runtime 2.0 VM yet' "$t/e" ||
+        ! grep -Fqx 'note: the program was not executed: no part of it ran' "$t/e"; then
+        echo 'FAIL builtin_names VM reservation' >&2
+        cat "$t/o" "$t/e" >&2
+        exit 1
+    fi
+fi
 ok receiver 'struct(P) { value := 4; fn(read()) { return value } }
 p := P()
 print(p.read())

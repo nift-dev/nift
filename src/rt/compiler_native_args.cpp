@@ -180,4 +180,24 @@ bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::Bui
 #endif
     return true;
 }
+bool UnitCompiler::may_fault(NodeId id) const {
+    if (id == kNoNode) return false;
+    const Node& n = ast_.at(id);
+    if (n.kind == NodeKind::Member || n.kind == NodeKind::Index || n.kind == NodeKind::Call) return true;
+    if (n.kind == NodeKind::Binary && (n.op == Op::Div || n.op == Op::Mod)) return true;
+    if (may_fault(n.a) || may_fault(n.b) || may_fault(n.c)) return true;
+    const NodeId* list = ast_.list(n);
+    for (std::uint32_t k = 0; k < n.count; ++k)
+        if (may_fault(list[k])) return true;
+    return false;
+}
+// CP14 W2/W4: an argument legacy may skip must be unobservable.
+bool UnitCompiler::unobservable_argument(NodeId id) {
+    const Node& node = ast_.at(id);
+    if (node.kind == NodeKind::Ident) return scopes_.find(text(node)) != nullptr;
+    Value value;
+    bool is_constant = false;
+    return constant_of(node, value, is_constant) && is_constant;
+}
+
 } // namespace nift::rt::detail

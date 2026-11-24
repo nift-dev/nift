@@ -1272,7 +1272,8 @@ def main():
                     rows if label == "file" else None)
             check(f"{lib}:1:1" not in proc.stderr and "hi" not in proc.stdout,
                   f"import-name-clash ({label}): no invented lib.f:1:1, nothing ran", f"err={proc.stderr!r}")
-        (d / "lib1.f").write_text("f := 1\n")
+        # A same-spelled parameter is beyond the linker's plain-binding proof.
+        (d / "lib1.f").write_text("f := 1\nfn(read_f(f)) { return f }\n")
         (d / "one.f").write_text('import("lib1.f")\nf := 2\n')
         proc, rows = run(nift, d, ["one.f"], {})
         refused(proc, f"{(d / 'lib1.f').resolve().as_posix()}:1:1", "import-name-clash",

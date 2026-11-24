@@ -107,7 +107,7 @@ c := () => a[0]
 d := c()
 d.push(4)
 print(a[0][2])' $'3\n4'
-ok shadowing 'n := 4
+shadowing_source='n := 4
 f := n => n + 1
 g := x => { y := 7; return y }
 print(f(2))
@@ -116,7 +116,11 @@ fn(h()) { return 3 }
 h := () => 9
 k := h
 print(k())
-print(h())' $'3\n7\n3\n9'
+print(h())'
+NIFT_VM=0 ok shadowing-legacy "$shadowing_source" $'3\n7\n3\n9'
+if [[ ${NIFT_VM:-} != 0 ]]; then
+    ok shadowing-vm "$shadowing_source" $'3\n7\n9\n9'
+fi
 ok async 'n := 5
 f := async x => x + n
 p := f(2)
@@ -166,6 +170,22 @@ print(g("a"))' $'3\n5\na!'
 err block_callback 'a := [1].map(x => { return x + 1 })' 'lambda body error: unknown value or malformed expression: return x'
 err arity 'a := [1].map((x,y) => x + y)' 'callback argument count mismatch'
 err local_shadows_parameter 'g := n => { n := 7; return n }; print(g(2))' 'binding already declared in this scope: n'
+# Both engines reject the duplicate only on invocation, before its RHS.
+for mode in 0 require; do
+    if [[ $mode == require && ${NIFT_VM:-} == 0 ]]; then continue; fi
+    printf '%s\n' 'fn(effect()) { print("rhs"); return 7 }
+g := n => { print("body"); n := effect(); return n }
+print(g(2))' > "$t/p.f"
+    status=0
+    NIFT_VM=$mode "$B" "$t/p.f" >"$t/o" 2>"$t/e" || status=$?
+    if [[ $status != 1 || $(cat "$t/o") != body ]] ||
+        ! grep -Fq 'p.f:2:28: binding already declared in this scope: n' "$t/e"; then
+        echo "FAIL parameter redeclaration timing ($mode)" >&2
+        cat "$t/o" "$t/e" >&2
+        exit 1
+    fi
+done
+
 err non_callable 'a := [1].map(2)' 'callback must be callable'
 err selector_result 'a := [1].sort_by(x => [x])' 'key must be scalar'
 err comparator_result 'a := [2,1]; a.sort((x,y) => x + y)' 'comparator must return bool'

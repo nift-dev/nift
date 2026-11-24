@@ -11,6 +11,8 @@
 
 namespace nift::rt {
 
+bool plain_private_binding(const Ast& ast, NodeId root, std::string_view name);
+
 namespace {
 
 namespace fs = std::filesystem;
@@ -66,6 +68,28 @@ void collect(UnitView& u) {
     }
 }
 
+void plan_entry_shadows(const ModuleGraph& graph, std::vector<UnitView>& units, InvocationPlan& plan) {
+    for (std::size_t m = 1; m < units.size() && plan.ok; ++m) {
+        std::vector<std::string_view> collisions;
+        const auto& exports = graph.modules[m]->exports;
+        for (std::string_view name : units[m].top) {
+            if ((units[0].top.count(name) || units[0].fns.count(name)) &&
+                std::find(exports.begin(), exports.end(), name) == exports.end())
+                collisions.push_back(name);
+        }
+        std::sort(collisions.begin(), collisions.end());
+        for (std::string_view name : collisions) {
+            const Ast& ast = *units[m].ast;
+            if (!plain_private_binding(ast, units[m].root, name)) continue;
+            units[m].top.erase(name);
+            plan.private_names[m].push_back(name);
+            for (NodeId id : units[m].uses)
+                if (ast.text(ast.at(id)) == name) plan.rename_ids[m].push_back(id);
+        }
+        std::sort(plan.rename_ids[m].begin(), plan.rename_ids[m].end());
+    }
+}
+
 // A `return` outside functions in a module ends only the module in legacy.
 bool has_top_level_return(const Ast& ast, NodeId root, std::uint32_t& offset) {
     std::vector<NodeId> stack{root};
@@ -96,7 +120,7 @@ std::size_t statement_end(std::string_view text, const Node& st) {
 class Linker {
 public:
     Linker(LinkedUnit& out, std::vector<UnitView>& units, const InvocationPlan& plan,
-           const std::vector<std::string>& generated)
+           const std::vector<std::vector<std::string>>& generated)
         : out_(out), units_(units), plan_(plan), generated_(generated) {}
 
     void emit(std::size_t m) {
@@ -122,12 +146,12 @@ public:
             edits.push_back({st.begin, statement_end(u.source, st), imp.module, nullptr,
                              (st.flags & kFlagTemplateImport) != 0});
         }
-        for (NodeId id : plan_.rename_ids[m]) {  // the module's private args/cmd (C1)
+        for (NodeId id : plan_.rename_ids[m]) {  // roles resolved in the module's source
             const Node& n = ast.at(id);
             const std::string_view name = ast.text(n);
             std::size_t g = 0;
             while (plan_.private_names[m][g] != name) ++g;
-            edits.push_back({n.begin, n.end, npos, &generated_[m * 2 + g]});
+            edits.push_back({n.begin, n.end, npos, &generated_[m][g]});
         }
         std::sort(edits.begin(), edits.end(), [](const Edit& a, const Edit& b) { return a.begin < b.begin; });
         std::size_t at = 0;
@@ -166,38 +190,36 @@ private:
     LinkedUnit& out_;
     std::vector<UnitView>& units_;
     const InvocationPlan& plan_;
-    const std::vector<std::string>& generated_;  // per module, per private name (two slots)
+    const std::vector<std::vector<std::string>>& generated_;  // per module, per private name
 };
 
 // Generated names for private bindings: absent from every unit's text and
 // from each other (C1); module_names views them in the heap-stable modules.
-std::vector<std::string> name_private_bindings(LinkedUnit& out, const std::vector<UnitView>& units,
+std::vector<std::vector<std::string>> name_private_bindings(LinkedUnit& out, const std::vector<UnitView>& units,
                                                const InvocationPlan& plan) {
     const std::size_t count = units.size();
-    std::vector<std::string> generated(count * 2);
+    std::vector<std::vector<std::string>> generated(count);
     for (std::size_t m = 1; m < count; ++m)
-        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g) {
+        for (std::size_t g = 0; g < plan.private_names[m].size(); ++g) {
             const std::string base = "nift__" + std::string(plan.private_names[m][g]) + "__m" + std::to_string(m);
             std::string name = base;
             const auto used = [&](const std::string& candidate) {
                 for (const UnitView& u : units) if (u.source.find(candidate) != std::string_view::npos) return true;
-                for (const std::string& other : generated) if (other == candidate) return true;
+                for (const auto& names : generated)
+                    if (std::find(names.begin(), names.end(), candidate) != names.end()) return true;
                 return false;
             };
 #if !(defined(NIFT_PACKAGES_MUTANT) && NIFT_PACKAGES_MUTANT == 15)  // test-only (packages/mutants.sh)
             for (int k = 1; used(name); ++k) name = base + "_" + std::to_string(k);
 #endif
-            generated[m * 2 + g] = name;
+            generated[m].push_back(name);
             out.renames.push_back({name, std::string(plan.private_names[m][g])});
         }
     for (std::size_t m = 1; m < count; ++m) out.module_names.insert(out.module_names.end(), units[m].top.begin(),
                                                                      units[m].top.end());
     for (std::size_t m = 1; m < count; ++m) {  // views into the (heap-stable) module, never into a moved string
         Module& mod = *out.graph.modules[m];
-        mod.generated_names.clear();
-        mod.generated_names.reserve(2);
-        for (std::size_t g = 0; g < plan.private_names[m].size() && g < 2; ++g)
-            mod.generated_names.push_back(generated[m * 2 + g]);
+        mod.generated_names = generated[m];
         for (const std::string& name : mod.generated_names) out.module_names.push_back(name);
     }
     return generated;
@@ -307,9 +329,10 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
     }
     // The entry's `args`/`cmd` in modules (rt/module_invocation.h): private
     // declarations are renamed below, so they take no part in name ownership.
-    const InvocationPlan plan = plan_invocation(views, out.graph, entry_names);
+    InvocationPlan plan = plan_invocation(views, out.graph, entry_names);
     for (std::size_t m = 1; m < count; ++m)
         for (std::string_view name : plan.private_names[m]) units[m].top.erase(name);
+    plan_entry_shadows(out.graph, units, plan);
     // Names declared outside functions, and function names, are the unit's
     // own: no other unit declares them.
     // A clash is refused at unit m's own declaration of the name (Review 8:
@@ -347,6 +370,7 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             for (std::string_view name : out.graph.modules[imp.module]->exports) imported.insert(name);
         std::uint32_t first = UINT32_MAX;
         for (NodeId id : units[m].uses) {
+            if (std::binary_search(plan.rename_ids[m].begin(), plan.rename_ids[m].end(), id)) continue;
             const std::string_view name = units[m].ast->text(units[m].ast->at(id));
             if (m > 0 && std::find(entry_names.begin(), entry_names.end(), name) != entry_names.end()) continue;
             const auto o = owner.find(name);
@@ -363,7 +387,7 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
         out.note_offset = plan.note_offset;
         return out;
     }
-    const std::vector<std::string> generated = name_private_bindings(out, units, plan);
+    const auto generated = name_private_bindings(out, units, plan);
     out.depth.assign(count, 0);
     out.prefix.assign(count, std::string());
     Linker(out, units, plan, generated).emit(0);

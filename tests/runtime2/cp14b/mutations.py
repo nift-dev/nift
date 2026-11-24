@@ -3,6 +3,7 @@
 import argparse,hashlib,json,subprocess,tempfile
 from pathlib import Path
 from functional import APPROVED,CASES,run
+from build_drain import check_drain
 import sys as _sys,os as _os
 _sys.path.insert(0,_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),'..'))
 import build_toolchain as toolchain
@@ -97,7 +98,17 @@ def main():
                 detected=actual['exit']==70 and actual_st.get('outcome')=='internal-error' and actual_st.get('reason')==reason and actual_st.get('vm_executions')==1 and actual_st.get('legacy_executions')==0 and 'CATCH' not in actual['out'] and 'AFTER' not in actual['out']
             else:
                 detected=actual['exit'] in [0,1] and actual_st.get('vm_executions')==1 and actual_st.get('legacy_executions')==0 and any(actual[k]!=normal[k] for k in ['out','err','exit'])
-            results.append(dict(id=number,name=name,source=source,detected=bool(detected),normal=normal,oracle=oracle,mutant=actual,binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest()))
+            evidence = dict(id=number, name=name, source=source, normal=normal, oracle=oracle,
+                            mutant=actual, binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
+            if (number == 9 and not detected and actual_st.get('outcome') == 'vm' and
+                actual_st.get('vm_executions') == 1 and actual_st.get('legacy_executions') == 0 and
+                all(actual[k] == normal[k] for k in ['out', 'err', 'exit'])):
+                # Q7 keeps the receiver intact even when the drain is
+                # skipped. Check controller progress in the allocation test.
+                observed = check_drain(out / 'skip-drain-control', detect_skip=True)
+                detected = observed['detected']
+                evidence['drain_observer'] = observed
+            results.append(dict(evidence, detected=bool(detected)))
             print('DETECTED' if detected else 'SURVIVED',number,name,flush=True)
     print(cprof.banner(prof,unverified,'named mutants'))
     (out/'results.json').write_text(json.dumps(dict(comparator_profile=prof.found,unverified_comparator_mutants=unverified,results=results),indent=2)+'\n');return 0 if all(r['detected'] for r in results) else 1

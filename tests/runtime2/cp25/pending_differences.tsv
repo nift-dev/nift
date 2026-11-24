@@ -3,4 +3,3 @@
 # than legacy (NIFT_VM=0). Listing a difference here approves nothing: the gate named in each row still fails on
 # it, by name, until the owner rules. Outputs are shown with \n for a newline.
 gate	case	program	vm	legacy	status
-test-v410-sort-factory-parity	named-precedence	fn(x()) { return 8 }; f := x => x; print(type(f(3)))	exit 0, stdout int\n	exit 0, stdout function\n	PENDING-OWNER

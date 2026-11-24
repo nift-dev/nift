@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Precise VM positions of the five mixed rows (owner 2026-11-11 05:41, decisions.md D-068 #7; D-067 #1).
 
-For their certain-type cases, the VM's refusal points at the actual offending construct, where legacy points at
-the enclosing statement. The owner approved these positions under the common diagnostic decision (D-067 #1); the
-rows stay PENDING-OWNER because of their union gap (D-068 #6). This test pins, for each row, the VM position and
-category (admission refusal before execution, exit 1, nothing printed) and legacy's position and category (a
-run-time error, exit 1). The runtime is not changed by this test.
+The admission cases pin the offending construct under D-067 #1. The member case now
+reaches a runtime error at the historical call site. Each case pins the VM diagnostic
+category, source position, exit status and empty output, and independently checks the
+legacy error. The remaining union gaps are recorded under D-068 #6.
 
 usage: precise_positions.py --nift NIFT
 """
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -31,17 +31,19 @@ CASES = [
     ("type:member",
      {"main.f": 'import("./error-module.f")\nf := mk_error(); print([1].sort_by(f).stringify())\n',
       "error-module.f": ERROR_MODULE},
-     "error-module.f:1:30", "main.f:2:24", "value has no member: missing"),
+     "main.f:2:24", "main.f:2:24", "value has no member: missing"),
     ("type:script-return", {"main.f": "return [1]\n"},
      "main.f:1:1", None, "script return value is not directly renderable"),
 ]
 
 
-def run(nift, d, legacy):
+def run(nift, d, legacy, stats=None):
     env = {k: v for k, v in os.environ.items() if not k.startswith("NIFT_")}
     env["HOME"] = d
     if legacy:
         env["NIFT_VM"] = "0"
+    if stats is not None:
+        env["NIFT_VM_STATS"] = stats
     p = subprocess.run([nift, "main.f"], cwd=d, env=env, capture_output=True, text=True, timeout=120)
     return p.returncode, p.stdout, p.stderr
 
@@ -56,12 +58,29 @@ def main():
             for name, text in files.items():
                 with open(os.path.join(d, name), "w") as f:
                     f.write(text)
-            rc, out, err = run(nift, d, False)
+            stats = os.path.join(d, "vm.jsonl") if row == "type:member" else None
+            rc, out, err = run(nift, d, False, stats)
             first = err.split("\n")[0]
-            want = "%s: not compiled for the VM (%s)" % (vm_pos, row)
-            if rc != 1 or out != "" or want not in first or "the program was not executed" not in err:
-                failures.append("%s: VM exit %d stdout %r first line %r (want %r, admission refusal, exit 1)" %
-                                (row, rc, out, first, want))
+            if row == "type:member":
+                want = vm_pos + ": lambda body error: " + legacy_msg
+                message_ok = first.endswith(want)
+                category = "execution error"
+                events = []
+                if os.path.isfile(stats):
+                    with open(stats, encoding="utf-8") as f:
+                        events = [json.loads(line) for line in f]
+                category_ok = any(os.path.basename(event.get("path", "")) == "main.f" and
+                                  event.get("outcome") == "vm-error" and
+                                  event.get("vm_executions") == 1 and
+                                  event.get("legacy_executions") == 0 for event in events)
+            else:
+                want = "%s: not compiled for the VM (%s)" % (vm_pos, row)
+                message_ok = want in first
+                category = "admission refusal"
+                category_ok = "the program was not executed" in err
+            if rc != 1 or out != "" or not message_ok or not category_ok:
+                failures.append("%s: VM exit %d stdout %r first line %r (want %r, %s, exit 1)" %
+                                (row, rc, out, first, want, category))
             rc, out, err = run(nift, d, True)
             first = err.split("\n")[0]
             pos_ok = (legacy_pos is None and ".f:" not in first) or (legacy_pos is not None and

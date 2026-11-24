@@ -3,6 +3,9 @@
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/string.h"
+
+#include <algorithm>
+#include <charconv>
 // rt-lint: cold-file compile-time collection callable-flow inference
 namespace nift::rt::infer_detail {
 namespace {
@@ -12,6 +15,101 @@ TyRef array_type(const TyRef& elem){auto t=std::make_shared<Ty>();t->kinds=kKind
 TyRef collection_value(const TyRef& value){return value;}
 TyRef object_type(const TyRef& elem){auto t=std::make_shared<Ty>();t->kinds=kKindObject;
     t->elem=elem;return t;}
+// The ordinary allocation classes still widen. This separate shape is valid
+// only for a literal array with no aliasing use and a comparator used at this
+// call alone. Comparator parameters can inspect scalar fields and stringify
+// a record, but cannot expose or write a record.
+TyRef isolated_sort_record(const Ast& ast, NodeId root, const Node& call, const Node& fn) {
+    const NodeId recv_id = ast.at(call.a).a;
+    const NodeId callback_id = ast.list(call)[0];
+    const Node& receiver = ast.at(recv_id);
+    if (receiver.kind != NodeKind::Ident || fn.count != 2 ||
+        fn.flags & (kFlagAsync | kFlagVariadic | kFlagMethod | kFlagDeferredBody) ||
+        ast.at(callback_id).kind != NodeKind::Ident) return {};
+    const auto recv = ast.text(receiver);
+    const auto name = ast.text(ast.at(fn.a));
+    if (ast.text(ast.at(callback_id)) != name || recv == name) return {};
+    const NodeId* params = ast.list(fn);
+    const auto left = ast.text(ast.at(params[0])), right = ast.text(ast.at(params[1]));
+    if (left == recv || right == recv || left == name || right == name ||
+        (ast.at(params[0]).flags | ast.at(params[1]).flags) & kFlagVariadic) return {};
+    NodeId declaration = kNoNode, literal = kNoNode;
+    const Node& program = ast.at(root);
+    for (std::uint32_t i = 0; i < program.count; ++i) {
+        const Node& stmt = ast.at(ast.list(program)[i]);
+        if (stmt.kind != NodeKind::Declare || ast.at(stmt.a).kind != NodeKind::Ident ||
+            ast.text(ast.at(stmt.a)) != recv) continue;
+        if (declaration != kNoNode || stmt.end >= call.begin) return {};
+        declaration = stmt.a;
+        literal = stmt.b;
+    }
+    if (literal == kNoNode) return {};
+    const Node& array = ast.at(literal);
+    if (array.kind != NodeKind::Array || array.count <= 16) return {};
+    auto shape = std::make_shared<Ty>();
+    shape->kinds = kKindObject;
+    for (std::uint32_t i = 0; i < array.count; ++i) {
+        const Node& object = ast.at(ast.list(array)[i]);
+        if (object.kind != NodeKind::Object || !object.count) return {};
+        std::unordered_set<std::string> fields;
+        for (std::uint32_t k = 0; k < object.count; ++k) {
+            const Node& prop = ast.at(ast.list(object)[k]);
+            if (prop.a == kNoNode || prop.b == kNoNode) return {};
+            const auto key = ast.text(ast.at(prop.a));
+            if (key.size() < 3 || key.front() != '"' || key.back() != '"' ||
+                key.find('\\') != std::string_view::npos) return {};
+            const auto text = ast.text(ast.at(prop.b));
+            std::int64_t value = 0;
+            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+            if (parsed.ec != std::errc() || parsed.ptr != text.data() + text.size() ||
+                value < -9007199254740991LL || value > 9007199254740991LL) return {};
+            const std::string field(key.substr(1, key.size() - 2));
+            if (!fields.insert(field).second) return {};
+        }
+        if (i == 0)
+            for (const auto& key : fields) shape->fields.emplace(key, kinds_ty(kKindInt));
+        else if (fields.size() != shape->fields.size() ||
+                 std::any_of(fields.begin(), fields.end(),
+                             [&](const auto& key) { return !shape->fields.count(key); })) return {};
+    }
+    struct Visit { NodeId id, parent, grandparent; bool comparator; };
+    std::vector<Visit> pending{{root, kNoNode, kNoNode, false}};
+    while (!pending.empty()) {
+        const Visit item = pending.back();
+        pending.pop_back();
+        if (item.id == kNoNode) continue;
+        const Node& node = ast.at(item.id);
+        if (node.kind == NodeKind::Command || node.kind == NodeKind::Opaque ||
+            node.kind == NodeKind::TemplateStmt || node.kind == NodeKind::StructDecl) return {};
+        const bool comparator = item.comparator || item.id == fn.b;
+        if (node.kind == NodeKind::Param || node.kind == NodeKind::Ident) {
+            const auto word = ast.text(node);
+            // Ignore a member key. It is data, not a binding or a use.
+            const Node& parent = ast.at(item.parent);
+            if ((parent.kind == NodeKind::Member || parent.kind == NodeKind::SafeMember) &&
+                parent.b == item.id) continue;
+            if (word == name && item.id != callback_id && item.id != fn.a) return {};
+            const bool record = comparator && (word == left || word == right);
+            const bool array_use = word == recv && item.id != declaration && item.id != recv_id;
+            if (record || array_use) {
+                if (parent.kind != NodeKind::Member || parent.a != item.id || item.grandparent == kNoNode)
+                    return {};
+                const auto field = ast.text(ast.at(parent.b));
+                const Node& outer = ast.at(item.grandparent);
+                const bool presentation = field == "stringify" && outer.kind == NodeKind::Call &&
+                    outer.a == item.parent && outer.count == 0;
+                if (!presentation &&
+                    !(record && outer.kind == NodeKind::Binary && shape->fields.count(std::string(field))))
+                    return {};
+            }
+        }
+        for (NodeId child : {node.a, node.b, node.c})
+            pending.push_back({child, item.id, item.parent, comparator});
+        for (std::uint32_t i = 0; i < node.count; ++i)
+            pending.push_back({ast.list(node)[i], item.id, item.parent, comparator});
+    }
+    return shape;
+}
 }
 TyRef Inference::collection_callables(const TyRef& callee,const std::vector<TyRef>& values,bool& grew) {
     std::vector<TyRef> arguments;arguments.reserve(values.size());
@@ -104,7 +202,15 @@ TyRef Inference::collection_result(const Node& n,const TyRef& recv,const std::ve
             add_element(receiver, empty_ty());
         if (m == M::Sort && !values.empty()) {
             bool grew = false;
-            const auto argument=collection_value(element);
+            TyRef argument = collection_value(element);
+            if (!session_ && exact_callee(values[0]) && values[0]->callables.size() == 1 &&
+                values[0]->callables.front() < plan_.functions.size()) {
+                const NodeId fn = plan_.functions[values[0]->callables.front()];
+                auto [proof, inserted] = sort_record_proofs_.try_emplace(receiver_id, fn, TyRef{});
+                if (inserted || proof->second.first != fn)
+                    proof->second = {fn, isolated_sort_record(ast_, root_, n, ast_.at(fn))};
+                if (proof->second.second) argument = fresh(receiver_id, proof->second.second);
+            }
             const TyRef order=call_callables(values[0], {argument, argument}, grew);
             if (tagged() && (order->kinds & kKindTagged)) result_.collection_inspections.insert(n.a);  // D-063
         }

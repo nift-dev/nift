@@ -71,9 +71,18 @@ SHAPES.update({
                            "main.f": 'fn(f(s)) {\n  return s + 1\n}\nimport("m.nft")\nprint(f(o.k))\n'},
                           "path-in-call-argument:imported"),
     "path-arg-own-global": ({"main.f": 'fn(f(s)) {\n  return s + 1\n}\no := {"k": 1}\nprint(f(o.k))\n'}, "vm"),
-    # Refused: two units declare the same top-level name.
+    # D-182: both units own a separate binding; the module binding is private.
     "name-clash": ({"m.nft": 'tmp := 1\nfn(mf()) {\n  return tmp\n}\nexport(mf)\n',
-                    "main.f": 'tmp := 2\nimport("m.nft")\nprint(mf() + tmp)\n'}, "import-name-clash"),
+                    "main.f": 'tmp := 2\nimport("m.nft")\nprint(mf() + tmp)\n'}, "vm"),
+    "private-overlap-multiple": ({
+        "m.nft": 'left := 1\nright := 2\nfn(mf()) { return left + right }\nexport(mf)\n',
+        "main.f": 'left := 10\nright := 20\nimport("m.nft")\nprint(mf()); print(left + right)\n',
+    }, "vm"),
+    "private-overlap-inaccessible": ({
+        "m.nft": 'hidden := 1\nfn(read_hidden()) { return hidden }\nexport(read_hidden)\n',
+        "other.nft": 'fn(other_read()) { return hidden }\nexport(other_read)\n',
+        "main.f": 'hidden := 2\nimport("m.nft")\nimport("other.nft")\nprint(other_read())\n',
+    }, "import-scope"),
     # Refused: a module's bare top-level return ends only the module in legacy.
     "module-bare-return": ({"m.nft": 'print("a")\nreturn\n', "main.f": 'import("m.nft")\nprint("b")\n'}, "module-bare-return"),
 })
@@ -84,8 +93,8 @@ PROBES = {
     "export_collision": "import-scope:collision", "export_copy": "binding-name-reserved", "export_missing": "module-error:export-missing",
     "in_block": "import-nested", "in_function": "import-nested", "missing": "import-error:missing",
     "module_bare_return": "module-bare-return", "module_error": "type:-", "module_free_unbound": "free-name",
-    # module_private: the importer declares `hidden` too (refused: names stay apart).
-    "module_private": "import-name-clash", "module_private_late": "vm", "module_return": "module-error:return-value",
+    # D-182: module-private hidden and the importer binding stay distinct.
+    "module_private": "vm", "module_private_late": "vm", "module_return": "module-error:return-value",
     "module_vs_caller_local": "import-scope", "nested_relative": "vm", "not_reexported": "import-scope",
     "package_missing": "import-error:package", "repeated": "import-reinitialised",
     "same_file_two_spellings": "import-reinitialised", "self_cycle": "import-error:cycle", "side_effect_order": "vm",
