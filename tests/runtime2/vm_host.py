@@ -84,6 +84,8 @@ ERRORS = [
     ("sha256_directory", 'print(sha256_file("sub"))'),
     ("rm_directory", 'native::rm("sub")'),
     ("cp_missing", 'native::cp("missing.txt", "out.txt")'),
+    ("cp_unmatched_before_invalid_destination", 'native::cp("*.missing", 7)'),
+    ("mv_unmatched_before_invalid_destination", 'native::mv("*.missing", 7)'),
     ("cd_missing", 'cd("missing-dir")'),
     ("sleep_negative", 'sleep(-1)'),
 ]
