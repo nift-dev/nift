@@ -294,6 +294,15 @@ def read_tty_audit(path, shell_pid):
     return records
 
 
+def audit_shell_restored(records):
+    # Require a real handoff to a child before interpreting terminal ownership.
+    if not background_tty_stolen(records):
+        raise OSError("terminal audit missing child ownership prerequisite")
+    handoffs = [row for row in records if row[0] == "handoff"]
+    _, shell_group, requested, observed, status = handoffs[-1]
+    return status == 0 and requested == observed == shell_group
+
+
 def background_owner(s, r):
     s.line("/bin/sleep 1 &")
     s.prompt()
@@ -352,8 +361,12 @@ def ctrl_z(s, r):
     r.witness("ctrl-z-returned")
     if LINUX:
         restored = shell_owns_tty(s) is True
-        if not r.check("ctrl-z-restores-terminal", restored):
-            return
+    elif TTY_AUDIT:
+        restored = audit_shell_restored(read_tty_audit(Path(s.root) / "tty-audit", s.pid))
+    else:
+        restored = None
+    if restored is not None and not r.check("ctrl-z-restores-terminal", restored):
+        return
     s.line("jobs")
     s.prompt()
     out = s.output()
@@ -565,7 +578,7 @@ SCENARIOS = {
 
 def run_scenario(binary, name, extra_env=None):
     extra_env = dict(extra_env or {})
-    if name == "background_owner" and TTY_AUDIT:
+    if TTY_AUDIT and (name == "background_owner" or (name == "ctrl_z" and not LINUX)):
         preload = "DYLD_INSERT_LIBRARIES" if sys.platform == "darwin" else "LD_PRELOAD"
         existing = extra_env.get(preload, os.environ.get(preload, ""))
         extra_env[preload] = TTY_AUDIT + (":" + existing if existing else "")

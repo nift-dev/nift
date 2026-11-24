@@ -1,4 +1,4 @@
-"""Missing, malformed and unrelated observations cannot kill CP21 mutant 1."""
+"""Only a witnessed child handoff can establish CP21 terminal ownership."""
 import tempfile
 from pathlib import Path
 import cp21_interactive_host as c
@@ -26,6 +26,15 @@ with tempfile.TemporaryDirectory() as td:
         assert not c.background_tty_stolen(c.read_tty_audit(p, 10)), suffix
         checks += 1
     p.write_text(ready + 'handoff 10 10 11 11 0\nhandoff 10 10 10 10 0\n')
-    assert c.background_tty_stolen(c.read_tty_audit(p, 10))
-    checks += 1
+    records = c.read_tty_audit(p, 10)
+    assert c.background_tty_stolen(records)
+    assert c.audit_shell_restored(records)
+    assert not c.audit_shell_restored(records[:-1])
+    try:
+        c.audit_shell_restored(records[:1])
+    except OSError:
+        pass
+    else:
+        raise AssertionError('missing child handoff accepted')
+    checks += 4
 print('PASS CP21 terminal audit evidence guards:', checks)
