@@ -366,7 +366,7 @@ def ctrl_z(s, r):
     try:
         # Wait for the foreground job's SIGCONT acknowledgement before
         # sending input. A shell prompt redraw alone proves no handoff.
-        s.until_text("RESUMED-Z", 3.0)
+        s.until_text("RESUMED-Z-FOREGROUND", 3.0)
         os.write(s.fd, b"HELLO-Z\r")
         s.until_text("GOT:HELLO-Z", 3.0)
         resumed = True

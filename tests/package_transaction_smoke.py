@@ -12,6 +12,12 @@ import time
 NIFT = str(Path(sys.argv[1] if len(sys.argv) > 1 else "./nift").resolve())
 
 
+def native_path(path):
+    if os.environ.get("MSYSTEM") and os.name != "nt":
+        return subprocess.check_output(["cygpath", "-m", str(path)], text=True).strip()
+    return Path(path).as_posix()
+
+
 def run(cwd, *args, env=None, ok=True):
     merged = os.environ.copy()
     if env:
@@ -329,7 +335,7 @@ with tempfile.TemporaryDirectory() as raw:
         'import("demo")\nprint(unchanged_value())\nprint(current_path())\n', encoding="utf-8")
     same = run(unchanged, "same.f", env={"NIFT_VM": "0"})
     assert same.stdout.splitlines() == [
-        "before", (unchanged / ".nift/packages/demo/src/asset.txt").as_posix()
+        "before", native_path(unchanged / ".nift/packages/demo/src/asset.txt")
     ]
 
     # A synchronous child package command must complete while an old package
@@ -337,7 +343,7 @@ with tempfile.TemporaryDirectory() as raw:
     # changed lock provenance instead of silently using the replacement.
     advance_helper("child-update")
     (unchanged / "child-update.f").write_text(
-        f'import("demo")\nr := run({json.dumps(NIFT)}, "update", "demo")\n'
+        f'import("demo")\nr := run({json.dumps(native_path(NIFT))}, "update", "demo")\n'
         'print(r.exit_code)\nprint(current_path())\n', encoding="utf-8")
     child = run(unchanged, "child-update.f", env={"NIFT_VM": "0"}, ok=False)
     assert child.stdout.splitlines() == ["0"]
@@ -353,7 +359,7 @@ with tempfile.TemporaryDirectory() as raw:
         marker = site / "worker-ready"
         (site / "worker.f").write_text(
             f'import("demo")\nworker := thread({callable_name})\n'
-            f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
+            f'touch({json.dumps(native_path(marker))})\nprint(worker.join())\n', encoding="utf-8")
         reader = subprocess.Popen([NIFT, "worker.f"], cwd=site,
                                   env=dict(os.environ, NIFT_VM="0"),
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -390,7 +396,7 @@ with tempfile.TemporaryDirectory() as raw:
         marker = local_site / "local-ready"
         (local_site / "local.f").write_text(
             f'import("localdemo")\nworker := thread(delayed_local)\n'
-            f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
+            f'touch({json.dumps(native_path(marker))})\nprint(worker.join())\n', encoding="utf-8")
         reader = subprocess.Popen([NIFT, "local.f"], cwd=local_site,
                                   env=dict(os.environ, NIFT_VM="0"),
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
