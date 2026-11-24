@@ -24,6 +24,24 @@ bool literal_octets(const Ast& ast, const Node& array) {
 }
 } // namespace
 
+// A String kind alone does not rule out a legacy tagged value.
+bool plain_readonly_arity_string(const Ast& ast, const Node& receiver, const Binding* binding) {
+    const Node* source = &receiver;
+    if (binding) {
+        if (!binding->string_literal_initializer || binding->cell || binding->global) return false;
+        for (NodeId id = 0; id < ast.size(); ++id) {
+            const Node& node = ast.at(id);
+            // Extraction writes through Command and is outside the ordinary assignment set.
+            if (node.kind == NodeKind::Command) return false;
+            if (node.kind == NodeKind::Declare && node.a == binding->decl_node) source = &ast.at(node.b);
+        }
+    }
+    Value value;
+    return source->kind == NodeKind::String && source->count == 0 &&
+           decode_string_literal(ast.text(*source), value) &&
+           value.is(Kind::String) && string_view_of(value).substr(0, 6) != "\x1f" "nift:";
+}
+
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
     const NodeId* args = ast_.list(node);
     if (spec.id == natives::BuiltinId::FnMinify &&

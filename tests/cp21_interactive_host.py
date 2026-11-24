@@ -169,7 +169,7 @@ class Pty:
             needle = needle.encode()
         return self.until(lambda: needle in self.buf, timeout, repr(needle))
 
-    def prompt(self, timeout=4.0, initial=False):
+    def prompt(self, timeout=4.0, initial=False, after_interrupt=False):
         def ready():
             data = ANSI.sub(b"", self.buf)
             if initial:
@@ -177,6 +177,12 @@ class Pty:
             # The command echo itself contains prompt redraws. Wait for a
             # prompt after the Enter newline; later background output is fine.
             newline = data.find(b"\n")
+            if after_interrupt:
+                # Darwin may echo the terminal's interrupt and redraw the
+                # prompt without inserting a newline between them.
+                interrupt = data.rfind(b"^C")
+                if interrupt >= 0:
+                    return b"~$ " in data[interrupt + 2:]
             return newline >= 0 and b"~$ " in data[newline + 1:]
         self.until(ready, timeout, "prompt")
 
@@ -382,7 +388,7 @@ def ctrl_z(s, r):
     s.line("fg 1")
     time.sleep(0.2)
     os.write(s.fd, b"\x03")
-    s.prompt()
+    s.prompt(after_interrupt=True)
     r.check("ctrl-z-fg-interrupt", probe_foreground(s))
 
 
@@ -424,7 +430,7 @@ def stop_bg_fg(s, r):
     s.line("fg 1")
     time.sleep(0.2)
     os.write(s.fd, b"\x03")
-    s.prompt()
+    s.prompt(after_interrupt=True)
     r.check("stop-bg-fg-resume", probe_foreground(s))
     s.line("/bin/sh -c 'printf \"RESUME-%s\\n\" OK'")
     s.until_text("RESUME-OK")

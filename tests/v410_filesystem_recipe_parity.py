@@ -33,7 +33,7 @@ EXPECTED_REFUSAL={
 }
 # Pure-string contracts by index.
 EXPECTED_PURE_REFUSAL={
- 48: 'context:assignment-error', 52: 'builtin-arity:split', 53: 'builtin-arity:last',
+ 48: 'context:assignment-error',
  54: 'unresolved-name', 56: 'opaque:legacy-runtime-error',
 }
 failures=[]
@@ -120,6 +120,30 @@ if os.environ.get('NIFT_VM')!='0':
    assert (q.returncode,q.stdout,q.stderr)==(0,stdout,''), (engine,q)
    assert set(root.iterdir())=={path,data} and data.read_bytes()==b'A', engine
  print('PASS stat provider effects with an admissible name')
+ with tempfile.TemporaryDirectory(prefix='nift-readonly-arity-') as directory:
+  root=Path(directory).resolve();path=root/'case.f'
+  for receiver,call,message in (
+   ('p','split(arg(),arg())','split: expected one delimiter'),
+   ('p.split("/")','last(arg())','last: expected no arguments'),
+  ):
+   prefix='p:="a/b";fn(arg()){print("ARG");return "/"};print("entered");print('
+   src=prefix+receiver+'.'+call+')'
+   path.write_text(src+'\n')
+   for mode in ('0','require'):
+    q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM=mode),
+                     capture_output=True,text=True,encoding='utf-8',timeout=60)
+    assert (q.returncode,q.stdout,normalize(q.stderr,root))==(
+     1,'entered\n',f'error: <ORACLE_ROOT>/case.f:1:{len(prefix)+1}: {message}\n'), (mode,q)
+   assert set(root.iterdir())=={path}
+  for source,reason in (('s:=open("data");s.split()','builtin-arity:split'),
+                        ('s:="$[open("data")]";s.split()','opaque:legacy-runtime-error'),
+                        ('fn(g()){return [1].last(2)};g()','builtin-arity:last'),
+                        ('st:=ifstream("data")\ns:=""\nst >> s\nclose(st)\ns.split()', 'builtin-arity:split')):
+   path.write_text(source+'\n')
+   q=subprocess.run([str(binary),native_path(path)],cwd=root,env=dict(os.environ,NIFT_VM='require'),
+                    capture_output=True,text=True,encoding='utf-8',timeout=60)
+   assert (q.returncode,q.stdout,approved_refusal.refusal_reason(q.stderr))==(1,'',reason), q
+ print('PASS readonly arity reports at execution and does not evaluate invalid operands')
 if failures:
  print('FAIL filesystem recipe parity: %d failing case(s):'%len(failures))
  for f in failures:print('  '+f)

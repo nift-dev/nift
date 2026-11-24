@@ -5,6 +5,7 @@
 #include "rt/alias.h"
 #include "rt/atom.h"
 #include "rt/builtin_bind.h"
+#include "rt/compiler_native_args.h"
 #include "rt/native.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
@@ -215,10 +216,24 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
                     return fail(node, "builtin-receiver:" + std::string(name));
                 break;
         }
+        const Node& receiver = ast_.at(callee.a);
+        using natives::BuiltinId;
+        const bool split_arity = spec->id == BuiltinId::StrSplit && node.count != 1;
+        const bool last_arity = spec->id == BuiltinId::ArrLast && node.count != 0;
+        if (!in_function_ && !session_ && !(fb_->flags() & kInstrReturnCall) && (split_arity || last_arity)) {
+            const auto name = text(receiver);
+            const Binding* binding = receiver.kind == NodeKind::Ident ? find_binding(name) : nullptr;
+            if (split_arity && (!plain_readonly_arity_string(ast_, receiver, binding) ||
+                (binding && (assigned_.count(name) || std::any_of(assigned_fn_.begin(), assigned_fn_.end(),
+                    [&](const auto& names) { return names.count(name); })))))
+                return fail(node, "builtin-arity:split");
+            if (!expr_to(callee.a, dst)) return false;
+            return legacy_fatal(node, split_arity ? "split: expected one delimiter"
+                                                : "last: expected no arguments", dst);
+        }
         // W6 (Q14): legacy composes a chain of presentation methods over the
         // original value outside loop code; each call serializes its receiver
         // in loop code. Refused in every context (one meaning, D-018).
-        const Node& receiver = ast_.at(callee.a);
         if (presentation_builtin(*spec) && receiver.kind == NodeKind::Call &&
             ast_.at(receiver.a).kind == NodeKind::Member &&
             natives::find_builtin(natives::Receiver::Any, text(ast_.at(ast_.at(receiver.a).b))))
