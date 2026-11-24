@@ -19,9 +19,6 @@ cases=json.loads((Path(__file__).parent/'data/v410-native-dispatch.json').read_t
 EXPECTED_REFUSAL={
  'print(len("abc"))':'callable:len',
  'print( len("abc") )':'callable:len',
- 'print(to_string(1))':'callable:to_string',
- 'print(unknown(1))':'callable:unknown',
- 'print(print())':'static-error:arity',
  # L6 (D-075 #2, D-095): the VM refuses an unqualified ls; native::ls is the Runtime 2.0 spelling.
  'print(ls("missing/*").size())':'native-unqualified',
 }
@@ -46,6 +43,24 @@ with tempfile.TemporaryDirectory() as d:
     problem=approved_refusal.check(source,[binary,'-'],d,pinned,tuple(case['result'][:2]),stdin=source)
     if problem:failures.append(problem)
     else:refused+=1
+ controls = (
+  ('print("before"); print()', (1, 'before\n', 'error: <stdin>:1:18: print: expected one value\n')),
+  ('if(false){print()}; print("after")', (0, 'after\n', '')),
+  ('try { print() } catch(e) { print("caught") }', (1, '', 'error: <stdin>:1:7: print: expected one value\n')),
+  ('fn(unknown(x)){return x+1}; print(unknown(7))', (0, '8\n', '')),
+  ('print("value".to_string())', (0, 'value\n', '')),
+  ('fn(effect()){print("operand");return 1}; print("prior"); print(unknown(effect()))',
+   (1, 'prior\n', 'error: <stdin>:1:64: undefined callable: unknown\n')),
+ )
+ for source, expected in controls:
+  for mode in ('0', 'require'):
+   result = subprocess.run([binary, '-'], input=source, cwd=d, env=dict(os.environ, NIFT_VM=mode),
+                           capture_output=True, text=True, encoding='utf-8', timeout=60)
+   actual = (result.returncode, result.stdout, result.stderr)
+   if actual != expected:
+    failures.append(f'{source!r} ({mode}): {actual!r} != {expected!r}')
+ if not failures:
+  print(f'PASS {len(controls)} reached-diagnostic and dispatch controls in both modes')
 for f in failures:print('FAIL',f)
 if failures:sys.exit('FAIL native dispatch: %d of %d case(s)'%(len(failures),len(cases)))
 print('PASS',len(cases),'exact native dispatch/method/error contracts (legacy channel); VM default: %d equal, %d accepted refusals'%(len(cases)-refused,refused))

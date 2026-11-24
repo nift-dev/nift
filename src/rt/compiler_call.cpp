@@ -37,19 +37,18 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (fn == plan_.index.end() && !is_native && !builtin) return thread_call(node, name, dst);  // or refused
     const std::uint16_t arity =
         builtin ? 0 : is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
-    // When `dst` is the newest register nothing above it is live, so the call
-    // window (arguments, then the callee frame) starts at `dst` and the result
-    // lands in place; otherwise it starts at the first free register.
+    // Reuse the newest destination for the callee window when nothing above it is live.
     const bool in_place = dst + 1u == fb_->top();
     const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
-    // CP25: legacy evaluates every argument, then raises its arity Error.
-    // Kept refused where legacy's report differs: in loop-evaluator code
-    // legacy evaluates the arguments a second time on its canonical retry,
-    // and inside a return expression it prefixes "return: " per frame and
-    // reports the return statement's position.
+    // CP25: user-function arity errors follow operand evaluation. Prepared
+    // retries and return-expression prefixes keep their existing refusals.
     const bool arity_error = !builtin && !is_native && node.count != arity && !loop_reachable() &&
                              !(fb_->flags() & kInstrReturnCall);
+    // An empty textual print call reaches the legacy output diagnostic.
+    if (is_native && node.count == 0 && name == "print" &&  // rt-lint: allow-string-compare compile time
+        !session_ && !in_function_ && !in_lambda_ && !loop_reachable() && !(fb_->flags() & kInstrReturnCall))
+        return legacy_fatal(node, "print: expected one value", dst);
     if (!builtin && node.count != arity && !arity_error) return fail(node, "static-error:arity");
     const std::size_t f = is_native || builtin ? 0 : fn->second - 1u;
     // Legacy evaluates a call with an argument its prepared parser rejects on

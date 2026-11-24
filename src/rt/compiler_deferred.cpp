@@ -64,7 +64,13 @@ bool UnitCompiler::deferred_call(const Node& node, std::string_view name, std::u
     // own error, so it keeps the refusal (the L-defer rows among them). Broad on purpose: missing a built-in would
     // raise where legacy runs; an extra word only costs coverage.
 #if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 7)  // test-only: legacy-known names deferred
-    if (legacy_special_name(name) || legacy_known_word(name)) return false;
+    // C120 records two free-call false positives in these textual tables:
+    // to_string is a receiver method and unknown is diagnostic text.
+    // Closed top-level scripts can use the ordinary unbound-name proof.
+    const bool known_table_false_positive =
+        !in_function_ && !in_lambda_ && !loop_reachable() && (!module_names_ || module_names_->empty()) &&
+        (name == "to_string" || name == "unknown");
+    if (!known_table_false_positive && (legacy_special_name(name) || legacy_known_word(name))) return false;
 #endif
 #if !(defined(NIFT_DEADCODE_MUTANT) && NIFT_DEADCODE_MUTANT == 3)  // test-only: name certainty skipped
     auto known = deferred_.unbound.find(name);
