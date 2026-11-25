@@ -5,7 +5,24 @@ namespace nift::rt::detail {
 
 bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool stable_members, bool direct) const {
     const bool keyed = kinds(path.a) == kKindObject;
-    if (keyed && (stable_members || direct)) return false;
+    if (keyed && direct) return false;
+    // Raw spelling is sufficient only for ordinary quoted keys without
+    // escapes. All other writes must obey the selected member's type proof.
+    const auto plain_key = [&](const Node& key) {
+        if (key.kind != NodeKind::String || key.count || key.a != kNoNode) return std::string_view{};
+        const auto spelling = text(key);
+        if (spelling.size() < 2 || spelling.front() != '"' || spelling.back() != '"') return std::string_view{};
+        const auto body = spelling.substr(1, spelling.size() - 2);
+        return body.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") ==
+                       std::string_view::npos ? spelling : std::string_view{};
+    };
+    // A projected child can share the aggregate value only while its
+    // parent member cannot be replaced. Inserts at disjoint keys are safe.
+    const auto selected_key = keyed ? plain_key(ast_.at(path.b)) : std::string_view{};
+    const auto disjoint_key = [&](const Node& key) {
+        const auto other = plain_key(key);
+        return !selected_key.empty() && !other.empty() && other != selected_key;
+    };
     const NodeKind literal_kind = kinds(node_id(path)) == kKindObject ? NodeKind::Object : NodeKind::Array;
     const auto aggregate_of_literals = [&](NodeId id) {
         const Node& literal = ast_.at(id);
@@ -28,6 +45,16 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
         const Node& head = ast_.at(consumer->a);
         return head.kind == NodeKind::Ident && text(head) == "print" && !plan_.index.count(text(head));
     };
+    std::unordered_set<NodeId> keyed_reads;
+    if (keyed) for (NodeId id = 0; id < ast_.size(); ++id) {
+        const Node& call = ast_.at(id);
+        if (call.kind != NodeKind::Call || call.count) continue;
+        const Node& method = ast_.at(call.a);
+        if (method.kind != NodeKind::Member || text(ast_.at(method.b)) != "stringify") continue;
+        NodeId receiver = method.a;
+        while (ast_.at(receiver).kind == NodeKind::Member) receiver = ast_.at(receiver).a;
+        if (ast_.at(receiver).kind == NodeKind::Ident) keyed_reads.insert(receiver);
+    }
     struct Visit { NodeId id, parent, outer, consumer; };
     std::vector<Visit> pending{{root_, kNoNode, kNoNode, kNoNode}};
     bool declared = false;
@@ -45,6 +72,7 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
         const auto resolved = kinds_.bindings.find(item.id);
         if (item.id != binding && n.kind == NodeKind::Ident &&
             resolved != kinds_.bindings.end() && resolved->second == binding) {
+            if (keyed_reads.count(item.id)) continue;
             if (item.parent == kNoNode) return false;
             const Node& parent = ast_.at(item.parent);
             const Node* outer = item.outer == kNoNode ? nullptr : &ast_.at(item.outer);
@@ -60,8 +88,10 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
                         (outer && outer->kind == NodeKind::Index && outer->a == item.parent &&
                          item.consumer != kNoNode && is_print_read(&ast_.at(item.consumer), item.outer)) ||
                         (outer && outer->kind == NodeKind::Assign && outer->a == item.parent &&
-                         !stable_members && ast_.at(outer->b).kind == literal_kind &&
-                         (!keyed || ast_.at(parent.b).kind == NodeKind::String)))) {
+                         ast_.at(outer->b).kind == literal_kind &&
+                         (keyed ? (stable_members ? disjoint_key(ast_.at(parent.b))
+                                                  : ast_.at(parent.b).kind == NodeKind::String)
+                                : !stable_members)))) {
             } else if (parent.kind == NodeKind::Declare && parent.b == item.id &&
                        observed_array_alias(parent.a, false)) {
             } else if (parent.kind == NodeKind::Member && parent.a == item.id && outer &&

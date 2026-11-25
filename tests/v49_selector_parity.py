@@ -138,6 +138,11 @@ keyed_location_cases = [
   0, '{"k":[9]}\n', ''),
  ('rebind-object', keyed_prefix + 'a={"target":{"k":[8]}}; print(b.stringify())\n',
   0, '{"k":[8]}\n', ''),
+ ('project-keyed-child', keyed_prefix +
+  'child:=b["k"]\n' +
+  ''.join(f'a["other{i}"]={{"k":[8]}}\n' for i in range(12)) +
+  'child.push(2); print(a.target.k.stringify())\n',
+  0, '[1,2]\n', ''),
  ('missing-key-after-rebind', keyed_prefix + 'a={}; print(b.stringify())\n',
   1, '', 'error: <root>/p.f:4:13: reference target no longer exists: b\n'),
  ('missing-key-at-call', 'a := {"target":{"k":[1]}}\nfn(id(x)) { return x }\na={}\n'
@@ -274,8 +279,16 @@ with tempfile.TemporaryDirectory() as directory:
   if (result.returncode != 1 or result.stdout or f'not compiled for the VM ({reason})' not in result.stderr or
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL bounded callback or object-location admission: {result}')
+ # A projected child cannot be materialized if its parent can be replaced.
+ path.write_text(keyed_prefix + 'print("marker"); child:=b["k"]; '
+                 'a["target"]={"k":[9]}; child.push(2); print(b.k.stringify())\n', encoding='utf-8')
+ refusal = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+ if (refusal.returncode != 1 or refusal.stdout or '(alias-argument)' not in refusal.stderr or
+     'the program was not executed' not in refusal.stderr):
+  raise SystemExit(f'FAIL replaceable keyed projection must refuse before execution: {refusal}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
-       'object cases, and 4 refusal controls')
+       'object cases, and 5 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))
