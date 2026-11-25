@@ -62,6 +62,18 @@ bool UnitCompiler::collection_callback_shape(const Node& site,NodeId callback,st
 }
 
 bool UnitCompiler::compile_lambda_body(const Node& lambda,const NodeId* params,bool collection_view) {
+    if (!session_ && !plan_.coroutines && (!module_names_ || module_names_->empty())) {
+        if (const Node* receiver = invalid_object_member_lambda(ast_, kinds_, lambda)) {
+            const Binding* binding = find_binding(text(*receiver));
+            if (binding && binding->loop_binding) {
+                std::uint16_t scratch = 0;
+                return temp(scratch) &&
+                       legacy_fatal(ast_.at(lambda.b),
+                                    "member assignment requires a struct instance: " + std::string(text(*receiver)),
+                                    scratch);
+            }
+        }
+    }
     bool unreachable_parameters = false;
     for (std::uint32_t k = 0; k < lambda.count; ++k)
         unreachable_parameters = unreachable_parameters || kinds_.of(params[k]) == 0;

@@ -1,4 +1,5 @@
 #include "rt/compiler_loops_scan.h"
+#include "rt/compiler_collection_lambda.h"
 
 #include "rt/native.h"
 
@@ -158,6 +159,7 @@ struct ShrinkScan {
     std::string_view captured_element;
     bool found = false;
     NodeId snapshot_source = kNoNode;
+    bool admit_invalid_member_callback = false;
 
     bool read_only_expression(NodeId id) const {
         const Node& n = ast.at(id);
@@ -172,7 +174,7 @@ struct ShrinkScan {
         }
     }
 
-    bool read_only_callable(NodeId id) const {
+    bool read_only_callable(NodeId id, bool allow_reached_error = false) const {
         const auto unknown = kinds.callable_unknown.find(id);
         if (kinds.of(id) != kKindFunction || unknown == kinds.callable_unknown.end() || unknown->second)
             return false;
@@ -180,8 +182,10 @@ struct ShrinkScan {
         if (targets == kinds.callable_targets.end() || targets->second.empty()) return false;
         for (NodeId target : targets->second) {
             const Node& lambda = ast.at(target);
-            if (lambda.kind != NodeKind::Lambda || (lambda.flags & (kFlagBlockBody | kFlagAsync)) ||
-                !read_only_expression(lambda.b)) return false;
+            if (lambda.kind != NodeKind::Lambda || (lambda.flags & (kFlagBlockBody | kFlagAsync))) return false;
+            if (read_only_expression(lambda.b)) continue;
+            const Node* receiver = allow_reached_error ? invalid_object_member_lambda(ast, kinds, lambda) : nullptr;
+            if (!receiver || ast.text(*receiver) != captured_element) return false;
         }
         return true;
     }
@@ -272,11 +276,12 @@ struct ShrinkScan {
                 const auto receiver = kinds.bindings.find(callee.a);
                 if (receiver != kinds.bindings.end() && receiver->second == snapshot_source) return;
             }
+            const bool map = method == "map";  // rt-lint: allow-string-compare compile time
             const bool nonshrinking = kinds.of(callee.a) == kKindArray &&
                 (push ||
                  (method == "stringify" && n.count == 0) ||  // rt-lint: allow-string-compare compile time
-                 ((method == "sort_by" || method == "map") &&  // rt-lint: allow-string-compare compile time
-                  n.count == 1 && read_only_callable(ast.list(n)[0])));
+                 ((method == "sort_by" || map) &&  // rt-lint: allow-string-compare compile time
+                  n.count == 1 && read_only_callable(ast.list(n)[0], map && admit_invalid_member_callback)));
             if (!nonshrinking) { found = true; return; }
         } else if (callee.kind == NodeKind::Ident) {
             NativeInfo info;
@@ -342,6 +347,7 @@ bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place,
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
     ShrinkScan scan{ast_, kinds_, name, captured_element};
+    scan.admit_invalid_member_callback = snapshot_callback && !captured_element.empty();
     scan.node(node_id(body));
     if (!scan.found || !snapshot_callback || captured_element.empty() || !scan.local_map_captures(body))
         return scan.found;

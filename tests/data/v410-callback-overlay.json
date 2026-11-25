@@ -113,6 +113,7 @@
       "source": "const rows := [{\"v\":3}]; for(row : rows) { f := x => row.v = x; print([1].map(f).stringify()); break }",
       "exit": 1,
       "stdout": "",
+      "vm_stdout": "",
       "stderr": "error: <ORACLE_ROOT>/root-readonly.f:1:54: lambda body error: member assignment requires a struct instance: row\n"
     },
     {

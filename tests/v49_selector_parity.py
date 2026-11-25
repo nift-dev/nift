@@ -228,6 +228,15 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('invalid-object-member-mapper-empty',
+  'const rows := [{"v":3}]\nfor(row : rows) {\n f := x => row.v = x\n'
+  ' print([].map(f).stringify()); break\n}\n',
+  0, '[]\n', ''),
+ ('invalid-object-member-mapper-reached',
+  'const rows := [{"v":3}]\nfor(row : rows) {\n f := x => row.v = x\n'
+  ' print("before")\n try { print([1].map(f).stringify()) } catch(e) { print("caught") }\n break\n}\n',
+  1, 'before\n',
+  'error: <root>/p.f:3:12: lambda body error: member assignment requires a struct instance: row\n'),
  ('const-root-read-only-mapper',
   'const rows := [{"v":3}]; for(row : rows) { f := x => row.v + x; '
   'print([1].map(f).stringify()); break }\nprint(rows.stringify())\n',
