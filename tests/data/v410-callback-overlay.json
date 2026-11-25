@@ -81,6 +81,9 @@
       "source": "rows := [{\"v\":3}]; for(row : rows) { f := x => row.v+x; rows.clear(); print([1].map(f).stringify()); break }",
       "exit": 1,
       "stdout": "",
+      "vm_exit": 0,
+      "vm_stdout": "[4]\n",
+      "vm_stderr": "",
       "stderr": "error: <ORACLE_ROOT>/location-invalid.f:1:48: lambda body error: reference target no longer exists: row.v+x\n"
     },
     {

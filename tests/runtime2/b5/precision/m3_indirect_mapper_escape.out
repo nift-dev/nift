@@ -1,0 +1,2 @@
+-- exit 1
+error: m3_indirect_mapper_escape.f:4:1: not compiled for the VM (for-capture-vanishing): this for-loop form is not supported by the Runtime 2.0 VM yet

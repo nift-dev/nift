@@ -87,7 +87,12 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     // missing check and (for a plain binding) the element copy.
     const bool captured = state.pair ? second_captured : first_captured;
     const auto captured_element = captured ? text(ast_.at(state.names[state.pair ? 1 : 0])) : std::string_view{};
-    const bool shrink = for_source_may_shrink(body, state.place, state.source_name, captured_element);
+    // A synchronous, nonescaping mapper reads the retained entry slot
+    // after a clear of the original array.
+    const bool snapshot_callback = !state.pair && !first_writes && !session_ && !plan_.coroutines &&
+                                   (!module_names_ || module_names_->empty());
+    const bool shrink =
+        for_source_may_shrink(body, state.place, state.source_name, captured_element, snapshot_callback);
     if (shrink && captured)
         return fail(node, "for-capture-vanishing");
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))

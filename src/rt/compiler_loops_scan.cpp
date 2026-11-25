@@ -157,6 +157,7 @@ struct ShrinkScan {
     std::string_view name;
     std::string_view captured_element;
     bool found = false;
+    NodeId snapshot_source = kNoNode;
 
     bool read_only_expression(NodeId id) const {
         const Node& n = ast.at(id);
@@ -185,6 +186,67 @@ struct ShrinkScan {
         return true;
     }
 
+    bool local_map_captures(const Node& body) const {
+        std::unordered_map<std::string_view, NodeId> callbacks;
+        std::unordered_set<NodeId> lambda_nodes;
+        const NodeId* statements = ast.list(body);
+        for (std::uint32_t i = 0; i < body.count; ++i) {
+            const Node& decl = ast.at(statements[i]);
+            if (decl.kind != NodeKind::Declare || decl.flags || decl.b == kNoNode) continue;
+            const Node& lambda = ast.at(decl.b);
+            if (lambda.kind != NodeKind::Lambda || (lambda.flags & (kFlagBlockBody | kFlagAsync)) ||
+                !read_only_expression(lambda.b)) continue;
+            CaptureScan capture{ast, captured_element};
+            capture.node(decl.b, false);
+            if (!capture.found) continue;
+            if (!callbacks.emplace(ast.text(ast.at(decl.a)), decl.a).second) return false;
+            lambda_nodes.insert(decl.b);
+        }
+        if (callbacks.empty()) return false;
+
+        std::unordered_set<NodeId> map_arguments;
+        std::vector<NodeId> references;
+        struct Visit { NodeId id; bool in_callback; };
+        std::vector<Visit> pending;
+        for (std::uint32_t i = 0; i < body.count; ++i) pending.push_back({statements[i], false});
+        while (!pending.empty()) {
+            const auto [id, in_callback] = pending.back();
+            pending.pop_back();
+            if (id == kNoNode) continue;
+            const Node& node = ast.at(id);
+            if (node.kind == NodeKind::Lambda) {
+                if (!lambda_nodes.count(id)) return false;
+                pending.push_back({node.b, true});
+                continue;
+            }
+            if (node.kind == NodeKind::FnDecl) return false;
+            if (node.kind == NodeKind::Ident) {
+                const auto callback = callbacks.find(ast.text(node));
+                if (callback != callbacks.end() && id != callback->second) {
+                    if (in_callback) return false;
+                    references.push_back(id);
+                }
+            }
+            if (node.kind == NodeKind::Call && node.count == 1) {
+                const Node& head = ast.at(node.a);
+                const NodeId arg = ast.list(node)[0];
+                if (head.kind == NodeKind::Member && kinds.of(head.a) == kKindArray &&
+                    ast.text(ast.at(head.b)) == "map" &&  // rt-lint: allow-string-compare compile time
+                    read_only_callable(arg))
+                    map_arguments.insert(arg);
+            }
+            for (NodeId child : {node.a, node.b, node.c}) pending.push_back({child, in_callback});
+            for (std::uint32_t i = 0; i < node.count; ++i) pending.push_back({ast.list(node)[i], in_callback});
+        }
+        for (NodeId use : references) {
+            const auto binding = kinds.bindings.find(use);
+            const NodeId declaration = callbacks.at(ast.text(ast.at(use)));
+            if (binding == kinds.bindings.end() || binding->second != declaration || !map_arguments.count(use))
+                return false;
+        }
+        return !references.empty();
+    }
+
     void call(NodeId id) {
         const Node& n = ast.at(id);
         const Node& callee = ast.at(n.a);
@@ -203,6 +265,12 @@ struct ShrinkScan {
                     capture.node(value, false);
                     if (capture.found) { found = true; return; }
                 }
+            }
+            if (snapshot_source != kNoNode && !n.count &&
+                method == "clear" &&  // rt-lint: allow-string-compare compile time
+                kinds.of(callee.a) == kKindArray && ast.at(callee.a).kind == NodeKind::Ident) {
+                const auto receiver = kinds.bindings.find(callee.a);
+                if (receiver != kinds.bindings.end() && receiver->second == snapshot_source) return;
             }
             const bool nonshrinking = kinds.of(callee.a) == kKindArray &&
                 (push ||
@@ -270,10 +338,15 @@ bool UnitCompiler::for_body_writes(const Node& body, std::string_view name) cons
 
 
 bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place, std::string_view name,
-                                         std::string_view captured_element) const {
+                                         std::string_view captured_element, bool snapshot_callback) const {
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
     ShrinkScan scan{ast_, kinds_, name, captured_element};
+    scan.node(node_id(body));
+    if (!scan.found || !snapshot_callback || captured_element.empty() || !scan.local_map_captures(body))
+        return scan.found;
+    scan.found = false;
+    scan.snapshot_source = place->decl_node;
     scan.node(node_id(body));
     return scan.found;
 }
