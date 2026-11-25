@@ -200,6 +200,36 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
     return constant_of(node, value, is_constant) && is_constant;
 }
 
+bool UnitCompiler::numeric_diagnostic_tree(const Node& node) {
+    if (session_ || loop_reachable()) return false;
+    // In a pure operator tree, report a failing operand before its parent.
+    // Calls and unresolved bindings retain their existing admission priority.
+    std::vector<NodeId> pending{node.a};
+    if (node.kind == NodeKind::Binary) pending.push_back(node.b);
+    bool nested = false;
+    while (!pending.empty()) {
+        const Node& operand = ast_.at(pending.back());
+        pending.pop_back();
+        switch (operand.kind) {
+            case NodeKind::Binary:
+                pending.push_back(operand.b);
+                [[fallthrough]];
+            case NodeKind::Unary:
+                nested = true;
+                pending.push_back(operand.a);
+                break;
+            case NodeKind::Ident:
+                if (!scopes_.find(text(operand))) return false;
+                break;
+            case NodeKind::Number:
+                break;
+            default:
+                return false;
+        }
+    }
+    return nested;
+}
+
 // Argument k written without parentheses of its own: legacy quotes the
 // argument's text, `(o.k)` included, which is not the path's.
 bool UnitCompiler::bare_argument(const Node& call, std::uint32_t k) const {

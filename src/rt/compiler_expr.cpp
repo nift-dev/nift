@@ -150,13 +150,12 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
     KindSet l = kinds(node.a), r = kinds(node.b);
-    // CP23: a bare atomic read in a value position is its contents (expr_any
-    // emits AtomicLoad). The handle tag itself is not an arithmetic kind.
+    // CP23: use the kind of an atomic handle's contents.
     if (l & kKindAtomicInt) l |= kKindInt;
     if (r & kKindAtomicInt) r |= kKindInt;
     l &= ~kKindAtomic;
     r &= ~kKindAtomic;
-    bool numeric_guard = false;
+    bool numeric_guard = false, bad_kind = false;
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
             // Legacy's string + callable is a run-time error with a fixed
@@ -168,15 +167,15 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
                     (widened(l) || widened(r) || node.begin < session_->unit_begin);
-                if (!numeric_guard) return fail(node, op_type_reason(node.op));
+                bad_kind = !numeric_guard;
             }
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
-            if (!ordering_kinds_ok(l, r) && !unknown_defers(l | r))
-                return fail(node, op_type_reason(node.op));
+            bad_kind = !ordering_kinds_ok(l, r) && !unknown_defers(l | r);
             break;
         default: break;
     }
+    if (bad_kind && !numeric_diagnostic_tree(node)) return fail(node, op_type_reason(node.op));
     const std::uint16_t mark = fb_->top();
     const auto numeric_flags = fb_->flags();
     std::uint16_t left = 0, right = 0;
@@ -188,6 +187,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     if (!expr_any(node.a, left) || !retain_receiver(left, left < mark, node.b) || !expr_any(node.b, right))
         return false;
 #endif
+    if (bad_kind) return fail(node, op_type_reason(node.op));
     fb_->set_offset(site(node));
 #if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 9
     if (numeric_guard) {
@@ -202,7 +202,6 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     return true;
 }
 
-// `&&` / `||` produce a bool (legacy converts the deciding operand).
 bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (node.op != Op::And && node.op != Op::Or) return fail(node, "logical-operator");
     if (!infix_left_ok(node)) return false;
@@ -239,14 +238,15 @@ bool UnitCompiler::ternary(const Node& node, std::uint16_t dst) {
 }
 
 bool UnitCompiler::unary(const Node& node, std::uint16_t dst) {
-    if (node.op != Op::Not && !kinds_within(node.a, kKindNumber, node, "type:unary")) return false;
-    // Legacy's prepared negation of an integer 0 gives -0 (the canonical one
-    // 0): refused in loop code where the operand may be an integer (D-018).
+    const bool nested = numeric_diagnostic_tree(node);
+    if (!nested && node.op != Op::Not && !kinds_within(node.a, kKindNumber, node, "type:unary")) return false;
+    // Prepared negation of zero differs from the canonical path (D-018).
     if (node.op == Op::Neg && loop_reachable() && (kinds(node.a) & (kKindInt | kKindUnknown)))
         return fail(node, "context:negative-zero");
     const std::uint16_t mark = fb_->top();
     std::uint16_t operand = 0;
     if (!reg_any(node.a, operand)) return false;
+    if (nested && node.op != Op::Not && !kinds_within(node.a, kKindNumber, node, "type:unary")) return false;
     fb_->set_offset(site(node));
     switch (node.op) {
         case Op::Not: fb_->emit(OpCode::Not, dst, operand); break;

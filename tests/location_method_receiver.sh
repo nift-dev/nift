@@ -12,13 +12,22 @@ a.push([2])
 b.push(3)
 print(a[0][1])
 F
-[ "$("$B" "$t/p.f")" = 3 ]
+for mode in 0 require; do
+    [ "$(NIFT_VM=$mode "$B" "$t/p.f")" = 3 ]
+done
 cat > "$t/missing.f" <<'F'
 a := [[1]]
 b := a[0]
 a.clear()
 b.push(2)
 F
-if "$B" "$t/missing.f" >"$t/o" 2>"$t/e"; then echo 'FAIL missing receiver succeeded' >&2; exit 1; fi
-grep -Fq 'reference target no longer exists: b' "$t/e"
+for mode in 0 require; do
+    status=0
+    NIFT_VM=$mode "$B" "$t/missing.f" >"$t/o" 2>"$t/e" || status=$?
+    if [[ $status != 1 || -s "$t/o" ]] ||
+       ! grep -Fq 'missing.f:4:1: reference target no longer exists: b' "$t/e"; then
+        echo "FAIL missing receiver ($mode): $(cat "$t/e")" >&2
+        exit 1
+    fi
+done
 echo 'PASS location method receiver synchronization'

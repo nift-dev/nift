@@ -106,12 +106,16 @@ const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint1
         function = found->second;
     }
     const Node& path = ast_.at(path_id);
-    if (path.kind != NodeKind::Index) return nullptr;
+    return indexed_array_path(path) ? &path : nullptr;
+}
+
+bool UnitCompiler::indexed_array_path(const Node& path) const {
+    if (session_ || plan_.coroutines || (module_names_ && !module_names_->empty()) ||
+        path.kind != NodeKind::Index) return false;
     const auto key = ast_.at(path.b).kind;
-    if ((key != NodeKind::Ident && key != NodeKind::Number) || ast_.at(path.a).kind != NodeKind::Ident ||
-        kinds(path.a) != kKindArray || kinds(path.b) == 0 || (kinds(path.b) & ~kKindNumber) ||
-        kinds(node_id(path)) != kKindArray) return nullptr;
-    return &path;
+    return (key == NodeKind::Ident || key == NodeKind::Number) &&
+           ast_.at(path.a).kind == NodeKind::Ident && kinds(path.a) == kKindArray &&
+           kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber) && kinds(node_id(path)) == kKindArray;
 }
 
 bool UnitCompiler::stable_indexed_root(NodeId binding) const {
@@ -159,6 +163,9 @@ bool UnitCompiler::stable_indexed_root(NodeId binding) const {
                 // Rebinding the root preserves the element kind.
             } else if (parent.kind == NodeKind::Index && parent.a == item.id &&
                        (is_identity_path(outer, parent) ||
+                        (outer && outer->kind == NodeKind::Declare && !outer->flags &&
+                         outer->b == item.parent && indexed_array_path(parent) &&
+                         observed_array_alias(outer->a, true)) ||
                         (outer && outer->kind == NodeKind::Lambda && !outer->count &&
                          outer->b == item.parent && ast_.at(parent.b).kind == NodeKind::Number) ||
                         (outer && outer->kind == NodeKind::Index && outer->a == item.parent &&
@@ -245,12 +252,23 @@ void UnitCompiler::prepare_indexed_roots() {
                              decl.kind == NodeKind::Return ? decl.a : kNoNode;
         if (value == kNoNode) continue;
         std::uint16_t function = 0;
-        const auto* path = indexed_identity_argument(ast_.at(value), function);
+        const Node& init = ast_.at(value);
+        const bool direct = decl.kind == NodeKind::Declare && indexed_array_path(init) &&
+                            observed_array_alias(decl.a, true);
+        const auto* path = direct ? &init : indexed_identity_argument(init, function);
         if (!path) continue;
         const auto root = kinds_.bindings.find(path->a);
         if (root != kinds_.bindings.end() && stable_indexed_root(root->second))
             selector_roots_.insert(root->second);
     }
+}
+
+bool UnitCompiler::emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result) {
+    std::uint16_t owner = 0, key = 0;
+    if (!binding_cell(root, owner) || !temp(key) || !expr_to(path.b, key)) return false;
+    fb_->set_offset(site(path));
+    fb_->note(fb_->emit(OpCode::NewIndexedCell, result, owner, key), std::string(text(path)));
+    return builder_ok();
 }
 
 bool UnitCompiler::emit_indexed_identity(const Node& call_node, const Node& path,
@@ -276,10 +294,7 @@ bool UnitCompiler::emit_indexed_identity(const Node& call_node, const Node& path
         fb_->mark_indexed_capture_call(fb_->note_index(at));
         fb_->release_to(scratch);
     }
-    std::uint16_t owner = 0, key = 0;
-    if (!binding_cell(*root, owner) || !temp(key) || !expr_to(path.b, key)) return false;
-    fb_->set_offset(site(path));
-    fb_->note(fb_->emit(OpCode::NewIndexedCell, result, owner, key), std::string(text(path)));
+    if (!emit_indexed_location(path, *root, result)) return false;
     fb_->set_offset(site(call_node));
     if (function) {
         fb_->emit(OpCode::Call, result, function, 1);
@@ -310,11 +325,15 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     if (in_function_ || in_lambda_ || loop_reachable() || captured_binding(node.a)) return 0;
     std::uint16_t function = 0;
     const Node& call_node = ast_.at(node.b);
-    const auto* path = indexed_identity_argument(call_node, function);
+    const bool direct = indexed_array_path(call_node);
+    if (direct && !observed_array_alias(node.a, true)) return 0;
+    const auto* path = direct ? &call_node : indexed_identity_argument(call_node, function);
+    const Binding* root = nullptr;
     if (path) {
-        const Binding* root = find_binding(text(ast_.at(path->a)));
-        if (!root || !root->location_source || root->global ||
-            !stable_indexed_root(root->decl_node)) return 0;
+        root = find_binding(text(ast_.at(path->a)));
+        const auto source = kinds_.bindings.find(path->a);
+        if (!root || !root->location_source || root->global || source == kinds_.bindings.end() ||
+            source->second != root->decl_node || !stable_indexed_root(root->decl_node)) return 0;
     } else {
         if (call_node.kind != NodeKind::Call || call_node.count ||
             ast_.at(call_node.a).kind != NodeKind::Ident) return 0;
@@ -333,7 +352,10 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     Binding binding;
     std::uint16_t result = 0;
     if (!new_binding(name, target, result, binding)) return -1;
-    if (path) {
+    if (direct) {
+        if (!emit_indexed_location(*path, *root, result)) return -1;
+        fb_->release_to(static_cast<std::uint16_t>(result + 1));
+    } else if (path) {
         if (!emit_indexed_identity(call_node, *path, function, result)) return -1;
     } else {
         fb_->set_offset(site(call_node));

@@ -443,3 +443,27 @@ and checks synchronous private captures with a separate fixture. No
 coroutine or isolate rule changed. The callback shell suite passes. Its
 separate numeric grid still finds a pre-existing diagnostic disagreement
 for array operands in `a + b * c`, reproduced on the earlier binary.
+
+### Nested numeric diagnostics and method receivers
+
+The script and lambda routes now report the failing child operator first
+for nested trees over lexical bindings and numeric literals. Other syntax,
+loop contexts and sessions keep their existing refusal ordering. All 470
+pairs in the original numeric grid pass in required VM mode. The local
+precise-position and evaluation-order gates pass.
+
+The post-certification refusal gate exposed a stale method:push sighting.
+The original named-identity receiver now executes and produces 3 in both
+engines. The companion missing-target case exposed a direct aggregate
+initializer that still read a snapshot. It now uses the same checked
+descriptor when the existing root and consumer proofs hold. Both
+historical inputs run independently in the location receiver test, which
+checks the exact missing-target name and position. The ledger removes
+only the resolved sighting and keeps the two other pinned method:push
+cases. All 90 remaining scoped refusals and the three mutation controls pass.
+
+Independent review also reproduced bare forwarding of a direct indexed
+alias: after slot replacement legacy observes [9], while the VM observes
+[1]. The same result occurs on the earlier binary. This remains open.
+The reserved declaration and computed-key position still require their
+existing historical checks.

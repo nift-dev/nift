@@ -77,7 +77,6 @@ private:
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
     void compute_may_double();
     bool begin(std::string name, NodeId body, const std::unordered_set<std::string_view>* assigned = nullptr);
-    // Cache the inferred text type per node for analysis and lowering.
     const TextType& text_type_at(NodeId id) const;
     bool finish(std::unique_ptr<Proto>& out);
     bool statements(const Node& block);
@@ -147,9 +146,11 @@ private:
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     const Node* indexed_identity_argument(const Node& call, std::uint16_t& function) const;
+    bool indexed_array_path(const Node& path) const;
     bool stable_indexed_root(NodeId binding) const;
     bool observed_array_alias(NodeId binding, bool rebind) const;
     const Node* indexed_return(std::uint16_t function) const;
+    bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result);
     bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);
     bool indexed_call_value(const Node& node, std::uint16_t function, std::uint16_t dst);
     void prepare_indexed_roots();
@@ -174,7 +175,6 @@ private:
     KindSet interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
                                          bool literal_only) const;
     KindSet interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
-    // Literal/operator-only return kinds. Never follows calls or resolves against caller scopes.
     KindSet interpolation_literal_kind(NodeId id) const;
     KindSet interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
@@ -199,7 +199,6 @@ private:
     bool member(const Node& node, std::uint16_t dst);
     bool index(const Node& node, std::uint16_t dst);
     bool local_register(const Node& node, std::uint16_t& reg);
-    // CP12C lambda construction, deferred Proto compilation and capture analysis.
     bool lambda_value(const Node& node, std::uint16_t dst);
     std::uint32_t collection_offset(const Node&) const;
     std::uint16_t collection_diagnostic_flags(const Node&,NodeId,bool comparator=false) const;
@@ -221,6 +220,7 @@ private:
     bool retain_receiver(std::uint16_t& reg, bool own_register, NodeId operand);
     bool plain_postfix(const Node& node);
     bool ends_with_not(NodeId id) const;
+    bool numeric_diagnostic_tree(const Node& node);
     bool infix_left_ok(const Node& node);
     bool comparison_chain_ok(const Node& node);
     bool element_target_ok(const Node& target);
