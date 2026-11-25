@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Selector value/capture/location and error contracts, with optional A/B oracle."""
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -228,6 +229,14 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('null-script-member-reached', 'o := null\nprint("before")\nprint(o.k)\n',
+  1, 'before\n', 'error: <root>/p.f:3:7: value has no member: k\n'),
+ ('null-script-index-reached', 'o := null\nprint("before")\nprint(o["k"])\n',
+  1, 'before\n', 'error: <root>/p.f:3:7: invalid index\n'),
+ ('const-object-cannot-rebind', 'const o := {"k":1}\n'
+  'fn(make()) { print("rhs"); return {"k":2} }\nprint("before")\no = make()\n',
+  1, 'before\n', 'error: <root>/p.f:4:1: cannot assign to const binding: o\n'),
+ ('const-object-read', 'const o := {"k":1}\nprint(o.k)\n', 0, '1\n', ''),
  ('scalar-live-location-after-shift-and-insert',
   'a := [{"k":1},{"k":2}]\nfn(id(x)) { return x }\n'
   'o := id(a[0]); a.remove(0); print(o.k); a.insert(0,{"k":9}); print(o.k)\n',
@@ -260,6 +269,12 @@ entry_and_object_cases = [
   'a := [{"k":[1]}]\nfn(id(x)) { return x }\n'
   'o := id(a[0]); a[0] = {"k":[9]}; print(o.stringify())\n', 0, '{"k":[9]}\n', ''),
 ]
+width_oracle = Path(__file__).with_name('data') / 'v410-callback-overlay.json'
+entry_and_object_cases.extend(
+ (case['name'], case['source'] + '\n', case['exit'], case['stdout'], case['stderr'])
+ for case in json.loads(width_oracle.read_text(encoding='utf-8'))['cases']
+ if case['name'] in {'map-width', 'filter-width', 'group_by-width'}
+)
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
@@ -356,8 +371,16 @@ with tempfile.TemporaryDirectory() as directory:
  if (refusal.returncode != 1 or refusal.stdout or '(alias-argument)' not in refusal.stderr or
      'the program was not executed' not in refusal.stderr):
   raise SystemExit(f'FAIL insertion with a retained child must refuse before execution: {refusal}')
+ # The reached null-index diagnostic only admits a literal string key.
+ path.write_text('o := null\nfn(key()){ print("key"); return "k" }\n'
+                 'print("marker"); print(o[key()])\n', encoding='utf-8')
+ refusal = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+ if (refusal.returncode != 1 or refusal.stdout or '(type:index)' not in refusal.stderr or
+     'the program was not executed' not in refusal.stderr):
+  raise SystemExit(f'FAIL effectful null index must refuse before execution: {refusal}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
-       'object cases, and 7 refusal controls')
+       'object cases, and 8 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

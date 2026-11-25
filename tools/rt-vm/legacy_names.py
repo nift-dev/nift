@@ -47,6 +47,10 @@ PATTERNS = [
 ]
 BRACE_LIST = re.compile(r'\{\s*("(?:[^"\\]|\\.)*"\s*(?:,\s*"(?:[^"\\]|\\.)*"\s*)+)\}')
 LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
+FFI_ABI_LIST_PREFIX = re.compile(
+    r'auto\s+valid_(?:field|type)\s*=\s*\[\]\s*\(const std::string\s*&\s*t\)\s*\{\s*'
+    r'static const std::unordered_set<std::string>\s+ok\s*=\s*$'
+)
 # 5. brace lists of wrapped literals, `{std::string("stack"), std::string("sorted_set")}` (ParserExpression.cpp's
 #    collection constructors; D-073 #5: `sorted_set` was missing because pattern 4 needs bare literals).
 WRAPPED = r'[A-Za-z_][\w:<>]*\(\s*"(?:[^"\\]|\\.)*"\s*\)'
@@ -86,7 +90,15 @@ def extract():
             for regex in PATTERNS:
                 names.update(regex.findall(text))
             for match in list(BRACE_LIST.finditer(text)) + list(WRAPPED_LIST.finditer(text)):
+                # The unsigned-width tags used by the ABI validators are
+                # string values, not legacy dispatch names. Other sources
+                # of a name still contribute to this table.
+                ffi_abi_list = os.path.basename(path) == "ParserExpression.cpp" and FFI_ABI_LIST_PREFIX.search(
+                    text[max(0, match.start() - 200):match.start()]
+                )
                 for literal in LITERAL.findall(match.group(1)):
+                    if ffi_abi_list and literal in {"u8", "u16", "u32", "u64"}:
+                        continue
                     if re.fullmatch(ID, literal):
                         names.add(literal)
     return sorted(names)

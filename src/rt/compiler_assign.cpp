@@ -43,7 +43,10 @@ bool UnitCompiler::declare(const Node& node) {
     const bool const_scalar = const_decl && init_kinds != 0 && (init_kinds & ~kKindScalar) == 0 &&
                               !session_ && target.kind == NodeKind::Ident &&
                               !captured_binding(node_id(target));
-    if (const_decl && !const_scalar && ((node.flags & kFlagImmut) || init_kinds != kKindArray))
+    const bool const_object = const_decl && init_kinds == kKindObject &&
+        !in_function_ && !in_lambda_ && !loop_reachable() && !session_ && !plan_.coroutines &&
+        (!module_names_ || module_names_->empty()) && !captured_binding(node_id(target));
+    if (const_decl && !const_scalar && ((node.flags & kFlagImmut) || (init_kinds != kKindArray && !const_object)))
         return fail(node, "declare-const");
     if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
     if (!const_decl) {
@@ -226,8 +229,11 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
         if (const StructFieldInfo* field = own_field(text(target)))  // CP12b: an implicit field
             return field_in_loop_code() ? fail(target, "context:struct-field") : field_assign(node, kNoNode, *field);
     if (!binding || binding->invocation) return fail(target, write_refusal(binding, text(target), "assign-free-name"));
-    if (binding->const_array) return fail(target, "declare-const");
-    if (binding->const_scalar) return const_write(node, nullptr, result, *binding, false);  // CP25: before the value
+    const bool script_const_object = binding->const_array && binding->decl_kinds == kKindObject &&
+        !binding->cell && !binding->global && !in_function_ && !loop_reachable() && !session_;
+    if (binding->const_array && !script_const_object) return fail(target, "declare-const");
+    if (binding->const_scalar || script_const_object)
+        return const_write(node, nullptr, result, *binding, false);  // CP25: before the value
     if (binding->readonly) return fail(target,
         session_ && binding->decl_kinds == kKindFunction ? "session:function-assignment" : "assign-catch-binding");
     if (binding->struct_id >= 0) return fail(target, "struct-assign");
