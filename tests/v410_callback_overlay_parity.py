@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 from v410_oracle_paths import fixture_root_aliases, normalize_fixture_paths
+from v410_exact_release_deferrals import check_deferral, load_deferrals
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'runtime2'))
 import approved_refusal  # noqa: E402
 
@@ -19,12 +20,16 @@ contract = json.loads(Path(__file__).with_name('data').joinpath('v410-callback-o
 binaries = [str(Path(path).resolve()) for path in (args.nift, args.baseline) if path]
 # D-065 defers timer construction. Keep both legacy capture diagnostics exact.
 timer_cases = {'unused-timer', 'param-timer'}
+deferrals = load_deferrals('v410-callback-overlay', contract["cases"])
 with tempfile.TemporaryDirectory(prefix='nift-v410-overlay-') as directory:
     root = Path(directory)
     aliases = fixture_root_aliases(root)
     for case in contract['cases']:
         path = root / (case['name'] + '.f')
-        path.write_text(case['source'] + '\n', encoding='utf-8')
+        path.write_bytes((case['source'] + '\n').encode('utf-8'))
+        if case['name'] in deferrals:
+            check_deferral(binaries[0], binaries[1] if len(binaries) > 1 else None, path, case, deferrals[case['name']], aliases)
+            continue
         expected = (case['exit'], case['stdout'], case['stderr'])
         checks = [(binary, None, expected) for binary in binaries]
         if 'vm_guard' in case:

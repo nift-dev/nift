@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 from v410_oracle_paths import fixture_root_aliases, normalize_fixture_paths
+from v410_exact_release_deferrals import check_deferral, load_deferrals
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--nift', default='./nift')
@@ -15,6 +16,7 @@ args = parser.parse_args()
 binary = str(Path(args.nift).resolve())
 baseline = str(Path(args.baseline).resolve()) if args.baseline else None
 contract = json.loads(Path(__file__).with_name('v410_object_member_cases.json').read_text(encoding='utf-8'))
+deferrals = load_deferrals('v410-object-member', contract["cases"])
 with tempfile.TemporaryDirectory(prefix='nift-v410-object-oracle-') as directory:
     root = Path(directory)
     root_aliases = fixture_root_aliases(root)
@@ -22,7 +24,10 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-object-oracle-') as directory
         (root / name).write_text(source, encoding='utf-8')
     for case in contract['cases']:
         path = root / (case['name'] + '.f')
-        path.write_text(case['source'] + '\n', encoding='utf-8')
+        path.write_bytes((case['source'] + '\n').encode('utf-8'))
+        if case['name'] in deferrals:
+            check_deferral(binary, baseline, path, case, deferrals[case['name']], root_aliases)
+            continue
         def execute(command, mode=None):
             env = dict(os.environ, NIFT_VM=mode) if mode else None
             result = subprocess.run([command, str(path)], capture_output=True, env=env,

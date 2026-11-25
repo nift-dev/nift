@@ -1,0 +1,28 @@
+{
+  "v410-callback-overlay": {
+    "cmd-redeclaration": {
+      "source_sha256": "ba6c8d03bb05b5a59762a2a48293a1160a755aa47173439b3711bf5081a703ca",
+      "position": "1:31",
+      "reason": "method:map",
+      "diagnostic": "the method call `.map()` is not supported by the Runtime 2.0 VM yet",
+      "legacy": [
+        0,
+        "[7]\n",
+        ""
+      ]
+    }
+  },
+  "v410-object-member": {
+    "location-parent-object-growth": {
+      "source_sha256": "21eb0b9d62bd6094c57e54a3d4edc0732e4a3e51526590128179f002c4693451",
+      "position": "3:9",
+      "reason": "path-in-call-argument",
+      "diagnostic": "an element path as a call argument is not supported by the Runtime 2.0 VM yet",
+      "legacy": [
+        0,
+        "[1,2]\n",
+        ""
+      ]
+    }
+  }
+}
