@@ -21,7 +21,13 @@ void Inference::for_statement(const Node& n) {
     if (normal) {
         value = keyed ? contents(source, false)  // D-NEXT-refsem: per-kind contents
                       : pair ? element_of(source, nullptr, true) : element_of(source, nullptr, false);
-        if (!value || value->kinds == 0) value = kinds_ty(kKindUnknown);
+        const bool tracked_array = !session_ && source->kinds == kKindArray && !source->any &&
+                                   !source->sites.empty() && source->sites.back() != kOpenSite;
+        // A known allocation can be waiting for an earlier store to acquire
+        // a type on the worklist. Keep that element at bottom: treating it
+        // as an unknown callable would widen unrelated lambda parameters
+        // permanently, even after the store's callable target becomes known.
+        if (!value || (value->kinds == 0 && !tracked_array)) value = kinds_ty(kKindUnknown);
         result_.elements[iterable] |= value->kinds;
     }
     const NodeId source_root = session_ ? session_mutation_root(ast_, iterable) : kNoNode;

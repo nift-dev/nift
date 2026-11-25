@@ -219,10 +219,37 @@ print(g(2))
 print(await pa)
 print(await pb)
 F
-[ "$(cd "$t/pkg" && "$B" p.f)" = $'15\n19\n16\n20' ]
+[ "$(cd "$t/pkg" && NIFT_VM=0 "$B" p.f)" = $'15\n19\n16\n20' ]
+if [[ ${NIFT_VM:-} != 0 ]]; then
+    status=0
+    (cd "$t/pkg" && NIFT_VM=require "$B" p.f) >"$t/o" 2>"$t/e" || status=$?
+    if [[ $status != 1 || -s "$t/o" ]] ||
+       ! grep -Fq '/packages/a/src/main.f:3:24: not compiled for the VM (coro-module-capture)' "$t/e" ||
+       ! grep -Fqx 'note: the program was not executed: no part of it ran' "$t/e"; then
+        echo "FAIL D-064 imported task capture: $(cat "$t/e")" >&2
+        exit 1
+    fi
+    # The synchronous factories still prove distinct module environments.
+    # D-064 also considers async lambdas declared but never called in imports.
+    for module in a b; do
+        fixture="$t/pkg/.nift/packages/$module/src/main.f"
+        { sed -n '1,2p' "$fixture"; printf 'export(make_%s)\n' "$module"; } > "$fixture.sync"
+        mv "$fixture.sync" "$fixture"
+    done
+    cat > "$t/pkg/sync.f" <<'F'
+import("a")
+import("b")
+n := 100
+f := make_a()
+g := make_b()
+print(f(2))
+print(g(2))
+F
+    [ "$(cd "$t/pkg" && NIFT_VM=require "$B" sync.f)" = $'15\n19' ]
+fi
 
 # Escaped capture hammer and worker cloning; cached plans contain no context.
-ok hammer 'fn(mk(n)) { return x => x + n }
+hammer_source='fn(mk(n)) { return x => x + n }
 a := []
 i := 0
 while(i < 400) { a.push(mk(i)); i += 1 }
@@ -233,5 +260,19 @@ f := async x => x * 2
 p := f(3)
 q := f(4)
 print(await p)
-print(await q)' $'80200\n6\n8'
+print(await q)'
+NIFT_VM=0 ok hammer-legacy "$hammer_source" $'80200\n6\n8'
+if [[ ${NIFT_VM:-} != 0 ]]; then
+    NIFT_VM=require ok hammer-vm "$hammer_source" $'80200\n6\n8'
+    # An actual type-changing write still requires the loop-context refusal.
+    printf '%s\n' 'a := [x => 1.5]' 'sum := 0' 'for(f : a) { sum += f(1) }' >"$t/p.f"
+    status=0
+    NIFT_VM=require "$B" "$t/p.f" >"$t/o" 2>"$t/e" || status=$?
+    if [[ $status != 1 || -s "$t/o" ]] ||
+       ! grep -Fq 'p.f:3:14: not compiled for the VM (context:assignment-error)' "$t/e" ||
+       ! grep -Fqx 'note: the program was not executed: no part of it ran' "$t/e"; then
+        echo "FAIL closure loop type change: $(cat "$t/e")" >&2
+        exit 1
+    fi
+fi
 echo 'PASS v4.8 callback compatibility matrix'

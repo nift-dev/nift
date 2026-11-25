@@ -423,3 +423,23 @@ rejects partial path matches while recognizing the translated fixture
 root. The v4.8 identifier suite passes locally in both modes. The
 surrounding callback suite now stops at an imported coroutine capture.
 The original reserved `first` and computed-key witnesses remain strict.
+
+### Closure loop inference
+
+The original v4.8 callback hammer now runs in required VM mode and matches
+explicit legacy output (80200, 6, 8). Before the fix, the first inference
+walk saw an empty element type while the factory's stored result was
+pending. Treating that as an unknown callable widened lambda parameters
+permanently. A standalone tracked array with a pending element now keeps
+that fact at bottom until its existing worklist dependency grows. Loop
+bodies are still analyzed. Open arrays, unknown arrays, and sessions keep
+their previous rules. Review checked the site dependencies and widening
+paths. A fractional-return closure still refuses the integer accumulator
+assignment before execution.
+
+The callback fixture preserves explicit legacy execution of the original
+imported-task test, checks the precise D-064 refusal in required VM mode,
+and checks synchronous private captures with a separate fixture. No
+coroutine or isolate rule changed. The callback shell suite passes. Its
+separate numeric grid still finds a pre-existing diagnostic disagreement
+for array operands in `a + b * c`, reproduced on the earlier binary.
