@@ -2,7 +2,9 @@
 
 #include "rt/cell.h"
 #include "rt/heap_account.h"
+#include "rt/number.h"
 
+#include <limits>
 #include <unordered_map>
 
 namespace nift::rt {
@@ -48,7 +50,29 @@ bool Vm::op_load_function(const Instr& in, Value* R, Fault& fault) {
     return memory_ok(fault);
 }
 
-bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault) {
+bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault, const Proto* proto) {
+    if (in.op == OpCode::NewIndexedCell) {
+        if (options_.session_globals || options_.return_value_only || coro_)
+            return internal(fault, "indexed cell execution context");
+        if (in.a >= proto->nregs || in.b >= proto->nregs || in.c >= proto->nregs)
+            return internal(fault, "indexed cell operands");
+        const Value root = R[in.b];
+        const Value key = R[in.c];
+        if (!is_cell(root) || has_indexed_location(root) || !key.is_number())
+            return internal(fault, "indexed cell receiver or index");
+        std::int64_t index = 0;
+        if (number_to_i64(key, index) && index >= 0 &&
+            static_cast<std::uint64_t>(index) <= std::numeric_limits<std::size_t>::max()) {
+            Value location = make_indexed_cell(root, static_cast<std::size_t>(index));
+            if (is_indexed_cell(location)) {
+                R[in.a] = std::move(location);
+                return memory_ok(fault);
+            }
+        }
+        Value unused;
+        if (!get_index(note_at(proto, &in), cell_load(root), key, unused, fault)) return false;
+        return internal(fault, "indexed cell creation");
+    }
     if (in.c >= stack_.size() || in.b >= stack_.size()) return internal(fault, "cell operands");
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 2
     // M2: share one cell per cell-creation site.  Keep the mutant state out of

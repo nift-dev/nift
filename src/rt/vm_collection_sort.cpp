@@ -23,6 +23,7 @@ using namespace collection_slot;
 Value* source(Value* stack,Value* R,const Instr& in) {
     if(!(in.c&0x20))return (in.c&0x10?stack:R)+in.b;
     Value anchor=cell_anchor(R[in.a+Selector]);
+    if (has_indexed_location(anchor)) return nullptr;
     auto* cell=cell_of(anchor);
     return cell?&cell->value:nullptr;
 }

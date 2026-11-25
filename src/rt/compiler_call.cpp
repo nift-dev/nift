@@ -31,6 +31,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (name == "error") return error_new(node, dst);  // rt-lint: allow-string-compare reserved Error constructor
     if (const int r = struct_callee(node, name, dst); r >= 0) return r == 1;  // CP12b structs
     NativeInfo native{}; const auto fn = plan_.index.find(name);
+    if (fn != plan_.index.end() && indexed_return(fn->second))
+        return indexed_call_value(node, fn->second, dst);
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;

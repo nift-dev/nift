@@ -132,6 +132,7 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
         }
         const auto fn = plan_.index.find(text(node));
         if (fn != plan_.index.end()) {
+            if (indexed_return(fn->second)) return fail(node, "alias-argument");
             if (!temp(reg)) return false;
             fb_->emit(OpCode::LoadFunction, reg, fn->second);
             return true;
@@ -145,7 +146,15 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
     }
     if (binding->global && !binding->cell)
         return global_read_value(binding->reg, reg, global_note_.empty() ? text(node) : global_note_);
-    return read_binding(*binding, reg);
+    if (!binding->indexed_alias) return read_binding(*binding, reg);
+    const auto saved_note = global_note_;
+    const auto saved_offset = fb_->offset();
+    global_note_ = text(node);
+    fb_->set_offset(node.begin);
+    const bool loaded = read_binding(*binding, reg);
+    fb_->set_offset(saved_offset);
+    global_note_ = saved_note;
+    return loaded;
 }
 
 } // namespace nift::rt::detail

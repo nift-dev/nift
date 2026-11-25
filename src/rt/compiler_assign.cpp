@@ -46,6 +46,10 @@ bool UnitCompiler::declare(const Node& node) {
     if (const_decl && !const_scalar && ((node.flags & kFlagImmut) || init_kinds != kKindArray))
         return fail(node, "declare-const");
     if (target.kind != NodeKind::Ident) return fail(node, "declare-pattern");
+    if (!const_decl) {
+        const int indexed = declare_indexed_alias(node);
+        if (indexed != 0) return indexed > 0;
+    }
     const std::string_view name = text(target);
     const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
     if (parameter && parameter->decl_node != kNoNode &&

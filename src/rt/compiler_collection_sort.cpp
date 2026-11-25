@@ -9,7 +9,7 @@ bool UnitCompiler::comparator_sort(const Node& node,std::uint16_t dst,const Bind
     return fail(node,"method:sort");
 #endif
     const Node& receiver=ast_.at(ast_.at(node.a).a);
-    if(binding.loop_binding)return fail(node,"method:sort");
+    if(binding.loop_binding || binding.indexed_alias)return fail(node,"method:sort");
     const NodeId receiver_id=node_id(receiver);
     const auto elements=kinds_.collection_elements.find(receiver_id);
     if(elements==kinds_.collection_elements.end()||

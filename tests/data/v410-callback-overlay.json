@@ -69,6 +69,7 @@
       "source": "fn(v()) { return 9 }; v := 3; f := x => v; print(type([1].map(f)[0]))",
       "exit": 0,
       "stdout": "function\n",
+      "vm_stdout": "int\n",
       "stderr": ""
     },
     {

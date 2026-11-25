@@ -285,6 +285,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
 }
 
 bool Vm::op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto) {
+    if (is_cell(R[in.a]) && has_indexed_location(R[in.a]))
+        return internal(fault, "indexed location escaped as a script value");
     if (const auto* note = note_at(proto, &in)) result.return_inspection = note->session_inspection;
     // CP23: the last TopReturn value, transferred out by isolate tasks. Only
     // an isolate (return_value_only) retains it: a persistent CP19 session VM

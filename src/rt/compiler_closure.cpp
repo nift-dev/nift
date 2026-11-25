@@ -16,6 +16,7 @@ namespace nift::rt::detail {
 
 void UnitCompiler::prepare_captures() {
     prepare_capture_bindings(ast_, root_, plan_, kinds_, top_level_decl_ids_, captured_bindings_, selector_roots_);
+    prepare_indexed_roots();
     declared_names_.clear();
     std::vector<NodeId> stack{root_};
     while (!stack.empty()) {

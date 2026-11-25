@@ -276,3 +276,95 @@ array slot that may later be replaced. A correct implementation needs
 an owned root and a checked slot re-resolution without retaining a
 pointer into the array storage. The existing live-slot oracle remains
 mandatory. No refusal was approved for the failing callback fixture.
+
+### Indexed-cell ownership groundwork
+
+The local indexed-cell core retains the original lexical binding cell and
+encodes the evaluated index in the cell tag. It uses the existing owned
+Value edge, heap destruction and cycle traversal. Reads resolve the
+current root and bounds-check its array before copying the current element.
+No pointer into array storage is retained. Rebinding an alias detaches
+that alias. Cached replacement refuses an indexed descriptor and leaves
+the root and descriptor intact.
+
+The allocation and lifetime unit passed 21 checks in native and
+ASan/UBSan/LeakSanitizer runs. The complete native destruction harness
+passed 100,509 checks. The unit covers invalid construction, injected
+allocation failure, slot replacement, shifts, shrinkage, root reassignment,
+root retention after external references are released, shared child
+mutation, alias detachment and the root edge in cycle detection.
+
+Compiler and call/return lowering remain open. Existing bytecode paths
+that read a cell's stored Value directly, including comparator sort
+locations and some session and coroutine paths, cannot accept this
+descriptor. The original 7 VM comparison witnesses and downstream
+location gate still need to pass before integration. No candidate was
+frozen for this local work.
+
+### Indexed-location bytecode
+
+The local VM now has a checked `NewIndexedCell` operation. It builds an
+indexed descriptor from an owned root and an already evaluated number.
+Ordinary internal call and return windows preserve the descriptor in
+hand-built bytecode. `CellLoad` resolves the slot and reports its binding
+name through the existing diagnostic note. Tests cover surviving a
+callee frame, root reassignment, an invalidated slot and rejection when
+a descriptor is returned as a user value. The VM suite passed 35 checks
+in both native and ASan/UBSan/LeakSanitizer runs. A stale-root build that
+retains the old array cell failed the reassignment and invalidation
+assertions. The existing allocation lifetime suite passed 21 checks.
+
+The ownership audit distinguished the stored root edge from script reads.
+Cycle traversal and heap destruction deliberately follow the stored edge.
+Sort rejects the indexed anchor. Top-level rendering and isolate transfer
+reject the descriptor, and indexed-cell construction is disabled in
+session, coroutine and isolate VM contexts. The compiler still needs to
+prove and mark the location-carrying argument and return paths, preserve
+binding type for detaching aliases, and prevent exposure through cached
+writes, raw-value consumers, or user aggregates before enabling emission.
+No script case was admitted by this patch.
+
+Historical macOS run 45508702035 passed the v4.4 shell stage and timed out
+in the v4.5 native runtime wall after reporting CP21 mutants 1 through 3.
+It supplies no mutant 4 verdict. Test Integrity run 45504368934 reached
+the parallel aggregate step and was still running at the recorded check.
+
+### Indexed-location compiler lowering
+
+Standalone scripts now carry a checked indexed cell through a statically
+identified one-parameter identity call. A simple named factory can return
+that cell out of its frame. A declaration receiving the location gives it
+a typed binding of its own so reassignment can detach the alias. Value
+reads resolve the current slot through the original binding. The compiler
+requires a root with proven array-valued slots and keeps arbitrary location
+forwarding, captures and unsupported escape paths under pre-execution
+refusal. The indexed key must be a numeric literal or a plain numeric
+binding read.
+
+The selector gate runs the seven original inputs independently in required
+VM and explicit legacy modes. It compares exit status, output and exact
+diagnostics, including the missing-target position. Two further controls
+reject bare and call-mediated alias forwarding before the script can print
+or mutate the array. Independent review reproduced both stale-value paths
+before the admission correction and confirmed their refusal afterwards.
+
+Test Integrity run 45504368934 finished with one failed job. The Linux
+production-binding runner received a shutdown signal during its aggregate
+step and exited 143. The static scan, deterministic contracts and both
+aggregate-evidence jobs passed. The interrupted aggregate requires a
+complete rerun on the eventual candidate.
+
+The final local lowering ran seven exact location witnesses, two
+propagation refusals, 69 other selector contracts, 55 closure
+differentials and the 182-script VM corpus. The indexed-cell and VM
+harnesses passed 21 and 35 checks under ASan/UBSan/LeakSanitizer. The
+native destruction suite passed 100,509 checks. The stale-root mutant
+failed three assertions across the reassignment and invalidation cases.
+
+The v4.8 callback and sort/factory gates passed locally. The callback
+overlay and object-member oracles now retain explicit legacy expectations
+while independently checking the D-182 lexical result and the B5
+aggregate reference result. The callback overlay still stops at the
+reserved declaration and the object-member oracle at computed-key
+assignment. No refusal approval or release certification is inferred
+from these runs.

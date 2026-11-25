@@ -11,14 +11,19 @@
 namespace nift::rt {
 
 Value make_cell(Value value, std::int64_t binding_type);
+// Retain a lexical root binding and an evaluated array index. Returns null
+// for an invalid root/index. Allocation failure propagates normally.
+Value make_indexed_cell(Value root, std::size_t index);
+bool is_indexed_cell(const Value& cell) noexcept;
+bool has_indexed_location(const Value& cell);
 CellObject* cell_of(const Value& cell);
 // Follow lexical forwarding only; never resolve a selector or its cache.
 const CellObject* cell_plain_capture(const Value& cell);
 // A plain Value copy (D-040 COW semantics for the value).
 Value cell_load(const Value& cell);
-// A source slot (-3) forwards to the cell it names. B5 4: the selector cell
-// (-2, a loop variable's lazy location descriptor) is deleted with the live
-// loop path; the cached-access functions below are the plain cell accesses.
+// A source slot (-3) forwards to the cell it names. B5 removed the old
+// loop selector (-2). Indexed cells use the remaining negative encodings
+// and store the root binding in their ordinary owned Value edge.
 constexpr std::int64_t kSourceSlot = -3;
 bool cell_read(const Value& cell, Value& value, std::string& missing);
 Value copy_cell_location(const Value& cell);

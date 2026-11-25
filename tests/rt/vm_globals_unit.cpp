@@ -63,6 +63,100 @@ void check_vm_opcodes() {
     CHECK(disassemble(*program).find("GetGlobal") != std::string::npos);
 }
 
+void check_indexed_cell_return(bool expose) {
+    FunctionBuilder callee("location");
+    std::uint16_t result = 0, item = 0, array = 0, type = 0, owner = 0, index = 0;
+    callee.alloc(result);
+    callee.alloc(item);
+    callee.alloc(array);
+    callee.alloc(type);
+    callee.alloc(owner);
+    callee.alloc(index);
+    callee.emit(OpCode::LoadI, item, jump_operand(7));
+    callee.emit(OpCode::NewArray, array, item, 1);
+    callee.emit(OpCode::LoadI, type, jump_operand(-1));
+    callee.emit(OpCode::NewSourceSlot, owner, array, type);
+    callee.emit(OpCode::LoadI, index, jump_operand(0));
+    callee.emit(OpCode::NewIndexedCell, result, owner, index);
+    callee.emit(OpCode::Return, result);
+
+    FunctionBuilder main("");
+    std::uint16_t location = 0, value = 0;
+    main.alloc(location);
+    main.emit(OpCode::Call, location, 1, 0);
+    main.alloc(value);
+    if (expose) {
+        main.emit(OpCode::TopReturn, location);
+    } else {
+        main.emit(OpCode::CellLoad, value, location);
+        main.emit(OpCode::TopReturn, value);
+    }
+
+    Program program;
+    program.protos.push_back(main.finish());
+    program.protos.push_back(callee.finish());
+    Vm vm(program);
+    std::string output;
+    const VmResult run = vm.run(output);
+    if (expose) {
+        CHECK(run.reason == StopReason::Internal);
+        CHECK(run.message.find("indexed location escaped as a script value") != std::string::npos);
+    } else {
+        CHECK(run.reason == StopReason::None);
+        CHECK(run.returned && run.return_text == "7");
+    }
+    CHECK(output.empty());
+}
+
+// The same descriptor survives argument and return windows. Rebinding
+// the root changes the selected element without changing that descriptor.
+void check_indexed_cell_rebind(bool missing) {
+    FunctionBuilder identity("identity");
+    std::uint16_t argument = 0;
+    identity.alloc(argument);
+    identity.set_params(1);
+    identity.emit(OpCode::Return, argument);
+
+    FunctionBuilder main("");
+    std::uint16_t item = 0, array = 0, type = 0, owner = 0, index = 0, location = 0;
+    main.alloc(item);
+    main.alloc(array);
+    main.alloc(type);
+    main.alloc(owner);
+    main.alloc(index);
+    main.alloc(location);
+    main.emit(OpCode::LoadI, item, jump_operand(7));
+    main.emit(OpCode::NewArray, array, item, 1);
+    main.emit(OpCode::LoadI, type, jump_operand(5));  // array binding
+    main.emit(OpCode::NewSourceSlot, owner, array, type);
+    main.emit(OpCode::LoadI, index, jump_operand(0));
+    main.emit(OpCode::NewIndexedCell, location, owner, index);
+    main.emit(OpCode::Call, location, 1, 1);
+    main.emit(OpCode::LoadI, item, jump_operand(9));
+    main.emit(OpCode::NewArray, array, item, missing ? 0 : 1);
+    std::uint16_t text_type = 0;
+    main.constant(Value::integer(-1), text_type);
+    main.emit(OpCode::CellStore, owner, array, text_type);
+    const auto load = main.emit(OpCode::CellLoad, item, location);
+    main.note(load, "b");
+    main.emit(OpCode::TopReturn, item);
+
+    Program program;
+    program.protos.push_back(main.finish());
+    program.protos.push_back(identity.finish());
+    Vm vm(program);
+    std::string output;
+    const VmResult run = vm.run(output);
+    if (missing) {
+        CHECK(run.reason == StopReason::Error);
+        CHECK(run.message == "reference target no longer exists: b");
+    } else {
+        CHECK(run.reason == StopReason::None);
+        CHECK(run.returned && run.return_text == "9");
+    }
+    CHECK(output.empty());
+}
+
 struct Unit {
     std::unique_ptr<Ast> ast;
     NodeId root = kNoNode;
@@ -171,6 +265,10 @@ void check_keep_type() {
 
 int main() {
     check_vm_opcodes();
+    check_indexed_cell_return(false);
+    check_indexed_cell_return(true);
+    check_indexed_cell_rebind(false);
+    check_indexed_cell_rebind(true);
     check_analysis();
     check_keep_type();
     return rt_test::finish("rt vm globals unit");

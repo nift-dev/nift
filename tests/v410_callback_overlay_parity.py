@@ -2,6 +2,7 @@
 """Exact callback frame, capture snapshot and hydration contracts."""
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -19,12 +20,20 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-overlay-') as directory:
     for case in contract['cases']:
         path = root / (case['name'] + '.f')
         path.write_text(case['source'] + '\n', encoding='utf-8')
-        for binary in binaries:
-            result = subprocess.run([binary, str(path)], capture_output=True,
+        expected = (case['exit'], case['stdout'], case['stderr'])
+        checks = [(binary, None, expected) for binary in binaries]
+        if 'vm_stdout' in case:
+            checks[0:1] = [
+                (binaries[0], '0', expected),
+                (binaries[0], 'require', (case['exit'], case['vm_stdout'], case['stderr'])),
+            ]
+        for binary, mode, expected in checks:
+            env = dict(os.environ, NIFT_VM=mode) if mode else None
+            result = subprocess.run([binary, str(path)], capture_output=True, env=env,
                                     text=True, encoding='utf-8', timeout=60)
             actual = (result.returncode, result.stdout,
                       normalize_fixture_paths(result.stderr, aliases))
-            expected = (case['exit'], case['stdout'], case['stderr'])
             if actual != expected:
-                raise SystemExit(f'FAIL {case["name"]}: {actual!r} != {expected!r}')
+                raise SystemExit(f'FAIL {case["name"]} ({mode or "default"}): {actual!r} != {expected!r}')
+
 print(f'PASS {len(contract["cases"])} exact callback environment/origin contracts')

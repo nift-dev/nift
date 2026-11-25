@@ -73,13 +73,11 @@ public:
         std::vector<Capture> captures;
     };
 private:
-    // compiler.cpp: statements
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
     void compute_may_double();
     bool begin(std::string name, NodeId body, const std::unordered_set<std::string_view>* assigned = nullptr);
-    // The text type of a node's type text (infer_text_type), memoised per
-    // node: the unit analyses and the compiler ask for the same nodes.
+    // Cache the inferred text type per node for analysis and lowering.
     const TextType& text_type_at(NodeId id) const;
     bool finish(std::unique_ptr<Proto>& out);
     bool statements(const Node& block);
@@ -120,7 +118,6 @@ private:
     int future_method(const Node& node, std::uint16_t dst);
     bool thread_call(const Node& node, std::string_view name, std::uint16_t dst);  // CP22, else `callable:<name>`
     bool await_expr(const Node& node, std::uint16_t dst);
-    // CP12C slice 2: the default `for` (compiler_loops*.cpp).
     struct ForState;
     bool for_loop(const Node& node);
     bool for_setup(ForState& state, const Node& node);
@@ -149,6 +146,14 @@ private:
     bool atomic_read(NodeId id, std::uint16_t source, std::uint16_t& dst);
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
+    const Node* indexed_identity_argument(const Node& call, std::uint16_t& function) const;
+    bool stable_indexed_root(NodeId binding) const;
+    bool observed_array_alias(NodeId binding, bool rebind) const;
+    const Node* indexed_return(std::uint16_t function) const;
+    bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);
+    bool indexed_call_value(const Node& node, std::uint16_t function, std::uint16_t dst);
+    void prepare_indexed_roots();
+    int declare_indexed_alias(const Node& node);
     bool new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding);
     std::size_t emit_binding_read(OpCode op, std::uint16_t dst, std::uint16_t source);
     bool read_binding(const Binding& b, std::uint16_t& reg);
@@ -156,7 +161,6 @@ private:
     bool indexed_binding(const Binding& b, std::uint16_t& reg);
     bool store_indexed_binding(const Binding& b, std::uint16_t value);
     bool store_binding(const Binding& b, std::uint16_t value, std::uint16_t text_type);
-    // compiler_expr.cpp: expressions
     bool expr_to(NodeId id, std::uint16_t dst);
     bool expr_any(NodeId id, std::uint16_t& operand);
     bool reg_any(NodeId id, std::uint16_t& reg);
@@ -196,8 +200,7 @@ private:
     bool member(const Node& node, std::uint16_t dst);
     bool index(const Node& node, std::uint16_t dst);
     bool local_register(const Node& node, std::uint16_t& reg);
-    // CP12C closures: lambda construction, deferred Proto compilation and
-    // the static capture pass that decides which bindings need cells.
+    // CP12C lambda construction, deferred Proto compilation and capture analysis.
     bool lambda_value(const Node& node, std::uint16_t dst);
     std::uint32_t collection_offset(const Node&) const;
     std::uint16_t collection_diagnostic_flags(const Node&,NodeId,bool comparator=false) const;
@@ -244,13 +247,11 @@ private:
     // 2).
     bool binding_error_possible(const Binding& b, KindSet value) const;
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
-    // Where an error raised by `node` is reported: its own start (D-018c).
     std::uint32_t site(const Node& node) const { return node.begin; }
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
     bool kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason);
-    // compiler_call.cpp: a member or index path in user-call arguments.
     bool argument_path(const Node& node, std::string& note);
     bool bare_argument(const Node& call, std::uint32_t k) const;
     const Node& chain_enter(const Node& node);
@@ -396,5 +397,4 @@ private:
     std::string reason_; DeferredSites deferred_; bool deferred_call(const Node&, std::string_view, std::uint16_t);
     std::uint32_t offset_ = 0; bool positioned_ = false;  // positioned_: offset_ recorded by fail()
 };
-
 } // namespace nift::rt::detail

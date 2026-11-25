@@ -63,6 +63,7 @@
       "source": "o := {\"k\":[1],\"v\":{\"a\":2}}\nf := x => x.k\na := f(o); a.push(9); print(o.k.stringify()); print(a.stringify()); print(o.v.stringify())",
       "exit": 0,
       "stdout": "[1]\n[1,9]\n{\"a\":2}\n",
+      "vm_stdout": "[1,9]\n[1,9]\n{\"a\":2}\n",
       "stderr": ""
     },
     {

@@ -22,6 +22,7 @@
 #include "rt/cell.h"
 #include "rt/string.h"
 #include "rt/value.h"
+#include "rt/value_cycle.h"
 #include "rt_test.h"
 #include "storage_access.h"  // B2: the storage commits (tests only)
 
@@ -365,6 +366,80 @@ void run_graph(std::uint32_t seed, Totals& totals) {
 } // namespace prop
 namespace {
 
+void indexed_cell_lifetime() {
+    {
+        // The cycle walker retains its scratch buffers. Exercise its owned
+        // root edge before taking the per-test allocation baseline.
+        Value owner = make_array(1);
+        array_push(owner, Value::integer(0));
+        Value root = make_cell(std::move(owner), -1);
+        Value slot = make_indexed_cell(root, 0);
+        CycleGraph graph;
+        CHECK(would_close_cycle(CycleTarget::captured_cell(root.heap()), slot, graph));
+    }
+    const Baseline base;
+    Value array = make_array(3);
+    array_push(array, Value::integer(1));
+    array_push(array, Value::integer(2));
+    array_push(array, Value::integer(3));
+    Value root = make_cell(make_cell(std::move(array), -1), kSourceSlot);
+    CHECK(make_indexed_cell(root, 3).is_null());
+    CHECK(make_indexed_cell(Value(), 0).is_null());
+
+    const Baseline before_failure;
+    g_allow = 0;
+    g_fail = true;
+    bool allocation_failed = false;
+    try {
+        static_cast<void>(make_indexed_cell(root, 1));
+    } catch (const std::bad_alloc&) {
+        allocation_failed = true;
+    }
+    g_fail = false;
+    CHECK(allocation_failed);
+    CHECK(g_live.load() == before_failure.allocs);
+    CHECK(live_heap_bytes() == before_failure.bytes);
+
+    Value location = make_indexed_cell(root, 1);
+    CHECK(is_cell(location));
+    CHECK(make_indexed_cell(location, 0).is_null());
+    Value old_array = cell_load(root);
+    array_set(old_array, 1, Value::integer(9));
+    CHECK(cell_load(location).as_int() == 9);
+    auto& items = StorageTestAccess::array_mut(old_array);
+    items.erase(items.begin());
+    CHECK(cell_load(location).as_int() == 3);
+    items.clear();
+    Value result;
+    std::string missing;
+    CHECK(!cell_read(location, result, missing));
+    CHECK(!missing.empty());
+
+    Value replacement = make_array(2);
+    array_push(replacement, Value::integer(7));
+    array_push(replacement, nested_chain(1));
+    cell_rebind(root, std::move(replacement));
+    {
+        Value child = cell_load(location);
+        CHECK(child.is(Kind::Array));
+        array_append(child, Value::integer(8));
+    }
+    CHECK(array_view(cell_load(location)).back().as_int() == 8);
+    std::string write_error;
+    CHECK(!cell_cached_put(location, Value::integer(10), write_error));
+    cell_put(location, Value::integer(10));
+    CHECK(array_view(cell_load(location)).back().as_int() == 8);
+    Value alias = copy_cell_location(location);
+    cell_rebind(alias, Value::integer(6));
+    CHECK(cell_load(alias).as_int() == 6);
+    CHECK(array_view(cell_load(location)).back().as_int() == 8);
+    alias = Value();
+    old_array = Value();
+    root = Value();
+    CHECK(array_view(cell_load(location)).back().as_int() == 8);
+    release_failing(location, base, 0, "indexed-cell");
+}
+
 bool want(const char* only, const char* name) { return !only || std::strcmp(only, name) == 0; }
 
 } // namespace
@@ -376,6 +451,7 @@ int main(int argc, char** argv) {
     (void)atom("a"), (void)atom("b"), (void)atom("c"), (void)atom("next"), (void)atom("leaf"), (void)atom("num"),
         (void)atom("Node");
 
+    if (want(only, "indexed-cell")) indexed_cell_lifetime();
     if (want(only, "function-owner")) {
         // Releasing a session Function can release its last Program owner
         // while the Value graph worklist is already draining captured cells.

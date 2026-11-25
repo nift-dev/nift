@@ -244,7 +244,7 @@ private:
     bool op_session_render(const Instr&, Value*, VmResult&, Fault&, const Proto*);
     bool op_top_return(const Instr& in, Value* R, VmResult& result, Fault& fault, const Proto* proto);
     void result_stats(VmResult& result);
-    bool op_new_cell(const Instr& in, Value* R, Fault& fault);
+    bool op_new_cell(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     bool op_cell_cached(const Instr& in, Value* R, Fault& fault, const Proto* proto);
     bool op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note);
     bool op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type);

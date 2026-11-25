@@ -214,6 +214,19 @@ bool UnitCompiler::return_statement(const Node& node) {
         fb_->emit(in_function_ ? OpCode::ReturnNull : OpCode::Halt);
         return true;
     }
+    if (in_function_ && !in_lambda_) {
+        for (std::size_t f = 0; f < plan_.functions.size(); ++f) {
+            if (indexed_return(static_cast<std::uint16_t>(f + 1)) != &node) continue;
+            std::uint16_t function = 0, location = 0;
+            const Node& call_node = ast_.at(node.a);
+            const Node* path = indexed_identity_argument(call_node, function);
+            if (!temp(location) || !emit_indexed_identity(call_node, *path, function, location))
+                return false;
+            end_tries();
+            fb_->emit(OpCode::Return, location);
+            return true;
+        }
+    }
     // D-063: the shown result of `nift eval` or of a session expression
     // statement: legacy shows a collection, also inside an array or object
     // (its tag or stringify form); the VM has no form for it: refused before

@@ -5,8 +5,26 @@
 #include "rt/heap_account.h"
 #include "rt/string.h"
 
+#include <limits>
+
 
 namespace nift::rt {
+
+namespace {
+constexpr std::int64_t kFirstIndexedCell = -4;
+
+bool indexed_cell(const CellObject* cell) {
+    return cell && cell->binding_type <= kFirstIndexedCell;
+}
+
+const Value* indexed_element(const CellObject& cell, std::uint64_t index) {
+    const Value& root = cell.value;
+    if (!root.is(Kind::Array)) return nullptr;
+    const auto& items = array_view(root);
+    if (index >= items.size()) return nullptr;
+    return &items[static_cast<std::size_t>(index)];
+}
+} // namespace
 
 Value make_cell(Value value, std::int64_t binding_type) {
     auto* cell = new CellObject();
@@ -17,6 +35,16 @@ Value make_cell(Value value, std::int64_t binding_type) {
 }
 
 CellObject* cell_of(const Value& cell) { return cell.is(Kind::Cell) ? cell.heap_as<CellObject>() : nullptr; }
+
+Value make_indexed_cell(Value root, std::size_t index) {
+    const CellObject* owner = cell_of(cell_anchor(root));
+    if (!owner || indexed_cell(owner) ||
+        index > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max() + kFirstIndexedCell + 1) ||
+        !indexed_element(*owner, index)) return {};
+    return make_cell(std::move(root), kFirstIndexedCell - static_cast<std::int64_t>(index));
+}
+
+bool is_indexed_cell(const Value& cell) noexcept { return indexed_cell(cell_of(cell)); }
 
 const CellObject* cell_plain_capture(const Value& cell) {
     const CellObject* current = cell_of(cell);
@@ -34,7 +62,7 @@ const CellObject* cell_plain_capture(const Value& cell) {
 std::int64_t cell_binding_type(const CellObject& cell) {
     const CellObject* current = &cell;
     while (current->binding_type == kSourceSlot) current = cell_of(current->value);
-    return current->binding_type;
+    return indexed_cell(current) ? -1 : current->binding_type;
 }
 
 // B5 4 (B2 review L2 resolved by deletion): the selector cells (a loop
@@ -56,10 +84,26 @@ Value cell_anchor(const Value& cell) {
     return anchor;
 }
 
+bool has_indexed_location(const Value& cell) {
+    const auto* owner = cell_of(cell_anchor(cell));
+    return indexed_cell(owner) || (owner && is_indexed_cell(owner->value));
+}
+
 bool cell_read(const Value& cell, Value& value, std::string& missing) {
-    (void)missing;
     const CellObject* current = cell_of(cell_anchor(cell));
     if (!current) return false;
+    if (!indexed_cell(current) && is_indexed_cell(current->value)) current = cell_of(current->value);
+    if (indexed_cell(current)) {
+        const CellObject* root = cell_of(cell_anchor(current->value));
+        const auto index = static_cast<std::uint64_t>(kFirstIndexedCell - current->binding_type);
+        const Value* item = root && !indexed_cell(root) ? indexed_element(*root, index) : nullptr;
+        if (!item) {
+            missing = "array element";
+            return false;
+        }
+        value = *item;
+        return true;
+    }
     value = current->value;
     return true;
 }
@@ -71,8 +115,12 @@ bool cell_cached_read(const Value& cell, Value& value, std::string& missing) {
 }
 
 bool cell_cached_put(Value& cell, Value value, std::string& missing) {
-    (void)missing;
-    if (!cell_of(cell)) return false;
+    const CellObject* owner = cell_of(cell_anchor(cell));
+    if (!owner) return false;
+    if (has_indexed_location(cell)) {
+        missing = "array element";
+        return false;
+    }
     cell_put(cell, std::move(value));
     return true;
 }
@@ -89,7 +137,7 @@ Value cell_load(const Value& cell) {
 void cell_put(Value& cell, Value value) {
     Value anchor = cell_anchor(cell);
     CellObject* object = cell_of(anchor);
-    if (!object) return;
+    if (!object || indexed_cell(object)) return;
     object->value = std::move(value);
     if (may_contain_identity(object->value)) mark_may_hold_identity(object);
 }
@@ -100,7 +148,11 @@ void cell_rebind(Value& cell, Value value) {
     if (object->binding_type == kSourceSlot) {
         CellObject* child = cell_of(object->value);
         if (child->binding_type == kSourceSlot) cell_rebind(object->value, std::move(value));
-        else object->value = make_cell(std::move(value), child->binding_type);
+        else object->value = make_cell(std::move(value), indexed_cell(child) ? -1 : child->binding_type);
+        return;
+    }
+    if (indexed_cell(object)) {
+        cell = make_cell(std::move(value), -1);
         return;
     }
     cell_put(cell, std::move(value));

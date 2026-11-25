@@ -59,6 +59,7 @@ struct Binding {
     // This internal owner does not imply mutation through a user closure.
     bool selector_root_only = false;
     bool location_source = false;
+    bool indexed_alias = false;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

@@ -1,6 +1,7 @@
 #include "rt/isolate_transfer_encode.h"
 
 #include "rt/aggregate.h"
+#include "rt/cell.h"
 #include "rt/future.h"
 #include "rt/heap.h"
 #include "rt/heap_account.h"
@@ -106,6 +107,8 @@ private:
                 break;
             }
             case Kind::Cell: {
+                if (is_indexed_cell(value))
+                    return fail(TransferStatus::InvalidGraph, "indexed location cannot cross isolate boundary", error);
                 const auto* cell = value.heap_as<CellObject>();
                 node.kind = WireKind::Cell;
                 node.binding_type = cell->binding_type;

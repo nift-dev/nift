@@ -61,7 +61,7 @@ cases = [
  ('bare ordinary aggregate remains a value', 'fn(add(x)) { x.push(9) }\na := [1]\nadd(a); print(a.stringify())', '[1]\n'),
  ('member iteration snapshot growth', 'a := [{"v":2}]\nfor(row : a) { f := x => row.v; row["v"] = 7; a.push({"v":9}); print(f(0)) }', '2\n'),
  ('negative index', 'f := x => x[-1]\nprint(f([2,7]))', None),
- ('live element argument', 'a := [[1]]\nfn(id(x)) { return x }\nb := id(a[0])\na[0] = [9]\nprint(b.stringify())', None),
+ ('live element argument', 'a := [[1]]\nfn(id(x)) { return x }\nb := id(a[0])\na[0] = [9]\nprint(b.stringify())', '[9]\n'),
  ('effectful Boolean index', 'fn(key()) { print("key"); return true }\nf := x => x[key()]\nprint(f([1]))', None),
  ('index type error', 'f := x => x[true]\nprint(f([2]))', None),
  ('missing capture', 'f := x => unknown_name\nprint(f(1))', None),
@@ -105,7 +105,6 @@ errors = {
  'missing member': 'value has no member: missing',
  'null member': 'value has no member: v',
  'negative index': "JSON array indices must be non-negative integers in 'x[-1]'",
- 'live element argument': 'selector.f:3:9: not compiled for the VM (path-in-call-argument)',
  'effectful Boolean index': 'selector.f:2:11: not compiled for the VM (type:index)',
  'index type error': "JSON array indices must be non-negative integers in 'x[true]'",
  'missing capture': 'unknown value or malformed expression: unknown_name',
@@ -114,12 +113,29 @@ errors = {
  'wrapped null index': 'selector.f:1:11: not compiled for the VM (type:index)',
  'null indexed': 'invalid index',
 }
+location_prefix = 'a := [[1],[2],[3]]\nfn(id(x)) { return x }\nb := id(a[1])\n'
+location_cases = [
+ ('replace-slot', 'a[1]=[9]; print(b.stringify())\n',
+  0, '[9]\n', ''),
+ ('rebind-root', 'saved:=a; a=[[7],[8]]; print(b.stringify()); print(saved.stringify())\n',
+  0, '[8]\n[[1],[2],[3]]\n', ''),
+ ('clear-root', 'a.clear(); print(b.stringify())\n',
+  1, '', 'error: <root>/p.f:4:18: reference target no longer exists: b\n'),
+ ('remove-earlier-slot', 'a.remove(0); print(b.stringify())\n',
+  0, '[3]\n', ''),
+ ('rebind-returned-alias', 'b=[9]; print(a.stringify()); print(b.stringify())\n',
+  0, '[[1],[2],[3]]\n[9]\n', ''),
+ ('root-survives-frame', 'fn(outer()){ a:=[[4]]; return id(a[0]) }; c:=outer();print(c.stringify())\n',
+  0, '[4]\n', ''),
+ ('evaluate-index-once', 'i:=1; c:=id(a[i]); i=0; print(c.stringify())\n',
+  0, '[2]\n', ''),
+]
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
   path.write_text(source+'\n',encoding='utf-8')
   candidate = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8")
-  if name == 'named precedence' or name in sharing_output:
+  if name in ('named precedence', 'live element argument') or name in sharing_output:
    legacy_expected = 'function\n' if name == 'named precedence' else expected
    legacy = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8",
                            env=dict(os.environ, NIFT_VM='0'))
@@ -130,13 +146,6 @@ with tempfile.TemporaryDirectory() as directory:
    original = subprocess.run([str(Path(baseline).resolve()),str(path)],capture_output=True,text=True,encoding="utf-8")
    if (candidate.returncode,candidate.stdout,candidate.stderr) != (original.returncode,original.stdout,original.stderr):
     raise SystemExit(f'FAIL A/B {name}: {candidate} != {original}')
-  if name == 'live element argument':
-   legacy = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8",
-                           env=dict(os.environ, NIFT_VM='0'))
-   if (legacy.returncode,legacy.stdout,legacy.stderr) != (0,'[9]\n',''):
-    raise SystemExit(f'FAIL historical live element argument: {legacy}')
-   if candidate.returncode != 1 or candidate.stdout or 'the program was not executed' not in candidate.stderr:
-    raise SystemExit(f'FAIL live element argument must refuse before execution: {candidate}')
   if name == 'null indexed':
    legacy = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8",
                            env=dict(os.environ, NIFT_VM='0'))
@@ -150,4 +159,25 @@ with tempfile.TemporaryDirectory() as directory:
    raise SystemExit(f'FAIL error contract {name}: {candidate}')
   if expected is not None and (candidate.returncode or candidate.stdout != expected):
    raise SystemExit(f'FAIL {name}: {candidate.stdout!r} {candidate.stderr}')
+ path = Path(directory) / 'p.f'
+ for name, tail, code, output, error in location_cases:
+  path.write_text(location_prefix + tail, encoding='utf-8')
+  for mode in ('0', 'require'):
+   result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                           env=dict(os.environ, NIFT_VM=mode))
+   diagnostic = result.stderr.replace(str(path), '<root>/p.f').replace(path.as_posix(), '<root>/p.f')
+   if (result.returncode, result.stdout, diagnostic) != (code, output, error):
+    raise SystemExit(f'FAIL live location {name}, mode {mode}: {result}')
+ # A bare alias can propagate a location in legacy. Keep unsupported
+ # propagation forms out of the VM before the marker or mutation can run.
+ for escape in ('c := b', 'c := id(b)'):
+  path.write_text(location_prefix + f'print("marker"); {escape}; a[1] = [9]; print(c.stringify())\n',
+                  encoding='utf-8')
+  result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+  if (result.returncode != 1 or result.stdout or
+      'p.f:3:6: not compiled for the VM (alias-argument)' not in result.stderr or
+      'the program was not executed' not in result.stderr):
+   raise SystemExit(f'FAIL indexed location propagation must refuse before execution: {result}')
+ print(f'PASS {len(location_cases)} exact indexed location witnesses and 2 propagation controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))
