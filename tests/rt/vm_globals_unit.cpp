@@ -135,6 +135,7 @@ void check_indexed_cell_rebind(bool missing, bool forwarded = false) {
     if (forwarded) {
         main.emit(OpCode::NewCell, location, location, type);
         main.emit(OpCode::CellLoadAlias, location, location);
+        main.emit(OpCode::Call, location, 1, 1);
         main.emit(OpCode::NewCell, location, location, type);
     }
     main.emit(OpCode::LoadI, item, jump_operand(9));

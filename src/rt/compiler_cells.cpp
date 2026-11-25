@@ -62,7 +62,7 @@ bool UnitCompiler::store_binding(const Binding& b, std::uint16_t value, std::uin
     return true;
 }
 
-const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint16_t& function) const {
+const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint16_t& function, bool forward) const {
     if (session_ || plan_.coroutines || (module_names_ && !module_names_->empty()) ||
         call.kind != NodeKind::Call || call.count > 1) return nullptr;
     const Node& head = ast_.at(call.a);
@@ -70,6 +70,7 @@ const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint1
     const auto local = kinds_.bindings.find(call.a);
     NodeId path_id = kNoNode;
     if (local != kinds_.bindings.end()) {
+        if (forward && call.count != 1) return nullptr;
         const auto declaration = direct_indexed_lambdas_.find(local->second);
         if (declaration == direct_indexed_lambdas_.end()) return nullptr;
         const Node& lambda = ast_.at(declaration->second);
@@ -104,7 +105,9 @@ const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint1
         function = found->second;
     }
     const Node& path = ast_.at(path_id);
-    return indexed_array_path(path) ? &path : nullptr;
+    const bool eligible = forward ? path.kind == NodeKind::Ident && bare_argument(call, 0)
+                                  : indexed_array_path(path);
+    return eligible ? &path : nullptr;
 }
 
 bool UnitCompiler::indexed_array_path(const Node& path) const {
@@ -114,113 +117,6 @@ bool UnitCompiler::indexed_array_path(const Node& path) const {
     return (key == NodeKind::Ident || key == NodeKind::Number) &&
            ast_.at(path.a).kind == NodeKind::Ident && kinds(path.a) == kKindArray &&
            kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber) && kinds(node_id(path)) == kKindArray;
-}
-
-bool UnitCompiler::stable_indexed_root(NodeId binding) const {
-    const auto array_of_arrays = [&](NodeId id) {
-        const Node& literal = ast_.at(id);
-        if (literal.kind != NodeKind::Array) return false;
-        const NodeId* items = ast_.list(literal);
-        for (std::uint32_t k = 0; k < literal.count; ++k)
-            if (ast_.at(items[k]).kind != NodeKind::Array) return false;
-        return true;
-    };
-    const auto is_identity_path = [&](const Node* outer, const Node& path) {
-        std::uint16_t function = 0;
-        return outer && indexed_identity_argument(*outer, function) == &path;
-    };
-    const auto is_print_read = [&](const Node* consumer, NodeId value) {
-        if (!consumer || consumer->kind != NodeKind::Call || consumer->count != 1 ||
-            ast_.list(*consumer)[0] != value || kinds_.bindings.count(consumer->a)) return false;
-        const Node& head = ast_.at(consumer->a);
-        return head.kind == NodeKind::Ident && text(head) == "print" && !plan_.index.count(text(head));
-    };
-    struct Visit { NodeId id, parent, outer, consumer; };
-    std::vector<Visit> pending{{root_, kNoNode, kNoNode, kNoNode}};
-    bool declared = false;
-    while (!pending.empty()) {
-        const auto item = pending.back();
-        pending.pop_back();
-        if (item.id == kNoNode) continue;
-        const Node& n = ast_.at(item.id);
-        if (n.kind == NodeKind::Command || n.kind == NodeKind::Opaque || n.kind == NodeKind::TemplateStmt)
-            return false;
-        if (n.kind == NodeKind::Declare && n.a == binding) {
-            if (!array_of_arrays(n.b)) return false;
-            declared = true;
-        }
-        const auto resolved = kinds_.bindings.find(item.id);
-        if (item.id != binding && n.kind == NodeKind::Ident &&
-            resolved != kinds_.bindings.end() && resolved->second == binding) {
-            if (item.parent == kNoNode) return false;
-            const Node& parent = ast_.at(item.parent);
-            const Node* outer = item.outer == kNoNode ? nullptr : &ast_.at(item.outer);
-            if (parent.kind == NodeKind::Assign && parent.a == item.id && array_of_arrays(parent.b)) {
-            } else if (parent.kind == NodeKind::Index && parent.a == item.id &&
-                       (is_identity_path(outer, parent) ||
-                        (outer && outer->kind == NodeKind::Declare && !outer->flags &&
-                         outer->b == item.parent && indexed_array_path(parent) &&
-                         observed_array_alias(outer->a, true, true)) ||
-                        (outer && outer->kind == NodeKind::Lambda && !outer->count &&
-                         outer->b == item.parent && ast_.at(parent.b).kind == NodeKind::Number) ||
-                        (outer && outer->kind == NodeKind::Index && outer->a == item.parent &&
-                         item.consumer != kNoNode && is_print_read(&ast_.at(item.consumer), item.outer)) ||
-                        (outer && outer->kind == NodeKind::Assign && outer->a == item.parent &&
-                         ast_.at(outer->b).kind == NodeKind::Array))) {
-            } else if (parent.kind == NodeKind::Declare && parent.b == item.id &&
-                       observed_array_alias(parent.a, false)) {
-            } else if (parent.kind == NodeKind::Member && parent.a == item.id && outer &&
-                       outer->kind == NodeKind::Call && outer->a == item.parent) {
-                const auto method = text(ast_.at(parent.b));
-                if (method != "clear" && method != "remove" && method != "stringify" &&
-                    !(method == "push" && outer->count == 1 &&
-                      ast_.at(ast_.list(*outer)[0]).kind == NodeKind::Array)) return false;
-            } else {
-                return false;
-            }
-        }
-        for (NodeId child : {n.a, n.b, n.c}) pending.push_back({child, item.id, item.parent, item.outer});
-        for (std::uint32_t k = 0; k < n.count; ++k)
-            pending.push_back({ast_.list(n)[k], item.id, item.parent, item.outer});
-    }
-    return declared;
-}
-
-bool UnitCompiler::observed_array_alias(NodeId binding, bool rebind, bool forward) const {
-    std::unordered_map<NodeId, NodeId> copies;
-    for (NodeId id = 0; id < ast_.size(); ++id) {
-        const Node& node = ast_.at(id);
-        if (node.kind == NodeKind::Command || node.kind == NodeKind::Opaque ||
-            node.kind == NodeKind::TemplateStmt) return false;
-    }
-    std::unordered_set<NodeId> reads;
-    for (NodeId id = 0; id < ast_.size(); ++id) {
-        const Node& call = ast_.at(id);
-        if (forward && top_level_decl_ids_.count(id) && call.kind == NodeKind::Declare && !call.flags &&
-            call.b != kNoNode && ast_.at(call.a).kind == NodeKind::Ident &&
-            ast_.at(call.b).kind == NodeKind::Ident && !captured_binding(call.a)) copies.emplace(call.b, call.a);
-        if (rebind && call.kind == NodeKind::Assign) reads.insert(call.a);
-        if (call.kind != NodeKind::Call) continue;
-        const Node& member = ast_.at(call.a);
-        if (member.kind != NodeKind::Member) continue;
-        const auto method = text(ast_.at(member.b));
-        if ((!call.count && method == "stringify") ||
-            (rebind && call.count == 1 && method == "push" &&
-             ast_.at(ast_.list(call)[0]).kind == NodeKind::Number)) reads.insert(member.a);
-    }
-    std::unordered_set<NodeId> bindings{binding};
-    std::vector<NodeId> pending{binding};
-    while (!pending.empty()) {
-        const NodeId current = pending.back();
-        pending.pop_back();
-        for (const auto& [use, declaration] : kinds_.bindings) {
-            if (declaration != current || use == current || reads.count(use)) continue;
-            const auto copy = copies.find(use);
-            if (copy == copies.end()) return false;
-            if (bindings.insert(copy->second).second) pending.push_back(copy->second);
-        }
-    }
-    return true;
 }
 
 const Node* UnitCompiler::indexed_return(std::uint16_t function) const {
@@ -333,8 +229,12 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     std::uint16_t function = 0;
     const Node& call_node = ast_.at(node.b);
     const bool direct = indexed_array_path(call_node);
-    const Binding* previous = call_node.kind == NodeKind::Ident ? find_binding(text(call_node)) : nullptr;
+    std::uint16_t forward_function = 0;
+    const Node* copy = call_node.kind == NodeKind::Ident ? &call_node
+                                                        : indexed_identity_argument(call_node, forward_function, true);
+    const Binding* previous = copy ? find_binding(text(*copy)) : nullptr;
     const bool forward = previous && previous->forward_indexed_alias;
+    const bool forward_call = forward && copy != &call_node;
     if (direct && !observed_array_alias(node.a, true, true)) return 0;
     const auto* path = direct ? &call_node : indexed_identity_argument(call_node, function);
     const Binding* root = nullptr;
@@ -355,17 +255,34 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         fail(ast_.at(node.b), "alias-argument");
         return -1;
     }
-    if (!forward && (!plain_postfix(call_node) || !no_trailing_comma(call_node))) return -1;
+    if ((!forward || forward_call) && (!plain_postfix(call_node) || !no_trailing_comma(call_node))) return -1;
     const Node& target = ast_.at(node.a);
     const auto name = text(target);
     Binding binding;
     std::uint16_t result = 0;
     if (!new_binding(name, target, result, binding)) return -1;
     if (forward) {
-        std::uint16_t source = 0;
+        const auto resolved = kinds_.bindings.find(node_id(*copy));
+        const Binding* callee = forward_call ? find_binding(text(ast_.at(call_node.a))) : nullptr;
+        const auto callee_source = kinds_.bindings.find(call_node.a);
+        if (resolved == kinds_.bindings.end() || resolved->second != previous->decl_node ||
+            (forward_call && (forward_function ? callee != nullptr :
+             !callee || callee_source == kinds_.bindings.end() || callee_source->second != callee->decl_node))) {
+            fail(*copy, "alias-argument");
+            return -1;
+        }
+        std::uint16_t source = 0, callable = 0, payload = result;
+        if (callee && (!read_binding(*callee, callable) || !temp(payload))) return -1;
         if (!binding_cell(*previous, source)) return -1;
-        fb_->set_offset(call_node.begin);
-        fb_->note(fb_->emit(OpCode::CellLoadAlias, result, source), std::string(text(call_node)));
+        fb_->set_offset(copy->begin);
+        fb_->note(fb_->emit(OpCode::CellLoadAlias, payload, source), std::string(text(*copy)));
+        if (forward_call) {
+            if (!operand_window(payload, 1)) return -1;
+            fb_->set_offset(site(call_node));
+            fb_->emit(forward_function ? OpCode::Call : OpCode::CallValue, payload,
+                      forward_function ? forward_function : callable, 1);
+        }
+        if (payload != result) fb_->emit(OpCode::Move, result, payload);
         fb_->emit(OpCode::Move, binding.type_reg, previous->type_reg);
         fb_->release_to(static_cast<std::uint16_t>(result + 1));
     } else if (direct) {

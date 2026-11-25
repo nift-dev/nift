@@ -504,3 +504,26 @@ baseline. The walker clears pending work and resets its busy flag on all
 exits. The full CP18 gate passed both dispatches and detected both
 ownership mutations under both dispatches. The focused indexed-cell
 harnesses passed 41 VM and 21 lifetime checks under ASan, UBSan and LSan.
+
+### Call-mediated indexed alias forwarding
+
+A checked direct indexed alias can now pass through a proven identity
+callee into a new standalone binding. The compiler checks the source
+before the call, then passes the live descriptor if attached or the
+ordinary array if detached. It recognizes a statically resolved named
+identity function and a directly used local expression identity lambda.
+It rechecks the lexical source and callee identities and gives the result
+a fresh typed binding. Unproved callees and transfers remain outside this
+lowering. The existing propagation refusal witnesses are unchanged.
+
+Five new legacy/required-VM controls include a parent-slot replacement
+through each callable form, independent rebind, detached forwarding, and
+the exact source-position error when a slot is missing before invocation.
+The bytecode forwarding control now passes the copied payload through the
+identity call before creating the destination binding.
+
+All three Checkpoint 10 jobs on 747a421b passed the numeric and location
+checks and stopped at the original reserved `first` fixture at 1:42.
+The CP18 sanitizer evidence on that commit still covers both dispatches
+and both ownership controls on each dispatch. The original computed-key
+and reserved-name rules are unchanged.

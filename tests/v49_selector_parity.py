@@ -167,6 +167,20 @@ forward_location_cases = [
   'a:=[[1]];b:=a[0];a.clear();c:=b;print(c.stringify())\n', 1, '',
   'error: <root>/p.f:1:31: reference target no longer exists: b\n'),
 ]
+call_forward_location_cases = [
+ ('local identity lambda forwards replacement',
+  'a:=[[1]];b:=a[0];f:=x=>x;c:=f(b);a[0]=[9];print(c.stringify())\n', 0, '[9]\n', ''),
+ ('named identity forwards replacement',
+  'fn(id(x)){return x};a:=[[1]];b:=a[0];c:=id(b);a[0]=[9];print(c.stringify())\n', 0, '[9]\n', ''),
+ ('named identity forwarding preserves independent detachment',
+  'fn(id(x)){return x};a:=[[1]];b:=a[0];c:=id(b);b=[8];a[0]=[9];print(c.stringify());print(b.stringify())\n',
+  0, '[9]\n[8]\n', ''),
+ ('named identity can forward a detached value',
+  'fn(id(x)){return x};a:=[[1]];b:=a[0];b=[8];c:=id(b);a[0]=[9];print(c.stringify())\n', 0, '[8]\n', ''),
+ ('named identity rejects a vanished source before the call',
+  'fn(id(x)){return x};a:=[[1]];b:=a[0];a.clear();c:=id(b);print(c.stringify())\n', 1, '',
+  'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
+]
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
@@ -200,7 +214,7 @@ with tempfile.TemporaryDirectory() as directory:
  aliases = fixture_root_aliases(path.parent)
  witnesses = [(name, location_prefix + tail, code, output, error)
               for name, tail, code, output, error in location_cases]
- for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases:
+ for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases + call_forward_location_cases:
   path.write_text(source, encoding='utf-8')
   for mode in ('0', 'require'):
    result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
@@ -220,6 +234,6 @@ with tempfile.TemporaryDirectory() as directory:
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL indexed location propagation must refuse before execution: {result}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
-       f'{len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses '
-       'and 2 propagation controls')
+       f'{len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
+       f'{len(call_forward_location_cases)} call forwarding witnesses and 2 propagation controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

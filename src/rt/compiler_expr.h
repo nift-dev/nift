@@ -145,7 +145,7 @@ private:
     bool atomic_read(NodeId id, std::uint16_t source, std::uint16_t& dst);
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
-    const Node* indexed_identity_argument(const Node& call, std::uint16_t& function) const;
+    const Node* indexed_identity_argument(const Node& call, std::uint16_t& function, bool forward = false) const;
     bool indexed_array_path(const Node& path) const;
     bool stable_indexed_root(NodeId binding) const;
     bool observed_array_alias(NodeId binding, bool rebind, bool forward = false) const;
