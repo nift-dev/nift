@@ -41,7 +41,9 @@
       "source": "f := x => (y => x+y); a := [1,2].map(f); first := a[0]; second := a[1]; print(first(7)); print(second(7)); print(first==second)",
       "exit": 0,
       "stdout": "8\n9\nfalse\n",
-      "stderr": ""
+      "stderr": "",
+      "vm_guard": "1:42: not compiled for the VM (binding-name-reserved)",
+      "vm_control_source": "f := x => (y => x+y); a := [1,2].map(f); first_callback := a[0]; second := a[1]; print(first_callback(7)); print(second(7)); print(first_callback==second)"
     },
     {
       "name": "local-capture-declaration",

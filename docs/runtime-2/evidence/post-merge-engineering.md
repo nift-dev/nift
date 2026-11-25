@@ -527,3 +527,23 @@ checks and stopped at the original reserved `first` fixture at 1:42.
 The CP18 sanitizer evidence on that commit still covers both dispatches
 and both ownership controls on each dispatch. The original computed-key
 and reserved-name rules are unchanged.
+
+### Clean aggregate runner and downstream contract observations
+
+Test Integrity run 45564824304 ended with an explicit runner shutdown
+and exit 143. The stream reached the repaired CP18 sanitizer command
+and contained no earlier failed Make recipe. Four sibling jobs passed.
+The clean test-all command, its subsequent exclusive measurements and
+the build-boundary check now run on a fresh Linux job with the same
+language toolchain setup. The production binding job still executes
+each language gate and the clean public test-bindings target.
+
+D-182 expressly preserves the first-name reservation and the precise
+refusal for unsupported computed writes. The downstream tests keep
+both historical inputs and their explicit legacy outputs. They pin the
+original VM refusal positions and independently execute a renamed
+binding and a plain-key write as positive controls in both modes.
+This records the two existing guards and does not add an inventory
+deferral or alter supported syntax. The next local failures are the
+callback overlay's local-capture-declaration and the object-member
+oracle's location-array-growth.

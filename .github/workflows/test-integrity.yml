@@ -130,6 +130,25 @@ jobs:
         run: |
           make clean
           make test-bindings
+  # Give the clean aggregate its own runner lifetime. The binding job
+  # has repeatedly been stopped during the second clean build.
+  production-aggregate:
+    name: Clean Linux test-all aggregate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+      - name: Install Python dev headers
+        run: sudo apt-get update && sudo apt-get install -y python3-dev
       - name: Clean + parallel aggregate target (make -j2 test-all)
         run: |
           make clean

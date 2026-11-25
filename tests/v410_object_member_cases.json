@@ -21,7 +21,9 @@
       "source": "o := {\"k\":1}\nf := x => o.k\nprint(f(0)); i := 0\nwhile(i < 256) { o[\"extra\"+i.stringify()] = i; i += 1 }\no[\"k\"] = 7; print(f(0)); o = {\"k\":9}; print(f(0))",
       "exit": 0,
       "stdout": "1\n7\n9\n",
-      "stderr": ""
+      "stderr": "",
+      "vm_guard": "4:18: not compiled for the VM (index-target)",
+      "vm_control_source": "o := {\"k\":1}\nf := x => o.k\nprint(f(0)); i := 0\nwhile(i < 256) { key := \"extra\"+i.stringify(); o[key] = i; i += 1 }\no[\"k\"] = 7; print(f(0)); o = {\"k\":9}; print(f(0))"
     },
     {
       "name": "location-array-growth",

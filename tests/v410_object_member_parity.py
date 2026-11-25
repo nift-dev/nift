@@ -32,6 +32,22 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-object-oracle-') as directory
             return (result.returncode, result.stdout,
                     normalize_fixture_paths(result.stderr, root_aliases))
         expected = (case['exit'], case['stdout'], case['stderr'])
+        # D-182 preserves the refusal at this unsupported computed write.
+        if 'vm_guard' in case:
+            if execute(binary, '0') != expected or (baseline and execute(baseline) != expected):
+                raise SystemExit(f"FAIL historical {case['name']}")
+            code, output, diagnostic = execute(binary, 'require')
+            origin = f'error: <ORACLE_ROOT>/{path.name}:{case["vm_guard"]}:'
+            if (code != 1 or output or not diagnostic.startswith(origin) or
+                    'note: the program was not executed: no part of it ran' not in diagnostic.splitlines()):
+                raise SystemExit(f"FAIL computed-key guard {case['name']}: {(code, output, diagnostic)!r}")
+            path.write_text(case['vm_control_source'] + '\n', encoding='utf-8')
+            for mode in ('0', 'require'):
+                control = execute(binary, mode)
+                if control != expected:
+                    raise SystemExit(f"FAIL plain-key control {case['name']} ({mode}): {control!r}")
+            print(f"PASS {case['name']}: existing computed-key guard and dual-mode plain-key control")
+            continue
         if 'vm_stdout' in case:
             if execute(binary, '0') != expected:
                 raise SystemExit(f"FAIL legacy {case['name']}")
