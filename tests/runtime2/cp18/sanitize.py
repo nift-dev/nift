@@ -9,27 +9,26 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--out', required=True)
+parser.add_argument('--cppflags', required=True)
+parser.add_argument('sources', nargs='+')
 a = parser.parse_args()
 out = Path(a.out).resolve(); out.mkdir(parents=True, exist_ok=True)
-flags = ['-Isrc', '-Iinclude', '-std=c++17', '-O1', '-g1', '-pthread',
-         '-fno-omit-frame-pointer', '-fsanitize=address,undefined', '-fno-pie']
-sources = sorted({str(p) for pattern in ('src/rt/*.cpp', 'src/rt/natives/*.cpp',
-                                       'src/rt/host/*.cpp', 'src/rt/handles/*.cpp')
-                  for p in Path().glob(pattern)})
-sources += ['src/Sha256.cpp', 'src/JsonSchema.cpp', 'src/ParserHelpers.cpp',
-            'src/ParserHostHelpers.cpp', 'src/Process.cpp', 'src/FileSystem.cpp',
-            'src/RuntimeValue.cpp', 'src/embed/program_api.cpp',
-            # src/rt/package_resolve.cpp needs them since bb5dc585 (b2-refrep.md 13.6a)
-            'src/PackageTransaction.cpp', 'src/JsonFile.cpp']
+flags = shlex.split(a.cppflags) + ['-std=c++17', '-O1', '-g1', '-pthread',
+                                  '-fno-omit-frame-pointer', '-fsanitize=address,undefined', '-fno-pie']
+sources = a.sources
 key = hashlib.sha256(json.dumps(flags).encode() + subprocess.check_output(['g++', '--version']))
-for directory in ('src', 'include'):
-    for p in sorted(Path(directory).rglob('*.h')):
-        key.update(str(p).encode()); key.update(p.read_bytes())
+for directory in ('src', 'include', 'minifypp', 'markuppp'):
+    for p in sorted(Path(directory).rglob('*')):
+        if p.is_file() and p.suffix in ('.h', '.hpp', '.inc'):
+            key.update(str(p).encode()); key.update(p.read_bytes())
+# EmbeddedMinify.cpp includes the Minify++ implementation directly.
+key.update(Path('minifypp/src/Minify.cpp').read_bytes())
 headers = key.digest()
 
 def compile_one(source, switch=False):

@@ -89,6 +89,13 @@ bool has_indexed_location(const Value& cell) {
     return indexed_cell(owner) || (owner && is_indexed_cell(owner->value));
 }
 
+Value indexed_alias_payload(const Value& cell, Value selected) {
+    const auto* owner = cell_of(cell_anchor(cell));
+    if (owner && indexed_cell(owner)) return cell_anchor(cell);
+    if (owner && is_indexed_cell(owner->value)) return owner->value;
+    return selected;
+}
+
 bool cell_read(const Value& cell, Value& value, std::string& missing) {
     const CellObject* current = cell_of(cell_anchor(cell));
     if (!current) return false;

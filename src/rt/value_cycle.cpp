@@ -211,9 +211,11 @@ bool would_close_cycle_walk(const CycleTarget& target, const Value& stored, cons
         return Walk(target, graph, own).run(stored);
     }
     shared.busy = true;
-    const bool closes = Walk(target, graph, shared).run(stored);
-    shared.busy = false;
-    return closes;
+    struct WalkScope {
+        Buffers& buffers;
+        ~WalkScope() { buffers.work.clear(); buffers.busy = false; }
+    } scope{shared};
+    return Walk(target, graph, shared).run(stored);
 }
 
 } // namespace nift::rt

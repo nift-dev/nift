@@ -90,16 +90,21 @@ bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault, const Proto* proto
 }
 
 bool Vm::op_cell_load(const Instr& in, Value* R, Fault& fault, const Note* note) {
+    if (in.op == OpCode::CellLoadAlias && (options_.session_globals || options_.return_value_only || coro_))
+        return internal(fault, "indexed alias execution context");
     CellObject* cell = cell_of(R[in.b]);
     if (cell == nullptr) return internal(fault, "cell");
 #if defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 5
     R[in.a] = R[in.b];
 #else
     std::string missing;
-    if (!cell_read(R[in.b], R[in.a], missing)) {
+    Value selected;
+    Value& output = in.op == OpCode::CellLoadAlias ? selected : R[in.a];
+    if (!cell_read(R[in.b], output, missing)) {
         if (missing.empty()) return internal(fault, "cell location");
         return raise(fault, StopReason::Error, "reference target no longer exists: " + (note ? note->text : missing));
     }
+    if (in.op == OpCode::CellLoadAlias) R[in.a] = indexed_alias_payload(R[in.b], std::move(selected));
 #endif
     return true;
 }

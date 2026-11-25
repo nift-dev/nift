@@ -152,6 +152,21 @@ lambda_location_cases = [
   'a:=[[1]];f:=()=>a[0];a.clear();b:=f();print(b.stringify())\n', 1, '',
   "error: <root>/p.f:1:35: lambda body error: JSON array index 0 is out of range in 'a[0]'\n"),
 ]
+forward_location_cases = [
+ ('forwarded slot replacement',
+  'a:=[[1]];b:=a[0];c:=b;a[0]=[9];print(c.stringify())\n', 0, '[9]\n', ''),
+ ('reassigning source leaves forwarded alias live',
+  'a:=[[1]];b:=a[0];c:=b;b=[8];a[0]=[9];print(c.stringify());print(b.stringify())\n',
+  0, '[9]\n[8]\n', ''),
+ ('forwarding a detached source copies its current array',
+  'a:=[[1]];b:=a[0];b=[8];c:=b;a[0]=[9];print(c.stringify())\n', 0, '[8]\n', ''),
+ ('reassigning the forwarded alias detaches only that alias',
+  'a:=[[1]];b:=a[0];c:=b;c=[8];a[0]=[9];print(b.stringify());print(c.stringify())\n',
+  0, '[9]\n[8]\n', ''),
+ ('forwarding checks a vanished slot at the source read',
+  'a:=[[1]];b:=a[0];a.clear();c:=b;print(c.stringify())\n', 1, '',
+  'error: <root>/p.f:1:31: reference target no longer exists: b\n'),
+]
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
@@ -185,7 +200,7 @@ with tempfile.TemporaryDirectory() as directory:
  aliases = fixture_root_aliases(path.parent)
  witnesses = [(name, location_prefix + tail, code, output, error)
               for name, tail, code, output, error in location_cases]
- for name, source, code, output, error in witnesses + lambda_location_cases:
+ for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases:
   path.write_text(source, encoding='utf-8')
   for mode in ('0', 'require'):
    result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
@@ -205,5 +220,6 @@ with tempfile.TemporaryDirectory() as directory:
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL indexed location propagation must refuse before execution: {result}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
-       f'{len(lambda_location_cases)} lambda location witnesses and 2 propagation controls')
+       f'{len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses '
+       'and 2 propagation controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

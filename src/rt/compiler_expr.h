@@ -148,7 +148,7 @@ private:
     const Node* indexed_identity_argument(const Node& call, std::uint16_t& function) const;
     bool indexed_array_path(const Node& path) const;
     bool stable_indexed_root(NodeId binding) const;
-    bool observed_array_alias(NodeId binding, bool rebind) const;
+    bool observed_array_alias(NodeId binding, bool rebind, bool forward = false) const;
     const Node* indexed_return(std::uint16_t function) const;
     bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result);
     bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);

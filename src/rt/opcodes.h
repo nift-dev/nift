@@ -99,6 +99,7 @@ namespace nift::rt {
     X(Halt)       /* end the script                                             */                    \
     X(JmpIncLt)   /* R[a] += 1; if R[a] < R[b] pc += int16 c (for-loop back edge) */ \
     X(CopyCellLocation) /* copy a selector descriptor; share an ordinary binding slot */              \
+    X(CellLoadAlias) /* checked declaration copy of an indexed alias payload */                      \
     X(CellLoadCached) /* indexed selector targets use the descriptor cache */                          \
     X(CellStoreCached) /* commit an indexed selector write without detaching */                        \
     X(NewSourceSlot) /* boxed slot owning a replaceable value cell */                                  \

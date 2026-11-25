@@ -60,6 +60,7 @@ struct Binding {
     bool selector_root_only = false;
     bool location_source = false;
     bool indexed_alias = false;
+    bool forward_indexed_alias = false;
     // CP12b structs: an instance of UnitPlan::structs[struct_id] (-1: none).
     int struct_id = -1;
 };

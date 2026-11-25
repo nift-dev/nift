@@ -5572,7 +5572,8 @@ test-runtime2-cp18-switch: $(TEST_DIR)/cp18/program-switch$(EXEEXT)
 test-runtime2-cp18: test-runtime2-cp18-switch
 .PHONY: test-runtime2-cp18-sanitize
 test-runtime2-cp18-sanitize:
-	$(PYTHON) tests/runtime2/cp18/sanitize.py --out "$(CURDIR)/$(TEST_DIR)/cp18/sanitize"
+	$(PYTHON) tests/runtime2/cp18/sanitize.py --out "$(CURDIR)/$(TEST_DIR)/cp18/sanitize" \
+	  --cppflags="$(CPPFLAGS)" $(RT_UNIT_SOURCES) src/embed/program_api.cpp
 test-embed: test-runtime2-cp18-sanitize
 
 # CP18 R2: ordinary optimized allocation accounting, independent of LSan.

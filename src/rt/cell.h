@@ -16,6 +16,7 @@ Value make_cell(Value value, std::int64_t binding_type);
 Value make_indexed_cell(Value root, std::size_t index);
 bool is_indexed_cell(const Value& cell) noexcept;
 bool has_indexed_location(const Value& cell);
+Value indexed_alias_payload(const Value& cell, Value selected);
 CellObject* cell_of(const Value& cell);
 // Follow lexical forwarding only; never resolve a selector or its cache.
 const CellObject* cell_plain_capture(const Value& cell);

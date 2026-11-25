@@ -86,7 +86,7 @@ void Vm::note_large(const Instr* pc, Fault& fault) {
 
 std::uint32_t Vm::report_offset(const Fault& fault, const Proto* proto, const Instr* pc) const {
     std::uint32_t offset = proto->offsets[static_cast<std::size_t>(pc - proto->code.data())];
-    if ((pc->op == OpCode::CellLoad || pc->op == OpCode::GetUpvalue) &&
+    if ((pc->op == OpCode::CellLoad || pc->op == OpCode::CellLoadAlias || pc->op == OpCode::GetUpvalue) &&
         fault.message.rfind("reference target no longer exists: ", 0) == 0)
         offset = selector_offset(offset);
     if (fault.use_call_site) offset = main_offset(offset);

@@ -322,7 +322,7 @@ VmResult Vm::run_loop(std::string& output) {
     OP(CellLoadCached) OP(CellStoreCached) OP(CellAnchor) OP(CellSlot) {
         if (!op_cell_cached(*pc, R, fault, proto)) FAIL();
         NEXT(); }
-    OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
+    OP(CellLoadAlias) OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }
     OP(GetUpvalue) { if (!op_get_upvalue(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }

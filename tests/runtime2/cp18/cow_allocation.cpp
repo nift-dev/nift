@@ -320,6 +320,13 @@ static void reference_model_campaigns() {
                    out = Value(); return ok; });
     // Growth with nested references present: the receiver holds the shared
     // graph, the stored value holds references; a refused cycle allocates nothing.
+    // Prime the reusable per-thread cycle walker before taking the leak
+    // baseline, as the ABI campaign does for its persistent caches.
+    {
+        Value warm = make_array(1);
+        array_push(warm, source);
+        CHECK(mutation::push(warm, source, mutation::Env{}).ok());
+    }
     Value r;
     campaign("nested-growth",[&] {
         r = make_array(1);

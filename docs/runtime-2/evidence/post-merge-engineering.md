@@ -467,3 +467,40 @@ alias: after slot replacement legacy observes [9], while the VM observes
 [1]. The same result occurs on the earlier binary. This remains open.
 The reserved declaration and computed-key position still require their
 existing historical checks.
+
+### Bare alias forwarding and CP18 aggregate repair
+
+A plain declaration that copies a proven direct indexed alias now
+checks the source before carrying its payload into a fresh typed cell.
+An attached alias carries its descriptor. A detached alias carries the
+current array. Each destination has an independent binding, so later
+rebinding either variable leaves the other alone. The five dual-mode
+controls cover live replacement, detaching before and after copying,
+destination detachment and the exact missing-target error at the source.
+The copy opcode retains the existing execution-context guards. Separate
+call-mediated forwarding from a direct indexed initializer can still
+materialize the value and remains open. The existing named-identity
+propagation refusals remain in their original controls.
+
+The earlier Checkpoint 10 reserved-name and computed-key witnesses
+still produce their original legacy results and precise VM refusals.
+Independent probes show that renaming the reserved binding or placing
+the computed key into a plain local before the write allows both engines
+to execute with the same results. The original checked fixtures remain
+strict.
+
+Test Integrity run 45549554803 published its aggregate output before the
+Linux runner shutdown. The CP18 sanitizer build failed to find
+minify/Minify.h before the shutdown. The sanitizer harness now consumes
+the runtime unit source list and include flags from Make and includes
+Minify++ dependencies in its object cache key. Both VM dispatches and
+the existing ownership mutation controls are still required. The
+interrupted aggregate has no complete verdict.
+
+Once the CP18 harness built, its injected nested-growth campaign found a
+persistent allocation-count delta associated with the first real cycle
+walk. The reusable thread-local scratch is now primed before the leak
+baseline. The walker clears pending work and resets its busy flag on all
+exits. The full CP18 gate passed both dispatches and detected both
+ownership mutations under both dispatches. The focused indexed-cell
+harnesses passed 41 VM and 21 lifetime checks under ASan, UBSan and LSan.

@@ -110,7 +110,7 @@ void check_indexed_cell_return(bool expose) {
 
 // The same descriptor survives argument and return windows. Rebinding
 // the root changes the selected element without changing that descriptor.
-void check_indexed_cell_rebind(bool missing) {
+void check_indexed_cell_rebind(bool missing, bool forwarded = false) {
     FunctionBuilder identity("identity");
     std::uint16_t argument = 0;
     identity.alloc(argument);
@@ -132,6 +132,11 @@ void check_indexed_cell_rebind(bool missing) {
     main.emit(OpCode::LoadI, index, jump_operand(0));
     main.emit(OpCode::NewIndexedCell, location, owner, index);
     main.emit(OpCode::Call, location, 1, 1);
+    if (forwarded) {
+        main.emit(OpCode::NewCell, location, location, type);
+        main.emit(OpCode::CellLoadAlias, location, location);
+        main.emit(OpCode::NewCell, location, location, type);
+    }
     main.emit(OpCode::LoadI, item, jump_operand(9));
     main.emit(OpCode::NewArray, array, item, missing ? 0 : 1);
     std::uint16_t text_type = 0;
@@ -269,6 +274,8 @@ int main() {
     check_indexed_cell_return(true);
     check_indexed_cell_rebind(false);
     check_indexed_cell_rebind(true);
+    check_indexed_cell_rebind(false, true);
+    check_indexed_cell_rebind(true, true);
     check_analysis();
     check_keep_type();
     return rt_test::finish("rt vm globals unit");
