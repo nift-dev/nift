@@ -11,6 +11,7 @@
 #include "rt/error.h"
 #include "rt/heap.h"
 #include "rt/natives/format_methods.h"
+#include "rt/natives/support.h"
 #include "rt/number.h"
 #include "rt/render.h"
 #include "rt/shared_state.h"
@@ -254,6 +255,18 @@ bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note*
 }
 
 bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault) {
+    if (object.is(Kind::Bytes) && key.is_number()) {
+        const auto& bytes = bytes_of(object);
+        std::size_t index = 0;
+        if (!natives::number_to_size(key, index))
+            return raise(fault, StopReason::Error,
+                         "bytes indices must be non-negative integers in '" + note_text(note) + "'");
+        if (index >= bytes.size())
+            return raise(fault, StopReason::Error, "bytes index " + std::to_string(index) +
+                         " is out of range in '" + note_text(note) + "'");
+        out = Value::integer(bytes[index]);
+        return true;
+    }
     if (object.is(Kind::Array) && key.is_number()) {
         const auto& items = array_view(object);
         std::int64_t i = 0;

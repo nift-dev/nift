@@ -340,9 +340,9 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (!argument_path(node, location)) return false;
     if (index_depth_ > 0) return fail(node, "path-in-index");
     const KindSet object_kinds = kinds(node.a), key_kinds = kinds(node.b);
-    const bool array = (object_kinds & ~kKindArray) == 0 && (key_kinds & ~kKindNumber) == 0;
+    const bool array = (object_kinds & ~kKindArray) == 0;
+    const bool bytes = object_kinds == kKindBytes && !loop_reachable() && key_kinds && !(key_kinds & ~kKindNumber);
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
-    // Legacy can retry location keys, so refuse effectful Boolean keys.
     const Node& key_ast = ast_.at(node.b);
     const bool bad_boolean_key = in_lambda_ && !session_ && !loop_reachable() &&
                                  return_read_offset_ == kNoNode && object_kinds == kKindArray &&
@@ -357,8 +357,8 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
         key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
         !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    if (!array && !object && !bad_boolean_key && !null_call && !null_script_index &&
-        !unknown_defers(object_kinds | key_kinds))
+    if (!(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
+        !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;

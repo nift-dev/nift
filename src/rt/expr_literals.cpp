@@ -1,5 +1,6 @@
 // Primaries of the Runtime 2.0 expression parser (see expr_literals.h).
 #include "rt/expr_literals.h"
+#include "Json.h"
 
 namespace nift::rt::detail {
 
@@ -303,6 +304,7 @@ NodeId ExprParser::object(std::uint32_t begin) {
     // (`if ({"k": a == b})` is malformed in legacy).
     if (options_.condition) return fail(OpaqueReason::IrregularLegacyParse);
     std::vector<NodeId> props;
+    bool escaped_json = false;
     ++nesting_;
     auto bad = [&]() { --nesting_; return fail(OpaqueReason::LegacyRuntimeError); };
     while (!is(Tok::RBrace)) {
@@ -319,7 +321,12 @@ NodeId ExprParser::object(std::uint32_t begin) {
         if (value == kNoNode) {
             value = unit();
             if (value == kNoNode) { --nesting_; return kNoNode; }
-            if (!verbatim_literal_ok(ast_, value)) return bad();
+            if (!verbatim_literal_ok(ast_, value)) {
+                const auto raw = ast_.text(ast_.at(value));
+                if (raw.size() < 2 || raw.front() != '"' || raw.back() != '"' ||
+                    raw.find("$[") != std::string_view::npos) return bad();
+                escaped_json = true;
+            }
         }
         const NodeId prop = node2(NodeKind::Property, Op::None, ast_.at(key).begin, key, value);
         props.push_back(prop);
@@ -329,6 +336,13 @@ NodeId ExprParser::object(std::uint32_t begin) {
             continue;
         }
         if (!is(Tok::RBrace)) return bad();
+    }
+    // Escapes in values use the same strict JSON parser as legacy and
+    // lowering. A mixed textual literal still takes the existing refusal.
+    if (escaped_json) {
+        json::Document document;
+        std::string error;
+        if (!nift_json::parse(std::string(src_.substr(begin, tok_.end - begin)), document, error)) return bad();
     }
     --nesting_;
     const NodeId id = ast_.add(NodeKind::Object, begin, tok_.end);

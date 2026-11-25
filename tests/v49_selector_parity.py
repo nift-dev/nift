@@ -229,6 +229,15 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('strict-json-object-escapes',
+  'print("before")\no := {"k":"s\\ntext","tab":"tab\\t","unicode":"\\u0041","quote":"x\\"y"}\n'
+  'print(o.stringify()); print("after")\n',
+  0, 'before\n{"k":"s\\ntext","tab":"tab\\t","unicode":"A","quote":"x\\"y"}\nafter\n', ''),
+ ('bytes-member-unsigned-and-bounds',
+  'o := {"k":bytes([0,128,255])}\nprint(o.k[2]); print(o.k[3])\n', 1, '255\n',
+  "error: <root>/p.f:2:22: bytes index 3 is out of range in 'o.k[3]'\n"),
+ ('bytes-member-fractional-key', 'o := {"k":bytes([1])}\nprint(o.k[0.5])\n', 1, '',
+  "error: <root>/p.f:2:7: bytes indices must be non-negative integers in 'o.k[0.5]'\n"),
  ('null-script-member-reached', 'o := null\nprint("before")\nprint(o.k)\n',
   1, 'before\n', 'error: <root>/p.f:3:7: value has no member: k\n'),
  ('null-script-index-reached', 'o := null\nprint("before")\nprint(o["k"])\n',
@@ -274,6 +283,12 @@ entry_and_object_cases.extend(
  (case['name'], case['source'] + '\n', case['exit'], case['stdout'], case['stderr'])
  for case in json.loads(width_oracle.read_text(encoding='utf-8'))['cases']
  if case['name'] in {'map-width', 'filter-width', 'group_by-width'}
+)
+object_oracle = Path(__file__).with_name('v410_object_member_cases.json')
+entry_and_object_cases.extend(
+ (case['name'], case['source'] + '\n', case['exit'], case['stdout'], case['stderr'])
+ for case in json.loads(object_oracle.read_text(encoding='utf-8'))['cases']
+ if case['name'] == 'marked-bytes' or case['name'].startswith('value-string-')
 )
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
@@ -379,8 +394,33 @@ with tempfile.TemporaryDirectory() as directory:
  if (refusal.returncode != 1 or refusal.stdout or '(type:index)' not in refusal.stderr or
      'the program was not executed' not in refusal.stderr):
   raise SystemExit(f'FAIL effectful null index must refuse before execution: {refusal}')
+ for source, reason, legacy_expected in (
+  ('print("before")\no := {"a":"x\\q"}\nprint(o.stringify())\n',
+   'opaque:legacy-runtime-error', (0, 'before\n{"a":"xq"}\n', '')),
+  ('print("before")\nfn(side()){print("side");return 7}\no := {"a":"s\\ntext","b":side()}\n'
+   'print(o.stringify())\n',
+   'opaque:legacy-runtime-error', (0, 'before\nside\n{"a":"s\\ntext","b":7}\n', '')),
+  ('print("before")\no := {"a":"s\\ntext","a":2}\nprint(o.stringify())\n',
+   'opaque:legacy-runtime-error', (1, 'before\n',
+    "error: <ORACLE_ROOT>/p.f:2:6: object literal: duplicate object key 'a'\n")),
+  ('i:=0; while(i<1){b:=bytes([4]); print(b[-1]); i+=1}\n',
+   'type:index', (1, '', 'error: <ORACLE_ROOT>/p.f:1:39: invalid index\n')),
+  ('o := {"k":bytes([1])}\nprint("marker"); o["k"][0]=2; print(o.k[0])\n',
+   'type:element-assignment', (1, 'marker\n',
+    'error: <ORACLE_ROOT>/p.f:2:18: assignment index does not address an array or object: 0\n')),
+ ):
+  path.write_text(source, encoding='utf-8')
+  legacy = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='0'))
+  if (legacy.returncode, legacy.stdout, normalize_fixture_paths(legacy.stderr, aliases)) != legacy_expected:
+   raise SystemExit(f'FAIL legacy JSON or bytes control: {legacy}')
+  refusal = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                           env=dict(os.environ, NIFT_VM='require'))
+  if (refusal.returncode != 1 or refusal.stdout or f'({reason})' not in refusal.stderr or
+      'the program was not executed' not in refusal.stderr):
+   raise SystemExit(f'FAIL JSON or bytes admission guard: {refusal}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
-       'object cases, and 8 refusal controls')
+       'object cases, and 13 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

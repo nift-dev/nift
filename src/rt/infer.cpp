@@ -256,7 +256,7 @@ TyRef Inference::expr(NodeId id) {
             const bool literal = k.kind == NodeKind::String && k.count == 0 && ast_.text(k).size() >= 2;
             if (literal) key = std::string(ast_.text(k).substr(1, ast_.text(k).size() - 2));
             const long position = k.kind == NodeKind::Number ? literal_position(ast_.text(k)) : -1;
-            t = element_of(o, literal ? &key : nullptr, false, position);
+            t = o->kinds == kKindBytes ? kinds_ty(kKindInt) : element_of(o, literal ? &key : nullptr, false, position);
             break;
         }
         case NodeKind::Array: {
