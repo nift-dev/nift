@@ -4,6 +4,18 @@
 #include "rt/string.h"
 // rt-lint: cold-file compile-time callback entry lowering
 namespace nift::rt::detail {
+namespace {
+
+// Collection expression views yield the value of a sole local declaration.
+// Limit the admitted shape to a plain numeric initializer and an ordinary name.
+bool collection_local_declaration(const Ast& ast, const Node& node) {
+    return node.kind == NodeKind::Declare && !node.flags && node.b != kNoNode &&
+           ast.at(node.a).kind == NodeKind::Ident && !reserved_name(ast.text(ast.at(node.a))) &&
+           ast.at(node.b).kind == NodeKind::Number;
+}
+
+} // namespace
+
 const Node* UnitCompiler::lambda_entry_duplicate(const Node& lambda) const {
     if (session_ || plan_.coroutines || (module_names_ && !module_names_->empty()) ||
         !(lambda.flags & kFlagBlockBody)) return nullptr;
@@ -50,7 +62,8 @@ bool UnitCompiler::collection_callback_shape(const Node& site,NodeId callback,st
         if (lambda_entry_duplicate(lambda)) continue;
         if(body.count!=1)return fail(site,reason);
         const Node& n=ast_.at(ast_.list(body)[0]);
-        if(n.kind==NodeKind::ExprStmt||n.kind==NodeKind::Assign||n.kind==NodeKind::CompoundAssign)continue;
+        if(n.kind==NodeKind::ExprStmt||n.kind==NodeKind::Assign||n.kind==NodeKind::CompoundAssign||
+           collection_local_declaration(ast_, n))continue;
         if(n.kind!=NodeKind::Return||n.a==kNoNode)return fail(site,reason);
         const Node* left=&ast_.at(n.a);
         while(left->kind==NodeKind::Binary||left->kind==NodeKind::Logical)left=&ast_.at(left->a);
@@ -110,6 +123,8 @@ bool UnitCompiler::compile_lambda_body(const Node& lambda,const NodeId* params,b
         const Node& n=ast_.at(statement_id);
         std::uint16_t value=0;
         if(n.kind==NodeKind::ExprStmt)ok=temp(value)&&expr_to(n.a,value);
+        else if(collection_local_declaration(ast_, n))
+            ok=statement(statement_id)&&temp(value)&&expr_to(n.a,value);
         else if(n.kind==NodeKind::Assign||n.kind==NodeKind::CompoundAssign)
             ok=statement(statement_id)&&temp(value)&&expr_to(n.a,value);
         else if(n.kind==NodeKind::Return&&n.a!=kNoNode) {

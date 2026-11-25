@@ -228,6 +228,12 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('sole-local-declaration-mapper',
+  'f := x => { q := 7 }\nprint(f(1))\nprint([1,2].map(f).stringify())\n',
+  0, 'null\n[7,7]\n', ''),
+ ('duplicate-local-declaration-mapper',
+  'print("before")\nf := x => { x := 7 }\nprint([1].map(f).stringify())\n',
+  1, 'before\n', 'error: <root>/p.f:2:13: lambda body error: binding already declared in this scope: x\n'),
  ('invalid-object-member-mapper-empty',
   'const rows := [{"v":3}]\nfor(row : rows) {\n f := x => row.v = x\n'
   ' print([].map(f).stringify()); break\n}\n',
