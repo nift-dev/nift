@@ -147,8 +147,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
-      - name: Install Python dev headers
-        run: sudo apt-get update && sudo apt-get install -y python3-dev
+      - name: Install aggregate test dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3-dev valgrind
       - name: Clean + parallel aggregate target (make -j2 test-all)
         run: |
           make clean
