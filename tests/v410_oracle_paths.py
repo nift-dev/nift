@@ -17,9 +17,9 @@ def fixture_root_aliases(root):
     return sorted(aliases, key=len, reverse=True)
 
 
-def normalize_fixture_paths(text, aliases):
+def normalize_fixture_paths(text, aliases, replacement="<ORACLE_ROOT>/"):
     for alias in sorted(set(aliases), key=len, reverse=True):
         # A POSIX suffix inside an unrelated/native path is not a root match.
         pattern = r'(?<![\w./\\:-])' + re.escape(alias) + r'[/\\]'
-        text = re.sub(pattern, '<ORACLE_ROOT>/', text)
+        text = re.sub(pattern, lambda match: replacement, text)
     return text

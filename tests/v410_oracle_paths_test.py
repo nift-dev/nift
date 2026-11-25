@@ -9,6 +9,14 @@ class OraclePathsTest(unittest.TestCase):
         expected = 'error: <ORACLE_ROOT>/unused-timer-observable.f:3:6: async function capture contains a non-transferable timer\n'
         self.assertEqual(normalize_fixture_paths(observed, aliases), expected)
 
+    def test_comparator_marker_with_msys_paths(self):
+        root = '/tmp/cp14b-comparator-profile-abc'
+        native = 'D:/a/_temp/msys64' + root
+        diagnostic = f'error: {native}/case.f:2:1: not compiled for the VM (method:sort)\n'
+        self.assertEqual(normalize_fixture_paths(diagnostic, [root, native], replacement='$CASE/'),
+                         'error: $CASE/case.f:2:1: not compiled for the VM (method:sort)\n')
+        self.assertEqual(normalize_fixture_paths(diagnostic, [root], replacement='$CASE/'), diagnostic)
+
     def test_native_and_posix_prefixes(self):
         aliases = ['/tmp/oracle', 'C:\\tmp\\oracle']
         for path in ['/tmp/oracle/case.f', 'C:\\tmp\\oracle\\case.f']:

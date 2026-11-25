@@ -402,3 +402,24 @@ The Test Integrity check annotation for job 138885898893 reports that
 the hosted runner lost communication with the server. The run published
 no artifacts and its log blob was unavailable. The last recorded step
 was the parallel production aggregate. Treat that failure as incomplete.
+
+### Diagnostic contracts and aggregate visibility
+
+On 20113844 the historical workflow passed Linux, macOS and Windows.
+The Linux Test Integrity aggregate received a runner shutdown signal
+and exited 143. Four other jobs passed. The aggregate now streams its
+output while retaining the same command, log and failure status so a
+runner shutdown leaves evidence of progress.
+
+The standalone `print(missing)` witness uses the same pre-execution
+undefined-operand contract already pinned by D-158. The v4.8 identifier
+suite independently checks the historical runtime diagnostic and the
+exact VM refusal reason and position. It also runs the two syntactically
+invalid historical inputs separately in both modes. No generic
+unresolved-name or opaque refusal is approved by these checks.
+
+CP14B shares the MSYS-aware oracle path normalizer. Its new control
+rejects partial path matches while recognizing the translated fixture
+root. The v4.8 identifier suite passes locally in both modes. The
+surrounding callback suite now stops at an imported coroutine capture.
+The original reserved `first` and computed-key witnesses remain strict.

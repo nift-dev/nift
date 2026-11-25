@@ -106,9 +106,30 @@ c := [].sort_by(mk())
 print(n)
 d := [].map(mk())
 print(n)' $'1\n3\n3\n4\n4\n5'
-err unresolved 'print(missing)' 'unknown value or malformed expression: missing'
-err malformed 'print(x ?)' 'ternary expression'
-err reserved 'return := 2' 'return'
+# These invalid scripts retain exact legacy diagnostics and require rejection
+# before execution. D-158 already pins the undefined standalone print operand.
+invalid_script(){
+    local name=$1 source=$2 legacy=$3 refusal=$4 mode status diagnostic
+    for mode in 0 require; do
+        if [[ $mode == require && ${NIFT_VM:-} == 0 ]]; then continue; fi
+        printf '%s\n' "$source" > "$t/p.f"
+        status=0
+        NIFT_VM=$mode "$B" "$t/p.f" >"$t/o" 2>"$t/e" || status=$?
+        diagnostic=$legacy
+        if [[ $mode == require ]]; then diagnostic=$refusal; fi
+        if [[ $status != 1 || -s "$t/o" ]] || ! grep -Fq "$diagnostic" "$t/e" ||
+           { [[ $mode == require ]] && ! grep -Fqx 'note: the program was not executed: no part of it ran' "$t/e"; }; then
+            echo "FAIL $name ($mode): $(cat "$t/e")" >&2
+            exit 1
+        fi
+    done
+}
+invalid_script unresolved 'print(missing)' 'p.f:1:7: unknown value or malformed expression: missing' \
+    'p.f:1:7: not compiled for the VM (unresolved-name)'
+invalid_script malformed 'print(x ?)' "p.f:1:7: ternary expression has '?' without a matching ':'" \
+    'p.f:1:1: not compiled for the VM (opaque:legacy-runtime-error)'
+invalid_script reserved 'return := 2' "p.f:1:1: return: declaration requires an identifier before ':='" \
+    'p.f:1:8: not compiled for the VM (opaque:legacy-runtime-error)'
 
 # Lexical module/private callable resolution and returned callable values.
 mkdir -p "$t/pkg/.nift/packages/demo/src"

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """CP14B source parity witnesses; require proves no fallback and no replay."""
-import argparse,json,os,re,subprocess,tempfile
+import argparse,json,os,re,subprocess,sys,tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from v410_oracle_paths import fixture_root_aliases, normalize_fixture_paths
+
 CASES={
 'map':'print([1,2,3].map(x=>x*2).stringify())',
 'filter':'print([1,2,3].filter(x=>x>1).stringify())',
@@ -183,7 +187,8 @@ def run(binary,mode,source,root):
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')
     p=subprocess.run([binary,'case.f'],cwd=root,env=env,capture_output=True,text=True,errors="surrogateescape",timeout=10)
     records=[json.loads(s) for s in stats.read_text().splitlines()] if stats.exists() else []
-    return dict(out=p.stdout,err=p.stderr.replace(str(root),'$CASE'),exit=p.returncode,stats=records)
+    error=normalize_fixture_paths(p.stderr,fixture_root_aliases(root),replacement='$CASE/')
+    return dict(out=p.stdout,err=error,exit=p.returncode,stats=records)
 def main():
     p=argparse.ArgumentParser();p.add_argument('--nift',required=True);p.add_argument('--legacy',required=True);p.add_argument('--output',required=True);a=p.parse_args();results=[]
     import comparator_profile as cprof
