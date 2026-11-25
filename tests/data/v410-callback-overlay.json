@@ -88,6 +88,7 @@
       "source": "rows := [{\"v\":3}]; for(row : rows) { f := x => row.v+x; rows.push({\"v\":9}); print([1].map(f).stringify()); break }",
       "exit": 0,
       "stdout": "[4]\n",
+      "vm_stdout": "[4]\n",
       "stderr": ""
     },
     {

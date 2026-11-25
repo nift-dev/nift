@@ -3,7 +3,7 @@
 // rt-lint: cold-file compile-time proof of indexed alias roots and uses
 namespace nift::rt::detail {
 
-bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool stable_members) const {
+bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool stable_members, bool direct) const {
     const NodeKind literal_kind = element == kKindObject ? NodeKind::Object : NodeKind::Array;
     const auto array_of_literals = [&](NodeId id) {
         const Node& literal = ast_.at(id);
@@ -43,7 +43,7 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool sta
             if (item.parent == kNoNode) return false;
             const Node& parent = ast_.at(item.parent);
             const Node* outer = item.outer == kNoNode ? nullptr : &ast_.at(item.outer);
-            if (parent.kind == NodeKind::Assign && parent.a == item.id && !stable_members &&
+            if (parent.kind == NodeKind::Assign && parent.a == item.id && !stable_members && !direct &&
                 array_of_literals(parent.b)) {
             } else if (parent.kind == NodeKind::Index && parent.a == item.id &&
                        (is_identity_path(outer, parent) ||

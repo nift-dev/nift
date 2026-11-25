@@ -155,6 +155,7 @@ struct ShrinkScan {
     const Ast& ast;
     const UnitKinds& kinds;
     std::string_view name;
+    std::string_view captured_element;
     bool found = false;
 
     bool read_only_expression(NodeId id) const {
@@ -188,15 +189,26 @@ struct ShrinkScan {
         const Node& n = ast.at(id);
         const Node& callee = ast.at(n.a);
         if (callee.kind == NodeKind::Member) {
-            // These proved array methods cannot remove elements. A sort
-            // still requires a known read-only selector and all operands
-            // must be scanned for effects before the method can run.
+            // These array methods cannot remove elements. Map and sort
+            // require a known read-only callback. All operands are scanned
+            // for effects before the method can run.
             const auto method = ast.text(ast.at(callee.b));
+            const bool push = method == "push";  // rt-lint: allow-string-compare compile time
+            if (push && n.count == 1 && !captured_element.empty()) {
+                const NodeId value = ast.list(n)[0];
+                // A stored closure may escape this iteration. Preserve M-3
+                // for this transfer even if the receiver only grows.
+                if (ast.at(value).kind == NodeKind::Lambda) {
+                    CaptureScan capture{ast, captured_element};
+                    capture.node(value, false);
+                    if (capture.found) { found = true; return; }
+                }
+            }
             const bool nonshrinking = kinds.of(callee.a) == kKindArray &&
-                (method == "push" ||  // rt-lint: allow-string-compare compile time
+                (push ||
                  (method == "stringify" && n.count == 0) ||  // rt-lint: allow-string-compare compile time
-                 (method == "sort_by" && n.count == 1 &&  // rt-lint: allow-string-compare compile time
-                  read_only_callable(ast.list(n)[0])));
+                 ((method == "sort_by" || method == "map") &&  // rt-lint: allow-string-compare compile time
+                  n.count == 1 && read_only_callable(ast.list(n)[0])));
             if (!nonshrinking) { found = true; return; }
         } else if (callee.kind == NodeKind::Ident) {
             NativeInfo info;
@@ -257,10 +269,11 @@ bool UnitCompiler::for_body_writes(const Node& body, std::string_view name) cons
 }
 
 
-bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const {
+bool UnitCompiler::for_source_may_shrink(const Node& body, const Binding* place, std::string_view name,
+                                         std::string_view captured_element) const {
     if (place == nullptr) return false;  // a held expression cannot be changed by the body
     if ((place->cell && !place->selector_root_only) || place->upvalue || place->global) return true;  // conservative
-    ShrinkScan scan{ast_, kinds_, name};
+    ShrinkScan scan{ast_, kinds_, name, captured_element};
     scan.node(node_id(body));
     return scan.found;
 }

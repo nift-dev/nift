@@ -163,7 +163,7 @@ void UnitCompiler::prepare_indexed_roots() {
         const auto* path = direct ? &init : indexed_identity_argument(init, function);
         if (!path) continue;
         const auto root = kinds_.bindings.find(path->a);
-        if (root != kinds_.bindings.end() && stable_indexed_root(root->second, kinds(node_id(*path))))
+        if (root != kinds_.bindings.end() && stable_indexed_root(root->second, kinds(node_id(*path)), false, direct))
             selector_roots_.insert(root->second);
     }
 }
@@ -250,7 +250,9 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         stable_members = element == kKindObject && !direct &&
                          !observed_array_alias(node.a, true) &&
                          stable_indexed_root(root->decl_node, element, true);
-        if (!stable_members && !stable_indexed_root(root->decl_node, element)) return 0;
+        // B5 Q3 direct extraction retains the value when the source binding
+        // is reassigned. The location-return proof has a different contract.
+        if (!stable_members && !stable_indexed_root(root->decl_node, element, false, direct)) return 0;
     } else if (!forward) {
         if (call_node.kind != NodeKind::Call || call_node.count ||
             ast_.at(call_node.a).kind != NodeKind::Ident) return 0;

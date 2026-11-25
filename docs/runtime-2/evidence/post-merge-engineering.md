@@ -570,3 +570,30 @@ The next callback-overlay failure is `location-invalid`, which refuses
 a vanishing captured loop location. The next object-member failure is
 `location-parent-object-growth`, which uses a keyed location and a
 computed object growth loop. Their historical witnesses remain intact.
+
+### CP17 aggregate failure and B5 convergence
+
+The fresh Linux runner finished with a genuine test-all failure.
+The first failed recipe was test-rt-handles: the CP17 scanner found
+legacy handle-tag literals in two VM compiler admission checks. Both
+checks now call the same prefix predicate as the legacy RuntimeValue
+handle detection. Decoding, refusal reasons and the scanner allowlist
+are unchanged. The complete local handle gate passed.
+
+Shortened probes isolate the remaining Checkpoint 10 witnesses.
+A logically non-shrinking array map with a proved read-only callback
+can run across growth, so the original location-reallocate fixture now
+matches legacy. A separate clear still refuses that captured-loop
+witness before execution. B5 iterates a snapshot and the historical
+vanished-loop error comes from a live-loop contract. The keyed parent
+fixture still refuses at the identity argument after hoisting the
+computed write key. Even isolated key replacement requires a keyed
+parent location, which is separate from a numeric array slot.
+
+The B5 run exposed an earlier regression: standalone direct extraction
+must preserve the selected value after root rebinding (Q3), while the
+identity location-return forms retain their separately pinned semantics.
+The direct proof now declines roots that may rebind. The two M-3
+precision witnesses remain unchanged. The conservative scan retains the
+refusal for a pushed literal lambda that captures the current loop
+element. All 140 default-dispatch B5 fixtures passed after these changes.

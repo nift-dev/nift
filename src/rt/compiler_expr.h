@@ -97,8 +97,7 @@ private:
     bool collection_call(const Node& node, std::uint16_t dst, int method);
     bool comparator_sort(const Node& node, std::uint16_t dst, const Binding& binding);
     bool array_mutation(const Node& node, std::uint16_t dst, int method);
-    // D-063 (compiler_keyed.cpp): a map/set/stack method (-1: the receiver is
-    // not a collection; 0 refused; 1 compiled) and its bare-binding mutators.
+    // D-063 keyed method status: -1 unhandled, 0 refused, 1 compiled.
     int keyed_method_call(const Node& node, std::uint16_t dst);
     bool keyed_mutation(const Node& node, std::uint16_t dst, int method);
     bool keyed_read_call(const Node& node, std::uint16_t dst, int method);
@@ -129,7 +128,8 @@ private:
     bool for_body_reads(const Node& body, std::string_view name, std::uint32_t& first_offset) const;
     bool for_body_writes(const Node& body, std::string_view name) const;
     bool for_body_captures(const Node& body, std::string_view name) const;
-    bool for_source_may_shrink(const Node& body, const Binding* place, std::string_view name) const;
+    bool for_source_may_shrink(const Node& body, const Binding* place, std::string_view name,
+                               std::string_view captured_element) const;
     bool for_declare_binding(std::string_view name, const Node& at, bool captured, KindSet decl_kinds,
                              Binding& binding);
     bool for_bind_value(const Binding& binding, std::uint16_t value, std::uint16_t type_reg, bool first,
@@ -147,7 +147,8 @@ private:
     bool expression_statement(const Node& node);
     const Node* indexed_identity_argument(const Node& call, std::uint16_t& function, bool forward = false) const;
     bool indexed_array_path(const Node& path) const;
-    bool stable_indexed_root(NodeId binding, KindSet element, bool stable_members = false) const;
+    bool stable_indexed_root(NodeId binding, KindSet element, bool stable_members = false,
+                             bool direct = false) const;
     bool observed_array_alias(NodeId binding, bool rebind, bool forward = false, bool members = false) const;
     const Node* indexed_return(std::uint16_t function) const;
     bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result);
@@ -277,7 +278,6 @@ private:
     bool temp(std::uint16_t& reg);
     bool operand_window(std::uint16_t base, std::uint32_t count);
     bool window_value(NodeId value, std::uint16_t dst);
-    // Resolve a lexical binding or a proven top-level free name.
     const Binding* find_binding(std::string_view name) const;
     const Binding* find_lambda_binding(std::string_view name) const;
     void note_global_declaration(const Node& node, const Binding& binding);

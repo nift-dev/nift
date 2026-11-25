@@ -85,8 +85,10 @@ bool UnitCompiler::for_prepare_bindings(ForState& state, const Node& node) {
     // A vanished element/key is only possible when the body can change the
     // source; otherwise the value-only opcodes avoid the found flag, the
     // missing check and (for a plain binding) the element copy.
-    const bool shrink = for_source_may_shrink(body, state.place, state.source_name);
-    if (shrink && ((!state.pair && first_captured) || (state.pair && second_captured)))
+    const bool captured = state.pair ? second_captured : first_captured;
+    const auto captured_element = captured ? text(ast_.at(state.names[state.pair ? 1 : 0])) : std::string_view{};
+    const bool shrink = for_source_may_shrink(body, state.place, state.source_name, captured_element);
+    if (shrink && captured)
         return fail(node, "for-capture-vanishing");
     if (shrink && ((!state.pair && first_writes) || (state.pair && second_writes)))
         return fail(node, "for-missing-write");

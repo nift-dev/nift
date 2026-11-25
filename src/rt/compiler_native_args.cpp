@@ -1,4 +1,5 @@
 #include "rt/compiler_native_args.h"
+#include "RuntimeValue.h"
 #include "rt/builtin_bind.h"
 #include "rt/compiler_handles.h"
 #include "rt/literal.h"
@@ -39,7 +40,7 @@ bool plain_readonly_arity_string(const Ast& ast, const Node& receiver, const Bin
     Value value;
     return source->kind == NodeKind::String && source->count == 0 &&
            decode_string_literal(ast.text(*source), value) &&
-           value.is(Kind::String) && string_view_of(value).substr(0, 6) != "\x1f" "nift:";
+           value.is(Kind::String) && !nift::runtime_reserved_handle_string(string_view_of(value));
 }
 
 bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver) {
@@ -76,7 +77,7 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
             // strings whose decoded literal is known to be plain.
             Value value;
             if (arg.kind != NodeKind::String || !decode_string_literal(text(arg), value) ||
-                !value.is(Kind::String) || string_view_of(value).substr(0, 6) == "\x1f" "nift:")
+                !value.is(Kind::String) || nift::runtime_reserved_handle_string(string_view_of(value)))
                 return fail(arg, "file-write-val-kind");
         }
     }

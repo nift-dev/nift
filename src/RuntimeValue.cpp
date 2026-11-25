@@ -495,8 +495,12 @@ bool runtime_contains_timer(const RuntimeValue& value) {
     return false;
 }
 
+bool runtime_reserved_handle_string(std::string_view value) {
+    return value.rfind("\x1fnift:", 0) == 0;
+}
+
 bool runtime_contains_reserved_handle(const RuntimeValue& value) {
-    if (value.is_string() && value.string.rfind("\x1fnift:", 0) == 0) return true;
+    if (value.is_string() && runtime_reserved_handle_string(value.string)) return true;
     if (value.is_array())
         return std::any_of(value.array.begin(), value.array.end(), runtime_contains_reserved_handle);
     if (value.is_object())

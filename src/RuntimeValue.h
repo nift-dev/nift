@@ -168,6 +168,7 @@ RuntimeValue runtime_error_with_origin(const RuntimeValue& value, std::string so
                                        std::size_t line, std::size_t column);
 bool runtime_contains_error(const RuntimeValue& value);
 bool runtime_contains_timer(const RuntimeValue& value);
+bool runtime_reserved_handle_string(std::string_view value);
 bool runtime_contains_reserved_handle(const RuntimeValue& value);
 
 } // namespace nift
