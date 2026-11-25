@@ -17,7 +17,7 @@ bool UnitCompiler::expression_statement(const Node& node) {
             const bool indirect = holder != nullptr && (holder->cell || holder->upvalue);
             const Binding held = (global || indirect) ? *holder : Binding();
             if (receiver.kind != NodeKind::Ident ||
-                (!global && !(holder && holder->cell ? indexed_binding(*holder, reg) :
+                (!global && !(holder && holder->cell && !holder->indexed_alias ? indexed_binding(*holder, reg) :
                               local_register(receiver, reg))))
                 return fail(receiver, "push-receiver");
             if (expr.count != 1) {

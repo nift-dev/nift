@@ -220,14 +220,22 @@ class Pty:
             os.kill(self.pid, signal.SIGKILL)
         except OSError:
             pass
-        try:
-            os.waitpid(self.pid, 0)
-        except ChildProcessError:
-            pass
+        # Release the terminal before waiting for a stopped or killed child.
+        # A cleanup stall must fail the fixture, never count as a mutant kill.
         try:
             os.close(self.fd)
         except OSError:
             pass
+        deadline = time.monotonic() + 4.0
+        while time.monotonic() < deadline:
+            try:
+                pid, _ = os.waitpid(self.pid, os.WNOHANG)
+            except ChildProcessError:
+                return
+            if pid == self.pid:
+                return
+            time.sleep(0.02)
+        raise Timeout("PTY child did not exit after cleanup")
 
 
 def shell_owns_tty(s):
@@ -616,7 +624,10 @@ def run_scenario(binary, name, extra_env=None):
     except (OSError, ChildProcessError, ValueError) as exc:
         r.setup_error = f"{type(exc).__name__}: {exc}"
     finally:
-        s.close()
+        try:
+            s.close()
+        except Timeout as exc:
+            r.setup_error = f"timeout: {exc}"
     return r
 
 

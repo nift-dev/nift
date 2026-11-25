@@ -90,6 +90,13 @@ std::uint32_t Vm::report_offset(const Fault& fault, const Proto* proto, const In
         fault.message.rfind("reference target no longer exists: ", 0) == 0)
         offset = selector_offset(offset);
     if (fault.use_call_site) offset = main_offset(offset);
+    if (fault.reason == StopReason::Error && pc->op == OpCode::GetIndex && !frames_.empty()) {
+        const Frame& caller = frames_.back();
+        const Instr* call = caller.ret - 1;
+        const Note* note = note_at(caller.proto, call);
+        if (note && note->indexed_capture_call)
+            offset = caller.proto->offsets[static_cast<std::size_t>(call - caller.proto->code.data())];
+    }
     MUTATE_ERROR_OFFSET(offset)
     return offset;
 }

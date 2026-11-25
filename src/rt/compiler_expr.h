@@ -174,8 +174,7 @@ private:
     KindSet interpolation_kind_impl(NodeId id, std::unordered_set<std::size_t>& active,
                                          bool literal_only) const;
     KindSet interpolation_kind(NodeId id, std::unordered_set<std::size_t>& active) const;
-    // Literal/operator-only kinds for a callee return expression: never resolves an identifier through the caller's
-    // scopes and never follows a call. Used only by interpolation_function_kind (F1).
+    // Literal/operator-only return kinds. Never follows calls or resolves against caller scopes.
     KindSet interpolation_literal_kind(NodeId id) const;
     KindSet interpolation_function_kind(std::size_t f, std::unordered_set<std::size_t>& active) const;
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
@@ -337,6 +336,7 @@ private:
     std::unordered_set<NodeId> top_level_decl_ids_;
     std::unordered_set<NodeId> captured_bindings_;
     std::unordered_set<NodeId> selector_roots_;
+    std::unordered_map<NodeId, NodeId> direct_indexed_lambdas_;
     std::unordered_set<std::string_view> declared_names_;
     std::vector<LambdaTask> lambda_tasks_;
     Program* program_ = nullptr;

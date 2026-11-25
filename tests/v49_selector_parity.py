@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from v410_oracle_paths import fixture_root_aliases, normalize_fixture_paths
+
 binary = str(Path(os.environ.get('NIFT', './nift')).resolve())
 baseline = os.environ.get('NIFT_BASELINE')
 cases = [
@@ -130,6 +132,26 @@ location_cases = [
  ('evaluate-index-once', 'i:=1; c:=id(a[i]); i=0; print(c.stringify())\n',
   0, '[2]\n', ''),
 ]
+lambda_location_cases = [
+ ('identity lambda sees the replacement',
+  'a := [[1]]\nf := x => x\nb := f(a[0])\na[0] = [9]\nprint(b.stringify())\n', 0, '[9]\n', ''),
+ ('capture lambda sees the replacement',
+  'a := [[1]]\nf := () => a[0]\nb := f()\na[0] = [9]\nprint(b.stringify())\n', 0, '[9]\n', ''),
+ ('identity lambda follows root rebinding',
+  'a := [[1]]\nf := x => x\nb := f(a[0])\na = [[7]]\nprint(b.stringify())\n', 0, '[7]\n', ''),
+ ('identity lambda mutates the replacement child',
+  'a := [[1]]\nf := x => x\nb := f(a[0])\na[0] = [9]\nb.push(3)\nprint(a.stringify())\n',
+  0, '[[9,3]]\n', ''),
+ ('capture lambda mutator reports a missing target',
+  'a := [[1]]\nf := () => a[0]\nb := f()\na.clear()\nb.push(3)\n', 1, '',
+  'error: <root>/p.f:5:1: reference target no longer exists: b\n'),
+ ('capture lambda reports a missing live target',
+  'a := [[1]]\nf := () => a[0]\nb := f()\na.clear()\nprint(b.stringify())\n', 1, '',
+  'error: <root>/p.f:5:7: reference target no longer exists: b\n'),
+ ('capture lambda checks the index at invocation',
+  'a:=[[1]];f:=()=>a[0];a.clear();b:=f();print(b.stringify())\n', 1, '',
+  "error: <root>/p.f:1:35: lambda body error: JSON array index 0 is out of range in 'a[0]'\n"),
+]
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
@@ -160,13 +182,16 @@ with tempfile.TemporaryDirectory() as directory:
   if expected is not None and (candidate.returncode or candidate.stdout != expected):
    raise SystemExit(f'FAIL {name}: {candidate.stdout!r} {candidate.stderr}')
  path = Path(directory) / 'p.f'
- for name, tail, code, output, error in location_cases:
-  path.write_text(location_prefix + tail, encoding='utf-8')
+ aliases = fixture_root_aliases(path.parent)
+ witnesses = [(name, location_prefix + tail, code, output, error)
+              for name, tail, code, output, error in location_cases]
+ for name, source, code, output, error in witnesses + lambda_location_cases:
+  path.write_text(source, encoding='utf-8')
   for mode in ('0', 'require'):
    result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
                            env=dict(os.environ, NIFT_VM=mode))
-   diagnostic = result.stderr.replace(str(path), '<root>/p.f').replace(path.as_posix(), '<root>/p.f')
-   if (result.returncode, result.stdout, diagnostic) != (code, output, error):
+   diagnostic = normalize_fixture_paths(result.stderr, aliases)
+   if (result.returncode, result.stdout, diagnostic) != (code, output, error.replace('<root>', '<ORACLE_ROOT>')):
     raise SystemExit(f'FAIL live location {name}, mode {mode}: {result}')
  # A bare alias can propagate a location in legacy. Keep unsupported
  # propagation forms out of the VM before the marker or mutation can run.
@@ -179,5 +204,6 @@ with tempfile.TemporaryDirectory() as directory:
       'p.f:3:6: not compiled for the VM (alias-argument)' not in result.stderr or
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL indexed location propagation must refuse before execution: {result}')
- print(f'PASS {len(location_cases)} exact indexed location witnesses and 2 propagation controls')
+ print(f'PASS {len(location_cases)} exact indexed location witnesses, '
+       f'{len(lambda_location_cases)} lambda location witnesses and 2 propagation controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

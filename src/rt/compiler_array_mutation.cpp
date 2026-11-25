@@ -36,6 +36,7 @@ bool UnitCompiler::array_mutation(const Node& node,std::uint16_t dst,int id) {
     auto read=[&]()->bool {
         std::uint16_t value=0;
         if(binding.global&&!binding.cell){if(!global_read_value(binding.reg,value,text(receiver)))return false;}
+        else if(binding.indexed_alias){if(!local_register(receiver,value))return false;}
         else if(binding.cell||binding.upvalue){if(!indexed_binding(binding,value))return false;}
         else value=binding.reg;
         fb_->emit(OpCode::Move,state+Source,value);

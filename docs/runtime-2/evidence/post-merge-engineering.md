@@ -368,3 +368,37 @@ aggregate reference result. The callback overlay still stops at the
 reserved declaration and the object-member oracle at computed-key
 assignment. No refusal approval or release certification is inferred
 from these runs.
+
+### Lambda-mediated indexed locations
+
+A local identity lambda and a zero-argument capture lambda both used to
+return the selected child snapshot. Each now retains the root cell and
+index when it initializes a supported alias. Identity lambdas still run
+with a resolved value argument. A captured literal index is checked by the
+actual lambda call before the descriptor is formed. The compiler proves
+that the lambda binding is only used as a direct callee and checks both
+lexical binding identities again at emission. Session, coroutine and
+isolate transfers retain their previous restrictions.
+
+Independent review found a captured-index error-site discrepancy. The
+compiler now marks that invocation so a checked index fault has the
+legacy call-site position. Review also checked the bounded numeric-literal
+push path and the non-escaping direct nested print read. The seven new
+dual-mode witnesses cover parent-slot replacement, root rebinding,
+mutation through the replacement, vanished targets and exact errors.
+The seven original indexed witnesses and both propagation controls pass.
+The unchanged v4.8 identifier location case now passes in required VM
+mode. The suite reaches its separate unresolved-name diagnostic witness.
+
+Checkpoint 10's Windows selector and macOS CP14B comparator failures
+included fixture paths in alternate native spellings. The oracle now
+uses the existing MSYS fixture-root aliases and CP14B resolves its
+working directory before invocation. The exact diagnostic and
+pre-execution assertions remain intact. The CP21 PTY fixture now closes
+the master before its bounded child reap. A teardown timeout records a
+fixture failure and cannot count as mutant evidence.
+
+The Test Integrity check annotation for job 138885898893 reports that
+the hosted runner lost communication with the server. The run published
+no artifacts and its log blob was unavailable. The last recorded step
+was the parallel production aggregate. Treat that failure as incomplete.

@@ -176,6 +176,9 @@ APPROVED={'splice_throw':dict(vm='boom\n[1,2,3]\n',legacy='boom\n[1,3]\n',
           citation='owner Q2 option B (const is binding-only), B5')}
 
 def run(binary,mode,source,root):
+    # Child processes can report the physical cwd when the fixture is under
+    # a symlink, such as macOS /var. Normalize the same root we pass to cwd.
+    root=root.resolve()
     (root/'case.f').write_text(source+'\n');stats=root/'stats';stats.unlink(missing_ok=True)
     env=dict(os.environ,NIFT_VM=mode,NIFT_VM_STATS=str(stats),NIFT_PREVALIDATE='off')
     p=subprocess.run([binary,'case.f'],cwd=root,env=env,capture_output=True,text=True,errors="surrogateescape",timeout=10)
