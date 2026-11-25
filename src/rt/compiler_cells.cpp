@@ -114,9 +114,11 @@ bool UnitCompiler::indexed_array_path(const Node& path) const {
     if (session_ || plan_.coroutines || (module_names_ && !module_names_->empty()) ||
         path.kind != NodeKind::Index) return false;
     const auto key = ast_.at(path.b).kind;
+    const auto element = kinds(node_id(path));
     return (key == NodeKind::Ident || key == NodeKind::Number) &&
            ast_.at(path.a).kind == NodeKind::Ident && kinds(path.a) == kKindArray &&
-           kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber) && kinds(node_id(path)) == kKindArray;
+           kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber) &&
+           (element == kKindArray || element == kKindObject);
 }
 
 const Node* UnitCompiler::indexed_return(std::uint16_t function) const {
@@ -133,7 +135,7 @@ const Node* UnitCompiler::indexed_return(std::uint16_t function) const {
     if (!path) return nullptr;
     const auto root = kinds_.bindings.find(path->a);
     return root != kinds_.bindings.end() && root->second == decl.a &&
-           stable_indexed_root(decl.a) ? &ret : nullptr;
+           stable_indexed_root(decl.a, kinds(node_id(*path))) ? &ret : nullptr;
 }
 
 void UnitCompiler::prepare_indexed_roots() {
@@ -161,7 +163,7 @@ void UnitCompiler::prepare_indexed_roots() {
         const auto* path = direct ? &init : indexed_identity_argument(init, function);
         if (!path) continue;
         const auto root = kinds_.bindings.find(path->a);
-        if (root != kinds_.bindings.end() && stable_indexed_root(root->second))
+        if (root != kinds_.bindings.end() && stable_indexed_root(root->second, kinds(node_id(*path))))
             selector_roots_.insert(root->second);
     }
 }
@@ -238,11 +240,17 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     if (direct && !observed_array_alias(node.a, true, true)) return 0;
     const auto* path = direct ? &call_node : indexed_identity_argument(call_node, function);
     const Binding* root = nullptr;
+    bool stable_members = false;
     if (path) {
         root = find_binding(text(ast_.at(path->a)));
         const auto source = kinds_.bindings.find(path->a);
         if (!root || !root->location_source || root->global || source == kinds_.bindings.end() ||
-            source->second != root->decl_node || !stable_indexed_root(root->decl_node)) return 0;
+            source->second != root->decl_node) return 0;
+        const KindSet element = kinds(node_id(*path));
+        stable_members = element == kKindObject && !direct &&
+                         !observed_array_alias(node.a, true) &&
+                         stable_indexed_root(root->decl_node, element, true);
+        if (!stable_members && !stable_indexed_root(root->decl_node, element)) return 0;
     } else if (!forward) {
         if (call_node.kind != NodeKind::Call || call_node.count ||
             ast_.at(call_node.a).kind != NodeKind::Ident) return 0;
@@ -251,7 +259,7 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         if (find_binding(callee) || found == plan_.index.end() || !indexed_return(found->second)) return 0;
         function = found->second;
     }
-    if (!observed_array_alias(node.a, true, direct || forward)) {
+    if (!observed_array_alias(node.a, true, direct || forward, stable_members)) {
         fail(ast_.at(node.b), "alias-argument");
         return -1;
     }
@@ -305,7 +313,9 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     fb_->emit(OpCode::NewCell, result, result, binding.type_reg);
     binding.cell = binding.indexed_alias = true;
     binding.forward_indexed_alias = direct || forward;
-    binding.decl_kinds = kKindArray;
+    binding.decl_kinds = path ? kinds(node_id(*path)) :
+                         forward ? previous->decl_kinds :
+                         kinds(node.b) == kKindObject ? kKindObject : kKindArray;
     if (!scopes_.declare(name, binding)) {
         fail(node, "static-error:redeclared");
         return -1;

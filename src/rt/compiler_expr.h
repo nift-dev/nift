@@ -147,8 +147,8 @@ private:
     bool expression_statement(const Node& node);
     const Node* indexed_identity_argument(const Node& call, std::uint16_t& function, bool forward = false) const;
     bool indexed_array_path(const Node& path) const;
-    bool stable_indexed_root(NodeId binding) const;
-    bool observed_array_alias(NodeId binding, bool rebind, bool forward = false) const;
+    bool stable_indexed_root(NodeId binding, KindSet element, bool stable_members = false) const;
+    bool observed_array_alias(NodeId binding, bool rebind, bool forward = false, bool members = false) const;
     const Node* indexed_return(std::uint16_t function) const;
     bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result);
     bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);
@@ -203,6 +203,7 @@ private:
     std::uint32_t collection_offset(const Node&) const;
     std::uint16_t collection_diagnostic_flags(const Node&,NodeId,bool comparator=false) const;
     bool collection_callback_shape(const Node&,NodeId,std::uint32_t argc);
+    const Node* lambda_entry_duplicate(const Node& lambda) const;
     bool compile_lambda_body(const Node&,const NodeId*,bool collection_view);
     bool session_lambda_definition(const LambdaTask& task, Proto& out);
     bool session_lambda_captures(NodeId id, const Node& node, std::vector<std::string_view>& names,
@@ -276,8 +277,7 @@ private:
     bool temp(std::uint16_t& reg);
     bool operand_window(std::uint16_t base, std::uint32_t count);
     bool window_value(NodeId value, std::uint16_t dst);
-    // CP12b globals (compiler_globals.cpp): the binding of `name` in the code being compiled: a local, or (in a
-    // function) the top-level binding a resolved free name denotes (Binding::global); nullptr otherwise.
+    // Resolve a lexical binding or a proven top-level free name.
     const Binding* find_binding(std::string_view name) const;
     const Binding* find_lambda_binding(std::string_view name) const;
     void note_global_declaration(const Node& node, const Binding& binding);

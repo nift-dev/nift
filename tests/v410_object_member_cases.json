@@ -30,6 +30,7 @@
       "source": "a := [{\"k\":[1]}]\nfn(id(x)) { return x }\no := id(a[0]); v := o[\"k\"]; a.push({\"k\":[9]}); v.push(2); print(a.stringify()); print(o.k.stringify())",
       "exit": 0,
       "stdout": "[{\"k\":[1,2]},{\"k\":[9]}]\n[1,2]\n",
+      "vm_stdout": "[{\"k\":[1,2]},{\"k\":[9]}]\n[1,2]\n",
       "stderr": ""
     },
     {

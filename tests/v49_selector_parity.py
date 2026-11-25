@@ -181,6 +181,13 @@ call_forward_location_cases = [
   'fn(id(x)){return x};a:=[[1]];b:=a[0];a.clear();c:=id(b);print(c.stringify())\n', 1, '',
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
+entry_and_object_cases = [
+ ('empty map never enters a duplicate capture declaration',
+  'v:=7; f:=x=>{v:=8; return v}; print([].map(f).stringify())\n', 0, '[]\n', ''),
+ ('an object-valued slot remains live through identity',
+  'a := [{"k":[1]}]\nfn(id(x)) { return x }\n'
+  'o := id(a[0]); a[0] = {"k":[9]}; print(o.stringify())\n', 0, '{"k":[9]}\n', ''),
+]
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in lexical_cases + cases:
@@ -214,7 +221,7 @@ with tempfile.TemporaryDirectory() as directory:
  aliases = fixture_root_aliases(path.parent)
  witnesses = [(name, location_prefix + tail, code, output, error)
               for name, tail, code, output, error in location_cases]
- for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases + call_forward_location_cases:
+ for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases + call_forward_location_cases + entry_and_object_cases:
   path.write_text(source, encoding='utf-8')
   for mode in ('0', 'require'):
    result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
@@ -233,7 +240,19 @@ with tempfile.TemporaryDirectory() as directory:
       'p.f:3:6: not compiled for the VM (alias-argument)' not in result.stderr or
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL indexed location propagation must refuse before execution: {result}')
+ for source, reason in (
+  ('v:=7; f:=x=>{fresh:=8; return fresh}; print([1].map(f).stringify())', 'method:map'),
+  ('a:=[{"k":[1]}];fn(id(x)){return x};o:=id(a[0]);v:=o["k"];a[0]={"k":[9]};print(v.stringify())',
+   'alias-argument'),
+ ):
+  path.write_text(source+'\n', encoding='utf-8')
+  result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+  if (result.returncode != 1 or result.stdout or f'not compiled for the VM ({reason})' not in result.stderr or
+      'the program was not executed' not in result.stderr):
+   raise SystemExit(f'FAIL bounded callback or object-location admission: {result}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
-       f'{len(call_forward_location_cases)} call forwarding witnesses and 2 propagation controls')
+       f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
+       'object cases, and 4 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

@@ -547,3 +547,26 @@ This records the two existing guards and does not add an inventory
 deferral or alter supported syntax. The next local failures are the
 callback overlay's local-capture-declaration and the object-member
 oracle's location-array-growth.
+
+### Callback entry and object-valued array slots
+
+The two original duplicate-declaration callback fixtures are reached
+legacy errors. For the proved first-statement shape, the VM now raises
+the same error at the declaration when the callback runs. Empty maps do
+not enter the body. An unrelated multi-statement block still follows its
+existing admission rule. Both originals run independently in explicit
+legacy and required VM modes.
+
+An array slot holding an object now retains its checked location through
+an admitted identity call. A direct replacement control verifies that
+the alias observes the new object. The original array-growth fixture
+also passes. Its projected array may be read as a shared value because
+the compiler proves append-only growth, no slot replacement and no
+rebinding of the object alias. A replacement combined with a retained
+projection still refuses before execution. Arbitrary nested or keyed
+locations remain outside this proof.
+
+The next callback-overlay failure is `location-invalid`, which refuses
+a vanishing captured loop location. The next object-member failure is
+`location-parent-object-growth`, which uses a keyed location and a
+computed object growth loop. Their historical witnesses remain intact.

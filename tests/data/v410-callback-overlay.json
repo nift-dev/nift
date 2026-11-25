@@ -50,6 +50,7 @@
       "source": "v := 7; f := x => { v := 8; return v }; print([1].map(f).stringify())",
       "exit": 1,
       "stdout": "",
+      "vm_stdout": "",
       "stderr": "error: <ORACLE_ROOT>/local-capture-declaration.f:1:21: lambda body error: binding already declared in this scope: v\n"
     },
     {
@@ -57,6 +58,7 @@
       "source": "f := x => { x := 8; return x }; print([1].map(f).stringify())",
       "exit": 1,
       "stdout": "",
+      "vm_stdout": "",
       "stderr": "error: <ORACLE_ROOT>/local-param-declaration.f:1:13: lambda body error: binding already declared in this scope: x\n"
     },
     {

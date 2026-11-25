@@ -239,10 +239,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
         if (!fb_->alloc(regs[k])) return false;
     fb_->set_params(static_cast<std::uint16_t>(lambda.count));
     if (!lambda_upvalues(task)) return false;
-    // Legacy rejects a nested lambda that declares a name already visible
-    // in its enclosing scope (the declaration would shadow a captured/outer
-    // binding). Only this lambda's own declarations count; a deeper lambda's
-    // declaration is checked when that lambda is compiled.
+    // Check enclosing binding collisions here. Deeper lambdas have their own check.
     {
         std::vector<NodeId> stack{lambda.b};
         std::vector<std::pair<std::string_view, NodeId>> declared;
@@ -265,8 +262,10 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
             const NodeId* list = ast_.list(n);
             for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
         }
+        const Node* duplicate = lambda_entry_duplicate(lambda);
         for (const auto& d : declared)
-            if (find_binding(d.first) != nullptr) return fail(ast_.at(d.second), "static-error:redeclared");
+            if ((!duplicate || d.second != node_id(*duplicate)) && find_binding(d.first) != nullptr)
+                return fail(ast_.at(d.second), "static-error:redeclared");
     }
     scopes_.push();  // parameters and locals
     const NodeId* params = ast_.list(lambda);
