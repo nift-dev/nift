@@ -149,6 +149,8 @@ jobs:
           node-version: '22'
       - name: Install aggregate test dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-dev valgrind
+      - name: Handle Callgrind guard verdict
+        run: make test-rt-handles-guards
       - name: Clean + parallel aggregate target (make -j2 test-all)
         run: |
           make clean
