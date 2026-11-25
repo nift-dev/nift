@@ -126,7 +126,8 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
     return declared;
 }
 
-bool UnitCompiler::observed_array_alias(NodeId binding, bool rebind, bool forward, bool members) const {
+bool UnitCompiler::observed_array_alias(NodeId binding, bool rebind, bool forward, bool members,
+                                        bool indexed_writes) const {
     std::unordered_map<NodeId, NodeId> copies;
     for (NodeId id = 0; id < ast_.size(); ++id) {
         const Node& node = ast_.at(id);
@@ -154,11 +155,18 @@ bool UnitCompiler::observed_array_alias(NodeId binding, bool rebind, bool forwar
             const Node* use = init.kind == NodeKind::Ident ? &init : indexed_identity_argument(init, identity, true);
             if (use) copies.emplace(node_id(*use), call.a);
         }
-        if (rebind && !members && call.kind == NodeKind::Assign) reads.insert(call.a);
+        if (rebind && !members && call.kind == NodeKind::Assign) {
+            reads.insert(call.a);
+            const Node& target = ast_.at(call.a);
+            if (indexed_writes && target.kind == NodeKind::Index &&
+                ast_.at(target.a).kind == NodeKind::Ident && kinds(target.a) == kKindArray &&
+                kinds(target.b) && !(kinds(target.b) & ~kKindNumber))
+                reads.insert(target.a);
+        }
         if (members && call.kind == NodeKind::Declare && !call.flags && call.b != kNoNode &&
             top_level_decl_ids_.count(id) && kinds(call.b) == kKindArray) {
             const NodeId receiver = member_receiver(call.b);
-            if (receiver != kNoNode && observed_array_alias(call.a, true)) reads.insert(receiver);
+            if (receiver != kNoNode && observed_array_alias(call.a, true, false, false, true)) reads.insert(receiver);
         }
         if (call.kind != NodeKind::Call) continue;
         const Node& member = ast_.at(call.a);

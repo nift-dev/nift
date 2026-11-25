@@ -148,6 +148,16 @@ keyed_location_cases = [
  ('computed-missing-key-after-effect', 'a := {"target":[1]}\nfn(id(x)) { return x }\n'
   'fn(pick()){ print("pick"); return "absent" }\nb:=id(a[pick()]); print(b.stringify())\n',
   1, 'pick\n', "error: <root>/p.f:4:7: JSON object has no key 'absent'\n"),
+ ('write-computed-index-in-projected-child',
+  'a := {"target":{"k":[1,2]}}\nfn(id(x)) { return x }\n'
+  'fn(pick()) { print("key"); return "target" }\no := id(a[pick()]); v := o["k"]\ni := 0\n'
+  'change := () => { print("value"); i=1; return 9 }\n'
+  'v[i] = change()\nprint(a.target.k.stringify())\n',
+  0, 'key\nvalue\n[1,9]\n', ''),
+ ('write-detached-projected-child', 'a := {"target":{"k":[1,2]}}\nfn(id(x)) { return x }\n'
+  'o := id(a["target"]); v := o["k"]\nv = [7,8]\ni := 1\nv[i] = 9\n'
+  'print(a.target.k.stringify())\nprint(v.stringify())\n',
+  0, '[1,2]\n[7,9]\n', ''),
  ('project-keyed-child', keyed_prefix +
   'child:=b["k"]\n' +
   ''.join(f'a["other{i}"]={{"k":[8]}}\n' for i in range(12)) +
@@ -218,6 +228,10 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('const-root-read-only-mapper',
+  'const rows := [{"v":3}]; for(row : rows) { f := x => row.v + x; '
+  'print([1].map(f).stringify()); break }\nprint(rows.stringify())\n',
+  0, '[4]\n[{"v":3}]\n', ''),
  ('empty map never enters a duplicate capture declaration',
   'v:=7; f:=x=>{v:=8; return v}; print([].map(f).stringify())\n', 0, '[]\n', ''),
  ('an object-valued slot remains live through identity',

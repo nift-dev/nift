@@ -1,7 +1,6 @@
 #pragma once
 // Expression compilation for the Runtime 2.0 compiler (CP11), and the per-unit compiler state it shares with
 // statement compilation (compiler.cpp). Internal to the compiler.
-//
 // CP12 (D-018): one compiled representation per function and one meaning for every expression wherever it appears:
 // legacy's canonical (textual) semantics. Legacy runs loop bodies and the functions called from them on a second
 // (prepared) evaluator; where a construct in such code could behave differently there, the unit is refused before
@@ -149,7 +148,8 @@ private:
     bool indexed_aggregate_path(const Node& path) const;
     bool stable_indexed_root(NodeId binding, const Node& path, bool stable_members = false,
                              bool direct = false) const;
-    bool observed_array_alias(NodeId binding, bool rebind, bool forward = false, bool members = false) const;
+    bool observed_array_alias(NodeId binding, bool rebind, bool forward = false,
+                              bool members = false, bool indexed_writes = false) const;
     const Node* indexed_return(std::uint16_t function) const;
     bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result, std::uint32_t offset);
     bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);
