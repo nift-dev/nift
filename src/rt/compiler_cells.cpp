@@ -118,7 +118,8 @@ bool UnitCompiler::indexed_aggregate_path(const Node& path) const {
     if (ast_.at(path.a).kind != NodeKind::Ident ||
         (element != kKindArray && element != kKindObject)) return false;
     if (kinds(path.a) == kKindObject)
-        return key.kind == NodeKind::String && key.count == 0 && key.a == kNoNode;
+        return kinds(path.b) == kKindString &&
+               (key.kind != NodeKind::String || (key.count == 0 && key.a == kNoNode));
     return kinds(path.a) == kKindArray &&
            (key.kind == NodeKind::Ident || key.kind == NodeKind::Number) &&
            kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber);
@@ -203,10 +204,17 @@ bool UnitCompiler::emit_indexed_identity(const Node& call_node, const Node& path
         fb_->mark_indexed_capture_call(fb_->note_index(at));
         fb_->release_to(scratch);
     }
-    // Legacy reports a missing key in a named-call argument one character before the
-    // argument start. Subsequent checked reads use the alias's own position.
-    const bool named_keyed_argument = function && kinds(path.a) == kKindObject;
-    if (!emit_indexed_location(path, *root, result, site(path) - named_keyed_argument)) return false;
+    auto offset = site(path);
+    if (function && kinds(path.a) == kKindObject) {
+        // Legacy locates named-call arguments from the untrimmed initializer
+        // start but measures them in the trimmed initializer.
+        const auto source_text = ast_.source();
+        auto start = site(call_node);
+        while (start && (source_text[start - 1] == ' ' || source_text[start - 1] == '\t')) --start;
+        const bool initializer = start >= 2 && source_text.substr(start - 2, 2) == ":=";
+        offset -= initializer ? site(call_node) - start : 1;
+    }
+    if (!emit_indexed_location(path, *root, result, offset)) return false;
     fb_->set_offset(site(call_node));
     if (function) {
         fb_->emit(OpCode::Call, result, function, 1);

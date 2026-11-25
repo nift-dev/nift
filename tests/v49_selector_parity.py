@@ -138,6 +138,16 @@ keyed_location_cases = [
   0, '{"k":[9]}\n', ''),
  ('rebind-object', keyed_prefix + 'a={"target":{"k":[8]}}; print(b.stringify())\n',
   0, '{"k":[8]}\n', ''),
+ ('computed-key-retained', 'a := {"target":[1],"other":[2]}\nfn(id(x)) { return x }\n'
+  'key := "target"; b := id(a[key]); key = "other"; a["target"]=[9]; print(b.stringify())\n',
+  0, '[9]\n', ''),
+ ('computed-key-effects-in-order', 'a := {"target":[1]}\nfn(id(x)) { return x }\n'
+  'fn(left()){ print("left"); return "tar" }\nfn(right()){ print("right"); return "get" }\n'
+  'b := id(a[left()+right()]); a["target"]=[9]; print(b.stringify())\n',
+  0, 'left\nright\n[9]\n', ''),
+ ('computed-missing-key-after-effect', 'a := {"target":[1]}\nfn(id(x)) { return x }\n'
+  'fn(pick()){ print("pick"); return "absent" }\nb:=id(a[pick()]); print(b.stringify())\n',
+  1, 'pick\n', "error: <root>/p.f:4:7: JSON object has no key 'absent'\n"),
  ('project-keyed-child', keyed_prefix +
   'child:=b["k"]\n' +
   ''.join(f'a["other{i}"]={{"k":[8]}}\n' for i in range(12)) +
@@ -287,8 +297,22 @@ with tempfile.TemporaryDirectory() as directory:
  if (refusal.returncode != 1 or refusal.stdout or '(alias-argument)' not in refusal.stderr or
      'the program was not executed' not in refusal.stderr):
   raise SystemExit(f'FAIL replaceable keyed projection must refuse before execution: {refusal}')
+ # A computed key cannot rebind the receiver before checked location creation.
+ path.write_text('a := {"x":[1],"y":[2]}\nfn(id(x)) { return x }\n'
+                 'f := () => { a = {"x":[9],"z":[8]}; print("key"); return "z" }\n'
+                 'b := id(a[f()]); print(b.stringify())\n', encoding='utf-8')
+ legacy = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                         env=dict(os.environ, NIFT_VM='0'))
+ expected = (1, 'key\n', "error: <ORACLE_ROOT>/p.f:4:8: JSON object has no key 'z'\n")
+ if (legacy.returncode, legacy.stdout, normalize_fixture_paths(legacy.stderr, aliases)) != expected:
+  raise SystemExit(f'FAIL historical receiver selection before evaluating key: {legacy}')
+ refusal = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+ if (refusal.returncode != 1 or refusal.stdout or '(path-in-call-argument)' not in refusal.stderr or
+     'the program was not executed' not in refusal.stderr):
+  raise SystemExit(f'FAIL receiver-changing computed key must refuse before execution: {refusal}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
-       'object cases, and 5 refusal controls')
+       'object cases, and 6 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

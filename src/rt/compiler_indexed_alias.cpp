@@ -1,11 +1,14 @@
 #include "rt/compiler_indexed_alias.h"
 
+#include <optional>
+
 // rt-lint: cold-file compile-time proof of indexed alias roots and uses
 namespace nift::rt::detail {
 
 bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool stable_members, bool direct) const {
     const bool keyed = kinds(path.a) == kKindObject;
     if (keyed && direct) return false;
+    const bool computed = keyed && ast_.at(path.b).kind != NodeKind::String;
     // Raw spelling is sufficient only for ordinary quoted keys without
     // escapes. All other writes must obey the selected member's type proof.
     const auto plain_key = [&](const Node& key) {
@@ -55,8 +58,16 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
         while (ast_.at(receiver).kind == NodeKind::Member) receiver = ast_.at(receiver).a;
         if (ast_.at(receiver).kind == NodeKind::Ident) keyed_reads.insert(receiver);
     }
-    struct Visit { NodeId id, parent, outer, consumer; };
-    std::vector<Visit> pending{{root_, kNoNode, kNoNode, kNoNode}};
+    struct Visit { NodeId id, parent, outer, consumer, callable; };
+    std::vector<Visit> pending{{root_, kNoNode, kNoNode, kNoNode, kNoNode}};
+    // A key call may have effects, but cannot reach a root confined to
+    // the current callable. Legacy validates against the pre-key receiver.
+    std::optional<NodeId> root_callable;
+    const auto same_callable = [&](NodeId callable) {
+        if (!computed) return true;
+        if (!root_callable) root_callable = callable;
+        return *root_callable == callable;
+    };
     bool declared = false;
     while (!pending.empty()) {
         const auto item = pending.back();
@@ -66,12 +77,13 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
         if (n.kind == NodeKind::Command || n.kind == NodeKind::Opaque || n.kind == NodeKind::TemplateStmt)
             return false;
         if (n.kind == NodeKind::Declare && n.a == binding) {
-            if (!aggregate_of_literals(n.b)) return false;
+            if (!same_callable(item.callable) || !aggregate_of_literals(n.b)) return false;
             declared = true;
         }
         const auto resolved = kinds_.bindings.find(item.id);
         if (item.id != binding && n.kind == NodeKind::Ident &&
             resolved != kinds_.bindings.end() && resolved->second == binding) {
+            if (!same_callable(item.callable)) return false;
             if (keyed_reads.count(item.id)) continue;
             if (item.parent == kNoNode) return false;
             const Node& parent = ast_.at(item.parent);
@@ -106,9 +118,10 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
                 return false;
             }
         }
-        for (NodeId child : {n.a, n.b, n.c}) pending.push_back({child, item.id, item.parent, item.outer});
+        const auto callable = n.kind == NodeKind::FnDecl || n.kind == NodeKind::Lambda ? item.id : item.callable;
+        for (NodeId child : {n.a, n.b, n.c}) pending.push_back({child, item.id, item.parent, item.outer, callable});
         for (std::uint32_t k = 0; k < n.count; ++k)
-            pending.push_back({ast_.list(n)[k], item.id, item.parent, item.outer});
+            pending.push_back({ast_.list(n)[k], item.id, item.parent, item.outer, callable});
     }
     return declared;
 }
