@@ -146,12 +146,12 @@ private:
     bool loop_jump(const Node& node);
     bool expression_statement(const Node& node);
     const Node* indexed_identity_argument(const Node& call, std::uint16_t& function, bool forward = false) const;
-    bool indexed_array_path(const Node& path) const;
-    bool stable_indexed_root(NodeId binding, KindSet element, bool stable_members = false,
+    bool indexed_aggregate_path(const Node& path) const;
+    bool stable_indexed_root(NodeId binding, const Node& path, bool stable_members = false,
                              bool direct = false) const;
     bool observed_array_alias(NodeId binding, bool rebind, bool forward = false, bool members = false) const;
     const Node* indexed_return(std::uint16_t function) const;
-    bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result);
+    bool emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result, std::uint32_t offset);
     bool emit_indexed_identity(const Node& call, const Node& path, std::uint16_t function, std::uint16_t result);
     bool indexed_call_value(const Node& node, std::uint16_t function, std::uint16_t dst);
     void prepare_indexed_roots();

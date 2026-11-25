@@ -1,6 +1,8 @@
 #include "rt/vm_closure.h"
 
+#include "rt/atom.h"
 #include "rt/cell.h"
+#include "rt/string.h"
 #include "rt/heap_account.h"
 #include "rt/number.h"
 
@@ -58,16 +60,21 @@ bool Vm::op_new_cell(const Instr& in, Value* R, Fault& fault, const Proto* proto
             return internal(fault, "indexed cell operands");
         const Value root = R[in.b];
         const Value key = R[in.c];
-        if (!is_cell(root) || has_indexed_location(root) || !key.is_number())
+        if (!is_cell(root) || has_indexed_location(root))
             return internal(fault, "indexed cell receiver or index");
         std::int64_t index = 0;
-        if (number_to_i64(key, index) && index >= 0 &&
-            static_cast<std::uint64_t>(index) <= std::numeric_limits<std::size_t>::max()) {
-            Value location = make_indexed_cell(root, static_cast<std::size_t>(index));
-            if (is_indexed_cell(location)) {
-                R[in.a] = std::move(location);
-                return memory_ok(fault);
-            }
+        Value location;
+        if (key.is(Kind::String)) {
+            Atom atom;
+            if (AtomTable::current().find(string_view_of(key), atom))
+                location = make_keyed_cell(root, atom);
+        } else if (number_to_i64(key, index) && index >= 0 &&
+                   static_cast<std::uint64_t>(index) <= std::numeric_limits<std::size_t>::max()) {
+            location = make_indexed_cell(root, static_cast<std::size_t>(index));
+        }
+        if (is_indexed_cell(location)) {
+            R[in.a] = std::move(location);
+            return memory_ok(fault);
         }
         Value unused;
         if (!get_index(note_at(proto, &in), cell_load(root), key, unused, fault)) return false;

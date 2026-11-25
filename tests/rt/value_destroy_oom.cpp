@@ -440,6 +440,55 @@ void indexed_cell_lifetime() {
     release_failing(location, base, 0, "indexed-cell");
 }
 
+void keyed_cell_lifetime() {
+    const Atom key = atom("a");
+    const Atom other = atom("b");
+    const Baseline base;
+    Value object = make_object();
+    object_set(object, key, Value::integer(1));
+    Value root = make_cell(make_cell(object, -1), kSourceSlot);
+    CHECK(make_keyed_cell(root, other).is_null());
+
+    const Baseline before_failure;
+    g_allow = 0;
+    g_fail = true;
+    bool allocation_failed = false;
+    try {
+        static_cast<void>(make_keyed_cell(root, key));
+    } catch (const std::bad_alloc&) {
+        allocation_failed = true;
+    }
+    g_fail = false;
+    CHECK(allocation_failed);
+    CHECK(g_live.load() == before_failure.allocs);
+    CHECK(live_heap_bytes() == before_failure.bytes);
+
+    Value location = make_keyed_cell(root, key);
+    CHECK(is_indexed_cell(location));
+    CHECK(make_keyed_cell(location, key).is_null());
+    object_put(object, key, Value::integer(9));
+    CHECK(cell_load(location).as_int() == 9);
+    CHECK(object_remove(object, key));
+    Value result;
+    std::string missing;
+    CHECK(!cell_read(location, result, missing));
+    CHECK(missing == "object member");
+    object_put(object, key, Value::integer(3));
+    CHECK(cell_load(location).as_int() == 3);
+
+    Value replacement = make_object();
+    object_set(replacement, key, Value::integer(8));
+    cell_rebind(root, std::move(replacement));
+    Value alias = copy_cell_location(location);
+    cell_rebind(alias, Value::integer(6));
+    CHECK(cell_load(alias).as_int() == 6);
+    alias = Value();
+    object = Value();
+    root = Value();
+    CHECK(cell_load(location).as_int() == 8);
+    release_failing(location, base, 0, "keyed-cell");
+}
+
 bool want(const char* only, const char* name) { return !only || std::strcmp(only, name) == 0; }
 
 } // namespace
@@ -452,6 +501,7 @@ int main(int argc, char** argv) {
         (void)atom("Node");
 
     if (want(only, "indexed-cell")) indexed_cell_lifetime();
+    if (want(only, "keyed-cell")) keyed_cell_lifetime();
     if (want(only, "function-owner")) {
         // Releasing a session Function can release its last Program owner
         // while the Value graph worklist is already draining captured cells.

@@ -11,9 +11,10 @@
 namespace nift::rt {
 
 Value make_cell(Value value, std::int64_t binding_type);
-// Retain a lexical root binding and an evaluated array index. Returns null
-// for an invalid root/index. Allocation failure propagates normally.
+// Retain a lexical root binding and an evaluated index or interned key.
+// Return null if the target does not exist. Allocation failure propagates.
 Value make_indexed_cell(Value root, std::size_t index);
+Value make_keyed_cell(Value root, Atom key);
 bool is_indexed_cell(const Value& cell) noexcept;
 bool has_indexed_location(const Value& cell);
 Value indexed_alias_payload(const Value& cell, Value selected);

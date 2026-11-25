@@ -12,6 +12,15 @@ namespace nift::rt {
 
 namespace {
 constexpr std::int64_t kFirstIndexedCell = -4;
+// Keep the full Atom id range disjoint from array index encodings.
+constexpr auto kFirstKeyedCell = std::numeric_limits<std::int64_t>::min();
+constexpr auto kLastKeyedCell = kFirstKeyedCell + std::numeric_limits<std::uint32_t>::max();
+
+bool keyed_cell(const CellObject& cell) { return cell.binding_type <= kLastKeyedCell; }
+
+const Value* keyed_member(const CellObject& root, Atom key) {
+    return root.value.is(Kind::Object) ? object_find(root.value, key) : nullptr;
+}
 
 bool indexed_cell(const CellObject* cell) {
     return cell && cell->binding_type <= kFirstIndexedCell;
@@ -39,9 +48,15 @@ CellObject* cell_of(const Value& cell) { return cell.is(Kind::Cell) ? cell.heap_
 Value make_indexed_cell(Value root, std::size_t index) {
     const CellObject* owner = cell_of(cell_anchor(root));
     if (!owner || indexed_cell(owner) ||
-        index > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max() + kFirstIndexedCell + 1) ||
+        index > static_cast<std::uint64_t>(kFirstIndexedCell - (kLastKeyedCell + 1)) ||
         !indexed_element(*owner, index)) return {};
     return make_cell(std::move(root), kFirstIndexedCell - static_cast<std::int64_t>(index));
+}
+
+Value make_keyed_cell(Value root, Atom key) {
+    const CellObject* owner = cell_of(cell_anchor(root));
+    if (!owner || indexed_cell(owner) || !keyed_member(*owner, key)) return {};
+    return make_cell(std::move(root), kFirstKeyedCell + key.id);
 }
 
 bool is_indexed_cell(const Value& cell) noexcept { return indexed_cell(cell_of(cell)); }
@@ -102,10 +117,17 @@ bool cell_read(const Value& cell, Value& value, std::string& missing) {
     if (!indexed_cell(current) && is_indexed_cell(current->value)) current = cell_of(current->value);
     if (indexed_cell(current)) {
         const CellObject* root = cell_of(cell_anchor(current->value));
-        const auto index = static_cast<std::uint64_t>(kFirstIndexedCell - current->binding_type);
-        const Value* item = root && !indexed_cell(root) ? indexed_element(*root, index) : nullptr;
+        const bool keyed = keyed_cell(*current);
+        const Value* item = nullptr;
+        if (root && !indexed_cell(root)) {
+            if (keyed) {
+                item = keyed_member(*root, Atom{static_cast<std::uint32_t>(current->binding_type - kFirstKeyedCell)});
+            } else {
+                item = indexed_element(*root, static_cast<std::uint64_t>(kFirstIndexedCell - current->binding_type));
+            }
+        }
         if (!item) {
-            missing = "array element";
+            missing = keyed ? "object member" : "array element";
             return false;
         }
         value = *item;

@@ -103,7 +103,7 @@ namespace nift::rt {
     X(CellLoadCached) /* indexed selector targets use the descriptor cache */                          \
     X(CellStoreCached) /* commit an indexed selector write without detaching */                        \
     X(NewSourceSlot) /* boxed slot owning a replaceable value cell */                                  \
-    X(NewIndexedCell) /* R[a] = checked location (root cell R[b], array index R[c]) */                \
+    X(NewIndexedCell) /* R[a] = checked location (root cell R[b], index or key R[c]) */                \
     X(CellAnchor) /* R[a] = the current value owner of slot R[b] */                                     \
     X(CellSlot) /* R[a] = the descriptor's own lexical slot */                                        \
     X(TryBegin)  /* push handler: a=catch reg, b=protected reg top, c=catch offset            */         \

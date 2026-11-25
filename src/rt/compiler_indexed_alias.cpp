@@ -3,14 +3,19 @@
 // rt-lint: cold-file compile-time proof of indexed alias roots and uses
 namespace nift::rt::detail {
 
-bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool stable_members, bool direct) const {
-    const NodeKind literal_kind = element == kKindObject ? NodeKind::Object : NodeKind::Array;
-    const auto array_of_literals = [&](NodeId id) {
+bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool stable_members, bool direct) const {
+    const bool keyed = kinds(path.a) == kKindObject;
+    if (keyed && (stable_members || direct)) return false;
+    const NodeKind literal_kind = kinds(node_id(path)) == kKindObject ? NodeKind::Object : NodeKind::Array;
+    const auto aggregate_of_literals = [&](NodeId id) {
         const Node& literal = ast_.at(id);
-        if (literal.kind != NodeKind::Array) return false;
+        if (literal.kind != (keyed ? NodeKind::Object : NodeKind::Array)) return false;
         const NodeId* items = ast_.list(literal);
-        for (std::uint32_t k = 0; k < literal.count; ++k)
-            if (ast_.at(items[k]).kind != literal_kind) return false;
+        for (std::uint32_t k = 0; k < literal.count; ++k) {
+            const Node& item = ast_.at(items[k]);
+            if (keyed && item.kind != NodeKind::Property) return false;
+            if ((keyed ? ast_.at(item.b) : item).kind != literal_kind) return false;
+        }
         return true;
     };
     const auto is_identity_path = [&](const Node* outer, const Node& path) {
@@ -34,7 +39,7 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool sta
         if (n.kind == NodeKind::Command || n.kind == NodeKind::Opaque || n.kind == NodeKind::TemplateStmt)
             return false;
         if (n.kind == NodeKind::Declare && n.a == binding) {
-            if (!array_of_literals(n.b)) return false;
+            if (!aggregate_of_literals(n.b)) return false;
             declared = true;
         }
         const auto resolved = kinds_.bindings.find(item.id);
@@ -44,23 +49,25 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, KindSet element, bool sta
             const Node& parent = ast_.at(item.parent);
             const Node* outer = item.outer == kNoNode ? nullptr : &ast_.at(item.outer);
             if (parent.kind == NodeKind::Assign && parent.a == item.id && !stable_members && !direct &&
-                array_of_literals(parent.b)) {
+                aggregate_of_literals(parent.b)) {
             } else if (parent.kind == NodeKind::Index && parent.a == item.id &&
                        (is_identity_path(outer, parent) ||
                         (outer && outer->kind == NodeKind::Declare && !outer->flags &&
-                         outer->b == item.parent && indexed_array_path(parent) &&
+                         outer->b == item.parent && indexed_aggregate_path(parent) &&
                          observed_array_alias(outer->a, true, true, stable_members)) ||
                         (outer && outer->kind == NodeKind::Lambda && !outer->count &&
                          outer->b == item.parent && ast_.at(parent.b).kind == NodeKind::Number) ||
                         (outer && outer->kind == NodeKind::Index && outer->a == item.parent &&
                          item.consumer != kNoNode && is_print_read(&ast_.at(item.consumer), item.outer)) ||
                         (outer && outer->kind == NodeKind::Assign && outer->a == item.parent &&
-                         !stable_members && ast_.at(outer->b).kind == literal_kind))) {
+                         !stable_members && ast_.at(outer->b).kind == literal_kind &&
+                         (!keyed || ast_.at(parent.b).kind == NodeKind::String)))) {
             } else if (parent.kind == NodeKind::Declare && parent.b == item.id &&
                        observed_array_alias(parent.a, false)) {
             } else if (parent.kind == NodeKind::Member && parent.a == item.id && outer &&
                        outer->kind == NodeKind::Call && outer->a == item.parent) {
                 const auto method = text(ast_.at(parent.b));
+                if (keyed && method != "stringify") return false;
                 if (stable_members && (method == "clear" || method == "remove")) return false;
                 if (method != "clear" && method != "remove" && method != "stringify" &&
                     !(method == "push" && outer->count == 1 &&

@@ -132,6 +132,27 @@ location_cases = [
  ('evaluate-index-once', 'i:=1; c:=id(a[i]); i=0; print(c.stringify())\n',
   0, '[2]\n', ''),
 ]
+keyed_prefix = 'a := {"target":{"k":[1]}}\nfn(id(x)) { return x }\nb := id(a["target"])\n'
+keyed_location_cases = [
+ ('replace-key', keyed_prefix + 'a["target"]={"k":[9]}; print(b.stringify())\n',
+  0, '{"k":[9]}\n', ''),
+ ('rebind-object', keyed_prefix + 'a={"target":{"k":[8]}}; print(b.stringify())\n',
+  0, '{"k":[8]}\n', ''),
+ ('missing-key-after-rebind', keyed_prefix + 'a={}; print(b.stringify())\n',
+  1, '', 'error: <root>/p.f:4:13: reference target no longer exists: b\n'),
+ ('missing-key-at-call', 'a := {"target":{"k":[1]}}\nfn(id(x)) { return x }\na={}\n'
+  'b := id(   a["target"])\nprint(b.stringify())\n',
+  1, '', "error: <root>/p.f:4:11: JSON object has no key 'target'\n"),
+ ('missing-key-at-lambda-call', 'a := {"target":{"k":[1]}}\nf := x => x\na={}\n'
+  'b := f(a["target"])\nprint(b.stringify())\n',
+  1, '', "error: <root>/p.f:4:8: JSON object has no key 'target'\n"),
+ ('detach-keyed-alias', keyed_prefix +
+  'b={"k":[7]}; a["target"]={"k":[9]}; print(b.stringify()); print(a.stringify())\n',
+  0, '{"k":[7]}\n{"target":{"k":[9]}}\n', ''),
+ ('object-root-survives-frame', 'fn(id(x)) { return x }\n'
+  'fn(outer()){ a:={"target":{"k":[4]}}; return id(a["target"]) }; c:=outer();print(c.stringify())\n',
+  0, '{"k":[4]}\n', ''),
+]
 lambda_location_cases = [
  ('identity lambda sees the replacement',
   'a := [[1]]\nf := x => x\nb := f(a[0])\na[0] = [9]\nprint(b.stringify())\n', 0, '[9]\n', ''),
@@ -221,7 +242,9 @@ with tempfile.TemporaryDirectory() as directory:
  aliases = fixture_root_aliases(path.parent)
  witnesses = [(name, location_prefix + tail, code, output, error)
               for name, tail, code, output, error in location_cases]
- for name, source, code, output, error in witnesses + lambda_location_cases + forward_location_cases + call_forward_location_cases + entry_and_object_cases:
+ for name, source, code, output, error in (
+     witnesses + keyed_location_cases + lambda_location_cases + forward_location_cases +
+     call_forward_location_cases + entry_and_object_cases):
   path.write_text(source, encoding='utf-8')
   for mode in ('0', 'require'):
    result = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
@@ -252,7 +275,7 @@ with tempfile.TemporaryDirectory() as directory:
       'the program was not executed' not in result.stderr):
    raise SystemExit(f'FAIL bounded callback or object-location admission: {result}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
-       f'{len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
+       f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
        'object cases, and 4 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

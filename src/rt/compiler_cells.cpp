@@ -106,19 +106,22 @@ const Node* UnitCompiler::indexed_identity_argument(const Node& call, std::uint1
     }
     const Node& path = ast_.at(path_id);
     const bool eligible = forward ? path.kind == NodeKind::Ident && bare_argument(call, 0)
-                                  : indexed_array_path(path);
+                                  : indexed_aggregate_path(path);
     return eligible ? &path : nullptr;
 }
 
-bool UnitCompiler::indexed_array_path(const Node& path) const {
+bool UnitCompiler::indexed_aggregate_path(const Node& path) const {
     if (session_ || plan_.coroutines || (module_names_ && !module_names_->empty()) ||
         path.kind != NodeKind::Index) return false;
-    const auto key = ast_.at(path.b).kind;
+    const Node& key = ast_.at(path.b);
     const auto element = kinds(node_id(path));
-    return (key == NodeKind::Ident || key == NodeKind::Number) &&
-           ast_.at(path.a).kind == NodeKind::Ident && kinds(path.a) == kKindArray &&
-           kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber) &&
-           (element == kKindArray || element == kKindObject);
+    if (ast_.at(path.a).kind != NodeKind::Ident ||
+        (element != kKindArray && element != kKindObject)) return false;
+    if (kinds(path.a) == kKindObject)
+        return key.kind == NodeKind::String && key.count == 0 && key.a == kNoNode;
+    return kinds(path.a) == kKindArray &&
+           (key.kind == NodeKind::Ident || key.kind == NodeKind::Number) &&
+           kinds(path.b) != 0 && !(kinds(path.b) & ~kKindNumber);
 }
 
 const Node* UnitCompiler::indexed_return(std::uint16_t function) const {
@@ -135,7 +138,7 @@ const Node* UnitCompiler::indexed_return(std::uint16_t function) const {
     if (!path) return nullptr;
     const auto root = kinds_.bindings.find(path->a);
     return root != kinds_.bindings.end() && root->second == decl.a &&
-           stable_indexed_root(decl.a, kinds(node_id(*path))) ? &ret : nullptr;
+           stable_indexed_root(decl.a, *path) ? &ret : nullptr;
 }
 
 void UnitCompiler::prepare_indexed_roots() {
@@ -158,20 +161,21 @@ void UnitCompiler::prepare_indexed_roots() {
         if (value == kNoNode) continue;
         std::uint16_t function = 0;
         const Node& init = ast_.at(value);
-        const bool direct = decl.kind == NodeKind::Declare && indexed_array_path(init) &&
+        const bool direct = decl.kind == NodeKind::Declare && indexed_aggregate_path(init) &&
                             observed_array_alias(decl.a, true, true);
         const auto* path = direct ? &init : indexed_identity_argument(init, function);
         if (!path) continue;
         const auto root = kinds_.bindings.find(path->a);
-        if (root != kinds_.bindings.end() && stable_indexed_root(root->second, kinds(node_id(*path)), false, direct))
+        if (root != kinds_.bindings.end() && stable_indexed_root(root->second, *path, false, direct))
             selector_roots_.insert(root->second);
     }
 }
 
-bool UnitCompiler::emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result) {
+bool UnitCompiler::emit_indexed_location(const Node& path, const Binding& root, std::uint16_t result,
+                                         std::uint32_t offset) {
     std::uint16_t owner = 0, key = 0;
     if (!binding_cell(root, owner) || !temp(key) || !expr_to(path.b, key)) return false;
-    fb_->set_offset(site(path));
+    fb_->set_offset(offset);
     fb_->note(fb_->emit(OpCode::NewIndexedCell, result, owner, key), std::string(text(path)));
     return builder_ok();
 }
@@ -199,7 +203,10 @@ bool UnitCompiler::emit_indexed_identity(const Node& call_node, const Node& path
         fb_->mark_indexed_capture_call(fb_->note_index(at));
         fb_->release_to(scratch);
     }
-    if (!emit_indexed_location(path, *root, result)) return false;
+    // Legacy reports a missing key in a named-call argument one character before the
+    // argument start. Subsequent checked reads use the alias's own position.
+    const bool named_keyed_argument = function && kinds(path.a) == kKindObject;
+    if (!emit_indexed_location(path, *root, result, site(path) - named_keyed_argument)) return false;
     fb_->set_offset(site(call_node));
     if (function) {
         fb_->emit(OpCode::Call, result, function, 1);
@@ -230,7 +237,7 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     if (in_function_ || in_lambda_ || loop_reachable() || captured_binding(node.a)) return 0;
     std::uint16_t function = 0;
     const Node& call_node = ast_.at(node.b);
-    const bool direct = indexed_array_path(call_node);
+    const bool direct = indexed_aggregate_path(call_node);
     std::uint16_t forward_function = 0;
     const Node* copy = call_node.kind == NodeKind::Ident ? &call_node
                                                         : indexed_identity_argument(call_node, forward_function, true);
@@ -249,10 +256,10 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         const KindSet element = kinds(node_id(*path));
         stable_members = element == kKindObject && !direct &&
                          !observed_array_alias(node.a, true) &&
-                         stable_indexed_root(root->decl_node, element, true);
+                         stable_indexed_root(root->decl_node, *path, true);
         // B5 Q3 direct extraction retains the value when the source binding
         // is reassigned. The location-return proof has a different contract.
-        if (!stable_members && !stable_indexed_root(root->decl_node, element, false, direct)) return 0;
+        if (!stable_members && !stable_indexed_root(root->decl_node, *path, false, direct)) return 0;
     } else if (!forward) {
         if (call_node.kind != NodeKind::Call || call_node.count ||
             ast_.at(call_node.a).kind != NodeKind::Ident) return 0;
@@ -296,7 +303,7 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         fb_->emit(OpCode::Move, binding.type_reg, previous->type_reg);
         fb_->release_to(static_cast<std::uint16_t>(result + 1));
     } else if (direct) {
-        if (!emit_indexed_location(*path, *root, result)) return -1;
+        if (!emit_indexed_location(*path, *root, result, site(*path))) return -1;
         fb_->release_to(static_cast<std::uint16_t>(result + 1));
     } else if (path) {
         if (!emit_indexed_identity(call_node, *path, function, result)) return -1;
