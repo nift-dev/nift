@@ -228,6 +228,13 @@ call_forward_location_cases = [
   'error: <root>/p.f:1:54: reference target no longer exists: b\n'),
 ]
 entry_and_object_cases = [
+ ('scalar-live-location-after-shift-and-insert',
+  'a := [{"k":1},{"k":2}]\nfn(id(x)) { return x }\n'
+  'o := id(a[0]); a.remove(0); print(o.k); a.insert(0,{"k":9}); print(o.k)\n',
+  0, '2\n9\n', ''),
+ ('scalar-live-location-after-delete',
+  'a := [{"k":1}]\nfn(id(x)) { return x }\no := id(a[0]); a.clear(); print(o.k)\n',
+  1, '', 'error: <root>/p.f:3:33: reference target no longer exists: o.k\n'),
  ('sole-local-declaration-mapper',
   'f := x => { q := 7 }\nprint(f(1))\nprint([1,2].map(f).stringify())\n',
   0, 'null\n[7,7]\n', ''),
@@ -340,8 +347,17 @@ with tempfile.TemporaryDirectory() as directory:
  if (refusal.returncode != 1 or refusal.stdout or '(path-in-call-argument)' not in refusal.stderr or
      'the program was not executed' not in refusal.stderr):
   raise SystemExit(f'FAIL receiver-changing computed key must refuse before execution: {refusal}')
+ # Insertion can move the parent slot, so a retained child is still refused.
+ path.write_text('a := [{"k":[1]}]\nfn(id(x)) { return x }\n'
+                 'print("marker"); o := id(a[0]); v := o["k"]; '
+                 'a.insert(0,{"k":[9]}); print(v.stringify())\n', encoding='utf-8')
+ refusal = subprocess.run([binary, str(path)], capture_output=True, text=True, encoding='utf-8',
+                          env=dict(os.environ, NIFT_VM='require'))
+ if (refusal.returncode != 1 or refusal.stdout or '(alias-argument)' not in refusal.stderr or
+     'the program was not executed' not in refusal.stderr):
+  raise SystemExit(f'FAIL insertion with a retained child must refuse before execution: {refusal}')
  print(f'PASS {len(location_cases)} exact indexed location witnesses, '
        f'{len(keyed_location_cases)} keyed witnesses, {len(lambda_location_cases)} lambda witnesses, {len(forward_location_cases)} forwarding witnesses, '
        f'{len(call_forward_location_cases)} call forwarding witnesses, {len(entry_and_object_cases)} callback and '
-       'object cases, and 6 refusal controls')
+       'object cases, and 7 refusal controls')
  print(f'PASS {len(cases) + len(lexical_cases)} selector/capture/location/error contracts'+(' with exact A/B diagnostics' if baseline else ''))

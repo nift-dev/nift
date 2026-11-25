@@ -111,9 +111,13 @@ bool UnitCompiler::stable_indexed_root(NodeId binding, const Node& path, bool st
                 const auto method = text(ast_.at(parent.b));
                 if (keyed && method != "stringify") return false;
                 if (stable_members && (method == "clear" || method == "remove")) return false;
-                if (method != "clear" && method != "remove" && method != "stringify" &&
-                    !(method == "push" && outer->count == 1 &&
-                      ast_.at(ast_.list(*outer)[0]).kind == literal_kind)) return false;
+                const NodeId* args = ast_.list(*outer);
+                // An inserted literal preserves the selected value's kind.
+                // Projected children still require a stable parent slot.
+                const bool insert = !stable_members && !direct && method == "insert" && outer->count == 2 &&
+                                    ast_.at(args[1]).kind == literal_kind;
+                if (method != "clear" && method != "remove" && method != "stringify" && !insert &&
+                    !(method == "push" && outer->count == 1 && ast_.at(args[0]).kind == literal_kind)) return false;
             } else {
                 return false;
             }
@@ -170,6 +174,18 @@ bool UnitCompiler::observed_array_alias(NodeId binding, bool rebind, bool forwar
         }
         if (call.kind != NodeKind::Call) continue;
         const Node& member = ast_.at(call.a);
+        // Immediate scalar member use reloads the live slot on every read.
+        // Only the actual print builtin consumes it here.
+        if (rebind && !forward && !members && !indexed_writes &&
+            member.kind == NodeKind::Ident && text(member) == "print" && call.count == 1 &&
+            !kinds_.bindings.count(call.a) && !plan_.index.count(text(member))) {
+            const NodeId value = ast_.list(call)[0];
+            const Node& projection = ast_.at(value);
+            const KindSet kind = kinds(value);
+            if (projection.kind == NodeKind::Member && kinds(projection.a) == kKindObject &&
+                kind && !(kind & ~kKindScalar))
+                reads.insert(projection.a);
+        }
         if (member.kind != NodeKind::Member) continue;
         const auto method = text(ast_.at(member.b));
         if (members && !call.count && method == "stringify") {

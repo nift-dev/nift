@@ -149,7 +149,10 @@ bool UnitCompiler::local_register(const Node& node, std::uint16_t& reg) {
     if (!binding->indexed_alias) return read_binding(*binding, reg);
     const auto saved_note = global_note_;
     const auto saved_offset = fb_->offset();
-    global_note_ = text(node);
+    const bool immediate_member = !binding->forward_indexed_alias && print_arg_ &&
+        print_arg_->kind == NodeKind::Member && print_arg_->a == node_id(node) && !saved_note.empty();
+    // A direct member read reports the full missing location.
+    global_note_ = immediate_member ? saved_note : text(node);
     fb_->set_offset(node.begin);
     const bool loaded = read_binding(*binding, reg);
     fb_->set_offset(saved_offset);

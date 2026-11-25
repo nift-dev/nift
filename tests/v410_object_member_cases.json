@@ -45,6 +45,7 @@
       "source": "a := [{\"k\":1},{\"k\":2}]\nfn(id(x)) { return x }\no := id(a[0]); a.remove(0); print(o.k); a.insert(0,{\"k\":9}); print(o.k)",
       "exit": 0,
       "stdout": "2\n9\n",
+      "vm_stdout": "2\n9\n",
       "stderr": ""
     },
     {
@@ -52,6 +53,7 @@
       "source": "a := [{\"k\":1}]\nfn(id(x)) { return x }\no := id(a[0]); a.clear(); print(o.k)",
       "exit": 1,
       "stdout": "",
+      "vm_stdout": "",
       "stderr": "error: <ORACLE_ROOT>/location-removed-error.f:3:33: reference target no longer exists: o.k\n"
     },
     {
