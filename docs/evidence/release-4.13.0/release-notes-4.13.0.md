@@ -33,6 +33,12 @@ their historical oracle. In particular, the five documented nested string
 replacement separately before passing it to `replace()`, or use `NIFT_VM=0`
 where legacy conditional argument evaluation is needed.
 
+Across the Checkpoint 10 callback and object-member suites, all 109
+historical witnesses matched in explicit legacy mode. Runtime 2.0 matched
+103 pinned execution results and exercised six approved pre-execution
+refusals. These include the exact nested `cmd` declaration and computed
+object insertion witnesses. Use `NIFT_VM=0` for those historical forms.
+
 Compact grouped string receivers support `split()` and `stringify()`. A
 one-argument `copy(value)` evaluates its operand once in the VM.
 
