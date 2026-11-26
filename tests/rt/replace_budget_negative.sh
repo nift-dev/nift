@@ -64,7 +64,28 @@ fi
 echo "candidate: PASS ($(tail -n 1 "$TMP/candidate.log"))"
 
 mutant_status=0
-"$TMP/mutant" >"$TMP/mutant.log" 2>&1 || mutant_status=$?
+python3 - "$TMP/mutant" >"$TMP/mutant.log" 2>&1 <<'PY' || mutant_status=$?
+import subprocess
+import sys
+
+# This binary deliberately ignores the VM heap budget. Set a separate
+# address-space ceiling where RLIMIT_AS is enforced and a deadline everywhere.
+if sys.platform.startswith(("linux", "freebsd")):
+    import resource
+
+    ceiling = 512 * 1024 * 1024
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    if soft != resource.RLIM_INFINITY:
+        ceiling = min(soft, ceiling)
+    resource.setrlimit(resource.RLIMIT_AS, (ceiling, ceiling))
+
+try:
+    result = subprocess.run(sys.argv[1:], timeout=30)
+except subprocess.TimeoutExpired:
+    print("replace-budget mutant exceeded its 30-second deadline", file=sys.stderr)
+    sys.exit(124)
+sys.exit(result.returncode if result.returncode >= 0 else 128 - result.returncode)
+PY
 if [ "$mutant_status" -eq 0 ]; then
   echo "FAIL: str.replace without its budget check passed the budget tests" >&2
   cat "$TMP/mutant.log" >&2
@@ -75,7 +96,11 @@ if [ "$mutant_status" -ne 1 ]; then
   tail -n 15 "$TMP/mutant.log" >&2
   exit 1
 fi
-grep -q "native_budget.cpp:" "$TMP/mutant.log" ||
-  { echo "FAIL: the mutant failed, but not on a native_budget check (harness error?)" >&2; cat "$TMP/mutant.log" >&2; exit 1; }
+if ! grep -q "native_budget.cpp:" "$TMP/mutant.log" ||
+   ! grep -Eq '^native-budget: [0-9]+ checks, [1-9][0-9]* failures$' "$TMP/mutant.log"; then
+  echo "FAIL: the mutant did not report a completed native_budget assertion failure" >&2
+  cat "$TMP/mutant.log" >&2
+  exit 1
+fi
 echo "mutant: PASS (rejected by correctness checks: $(grep -c 'CHECK failed' "$TMP/mutant.log") failed; $(tail -n 1 "$TMP/mutant.log"))"
 echo "negative-control: PASS"
