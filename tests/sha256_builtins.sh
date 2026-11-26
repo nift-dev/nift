@@ -94,7 +94,7 @@ print(sha256(open_bytes("nul.bin")))
 print(sha256_file("nul.bin"))
 print(sha256("line\r\n") == sha256("line\n"))
 EOF
-lines "$NIFT" nul.f
+NIFT_VM=0 lines "$NIFT" nul.f
 expect "bytes with NULs" "$(printf '\0\0\1\0' | toolsum)" "${got[0]:-}"
 want="$(toolsum nul.bin)"
 expect "string with NULs (open)" "$want" "${got[1]:-}"
@@ -118,7 +118,7 @@ PY
 {
   echo 'for(f : ls("files")) { print(f + " " + sha256_file("files/" + f)) }'
 } > files.f
-"$NIFT" files.f > files.out 2>&1 || bad "hashing files failed: $(head -3 files.out)"
+NIFT_VM=0 "$NIFT" files.f > files.out 2>&1 || bad "hashing files failed: $(head -3 files.out)"
 mismatch=0; count=0
 while read -r name digest; do
   count=$((count+1))
@@ -138,7 +138,8 @@ i := 0
 while(i < 3) { if(h("files/s1.bin") != sha256_file("files/s1.bin")) { ok = false }; i += 1 }
 print(ok)
 EOF
-lines "$NIFT" repeat.f
+# The nested file read uses the historical inline open_bytes form.
+NIFT_VM=0 lines "$NIFT" repeat.f
 expect "repeated hashing is stable" true "${got[0]:-}"
 expect "sha256(open_bytes(p)) == sha256_file(p)" true "${got[1]:-}"
 expect "loops and functions" true "${got[2]:-}"
@@ -179,9 +180,9 @@ expect "null rejected" "sha256: expected a string or bytes value" "$(err_of 'pri
 expect "array rejected" "sha256: expected a string or bytes value" "$(err_of 'print(sha256([1, 2]))')"
 expect "callable rejected" "sha256: expected a string or bytes value" "$(err_of 'f := (x) => x
 print(sha256(f))')"
-expect "arity" "sha256: expected one string or bytes value" "$(err_of 'print(sha256("a", "b"))')"
+expect "arity" "sha256: expected one string or bytes value" "$(NIFT_VM=0 err_of 'print(sha256("a", "b"))')"
 expect "path type" "sha256_file: expected string path" "$(err_of 'print(sha256_file(1))')"
-expect "path arity" "sha256_file: expected one path" "$(err_of 'print(sha256_file())')"
+expect "path arity" "sha256_file: expected one path" "$(NIFT_VM=0 err_of 'print(sha256_file())')"
 
 # Unreadable file: root bypasses permission bits, so as root run the check as
 # an unprivileged user when setpriv is available (otherwise skip, as other
@@ -234,7 +235,8 @@ print(sha256("abc"))
 print(sha256_file("x"))
 for(i : range(1)) { print(sha256("loop")); print(sha256_file("loop")) }
 EOF
-lines "$NIFT" shadow.f
+# Keep the historical user-definition precedence oracle.
+NIFT_VM=0 lines "$NIFT" shadow.f
 expect "user sha256 wins (top level)" "user:abc" "${got[0]:-}"
 expect "user sha256_file wins (top level)" "userfile:x" "${got[1]:-}"
 expect "user sha256 wins (loop)" "user:loop" "${got[2]:-}"

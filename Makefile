@@ -2638,6 +2638,8 @@ $(LAMBDA_CACHE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TES
 test-v48-callback-guard: $(LAMBDA_CACHE_GUARD)
 	NIFT_VM=0 NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" "$(PYTHON)" tests/v48_callback_guard.py
 
+# Historical parser, session, and project smokes pin legacy where their oracle
+# uses legacy-only syntax or behavior. VM/refusal contracts select their own mode.
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp15_cp34_smoke.sh
@@ -2645,46 +2647,46 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_review_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp51_cp70_scripting_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/script_import_syntax.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp71_cp87_native_io_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp78_streams_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp85_repl_multiline_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp88_repl_lifetime_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp90_scripting_wall_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp94_cp97_inspection_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp100_cp103_string_expr_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp105_cp113_filevalue_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp112_filevalue_wall_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_pay_for_use_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_readval_writeval_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp71_cp87_native_io_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp78_streams_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp85_repl_multiline_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp88_repl_lifetime_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp90_scripting_wall_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp94_cp97_inspection_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp100_cp103_string_expr_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp105_cp113_filevalue_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp112_filevalue_wall_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_pay_for_use_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_readval_writeval_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_collection_ops_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_postfix_composition_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_postfix_composition_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_incremental_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_adversarial_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_adversarial_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_pay_for_use_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_mundane_surface_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_mundane_surface_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_frontend_surface_dogfood.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_surface_robustness_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_object_expressions_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_recursion_guard_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp167_dogfood.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp141_cp163_content_model.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp137_cp140_frontmatter.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp131_cp136_project_model.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_surface_robustness_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_object_expressions_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_recursion_guard_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp167_dogfood.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp141_cp163_content_model.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp137_cp140_frontmatter.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp131_cp136_project_model.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp130_eval_parity.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp129_eval_capabilities.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp127_eval_json_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp126_eval_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp124_json_object_wall.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp124_json_object_wall.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp117_object_methods_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_final_language_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/hierarchy_scaling.py
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_final_language_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/hierarchy_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp172_from_entries_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp173_index_by_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp174_pick_omit_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp175_merge_deep_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp176_cp182_collection_algebra_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp183_collection_composition_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp183_collection_composition_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp184_cp186_sort_by_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/typed_content_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" benchmarks/project_dependency_scaling.py
@@ -3754,11 +3756,11 @@ test-v46-time: test-v46-time-cli test-v46-time-embed
 
 test-v46-timer: $(TARGET) $(V46_TIMER_UNIT_TEST) $(V46_TIME_EMBED_TEST)
 	$(V46_TIMER_UNIT_TEST)
-	NIFT="$(CURDIR)/$(TARGET)" tests/v46_timer_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v46_timer_smoke.sh
 	$(V46_TIME_EMBED_TEST)
 
 test-v46-timer-sanitize: $(SAN_TARGET) $(V46_TIMER_UNIT_SAN_TEST) $(V46_TIMER_EMBED_SAN_TEST)
-	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/v46_timer_smoke.sh
+	env -u LD_PRELOAD NIFT_VM=0 ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/v46_timer_smoke.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(V46_TIMER_UNIT_SAN_TEST)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(V46_TIMER_EMBED_SAN_TEST)"
 
