@@ -49,6 +49,10 @@ bool export_without_name(const Ast& ast, const Node& st);
 // global tables). Declared after the import too (conservative).
 std::vector<std::string_view> importer_names(const Ast& ast, NodeId root);
 
+// Identifier nodes that provably belong to a parameter or to a plain
+// declaration in a function's block. Used only by the link visibility check.
+std::vector<bool> module_local_uses(const Ast& ast, NodeId root, const std::vector<NodeId>& uses);
+
 // An import's plain string-literal argument (empty included: a package name).
 bool literal_argument(const Ast& ast, const Node& st, std::string& out);
 

@@ -1,6 +1,7 @@
 #include "rt/module_link.h"
 
 #include "rt/module_invocation.h"
+#include "rt/module_scan.h"
 
 #include <algorithm>
 #include <functional>
@@ -361,16 +362,16 @@ LinkedUnit link_unit(const Ast& entry, NodeId root, std::string_view entry_sourc
             }
         if (clash) { refuse(m, at, "import-name-clash", positioned); return out; }
     }
-    // A unit names another unit's binding or function only where it
-    // imports it (legacy isolates module scopes). The invocation names are
-    // the planner's (resolved by binding identity, not here). The first use
-    // in the unit's text is reported.
+    // Check cross-module uses against direct exports. Invocation bindings
+    // are resolved by the planner. Report the first inaccessible use.
     for (std::size_t m = 0; m < count; ++m) {
         Names imported;
         for (const ModuleImport& imp : out.graph.modules[m]->imports)
             for (std::string_view name : out.graph.modules[imp.module]->exports) imported.insert(name);
         std::uint32_t first = UINT32_MAX;
+        const auto local = m ? module_local_uses(*units[m].ast, units[m].root, units[m].uses) : std::vector<bool>{};
         for (NodeId id : units[m].uses) {
+            if (m > 0 && local[id]) continue;
             if (std::binary_search(plan.rename_ids[m].begin(), plan.rename_ids[m].end(), id)) continue;
             const std::string_view name = units[m].ast->text(units[m].ast->at(id));
             if (m > 0 && std::find(entry_names.begin(), entry_names.end(), name) != entry_names.end()) continue;

@@ -83,6 +83,31 @@ SHAPES.update({
         "other.nft": 'fn(other_read()) { return hidden }\nexport(other_read)\n',
         "main.f": 'hidden := 2\nimport("m.nft")\nimport("other.nft")\nprint(other_read())\n',
     }, "import-scope"),
+    "local-binding-not-import": ({
+        "a.f": "hidden := 99\nfn(other()) { return hidden }\nexport(other)\n",
+        "b.f": "fn(read_local(hidden)) { local := hidden; return local }\nexport(read_local)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(read_local(4))\n',
+    }, "vm"),
+    "local-declaration-not-import": ({
+        "a.f": "hidden := 99\nfn(other()) { return hidden }\nexport(other)\n",
+        "b.f": "fn(read_local()) { hidden := 4; return hidden }\nexport(read_local)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(read_local())\n',
+    }, "vm"),
+    "local-initializer-not-yet-bound": ({
+        "a.f": "hidden := 99\nfn(other()) { return hidden }\nexport(other)\n",
+        "b.f": "fn(read_local()) { hidden := hidden + 1; return hidden }\nexport(read_local)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(read_local())\n',
+    }, "import-scope"),
+    "local-callable-not-import": ({
+        "a.f": "fn(hidden(x)) { return x + 99 }\nfn(other()) { return hidden(0) }\nexport(other)\n",
+        "b.f": "fn(read_local()) { hidden := (x) => x + 1; return hidden(4) }\nexport(read_local)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(read_local())\n',
+    }, "vm"),
+    "local-block-exit-not-bound": ({
+        "a.f": "hidden := 99\nfn(other()) { return hidden }\nexport(other)\n",
+        "b.f": "fn(read_local()) { if (true) { hidden := 4 }; return hidden }\nexport(read_local)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(read_local())\n',
+    }, "import-scope"),
     "struct-method-namespace": ({
         "a.f": "struct(Alpha) { private x := 3; fn(read()) { return this.x } }\nexport(Alpha)\n",
         "b.f": "struct(Beta) { private x := 5; fn(read()) { return this.x } }\nexport(Beta)\n",
