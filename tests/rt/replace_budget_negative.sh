@@ -63,9 +63,16 @@ if ! "$TMP/candidate" >"$TMP/candidate.log" 2>&1; then
 fi
 echo "candidate: PASS ($(tail -n 1 "$TMP/candidate.log"))"
 
-if "$TMP/mutant" >"$TMP/mutant.log" 2>&1; then
+mutant_status=0
+"$TMP/mutant" >"$TMP/mutant.log" 2>&1 || mutant_status=$?
+if [ "$mutant_status" -eq 0 ]; then
   echo "FAIL: str.replace without its budget check passed the budget tests" >&2
   cat "$TMP/mutant.log" >&2
+  exit 1
+fi
+if [ "$mutant_status" -ne 1 ]; then
+  echo "FAIL: the mutant did not complete its assertions (exit $mutant_status)" >&2
+  tail -n 15 "$TMP/mutant.log" >&2
   exit 1
 fi
 grep -q "native_budget.cpp:" "$TMP/mutant.log" ||

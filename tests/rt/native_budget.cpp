@@ -259,8 +259,11 @@ int main() {
             CHECK(live <= limit + kSlack);
             Call c = replace(s, make_string("x"), make_string("xx"), limit);
             last = c.status;
-            CHECK(c.peak_extra <= (live < limit ? limit - live : 0) + kSlack);
-            if (c.status != Status::Ok) break;
+            const bool within_budget = c.peak_extra <= (live < limit ? limit - live : 0) + kSlack;
+            CHECK(within_budget);
+            // The negative control removes the budget check. Once it has
+            // failed this assertion, another doubling adds risk, not evidence.
+            if (!within_budget || c.status != Status::Ok) break;
             s = c.out;
             ++steps;
         }
