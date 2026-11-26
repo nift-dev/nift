@@ -3,6 +3,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/compiler_handles.h"
 #include "rt/literal.h"
+#include "rt/native.h"
 #include "rt/string.h"
 #include <charconv>
 // rt-lint: cold-file shared native argument evaluation and error restrictions
@@ -277,6 +278,34 @@ const Node* direct_null_index_call(const Ast& ast, NodeId root, NodeId indexed) 
             ast.at(ast.list(call)[0]).kind == NodeKind::Null) return &call;
     }
     return nullptr;
+}
+
+// CP14: a call of a built-in over a fresh window (receiver, arguments), D-018.
+bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
+                                std::uint16_t dst, bool dynamic) {
+    if (!builtin_arguments_ok(node, spec, receiver)) return false;
+    const NodeId* args = ast_.list(node);
+    const std::uint32_t window = node.count + (receiver != kNoNode ? 1u : 0u);
+    if (window > 0x7fff) return fail(node, "limit:arguments");
+    const std::uint16_t mark = fb_->top();
+    const auto base = mark;
+    if (!operand_window(base, window)) return false;
+    std::uint16_t slot = base;
+    const auto next = [&](NodeId value) {
+        if (ast_.at(value).kind == NodeKind::Spread) return fail(ast_.at(value), "spread");
+        return window_value(value, slot++);
+    };
+    if (receiver != kNoNode && !next(receiver)) return false;
+    for (std::uint32_t k = 0; k < node.count; ++k)
+        if (!next(args[k])) return false;
+    fb_->set_offset(site(node));
+    const std::size_t at = fb_->emit(OpCode::CallNative, base,
+                                     static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),
+                                     static_cast<std::uint16_t>(window | (dynamic ? kDynamicDispatch : 0u)));
+    fb_->note(at, dynamic ? std::string(text(node)) : std::string(spec.name));  // B4: legacy's call text
+    if (dst != base) fb_->emit(OpCode::Move, dst, base);
+    fb_->release_to(mark);
+    return builder_ok();
 }
 
 } // namespace nift::rt::detail

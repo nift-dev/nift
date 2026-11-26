@@ -43,10 +43,24 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const bool in_place = dst + 1u == fb_->top();
     const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
-    // CP25: user-function arity errors follow operand evaluation. Prepared
-    // retries and return-expression prefixes keep their existing refusals.
-    const bool arity_error = !builtin && !is_native && node.count != arity && !loop_reachable() &&
-                             !(fb_->flags() & kInstrReturnCall);
+    // CP25: user-function arity errors follow operand evaluation. The
+    // prepared evaluator can retry operands, so only admit operands whose
+    // repeated evaluation has no observable effect.
+    bool arity_error = !builtin && !is_native && node.count != arity && !(fb_->flags() & kInstrReturnCall);
+    if (arity_error && loop_reachable()) {
+        arity_error = std::all_of(args, args + node.count, [&](NodeId id) {
+            const Node& arg = ast_.at(id);
+            const auto spelling = text(arg);
+            if (arg.kind == NodeKind::Number)
+                return kinds(id) == kKindInt && spelling.size() <= 9 &&
+                    spelling.find_first_not_of("0123456789") == std::string_view::npos;
+            if (arg.kind != NodeKind::Ident || find_binding(spelling) || reserved_name(spelling) ||
+                session_ || in_function_ || in_lambda_ || (module_names_ && !module_names_->empty())) return false;
+            const auto function = plan_.index.find(spelling);
+            return function != plan_.index.end() &&
+                ast_.at(plan_.functions[function->second - 1]).begin < node.begin;
+        });
+    }
     // An empty textual print call reaches the legacy output diagnostic.
     if (is_native && node.count == 0 && name == "print" &&  // rt-lint: allow-string-compare compile time
         !session_ && !in_function_ && !in_lambda_ && !loop_reachable() && !(fb_->flags() & kInstrReturnCall))
@@ -128,33 +142,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
-// CP14: a call of a built-in over a fresh window (receiver, arguments), D-018.
-bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver,
-                                std::uint16_t dst, bool dynamic) {
-    if (!builtin_arguments_ok(node, spec, receiver)) return false;
-    const NodeId* args = ast_.list(node);
-    const std::uint32_t window = node.count + (receiver != kNoNode ? 1u : 0u);
-    if (window > 0x7fff) return fail(node, "limit:arguments");
-    const std::uint16_t mark = fb_->top();
-    const auto base = mark;
-    if (!operand_window(base, window)) return false;
-    std::uint16_t slot = base;
-    const auto next = [&](NodeId value) {
-        if (ast_.at(value).kind == NodeKind::Spread) return fail(ast_.at(value), "spread");
-        return window_value(value, slot++);
-    };
-    if (receiver != kNoNode && !next(receiver)) return false;
-    for (std::uint32_t k = 0; k < node.count; ++k)
-        if (!next(args[k])) return false;
-    fb_->set_offset(site(node));
-    const std::size_t at = fb_->emit(OpCode::CallNative, base,
-                                     static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),
-                                     static_cast<std::uint16_t>(window | (dynamic ? kDynamicDispatch : 0u)));
-    fb_->note(at, dynamic ? std::string(text(node)) : std::string(spec.name));  // B4: legacy's call text
-    if (dst != base) fb_->emit(OpCode::Move, dst, base);
-    fb_->release_to(mark);
-    return builder_ok();
-}
+
 bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     bool is_this = false;  // CP12b: a struct method
