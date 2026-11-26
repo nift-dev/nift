@@ -372,11 +372,11 @@ bool consistent(const Value& c) {
 
 // One insertion, failed at each allocation in turn, then completed.
 void allocation_campaign(const char* name, CollectionKind kind, int prefill,
-                         const std::function<m::Outcome(Value&)>& insert) {
+                         const std::function<m::Outcome(Value&)>& insert, bool sorted = false) {
     int sites = 0;
     bool completed = false;
     for (long k = 0; k < 64 && !completed; ++k) {
-        Value c = make_collection(kind);
+        Value c = make_collection(kind, sorted);
         for (int i = 0; i < prefill; ++i) {
             if (kind == CollectionKind::Map) map_set(c, Value::integer(i), make_string("value"));
             else if (kind == CollectionKind::Set) set_add(c, Value::integer(i));
@@ -424,6 +424,47 @@ void allocation_failures() {
         allocation_campaign(("set_insert/" + tag).c_str(), CollectionKind::Set, prefill, sadd);
         if (prefill != 7) allocation_campaign(("stack_push/" + tag).c_str(), CollectionKind::Stack, prefill, spush);
     }
+    const auto sorted_map_insert = [&](Value& c) {
+        return m::map_put(c, Value::integer(-1), make_string("first"), e);
+    };
+    const auto sorted_set_insert = [&](Value& c) { return m::set_insert(c, Value::integer(-1), e); };
+    allocation_campaign("sorted-map/front", CollectionKind::Map, 8, sorted_map_insert, true);
+    allocation_campaign("sorted-set/front", CollectionKind::Set, 8, sorted_set_insert, true);
+}
+
+void sorted_collection_controls() {
+    const m::Env e;
+    Value map = make_collection(CollectionKind::Map, true);
+    CHECK(m::map_put(map, Value::integer(2), Value::integer(20), e).ok());
+    Value alias = map;
+    CHECK(m::map_put(alias, Value::integer(1), Value::integer(10), e).ok());
+    CHECK(collection_find(map, Value::integer(1)) == 0);
+    CHECK(collection_find(map, Value::integer(2)) == 1);
+    const auto& entries = collection_view(map);
+    CHECK(entries[1].as_int() == 10 && entries[3].as_int() == 20);
+    const Value incompatible = make_string("key");
+    const Snap before = snap(map, {incompatible});
+    const auto rejected = m::map_put(alias, incompatible, Value::integer(30), e);
+    CHECK(rejected.failure == Failure::Argument && rejected.text == "sorted_map: incomparable keys");
+    CHECK(snap(map, {incompatible}) == before);
+    for (const bool number_first : {false, true}) {
+        const Value number = Value::integer(7);
+        const Value string = make_string("seven");
+        const Value& first = number_first ? number : string;
+        const Value& second = number_first ? string : number;
+        Value sorted_map = make_collection(CollectionKind::Map, true);
+        Value sorted_set = make_collection(CollectionKind::Set, true);
+        CHECK(m::map_put(sorted_map, first, number, e).ok());
+        CHECK(m::set_insert(sorted_set, first, e).ok());
+        const Snap map_before = snap(sorted_map, {first, second});
+        const Snap set_before = snap(sorted_set, {first, second});
+        const auto map_result = m::map_put(sorted_map, second, number, e);
+        const auto set_result = m::set_insert(sorted_set, second, e);
+        CHECK(map_result.failure == Failure::Argument && map_result.text == "sorted_map: incomparable keys");
+        CHECK(set_result.failure == Failure::Argument && set_result.text == "sorted_set: incomparable values");
+        CHECK(snap(sorted_map, {first, second}) == map_before && collection_find(sorted_map, second) == -1);
+        CHECK(snap(sorted_set, {first, second}) == set_before && collection_find(sorted_set, second) == -1);
+    }
 }
 
 } // namespace
@@ -435,6 +476,7 @@ int main() {
     aliases_and_copies();
     cycle_targets_and_bookkeeping();
     allocation_failures();
+    sorted_collection_controls();
     std::printf("mutation protocol: %d refusal cases\n", cases);
     return rt_test::finish("mutation-protocol");
 }

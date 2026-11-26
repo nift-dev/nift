@@ -84,6 +84,7 @@ private:
             case Kind::Collection:  // D-063: a value, copied like an array
                 node.kind = WireKind::Collection;
                 node.binding_type = static_cast<std::int64_t>(collection_kind(value));
+                node.sorted_collection = collection_sorted(value);
                 break;
             case Kind::Struct: {  // B3: the descriptor by value, once per graph
                 node.kind = WireKind::Struct;

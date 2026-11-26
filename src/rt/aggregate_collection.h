@@ -20,8 +20,9 @@
 
 namespace nift::rt {
 
-Value make_collection(CollectionKind kind);
+Value make_collection(CollectionKind kind, bool sorted = false);
 CollectionKind collection_kind(const Value& collection);
+bool collection_sorted(const Value& collection);
 // Entries for a map, members/elements otherwise.
 std::size_t collection_size(const Value& collection);
 const std::vector<Value>& collection_items(const Value& collection);

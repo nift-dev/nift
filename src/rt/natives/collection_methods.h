@@ -13,6 +13,8 @@ namespace nift::rt::natives {
 
 Status fn_map(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status fn_set(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
+Status fn_sorted_map(const Context&, const Value*, std::uint32_t, Value&, std::string&);
+Status fn_sorted_set(const Context&, const Value*, std::uint32_t, Value&, std::string&);
 Status fn_stack(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status coll_get(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status coll_contains(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

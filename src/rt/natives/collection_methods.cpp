@@ -17,9 +17,10 @@ Status internal(std::string& error, std::string what) {
     return Status::Internal;
 }
 
-Status make(CollectionKind kind, std::uint32_t argc, Value& out, std::string& error, const char* name) {
+Status make(CollectionKind kind, std::uint32_t argc, Value& out, std::string& error,
+            const char* name, bool sorted = false) {
     if (argc != 0) return internal(error, std::string(name) + ": arguments");  // compiler: exact `name()`
-    out = make_collection(kind);
+    out = make_collection(kind, sorted);
     return Status::Ok;
 }
 
@@ -46,6 +47,12 @@ Status fn_map(const Context&, const Value*, std::uint32_t argc, Value& out, std:
 }
 Status fn_set(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
     return make(CollectionKind::Set, argc, out, error, "set");
+}
+Status fn_sorted_map(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
+    return make(CollectionKind::Map, argc, out, error, "sorted_map", true);
+}
+Status fn_sorted_set(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
+    return make(CollectionKind::Set, argc, out, error, "sorted_set", true);
 }
 Status fn_stack(const Context&, const Value*, std::uint32_t argc, Value& out, std::string& error) {
     return make(CollectionKind::Stack, argc, out, error, "stack");

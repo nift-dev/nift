@@ -183,6 +183,23 @@ out := ""
 for(v : s) { out = out + v }
 print(out)' '102030'
 
+# The reached insertion fails in both domain directions. Earlier output
+# remains visible and execution stops at the failing method call.
+mixed_error() {
+  local constructor=$1 first=$2 second=$3 diagnostic=$4 rc=0
+  printf '%s\n' "c := $constructor()" "$first" 'print(c.size())' "$second" 'print("after")' > "$t/p.f"
+  "$B" "$t/p.f" > "$t/o" 2> "$t/e" || rc=$?
+  if [[ $rc -ne 1 || $(cat "$t/o") != 1 ||
+        $(sed 's/^error: .*:4:1: //' "$t/e") != "$diagnostic" ]]; then
+    echo "FAIL $constructor mixed-domain insertion ($second): exit $rc, $(why "$t/e")" >&2
+    failed=1
+  fi
+}
+mixed_error sorted_map 'c.set(1, 10)' 'c.set("one", 20)' 'sorted_map: incomparable keys'
+mixed_error sorted_map 'c.set("one", 10)' 'c.set(1, 20)' 'sorted_map: incomparable keys'
+mixed_error sorted_set 'c.add(1)' 'c.add("one")' 'sorted_set: incomparable values'
+mixed_error sorted_set 'c.add("one")' 'c.add(1)' 'sorted_set: incomparable values'
+
 # --- PREPARED / TEMPLATE PARITY ----------------------------------
 ok "prepared for-body map ops" 'm := map()
 m.set("a", 1)

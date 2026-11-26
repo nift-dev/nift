@@ -168,7 +168,7 @@ static_assert(static_cast<std::uint16_t>(BuiltinId::StreamExtractString) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::FnMinify));
 static_assert(static_cast<std::uint16_t>(BuiltinId::FnMinify) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::FileWriteVal));
-static_assert(static_cast<std::uint16_t>(BuiltinId::FileReplaceOnce) + 1 ==
+static_assert(static_cast<std::uint16_t>(BuiltinId::FnSortedSet) + 1 ==
                   static_cast<std::uint16_t>(BuiltinId::Count),
               "builtin_list.inc: update this assert when appending built-ins");
 inline constexpr bool host_builtin(BuiltinId id) {

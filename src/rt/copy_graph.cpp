@@ -57,7 +57,7 @@ Value shell(const Value& v) {
     if (v.is(Kind::Array)) return make_array(array_size(v));
     if (v.is(Kind::Object)) return make_object();
     if (v.is(Kind::Struct)) return make_struct(copy_descriptor(v), struct_fields(v).size());
-    return make_collection(collection_kind(v));
+    return make_collection(collection_kind(v), collection_sorted(v));
 }
 
 // Tooling 2 (in place, tooling.md 2.4): the shells are created first (so every

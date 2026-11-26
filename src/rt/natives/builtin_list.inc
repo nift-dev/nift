@@ -243,3 +243,5 @@ NIFT_RT_BUILTIN(FileInsertBefore, "insert_before", File, 2, 2, kNull, Fixed, tru
 NIFT_RT_BUILTIN(FileInsertAfter, "insert_after", File, 2, 2, kNull, Fixed, true, 100)
 NIFT_RT_BUILTIN(FileReplace, "replace", File, 2, 2, kInt, Fixed, true, 100)
 NIFT_RT_BUILTIN(FileReplaceOnce, "replace_once", File, 2, 2, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(FnSortedMap, "sorted_map", None, 0, 0, kMap, Fixed, false, 100)
+NIFT_RT_BUILTIN(FnSortedSet, "sorted_set", None, 0, 0, kSet, Fixed, false, 100)

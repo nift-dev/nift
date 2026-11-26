@@ -42,6 +42,17 @@ object insertion witnesses. Use `NIFT_VM=0` for those historical forms.
 Compact grouped string receivers support `split()` and `stringify()`. A
 one-argument `copy(value)` evaluates its operand once in the VM.
 
+Sorted collections preserve ordering for homogeneous numeric or string keys
+and members. Legacy accepts mixtures of these domains without promising a
+portable order. For v4.13.0, an insertion that mixes the domains fails with
+`sorted_map: incomparable keys` or `sorted_set: incomparable values`, in
+either insertion order. The reached operation fails before changing the
+collection, including through an alias. This is a runtime diagnostic. Earlier
+statements and ordinary argument evaluation retain their effects. The two
+approved mutable-key refusals still apply before script execution.
+Boolean-only sorted collections retain insertion order. Other combinations
+are outside this compatibility approval.
+
 The separate external Nift regression suite recorded 57/94 passes with the VM
 default and 94/94 with explicit legacy execution.
 

@@ -3,6 +3,7 @@
 #include "rt/aggregate_store.h"
 #include "rt/compare.h"
 #include "rt/heap_account.h"
+#include "rt/number.h"
 
 #include <algorithm>
 #include <memory>
@@ -21,12 +22,21 @@ std::size_t stride(const CollectionObject& c) { return c.sub == CollectionKind::
 std::size_t entries(const CollectionObject& c) { return c.items.size() / stride(c); }
 const Value& key_at(const CollectionObject& c, std::size_t entry) { return c.items[entry * stride(c)]; }
 
+int sorted_key_order(const Value& left, const Value& right) {
+    int order = 0;
+    if (compare_relational(left, right, order)) return order;
+    // Legacy's collection sort places NaN after all other numbers.
+    if (left.is_number() && right.is_number())
+        return compare_decimal_forms(number_form(left), number_form(right));
+    return 0;
+}
+
 // The key index of `c`'s items, built into `out` (may throw: nothing of `c`
 // changes), empty below the threshold.
 void build_index(const CollectionObject& c, std::vector<std::uint32_t>& out) {
     const std::size_t n = entries(c);
     out.clear();
-    if (!keyed(c) || n < CollectionObject::kIndexThreshold) return;
+    if (!keyed(c) || c.sorted || n < CollectionObject::kIndexThreshold) return;
     std::size_t capacity = 16;
     while (capacity < n * 2) capacity <<= 1;
     out.assign(capacity, 0);
@@ -67,13 +77,14 @@ CollectionObject& collection_mut(Value& collection) {
 
 } // namespace
 
-Value make_collection(CollectionKind kind) {
-    auto* c = new CollectionObject(kind);
+Value make_collection(CollectionKind kind, bool sorted) {
+    auto* c = new CollectionObject(kind, sorted);
     heap_retally(c);
     return Value::adopt(c);
 }
 
 CollectionKind collection_kind(const Value& collection) { return collection.heap_as<CollectionObject>()->sub; }
+bool collection_sorted(const Value& collection) { return collection.heap_as<CollectionObject>()->sorted; }
 
 std::size_t collection_size(const Value& collection) { return entries(*collection.heap_as<CollectionObject>()); }
 
@@ -135,6 +146,13 @@ void reserve_for(std::vector<Value>& items, std::size_t extra) {
 // Appends `values` (a map's key and value, or one member) atomically.
 template <std::size_t N> void append_entry(Value& collection, Value (&values)[N]) {
     CollectionObject& c = collection_mut(collection);
+    std::size_t insertion = c.items.size();
+    if (c.sorted) {
+        while (insertion != 0) {
+            if (sorted_key_order(values[0], c.items[insertion - N]) >= 0) break;
+            insertion -= N;
+        }
+    }
 #if defined(NIFT_MUTATION_MUTANT) && NIFT_MUTATION_MUTANT == 6
     c.items.push_back(values[0]);  // D mutant: the key lands before the reservation that may throw
     c.items.pop_back();
@@ -145,7 +163,7 @@ template <std::size_t N> void append_entry(Value& collection, Value (&values)[N]
     reserve_for(c.items, N);  // the only storage allocation: before any change
     for (Value& v : values) c.items.push_back(static_cast<Value&&>(v));  // no allocation: cannot throw
 #endif
-    if (c.sub != CollectionKind::Stack) {
+    if (!c.sorted && c.sub != CollectionKind::Stack) {
         try {
             index_after_append(c, 1);
         } catch (...) {
@@ -157,6 +175,10 @@ template <std::size_t N> void append_entry(Value& collection, Value (&values)[N]
         check_not_self(&c, c.items[k]);
         note_store(&c, c.items[k]);
     }
+#if !defined(NIFT_COLLECTIONS_MUTANT) || NIFT_COLLECTIONS_MUTANT != 17
+    if (c.sorted && insertion != c.items.size() - N)
+        std::rotate(c.items.begin() + static_cast<std::ptrdiff_t>(insertion), c.items.end() - N, c.items.end());
+#endif
 #if !(defined(NIFT_COLLECTIONS_MUTANT) && NIFT_COLLECTIONS_MUTANT == 5)
     heap_retally(collection.heap());  // M5 drops this: the growth is never counted
 #endif
@@ -238,7 +260,7 @@ void rebuild_collection_index(CollectionObject& collection) { reindex(collection
 
 Value collection_shallow_clone(const Value& collection) {
     const auto* source = collection.heap_as<CollectionObject>();
-    Value owned = Value::adopt(new CollectionObject(source->sub));  // owned before copying (bad_alloc)
+    Value owned = Value::adopt(new CollectionObject(source->sub, source->sorted));
     auto* c = owned.heap_as<CollectionObject>();
     c->items = source->items;
     c->index = source->index;

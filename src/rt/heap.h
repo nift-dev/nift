@@ -155,9 +155,11 @@ enum class CollectionKind : std::uint8_t { Map, Set, Stack };
 struct CollectionObject : HeapObject {
     static constexpr std::size_t kIndexThreshold = 8;
     CollectionKind sub;
+    bool sorted;
     std::vector<Value> items;
     std::vector<std::uint32_t> index;  // map/set only; empty below the threshold
-    explicit CollectionObject(CollectionKind k) : HeapObject(Kind::Collection), sub(k) {}
+    explicit CollectionObject(CollectionKind k, bool ordered = false)
+        : HeapObject(Kind::Collection), sub(k), sorted(ordered) {}
 };
 
 // Immutable error value (legacy RuntimeErrorData): message, code, category,

@@ -131,7 +131,8 @@ bool serialize_collection(const Value& value, bool pretty, int depth, std::strin
                           bool& bad_kind) {
     const CollectionKind kind = collection_kind(value);
     const auto& items = collection_items(value);
-    out += collection_kind_name(kind);
+    out += collection_sorted(value) ? (kind == CollectionKind::Map ? "sorted_map" : "sorted_set")
+                                    : collection_kind_name(kind);
     out += "([";
     const std::size_t step = kind == CollectionKind::Map ? 2 : 1;
     const std::size_t count = items.size() / step;

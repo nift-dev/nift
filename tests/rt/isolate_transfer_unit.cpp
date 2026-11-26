@@ -362,5 +362,20 @@ int main() {
     refusals();
     task_handles();
     equality_and_length();
+    {
+        ProtoMap protos;
+        TransferGraph graph;
+        Value decoded;
+        std::string error;
+        Value source = make_collection(CollectionKind::Map, true);
+        map_set(source, I(3), I(30));
+        map_set(source, I(1), I(10));
+        CHECK(roundtrip(source, protos, graph, decoded, error));
+        CHECK(collection_sorted(decoded));
+        CHECK(equal(source, decoded));
+        map_set(decoded, I(2), I(20));
+        CHECK(collection_find(decoded, I(2)) == 1);
+        CHECK(collection_find(source, I(2)) == -1);
+    }
     return rt_test::finish("isolate-transfer-unit");
 }

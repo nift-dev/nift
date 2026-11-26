@@ -28,8 +28,9 @@ declare -A FILE=(
                                              # is unreachable, every loop iterates its held entry snapshot;
                                              # witnesses parity/snapshot_map_body_{write,capture}.f)
   [16]=src/rt/compiler_native_args.cpp       # mutex(v) accepts a value holding a collection
+  [17]=src/rt/aggregate_collection.cpp      # sorted inserts retain append order
 )
-list=("$@"); [ ${#list[@]} -eq 0 ] && list=(5 6 7 8 9 11 12 13 14 15 16)
+list=("$@"); [ ${#list[@]} -eq 0 ] && list=(5 6 7 8 9 11 12 13 14 15 16 17)
 CXX=${CXX:-g++}
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/$(${CC:-cc} -dumpmachine 2>/dev/null || uname -m)-$(basename "${CC:-cc}")/install/include"
 CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -pedantic -pthread"

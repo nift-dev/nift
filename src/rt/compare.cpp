@@ -121,7 +121,8 @@ Shallow shallow_equal(const Value& left, const Value& right, bool identity) {
         case Kind::Collection: {  // D-063, legacy's per-kind rules (ParserExpression.cpp structural_equal)
             if (identity && left.heap() == right.heap()) return Shallow::Equal;
             const CollectionKind k = collection_kind(left);
-            if (k != collection_kind(right) || collection_size(left) != collection_size(right))
+            if (k != collection_kind(right) || collection_sorted(left) != collection_sorted(right) ||
+                collection_size(left) != collection_size(right))
                 return Shallow::Unequal;
             if (k != CollectionKind::Set) return collection_size(left) ? Shallow::Descend : Shallow::Equal;
             // Set members are scalars: size plus membership decides.

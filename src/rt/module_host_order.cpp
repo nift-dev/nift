@@ -30,7 +30,8 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
     case I::FnIsEnum: case I::NumToInt: case I::NumAbs: case I::NumFloor: case I::NumCeil: case I::NumRound:
     case I::FnBytes: case I::StrEncode: case I::BytesLength: case I::BytesSize: case I::BytesEmpty:
     case I::BytesSlice: case I::BytesDecode: case I::FnSha256: case I::FnValidate: case I::FnCopy:
-    case I::FnDeepcopy: case I::FnMap: case I::FnSet: case I::FnStack: case I::MapGet: case I::MapContains:
+    case I::FnDeepcopy: case I::FnMap: case I::FnSet: case I::FnSortedMap: case I::FnSortedSet:
+    case I::FnStack: case I::MapGet: case I::MapContains:
     case I::MapSize: case I::MapEmpty: case I::SetContains: case I::SetSize: case I::SetEmpty: case I::StackTop:
     case I::StackFront: case I::StackContains: case I::StackSize: case I::StackEmpty: case I::FnSame:
         return BuiltinEffect::Pure;
