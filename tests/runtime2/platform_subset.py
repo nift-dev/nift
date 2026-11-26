@@ -72,6 +72,8 @@ ENTRIES = [
     ("vm_builtins", "core semantics", "{py} tests/runtime2/vm_builtins.py --nift {nift}", {}, ""),
     ("vm_host", "file operations", "{py} tests/runtime2/vm_host.py --nift {nift}",
      {"windows": W_PREEXEC + "; it also creates POSIX symlinks"}, "macOS already runs it in v44-cross-platform"),
+    ("vm_package_process", "process execution",
+     "{py} tests/runtime2/vm_package_process.py --nift {nift}", {}, ""),
     ("vm_records_coverage", "core semantics", "{py} tests/runtime2/vm_records_coverage.py --nift {nift}", {}, ""),
     ("vm_path_wording", "core semantics", "{py} tests/runtime2/vm_path_wording.py --nift {nift}", {}, ""),
     ("vm_known_refused", "core semantics", "{py} tests/runtime2/vm_known_refused.py --nift {nift}", {}, ""),

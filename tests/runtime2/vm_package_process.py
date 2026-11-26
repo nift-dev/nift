@@ -68,6 +68,15 @@ def main():
         assert proc.returncode == 1 and not proc.stdout and "external process execution disabled" in proc.stderr, proc
         assert not (allowed / "launches").exists()
 
+        for mode in ({}, {"NIFT_VM": "0"}):
+            invalid = (
+                'fn(later_operand()) { print("unexpected operand"); return "late" }\n'
+                f'run({launcher}, [{{"invalid": true}}], later_operand())\n'
+            )
+            proc, _ = run(invalid, **mode)
+            assert proc.returncode == 1 and not proc.stdout and "run: arguments must be scalar" in proc.stderr, proc
+            assert not (allowed / "launches").exists()
+
         redirect = (
             'fn(output_path()) { print("path evaluated"); return "../escaped.txt" }\n'
             f'cmd({launcher}, "child.py").stdout(output_path()).run()\n'

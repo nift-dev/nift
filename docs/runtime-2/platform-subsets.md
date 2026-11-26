@@ -145,6 +145,7 @@ once the candidate fix lands.
 | `vm_subset_gen` | core semantics | run | run | run | run |  |
 | `vm_builtins` | core semantics | run | run | run | run |  |
 | `vm_host` | file operations | run | run | **excluded**: Windows: the harness passes a trace descriptor as fd 3 with preexec_fn/pass_fds (os.dup2 in the child); Python's subprocess has no preexec_fn on Windows; it also creates POSIX symlinks | run | macOS already runs it in v44-cross-platform |
+| `vm_package_process` | process execution | run | run | run | run |  |
 | `vm_records_coverage` | core semantics | run | run | run | run |  |
 | `vm_path_wording` | core semantics | run | run | run | run |  |
 | `vm_known_refused` | core semantics | run | run | run | run |  |

@@ -113,6 +113,22 @@ SHAPES.update({
         "b.f": "struct(Beta) { private x := 5; fn(read()) { return this.x } }\nexport(Beta)\n",
         "main.f": 'import("a.f")\nimport("b.f")\na := Alpha()\nb := Beta()\nprint(a.read() + b.read())\n',
     }, "vm"),
+    "struct-method-module-scalar-path": ({
+        "m.f": 'struct(Box) { private fn(report(code)) { return {"code": code} }\n'
+               'fn(read()) { result := {"exit_code": 7}; return this.report(result.exit_code) } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.code)\n',
+    }, "vm"),
+    "struct-method-module-aggregate-path": ({
+        "m.f": 'struct(Box) { private fn(report(value)) { return {"value": value} }\n'
+               'fn(read()) { result := {"nested": [7]}; return this.report(result.nested) } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.value)\n',
+    }, "path-in-call-argument"),
+    "struct-method-module-forwarded-path": ({
+        "m.f": 'struct(Box) { private fn(change(code)) { return {"code": code} }\n'
+               'private fn(report(code)) { return this.change(code) }\n'
+               'fn(read()) { result := {"exit_code": 7}; return this.report(result.exit_code) } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.code)\n',
+    }, "path-in-call-argument"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

@@ -1337,6 +1337,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(RT_OBJEC
 		python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(SAN_TARGET)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_package_process.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300

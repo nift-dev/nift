@@ -1,12 +1,12 @@
 #include "rt/compiler_structs.h"
 #include "rt/compiler_presentation.h"
-
 #include "rt/aggregate.h"
 #include "rt/alias.h"
 #include "rt/atom.h"
+#include "rt/module_link.h"
 #include "rt/natives/builtin.h"
 #include "rt/native.h"
-
+#include <algorithm>
 // CP12b structs (rt/structs.h). Struct instances are identity-bearing mutable
 // references (D-NEXT-refsem #1, superseding D-046 #3 / D-040 V9): legacy's
 // model. A binding, parameter, return value, container element or captured
@@ -332,6 +332,21 @@ bool UnitCompiler::struct_construct(const Node& call, int s, std::uint16_t reg) 
     return builder_ok();
 }
 
+// A fresh result assembled from values cannot forward or mutate a formal.
+static bool method_returns_value_object(const Ast& ast, const Node& body) {
+    if (body.count != 1) return false;
+    const Node& stmt = ast.at(ast.list(body)[0]);
+    if (stmt.kind != NodeKind::Return || stmt.a == kNoNode) return false;
+    const Node& object = ast.at(stmt.a);
+    if (object.kind != NodeKind::Object) return false;
+    const auto* props = ast.list(object);
+    return std::all_of(props, props + object.count, [&](NodeId id) {
+        const auto& value = ast.at(ast.at(id).b);
+        return value.kind == NodeKind::Ident || value.kind == NodeKind::Number || value.kind == NodeKind::True ||
+               value.kind == NodeKind::False || value.kind == NodeKind::Null ||
+               (value.kind == NodeKind::String && value.count == 0);
+    });
+}
 // A method call: the instance, then the arguments, in a fresh window.
 bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver,
                                int receiver_reg, std::uint16_t dst) {
@@ -351,9 +366,13 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     else if (!receiver_value(receiver, base)) return false;
     ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
-    path_arg_ = path_chain_ = kNoNode;  // no member or index path in method arguments
+    const bool value_only = !session_ && plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
+                            method_returns_value_object(ast_, ast_.at(fn.b));
     bool ok = true;
     for (std::uint32_t k = 0; ok && k < node.count; ++k) {
+        path_arg_ = value_only && index_depth_ == 0 && bare_argument(node, k)
+            ? args[k] : kNoNode;
+        path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
                  plan_.escaping[f][k])
