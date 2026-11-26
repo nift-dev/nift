@@ -171,6 +171,18 @@ SHAPES.update({
                'struct(Other) { fn(size()) { print("effect"); return 6 } }\nexport(Box)\nexport(Other)\n',
         "main.f": 'import("m.f")\nb := Box()\nc := Other()\nprint(b.check_size(c))\n',
     }, "param-name-reserved"),
+    "struct-method-negated-boolean-short-circuit": ({
+        "m.f": 'struct(Checks) { private fn(probe(value, label)) { print(label); return value }\n'
+               'fn(check(left, right)) { if(!this.probe(left, "left") || !this.probe(right, "right")) { return true }; '
+               'return false } }\nexport(Checks)\n',
+        "main.f": 'import("m.f")\nc := Checks()\n'
+                  'print(c.check(false, true))\nprint(c.check(true, true))\n',
+    }, "vm"),
+    "struct-method-negated-mixed-operators-refusal": ({
+        "m.f": 'struct(Checks) { private fn(probe(value)) { return value }\n'
+               'fn(check(left, right)) { return !this.probe(left) && !this.probe(right) } }\nexport(Checks)\n',
+        "main.f": 'import("m.f")\nc := Checks()\nprint(c.check(false, true))\n',
+    }, "prefix-not-precedence"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

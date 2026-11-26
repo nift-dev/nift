@@ -1,7 +1,6 @@
 #pragma once
 // Runtime 2.0 expression compilation and the compiler state shared with statements.
-// CP12 (D-018): compile legacy textual semantics and refuse differing prepared evaluator contexts,
-// except for the approved exactly-once evaluation and error-position differences (D-009 #1/#5).
+// CP12 (D-018): compile legacy textual semantics with the approved evaluation-order exceptions.
 #include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/codegen.h"
@@ -225,6 +224,7 @@ private:
     bool numeric_diagnostic_tree(const Node& node);
     int literal_ordering_error(const Node& expression, const Node& diagnostic, std::uint16_t dst);
     bool infix_left_ok(const Node& node);
+    bool boolean_method_condition(NodeId id) const;
     bool comparison_chain_ok(const Node& node);
     bool element_target_ok(const Node& target);
     std::string_view type_text(const Node& node) const;

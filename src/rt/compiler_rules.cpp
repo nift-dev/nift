@@ -359,7 +359,10 @@ bool UnitCompiler::ends_with_not(NodeId id) const {
 }
 
 bool UnitCompiler::infix_left_ok(const Node& node) {
-    return !ends_with_not(node.a) || fail(node, "prefix-not-precedence");
+    if (!ends_with_not(node.a)) return true;
+    if (node.kind == NodeKind::Logical && in_function_ && !session_ && boolean_method_condition(node_id(node)))
+        return true;
+    return fail(node, "prefix-not-precedence");
 }
 
 // A comparison whose operand is itself a comparison (`1 != 1 == 1`,

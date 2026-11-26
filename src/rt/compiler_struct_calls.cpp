@@ -24,6 +24,22 @@ static bool method_returns_value_object(const Ast& ast, const Node& body) {
                (value.kind == NodeKind::String && value.count == 0);
     });
 }
+// Legacy splits these boolean chains at || before negating each
+// method result. Match the same short-circuit even when a method has effects.
+bool UnitCompiler::boolean_method_condition(NodeId id) const {
+    if (!plan_.is_method(function_) || !plan_.linked || plan_.linked->locate(ast_.at(id).begin).module == 0)
+        return false;
+    const auto& node = ast_.at(id);
+    if (node.kind == NodeKind::Logical && node.op == Op::Or)
+        return boolean_method_condition(node.a) && boolean_method_condition(node.b);
+    if (node.kind != NodeKind::Unary || node.op != Op::Not) return false;
+    const auto& call = ast_.at(node.a);
+    if (call.kind != NodeKind::Call || kinds(node.a) != kKindBool) return false;
+    const auto& method = ast_.at(call.a);
+    return method.kind == NodeKind::Member && ast_.at(method.a).kind == NodeKind::Ident &&
+           text(ast_.at(method.a)) == "this";  // rt-lint: allow-string-compare compile time
+}
+
 // A method call: the instance, then the arguments, in a fresh window.
 bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& m, NodeId receiver,
                                int receiver_reg, std::uint16_t dst) {
