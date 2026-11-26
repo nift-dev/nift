@@ -3170,10 +3170,17 @@ int run_cli(int argc, char** argv) {
     nift::rt::natives::set_script_platform(selected_platform);
 
     const std::string command = argc > 1 ? argv[1] : "";
+    // These dispatch checks classify the same argv entry before running any command.
+    std::optional<bool> command_is_file;
+    const auto is_script_path = [&] {
+        if (!command_is_file.has_value())
+            command_is_file = filesystem::file_exists(command) && !fs::is_directory(command);
+        return *command_is_file;
+    };
     const bool platform_capable_command = command.empty() || command == "build" ||
         command == "-e" || command == "-c" || command == "-i" || command == "-" ||
         command == "--no-process" || command.rfind("--fs-root=", 0) == 0 ||
-        (filesystem::file_exists(command) && !fs::is_directory(command));
+        is_script_path();
     if (platform_selected && !platform_capable_command) {
         console::error("--platform is only valid for script execution, the REPL, and build");
         return 2;
@@ -3184,7 +3191,7 @@ int run_cli(int argc, char** argv) {
     // project commands never consult NIFT_VM and are not checked.
     const bool scripting_command = command.empty() || command == "-e" || command == "-c" || command == "-i" ||
         command == "-" || command == "eval" || command == "--no-process" || command.rfind("--fs-root=", 0) == 0 ||
-        (filesystem::file_exists(command) && !fs::is_directory(command));
+        is_script_path();
     if (scripting_command) {
         const std::string vm_error = nift::rt::vm_mode_configuration_error();
         if (!vm_error.empty()) { console::error(vm_error); return 1; }
@@ -3379,7 +3386,7 @@ int run_cli(int argc, char** argv) {
     // what makes `#!/usr/bin/env nift` work. Only applied when the argument
     // genuinely resolves to an existing file, so a typoed command name is not
     // silently turned into an arbitrary path.
-    if (filesystem::file_exists(command) && !fs::is_directory(command)) {
+    if (is_script_path()) {
         std::vector<std::string> script_args; bool literal_args=false;
         for (int i = 2; i < argc; ++i) {
             const std::string a = argv[i];
