@@ -40,9 +40,12 @@ sequenced() {
   for arg in "$@"; do
     # MSYS Python treats drive-letter paths as relative. Keep the native
     # spelling in the Nift fixtures and use POSIX paths for the clock helper.
-    case "$IS_WINDOWS:$arg" in
-      1:[A-Za-z]:/*) arg="$(cygpath -u "$arg")" || { bad "converting the edit path $arg"; return 1; } ;;
-    esac
+    if [[ "$IS_WINDOWS" == 1 && "$arg" == [A-Za-z]:/* ]]; then
+      if ! arg="$(cygpath -u "$arg")"; then
+        bad "converting the edit path"
+        return 1
+      fi
+    fi
     paths+=("$arg")
   done
   "$PY" "$TICKS" "${paths[@]}" >/dev/null || bad "sequencing the edit of $*"

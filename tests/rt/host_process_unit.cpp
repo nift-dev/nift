@@ -1480,6 +1480,7 @@ void terminal_never_option() {
 
 void orphan_after_group_destroy() {
     if (!runtime::enable_subreaper()) { std::printf("orphan_after_group_destroy: SKIPPED\n"); return; }
+    const auto started = Clock::now();
     const std::string tag = new_tag();
     {
         auto g = start_ok(req({"sh", "-c", "sleep 0.5 &"}, OutputMode::Inherit, tag));
@@ -1491,7 +1492,15 @@ void orphan_after_group_destroy() {
     }, milliseconds(4000));
     CHECK(gone);
     runtime::reap_adopted_orphans();
-    CHECK(no_zombies());
+    const bool reaped = no_zombies();
+    if (!reaped) {
+        for (const auto& p : runtime::proc_scan()) {
+            if (p.ppid == ::getpid() && p.state == 'Z')
+                std::printf("  unreaped child: pid=%ld group=%ld session=%ld\n", p.pid, p.pgrp, p.session);
+        }
+        dump_events(started);
+    }
+    CHECK(reaped);
 }
 
 void managed_pgid_cleanup() {
