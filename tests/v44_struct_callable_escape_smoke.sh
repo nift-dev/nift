@@ -29,6 +29,8 @@ else
     [ "$?" -eq 1 ]
 fi
 [ ! -s "$t/stdout" ]
-grep -Fx "error: $t/a.f:2:16: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet" "$t/stderr"
+# Native Windows may print a drive path for an MSYS temporary directory.
+sed -E 's|^error: .*[/\\]a\.f:|error: a.f:|' "$t/stderr" |
+    grep -Fx "error: a.f:2:16: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet"
 grep -F 'no part of it ran' "$t/stderr"
 echo 'PASS v4.4 struct-callable string argument escaping'
