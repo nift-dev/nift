@@ -59,6 +59,7 @@ struct SpawnStage {
     std::string stderr_path;
     bool stderr_append = false;
     bool stderr_to_stdout = false;  // CP20: 2>&1, after stdout is set up
+    bool allow_enoexec_shell = true;  // historical execvp fallback, omitted for direct argv
     std::vector<std::string> argv() const;
 };
 

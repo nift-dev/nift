@@ -1,7 +1,45 @@
 #include "rt/infer_callable.h"
 #include "rt/compiler.h"
+#include "rt/compiler_process.h"
+#include "rt/infer_builtins.h"
+
+#include <algorithm>
 // rt-lint: cold-file callable inference worklist and lexical environments
 namespace nift::rt::infer_detail {
+TyRef Inference::process_call(const Node& call) {
+    if (session_ || !detail::package_process_scope(plan_, call)) return {};
+    const auto& callee = ast_.at(call.a);
+    NodeId output = kNoNode;
+    const Node* command = nullptr;
+    if (callee.kind == NodeKind::Ident && ast_.text(callee) == "run" &&
+        !plan_.index.count("run") && !find("run")) {
+        command = &call;
+    } else if (callee.kind == NodeKind::Member && !plan_.index.count("cmd")) {
+        command = detail::process_pipeline_command(ast_, call, output);
+        if (command) {
+            if (const TyRef* binding = find_binding("cmd")) {
+                const auto slot = static_cast<std::size_t>(binding - vars_.data());
+                const auto installed = external_.find("cmd");
+                const auto declaration = binding_decls_.find(slot);
+                const bool invocation = installed != external_.end() && installed->second == slot;
+                const bool shadow = invocation_ && declaration != binding_decls_.end() &&
+                    std::any_of(invocation_->begin(), invocation_->end(), [&](const auto& entry) {
+                        return entry.shadow == declaration->second;
+                    });
+                if (!invocation && !shadow) return {};
+            }
+        }
+    }
+    if (!command || !detail::process_program_literal(ast_, *command)) return {};
+    for (std::uint32_t k = 0; k < command->count; ++k) {
+        const auto id = ast_.list(*command)[k];
+        const auto& arg = ast_.at(id);
+        expr(arg.kind == NodeKind::Spread ? arg.a : id);
+    }
+    if (output != kNoNode) expr(output);
+    return fresh(static_cast<NodeId>(&call - &ast_.at(0)), process_result());
+}
+
 std::size_t Inference::lambda_unit(NodeId node) {
     const auto found = lambda_unit_.find(node);
     if (found != lambda_unit_.end()) {

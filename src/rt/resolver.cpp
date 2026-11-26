@@ -133,8 +133,10 @@ bool check_declaration_order(const Ast& ast, NodeId root, UnitPlan& plan, const 
 
 } // namespace
 
-UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::string>* existing_functions) {
+UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::string>* existing_functions,
+                   const LinkedUnit* linked) {
     UnitPlan plan;
+    plan.linked = linked;
     // The for-loop/catch binding rule (rt/binding_rules.h), for units that
     // skip prevalidation: such a call is never compiled as a call of the binding.
     const BindingCallViolation binding = reserved_binding_call(ast);
@@ -179,7 +181,7 @@ UnitPlan plan_unit(const Ast& ast, NodeId root, const std::unordered_set<std::st
         plan.collections = name == "map" || name == "set" || name == "stack";  // rt-lint: allow-string-compare
     }
     plan.method_of.assign(plan.functions.size(), -1);
-    if (!plan_structs(ast, root, plan)) return plan;  // CP12b: methods appended to functions
+    if (!plan_structs(ast, root, plan, linked)) return plan;  // CP12b: methods appended to functions
     if (plan.functions.size() >= 0x7fff) reject(plan, program, "too-many-functions");
     if (plan.ok) plan_escaping_params(ast, root, plan);
     return plan;

@@ -121,6 +121,16 @@ SHAPES.update({
         "m.f": "struct(Box) { x := 3 }\nexport(Box)\n",
         "main.f": 'print("before")\np := Box()\nimport("m.f")\nprint(p.x)\n',
     }, "struct-after-statement"),
+    "struct-after-module-data": ({
+        "m.f": 'prefix := "A" + ":"\ncache := map()\n'
+               'struct(Box) { x := 3 }\nexport(Box)\n',
+        "main.f": 'import("m.f")\np := Box()\nprint(p.x)\n',
+    }, "vm"),
+    "struct-after-module-user-call": ({
+        "m.f": 'fn(announce_prefix()) { print("module effect"); return 7 }\ncount := announce_prefix()\n'
+               'struct(Box) { x := 3 }\nexport(Box)\n',
+        "main.f": 'import("m.f")\np := Box()\nprint(p.x)\n',
+    }, "struct-after-statement"),
     "struct-reexport": ({
         "a.f": "struct(Token) { n := 3 }\nexport(Token)\n",
         "b.f": 'import("a.f")\nexport(Token)\n',

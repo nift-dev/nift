@@ -22,6 +22,6 @@ namespace nift::rt {
 
 // Fills plan.structs / struct_index and appends every method to
 // plan.functions (method_of: its struct). False (plan refused) otherwise.
-bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan);
+bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan, const LinkedUnit* linked);
 
 } // namespace nift::rt

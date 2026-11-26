@@ -36,6 +36,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     NativeInfo native{}; const auto fn = plan_.index.find(name);
     if (fn != plan_.index.end() && indexed_return(fn->second))
         return indexed_call_value(node, fn->second, dst);
+    if (fn == plan_.index.end() && name == "run")  // rt-lint: allow-string-compare compile time
+        if (const int result = process_call(node, node, kNoNode, dst); result >= 0) return result == 1;
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;
@@ -152,6 +154,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     bool is_this = false;  // CP12b: a struct method
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
+    if (const int result = process_pipeline(node, dst); result >= 0) return result == 1;
     const std::string_view name = text(ast_.at(callee.b));
     if (int r = keyed_method_call(node, dst); r >= 0) return r == 1;  // D-063 map/set/stack
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;

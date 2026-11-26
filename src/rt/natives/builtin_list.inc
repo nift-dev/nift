@@ -245,3 +245,10 @@ NIFT_RT_BUILTIN(FileReplace, "replace", File, 2, 2, kInt, Fixed, true, 100)
 NIFT_RT_BUILTIN(FileReplaceOnce, "replace_once", File, 2, 2, kNull, Fixed, true, 100)
 NIFT_RT_BUILTIN(FnSortedMap, "sorted_map", None, 0, 0, kMap, Fixed, false, 100)
 NIFT_RT_BUILTIN(FnSortedSet, "sorted_set", None, 0, 0, kSet, Fixed, false, 100)
+
+// Internal to the compiler's synchronous process-call lowering.
+NIFT_RT_BUILTIN(ProcessCheck, "<process-check>", None, 0, 0, kNull, Fixed, true, 60)
+NIFT_RT_BUILTIN(ProcessArg, "<process-argument>", None, 1, 2, kAny, Fixed, true, 100)
+NIFT_RT_BUILTIN(ProcessSpread, "<process-spread>", None, 1, 2, kArray, Fixed, true, 100)
+NIFT_RT_BUILTIN(ProcessRun, "<process-run>", None, 1, 255, kObject, Fixed, true, 100)
+NIFT_RT_BUILTIN(ProcessRunStdout, "<process-run-stdout>", None, 2, 255, kObject, Fixed, true, 100)

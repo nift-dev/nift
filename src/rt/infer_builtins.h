@@ -15,6 +15,7 @@ TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv,
                     const std::vector<TyRef>& values, bool session_dispatch = false);
 // `name(values...)` with no user function of that name: print (null), a free
 // built-in's result, or Unknown.
+TyRef process_result();
 TyRef function_result(const Ast& ast, const Node& n, const std::vector<TyRef>& values);
 
 } // namespace nift::rt::infer_detail

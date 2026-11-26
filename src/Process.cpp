@@ -564,7 +564,27 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     const std::string stage_failure = r.error;
     r.stages.assign(specs.size(), ProcessStageResult{});
     for (std::size_t i = 0; i < procs.size(); ++i) {
-        DWORD waited=WaitForSingleObject(procs[i],ok?INFINITE:5000);
+        DWORD waited;
+        if (ok && capture && capture_limit && r.capture_limit_exceeded.empty()) {
+            do {
+                waited = WaitForSingleObject(procs[i], 20);
+                if (waited != WAIT_TIMEOUT) break;
+                const auto exceeds_limit = [capture_limit](HANDLE file) {
+                    LARGE_INTEGER size{};
+                    return GetFileSizeEx(file, &size) && size.QuadPart >= 0 &&
+                           static_cast<std::uint64_t>(size.QuadPart) > capture_limit;
+                };
+                if (exceeds_limit(okeep)) r.capture_limit_exceeded = "stdout";
+                else if (exceeds_limit(ekeep)) r.capture_limit_exceeded = "stderr";
+                if (!r.capture_limit_exceeded.empty()) {
+                    for (std::size_t j = i; j < procs.size(); ++j) TerminateProcess(procs[j], 126);
+                    waited = WaitForSingleObject(procs[i], 5000);
+                    break;
+                }
+            } while (waited == WAIT_TIMEOUT);
+        } else {
+            waited = WaitForSingleObject(procs[i], ok && r.capture_limit_exceeded.empty() ? INFINITE : 5000);
+        }
         if(waited!=WAIT_OBJECT_0){r.error += " process cleanup/wait failed";ok=false;}
         GetExitCodeProcess(procs[i], &exit);
         CloseHandle(procs[i]);
@@ -596,8 +616,10 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
             return data;
         };
         bool out_exceeded = false, err_exceeded = false;
-        r.out = read_handle(okeep, out_exceeded);
-        if (!out_exceeded) r.err = read_handle(ekeep, err_exceeded);
+        if (r.capture_limit_exceeded.empty()) {
+            r.out = read_handle(okeep, out_exceeded);
+            if (!out_exceeded) r.err = read_handle(ekeep, err_exceeded);
+        }
         if (out_exceeded || err_exceeded) { r.out.clear(); r.err.clear(); r.capture_limit_exceeded = out_exceeded ? "stdout" : "stderr"; stream = false; }
         // MSYS2/Cygwin children write CRLF to redirected output in text mode,
         // so normalize captured output to LF; exact-output callers (run(),

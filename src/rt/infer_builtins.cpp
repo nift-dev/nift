@@ -164,6 +164,17 @@ TyRef method_result(const Ast& ast, const Node& n, const TyRef& recv, const std:
     return result;
 }
 
+TyRef process_result() {
+    auto result = std::make_shared<Ty>();
+    result->kinds = kKindObject;
+    result->fields["exit_code"] = kinds_ty(kKindInt);
+    result->fields["stdout"] = kinds_ty(kKindString);
+    result->fields["stderr"] = kinds_ty(kKindString);
+    result->fields["launched"] = kinds_ty(kKindBool);
+    result->fields["error"] = kinds_ty(kKindString | kKindNull);
+    return result;
+}
+
 TyRef function_result(const Ast& ast, const Node& n, const std::vector<TyRef>& values) {
     const std::string_view name = ast.text(ast.at(n.a));
     NativeInfo native{};

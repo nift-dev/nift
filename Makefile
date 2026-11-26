@@ -1277,6 +1277,7 @@ test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT)
 		--count $${RT_VM_SUBSET_GEN:-500}
 	-@$(RT_VM_SUITE) vm-builtins -- python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-host -- python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-package-process -- python3 tests/runtime2/vm_package_process.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-records-coverage -- python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-path-wording -- python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-known-refused -- python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"

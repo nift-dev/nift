@@ -22,6 +22,8 @@
 
 namespace nift::rt {
 
+struct LinkedUnit;
+
 struct Binding {
     std::string session_name;  // compiler-only diagnostic name for a stable session cell
     // Loop reads use the source location until explicit reassignment. The
@@ -136,6 +138,7 @@ bool presentation_name(std::string_view name);  // stringify, prettify, highligh
 bool presentation_builtin_binds(const StructInfo& s, std::string_view name, std::uint32_t argc, bool inside);
 
 struct UnitPlan {
+    const LinkedUnit* linked = nullptr;  // source ownership during compilation
     bool ok = true;
     std::string reason;
     std::uint32_t offset = 0;
@@ -167,7 +170,8 @@ struct UnitPlan {
 // calls (else `fn-called-before-declaration`): legacy registers a function
 // when its declaration runs, and compile-time binding is exact then.
 UnitPlan plan_unit(const Ast& ast, NodeId root,
-                   const std::unordered_set<std::string>* existing_functions = nullptr);
+                   const std::unordered_set<std::string>* existing_functions = nullptr,
+                   const LinkedUnit* linked = nullptr);
 
 // Every name that is the target of `=`, a compound assignment or `++`/`--`
 // anywhere inside the statements of `node`.

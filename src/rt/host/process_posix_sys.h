@@ -52,7 +52,7 @@ struct PreparedExec {
     std::vector<std::string> arguments, environment, candidates;
     std::vector<char*> argv, envp, shell_argv;
     std::string cwd, stdin_path, stdout_path, stderr_path;
-    bool stdout_append = false, stderr_append = false;
+    bool stdout_append = false, stderr_append = false, allow_enoexec_shell = true;
 
     PreparedExec(const SpawnStage& stage, const std::map<std::string, std::string>& base_env) {
         arguments = stage.argv();
@@ -86,6 +86,7 @@ struct PreparedExec {
         stderr_path = stage.stderr_path;
         stdout_append = stage.stdout_append;
         stderr_append = stage.stderr_append;
+        allow_enoexec_shell = stage.allow_enoexec_shell;
     }
 
     [[noreturn]] void exec(int report_fd) {
@@ -96,7 +97,7 @@ struct PreparedExec {
             const auto& candidate = candidates[index];
             ::execve(candidate.c_str(), argv.data(), envp.data());
             const int error = errno;
-            if (error == ENOEXEC) {
+            if (error == ENOEXEC && allow_enoexec_shell) {
                 shell_argv[1] = const_cast<char*>(candidate.c_str());
                 ::execve("/bin/sh", shell_argv.data(), envp.data());
                 child_fail(report_fd, ExecOther, errno, 126);

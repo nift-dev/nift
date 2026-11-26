@@ -3,6 +3,7 @@
 #include "rt/binding_rules.h"
 
 #include "rt/literal.h"
+#include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/text_type.h"
 #include "rt/vm_ops.h"
@@ -46,6 +47,27 @@ bool constant(const Ast& ast, NodeId id, Value& out) {
     }
 }
 
+// These prefixes cannot invoke user code or observe a type before its
+// declaration. Other initializers still close the struct declaration prefix.
+bool module_prefix_data(const Ast& ast, const Node& node) {
+    switch (node.kind) {
+        case NodeKind::Number: case NodeKind::True: case NodeKind::False: case NodeKind::Null:
+            return true;
+        case NodeKind::String:
+            return node.count == 0;
+        case NodeKind::Binary:
+            return node.op == Op::Add && module_prefix_data(ast, ast.at(node.a)) &&
+                   module_prefix_data(ast, ast.at(node.b));
+        case NodeKind::Call:
+            break;
+        default:
+            return false;
+    }
+    const Node& callee = ast.at(node.a);
+    return callee.kind == NodeKind::Ident && node.count == 0 &&
+           ast.text(callee) == "map";  // rt-lint: allow-string-compare compile time
+}
+
 bool admit_method(const Ast& ast, const Node& fn, UnitPlan& plan) {
     if (fn.flags & (kFlagAsync | kFlagDeferredBody)) return refuse(plan, fn, "struct-method");
     if (fn.a == kNoNode || fn.b == kNoNode) return refuse(plan, fn, "struct-method");
@@ -62,7 +84,7 @@ bool admit_method(const Ast& ast, const Node& fn, UnitPlan& plan) {
 
 } // namespace
 
-bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan) {
+bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan, const LinkedUnit* linked) {
     const Node& program = ast.at(root);
     const NodeId* items = ast.list(program);
     // Struct declarations anywhere else than the top level are refused.
@@ -86,7 +108,12 @@ bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan) {
     for (std::uint32_t k = 0; k < program.count; ++k) {
         const Node& st = ast.at(items[k]);
         if (st.kind == NodeKind::FnDecl) continue;
-        if (st.kind != NodeKind::StructDecl) { executable_seen = true; continue; }
+        if (st.kind != NodeKind::StructDecl) {
+            const bool safe_module_data = linked && linked->linked && st.kind == NodeKind::Declare &&
+                st.b != kNoNode && linked->locate(st.begin).module > 0 && module_prefix_data(ast, ast.at(st.b));
+            if (!safe_module_data) executable_seen = true;
+            continue;
+        }
         if (executable_seen) return refuse(plan, st, "struct-after-statement");
         const std::string_view name = ast.text(ast.at(st.a));
         const bool reserved = reserved_name(name) || name == "this";  // rt-lint: allow-string-compare

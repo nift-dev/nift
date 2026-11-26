@@ -146,7 +146,6 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
 
 
 
-
 TyRef Inference::expr(NodeId id) {
     const Node& n = visit(id);
     if (const auto seed = session_expression_seed(id)) return record(id, seed);
@@ -308,6 +307,7 @@ TyRef Inference::call(const Node& n) {
         for (std::uint32_t k = 0; k < n.count; ++k) expr(args[k]);
         return kinds_ty(kKindError);
     }
+    if (const auto process = process_call(n)) return process;
     // CP13B: Error JSON presentation methods (ErrorJson), not natives.
     if (callee.kind == NodeKind::Member) {
         const TyRef recv = expr(callee.a);

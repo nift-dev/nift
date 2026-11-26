@@ -8,6 +8,7 @@
 #include "rt/natives/collection_methods.h"
 #include "rt/natives/host_file_handles.h"
 #include "rt/natives/host_ops.h"
+#include "rt/natives/host_process.h"
 #include "rt/natives/host_stream_handles.h"
 #include "rt/natives/host_stream_extract.h"
 #include "rt/natives/json_methods.h"
@@ -60,6 +61,7 @@ constexpr NativeFn kFunctions[] = {
     stream_read_bytes, stream_read_all_bytes, stream_extract_string, fn_minify, file_write_val,
     file_append, file_prepend, file_insert, file_insert_before, file_insert_after, file_replace, file_replace_once,
     fn_sorted_map, fn_sorted_set,
+    process_check, process_argument, process_spread, process_run, process_run_stdout,
 };
 
 constexpr BuiltinSpec kSpecs[] = {

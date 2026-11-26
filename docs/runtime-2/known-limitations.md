@@ -62,7 +62,7 @@ platforms it prints a SKIP line.
 | Construct | VM refusal reason | Still works with |
 | --- | --- | --- |
 | A delayed import inside a function: `fn(f()) { import("./m.f"); … }` | `import-nested` | `NIFT_VM=0`. Top-level, relative, chained and package imports run on the VM. |
-| Process execution: `run()`, `cmd()` and their handle methods | `callable:run`, `callable:cmd`, `method:run`, `method:pipe`, … | `NIFT_VM=0` (D-029, D-030, D-034) |
+| General process execution outside the v4.13.0 package scope | `callable:run`, `callable:cmd`, `method:run`, `method:pipe`, … | `NIFT_VM=0` (D-029, D-030, D-034, D-065) |
 | FFI: `ffi_open` and FFI calls | `callable:ffi_open` | `NIFT_VM=0`, and the non-VM paths (docs/ffi.md, D-036) |
 | Timers: `timer()` and its handle methods | `callable:timer`, `method:start`, `method:stop`, `method:elapsed`, … | `NIFT_VM=0` |
 | `project_root()` | `callable:project_root` | `NIFT_VM=0`, and project builds (the template compiler, CP24, is deferred: D-053) |
@@ -110,8 +110,11 @@ This construct is refused on the VM by an owner decision. It is not pending work
   same output and effects as the unqualified form. Every other built-in is unchanged.
 - **No implicit external program (scope, D-101 F4).** Function-call syntax never falls back to running a program
   found on PATH: a call is a native, a user function, or refused. This is about implicit dispatch only. The explicit
-  process APIs `run()` and `cmd()` launch programs by design (legacy runs them; the VM refuses them as
-  `deferred-named`). Since C144 and C144b this holds in the interactive and piped shell too, for a call whose head is
+  process APIs launch programs by design. Under the v4.13.0 package amendment to D-065, imported-module code supports
+  synchronous `run("program", ...argv)` and `cmd("program", ...argv).stdout(path).run()` with a literal executable name
+  resolved on PATH, scalar or array arguments, and no retained command handle. On Windows the executable must be native.
+  The entry-script, interactive, and handle-based forms retain their existing refusals. Since C144 and C144b the
+  no-implicit-launch rule holds in the interactive and piped shell too, for a call whose head is
   an identifier, `native::name` or a dotted member head (`o.f`): written with a blank before `(` (`cp ("a.txt",
   "c.txt")`, `o.f ("x")`) it is Nift, not a command line. A line whose first word is a shell built-in, `command`, or
   an environment assignment (`FOO=1 cp (...)`) keeps the shell rule and can run a program (compatibility.md lists
