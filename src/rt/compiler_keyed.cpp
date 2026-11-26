@@ -96,13 +96,28 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
     // (`o["m"].size()`, `f().get(1)` fail there): the same is refused here.
     if (!presentation && (ast_.at(callee.a).kind != NodeKind::Ident || !find_binding(text(ast_.at(callee.a)))))
         return fail(node, "method:" + name) ? 1 : 0;
-    // Legacy checks the arity first, before the receiver binding or any
-    // argument; its message is a fatal Error. Its loop-code report is not
-    // established: refused there.
+    // Textual dispatch checks arity before evaluating arguments. Prepared
+    // dispatch can evaluate them, so only lower the verified literal cases
+    // there. Effectful or faulting arguments still require that evaluation.
     std::string arity_message;
     const int arity = keyed_arity_of(k, name, arity_message);
     if (arity >= 0 && node.count != static_cast<std::uint32_t>(arity)) {
-        if (loop_reachable() || !plain_postfix(node)) return fail(node, "builtin-arity:" + name) ? 1 : 0;
+        if (loop_reachable()) {
+            if (k != kKindMap || (name != "contains" && name != "set") ||
+                (fb_->flags() & kInstrReturnCall))
+                return fail(node, "builtin-arity:" + name) ? 1 : 0;
+            for (std::uint32_t i = 0; i < node.count; ++i) {
+                const Node& arg = ast_.at(ast_.list(node)[i]);
+                if (arg.kind != NodeKind::String || arg.count != 0)
+                    return fail(node, "builtin-arity:" + name) ? 1 : 0;
+                const auto spelling = text(arg);
+                if (spelling.size() < 2 || spelling.front() != '"' || spelling.back() != '"' ||
+                    spelling.substr(1, spelling.size() - 2).find_first_not_of(
+                        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") != std::string_view::npos)
+                    return fail(node, "builtin-arity:" + name) ? 1 : 0;
+            }
+        }
+        if (!plain_postfix(node)) return fail(node, "builtin-arity:" + name) ? 1 : 0;
         return collection_failure(node, dst, std::move(arity_message)) ? 1 : 0;
     }
     if (const int m = keyed_mutator(k, name); m >= 0) return keyed_mutation(node, dst, m) ? 1 : 0;

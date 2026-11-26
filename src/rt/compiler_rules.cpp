@@ -44,14 +44,28 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     const char expected = node.kind == NodeKind::Member ? '.' : node.kind == NodeKind::Index ? '[' : '(';
     // The parser returns the inner AST node for a grouped receiver. Its
     // span ends before the closing parentheses, even when the dot is
-    // adjacent to the group. Admit the verified string methods only.
+    // adjacent to the group. Admit only verified receiver/method pairs.
     if (node.kind == NodeKind::Member && node.begin < left.begin &&
-        left.end < ast_.at(node.b).begin && kinds(node.a) == kKindString) {
+        left.end < ast_.at(node.b).begin) {
         const Node& member = ast_.at(node.b);
         const auto name = ast_.text(member);
         const auto opening = src.substr(node.begin, left.begin - node.begin);
         const auto closing = src.substr(left.end, member.begin - left.end - 1);
-        if ((name == "split" || name == "stringify") &&  // rt-lint: allow-string-compare compile time
+        const bool string_method = kinds(node.a) == kKindString &&
+            (name == "split" || name == "stringify");  // rt-lint: allow-string-compare compile time
+        bool integer_remainder = false;
+        if (left.kind == NodeKind::Binary && left.op == Op::Mod &&
+            ast_.at(left.a).kind == NodeKind::Ident &&
+            kinds(left.a) == kKindInt && kinds(left.b) == kKindInt &&
+            name == "to_string") {  // rt-lint: allow-string-compare compile time
+            const Node& divisor = ast_.at(left.b);
+            const auto spelling = text(divisor);
+            // A nonzero literal avoids context-dependent modulo fault reports.
+            integer_remainder = divisor.kind == NodeKind::Number && !spelling.empty() &&
+                spelling.front() >= '1' && spelling.front() <= '9' &&
+                spelling.find_first_not_of("0123456789") == std::string_view::npos;
+        }
+        if ((string_method || integer_remainder) &&
             opening.size() == closing.size() &&
             opening.find_first_not_of('(') == std::string_view::npos &&
             closing.find_first_not_of(')') == std::string_view::npos &&
