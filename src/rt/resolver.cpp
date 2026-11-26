@@ -37,18 +37,6 @@ const Binding* Scopes::find(std::string_view name) const {
 
 namespace {
 
-// Never an ordinary parameter name on the VM: language words, `this`/`self`
-// (struct instances) and `args` (the script invocation binding).
-bool special_parameter_name(std::string_view name) {
-    static const std::string_view words[] = {
-        "fn", "struct", "enum", "import", "export", "return", "throw", "try", "catch", "if", "else", "while",
-        "for", "break", "continue", "const", "immut", "true", "false", "null", "this", "self", "lambda",
-        "async", "await", "args"};
-    for (std::string_view w : words)
-        if (w == name) return true;  // rt-lint: allow-string-compare cold path, once per parameter
-    return false;
-}
-
 bool reject(UnitPlan& plan, const Node& node, std::string reason) {
     plan.ok = false;
     plan.reason = std::move(reason);
@@ -84,8 +72,7 @@ bool admit_function(const Ast& ast, NodeId id, UnitPlan& plan) {
         // (reads and writes, every context) unless it is called in the body,
         // where legacy calls the built-in (the D-009 #3 split): refused then.
         // Language words and the VM's own special names stay refused.
-        if (reserved_name(ast.text(param)) &&
-            (special_parameter_name(ast.text(param)) || reserved_name_called_in(ast, ast.text(param), ast.at(fn.b))))
+        if (refused_parameter_name(ast, param, ast.at(fn.b)))
             return reject(plan, param, "param-name-reserved");
     }
     plan.functions.push_back(id);

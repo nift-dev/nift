@@ -1,5 +1,6 @@
 #include "rt/structs.h"
 #include "rt/aggregate.h"
+#include "rt/binding_rules.h"
 
 #include "rt/literal.h"
 #include "rt/native.h"
@@ -52,7 +53,8 @@ bool admit_method(const Ast& ast, const Node& fn, UnitPlan& plan) {
     for (std::uint32_t k = 0; k < fn.count; ++k) {
         const Node& param = ast.at(params[k]);
         if (param.kind != NodeKind::Param || (param.flags & kFlagVariadic)) return refuse(plan, param, "fn-param");
-        if (reserved_name(ast.text(param)) || ast.text(param) == "this")  // rt-lint: allow-string-compare
+        const auto name = ast.text(param);
+        if (name == "this" || refused_parameter_name(ast, param, ast.at(fn.b)))  // rt-lint: allow-string-compare
             return refuse(plan, param, "param-name-reserved");
     }
     return true;

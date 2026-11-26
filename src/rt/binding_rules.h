@@ -40,6 +40,9 @@ BindingCallViolation reserved_binding_call(const Ast& ast);
 // legacy then reads and writes it as an ordinary parameter in every context.
 bool reserved_name_called_in(const Ast& ast, std::string_view name, const Node& scope);
 
+// CP25-R parameter admission for named functions and struct methods.
+bool refused_parameter_name(const Ast& ast, const Node& parameter, const Node& body);
+
 // B4 (review H2): a for-loop or catch binding named `this` inside a struct
 // declaration (its methods and the lambdas in them): legacy resolves `this`
 // there to the binding, the VM's receiver analysis to the instance. Refused

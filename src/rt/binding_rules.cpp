@@ -32,11 +32,28 @@ bool first_call(const Ast& ast, std::string_view name, const Node& scope, std::u
     return found;
 }
 
+// Never an ordinary parameter name on the VM: language words, `this`/`self`
+// (struct instances) and `args` (the script invocation binding).
+bool special_parameter_name(std::string_view name) {
+    static const std::string_view words[] = {
+        "fn", "struct", "enum", "import", "export", "return", "throw", "try", "catch", "if", "else", "while",
+        "for", "break", "continue", "const", "immut", "true", "false", "null", "this", "self", "lambda",
+        "async", "await", "args"};
+    for (std::string_view w : words)
+        if (w == name) return true;  // rt-lint: allow-string-compare cold path, once per parameter
+    return false;
+}
+
 }  // namespace
 
 bool reserved_name_called_in(const Ast& ast, std::string_view name, const Node& scope) {
     std::uint32_t at = 0;
     return first_call(ast, name, scope, at);
+}
+
+bool refused_parameter_name(const Ast& ast, const Node& parameter, const Node& body) {
+    const std::string_view name = ast.text(parameter);
+    return reserved_name(name) && (special_parameter_name(name) || reserved_name_called_in(ast, name, body));
 }
 
 BindingCallViolation reserved_binding_call(const Ast& ast) {
