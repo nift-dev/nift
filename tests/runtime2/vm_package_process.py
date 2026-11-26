@@ -64,6 +64,22 @@ def main():
             assert (allowed / "result.txt").read_text() == "written|in order\n"
 
         (allowed / "launches").unlink()
+        (allowed / "runner.f").write_text(
+            'struct(ArgvRunner) {\n'
+            f'fn(launch_with(args)) {{ return run({launcher}, "child.py", ...args) }}\n'
+            '}\nexport(ArgvRunner)\n', encoding="utf-8")
+        method = (
+            'import("./runner.f")\nr := ArgvRunner()\n'
+            'report := r.launch_with(["one", "two words"])\nprint(report.stdout.trim())\n'
+        )
+        for mode in ({}, {"NIFT_VM": "0"}):
+            proc, row = run(method, imported=False, **mode)
+            assert (proc.returncode, proc.stdout, proc.stderr) == (0, "one|two words\n", ""), (proc, row)
+            if not mode:
+                assert (row.get("vm_executions"), row.get("legacy_executions")) == (1, 0), row
+            assert (allowed / "launches").read_text() == "child\n"
+            (allowed / "launches").unlink()
+
         proc, _ = run(script, NIFT_NO_PROCESS="1")
         assert proc.returncode == 1 and not proc.stdout and "external process execution disabled" in proc.stderr, proc
         assert not (allowed / "launches").exists()

@@ -150,6 +150,27 @@ SHAPES.update({
     "struct-method-entry-variadic-refusal": ({
         "main.f": 'struct(ArgsBox) { fn(gather(...tail)) { return tail } }\nprint("must not execute")\n',
     }, "fn-param"),
+    "struct-method-module-args-parameter": ({
+        "m.f": 'struct(Box) { fn(size_of(args)) { return args.size() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.size_of([3, 4]))\nprint(args.size())\n',
+    }, "vm"),
+    "struct-method-module-args-callee-refusal": ({
+        "m.f": 'struct(Box) { fn(call_args(args)) { return args() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("must not execute")\n',
+    }, "param-name-reserved"),
+    "struct-method-module-args-write-refusal": ({
+        "m.f": 'struct(Box) { fn(change(args)) { args = []; return args } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("must not execute")\n',
+    }, "param-name-reserved"),
+    "struct-method-module-args-mutation-refusal": ({
+        "m.f": 'struct(Box) { fn(change(args)) { args.push(3); return args.size() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("must not execute")\n',
+    }, "param-name-reserved"),
+    "struct-method-module-args-custom-size-refusal": ({
+        "m.f": 'struct(Box) { fn(check_size(args)) { return args.size() } }\n'
+               'struct(Other) { fn(size()) { print("effect"); return 6 } }\nexport(Box)\nexport(Other)\n',
+        "main.f": 'import("m.f")\nb := Box()\nc := Other()\nprint(b.check_size(c))\n',
+    }, "param-name-reserved"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',
@@ -167,6 +188,21 @@ SHAPES.update({
         "m.f": 'fn(announce_prefix()) { print("module effect"); return 7 }\ncount := announce_prefix()\n'
                'struct(Box) { x := 3 }\nexport(Box)\n',
         "main.f": 'import("m.f")\np := Box()\nprint(p.x)\n',
+    }, "struct-after-statement"),
+    "struct-after-independent-module-construction": ({
+        "a.f": "struct(Alpha) { x := 3 }\na := Alpha()\nexport(a)\n",
+        "b.f": "struct(Beta) { y := 5 }\nb := Beta()\nexport(b)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint(a.x)\nprint(b.y)\n',
+    }, "vm"),
+    "struct-after-foreign-type-reference": ({
+        "a.f": 'print("before")\na := Beta()\n',
+        "b.f": "struct(Beta) { y := 5 }\nexport(Beta)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\nprint("after")\n',
+    }, "import-scope"),
+    "struct-after-dependent-module-effect": ({
+        "a.f": 'print("before")\nimport("b.f")\n',
+        "b.f": "struct(Beta) { y := 5 }\nexport(Beta)\n",
+        "main.f": 'import("a.f")\nprint("after")\n',
     }, "struct-after-statement"),
     "struct-reexport": ({
         "a.f": "struct(Token) { n := 3 }\nexport(Token)\n",

@@ -4,6 +4,9 @@
 
 #include "rt/literal.h"
 #include "rt/module_link.h"
+#include "rt/compiler_process.h"
+
+#include <algorithm>
 #include "rt/native.h"
 #include "rt/text_type.h"
 #include "rt/vm_ops.h"
@@ -68,17 +71,71 @@ bool module_prefix_data(const Ast& ast, const Node& node) {
            ast.text(callee) == "map";  // rt-lint: allow-string-compare compile time
 }
 
+// The package uses args only as an argv source. Keep any receiver mutation,
+// direct call, forwarding or data escape out of this name exception.
+bool readonly_method_args(const Ast& ast, NodeId id, bool native_run) {
+    if (id == kNoNode) return true;
+    const Node& node = ast.at(id);
+    const auto args_ident = [&](NodeId child) {
+        return child != kNoNode && ast.at(child).kind == NodeKind::Ident &&
+               ast.text(ast.at(child)) == "args";  // rt-lint: allow-string-compare compile time
+    };
+    if (args_ident(id)) return false;
+    if (node.kind == NodeKind::Call) {
+        const Node& callee = ast.at(node.a);
+        if (callee.kind == NodeKind::Member && args_ident(callee.a) && node.count == 0) {
+            const auto name = ast.text(ast.at(callee.b));
+            return name == "size" || name == "length";  // rt-lint: allow-string-compare compile time
+        }
+        const bool direct_run = callee.kind == NodeKind::Ident &&
+                                ast.text(callee) == "run";  // rt-lint: allow-string-compare compile time
+        if (native_run && direct_run && detail::process_program_literal(ast, node)) {
+            for (std::uint32_t k = 0; k < node.count; ++k) {
+                const auto item = ast.list(node)[k];
+                const Node& arg = ast.at(item);
+                if (arg.kind == NodeKind::Spread && args_ident(arg.a)) continue;
+                if (!readonly_method_args(ast, item, native_run)) return false;
+            }
+            return true;
+        }
+    }
+    for (NodeId child : {node.a, node.b, node.c})
+        if (!readonly_method_args(ast, child, native_run)) return false;
+    for (std::uint32_t k = 0; k < node.count; ++k)
+        if (!readonly_method_args(ast, ast.list(node)[k], native_run)) return false;
+    return true;
+}
+
 bool admit_method(const Ast& ast, const Node& fn, UnitPlan& plan) {
     if (fn.flags & (kFlagAsync | kFlagDeferredBody)) return refuse(plan, fn, "struct-method");
     if (fn.a == kNoNode || fn.b == kNoNode) return refuse(plan, fn, "struct-method");
+    const auto owner = plan.linked && plan.linked->linked ? plan.linked->locate(fn.begin).module : 0;
+    const Node& body = ast.at(fn.b);
     const NodeId* params = ast.list(fn);
     for (std::uint32_t k = 0; k < fn.count; ++k) {
         const Node& param = ast.at(params[k]);
-        const bool package_rest = k + 1 == fn.count && plan.linked && plan.linked->locate(fn.begin).module > 0;
+        const bool package_rest = k + 1 == fn.count && owner > 0;
         if (param.kind != NodeKind::Param || ((param.flags & kFlagVariadic) && !package_rest))
             return refuse(plan, param, "fn-param");
         const auto name = ast.text(param);
-        if (name == "this" || refused_parameter_name(ast, param, ast.at(fn.b)))  // rt-lint: allow-string-compare
+        // Local method values can be named args. A module with its own
+        // generated invocation bindings still uses the conservative rule.
+        bool method_args_value = false;
+        if (owner > 0 && !(param.flags & kFlagVariadic) && name == "args" &&  // rt-lint: allow-string-compare
+            plan.linked->graph.modules[owner]->generated_names.empty()) {
+            bool native_run = true;
+            for (NodeId id = 0; id < ast.size(); ++id) {
+                const Node& candidate = ast.at(id);
+                if ((candidate.kind == NodeKind::FnDecl || candidate.kind == NodeKind::Declare) &&
+                    candidate.a != kNoNode && ast.text(ast.at(candidate.a)) == "run") { // rt-lint: allow-string-compare
+                    native_run = false;
+                    break;
+                }
+            }
+            method_args_value = readonly_method_args(ast, fn.b, native_run);
+        }
+        const bool receiver_name = name == "this";  // rt-lint: allow-string-compare
+        if (receiver_name || (!method_args_value && refused_parameter_name(ast, param, body)))
             return refuse(plan, param, "param-name-reserved");
     }
     return true;
@@ -106,17 +163,37 @@ bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan, const LinkedUnit*
         const NodeId* list = ast.list(n);
         for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
     }
-    bool executable_seen = false;
+    // An earlier statement may observe a declaration from its own module or
+    // one of its dependencies. Independent earlier modules have no lexical
+    // route to this type. Entry statements keep the original prefix fence.
+    const bool linked_script = linked && linked->linked;
+    std::vector<bool> blocked(linked_script ? linked->graph.modules.size() : 1, false);
+    const auto seal = [&](std::size_t owner) {
+        if (owner == 0) {
+            std::fill(blocked.begin(), blocked.end(), true);
+            return;
+        }
+        std::vector<std::size_t> pending{owner};
+        while (!pending.empty()) {
+            const auto module = pending.back();
+            pending.pop_back();
+            if (blocked[module]) continue;
+            blocked[module] = true;
+            for (const auto& edge : linked->graph.modules[module]->imports)
+                pending.push_back(edge.module);
+        }
+    };
     for (std::uint32_t k = 0; k < program.count; ++k) {
         const Node& st = ast.at(items[k]);
         if (st.kind == NodeKind::FnDecl) continue;
+        const std::size_t owner = linked_script ? linked->locate(st.begin).module : 0;
         if (st.kind != NodeKind::StructDecl) {
-            const bool safe_module_data = linked && linked->linked && st.kind == NodeKind::Declare &&
-                st.b != kNoNode && linked->locate(st.begin).module > 0 && module_prefix_data(ast, ast.at(st.b));
-            if (!safe_module_data) executable_seen = true;
+            const bool safe_module_data = owner > 0 && st.kind == NodeKind::Declare &&
+                st.b != kNoNode && module_prefix_data(ast, ast.at(st.b));
+            if (!safe_module_data) seal(owner);
             continue;
         }
-        if (executable_seen) return refuse(plan, st, "struct-after-statement");
+        if (blocked[owner]) return refuse(plan, st, "struct-after-statement");
         const std::string_view name = ast.text(ast.at(st.a));
         const bool reserved = reserved_name(name) || name == "this";  // rt-lint: allow-string-compare
         if (reserved) return refuse(plan, st, "struct-name");
