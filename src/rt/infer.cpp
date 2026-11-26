@@ -8,6 +8,7 @@
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/number.h"
+#include "rt/structs.h"
 #include <cmath>
 #include <memory>
 #include <string>
@@ -32,6 +33,7 @@ Inference::Inference(const Ast& ast, NodeId root, const UnitPlan& plan, const Gl
     for (std::size_t f = 0; f < n; ++f) {
         const auto& fn = ast.at(plan.functions[f]);
         params_[f].assign(fn.count, empty_ty());
+        if (variadic_method(ast, fn)) params_[f].back() = kinds_ty(kKindArray);
         if (session_) for (std::uint32_t k = 0; k < fn.count; ++k) {
             const auto seed = session_->parameter_seeds.find(ast.list(fn)[k]);
             if (seed != session_->parameter_seeds.end()) params_[f][k] = seed->second;
@@ -69,7 +71,6 @@ UnitKinds Inference::run(std::size_t max_walks) {
     result_.converged = true;
     return std::move(result_);
 }
-
 void Inference::enqueue(std::size_t unit) {
     ++result_.work.reader_checks;  // B4b 28: every check, queued or not
     if (session_ && unit > plan_.functions.size()) {
@@ -81,7 +82,6 @@ void Inference::enqueue(std::size_t unit) {
     if (!queued_[unit]) queue_.push_back(unit), ++result_.work.enqueues;
     queued_[unit] = true;
 }
-
 std::size_t Inference::current_unit() const {
     return current_ < 0 ? plan_.functions.size() : static_cast<std::size_t>(current_);
 }

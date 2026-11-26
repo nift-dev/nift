@@ -88,7 +88,8 @@ UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, co
             const NodeId* params = ast.list(fn);
             // CP22: an async call binds parameters from values (legacy's __future_argN).
             for (std::uint32_t k = 0; k < fn.count && !(fn.flags & kFlagAsync); ++k)
-                if (!observable_[f][k] && names[f].count(ast.text(ast.at(params[k])))) {
+                if (!(ast.at(params[k]).flags & kFlagVariadic) && !observable_[f][k] &&
+                    names[f].count(ast.text(ast.at(params[k])))) {
                     observable_[f][k] = true;
                     changed = true;
                 }
@@ -343,6 +344,7 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     for (const Instr& in : out->code)
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (in.op == OpCode::BindType && in.a == type_regs[k] && !observable_[f][k] && !(node.flags & kFlagAsync) &&
+                !(ast_.at(params[k]).flags & kFlagVariadic) &&
                 !captured_binding(node_id(ast_.at(params[k]))) &&
                 !selector_roots_.count(node_id(ast_.at(params[k]))))
                 return fail(ast_.at(params[k]), "param-type-unpredicted");

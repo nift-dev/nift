@@ -129,6 +129,27 @@ SHAPES.update({
                'fn(read()) { result := {"exit_code": 7}; return this.report(result.exit_code) } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.code)\n',
     }, "path-in-call-argument"),
+    "struct-method-module-variadic": ({
+        "m.f": 'struct(ArgsBox) { fn(gather(head, ...tail)) { tail.push(head); return tail }\n'
+               'fn(forward(head, ...tail)) { return this.gather(head, ...tail) } }\nexport(ArgsBox)\n',
+        "main.f": 'import("m.f")\nb := ArgsBox()\n'
+                  'collected_empty := b.gather(1)\ncollected_first := b.gather(2, 3, 4)\n'
+                  'data := [5, 6]\ncollected_spread := b.gather(7, ...data, 8)\n'
+                  'collected_forwarded := b.forward(9, 10)\n'
+                  'print(collected_empty.stringify())\nprint(collected_first.stringify())\nprint(collected_spread.stringify())\n'
+                  'print(data.stringify())\nprint(collected_forwarded.stringify())\n',
+    }, "vm"),
+    "struct-method-module-variadic-order": ({
+        "m.f": 'struct(ArgsBox) { fn(gather(head, ...tail)) { tail.push(head); return tail } }\nexport(ArgsBox)\n',
+        "main.f": 'import("m.f")\nb := ArgsBox()\ndata := [1, 2]\n'
+                  'later_ordinary := () => { print("fixed"); data.push(9); return 4 }\n'
+                  'early_expansion := () => { print("spread"); return data }\n'
+                  'r := b.gather(later_ordinary(), ...early_expansion())\n'
+                  'print(r.stringify())\nprint(data.stringify())\n',
+    }, "vm"),
+    "struct-method-entry-variadic-refusal": ({
+        "main.f": 'struct(ArgsBox) { fn(gather(...tail)) { return tail } }\nprint("must not execute")\n',
+    }, "fn-param"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

@@ -74,7 +74,9 @@ bool admit_method(const Ast& ast, const Node& fn, UnitPlan& plan) {
     const NodeId* params = ast.list(fn);
     for (std::uint32_t k = 0; k < fn.count; ++k) {
         const Node& param = ast.at(params[k]);
-        if (param.kind != NodeKind::Param || (param.flags & kFlagVariadic)) return refuse(plan, param, "fn-param");
+        const bool package_rest = k + 1 == fn.count && plan.linked && plan.linked->locate(fn.begin).module > 0;
+        if (param.kind != NodeKind::Param || ((param.flags & kFlagVariadic) && !package_rest))
+            return refuse(plan, param, "fn-param");
         const auto name = ast.text(param);
         if (name == "this" || refused_parameter_name(ast, param, ast.at(fn.b)))  // rt-lint: allow-string-compare
             return refuse(plan, param, "param-name-reserved");

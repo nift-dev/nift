@@ -10,7 +10,7 @@
 //     no function shares (L47, L48);
 //   - field initialisers are constants (legacy evaluates them at each
 //     construction with the bindings visible then, L49);
-//   - methods are plain functions of the struct (no async, no variadics),
+//   - methods are synchronous functions of the struct,
 //     named unlike top-level functions and fields; the constructor is the
 //     method named like the struct.
 // Refusals: struct-nested, struct-after-statement, struct-redeclared,
@@ -22,6 +22,11 @@ namespace nift::rt {
 
 // Fills plan.structs / struct_index and appends every method to
 // plan.functions (method_of: its struct). False (plan refused) otherwise.
+inline bool variadic_method(const Ast& ast, const Node& fn) {
+    return (fn.flags & kFlagMethod) && fn.count &&
+           (ast.at(ast.list(fn)[fn.count - 1]).flags & kFlagVariadic);
+}
+
 bool plan_structs(const Ast& ast, NodeId root, UnitPlan& plan, const LinkedUnit* linked);
 
 } // namespace nift::rt

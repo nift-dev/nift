@@ -3,6 +3,7 @@
 
 #include "rt/number.h"
 #include "rt/session_mutation_shape.h"
+#include "rt/structs.h"
 
 #include <memory>
 
@@ -86,11 +87,33 @@ TyRef Inference::method_call(std::size_t f, const Node& n) {
     const NodeId* args = ast_.list(n);
     auto& params = params_[f];
     if (session_) session_call_edge(f, params.size(), n.count);
+    const bool variadic = variadic_method(ast_, ast_.at(plan_.functions[f]));
+    const std::size_t fixed = params.size() - (variadic ? 1u : 0u);
     bool grew = false;
-    for (std::uint32_t k = 0; k < n.count; ++k) {
-        const TyRef v = expr(args[k]);
-        if (k < params.size()) grew = merge(params[k], v) || grew;
+    std::shared_ptr<Ty> rest;
+    if (variadic) {
+        rest = std::make_shared<Ty>();
+        rest->kinds = kKindArray;
     }
+    std::vector<TyRef> spreads;
+    if (variadic && n.count > fixed) {
+        spreads.resize(n.count - fixed);
+        for (std::size_t k = fixed; k < n.count; ++k) {
+            const Node& operand = ast_.at(args[k]);
+            if (operand.kind == NodeKind::Spread) spreads[k - fixed] = element_of(expr(operand.a), nullptr, false);
+        }
+    }
+    for (std::uint32_t k = 0; k < n.count; ++k) {
+        if (k < fixed) grew = merge(params[k], expr(args[k])) || grew;
+        else if (rest) {
+            const auto& spread = spreads[k - fixed];
+            const auto value = spread ? spread : expr(args[k]);
+            rest->elem = unite(rest->elem ? rest->elem : empty_ty(), value);
+        } else {
+            expr(args[k]);
+        }
+    }
+    if (rest) grew = merge(params.back(), rest) || grew;
     if (grew) enqueue(f);
     callers_[f].insert(current_unit());
     return returns_[f];
