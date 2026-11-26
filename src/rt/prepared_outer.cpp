@@ -4,6 +4,7 @@
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
 
+#include <unordered_map>
 #include <vector>
 
 namespace nift::rt {
@@ -44,6 +45,31 @@ bool outer_bindings_int_typed(const Ast& ast, NodeId root, const UnitPlan& plan,
         for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
     }
     return true;
+}
+
+// The expression parameter is local to the new callable. A spelling
+// confined to that parameter and its read cannot influence the prepared
+// declaration through another scope.
+std::unordered_set<NodeId> prepared_lambda_literals(const Ast& ast) {
+    std::unordered_map<std::string_view, std::size_t> names;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const Node& node = ast.at(id);
+        if (node.kind == NodeKind::Ident || node.kind == NodeKind::Param) ++names[ast.text(node)];
+    }
+    std::unordered_set<NodeId> proven;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const Node& lambda = ast.at(id);
+        if (lambda.kind != NodeKind::Lambda || lambda.count != 1 ||
+            (lambda.flags & (kFlagBlockBody | kFlagAsync))) continue;
+        const Node& body = ast.at(lambda.b);
+        if (body.kind != NodeKind::Binary || body.op != Op::Add || ast.at(body.a).kind != NodeKind::String ||
+            ast.at(body.a).count != 0 || ast.at(body.b).kind != NodeKind::Ident) continue;
+        const Node& parameter = ast.at(ast.list(lambda)[0]);
+        const auto name = ast.text(parameter);
+        if (!(parameter.flags & kFlagVariadic) && ast.text(ast.at(body.b)) == name && names.at(name) == 2)
+            proven.insert(id);
+    }
+    return proven;
 }
 
 } // namespace nift::rt

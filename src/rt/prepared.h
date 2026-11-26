@@ -36,6 +36,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace nift::rt {
@@ -47,9 +48,11 @@ struct PreparedRefusal {
     // Functions legacy may call from prepared (loop) code, transitively
     // (over-approximated): their bodies run on its prepared evaluator.
     std::vector<bool> loop_called;
+    std::unordered_set<NodeId> lambda_literals;
 };
 
 // `kinds`: the unit's converged kinds, or null (rt/prepared_outer.h).
-PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds);
+PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds,
+                                       bool standalone);
 
 } // namespace nift::rt

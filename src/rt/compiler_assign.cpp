@@ -13,7 +13,6 @@
 namespace nift::rt::detail {
 
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
-    if (reserved_name(name) && !invocation_shadows_.count(node_id(at))) return fail(at, "binding-name-reserved");
     if (session_ && plan_.index.count(name)) return fail(at, "binding-shadows-fn");
     // The type register comes first so the value register is the newest one
     // (a call initialiser then returns in place).
@@ -54,6 +53,13 @@ bool UnitCompiler::declare(const Node& node) {
         if (indexed != 0) return indexed > 0;
     }
     const std::string_view name = text(target);
+    const Node& init = ast_.at(node.b);
+    const bool same_value = name == "same" && init_kinds == kKindBool &&  // rt-lint: allow-string-compare compile time
+        init.kind == NodeKind::Binary && (init.op == Op::Eq || init.op == Op::Ne) &&
+        !session_ && !in_function_ && !in_lambda_ && !plan_.coroutines &&
+        (!module_names_ || module_names_->empty());
+    if (reserved_name(name) && !same_value && !invocation_shadows_.count(node_id(target)))
+        return fail(target, "binding-name-reserved");
     const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
     if (parameter && parameter->decl_node != kNoNode &&
         ast_.at(parameter->decl_node).kind == NodeKind::Param &&
@@ -74,7 +80,6 @@ bool UnitCompiler::declare(const Node& node) {
     binding.const_array = (node.flags & kFlagConst) != 0 && !const_scalar;
     binding.const_scalar = const_scalar;
     // CP12b structs: `p := Name(args)` makes the instance the binding holds.
-    const Node& init = ast_.at(node.b);
     const auto made = init.kind == NodeKind::Call && ast_.at(init.a).kind == NodeKind::Ident
                           ? plan_.struct_index.find(text(ast_.at(init.a)))
                           : plan_.struct_index.end();
@@ -90,11 +95,11 @@ bool UnitCompiler::declare(const Node& node) {
     binding.string_literal_initializer = init.kind == NodeKind::String;
     binding.decl_text_double = inferred.kind == TextType::Kind::Known && inferred.known == 3;
     binding.decl_may_double = may_double(inferred, scope_index());
-    // The legacy text probe can see lambda-body operands while typing the
-    // initializer. A name absent from the enclosing top-level scope has no
-    // type at declaration time, even if it will exist when invoked.
-    const bool lambda_initializer = init.kind == NodeKind::Lambda && !in_function_ && !in_lambda_ &&
-                                    !session_ && !loop_reachable() && (!module_names_ || module_names_->empty());
+    // The legacy type probe can see lambda-body operands. An unbound formal
+    // has no type at declaration time.
+    const bool lambda_initializer = !session_ && (!module_names_ || module_names_->empty()) &&
+        ((init.kind == NodeKind::Lambda && !in_function_ && !in_lambda_ && !loop_reachable()) ||
+         prepared_lambdas_.count(node.b));
     if (!text_type_of(inferred, init, text_type, lambda_initializer)) return false;
     fb_->set_offset(node.begin);
     fb_->emit(OpCode::BindType, binding.type_reg, reg, text_type);

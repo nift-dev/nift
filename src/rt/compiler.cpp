@@ -166,43 +166,6 @@ bool UnitCompiler::statement(NodeId id) {
     return ok && builder_ok();
 }
 
-bool UnitCompiler::if_chain(const Node& node) {
-    std::vector<std::size_t> to_else;
-    if (!false_jump(node.a, to_else)) return false;
-    const Node& body = ast_.at(node.b);
-    scopes_.push();
-    BlockRegs body_regs = block_begin(node.b);
-    const bool ok = statements(body);
-    block_end(body_regs);
-    scopes_.pop();
-    if (!ok) return false;
-    block_clear(body_regs);
-    if (node.c == kNoNode) {
-        for (std::size_t at : to_else) fb_->patch(at, fb_->here());
-        return builder_ok();
-    }
-    const std::size_t to_end = fb_->emit(OpCode::Jmp);
-    for (std::size_t at : to_else) fb_->patch(at, fb_->here());
-    const Node& other = ast_.at(node.c);
-    bool other_ok = false;
-    if (other.kind == NodeKind::If) {
-        other_ok = if_chain(other);
-        if (other_ok && loop_region() && !statement_preparable(other))
-            other_ok = fail(other, "prepared-unpreparable");
-    } else {
-        scopes_.push();
-        const std::uint16_t mark = fb_->top();
-        BlockRegs else_regs = block_begin(node.c);
-        other_ok = statements(other);
-        block_end(else_regs);
-        if (other_ok) block_clear(else_regs);
-        fb_->release_to(mark);
-        scopes_.pop();
-    }
-    fb_->patch(to_end, fb_->here());
-    return other_ok && builder_ok();
-}
-
 bool UnitCompiler::return_statement(const Node& node) {
     fb_->session_returns |= node.a == kNoNode ? kKindNull : kinds(node.a);
     const auto end_tries = [this, &node] {
@@ -297,7 +260,8 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         const auto refusal = validate_session_history(kinds, plan.functions.size());
         if (!refusal.empty()) { result.reason = refusal; result.offset = ast.at(root).begin; return result; }
     }
-    const PreparedRefusal prepared = check_prepared_contexts(ast, root, plan, kinds.converged ? &kinds : nullptr);
+    const PreparedRefusal prepared = check_prepared_contexts(
+        ast, root, plan, kinds.converged ? &kinds : nullptr, !limits.session && limits.module_names.empty());
     if (prepared.refused) {
         result.reason = prepared.reason;
         result.offset = prepared.offset; result.positioned = true;
@@ -327,7 +291,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
     // CP22: a coroutine unit's futures and excluded constructs (compiler_coro.h).
     if (!check_coroutine_unit(ast, root, plan, kinds, limits, result.reason, result.offset, result.positioned))
         return result;  // positioned only where the check recorded a node's offset (not coro-module)
-    detail::UnitCompiler compiler(ast, root, plan, kinds, prepared.loop_called, &globals);
+    detail::UnitCompiler compiler(ast, root, plan, kinds, prepared, &globals);
     compiler.set_module_names(&limits.module_names);
     compiler.set_session(limits.session, limits.invocation);
     if (expression_result) compiler.expression_result();
@@ -339,7 +303,7 @@ static CompileResult compile_unit_impl(const Ast& ast, NodeId root, const Compil
         if (compiler.unknown_hit() && !limits.session) {
             // Unknown kinds come from something refused anyway: report that
             // refusal when the probe finds one (the unit is refused either way).
-            detail::UnitCompiler probe(ast, root, plan, kinds, prepared.loop_called, &globals);
+            detail::UnitCompiler probe(ast, root, plan, kinds, prepared, &globals);
             probe.probe_unknown();
             if (expression_result) probe.expression_result();
             probe.set_module_names(&limits.module_names);

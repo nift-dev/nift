@@ -15,4 +15,6 @@ NodeKind keyword_kind(std::string_view word);
 // the same literal elsewhere: regular only without `$[` and backslashes.
 bool verbatim_literal_ok(const Ast& ast, NodeId item);
 
+bool condition_object_is_json(std::string_view source, std::uint32_t begin, std::uint32_t end);
+
 } // namespace nift::rt::detail

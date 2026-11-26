@@ -1,4 +1,5 @@
 #include "rt/compiler_unit.h"
+#include "rt/prepared.h"
 #include "rt/session_shape.h"
 
 #include <unordered_set>
@@ -59,8 +60,9 @@ void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
 } // namespace
 
 UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
-                           const std::vector<bool>& loop_called, const GlobalPlan* globals)
-    : globals_(globals), ast_(ast), plan_(plan), kinds_(kinds), root_(root), loop_called_(loop_called) {
+                           const PreparedRefusal& prepared, const GlobalPlan* globals)
+    : globals_(globals), ast_(ast), plan_(plan), kinds_(kinds), root_(root),
+      loop_called_(prepared.loop_called), prepared_lambdas_(prepared.lambda_literals) {
     for (NodeId id = 0; id < ast_.size() && !variadic_parameters_; ++id) {
         const Node& node = ast_.at(id);
         variadic_parameters_ = node.kind == NodeKind::Param && (node.flags & kFlagVariadic);

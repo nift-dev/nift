@@ -19,6 +19,9 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (!plain_postfix(node) || !no_trailing_comma(node)) return false;
     const std::string_view name = text(callee);
     const Binding* bound = find_binding(name);
+    if (bound && name == "same" && bound->decl_node != kNoNode &&  // rt-lint: allow-string-compare compile time
+        ast_.at(bound->decl_node).kind == NodeKind::Ident && bound->decl_kinds == kKindBool &&
+        !session_ && !in_function_ && !in_lambda_) bound = nullptr;
     // Legacy's built-in `cmd(...)` (the process builder) takes precedence over
     // the `cmd` invocation binding (a string) or a top-level `cmd := …`: that
     // call is the built-in's, refused on the VM (`callable:cmd`, deferred).
@@ -329,9 +332,13 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     if (index_depth_ > 0) return fail(node, "path-in-index");
     const KindSet object_kinds = kinds(node.a), key_kinds = kinds(node.b);
     const bool array = (object_kinds & ~kKindArray) == 0;
-    const bool bytes = object_kinds == kKindBytes && !loop_reachable() && key_kinds && !(key_kinds & ~kKindNumber);
+    const bool bytes = object_kinds == kKindBytes && key_kinds && !(key_kinds & ~kKindNumber) &&
+        (!loop_reachable() || (loop_region() && key_kinds == kKindInt && ast_.at(node.a).kind == NodeKind::Ident &&
+                              ast_.at(node.b).kind == NodeKind::Ident));
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
     const Node& key_ast = ast_.at(node.b);
+    const bool bad_bytes_key = object_kinds == kKindBytes && key_kinds == kKindString &&
+        !loop_reachable() && !session_ && key_ast.kind == NodeKind::Ident;
     const bool bad_boolean_key = in_lambda_ && !session_ && !loop_reachable() &&
                                  return_read_offset_ == kNoNode && object_kinds == kKindArray &&
                                  (key_ast.kind == NodeKind::True || key_ast.kind == NodeKind::False);
@@ -345,7 +352,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
         key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
         !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    if (!(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
+    if (!(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key && !bad_bytes_key &&
         !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
@@ -373,8 +380,9 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
         fb_->release_to(mark);
         return ok;
     }
-    if (bad_boolean_key) {
-        const bool ok = legacy_fatal(node, "JSON array indices must be non-negative integers in '" +
+    if (bad_boolean_key || bad_bytes_key) {
+        const std::string kind = bad_bytes_key ? "bytes" : "JSON array";
+        const bool ok = legacy_fatal(node, kind + " indices must be non-negative integers in '" +
                                      std::string(location.empty() ? text(chain) : location) + "'", dst);
         fb_->release_to(mark);
         return ok;

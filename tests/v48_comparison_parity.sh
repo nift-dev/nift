@@ -56,6 +56,13 @@ same := a == [1,2]
 if(same != (a == [1,2])) { print("mismatch") } else { print("match") }' "match"
 ok "precomputed condition then direct nested" 'same := [1,2] == [1,2]
 if(same && [1,2] == [1,2]) { print("parity") }' "parity"
+ok "same value binding preserves builtin invocation" 'a := [1]
+same := a == [2]
+print(same)
+print(same(a, a))' $'false\ntrue'
+ok "JSON condition selects else without evaluating then" 'if({"k":[1]} == {"k":[2]}) {
+  print("wrong")
+} else { print("else") }' "else"
 
 # Function bodies: direct conditions in return and nested call sites.
 ok "function condition" 'fn(f()) {
@@ -85,6 +92,7 @@ print(i)' "1"
 err "ordinary array ordering rejected" 'print([1] < [2])' "ordering comparisons require two numbers or two strings"
 err "direct if array ordering rejected" 'if([1] < [2]) { print("yes") }' "ordering comparisons require two numbers or two strings"
 err "direct if object ordering rejected" 'if({"a":1} > {"b":2}) { print("yes") }' "ordering comparisons require two numbers or two strings"
+err "direct condition ordering retains its diagnostic context" 'if([1] >= [2]) { print("yes") }' "@if ordering comparisons require two numbers or two strings of the same type"
 
 # Template (prepared) execution.
 mkdir -p "$t/site/.nift" "$t/site/content" "$t/site/templates"

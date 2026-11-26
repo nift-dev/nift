@@ -102,7 +102,8 @@ inline std::int64_t text_binding_type(std::int64_t text_type, const Value& value
 // computed for the value; `name` the binding).
 bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault);
 
-bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault);
+bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault,
+               bool prepared = false);
 // set_index and push_value: the SetIndex and Push implementations (the
 // mutation protocol). `graph`: the VM's cycle graph (null: the default); a
 // refused cycle sets *cycle and returns false without raising (the VM raises

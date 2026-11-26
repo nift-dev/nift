@@ -1,5 +1,7 @@
 // Postfix links of the Runtime 2.0 expression parser (see expr_postfix.h).
 #include "rt/expr_postfix.h"
+#include "rt/expr_literals.h"
+#include "Json.h"
 #include "rt/native_qualifier.h"
 
 #include <algorithm>
@@ -197,6 +199,25 @@ NodeId ExprParser::call(NodeId callee, std::uint32_t begin) {
     ast_.at(args).a = callee;
     ast_.at(args).begin = begin;
     return args;
+}
+
+bool verbatim_literal_ok(const Ast& ast, NodeId item) {
+    const Node& node = ast.at(item);
+    if (node.kind != NodeKind::String) return true;
+    const std::string_view text = ast.text(node);
+    return text.find('\\') == std::string_view::npos && text.find("$[") == std::string_view::npos;
+}
+
+// Legacy scans condition separators through braces. A complete JSON literal
+// without those separators needs no evaluation or legacy parse inside it.
+bool condition_object_is_json(std::string_view source, std::uint32_t begin, std::uint32_t end) {
+    std::uint32_t close = 0;
+    if (!find_balanced(source, begin, end, '{', '}', close)) return false;
+    const auto literal = source.substr(begin, close + 1 - begin);
+    if (literal.find_first_of("<>=!&|?$") != std::string_view::npos) return false;
+    json::Document document;
+    std::string error;
+    return nift_json::parse(std::string(literal), document, error);
 }
 
 } // namespace nift::rt::detail

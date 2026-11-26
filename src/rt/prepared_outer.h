@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <string_view>
+#include <unordered_set>
 
 namespace nift::rt {
 
@@ -22,5 +23,7 @@ namespace nift::rt {
 // kinds (nullptr) only the absence of such bindings qualifies.
 bool outer_bindings_int_typed(const Ast& ast, NodeId root, const UnitPlan& plan, std::size_t f,
                               std::string_view name, const UnitKinds* kinds);
+
+std::unordered_set<NodeId> prepared_lambda_literals(const Ast& ast);
 
 } // namespace nift::rt

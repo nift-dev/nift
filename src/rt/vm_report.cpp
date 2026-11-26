@@ -262,7 +262,7 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             return true;
         }
         case OpCode::GetIndex:  // checkpoint 1: a failed step of an assignment path reports legacy's wording
-            if (!get_index(note, R[in.b], RK(in.c), out, fault))
+            if (!get_index(note, R[in.b], RK(in.c), out, fault, (in.flags & kInstrLoopPath) != 0))
                 return note && note->assign_path && path_step(note, R[in.b], RK(in.c), out, fault);
             break;
         case OpCode::SetIndex: {

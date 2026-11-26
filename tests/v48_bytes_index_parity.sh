@@ -55,6 +55,10 @@ err "bytes index out of range" 'b := bytes([10,20,30]); i := 9
 print(b[i])' "bytes index 9 is out of range"
 err "bytes index non-integer" 'b := bytes([10,20,30]); i := "x"
 print(b[i])' "bytes indices must be non-negative integers"
+err "prepared negative bytes index" 'b := bytes([4]); i := 0; k := -1
+while(i < 1) { print(b[k]); i += 1 }' "invalid index"
+err "prepared out-of-bounds bytes index" 'b := bytes([4]); i := 0; k := 1
+while(i < 1) { print(b[k]); i += 1 }' "bytes index 1 is out of range"
 err "array index out of range preserved" 'a := [10,20,30]; i := 9
 print(a[i])' "is out of range"
 

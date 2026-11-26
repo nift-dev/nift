@@ -61,22 +61,38 @@ err() {
 ok "bare import" "$T/scripts" bare.f 42
 ok "spaced import" "$T/scripts" spaced.f 42
 ok "@import" "$T/scripts" legacy.f 42
-# Owner 2026-11-10 13:26, item 5 (combined-b3-b5.md section 81): a function named like a built-in
-# (`import`) is refused under the VM default (fn-name-reserved). The session refuses that
-# first statement before running it and stops: nothing ran. Legacy (NIFT_VM=0) keeps the original
-# check (the import statement is not overridden by the user callable).
-# Review of C83-C99, P1-1/P1-2 (combined-b3-b5.md section 89): the refusal counts only while its
-# inventory status (classification.tsv) is approved or deferred-named; fn-name-reserved is PENDING-OWNER.
+# D-078 #1 approves fn-name-reserved by name. The exact REPL member was
+# recorded in combined-b3-b5.md §85, and §3.3 of the post-CP1 rescan
+# identifies script_import_syntax as a gate of that family.
 status=$(python3 -B "$(dirname "$0")/runtime2/approved_refusal.py" status fn-name-reserved)
-if [ "$status" != approved ] && [ "$status" != deferred-named ]; then
-    fail "REPL fn named import: refused with fn-name-reserved, whose inventory status is $status (only approved or deferred-named may be accepted)"
+if [ "$status" != deferred-post-cert ]; then
+    fail "REPL fn named import: expected the D-078 deferral, got $status"
 fi
 rc=0
 printf '%s\n' 'fn(import(x)) { return 99 }' 'import("module.f")' 'answer()' > "$T/repl.in"
-repl=$(cd "$T/scripts" && "$NIFT" < "$T/repl.in" 2>&1) || rc=$?
-if [[ $rc -ne 1 ]] || ! grep -qF 'NIFT_VM session refused: fn-name-reserved:' <<<"$repl" \
-   || ! grep -qF 'note: this statement was not executed' <<<"$repl" || grep -q '42\|99' <<<"$repl"; then
-    fail "REPL fn named import: not the session refusal fn-name-reserved: exit $rc: $repl"
+(cd "$T/scripts" && env -u NIFT_VM NIFT_VM_STATS="$T/repl.stats" "$NIFT" \
+    < "$T/repl.in" > "$T/repl.out" 2> "$T/repl.err") || rc=$?
+if [[ $rc -ne 1 || -s "$T/repl.out" ]] \
+   || ! grep -qF 'error: <stdin>:1:1: NIFT_VM session refused: fn-name-reserved:' "$T/repl.err" \
+   || ! grep -qF 'note: this statement was not executed' "$T/repl.err" \
+   || ! grep -qF 'no later input was run' "$T/repl.err"; then
+    fail "REPL fn named import: expected refusal before the first statement: exit $rc: $(cat "$T/repl.err")"
+fi
+if ! python3 -B - "$T/repl.stats" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as stats:
+        row, = map(json.loads, stats)
+    expected = {"outcome": "require-error", "reason": "fn-name-reserved", "line": 1, "column": 1,
+                "vm_executions": 0, "legacy_executions": 0}
+    sys.exit(any(row.get(key) != value for key, value in expected.items()))
+except (OSError, ValueError):
+    sys.exit(1)
+PY
+then
+    fail "REPL fn named import: expected a single refusal record with zero executions"
 fi
 rc=0
 repl=$(cd "$T/scripts" && NIFT_VM=0 "$NIFT" < "$T/repl.in" 2>&1) || rc=$?

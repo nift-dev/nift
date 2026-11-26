@@ -81,6 +81,9 @@ for(i : [1]) { try { call_it(bad) } catch(e) { print(e.message) } }' "boom"
 ok "callable shadowed by lambda inside prepared" 'fn(f()) { return "outer" }
 fn(inner()) { f := (x) => "lambda:" + x; return f("z") }
 for(i : [1]) { print(inner()) }' "lambda:z"
+ok "prepared lambda shadow does not leak to later calls" 'fn(f()) { return "outer" }
+fn(inner()) { f := (local) => "lambda:" + local; return f("z") }
+for(i : [1]) { print(inner()); print(f()) }' $'lambda:z\nouter'
 
 # Invalid callable behaviour is preserved.
 

@@ -149,6 +149,8 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     const OpCode op = binary_opcode(node.op);
     if (op == OpCode::Nop) return fail(node, "binary-operator");
     if (!infix_left_ok(node) || !comparison_chain_ok(node)) return false;
+    if (const int rejected = literal_ordering_error(node, node, dst); rejected >= 0)
+        return rejected != 0;
     KindSet l = kinds(node.a), r = kinds(node.b);
     // CP23: use the kind of an atomic handle's contents.
     if (l & kKindAtomicInt) l |= kKindInt;
@@ -213,15 +215,6 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->patch(decided, fb_->here());
     fb_->emit(OpCode::LoadBool, dst, is_and ? 0 : 1);
-    fb_->patch(done, fb_->here());
-    return builder_ok();
-}
-
-bool UnitCompiler::coalesce(const Node& node, std::uint16_t dst) {
-    if (!infix_left_ok(node)) return false;
-    if (!expr_to(node.a, dst)) return false;
-    const std::size_t done = fb_->emit(OpCode::JmpNotNull, dst);
-    if (!expr_to(node.b, dst)) return false;
     fb_->patch(done, fb_->here());
     return builder_ok();
 }

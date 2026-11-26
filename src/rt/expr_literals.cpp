@@ -191,13 +191,6 @@ NodeId ExprParser::lambda_body(NodeId lambda) {
     return lambda;
 }
 
-bool verbatim_literal_ok(const Ast& ast, NodeId item) {
-    const Node& node = ast.at(item);
-    if (node.kind != NodeKind::String) return true;
-    const std::string_view text = ast.text(node);
-    return text.find('\\') == std::string_view::npos && text.find("$[") == std::string_view::npos;
-}
-
 // Call arguments or array elements up to `close` (current token is the first
 // one after the opening bracket). A trailing comma is a legacy run-time error
 // ("expression cannot be empty").
@@ -302,7 +295,8 @@ NodeId ExprParser::quoted_object_value() {
 NodeId ExprParser::object(std::uint32_t begin) {
     // A condition is split at comparison operators without regard to braces
     // (`if ({"k": a == b})` is malformed in legacy).
-    if (options_.condition) return fail(OpaqueReason::IrregularLegacyParse);
+    if (options_.condition && !condition_object_is_json(src_, begin, end_))
+        return fail(OpaqueReason::IrregularLegacyParse);
     std::vector<NodeId> props;
     bool escaped_json = false;
     ++nesting_;

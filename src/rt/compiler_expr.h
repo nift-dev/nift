@@ -1,6 +1,5 @@
 #pragma once
-// Expression compilation for the Runtime 2.0 compiler (CP11), and the per-unit compiler state it shares with
-// statement compilation (compiler.cpp). Internal to the compiler.
+// Runtime 2.0 expression compilation and the compiler state shared with statements.
 // CP12 (D-018): one compiled representation per function and one meaning for every expression wherever it appears:
 // legacy's canonical (textual) semantics. Legacy runs loop bodies and the functions called from them on a second
 // (prepared) evaluator; where a construct in such code could behave differently there, the unit is refused before
@@ -21,11 +20,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+namespace nift::rt { struct PreparedRefusal; }
 namespace nift::rt::detail {
 class UnitCompiler {
 public:
     UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds& kinds,
-                 const std::vector<bool>& loop_called, const GlobalPlan* globals = nullptr);
+                 const PreparedRefusal& prepared, const GlobalPlan* globals = nullptr);
     bool compile_program(NodeId root, Program& program);
     const std::string& reason() const { return reason_; }
     std::uint32_t offset() const { return offset_; } bool positioned() const { return positioned_; }
@@ -223,6 +223,7 @@ private:
     bool plain_postfix(const Node& node);
     bool ends_with_not(NodeId id) const;
     bool numeric_diagnostic_tree(const Node& node);
+    int literal_ordering_error(const Node& expression, const Node& diagnostic, std::uint16_t dst);
     bool infix_left_ok(const Node& node);
     bool comparison_chain_ok(const Node& node);
     bool element_target_ok(const Node& target);
@@ -350,9 +351,8 @@ private:
     std::unique_ptr<FunctionBuilder> fb_;
     NodeId root_ = kNoNode;
     const std::vector<bool>& loop_called_;  // functions called from loop code (rt/prepared.h)
-    // Parameters whose binding type is observable in the body (assigned, or named in a text whose type legacy
-    // infers): every call passes their text-derived types (legacy bind_call_param, the canonical P5 rule).
-    std::vector<std::vector<bool>> observable_;
+    const std::unordered_set<NodeId>& prepared_lambdas_;
+    std::vector<std::vector<bool>> observable_;  // P5: observes the argument text type
     // Per scope (functions, then main): names whose binding type may be
     // double, so that the binding can hold a value of another type.
     std::vector<std::unordered_set<std::string_view>> may_double_;

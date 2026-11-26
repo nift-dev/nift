@@ -254,12 +254,12 @@ bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note*
                      " binding '" + note_text(note) + "'");
 }
 
-bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault) {
+bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault, bool prepared) {
     if (object.is(Kind::Bytes) && key.is_number()) {
         const auto& bytes = bytes_of(object);
         std::size_t index = 0;
         if (!natives::number_to_size(key, index))
-            return raise(fault, StopReason::Error,
+            return raise(fault, StopReason::Error, prepared ? "invalid index" :
                          "bytes indices must be non-negative integers in '" + note_text(note) + "'");
         if (index >= bytes.size())
             return raise(fault, StopReason::Error, "bytes index " + std::to_string(index) +

@@ -1,4 +1,5 @@
 #include "rt/compiler_cells.h"
+#include "rt/reserved_names.h"
 
 // rt-lint: cold-file binding-slot and selector access emission, once per unit
 
@@ -285,6 +286,10 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
     const auto name = text(target);
     Binding binding;
     std::uint16_t result = 0;
+    if (reserved_name(name) && !invocation_shadows_.count(node_id(target))) {
+        fail(target, "binding-name-reserved");
+        return -1;
+    }
     if (!new_binding(name, target, result, binding)) return -1;
     if (forward) {
         const auto resolved = kinds_.bindings.find(node_id(*copy));
@@ -338,6 +343,29 @@ int UnitCompiler::declare_indexed_alias(const Node& node) {
         return -1;
     }
     return builder_ok() ? 1 : -1;
+}
+
+// Element assignment `a[i] = v`: legacy's textual evaluator treats a target
+// whose text contains `.` as a member path (`a[a.length() - 1] = 9`,
+// `a[o.k] = 1`, `a[1.0] = 1` fail there), so only a plain local name or an
+// unsigned integer literal is compiled as the index (review round 3, F1).
+bool UnitCompiler::element_target_ok(const Node& target) {
+    const Node& key = ast_.at(target.b);
+    bool plain = key.kind == NodeKind::Ident;
+    if (key.kind == NodeKind::Number) {
+        plain = true;
+        for (char c : text(key))
+            if (c < '0' || c > '9') plain = false;
+    }
+    // The bracket holds exactly that token (no parentheses around it).
+    std::string_view inside = ast_.source().substr(ast_.at(target.a).end, target.end - ast_.at(target.a).end);
+    while (!inside.empty() && (inside.front() == '[' || inside.front() == ' ' || inside.front() == '\t'))
+        inside.remove_prefix(1);
+    while (!inside.empty() && (inside.back() == ']' || inside.back() == ' ' || inside.back() == '\t'))
+        inside.remove_suffix(1);
+    if (!plain || inside != text(key) || text(target).find('.') != std::string_view::npos)
+        return fail(target, "index-target");
+    return true;
 }
 
 } // namespace nift::rt::detail

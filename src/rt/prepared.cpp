@@ -45,7 +45,8 @@ public:
     Analysis(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds)
         : ast_(ast), root_(root), plan_(plan), kinds_(kinds) {}
 
-    PreparedRefusal run() {
+    PreparedRefusal run(bool standalone) {
+        if (standalone) result_.lambda_literals = prepared_lambda_literals(ast_);
         mark_prepared_functions();
         result_.loop_called = marked_;
         mark_unpreparable_functions();
@@ -215,7 +216,6 @@ private:
         return !plan_.index.count(name);
     }
 
-    // Does the text type name a binding (from `names`, when given)?
     bool refers_to(const TextType& type, const std::unordered_set<std::string_view>* names) const {
         if (type.kind == TextType::Kind::Binding)
             return is_binding_name(type.binding) && (!names || names->count(type.binding));
@@ -223,8 +223,7 @@ private:
         return false;
     }
 
-    // Legacy types the declaration from the text after `:=` (decl_type),
-    // evaluated when the body is prepared.
+    // Legacy types the declaration from the text after `:=` during preparation.
     // Stage 4 (D-046 #1): `x := p` keeps p's declared type (P5). Legacy types it when preparing, from
     // `p` in the caller's scopes (decl_type; not found or int: the value's type): admitted only where
     // that is equal, i.e. every binding p outside the function is certainly int typed (rt/prepared_outer.h)
@@ -243,6 +242,7 @@ private:
     bool check_declaration(const Node& n, const std::unordered_set<std::string_view>* risky_names, std::size_t f = 0,
                            const std::vector<std::string_view>* params = nullptr) {
         if (n.kind != NodeKind::Declare) return true;
+        if (result_.lambda_literals.count(n.b)) return true;
         const std::string_view src = ast_.source();
         const std::uint32_t op = detail::find_in(src, ":=", n.begin, n.end);
         if (op == n.end) return refuse(n, "prepared-decl-type");
@@ -254,8 +254,7 @@ private:
         return true;
     }
 
-    // The parenthesised header of `if`/`while` at node.begin, as legacy's
-    // translator copies it.
+    // The parenthesised header copied by the legacy translator.
     bool header_text(const Node& n, std::size_t keyword, std::string_view& out) const {
         const std::string_view src = ast_.source();
         const auto end = static_cast<std::uint32_t>(src.size());
@@ -393,8 +392,9 @@ private:
 
 } // namespace
 
-PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds) {
-    return Analysis(ast, root, plan, kinds).run();
+PreparedRefusal check_prepared_contexts(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds,
+                                       bool standalone) {
+    return Analysis(ast, root, plan, kinds).run(standalone);
 }
 
 } // namespace nift::rt

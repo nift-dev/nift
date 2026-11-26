@@ -370,30 +370,18 @@ bool UnitCompiler::infix_left_ok(const Node& node) {
 // refused as well (conservative).
 bool UnitCompiler::comparison_chain_ok(const Node& node) {
     if (!is_comparison(node)) return true;
-    if (is_comparison(ast_.at(node.a)) || is_comparison(ast_.at(node.b))) return fail(node, "comparison-chain");
-    return true;
-}
-
-// Element assignment `a[i] = v`: legacy's textual evaluator treats a target
-// whose text contains `.` as a member path (`a[a.length() - 1] = 9`,
-// `a[o.k] = 1`, `a[1.0] = 1` fail there), so only a plain local name or an
-// unsigned integer literal is compiled as the index (review round 3, F1).
-bool UnitCompiler::element_target_ok(const Node& target) {
-    const Node& key = ast_.at(target.b);
-    bool plain = key.kind == NodeKind::Ident;
-    if (key.kind == NodeKind::Number) {
-        plain = true;
-        for (char c : text(key))
-            if (c < '0' || c > '9') plain = false;
+    const Node& left = ast_.at(node.a);
+    const Node& right = ast_.at(node.b);
+    if ((node.op == Op::Eq || node.op == Op::Ne) && !is_comparison(left) &&
+        is_comparison(right) && (right.op == Op::Eq || right.op == Op::Ne)) {
+        const auto src = ast_.source();
+        const auto gap = src.substr(left.end, right.begin - left.end);
+        const auto last = gap.find_last_not_of(" \t");
+        if (last != std::string_view::npos && gap[last] == '(' &&
+            right.end < src.size() && src[right.end] == ')')
+            return true;
     }
-    // The bracket holds exactly that token (no parentheses around it).
-    std::string_view inside = ast_.source().substr(ast_.at(target.a).end, target.end - ast_.at(target.a).end);
-    while (!inside.empty() && (inside.front() == '[' || inside.front() == ' ' || inside.front() == '\t'))
-        inside.remove_prefix(1);
-    while (!inside.empty() && (inside.back() == ']' || inside.back() == ' ' || inside.back() == '\t'))
-        inside.remove_suffix(1);
-    if (!plain || inside != text(key) || text(target).find('.') != std::string_view::npos)
-        return fail(target, "index-target");
+    if (is_comparison(ast_.at(node.a)) || is_comparison(ast_.at(node.b))) return fail(node, "comparison-chain");
     return true;
 }
 
