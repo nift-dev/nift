@@ -4262,7 +4262,7 @@ $(TEST_DIR)/evaluated-operand-unit$(EXEEXT): tests/evaluated_operand_unit.cpp sr
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/evaluated_operand_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
 test-evaluated-operand: $(TEST_DIR)/evaluated-operand-unit$(EXEEXT) $(TARGET)
 	$(TEST_DIR)/evaluated-operand-unit$(EXEEXT)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/evaluated_operand_smoke.py
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" "$(PYTHON)" tests/evaluated_operand_smoke.py
 test: test-evaluated-operand
 .PHONY: test-evaluated-operand-differential
 test-evaluated-operand-differential: $(TARGET)
