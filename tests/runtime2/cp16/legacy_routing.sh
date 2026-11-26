@@ -24,6 +24,7 @@
 # D-031: file-size and address-space limits, a timeout on every nift call,
 # and every process the tests start is killed by its recorded PID at exit.
 set -u -o pipefail
+export NIFT_VM=0
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 W="$(mktemp -d)"
