@@ -16,7 +16,7 @@
 //   import-reinitialised    temporary policy only (InitPolicy, D-041 #2)
 //   import-collision        an export clashes with a different binding of the
 //                           importer (the same declaration again is a rebind)
-//   export-nested / export-struct (structs: B4)
+//   export-nested (struct declarations still follow B4 planning rules)
 //   import-limit            more than kMaxModules modules or kMaxModuleDepth
 // Packages (`import("name")`: no `/` or `\`, no extension) resolve with
 // legacy's rules (rt/package_resolve.h) under one read lock held for the build.

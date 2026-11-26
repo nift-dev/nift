@@ -44,7 +44,7 @@ void collect(UnitView& u) {
         NodeId skip = kNoNode;
         switch (n.kind) {
             case NodeKind::FnDecl:
-                if (!in_fn && !name_of(n.a).empty()) u.fns.insert(name_of(n.a));
+                if (!in_fn && !(n.flags & kFlagMethod) && !name_of(n.a).empty()) u.fns.insert(name_of(n.a));
                 skip = n.a;
                 break;
             case NodeKind::StructDecl: case NodeKind::EnumDecl:
@@ -54,6 +54,7 @@ void collect(UnitView& u) {
             case NodeKind::Declare:
                 if (!in_fn && !name_of(n.a).empty()) u.top.insert(name_of(n.a));
                 break;
+            case NodeKind::StructField: skip = n.a; break;
             case NodeKind::Member: case NodeKind::SafeMember: skip = n.b; break;
             case NodeKind::Export: skip = n.a; break;
             case NodeKind::Ident: u.uses.push_back(id); break;

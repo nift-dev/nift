@@ -83,6 +83,24 @@ SHAPES.update({
         "other.nft": 'fn(other_read()) { return hidden }\nexport(other_read)\n',
         "main.f": 'hidden := 2\nimport("m.nft")\nimport("other.nft")\nprint(other_read())\n',
     }, "import-scope"),
+    "struct-method-namespace": ({
+        "a.f": "struct(Alpha) { private x := 3; fn(read()) { return this.x } }\nexport(Alpha)\n",
+        "b.f": "struct(Beta) { private x := 5; fn(read()) { return this.x } }\nexport(Beta)\n",
+        "main.f": 'import("a.f")\nimport("b.f")\na := Alpha()\nb := Beta()\nprint(a.read() + b.read())\n',
+    }, "vm"),
+    "struct-private-type": ({
+        "m.f": "struct(Secret) { x := 3 }\n",
+        "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',
+    }, "import-scope"),
+    "struct-before-import": ({
+        "m.f": "struct(Box) { x := 3 }\nexport(Box)\n",
+        "main.f": 'print("before")\np := Box()\nimport("m.f")\nprint(p.x)\n',
+    }, "struct-after-statement"),
+    "struct-reexport": ({
+        "a.f": "struct(Token) { n := 3 }\nexport(Token)\n",
+        "b.f": 'import("a.f")\nexport(Token)\n',
+        "main.f": 'import("b.f")\nt := Token()\nprint(t.n)\n',
+    }, "vm"),
     # Refused: a module's bare top-level return ends only the module in legacy.
     "module-bare-return": ({"m.nft": 'print("a")\nreturn\n', "main.f": 'import("m.nft")\nprint("b")\n'}, "module-bare-return"),
 })
@@ -98,7 +116,7 @@ PROBES = {
     "module_vs_caller_local": "import-scope", "nested_relative": "vm", "not_reexported": "import-scope",
     "package_missing": "import-error:package", "repeated": "import-reinitialised",
     "same_file_two_spellings": "import-reinitialised", "self_cycle": "import-error:cycle", "side_effect_order": "vm",
-    "struct_export": "export-struct", "template_import": "binding-name-reserved",
+    "struct_export": "vm", "template_import": "binding-name-reserved",
 }
 
 

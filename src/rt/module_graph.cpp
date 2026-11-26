@@ -342,13 +342,8 @@ private:
         if (!has(provided, name))
             return error(index, st.begin, "module-error:export-missing",
                          "export names no existing binding: " + std::string(name));
-        const Node& program = ast.at(mod.root);
-        const NodeId* items = ast.list(program);
-        for (std::uint32_t k = 0; k < program.count; ++k) {
-            const Node& decl = ast.at(items[k]);
-            if (decl.kind == NodeKind::StructDecl && declared_name(ast, decl) == name)
-                return refuse(index, st.begin, "export-struct");
-        }
+        // Type exports use the same declaration origin as value exports.
+        // Struct planning still admits only the combined declaration prefix.
         std::size_t origin = index;
         for (const Origin& o : bound)
             if (o.name == name) origin = o.module;
