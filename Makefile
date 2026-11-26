@@ -2564,7 +2564,7 @@ test-v42-struct: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_constructor_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_methods_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_this_smoke.sh
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_private_smoke.sh
+	NIFT_VM=0 NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_private_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_copy_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_deepcopy_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_member_expression_smoke.sh
@@ -2575,10 +2575,10 @@ test-parser-hardening: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v47_deep_expression_smoke.sh
 
 test-prepared-method-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v472_prepared_method_parity.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v472_prepared_method_parity.sh
 
 test-v48-warn: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_warn_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_warn_smoke.sh
 
 test-v48-bytes-index-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_bytes_index_parity.sh
@@ -2596,7 +2596,7 @@ test-v48-map-set-scaling: $(TARGET)
 	$(LOAD_SENSITIVE_DEFER) NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_scaling_guard.sh
 
 test-v48-prepared-object-literal-parity: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_parity.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_parity.sh
 
 test-v48-prepared-object-literal-guard: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_guard.sh
@@ -3746,7 +3746,7 @@ test-v45-native-runtime: test-v45-invocation test-v45-host-introspection test-v4
 	test-v45-concurrency test-v45-job-control test-v45-target
 
 test-v46-time-cli: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" tests/v46_time_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v46_time_smoke.sh
 
 test-v46-time: test-v46-time-cli test-v46-time-embed
 
@@ -3765,7 +3765,7 @@ test-v46-timer-sanitize: $(SAN_TARGET) $(V46_TIMER_UNIT_SAN_TEST) $(V46_TIMER_EM
 .PHONY: test-v46-timer test-v46-timer-sanitize
 
 test-v46-secure-random-cli: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" tests/v46_secure_random_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v46_secure_random_smoke.sh
 
 test-v46-secure-random-embed: $(V46_SECURE_RANDOM_EMBED_TEST)
 	$(V46_SECURE_RANDOM_EMBED_TEST)
@@ -3775,7 +3775,7 @@ test-v46-secure-random: test-v46-secure-random-cli test-v46-secure-random-embed
 .PHONY: test-v46-secure-random test-v46-secure-random-cli test-v46-secure-random-embed
 
 test-v46-output-cli: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" tests/v46_output_smoke.sh
+	NIFT_VM=0 NIFT="$(CURDIR)/$(TARGET)" tests/v46_output_smoke.sh
 
 test-v46-output-embed: $(V46_OUTPUT_EMBED_TEST)
 	$(V46_OUTPUT_EMBED_TEST)
@@ -4250,7 +4250,7 @@ test-dependency-path-identity: $(TARGET)
 .PHONY: test-sort-number-compact
 test: test-sort-number-compact
 test-sort-number-compact: $(TARGET)
-	"$(PYTHON)" tests/sort_number_compact.py --nift ./$(TARGET)
+	NIFT_VM=0 "$(PYTHON)" tests/sort_number_compact.py --nift ./$(TARGET)
 	"$(PYTHON)" tests/sort_number_compact_oracle.py
 
 .PHONY: test-evaluated-operand

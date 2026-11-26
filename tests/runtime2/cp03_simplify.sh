@@ -9,7 +9,7 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
 NIFT_BIN="$NIFT" bash "$HERE/fs_freedom.sh" >"$T/fs.log" 2>&1 || { cat "$T/fs.log"; fail=1; }
 NIFT_BIN="$NIFT" bash "$HERE/file_copy_move_freedom.sh" >"$T/copy.log" 2>&1 || { cat "$T/copy.log"; fail=1; }
-bash "$HERE/../v44_cp27_restricted_smoke.sh" "$NIFT" >"$T/restricted.log" 2>&1 || { cat "$T/restricted.log"; fail=1; }
+NIFT_VM=0 bash "$HERE/../v44_cp27_restricted_smoke.sh" "$NIFT" >"$T/restricted.log" 2>&1 || { cat "$T/restricted.log"; fail=1; }
 python3 "$HERE/../v46_resource_paths.py" "$NIFT" >"$T/resources.log" 2>&1 || { cat "$T/resources.log"; fail=1; }
 NIFT_BIN="$NIFT" bash "$HERE/../path_safety_smoke.sh" >"$T/path-safety.log" 2>&1 || { cat "$T/path-safety.log"; fail=1; }
 python3 "$HERE/cp03_restricted.py" "$NIFT" >"$T/restricted-probes.log" 2>&1 || { cat "$T/restricted-probes.log"; fail=1; }

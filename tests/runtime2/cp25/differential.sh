@@ -37,6 +37,7 @@ run --cases "$D/const/loop-outside-operation.txt" --values "$D/const/values.txt"
 # A const that is only read (here: passed by value) runs on the VM in every context, loops included.
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/contexts.txt"
 run --cases "$D/const/read-cases.txt" --contexts "$D/const/loop-contexts.txt"
+run --cases "$D/const/object-read.txt"
 run --cases "$D/const/refused-cases.txt" --expect-refusal
 # Legacy computes a compound assignment's or increment's operation (and its
 # errors) before rejecting the const write. Operand kinds the compiler refuses

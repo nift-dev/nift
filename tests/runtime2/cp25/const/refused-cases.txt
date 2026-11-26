@@ -7,10 +7,6 @@ w()
 const c := 1
 i := 0
 while(i < 1) { c = 2; i += 1 }
-=== object-const
-const c := {"a": 1}
-print(c.a)
-
 === redeclare
 const c := 1
 c := 2
