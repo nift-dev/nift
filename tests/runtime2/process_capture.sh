@@ -2,7 +2,9 @@
 # Runtime 2.0 CP07: process capture uses anonymous regular files. Expected
 # values are the pre-CP07 (v4.12.0 / runtime-2 c5db14d) behaviour; CP07 must
 # not change any of them (D-006/D-010), and must never leave capture files.
+# The historical cmd() handle API uses the explicit legacy engine (D-029/D-030/D-034).
 set -u -o pipefail
+export NIFT_VM=0
 NIFT="${NIFT_BIN:-$(pwd)/nift}"
 W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 export TMPDIR="$W/tmpdir"; mkdir -p "$TMPDIR"
