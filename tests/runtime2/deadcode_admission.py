@@ -97,8 +97,9 @@ CASES = {
     "module-binding": ({"m.nft": 'nope := 1\nexport(nope)\n',
                         "main.f": 'import("m.nft")\nif (false) {\n  nope()\n}\nprint("x")\n'}, "vm"),
     "string-mention": ({"main.f": 'print("nope")\nif (false) {\n  nope()\n}\nprint("x")\n'}, "callable:nope"),
-    # A name legacy may know keeps the refusal (sorted_set is a legacy built-in no pattern list names).
-    "legacy-known-name": ({"main.f": 'if (false) {\n  sorted_set()\n}\nprint("x")\n'}, "callable:sorted_set"),
+    # Unsupported legacy built-ins keep the admission refusal even in dead code.
+    "legacy-known-name": ({"main.f": 'if (false) {\n  prique()\n}\nprint("x")\n'}, "callable:prique"),
+    "sorted-set-constructor": ({"main.f": 'if (false) {\n  sorted_set()\n}\nprint("x")\n'}, "vm"),
     "legacy-special-name": ({"main.f": 'if (false) {\n  inject("x")\n}\nprint("x")\n'}, "callable:inject"),
     # Exclusions: arguments a compile could refuse (lambda), a return value in loop-evaluator code.
     "argument-lambda": ({"main.f": 'if (false) {\n  nope(() => 1)\n}\nprint("x")\n'}, "callable:nope"),

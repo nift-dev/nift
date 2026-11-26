@@ -51,7 +51,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     // repeated evaluation has no observable effect.
     bool arity_error = !builtin && !is_native && node.count != arity && !(fb_->flags() & kInstrReturnCall);
     if (arity_error && loop_reachable()) {
-        arity_error = std::all_of(args, args + node.count, [&](NodeId id) {
+        arity_error = node.count > arity && ast_.at(args[0]).kind == NodeKind::Ident &&
+            std::all_of(args, args + node.count, [&](NodeId id) {
             const Node& arg = ast_.at(id);
             const auto spelling = text(arg);
             if (arg.kind == NodeKind::Number)
