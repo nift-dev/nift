@@ -96,7 +96,7 @@ if [ "$mutant_status" -ne 1 ]; then
   tail -n 15 "$TMP/mutant.log" >&2
   exit 1
 fi
-if ! grep -q "native_budget.cpp:" "$TMP/mutant.log" ||
+if ! grep -Eq 'native_budget.cpp:[0-9]+: CHECK failed: within_budget$' "$TMP/mutant.log" ||
    ! grep -Eq '^native-budget: [0-9]+ checks, [1-9][0-9]* failures$' "$TMP/mutant.log"; then
   echo "FAIL: the mutant did not report a completed native_budget assertion failure" >&2
   cat "$TMP/mutant.log" >&2
