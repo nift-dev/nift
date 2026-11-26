@@ -67,7 +67,7 @@ struct ParallelTaskRecord {
     bool failure_catchable = false;
     StopReason failure_reason = StopReason::Error;
     std::uint32_t failure_offset = 0;
-    bool failure_starved = false;  // C141: failed unrun by ParallelRuntime::starve (kParallelResourcesExhausted)
+    bool failure_resources_exhausted = false;  // use the fixed resource diagnostic
     // C140a: the spawning instruction in the parent's program (proto index, instruction index), for a position
     std::uint32_t spawn_proto = 0xffffffffu, spawn_instr = 0, spawn_offset = 0;
     bool failure_error_origin = false;

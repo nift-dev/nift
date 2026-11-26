@@ -20,23 +20,24 @@ inline constexpr const char* kParallelBudgetExceeded = "parallel task memory bud
 struct VmResult;
 // C140: records a task's budget or thread-creation failure with its runtime (ParallelRuntime::note_limit), so that
 // the run ends with it even when no one awaits the task.
-void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result);
+void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result, bool worker_allocation_failed);
 // C140a/C140b, test-only. Mutant 11 keeps the old Internal mapping of a bad_alloc creating a task; builds 9, 11 and 12
 // fail the n-th pass through a site, NIFT_TEST_PARALLEL_BAD_ALLOC="<site>:n": std::bad_alloc at "start" or
-// "submit" (task creation), std::system_error (no thread) at "wait", "timer" or "cleanup" (a worker's ParallelBlock of
-// that kind: Blocking, Timer, Cleanup); C141: "nothread:n" fails every worker-thread start from the n-th on (sticky).
+// "submit" (task creation) or "snapshot" (isolate setup). The "wait", "timer" and "cleanup" sites inject
+// std::system_error in the corresponding ParallelBlock. C141: "nothread:n" fails every worker-thread start
+// from the n-th on (sticky).
 // Builds 13-18 (C141 mutants) keep the hook too. Absent from production builds (the build guard refuses *MUTANT*
 // defines on production objects).
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
 // The variable holds one or more comma-separated "<site>:n" items, each counted separately ("wait:1,cleanup:1").
 inline void inject_bad_alloc(const char* site) {
-    static const char* const sites[] = {"start", "submit", "wait", "timer", "cleanup", "nothread"};
-    static std::atomic<int> counts[6];
+    static const char* const sites[] = {"start", "submit", "wait", "timer", "cleanup", "nothread", "snapshot"};
+    static std::atomic<int> counts[7];
     const char* spec = std::getenv("NIFT_TEST_PARALLEL_BAD_ALLOC");
     const std::size_t n = std::strlen(site);
     int index = 0;
-    while (index < 6 && std::strcmp(sites[index], site) != 0) ++index;  // rt-lint: allow-string-compare test-only
-    if (!spec || index == 6) return;
+    while (index < 7 && std::strcmp(sites[index], site) != 0) ++index;  // rt-lint: allow-string-compare test-only
+    if (!spec || index == 7) return;
     for (const char* at = std::strstr(spec, site); at; at = std::strstr(at + 1, site)) {
         if ((at != spec && at[-1] != ',') || at[n] != ':') continue;
         const int count = ++counts[index], nth = std::atoi(at + n + 1);

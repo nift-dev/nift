@@ -27,28 +27,9 @@ void ParallelOutput::publish(std::string& text) {
 }
 void ParallelOutput::drain(std::string& output) {
     std::lock_guard<std::mutex> lock(mutex);
-    output += pending;
+    if (output.empty()) output.swap(pending);
+    else output += pending;
     pending.clear();
-}
-
-ProgramTransferMap::ProgramTransferMap(const Program& program) {
-    static std::atomic<std::uint64_t> next_domain{1};
-    domain_ = next_domain.fetch_add(1);
-    by_index_.reserve(program.protos.size());
-    for (std::size_t i = 0; i < program.protos.size(); ++i) {
-        const Proto* proto = program.protos[i].get();
-        by_pointer_.emplace(proto, static_cast<std::uint32_t>(i));
-        by_index_.push_back(proto);
-    }
-}
-bool ProgramTransferMap::index_of(const Proto* proto, std::uint32_t& index) const {
-    const auto found = by_pointer_.find(proto);
-    if (found == by_pointer_.end()) return false;
-    index = found->second;
-    return true;
-}
-const Proto* ProgramTransferMap::proto_of(std::uint32_t index) const {
-    return index < by_index_.size() ? by_index_[index] : nullptr;
 }
 
 std::shared_ptr<ParallelRuntime> ParallelRuntime::from_environment(std::size_t root_heap_budget) {
@@ -309,8 +290,24 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
     record->options.current_task = record;
     if (!record->options.parallel_wait) record->options.parallel_wait = record->wait_state;
     IsolateTaskOutcome outcome;
+    bool worker_allocation_failed = false;
     if (!task_cancelled(record)) {
-        try { outcome = execute_isolate_task(*record->program, record->input, record->options); }
+        try {
+            NIFT_INJECT_BAD_ALLOC("snapshot");
+            outcome = execute_isolate_task(*record->program, record->input, record->options);
+        }
+        catch (const std::bad_alloc&) {
+            outcome.status = IsolateTaskStatus::ExecutionError;
+            if (kAllocFailureInternal) {
+                outcome.result.reason = StopReason::Internal;
+                outcome.result.message = "parallel task execution failed: std::bad_alloc";
+            } else {
+                // Publish the fixed diagnostic without allocating text in the worker.
+                worker_allocation_failed = true;
+                outcome.result.reason = StopReason::Error;
+                outcome.result.offset = record->spawn_offset;
+            }
+        }
         catch (const std::system_error&) {  // C140 (a): no worker thread for a timer or cleanup wait
             outcome.status = IsolateTaskStatus::ExecutionError; outcome.result.code = "limit.exceeded";
             outcome.result.reason = kThreadFailureInternal ? StopReason::Internal : StopReason::Error;
@@ -327,7 +324,7 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
         outcome.result.message = "task cancelled";
         outcome.result.code = "runtime.cancelled";
     }
-    note_parallel_limit(*record, outcome.result);
+    note_parallel_limit(*record, outcome.result, worker_allocation_failed);
     if (record->output_root && record->options.parallel_output)
         record->options.parallel_output->drain(outcome.output);
     record->options.current_task.reset();  // the worker Vm is gone; no self-reference may survive
@@ -380,6 +377,7 @@ void run_parallel_task(std::shared_ptr<ParallelTaskRecord> record) {
             record->failure_message =
                 outcome.result.reason != StopReason::None ? outcome.result.message : outcome.error;
             record->failure_code = outcome.result.code;
+            record->failure_resources_exhausted = worker_allocation_failed;
             record->failure_offset = outcome.result.offset;
             record->failure_error_origin = outcome.result.error_origin;
             record->failure_in_loop_path = outcome.result.error_in_loop_path;

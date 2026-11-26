@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <exception>
 #include <new>
+#include <string_view>
 #include <system_error>
 
 // Source-thread task snapshot and admission validation.
@@ -37,7 +38,27 @@ std::size_t image_bytes(const Program& program) {
 }
 }
 
-void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result) {
+ProgramTransferMap::ProgramTransferMap(const Program& program) {
+    static std::atomic<std::uint64_t> next_domain{1};
+    domain_ = next_domain.fetch_add(1);
+    by_index_.reserve(program.protos.size());
+    for (std::size_t i = 0; i < program.protos.size(); ++i) {
+        const Proto* proto = program.protos[i].get();
+        by_pointer_.emplace(proto, static_cast<std::uint32_t>(i));
+        by_index_.push_back(proto);
+    }
+}
+bool ProgramTransferMap::index_of(const Proto* proto, std::uint32_t& index) const {
+    const auto found = by_pointer_.find(proto);
+    if (found == by_pointer_.end()) return false;
+    index = found->second;
+    return true;
+}
+const Proto* ProgramTransferMap::proto_of(std::uint32_t index) const {
+    return index < by_index_.size() ? by_index_[index] : nullptr;
+}
+
+void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& result, bool worker_allocation_failed) {
 #if defined(NIFT_ASYNC_MEMORY_MUTANT) && (NIFT_ASYNC_MEMORY_MUTANT == 9 || NIFT_ASYNC_MEMORY_MUTANT >= 11)
     // C141a (T1, M14), test-only: run_parallel_task calls this just before it publishes the task's completion (and
     // execute_record then releases its CPU permit). With NIFT_TEST_HOLD_COMPLETION set, a task does not finish while
@@ -46,16 +67,25 @@ void note_parallel_limit(const ParallelTaskRecord& record, const VmResult& resul
         if (auto runtime = record.runtime.lock())
             wait_for_test([&] { return runtime->completion_may_proceed_for_test(); });
 #endif
-    const auto ends = [&](const std::string& tail) {
-        return result.message.size() >= tail.size() &&
-               result.message.compare(result.message.size() - tail.size(), tail.size(), tail) == 0;
-    };
 #if !(defined(NIFT_ASYNC_MEMORY_MUTANT) && NIFT_ASYNC_MEMORY_MUTANT == 8)  // test-only: an un-awaited failure dropped
+    if (worker_allocation_failed) {
+        if (auto runtime = record.runtime.lock())
+            runtime->note_limit(result.message, result.offset, kParallelResourcesExhausted);
+        return;
+    }
+    const auto ends = [&](std::string_view tail) {
+        const std::string_view message(result.message);
+        return message.size() >= tail.size() && message.substr(message.size() - tail.size()) == tail;
+    };
     if (result.reason == StopReason::Error && result.code == "limit.exceeded" &&  // rt-lint: allow-string-compare
         (ends(kParallelBudgetExceeded) || ends(kParallelResourcesExhausted)))
         if (auto runtime = record.runtime.lock())
             runtime->note_limit(result.message, result.offset,
                                 ends(kParallelBudgetExceeded) ? kParallelBudgetExceeded : kParallelResourcesExhausted);
+#else
+    static_cast<void>(result);
+    static_cast<void>(record);
+    static_cast<void>(worker_allocation_failed);
 #endif
 }
 

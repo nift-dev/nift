@@ -77,7 +77,7 @@ void ParallelRuntime::starve(std::uint32_t offset) noexcept {
                 std::lock_guard<std::mutex> lock(record->mutex);
                 record->failure_reason = StopReason::Error; record->failure_catchable = false;
                 record->failure_code = kStarveCancels ? "runtime.cancelled" : "limit.exceeded";
-                record->failure_starved = !kStarveCancels; record->failure_offset = record->spawn_offset;
+                record->failure_resources_exhausted = !kStarveCancels; record->failure_offset = record->spawn_offset;
                 record->state = kStarveCancels ? ParallelTaskState::Cancelled : ParallelTaskState::Failed;
             }
             notify_parallel_wait_states(record); record->cv.notify_all();
@@ -94,7 +94,7 @@ void ParallelRuntime::note_limit(const std::string& message, std::uint32_t offse
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (limit_failed_) return;  // idempotent: the first recorded limit stays authoritative
-        limit_failed_ = true; limit_message_ = message; limit_offset_ = offset;
+        limit_message_ = message; limit_offset_ = offset; limit_failed_ = true;
         fatal_.store(reason, std::memory_order_release);
     }
     shared_detail::notify_shared_cancellation();  // blocked shared waits observe fatal_limit() (D-085)

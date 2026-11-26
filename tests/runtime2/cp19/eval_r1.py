@@ -82,14 +82,14 @@ def main():
         '{"a":[{"b":[error("deep")]}]}.prettify()',
         '[[error("x")]].stringify()', '[[error("x")]].highlight()',
         '[print("ONCE"),error("x")].stringify()',
-        '[touch("marker"),error("x")].prettify()',
-        '{"a":[touch("marker"),error("x")]}.highlight()',
+        '[native::touch("marker"),error("x")].prettify()',
+        '{"a":[native::touch("marker"),error("x")]}.highlight()',
         '[1].map("x")', '[touch("marker"),[1].map("x")]',
         '[{"a":2},{"a":1}].sort_by("a")',
     ] + [f'error("x").cause.{member}' for member in ['message','code','source']] + [
         f'error("outer","user.outer",error("inner")).cause.{member}'
         for member in ['message','code','source']] + [
-        '[touch("marker"),error("x").cause.message]',
+        '[native::touch("marker"),error("x").cause.message]',
         '[print("ONCE"),error("x").cause.code]',
         '\n  error("x").cause.message',
     ]

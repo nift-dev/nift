@@ -1131,7 +1131,8 @@ def case_alloc(nift, site, rollback=False):
     fault = {"NIFT_TEST_PARALLEL_BAD_ALLOC": "%s:%d" % (site, 2 if rollback else 1)}
     if not rollback:
         got = run(hook, ALLOC, env=fault)
-        want = (1, "before\n", "error: main.f:6:12: %s\n" % MESSAGE_THREADS)
+        prefix = "future: " if site == "snapshot" else ""
+        want = (1, "before\n", "error: main.f:6:12: %s%s\n" % (prefix, MESSAGE_THREADS))
         return [] if got == want else ["want %r, got %r" % (want, got)]
     problems = []
     three = least_budget(hook, ALLOC_ROLLBACK, problems)  # no fault: the peak is the three sleepers, 3 c
@@ -1266,6 +1267,7 @@ CASES = {
     "healthy-unchanged": case_healthy,
     "release-exact": case_release,
     "threads-default-environment": case_default_env,
+    "alloc-snapshot": lambda n: case_alloc(n, "snapshot"),
     "alloc-start": lambda n: case_alloc(n, "start"),
     "alloc-submit": lambda n: case_alloc(n, "submit"),
     "alloc-rollback-start": lambda n: case_alloc(n, "start", True),
@@ -1286,7 +1288,7 @@ MUTANTS = {
     8: ["abandoned-async", "abandoned-thread", "abandoned-deep-async", "abandoned-deep-thread"],
     9: ["detached-async", "detached-thread"],
     10: ["release-exact", "release-completion"],
-    11: ["alloc-start", "alloc-submit", "alloc-rollback-start", "alloc-rollback-submit"],
+    11: ["alloc-snapshot", "alloc-start", "alloc-submit", "alloc-rollback-start", "alloc-rollback-submit"],
     13: ["r1-cleanup-wait", "starve-spawn-refused"],
     14: ["starve-await-swept"],
     15: ["starve-spawn-refused"],
