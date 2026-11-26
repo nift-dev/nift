@@ -5,6 +5,7 @@
 #include "rt/literal.h"
 #include "rt/module_link.h"
 #include "rt/compiler_process.h"
+#include "rt/module_data.h"
 
 #include <algorithm>
 #include "rt/native.h"
@@ -61,11 +62,18 @@ bool module_prefix_data(const Ast& ast, const Node& node) {
         case NodeKind::Binary:
             return node.op == Op::Add && module_prefix_data(ast, ast.at(node.a)) &&
                    module_prefix_data(ast, ast.at(node.b));
+        case NodeKind::Array: {
+            const auto* items = ast.list(node);
+            return std::all_of(items, items + node.count, [&](NodeId id) {
+                return module_prefix_data(ast, ast.at(id));
+            });
+        }
         case NodeKind::Call:
             break;
         default:
             return false;
     }
+    if (module_ascii_literal(ast, node)) return true;
     const Node& callee = ast.at(node.a);
     return callee.kind == NodeKind::Ident && node.count == 0 &&
            ast.text(callee) == "map";  // rt-lint: allow-string-compare compile time

@@ -10,7 +10,6 @@
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
-// Calls, methods, member and index reads (CP11/CP12); errors at the expression (D-018c).
 namespace nift::rt::detail {
 bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
@@ -155,6 +154,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     if (const int s = struct_of_receiver(callee.a, is_this); s >= 0) return struct_method(node, s, dst);
     if (!plain_postfix(node) || !plain_postfix(callee) || !no_trailing_comma(node)) return false;
     if (const int result = process_pipeline(node, dst); result >= 0) return result == 1;
+    if (const int result = imported_data_call(node, dst); result >= 0) return result == 1;
     const std::string_view name = text(ast_.at(callee.b));
     if (int r = keyed_method_call(node, dst); r >= 0) return r == 1;  // D-063 map/set/stack
     if (int r = collection_method_call(node, dst); r >= 0) return r == 1;

@@ -180,10 +180,30 @@ SHAPES.update({
         "main.f": 'print("before")\np := Box()\nimport("m.f")\nprint(p.x)\n',
     }, "struct-after-statement"),
     "struct-after-module-data": ({
-        "m.f": 'prefix := "A" + ":"\ncache := map()\n'
-               'struct(Box) { x := 3 }\nexport(Box)\n',
-        "main.f": 'import("m.f")\np := Box()\nprint(p.x)\n',
+        "m.f": 'prefix := "A" + ":"\ncache := map()\nyields := [1, 2, 4, 8]\n'
+               'struct(Box) { x := 3 }\nexport(Box)\nexport(yields)\n',
+        "main.f": 'import("m.f")\np := Box()\nprint(p.x)\nprint(yields.stringify())\n',
     }, "vm"),
+    "struct-after-effectful-array-prefix": ({
+        "m.f": 'fn(effect()) { print("before"); return 3 }\n'
+               'values := [effect()]\nstruct(Box) { x := 3 }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("after")\n',
+    }, "struct-after-statement"),
+    "struct-after-module-ascii-bytes": ({
+        "m.f": 'prefix := bytes([0, 65, 27]).decode("utf-8") + ":"\n'
+               'struct(Box) { x := 3 }\nexport(Box)\nexport(prefix)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.x)\nprint(prefix)\n',
+    }, "vm"),
+    "struct-after-module-unproved-bytes": ({
+        "m.f": 'prefix := bytes([255]).decode("utf-8")\n'
+               'struct(Box) { x := 3 }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("after")\n',
+    }, "struct-after-statement"),
+    "struct-after-module-tag-prefix": ({
+        "m.f": 'prefix := bytes([31, 110, 105, 102, 116, 58]).decode("utf-8")\n'
+               'struct(Box) { x := 3 }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("after")\n',
+    }, "struct-after-statement"),
     "struct-after-module-user-call": ({
         "m.f": 'fn(announce_prefix()) { print("module effect"); return 7 }\ncount := announce_prefix()\n'
                'struct(Box) { x := 3 }\nexport(Box)\n',

@@ -2,7 +2,6 @@
 // Runtime 2.0 expression compilation and the compiler state shared with statements.
 // CP12 (D-018): compile legacy textual semantics and refuse differing prepared evaluator contexts,
 // except for the approved exactly-once evaluation and error-position differences (D-009 #1/#5).
-// See compiler_rules.cpp for the context refusals.
 #include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/codegen.h"
@@ -186,6 +185,7 @@ private:
     bool call(const Node& node, std::uint16_t dst);
     int process_call(const Node& node, const Node& command, NodeId output, std::uint16_t dst);
     int process_pipeline(const Node& node, std::uint16_t dst);
+    int imported_data_call(const Node& node, std::uint16_t dst);
     bool call_value(const Node& node, NodeId callee, bool member, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);
     bool length_call(const Node& node, NodeId receiver_node, bool size, std::uint16_t dst);

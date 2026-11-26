@@ -2,13 +2,18 @@
 #include "rt/compiler.h"
 #include "rt/compiler_process.h"
 #include "rt/infer_builtins.h"
+#include "rt/module_data.h"
 
 #include <algorithm>
 // rt-lint: cold-file callable inference worklist and lexical environments
 namespace nift::rt::infer_detail {
 TyRef Inference::process_call(const Node& call) {
-    if (session_ || !detail::package_process_scope(plan_, call)) return {};
+    if (session_ || !imported_module_data(plan_, call)) return {};
     const auto& callee = ast_.at(call.a);
+    if (current_ == static_cast<int>(plan_.functions.size()) && callee.kind == NodeKind::Member &&
+        !find("bytes") && !plan_.index.count("bytes") && !plan_.struct_index.count("bytes") &&
+        module_ascii_literal(ast_, call))
+        return kinds_ty(kKindString);
     NodeId output = kNoNode;
     const Node* command = nullptr;
     if (callee.kind == NodeKind::Ident && ast_.text(callee) == "run" &&
