@@ -21,4 +21,14 @@ out=$(NIFT_VM=0 "$NIFT_ABS" "$t/a.f")
 [ "$(sed -n '2p' <<<"$out")" = 'a\b' ] || exit 1
 [ "$(sed -n '3p' <<<"$out")" = 'single "quote"' ] || exit 1
 [ "$(sed -n '4p' <<<"$out")" = $'tab\there' ] || exit 1
+# Admission reaches the unsupported callable field before executing the script.
+if env -u NIFT_VM "$NIFT_ABS" "$t/a.f" >"$t/stdout" 2>"$t/stderr"; then
+    echo 'expected the VM to refuse the callable struct field' >&2
+    exit 1
+else
+    [ "$?" -eq 1 ]
+fi
+[ ! -s "$t/stdout" ]
+grep -Fx "error: $t/a.f:2:16: not compiled for the VM (struct-field-init): this struct feature is not supported by the Runtime 2.0 VM yet" "$t/stderr"
+grep -F 'no part of it ran' "$t/stderr"
 echo 'PASS v4.4 struct-callable string argument escaping'

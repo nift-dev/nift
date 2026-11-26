@@ -351,15 +351,25 @@ NodeId ExprParser::object(std::uint32_t begin) {
 // and then interpolates the decoded text, where `\$` is an escaped `$` and a
 // `$[` segment ends at the first `]` that balances `[`s, quotes ignored
 // (Parser::interpolate_parameter). A literal with both a backslash and a `$`,
-// or whose segment end differs from the quote-aware one, is Opaque.
+// or whose segment end differs from the quote-aware one, is Opaque except
+// when every dollar begins an unescaped decimal placeholder.
 NodeId ExprParser::string_literal(Token token) {
     const NodeId id = leaf(NodeKind::String, token);
     if (src_[token.begin] == '\'') ast_.at(id).flags |= kFlagSingleQuote;
     const std::uint32_t body_end = token.end - 1;
     const std::string_view body = src_.substr(token.begin + 1, body_end - token.begin - 1);
     if (body.find('$') == std::string_view::npos) return id;
-    if (body.find('\\') != std::string_view::npos)
-        return make_opaque(ast_, token.begin, token.end, OpaqueReason::IrregularLegacyParse);
+    if (body.find('\\') != std::string_view::npos) {
+        // Unescaped decimal placeholders cannot become interpolation
+        // markers after escape decoding. Preserve the other mixed refusals.
+        for (std::size_t dollar = body.find('$'); dollar != std::string_view::npos;
+             dollar = body.find('$', dollar + 1)) {
+            if ((dollar > 0 && body[dollar - 1] == '\\') || dollar + 1 == body.size() ||
+                body[dollar + 1] < '0' || body[dollar + 1] > '9')
+                return make_opaque(ast_, token.begin, token.end, OpaqueReason::IrregularLegacyParse);
+        }
+        return id;
+    }
     std::vector<NodeId> parts;
     std::uint32_t text_begin = token.begin + 1;
     for (std::uint32_t k = token.begin + 1; k < body_end; ++k) {

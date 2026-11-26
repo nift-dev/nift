@@ -170,6 +170,9 @@ void review_findings() {
     contains("print(\"a\\$b\")", irr);
     contains("print('$[\"]\"]')", lre);
     contains("print(\"\\q\")", "String @6..10");
+    contains(R"(print("SELECT $1, $10, \"id $1\""))", "String @6..");
+    contains(R"(print("\$1"))", irr);
+    contains(R"(print("$\[1]"))", irr);
     // D5 postfix and call shapes
     for (const char* text : {"print(x [0])", "print(o . a)", "print(o.a .b)", "print(o?. a)", "print(o.a\n.b)",
                              "print(\"abc\"[1])", "print('r'.k)", "print(1e2[0])", "print(true.k)",
