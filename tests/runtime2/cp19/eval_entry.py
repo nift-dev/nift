@@ -13,6 +13,13 @@ import approved_refusal  # noqa: E402
 
 refusal_failures = []
 
+# v4.13.0 owner approval applies only to these exact eval inputs, reason,
+# source position, and explicit legacy oracles.
+APPROVED_EVAL_REFUSALS = {
+    '1 +': (2, '', 'eval: expression cannot be empty\n'),
+    '[3,1,2].sort()': (2, '', 'eval: unknown value or malformed expression: [3,1,2].sort()\n'),
+}
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -120,6 +127,8 @@ def main():
                   '[3,1,2].sort()': 'opaque:legacy-runtime-error', 'timer()': 'callable:timer'}
         for expression in pinned:
             expected, _ = run(['eval', expression], '0')
+            if expression in APPROVED_EVAL_REFUSALS:
+                assert expected == APPROVED_EVAL_REFUSALS[expression], (expression, expected)
             actual, rows = run(['eval', expression], '1')
             assert actual == expected, (expression, expected, actual)
             assert len(rows) == 1 and rows[0]['outcome'] == 'fallback', rows
@@ -130,9 +139,14 @@ def main():
             assert (refused[0] == 1 and refused[1] == ''
                     and approved_refusal.refusal_reason(refused[2]) == pinned[expression]
                     and 'note: the program was not executed: no part of it ran' in refused[2]), (expression, refused)
-            problem = approved_refusal.acceptance_problem(repr(expression), pinned[expression])
-            if problem:
-                refusal_failures.append(problem)
+            if expression in APPROVED_EVAL_REFUSALS:
+                assert pinned[expression] == 'opaque:legacy-runtime-error', expression
+                assert refused[2].startswith('error: <eval>:1:1: '), (expression, refused)
+                assert (rows[0]['path'], rows[0]['line'], rows[0]['column']) == ('<eval>', 1, 1), rows
+            else:
+                problem = approved_refusal.acceptance_problem(repr(expression), pinned[expression])
+                if problem:
+                    refusal_failures.append(problem)
             assert rows[0]['outcome'] == 'require-error', rows
             assert (rows[0]['vm_executions'], rows[0]['legacy_executions']) == (0, 0), rows
 

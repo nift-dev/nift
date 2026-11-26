@@ -16,6 +16,13 @@ Must not change unless a decision in `decisions.md` approves it.
 
 ## Approved breaks
 
+**Two exact CP19 eval refusals (v4.13.0 owner decision).** The inputs
+`nift eval '1 +'` and `nift eval '[3,1,2].sort()'` each refuse at
+`<eval>:1:1` with `opaque:legacy-runtime-error`, exit status 1, empty
+stdout, and zero VM and legacy executions in VM-default mode. Explicit
+fallback runs the legacy interpreter once and reproduces its exit-2
+diagnostic byte for byte. The approval is scoped to those two inputs.
+
 **Sorted collections with mixed numeric and string domains (v4.13.0 owner
 decision).** In either insertion order, `set` on a sorted map rejects the
 incompatible key with `sorted_map: incomparable keys` and `add` on a sorted
