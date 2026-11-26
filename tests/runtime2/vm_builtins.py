@@ -187,6 +187,7 @@ SUPPORTED = {
 # array element) is integer negation, refused in loop code
 # (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
 SUPPORTED_TOP = [
+    ("w9-escaped-string", 'je := {"s": "caf\\u00e9"}\nprint(je.s)\n'),
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n"),
     # B5 23 (b5-refsem.md 13.4; originals docs/runtime-2/evidence/b5/vm-builtins-originals.json):
     # w3-mixed was UNSUPPORTED "builtin-receiver:empty" (CP14 W3). B4a's Dynamic admission
@@ -320,10 +321,6 @@ UNSUPPORTED = [
      "context:negative-zero"),
     ("w10-validate-literal", 'schema := {"type": "string"}\nr := validate(schema, "x")\nprint(r)\n',
      "builtin-literal-arg:validate"),
-    # W9 cannot see an escaped string inside a structured literal: the CP10
-    # parser keeps any such statement Opaque (J-Q1: `\u00e9` means different
-    # values in `{...}` and `[...]`), so it runs on legacy before W9 applies.
-    ("w9-escaped-string", 'je := {"s": "caf\\u00e9"}\nprint(je.s)\n', "opaque:legacy-runtime-error"),
     ("n-q2-abs-arity", "x := -2\nprint(x.abs(1))\n", "builtin-arity:abs"),
     ("cp16-replace-once", 's := "aa"\nprint(s.replace_once("a", "b"))\n', "method:replace_once"),
     # D-063 (base candidate): stack() compiles since the weekend collections;

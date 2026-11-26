@@ -174,6 +174,7 @@ while (i < 1) {
                                          "  inner := n[0]\n  inner.push(9)\n  return await f()\n}\nprint(m())\n"))
     # CP25-R: a reserved parameter name that is only read is an ordinary parameter.
     out.append(("reserved-param-read", "fn(f(name)) { return name }\nprint(f(1))\n"))
+    out.append(("const-object", 'const c := {"a": 1}\nprint(c.a)\n'))
     out.append(("for-top", "for (x : [1, 2]) { print(x) }\n"))
     out.append(("for-in-loop", "i0 := 0\nwhile (i0 < 2) {\n  i0 += 1\n  for (x : [1, 2]) { print(x) }\n}\n"))
     out.append(("for-in-function", "fn(w0()) {\n  for (x : [1, 2]) { print(x) }\n  return 0\n}\nprint(w0())\n"))
@@ -191,8 +192,8 @@ UNSUPPORTED = [
     ("file-write-computed-byte", 'n := 65; f := file("data"); f.open("rw"); f.write(bytes([n]))\n',
      "builtin-arg-fault-context"),
     # Statements and declarations outside the subset.
-    # CP25-R: const scalars compile outside loop code; objects stay refused.
-    ("const", 'const c := {"a": 1}\nprint(c.a)\n', "declare-const"),
+    ("const-object-in-function", 'fn(f()) { const c := {"a": 1}; return c.a }\nprint(f())\n',
+     "declare-const"),
     ("destructuring", "[a, b] := [1, 2]\nprint(a)\n", "declare-pattern"),
     # CP12b structs compile (vm_structs.py); a field initialised by a
     # non-constant is still refused (legacy evaluates it at each construction).

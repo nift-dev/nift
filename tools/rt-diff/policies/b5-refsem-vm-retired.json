@@ -167,5 +167,44 @@
   "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 const is binding-only (owner ruling Q2 option B; D-NEXT-refsem-b, b5-refsem.md section 1): an element store through a const binding runs. Legacy combined 'error: $ROOT/const.f:2:1: cannot assign to const binding: a\\n'; VM ''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 28 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
   "test": "tests/v44_element_assignment_smoke.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/v44_element_assignment_smoke/003-const/const.f)",
   "retired": "C108 (combined-b3-b5.md section 95): retired; since C95 (owner 13:26 item 3) the smoke states its const case inline (no heredoc), so rt-diff no longer extracts this entry. The binding-only const element write stays pinned by tests/v44_element_assignment_smoke.sh and tests/runtime2/assign_family.py const_element_writes."
+ },
+ {
+  "id": "b5-smoke_location_method_receiver_002-missing_missing-exit",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/location_method_receiver/002-missing/missing.f",
+  "source_sha256": "365ae57558b79b4c8bf9903f225e23ca438106bbcdef74e15b160bfb28d65648",
+  "channel": "exit",
+  "old": "1",
+  "new": "0",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 extracted-element lifetime (D-NEXT-refsem-b; b5-refsem.md section 1; compatibility.md): an extracted element stays valid after its source is cleared, so the later push runs. Legacy exit '1'; VM '0'. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 27 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tests/location_method_receiver.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/location_method_receiver/002-missing/missing.f)",
+  "retired": "v4.13.0: a live indexed location now reports the same missing target as legacy. tests/location_method_receiver.sh retains both execution oracles."
+ },
+ {
+  "id": "b5-smoke_location_method_receiver_002-missing_missing-stderr",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/location_method_receiver/002-missing/missing.f",
+  "source_sha256": "365ae57558b79b4c8bf9903f225e23ca438106bbcdef74e15b160bfb28d65648",
+  "channel": "stderr",
+  "old": "error: $ROOT/missing.f:4:1: reference target no longer exists: b\n",
+  "new": "",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 extracted-element lifetime (D-NEXT-refsem-b; b5-refsem.md section 1; compatibility.md): an extracted element stays valid after its source is cleared, so the later push runs. Legacy stderr 'error: $ROOT/missing.f:4:1: reference target no longer exists: b\\n'; VM ''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 27 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tests/location_method_receiver.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/location_method_receiver/002-missing/missing.f)",
+  "retired": "v4.13.0: a live indexed location now reports the same missing target as legacy. tests/location_method_receiver.sh retains both execution oracles."
+ },
+ {
+  "id": "b5-smoke_location_method_receiver_002-missing_missing-combined",
+  "decision": "D-NEXT-refsem-b",
+  "entry": "smoke/location_method_receiver/002-missing/missing.f",
+  "source_sha256": "365ae57558b79b4c8bf9903f225e23ca438106bbcdef74e15b160bfb28d65648",
+  "channel": "combined",
+  "old": "error: $ROOT/missing.f:4:1: reference target no longer exists: b\n",
+  "new": "",
+  "count": 1,
+  "justification": "APPROVED owner 2026-11-08 06:46: an approved B5 semantic difference, not legacy parity. Cause: B5 extracted-element lifetime (D-NEXT-refsem-b; b5-refsem.md section 1; compatibility.md): an extracted element stays valid after its source is cleared, so the later push runs. Legacy combined 'error: $ROOT/missing.f:4:1: reference target no longer exists: b\\n'; VM ''. Evidence: docs/runtime-2/checkpoints/combined-b3-b5.md section 23.1 row 27 (fc987ec1 identical; 17f7964c and weekend/r2 refuse it on the VM).",
+  "test": "tests/location_method_receiver.sh (heredoc extracted by tools/rt-diff/extract_smoke.py as smoke/location_method_receiver/002-missing/missing.f)",
+  "retired": "v4.13.0: a live indexed location now reports the same missing target as legacy. tests/location_method_receiver.sh retains both execution oracles."
  }
 ]

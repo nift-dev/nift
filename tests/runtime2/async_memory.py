@@ -764,7 +764,9 @@ def case_default_depth(nift):
     by_budget = DEFAULT_BUDGET // c - 1
     print("    default budget %d: accounting allows depth %d; the %d-wait blocking capacity bounds it first: "
           "derived maximum depth %d" % (DEFAULT_BUDGET, by_budget, BLOCKING_CAPACITY, min(by_budget, BLOCKING_CAPACITY)))
-    got = run(nift, REC % 300)
+    # Keep glibc's per-thread allocator reservations from exhausting the
+    # address-space cap before the VM's default-budget depth is exercised.
+    got = run(nift, REC % 300, env={"MALLOC_ARENA_MAX": "2"})
     return [] if got == (0, "45150\n", "") else ["depth 300: %r" % (got,)]
 
 

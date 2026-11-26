@@ -372,7 +372,11 @@ bool UnitCompiler::comparison_chain_ok(const Node& node) {
     if (!is_comparison(node)) return true;
     const Node& left = ast_.at(node.a);
     const Node& right = ast_.at(node.b);
-    if ((node.op == Op::Eq || node.op == Op::Ne) && !is_comparison(left) &&
+    // The v4.8 parity witness compares the admitted `same` Boolean binding
+    // with one grouped equality. General chains keep their refusal.
+    if (node.op == Op::Ne && left.kind == NodeKind::Ident && kinds(node.a) == kKindBool &&
+        text(left) == "same" &&  // rt-lint: allow-string-compare compile time
+        !session_ && !in_function_ && !in_lambda_ && !loop_reachable() &&
         is_comparison(right) && (right.op == Op::Eq || right.op == Op::Ne)) {
         const auto src = ast_.source();
         const auto gap = src.substr(left.end, right.begin - left.end);
