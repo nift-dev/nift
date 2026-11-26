@@ -34,7 +34,19 @@ PY="$(command -v python3 || command -v python)"
 # before the filesystem clock, so they are strictly newer than the last build
 # and strictly older than the next. The edits are real content changes.
 TICKS="$(cd "$(dirname "$0")" && pwd)/runtime2/cp01/ticks.py"
-sequenced() { "$PY" "$TICKS" "$@" >/dev/null || bad "sequencing the edit of $*"; }
+sequenced() {
+  local arg
+  local paths=()
+  for arg in "$@"; do
+    # MSYS Python treats drive-letter paths as relative. Keep the native
+    # spelling in the Nift fixtures and use POSIX paths for the clock helper.
+    case "$IS_WINDOWS:$arg" in
+      1:[A-Za-z]:/*) arg="$(cygpath -u "$arg")" || { bad "converting the edit path $arg"; return 1; } ;;
+    esac
+    paths+=("$arg")
+  done
+  "$PY" "$TICKS" "${paths[@]}" >/dev/null || bad "sequencing the edit of $*"
+}
 nat() {
   if [ "$IS_WINDOWS" -eq 1 ] && command -v cygpath >/dev/null 2>&1; then
     cygpath -m "$1"

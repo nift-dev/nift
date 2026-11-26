@@ -87,17 +87,38 @@ hold_port() {
 }
 release_port() { kill "$HOLD" 2>/dev/null; wait "$HOLD" 2>/dev/null; rm -f "$WORK/hold.out"; }
 
-# start NAME [serve args...]: launches in the background (cwd = $RUN_CWD,
-# extra environment = START_ENV), waits up to 10 s for "Serving HTTP".
+# start NAME HOST PORT [serve args...]: launches in the background (cwd = $RUN_CWD,
+# extra environment = START_ENV), waits for the selected endpoint to accept
+# connections. Python versions can differ in where they write their banner.
 start() {
-    local name=$1; shift
-    (cd "$RUN_CWD" && exec env ${START_ENV[@]+"${START_ENV[@]}"} "$NIFT_BIN" serve "$@") >"$WORK/$name.out" 2>"$WORK/$name.err" &
+    local name=$1 host=$2 port=$3 url; shift 3
+    if [ "$host" != 127.0.0.1 ]; then set -- --host "$host" "$@"; fi
+    (cd "$RUN_CWD" && exec env ${START_ENV[@]+"${START_ENV[@]}"} "$NIFT_BIN" serve --port "$port" "$@") >"$WORK/$name.out" 2>"$WORK/$name.err" &
     SPID=$!; PIDS+=("$SPID")
     for _ in $(seq 100); do
-        grep -q "Serving HTTP" "$WORK/$name.out" 2>/dev/null && return 0
-        kill -0 "$SPID" 2>/dev/null || return 1
+        kill -0 "$SPID" 2>/dev/null || break
+        url=$(sed -n 's/^URL:     //p' "$WORK/$name.out")
+        if [ -n "$url" ] && "$PY" - "$url" "$host" "$port" <<'EOF'
+import socket, sys
+from urllib.parse import urlsplit
+
+address = urlsplit(sys.argv[1])
+host, port = sys.argv[2], int(sys.argv[3])
+if (address.scheme, address.hostname, address.port) != ("http", host, port):
+    sys.exit(1)
+try:
+    with socket.create_connection((host, port), timeout=0.2):
+        pass
+except OSError:
+    sys.exit(1)
+EOF
+        then
+            kill -0 "$SPID" 2>/dev/null && return 0
+            break
+        fi
         sleep 0.1
     done
+    sed 's/^/       stdout: /' "$WORK/$name.out" >&2
     return 1
 }
 # stop SIG: signals $SPID, waits up to 10 s, sets STATUS.
@@ -149,7 +170,7 @@ if [ "$FULL" = 1 ]; then BEFORE=$(tree_hash "$PROJ") || { bad "tree hash of the 
 
 # 1. default output dir + custom port; byte-exact fetch; request log; SIGINT
 P=$(free_port)
-if start default --port "$P"; then
+if start default 127.0.0.1 "$P"; then
     grep -qx "Serving: $PROJ/public" "$WORK/default.out" && grep -qx "URL:     http://127.0.0.1:$P/" "$WORK/default.out" \
         && grep -q "^Press Ctrl+C to stop.$" "$WORK/default.out" && ok "banner (default dir, custom port)" || bad "banner" "$WORK/default.out"
     if [ "$FULL" = 1 ]; then
@@ -191,7 +212,7 @@ else bad "default start" "$WORK/default.err"; fi
 
 # 2. SIGTERM: no orphan, status reflects the signal
 P=$(free_port)
-if start term --port "$P"; then
+if start term 127.0.0.1 "$P"; then
     stop TERM; [ "$STATUS" = 143 ] && ok "SIGTERM status 143" || bad "SIGTERM status $STATUS"
     port_free 127.0.0.1 "$P" && wait_gone "http.server $P" && ok "SIGTERM: no orphan" || bad "SIGTERM orphan"
 else bad "term start" "$WORK/term.err"; fi
@@ -199,7 +220,7 @@ else bad "term start" "$WORK/term.err"; fi
 # 3. force-kill nift (SIGKILL to the PID the user started): no child left,
 #    port free within 5 s. With exec there is no separate child by design.
 P=$(free_port)
-if start forcekill --port "$P"; then
+if start forcekill 127.0.0.1 "$P"; then
     fetch "http://127.0.0.1:$P/blob.bin" "$WORK/fk.got" && cmp -s "$WORK/fk.got" "$PROJ/public/blob.bin" && ok "force-kill: fetched before kill" || bad "force-kill fetch"
     stop KILL; [ "$STATUS" = 137 ] && ok "force-kill: status 137" || bad "force-kill status $STATUS"
     wait_gone "http.server $P" && port_free 127.0.0.1 "$P" && ok "force-kill: no Python child left, port free" || bad "force-kill left a server"
@@ -219,7 +240,7 @@ fi
 #    (a wildcard or 127.0.0.1 bind would have failed).
 OUT="$WORK/other dir/with spaces"; mkdir -p "$OUT"; printf 'outside\n' > "$OUT/a file.txt"
 P=$(free_port)
-if hold_port 127.0.0.1 "$P" && start spaces "--dir=$OUT" --host 127.0.0.2 --port "$P"; then
+if hold_port 127.0.0.1 "$P" && start spaces 127.0.0.2 "$P" "--dir=$OUT"; then
     grep -qx "Serving: $OUT" "$WORK/spaces.out" && grep -qx "URL:     http://127.0.0.2:$P/" "$WORK/spaces.out" && ok "--dir with spaces + custom host banner" || bad "spaces banner" "$WORK/spaces.out"
     fetch "http://127.0.0.2:$P/a%20file.txt" "$WORK/a.got" && cmp -s "$WORK/a.got" "$OUT/a file.txt" \
         && ok "custom host 127.0.0.2 served while 127.0.0.1:$P is held by the test" || bad "spaces fetch" "$WORK/spaces.err"
@@ -230,7 +251,7 @@ release_port
 # 5. relative --dir; no project needed when --dir is given
 mkdir -p "$WORK/noproj/www"; printf 'np\n' > "$WORK/noproj/www/x.txt"
 SAVE=$RUN_CWD; RUN_CWD="$WORK/noproj"; P=$(free_port)
-if start noproj --dir www --port "$P"; then
+if start noproj 127.0.0.1 "$P" --dir www; then
     grep -qx "Serving: $WORK/noproj/www" "$WORK/noproj.out" && fetch "http://127.0.0.1:$P/x.txt" "$WORK/x.got" && ok "no project + relative --dir served" || bad "noproj" "$WORK/noproj.out"
     stop INT; [ "$STATUS" = 0 ] && ok "stop no-project server" || bad "stop noproj $STATUS"
 else bad "noproj start" "$WORK/noproj.err"; fi
@@ -241,7 +262,7 @@ RUN_CWD=$SAVE
 # 6. IPv6 host (skipped if ::1 unavailable)
 if has_ipv6; then
     P=$(free_port)
-    if start v6 --host ::1 --port "$P"; then
+    if start v6 ::1 "$P"; then
         grep -qx "URL:     http://\[::1\]:$P/" "$WORK/v6.out" && fetch "http://[::1]:$P/index.html" "$WORK/v6.got" && ok "IPv6 ::1 served, URL bracketed" || bad "v6" "$WORK/v6.out"
         stop INT; [ "$STATUS" = 0 ] && ok "stop IPv6 server" || bad "stop v6 $STATUS"
     else bad "v6 start" "$WORK/v6.err"; fi
@@ -253,7 +274,7 @@ L="$WORK/linktest"; mkdir -p "$L/real/inner" "$L/real/www" "$L/www"
 printf 'kernel\n' > "$L/real/www/which.txt"; printf 'lexical\n' > "$L/www/which.txt"
 ln -s real/inner "$L/link"
 SAVE=$RUN_CWD; RUN_CWD="$L"; P=$(free_port)
-if start dotdot --dir link/../www --port "$P"; then
+if start dotdot 127.0.0.1 "$P" --dir link/../www; then
     grep -qx "Serving: $L/real/www" "$WORK/dotdot.out" && fetch "http://127.0.0.1:$P/which.txt" "$WORK/which.got" && [ "$(cat "$WORK/which.got")" = kernel ] \
         && ok "--dir link/../www serves and shows the kernel-resolved dir" || bad "dotdot" "$WORK/dotdot.out"
     stop INT
@@ -268,7 +289,7 @@ import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d["config"]["output-dir"] = "link/../out/"; json.dump(d, open(p, "w"), indent=2)
 EOF
 SAVE=$RUN_CWD; RUN_CWD="$WORK/site-link"; P=$(free_port)
-if start cfglink --port "$P"; then
+if start cfglink 127.0.0.1 "$P"; then
     grep -qx "Serving: $WORK/site-link/real/out" "$WORK/cfglink.out" && fetch "http://127.0.0.1:$P/which.txt" "$WORK/cw.got" && [ "$(cat "$WORK/cw.got")" = kernel ] \
         && ok "configured output-dir link/../out resolved by the kernel" || bad "cfglink" "$WORK/cfglink.out"
     stop INT
@@ -367,7 +388,7 @@ run_path race "$RACE:/usr/bin:/bin" --port "$P"
 
 # 13. served directory disappears while running: 404, server stays up
 GONE="$WORK/gone"; mkdir -p "$GONE"; echo hi > "$GONE/f.txt"; P=$(free_port)
-if start gone --dir "$GONE" --port "$P"; then
+if start gone 127.0.0.1 "$P" --dir "$GONE"; then
     rm -rf "$GONE"
     s=$(http_status "http://127.0.0.1:$P/f.txt"); [ "$s" = 404 ] && kill -0 "$SPID" && ok "dir removed while serving: 404, still running" || bad "gone status $s" "$WORK/gone.err"
     stop INT; [ "$STATUS" = 0 ] && ok "stop after dir removal" || bad "gone stop $STATUS"
@@ -378,7 +399,7 @@ else bad "gone start" "$WORK/gone.err"; fi
 SHADOW="$WORK/shadow"; mkdir -p "$SHADOW/www"; echo s > "$SHADOW/www/s.txt"
 for m in socketserver mimetypes; do printf 'open(%s, "w").write("ran")\n' "\"$WORK/shadow-$m-ran\"" > "$SHADOW/$m.py"; done
 SAVE=$RUN_CWD; RUN_CWD="$SHADOW"; START_ENV=(PYTHONPATH="$SHADOW" PYTHONDONTWRITEBYTECODE=); P=$(free_port)
-if start shadow --dir www --port "$P"; then
+if start shadow 127.0.0.1 "$P" --dir www; then
     fetch "http://127.0.0.1:$P/s.txt" "$WORK/s.got" && ok "served from a cwd with shadowing modules" || bad "shadow fetch" "$WORK/shadow.err"
     stop INT
 else bad "shadow start" "$WORK/shadow.err"; fi
