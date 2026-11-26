@@ -16,6 +16,18 @@ Must not change unless a decision in `decisions.md` approves it.
 
 ## Approved breaks
 
+**Sorted collections with mixed numeric and string domains (v4.13.0 owner
+decision).** In either insertion order, `sorted_map().set` rejects the
+incompatible key with `sorted_map: incomparable keys` and
+`sorted_set().add` rejects the incompatible member with
+`sorted_set: incomparable values`. These diagnostics occur at the reached
+call after ordinary operand evaluation, before the insertion reserves
+collection storage, changes membership, or reorders entries. Aliases
+continue to see the original contents. Legacy accepts the mixture and its
+comparator does not guarantee a portable order across the domains.
+Homogeneous numeric and string ordering and the existing pre-execution
+mutable-key refusals remain in force.
+
 **Interactive shell: function-call syntax is never a command line (C144; D-100, D-101).** In `nift`, `nift -i` and
 piped stdin, both engines (classification happens before engine selection); scripts, `-e`, `-c`, `nift -`, templates
 and hooks were never affected. This restores v4.12.0's treatment of `NAME (…)` as Nift (it does not restore v4.12.0's
