@@ -17,9 +17,9 @@ Must not change unless a decision in `decisions.md` approves it.
 ## Approved breaks
 
 **Sorted collections with mixed numeric and string domains (v4.13.0 owner
-decision).** In either insertion order, `sorted_map().set` rejects the
-incompatible key with `sorted_map: incomparable keys` and
-`sorted_set().add` rejects the incompatible member with
+decision).** In either insertion order, `set` on a sorted map rejects the
+incompatible key with `sorted_map: incomparable keys` and `add` on a sorted
+set rejects the incompatible member with
 `sorted_set: incomparable values`. These diagnostics occur at the reached
 call after ordinary operand evaluation, before the insertion reserves
 collection storage, changes membership, or reorders entries. Aliases
