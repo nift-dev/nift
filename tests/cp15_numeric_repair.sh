@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This smoke covers the legacy RuntimeValue numeric boundary repairs.
+export NIFT_VM=0
+
 NIFT=${NIFT:-./nift}
 NIFT=$(cd "$(dirname "$NIFT")" && pwd)/$(basename "$NIFT")
 tmp=$(mktemp -d)
