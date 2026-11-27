@@ -85,7 +85,7 @@ int UnitCompiler::literal_ordering_error(const Node& expression, const Node& dia
 }
 
 KindSet UnitCompiler::guarded_kind(NodeId id) const {
-    if (id != kNoNode && id == guarded_numeric_read_) return kKindNumber;
+    if (id != kNoNode && id == guarded_conversion_.first) return guarded_conversion_.second;
     if (kinds_.of(id) == (kKindObject | kKindNull) &&
         std::find(guarded_object_reads_.begin(), guarded_object_reads_.end(), id) != guarded_object_reads_.end())
         return kKindObject;
@@ -93,52 +93,88 @@ KindSet UnitCompiler::guarded_kind(NodeId id) const {
 }
 
 // The first statement records the built-in type of a parameter. With both
-// bindings stable, the numeric branch can call to_string on that parameter.
-NodeId UnitCompiler::guarded_numeric_return(const Node& node) const {
+// bindings stable, a guarded conversion can use the corresponding native.
+std::pair<NodeId, KindSet> UnitCompiler::guarded_conversion(const Node& node) const {
     if (session_ || in_lambda_ || !in_function_ || plan_.coroutines || !imported_module_data(plan_, node))
-        return kNoNode;
+        return {kNoNode, 0};
     const auto& test = ast_.at(node.a);
     const auto& yes = ast_.at(node.b);
-    if (test.kind != NodeKind::Logical || test.op != Op::Or || yes.count != 1) return kNoNode;
     const auto label = [&](NodeId id, std::string_view spelling) -> NodeId {
         const auto& n = ast_.at(id);
         if (n.kind != NodeKind::Binary || n.op != Op::Eq || ast_.at(n.a).kind != NodeKind::Ident ||
             ast_.at(n.b).kind != NodeKind::String || text(ast_.at(n.b)) != spelling) return kNoNode;
         return n.a;
     };
-    const NodeId lhs = label(test.a, R"("int")"), rhs = label(test.b, R"("float")");
-    if (lhs == kNoNode || rhs == kNoNode || text(ast_.at(lhs)) != text(ast_.at(rhs))) return kNoNode;
+    NodeId lhs = label(node.a, R"("string")");
+    const bool string_test = lhs != kNoNode;
+    if (!string_test) {
+        if (test.kind != NodeKind::Logical || test.op != Op::Or || yes.count != 1) return {kNoNode, 0};
+        lhs = label(test.a, R"("int")");
+        const NodeId rhs = label(test.b, R"("float")");
+        if (lhs == kNoNode || rhs == kNoNode || text(ast_.at(lhs)) != text(ast_.at(rhs))) return {kNoNode, 0};
+    } else if (yes.count != 1 && yes.count != 2) {
+        return {kNoNode, 0};
+    }
     const auto* alias = find_binding(text(ast_.at(lhs)));
     const auto& body = ast_.at(ast_.at(plan_.functions[function_]).b);
-    if (!alias || alias->cell || alias->global || !body.count) return kNoNode;
+    if (!alias || alias->cell || alias->global || !body.count) return {kNoNode, 0};
     const auto& declaration = ast_.at(ast_.list(body)[0]);
-    if (declaration.kind != NodeKind::Declare || declaration.a != alias->decl_node) return kNoNode;
+    if (declaration.kind != NodeKind::Declare || declaration.a != alias->decl_node) return {kNoNode, 0};
     const auto& type_call = ast_.at(declaration.b);
-    if (type_call.kind != NodeKind::Call || type_call.count != 1) return kNoNode;
+    if (type_call.kind != NodeKind::Call || type_call.count != 1) return {kNoNode, 0};
     const auto& type = ast_.at(type_call.a);
     if (type.kind != NodeKind::Ident || text(type) != "type" || find_binding("type") ||
-        plan_.index.count("type") || plan_.struct_index.count("type")) return kNoNode;
+        plan_.index.count("type") || plan_.struct_index.count("type")) return {kNoNode, 0};
     const int owner = current_struct();
-    if (owner >= 0 && plan_.structs[static_cast<std::size_t>(owner)].method("type")) return kNoNode;
+    if (owner >= 0 && plan_.structs[static_cast<std::size_t>(owner)].method("type")) return {kNoNode, 0};
     const auto& input = ast_.at(ast_.list(type_call)[0]);
-    if (input.kind != NodeKind::Ident) return kNoNode;
+    if (input.kind != NodeKind::Ident) return {kNoNode, 0};
     const auto* parameter = find_binding(text(input));
     if (!parameter || parameter->cell || parameter->global || parameter->decl_node == kNoNode ||
         ast_.at(parameter->decl_node).kind != NodeKind::Param ||
-        assigned_.count(text(input)) || assigned_.count(text(ast_.at(lhs)))) return kNoNode;
+        assigned_.count(text(input)) || assigned_.count(text(ast_.at(lhs)))) return {kNoNode, 0};
     for (NodeId id = 0; id < ast_.size(); ++id) {
         const auto& candidate = ast_.at(id);
         if (candidate.kind == NodeKind::Command && candidate.begin >= body.begin && candidate.end <= body.end)
-            return kNoNode;
+            return {kNoNode, 0};
     }
-    const auto& ret = ast_.at(ast_.list(yes)[0]);
-    if (ret.kind != NodeKind::Return || ret.a == kNoNode) return kNoNode;
-    const auto& conversion = ast_.at(ret.a);
-    if (conversion.kind != NodeKind::Call || conversion.count != 0) return kNoNode;
+    const auto* statements = ast_.list(yes);
+    if (yes.count == 2) {
+        const auto& early = ast_.at(statements[0]);
+        if (early.kind != NodeKind::If || early.c != kNoNode) return {kNoNode, 0};
+        const auto& alternative = ast_.at(early.b);
+        if (alternative.count != 1) return {kNoNode, 0};
+        const auto& exit = ast_.at(ast_.list(alternative)[0]);
+        if (exit.kind != NodeKind::Return || exit.a == kNoNode ||
+            ast_.at(exit.a).kind != NodeKind::Null) return {kNoNode, 0};
+    }
+    const auto& ret = ast_.at(statements[yes.count - 1]);
+    if (ret.kind != NodeKind::Return || ret.a == kNoNode) return {kNoNode, 0};
+    const auto plain_string = [&](NodeId id) {
+        const auto& n = ast_.at(id);
+        return n.kind == NodeKind::String && n.count == 0;
+    };
+    NodeId value = ret.a;
+    if (string_test) {
+        // Allow a conversion surrounded by literal prefixes and suffixes.
+        const auto& suffix = ast_.at(value);
+        if (suffix.kind != NodeKind::Binary || suffix.op != Op::Add ||
+            !plain_string(suffix.b)) return {kNoNode, 0};
+        const auto& prefix = ast_.at(suffix.a);
+        if (prefix.kind != NodeKind::Binary || prefix.op != Op::Add ||
+            !plain_string(prefix.a)) return {kNoNode, 0};
+        value = prefix.b;
+    }
+    const auto& conversion = ast_.at(value);
+    if (conversion.kind != NodeKind::Call || conversion.count != (string_test ? 2u : 0u)) return {kNoNode, 0};
     const auto& method = ast_.at(conversion.a);
-    if (method.kind != NodeKind::Member || text(ast_.at(method.b)) != "to_string") return kNoNode;
+    if (method.kind != NodeKind::Member ||
+        text(ast_.at(method.b)) != (string_test ? "replace" : "to_string")) return {kNoNode, 0};
     const auto& receiver = ast_.at(method.a);
-    return receiver.kind == NodeKind::Ident && text(receiver) == text(input) ? method.a : kNoNode;
+    if (receiver.kind != NodeKind::Ident || text(receiver) != text(input)) return {kNoNode, 0};
+    if (string_test && (!plain_string(ast_.list(conversion)[0]) ||
+                        !plain_string(ast_.list(conversion)[1]))) return {kNoNode, 0};
+    return {method.a, string_test ? kKindString : kKindNumber};
 }
 
 // Admit reads only in the immediate return. A call operand may precede a
@@ -187,10 +223,10 @@ bool UnitCompiler::if_chain(const Node& node) {
     BlockRegs body_regs = block_begin(node.b);
     auto saved_reads = std::move(guarded_object_reads_);
     guarded_object_reads_ = guarded_return_reads(node);
-    const NodeId saved_numeric = guarded_numeric_read_;
-    guarded_numeric_read_ = guarded_numeric_return(node);
+    const auto saved_conversion = guarded_conversion_;
+    guarded_conversion_ = guarded_conversion(node);
     const bool ok = statements(body);
-    guarded_numeric_read_ = saved_numeric;
+    guarded_conversion_ = saved_conversion;
     guarded_object_reads_ = std::move(saved_reads);
     block_end(body_regs);
     scopes_.pop();

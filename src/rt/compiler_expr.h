@@ -83,9 +83,9 @@ private:
     bool compound_assign(const Node& node); friend struct ElementPath;  // checkpoint 1 (compiler_element_path.cpp)
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
-    KindSet guarded_kind(NodeId id) const; NodeId guarded_numeric_return(const Node& node) const;
+    KindSet guarded_kind(NodeId id) const; std::pair<NodeId, KindSet> guarded_conversion(const Node& node) const;
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
-    std::vector<NodeId> guarded_object_reads_; NodeId guarded_numeric_read_ = kNoNode;
+    std::vector<NodeId> guarded_object_reads_; std::pair<NodeId, KindSet> guarded_conversion_ = {kNoNode, 0};
     bool while_loop(const Node& node);
     bool try_statement(const Node& node);
     bool throw_statement(const Node& node);

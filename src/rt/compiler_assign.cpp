@@ -1,13 +1,10 @@
 #include "rt/compiler_assign.h"
 #include "rt/compiler_element_path.h"
-
 #include "rt/binding_rules.h"
 #include "rt/literal.h"
 #include "rt/module_data.h"
 #include "rt/native.h"
-
 namespace nift::rt::detail {
-
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
     if (session_ && plan_.index.count(name)) return fail(at, "binding-shadows-fn");
     // The type register comes first so the value register is the newest one
@@ -25,7 +22,6 @@ bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint1
     }
     return true;
 }
-
 bool UnitCompiler::declare(const Node& node) {
     const Node& target = ast_.at(node.a);
     // CP25: a `const`/`immut` binding of a proved scalar is an ordinary binding
@@ -55,10 +51,15 @@ bool UnitCompiler::declare(const Node& node) {
         !session_ && !in_function_ && !in_lambda_ && !plan_.coroutines &&
         (!module_names_ || module_names_->empty());
     const bool size_value = name == "size" && init.kind == NodeKind::String &&  // rt-lint: allow-string-compare
-        init_kinds == kKindString && !session_ && in_function_ && !in_lambda_ && plan_.is_method(function_) &&
-        imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
+        init_kinds == kKindString;
+    const bool length_value = name == "len" &&  // rt-lint: allow-string-compare
+        init.kind == NodeKind::Call && init.count == 0 && ast_.at(init.a).kind == NodeKind::Member &&
+        text(ast_.at(ast_.at(init.a).b)) == "length" &&  // rt-lint: allow-string-compare
+        !assigned_.count(name);
+    const bool method_value = (size_value || length_value) && !session_ && in_function_ && !in_lambda_ &&
+        plan_.is_method(function_) && imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
         !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
-    if (reserved_name(name) && !same_value && !size_value && !invocation_shadows_.count(node_id(target)))
+    if (reserved_name(name) && !same_value && !method_value && !invocation_shadows_.count(node_id(target)))
         return fail(target, "binding-name-reserved");
     const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
     if (parameter && parameter->decl_node != kNoNode &&

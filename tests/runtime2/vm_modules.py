@@ -183,6 +183,14 @@ SHAPES.update({
                'fn(check(left, right)) { return !this.probe(left) && !this.probe(right) } }\nexport(Checks)\n',
         "main.f": 'import("m.f")\nc := Checks()\nprint(c.check(false, true))\n',
     }, "prefix-not-precedence"),
+    "struct-method-local-len-value": ({
+        "m.f": 'struct(Box) { fn(count(value)) { len := value.length(); return len } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.count("abc"))\n',
+    }, "vm"),
+    "struct-method-local-len-callee-refusal": ({
+        "m.f": 'struct(Box) { fn(count(value)) { len := value.length(); return len() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.count("abc"))\n',
+    }, "binding-name-reserved"),
     "struct-method-local-size-value": ({
         "m.f": 'struct(Box) { fn(size()) { return "method" }\nfn(render()) { size := ""; size = "large"; return size + this.size() } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nprint(b.render())\n',
@@ -258,6 +266,13 @@ SHAPES.update({
                'if(label == "int" || label == "float") { return value.to_string() }; '
                'return "other" } }\nbox := Box()\nexport(box)\n',
         "main.f": 'import("m.f")\nprint(box.show(7))\nprint(box.show("kept"))\n',
+    }, "vm"),
+    "imported-cached-string-type": ({
+        "m.f": 'struct(Box) { private fn(skip(value)) { print(value); return value == "skip" }\n'
+               'fn(show(value)) { label := type(value); if(label == "string") { '
+               'if(this.skip(value)) { return null }; return "[" + value.replace("a", "b") + "]" }; '
+               'return "other" } }\nbox := Box()\nexport(box)\n',
+        "main.f": 'import("m.f")\nprint(box.show("a"))\nprint(box.show("skip"))\nprint(box.show([]))\n',
     }, "vm"),
     "imported-nonnull-return-members": ({
         "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
