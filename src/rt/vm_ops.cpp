@@ -110,6 +110,11 @@ bool push_kind_error(Fault& fault, const Note* note) {
 
 } // namespace
 
+bool order_guard(const Value& left, const Value& right, const Note* note, Fault& fault) {
+    if ((left.is_number() && right.is_number()) || (left.is(Kind::String) && right.is(Kind::String))) return true;
+    return raise(fault, StopReason::Error, note ? note->text : std::string());
+}
+
 bool session_numeric(const Value& left, const Value& right, Fault& fault) {
     if (left.is_number() && right.is_number()) return true;
     return raise(fault, StopReason::Error, "arithmetic operators require numeric operands");

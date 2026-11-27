@@ -118,6 +118,7 @@ namespace nift::rt {
     X(KeyedMutate) /* D-063: map/set/stack bare-binding mutation (rt/keyed.h) */ \
     X(SessionRender) /* append a compound REPL statement value, never stdout */ \
     X(SessionNumeric) /* CP19 numeric operand guard for widened readers */ \
+    X(OrderGuard) /* B: ordering operands are two numbers or two strings, else legacy's noted fatal Error */ \
     X(Spawn)      /* R[a] = future of protos[b](R[a] .. ); c: argc, bit 15: + argc type regs (CP22) */ \
     X(CallValueAny) /* CallValue that spawns when the callee is async (coroutine units, CP22) */ \
     X(Await)      /* R[a] = await R[b] (suspends while R[b] is pending; CP22)              */ \

@@ -3,6 +3,7 @@
 #include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/codegen.h"
+#include "rt/compiler_order_guard.h"
 #include "rt/globals.h"
 #include "rt/natives/builtin.h"
 #include "rt/infer.h"
@@ -87,8 +88,7 @@ private:
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
     std::vector<NodeId> guarded_object_reads_; std::pair<NodeId, KindSet> guarded_conversion_ = {kNoNode, 0};
     bool while_loop(const Node& node);
-    bool try_statement(const Node& node);
-    bool throw_statement(const Node& node);
+    bool try_statement(const Node& node); bool throw_statement(const Node& node);
     bool collection_failure(const Node&,std::uint16_t,std::string);
     int collection_method_call(const Node&,std::uint16_t);
     bool collection_call(const Node& node, std::uint16_t dst, int method);
@@ -117,9 +117,7 @@ private:
     bool for_loop(const Node& node);
     bool for_setup(ForState& state, const Node& node);
     bool for_prepare_bindings(ForState& state, const Node& node);
-    bool for_step(ForState& state);
-    bool for_emit_body(ForState& state);
-    bool for_finish(ForState& state);
+    bool for_step(ForState& state); bool for_emit_body(ForState& state); bool for_finish(ForState& state);
     bool for_read_source(const Binding& b, std::uint16_t& reg, bool& temp_owned);
     bool for_source_binding(const Node& iterable, const Binding*& binding) const;
     bool for_body_reads(const Node& body, std::string_view name, std::uint32_t& first_offset) const;
@@ -132,8 +130,7 @@ private:
     bool for_bind_value(const Binding& binding, std::uint16_t value, std::uint16_t type_reg, bool first,
                         std::uint16_t flag);
     bool for_emit_loop_metadata(const Binding& binding, std::uint16_t index, std::uint16_t count);
-    bool for_clear_register(std::uint16_t reg);
-    bool return_statement(const Node& node);
+    bool for_clear_register(std::uint16_t reg); bool return_statement(const Node& node);
     bool assign_value(const Node& node, const Binding& b);
     bool compound_op(const Node& node, const Binding& b);
     bool compound_snapshot(const Node& node, const Binding& b);
@@ -256,6 +253,9 @@ private:
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
+    // OrderGuard (compiler_order_guard.cpp): the ordering context of the statement being compiled.
+    OrderContext order_ctx_;
+    bool order_guard(const Node& node, std::uint16_t left, std::uint16_t right); bool order_guarded(const Node&) const;
     bool kinds_within(NodeId id, KindSet allowed, const Node& at, const char* reason);
     bool argument_path(const Node& node, std::string& note);
     bool bare_argument(const Node& call, std::uint32_t k) const;

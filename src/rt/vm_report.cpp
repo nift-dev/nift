@@ -157,6 +157,12 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
         }
 #endif
     }
+    if (pc->op == OpCode::OrderGuard && fault.reason == StopReason::Error && !fault.catchable) {
+        result.message = fault.message;  // the note: the innermost statement's legacy wording
+        for (const auto& frame : frames_)  // a return call in a prepared loop region adds none (legacy)
+            if (frame.return_call && !((frame.ret - 1)->flags & kInstrLoopPath))
+                result.message = "return: " + result.message;
+    }
     if (uncaught_error) {
         const auto* error = fault.error.heap_as<ErrorObject>();
         result.error_origin = !error->source.empty() && error->line != 0 && error->column != 0;

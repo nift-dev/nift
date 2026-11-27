@@ -74,7 +74,7 @@ bool writes_register_a(OpCode op) {
         case OpCode::NewSourceSlot: case OpCode::TryBegin: case OpCode::TryEnd: case OpCode::CollectionSort:
         case OpCode::CollectionStep: case OpCode::CollectionCall: case OpCode::ArrayMutate: case OpCode::KeyedMutate:
         case OpCode::SessionRender: case OpCode::SessionNumeric: case OpCode::CallValueAny: case OpCode::Yield:
-        case OpCode::TaskEnd: case OpCode::CheckVariadicArity: return false;
+        case OpCode::TaskEnd: case OpCode::CheckVariadicArity: case OpCode::OrderGuard: return false;
         default: return true;
     }
 }

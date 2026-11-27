@@ -192,7 +192,11 @@ bool UnitCompiler::while_loop(const Node& node) {
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     std::vector<std::size_t> exits;
-    bool ok = false_jump(node.a, exits);
+    bool ok = false;
+    {
+        const OrderScope order_scope(order_ctx_, {node.a, 0, 0});
+        ok = false_jump(node.a, exits);
+    }
     BlockRegs body_regs;
     if (ok) {
         scopes_.push();

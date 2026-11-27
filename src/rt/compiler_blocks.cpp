@@ -217,7 +217,13 @@ std::vector<NodeId> UnitCompiler::guarded_return_reads(const Node& node) const {
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
     const int rejected = literal_ordering_error(ast_.at(node.a), node, 0);
-    if (rejected == 0 || (rejected < 0 && !false_jump(node.a, to_else))) return false;
+    bool jumped = rejected > 0;
+    if (rejected < 0) {
+        const bool canonical = !loop_reachable();
+        const OrderScope order_scope(order_ctx_, {node.a, canonical ? node.begin : 0, canonical ? 1 : 0});
+        jumped = false_jump(node.a, to_else);
+    }
+    if (rejected == 0 || !jumped) return false;
     const Node& body = ast_.at(node.b);
     scopes_.push();
     BlockRegs body_regs = block_begin(node.b);

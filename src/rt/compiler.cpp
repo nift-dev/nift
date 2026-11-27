@@ -135,6 +135,8 @@ bool UnitCompiler::statement(NodeId id) {
     }
     update_flags();
     fb_->set_offset(node.begin);
+    const OrderScope order_scope(order_ctx_, node.kind == NodeKind::Declare || node.kind == NodeKind::Assign
+                                                 ? OrderContext{node.b, 0, 0} : OrderContext{});
     bool ok = false;
     switch (node.kind) {
         // Legacy may change the prepared/textual path around a nested
@@ -219,7 +221,12 @@ bool UnitCompiler::return_statement(const Node& node) {
     if (in_lambda_) return_read_offset_ = node.begin;
     const std::uint32_t saved_statement = deferred_.return_statement;
     deferred_.return_statement = node.begin;  // slot 3: legacy reports an error in the value at the statement
-    const bool value_ok = temp(value) && expr_to(node.a, value);
+    bool value_ok = temp(value);
+    {
+        const bool canonical = !loop_reachable();
+        const OrderScope order_scope(order_ctx_, {node.a, canonical ? node.begin : 0, canonical ? 2 : 0});
+        value_ok = value_ok && expr_to(node.a, value);
+    }
     deferred_.return_statement = saved_statement;
     return_read_offset_ = saved_return_offset;
     fb_->set_flags(saved_flags);

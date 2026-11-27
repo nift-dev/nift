@@ -157,7 +157,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     if (r & kKindAtomicInt) r |= kKindInt;
     l &= ~kKindAtomic;
     r &= ~kKindAtomic;
-    bool numeric_guard = false, bad_kind = false;
+    bool numeric_guard = false, bad_kind = false, order_check = false;
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
             // Legacy's string + callable is a run-time error with a fixed
@@ -174,6 +174,8 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
             bad_kind = !ordering_kinds_ok(l, r) && !unknown_defers(l | r);
+            order_check = bad_kind && order_guarded(node);
+            bad_kind = bad_kind && !order_check;
             break;
         default: break;
     }
@@ -190,6 +192,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
         return false;
 #endif
     if (bad_kind) return fail(node, op_type_reason(node.op));
+    if (order_check && !order_guard(node, left, right)) return false;
     fb_->set_offset(site(node));
 #if !defined(NIFT_SESSION_ADMISSION_MUTANT) || NIFT_SESSION_ADMISSION_MUTANT != 9
     if (numeric_guard) {
@@ -369,9 +372,9 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
         // The fused form takes the same kind check as the plain comparison
         // (found by vm_context_consistency.py: `if (p > 1)` with a string p).
         const bool ordering = node.op != Op::Eq && node.op != Op::Ne;
-        if (ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)) &&
-            !unknown_defers(kinds(node.a) | kinds(node.b)))
-            return fail(node, op_type_reason(node.op));
+        const bool order_check = ordering && !ordering_kinds_ok(kinds(node.a), kinds(node.b)) &&
+            !unknown_defers(kinds(node.a) | kinds(node.b));
+        if (order_check && !order_guarded(node)) return fail(node, op_type_reason(node.op));
         std::uint16_t left = 0, right = 0;
 #if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 2
         if (!expr_any(node.a, left) || !expr_any(node.b, right)) return false;
@@ -379,6 +382,7 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
         if (!expr_any(node.a, left) || !retain_receiver(left, left < mark, node.b) || !expr_any(node.b, right))
             return false;  // D2 family A (fused comparison)
 #endif
+        if (order_check && !order_guard(node, left, right)) return false;
         fb_->set_offset(node.begin);
         jumps.push_back(fb_->emit(fused, left, right));
     } else {

@@ -330,11 +330,10 @@ VmResult Vm::run_loop(std::string& output) {
     OP(SetUpvalue) { if (!op_set_upvalue(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Undefined) { if (!op_undefined(*pc, fault, proto)) FAIL(); NEXT(); }
     OP(IterCheck) OP(ArrayElem) OP(ArrayElemValue) OP(ObjectKeys) OP(ObjectLookup)
-    OP(ObjectLookupValue) OP(IterMissing) {
-        if (!op_iter(*pc, R, proto, fault)) FAIL();
-        NEXT(); }
+    OP(ObjectLookupValue) OP(IterMissing) { if (!op_iter(*pc, R, proto, fault)) FAIL(); NEXT(); }
     OP(Return) { if (pc->a != 0) R[0] = R[pc->a]; RETURN_TO_CALLER } OP(ReturnNull) { R[0] = Value(); RETURN_TO_CALLER }
     OP(SessionNumeric) { if (!session_numeric(RK(pc->b), RK(pc->c), fault)) FAIL(); NEXT(); }
+    OP(OrderGuard) { if (!order_guard(RK(pc->b), RK(pc->c), note_at(proto, pc), fault)) FAIL(); NEXT(); }
     OP(SessionRender) { if (!op_session_render(*pc, R, result, fault, proto)) FAIL(); NEXT(); }
     OP(TopReturn) { if (!op_top_return(*pc, R, result, fault, proto)) FAIL(); CORO_END }
     OP(Halt) { if (!pop_handlers_for_frame(0, fault)) FAIL(); CORO_END }
