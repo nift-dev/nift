@@ -135,7 +135,11 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
         // parameter keeps the scalar-only location rule (or alias-argument).
         const bool escapes = f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
                              plan_.escaping[f][k];
-        path_arg_ = escapes && index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
+        // A non-escaping argument may be read as a value only in imported
+        // package code; entry scripts keep the conservative location refusal.
+        const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+        path_arg_ = (escapes || !package_scope) && index_depth_ == 0 && path_kind && bare_argument(node, k)
+                        ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&

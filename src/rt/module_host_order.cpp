@@ -52,7 +52,7 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
     case I::StreamReadBytes: case I::StreamReadAllBytes: case I::StreamExtractString: case I::FileWriteVal:
     case I::FileAppend: case I::FilePrepend: case I::FileInsert: case I::FileInsertBefore: case I::FileInsertAfter:
     case I::FileReplace: case I::FileReplaceOnce:
-    case I::StreamWriteLine: case I::StreamFlush: case I::StreamEof:
+    case I::StreamWriteBytes: case I::StreamWriteLine: case I::StreamFlush: case I::StreamEof:
         return BuiltinEffect::Host;
     // Shared: synchronisation and channels (may block or observe other tasks).
     case I::SharedMutex: case I::SharedAtomicInt: case I::SharedAtomicBool: case I::SharedChannel:

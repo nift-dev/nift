@@ -111,7 +111,11 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
                                arg_kind == NodeKind::Index;
         const bool escapes = !is_native && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
                              plan_.escaping[f][k];
-        path_arg_ = escapes && index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
+        // A non-escaping argument may be read as a value only in imported
+        // package code; entry scripts keep the conservative location refusal.
+        const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+        path_arg_ = (escapes || !package_scope) && index_depth_ == 0 && path_kind && bare_argument(node, k)
+                        ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
@@ -464,7 +468,15 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
         key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
         !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    const bool dynamic_index = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    const Binding* local_index = receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
+    const bool local_value_index = local_index && !local_index->global && !local_index->cell &&
+        local_index->decl_node != kNoNode && ast_.at(local_index->decl_node).kind == NodeKind::Ident;
+    const NodeKind index_receiver_kind = ast_.at(node.a).kind;
+    const bool non_ident_index = index_receiver_kind == NodeKind::Call ||
+        index_receiver_kind == NodeKind::Member || index_receiver_kind == NodeKind::Index;
+    const bool unproved_index = object_kinds == 0 || (object_kinds & (kKindUnknown | kKindNull)) != 0;
+    const bool dynamic_index = (plan_.linked && plan_.linked->locate(node.begin).module > 0) ||
+        ((local_value_index || non_ident_index) && unproved_index);
     if (!dynamic_index && !(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
         !bad_bytes_key && !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");

@@ -1,4 +1,5 @@
 #include "rt/compiler_compound.h"
+#include "rt/module_link.h"
 
 // D2 family B (owner rulings 03:27/03:29): a compound assignment on a variable
 // (`x op= g()`, `s += k()`) reads its target before the right-hand side, once,
@@ -81,7 +82,12 @@ bool UnitCompiler::compound_snapshot(const Node& node, const Binding& b) {
         if (b.global && (!global_take(b, reg, name) || !global_read(b.type_reg, type))) return false;
         fb_->set_offset(node.begin);
         fb_->emit(OpCode::AddAssign, reg, value);
-        fb_->note(fb_->emit(OpCode::CheckType, reg, type), std::string(name));
+        {
+            const auto saved_flags = fb_->flags();
+            fb_->set_flags(static_cast<std::uint8_t>(saved_flags & ~kInstrLoopPath));
+            fb_->note(fb_->emit(OpCode::CheckType, reg, type), std::string(name));
+            fb_->set_flags(saved_flags);
+        }
         if (b.global) global_put(b, reg);
         done = fb_->emit(OpCode::Jmp);
         if (changed != 0 && !fb_->patch(changed, fb_->here())) return builder_ok();
@@ -96,16 +102,27 @@ bool UnitCompiler::compound_snapshot(const Node& node, const Binding& b) {
         case Op::ModAssign: fb_->emit(OpCode::Mod, t, t, value); break;
         default: return fail(node, "compound-operator");
     }
-    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
+    const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    if (package_scope ? ((loop_region() || loop_type_error_ambiguous()) && binding_error_certain(b, kinds(node.a)))
+                      : (loop_reachable() && binding_error_possible(b, kinds(node.a))))
+        return fail(node, "context:assignment-error");
     // 4. The binding-type check, then the write-back (nothing is written before it).
     if (indirect) {
         std::uint16_t untyped = 0;
         if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+        const auto saved_flags = fb_->flags();
+        fb_->set_flags(static_cast<std::uint8_t>(saved_flags & ~kInstrLoopPath));  // canonical compound wording
         if (!store_binding(b, t, untyped)) return false;
+        fb_->set_flags(saved_flags);
         fb_->note(fb_->here() - 1u, std::string(name));
     } else {
         if (b.global && !global_read(b.type_reg, binding_type)) return false;  // after the rhs, as before
-        fb_->note(fb_->emit(OpCode::CheckType, t, binding_type), std::string(name));
+        {
+            const auto saved_flags = fb_->flags();
+            fb_->set_flags(static_cast<std::uint8_t>(saved_flags & ~kInstrLoopPath));
+            fb_->note(fb_->emit(OpCode::CheckType, t, binding_type), std::string(name));
+            fb_->set_flags(saved_flags);
+        }
         if (b.global) fb_->emit(OpCode::SetGlobal, b.reg, t);  // a plain put: nothing was taken
         else if (t != b.reg) fb_->emit(OpCode::Move, b.reg, t);
     }

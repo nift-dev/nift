@@ -107,12 +107,16 @@ bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size
     // An unproven receiver is checked at run time (legacy's reached error or
     // the container length); a proved non-container kind keeps the refusal.
     const KindSet length_kinds = kinds(receiver_node);
-    const bool multiple_kinds = length_kinds != 0 && (length_kinds & (length_kinds - 1)) != 0;
-    const bool containerish = (length_kinds &
-        (kKindString | kKindArray | kKindObject | kKindBytes | kKindUnknown | kKindNull)) != 0;
     const bool package_length = plan_.linked && plan_.linked->locate(node.begin).module > 0;
-    const bool dynamic_length = package_length || length_kinds == 0 ||
-        (length_kinds & (kKindUnknown | kKindNull)) != 0 || (multiple_kinds && containerish);
+    const Binding* local_length = ast_.at(receiver_node).kind == NodeKind::Ident
+                                      ? find_binding(text(ast_.at(receiver_node))) : nullptr;
+    const bool local_value_length = local_length && !local_length->global && !local_length->cell &&
+        local_length->decl_node != kNoNode && ast_.at(local_length->decl_node).kind == NodeKind::Ident;
+    const NodeKind length_receiver_kind = ast_.at(receiver_node).kind;
+    const bool non_ident_length = length_receiver_kind == NodeKind::Call ||
+        length_receiver_kind == NodeKind::Member || length_receiver_kind == NodeKind::Index;
+    const bool unproved_length = length_kinds == 0 || (length_kinds & (kKindUnknown | kKindNull)) != 0;
+    const bool dynamic_length = package_length || ((local_value_length || non_ident_length) && unproved_length);
     if (!stream_line_length && length_kinds != kKindBytes && !dynamic_length &&
         !kinds_within(receiver_node, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
                       "type:length"))

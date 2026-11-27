@@ -43,8 +43,6 @@ bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     const auto only = [](KindSet k, KindSet allowed) { return (k & ~allowed) == 0; };
     if (op == Op::Add) {
         if (only(l, kKindNumber) && only(r, kKindNumber)) return true;
-        // Array concatenation: two arrays.
-        if (only(l, kKindArray) && only(r, kKindArray)) return true;
         // Concatenation: one side is a string, the other a scalar.
         if (only(l, kKindScalar) && only(r, kKindScalar)) {
             for (KindSet a = 1; a <= kKindObject; a <<= 1)
@@ -193,9 +191,10 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
                 // (and string/array/bytes concatenation for `+`), else its
                 // reached arithmetic error.
                 const bool unproved = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;
-                add_guard = op == OpCode::Add && unproved;
-                const bool dynamic_arith = op != OpCode::Add && unproved && plan_.linked &&
-                    plan_.linked->locate(node.begin).module > 0;
+                const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+                const bool array_add = op == OpCode::Add && l == kKindArray && r == kKindArray && package_scope;
+                add_guard = op == OpCode::Add && (unproved || array_add) && package_scope;
+                const bool dynamic_arith = op != OpCode::Add && unproved && package_scope;
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
                     (widened(l) || widened(r) || node.begin < session_->unit_begin);

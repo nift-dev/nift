@@ -254,6 +254,11 @@ private:
     // error differently in loop code (D-018c), so such loop code is refused (context:assignment-error, review round
     // 2).
     bool binding_error_possible(const Binding& b, KindSet value) const;
+    bool binding_error_certain(const Binding& b, KindSet value) const {
+        const auto single = [](KindSet k) { return k != 0 && (k & (k - 1)) == 0; };
+        return binding_error_possible(b, value) && single(b.decl_kinds) && single(value) &&
+               !((b.decl_kinds | value) & kKindUnknown);
+    }
     // A free function called from a loop runs legacy's prepared path, whose
     // type-check wording differs (and the caller is not known here). Struct
     // methods and top-level code keep the canonical wording; an actual loop

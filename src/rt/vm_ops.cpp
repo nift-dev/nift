@@ -203,7 +203,8 @@ bool add_assign_slow(const Instr& in, Value& target, const Value& right, Fault& 
             return raise(fault, StopReason::Error, text);
         }
 #endif
-    if (!target.is_number() || !right.is_number()) return internal(fault, "compound assignment");
+    if (!target.is_number() || !right.is_number())
+        return raise(fault, StopReason::Error, "arithmetic operators require numeric operands");
     return arith_slow(in, OpCode::Add, target, right, target, fault);
 }
 

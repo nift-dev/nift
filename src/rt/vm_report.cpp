@@ -41,7 +41,9 @@ bool length_of(const Note* note, const Value& value, LengthMode mode, bool loop,
         out = Value::integer(static_cast<std::int64_t>(object_size(value)));
         return true;
     }
-    if (!size && value.is(Kind::String)) {
+    if (value.is(Kind::String)) {
+        if (size)
+            return raise(fault, StopReason::Error, "size: unsupported for this value");
         std::int64_t count = 0;
         for (char c : string_view_of(value))
             if ((static_cast<unsigned char>(c) & 0xc0u) != 0x80u) ++count;

@@ -150,9 +150,15 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
         may_double_[binding_scope(b)].count(target);
     const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target) ||
                                     int_into_maybe_double);
-    if (loop_type_error_ambiguous() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
+    const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    // Entry scripts keep the pre-campaign contracts; imported package code
+    // admits the unproved case and lets the loop's value-only check decide.
+    if (!package_scope && loop_reachable() && !exempt &&
+        type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
-    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
+    if (package_scope ? ((loop_region() || loop_type_error_ambiguous()) && binding_error_certain(b, kinds(node.b)))
+                      : (loop_reachable() && binding_error_possible(b, kinds(node.b))))
+        return fail(node, "context:assignment-error");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
@@ -311,14 +317,23 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
             default: return fail(node, "compound-operator");
         }
     }
-    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
+    const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    if (package_scope ? ((loop_region() || loop_type_error_ambiguous()) && binding_error_certain(b, kinds(node.a)))
+                      : (loop_reachable() && binding_error_possible(b, kinds(node.a))))
+        return fail(node, "context:assignment-error");
     if (indirect) {
         std::uint16_t untyped = 0;
         if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
+        const auto saved_flags = fb_->flags();
+        fb_->set_flags(static_cast<std::uint8_t>(saved_flags & ~kInstrLoopPath));  // canonical compound wording
         if (!store_binding(b, reg, untyped)) return false;
+        fb_->set_flags(saved_flags);
         fb_->note(fb_->here() - 1u, std::string(text(target)));
     } else {
+        const auto saved_flags = fb_->flags();
+        fb_->set_flags(static_cast<std::uint8_t>(saved_flags & ~kInstrLoopPath));  // canonical compound wording
         const std::size_t check = fb_->emit(OpCode::CheckType, reg, binding_type);
+        fb_->set_flags(saved_flags);
         fb_->note(check, std::string(text(target)));
         if (b.global) global_put(b, reg);
     }
