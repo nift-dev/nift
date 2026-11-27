@@ -118,7 +118,8 @@ v1	refuse	opaque:legacy-runtime-error	main.f:3:1
 v2	refuse	opaque:legacy-runtime-error	main.f:3:1
 v3	refuse	coro-async-value	main.f:2:12
 v4	refuse	coro-async-value	main.f:2:12
-lam-entry-to-mod	refuse	import-scope	pa.f:1:29
+lam-entry-to-mod	parity	-	-
+lam-entry-free-in-mod	refuse	import-scope	pa.f:1:26
 lam-mod-export	parity	-	-
 lam-mod-state	refuse	coro-module-capture	pa.f:2:18
 lam-init-call	refuse	coro-module-init-task	pa.f:2:12
