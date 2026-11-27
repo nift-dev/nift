@@ -410,8 +410,18 @@ bool UnitCompiler::object_literal(const Node& node, std::uint16_t dst) {
 bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
     const Node& node = ast_.at(id);
     if ((node.kind == NodeKind::Logical || node.kind == NodeKind::Binary) && !infix_left_ok(node)) return false;
-    if (node.kind == NodeKind::Logical && node.op == Op::And)
-        return false_jump(node.a, jumps) && false_jump(node.b, jumps);
+    if (node.kind == NodeKind::Logical && node.op == Op::And) {
+        if (!false_jump(node.a, jumps)) return false;
+        const auto saved = guarded_conversion_;
+        NodeId subject = kNoNode;
+        KindSet narrowed = 0;
+        if (plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
+            type_call_positive_guard(ast_.at(node.a), subject, narrowed))
+            guarded_conversion_ = {subject, narrowed};
+        const bool ok = false_jump(node.b, jumps);
+        guarded_conversion_ = saved;
+        return ok;
+    }
     const std::uint16_t mark = fb_->top();
     const OpCode fused = node.kind == NodeKind::Binary ? fused_not_jump(node.op) : OpCode::Nop;
     if (fused != OpCode::Nop) {

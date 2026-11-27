@@ -235,6 +235,8 @@ bool UnitCompiler::type_call_guard(const Node& condition, NodeId& source, KindSe
     const Node& callee = ast_.at(call.a);
     if (callee.kind != NodeKind::Ident || text(callee) != "type" || find_binding("type") ||
         plan_.index.count("type") || plan_.struct_index.count("type")) return false;
+    const int owner = current_struct();
+    if (owner >= 0 && plan_.structs[static_cast<std::size_t>(owner)].method("type")) return false;
     const KindSet narrowed = type_label_kind(text(label));
     if (narrowed == 0) return false;
     const Node& input = ast_.at(ast_.list(call)[0]);
@@ -264,6 +266,8 @@ bool UnitCompiler::type_call_positive_guard(const Node& condition, NodeId& sourc
     const Node& callee = ast_.at(call.a);
     if (callee.kind != NodeKind::Ident || text(callee) != "type" || find_binding("type") ||
         plan_.index.count("type") || plan_.struct_index.count("type")) return false;
+    const int owner = current_struct();
+    if (owner >= 0 && plan_.structs[static_cast<std::size_t>(owner)].method("type")) return false;
     const KindSet narrowed = type_label_kind(text(label));
     if (narrowed == 0) return false;
     const Node& input = ast_.at(ast_.list(call)[0]);
@@ -344,11 +348,15 @@ bool UnitCompiler::type_test_guard(const Node& condition, NodeId& source, KindSe
     const Node& test = ast_.at(initializer->a);
     if (test.kind != NodeKind::Ident || text(test) != "type" || find_binding("type") ||
         plan_.index.count("type") || plan_.struct_index.count("type")) return false;
+    const int owner = current_struct();
+    if (owner >= 0 && plan_.structs[static_cast<std::size_t>(owner)].method("type")) return false;
     const Node& input = ast_.at(ast_.list(*initializer)[0]);
     if (input.kind != NodeKind::Ident) return false;
     const Binding* target = find_binding(text(input));
     if (!target || target->cell || target->global || target->decl_node == kNoNode ||
         assigned_.count(text(input))) return false;
+    const auto original = kinds_.bindings.find(ast_.list(*initializer)[0]);
+    if (original == kinds_.bindings.end() || original->second != target->decl_node) return false;
     source = target->decl_node;
     kind = narrowed;
     return true;

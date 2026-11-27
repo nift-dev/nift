@@ -255,6 +255,12 @@ SHAPES.update({
                ' minc := row[k]\n j := minc\n print(j)\n k += 1\n }\n}\nexport(outer_cost)\n',
         "main.f": 'import("m.f")\nouter_cost()\n',
     }, "vm"),
+    "imported-branch-short-circuit-type-proof": ({
+        "m.f": 'struct(Box) {\nfn(check(items)) {\nfor(value : items) {\n'
+               'if(type(value) == "object" && value.has("key")) { print("hit") }\n'
+               'else { print("skip") }\n}\n}\n}\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nb.check(["text"])\n',
+    }, "vm"),
     "imported-utf8-encode": ({
         "m.f": 'struct(Box) { fn(to_bytes(text)) { return text.encode("utf-8") } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\na := b.to_bytes("é😀")\n'
