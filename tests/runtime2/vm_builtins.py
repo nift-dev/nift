@@ -187,6 +187,9 @@ SUPPORTED = {
 # array element) is integer negation, refused in loop code
 # (context:negative-zero, CP12 #11; pinned in UNSUPPORTED).
 SUPPORTED_TOP = [
+    # Reconciled: length() of an object in loop code counts members in both
+    # engines; the old context:object-length refusal was a VM limitation.
+    ("q3-object-length-loop", 'o := {"a": 1}\ni := 0\nwhile (i < 1) { i += 1\nprint(o.length()) }\n'),
     ("w9-escaped-string", 'je := {"s": "caf\\u00e9"}\nprint(je.s)\n'),
     ("f4-pop", "a := [1]\nx := a.pop()\nprint(x)\n"),
     # B5 23 (b5-refsem.md 13.4; originals docs/runtime-2/evidence/b5/vm-builtins-originals.json):
@@ -289,9 +292,6 @@ UNSUPPORTED = [
     ("w3-family", 's := "a"\nprint(s.keys())\n', "builtin-receiver:keys"),
     ("q8-index-of-array", "a := [1]\nprint(a.index_of(1))\n", "builtin-receiver:index_of"),
     ("q4-number-to-double", "x := 2\nprint(x.to_double())\n", "builtin-receiver:to_double"),
-    # Q3 object length() in loop code (context).
-    ("q3-object-length-loop", 'o := {"a": 1}\ni := 0\nwhile (i < 1) { i += 1\nprint(o.length()) }\n',
-     "context:object-length"),
     # Q14 / W6 presentation chain: refused in every context (legacy composes
     # the chain over the original value outside loop code). Since CP12b's
     # chained postfix (cp12b-resolver.md, accepted) a method call on a call

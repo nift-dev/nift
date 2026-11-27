@@ -75,6 +75,9 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     const NodeId* args = ast_.list(node);
     const std::uint16_t base = fb_->top();
     if (!operand_window(base, fn.count + 1)) return false;
+    const bool saved_path_allow = path_allow_nested_;
+    path_allow_nested_ = f < plan_.functions.size() && plan_.linked &&
+        plan_.linked->locate(ast_.at(plan_.functions[f]).begin).module > 0;
     if (receiver_reg >= 0) fb_->emit(OpCode::Move, base, static_cast<std::uint16_t>(receiver_reg));
     else if (!receiver_value(receiver, base)) return false;
     ++call_args_;
@@ -135,11 +138,9 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
         // parameter keeps the scalar-only location rule (or alias-argument).
         const bool escapes = f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
                              plan_.escaping[f][k];
-        // A non-escaping argument may be read as a value only in imported
-        // package code; entry scripts keep the conservative location refusal.
-        const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
-        path_arg_ = (escapes || !package_scope) && index_depth_ == 0 && path_kind && bare_argument(node, k)
-                        ? args[k] : kNoNode;
+        // A non-escaping method parameter only reads its argument, so a path
+        // may be read as an ordinary value (shared aggregates included).
+        path_arg_ = escapes && index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
@@ -183,6 +184,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     const std::size_t at = fb_->emit(OpCode::Call, base, static_cast<std::uint16_t>(f + 1),
                                      static_cast<std::uint16_t>(fn.count + 1));
     fb_->note(at, std::string(m.name), false, false, numeric_return);
+    path_allow_nested_ = saved_path_allow;
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(dst >= base ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();

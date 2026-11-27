@@ -65,15 +65,18 @@ bool UnitCompiler::declare(const Node& node) {
     // methods, a top-level one covers the entry script). It shadows the
     // script invocation binding, and the module has no generated private
     // args/cmd name that the linker would rename through it.
-    const bool method_args_binding = name == "args" && !session_ && in_function_ && !in_lambda_ &&  // rt-lint: allow-string-compare
-        plan_.is_method(function_) && imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
-        (!plan_.linked || plan_.linked->graph.modules[plan_.linked->locate(node.begin).module]->generated_names.empty()) &&
+    const bool method_args_binding = name == "args" &&  // rt-lint: allow-string-compare
+        !session_ && in_function_ && !in_lambda_ && plan_.is_method(function_) &&
+        imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
+        (!plan_.linked ||
+         plan_.linked->graph.modules[plan_.linked->locate(node.begin).module]->generated_names.empty()) &&
         !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
     // A local value binding in a function may take a built-in's name when it is
     // never called there (legacy resolves the binding; the call split is the
     // same rule as for-loop/catch bindings). `this`/`self` stay receiver names.
     const bool local_reserved_value = reserved_name(name) && in_function_ && !in_lambda_ &&
         name != "this" && name != "self" &&  // rt-lint: allow-string-compare compile time
+        plan_.is_method(function_) && plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
         !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
     if (reserved_name(name) && !same_value && !method_value && !method_args_binding && !local_reserved_value &&
         !invocation_shadows_.count(node_id(target)))
@@ -362,7 +365,8 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const KindSet l = kinds(node.a), r = kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-    const bool dynamic = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;  // legacy checks the reached value kinds
+    // legacy checks the reached value kinds
+    const bool dynamic = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;
     if (!numbers && !strings && !dynamic && !unknown_defers(l | r))
         return fail(node, "type:compound-assignment");
     if (loop_reachable()) {
@@ -384,61 +388,5 @@ bool UnitCompiler::compound_assign(const Node& node) {
     return compound_op(node, b);
 }
 
-bool UnitCompiler::inc_dec_expr(const Node& node, std::uint16_t dst) {
-    const Node& target = ast_.at(node.a);
-    if (target.kind != NodeKind::Ident) return fail(target, "incdec-target");
-    const Binding* found = find_binding(text(target));
-    if (!found || found->invocation) return fail(target, write_refusal(found, text(target), "assign-free-name"));
-    if (found->const_array) return fail(target, "declare-const");
-    if (found->readonly) return fail(target, "assign-catch-binding");
-    const Binding b = *found;
-    if (kinds(node.a) & kKindAtomic) return atomic_update(node, b, dst, true);
-    if (!kinds_within(node.a, kKindNumber, node, "type:increment")) return false;
-    // CP25: after the numeric check; a loop-code prefix is legacy's unapplied read (below).
-    const bool loop_prefix = loop_reachable() && node.op != Op::PostInc && node.op != Op::PostDec;
-    if (b.const_scalar && !loop_prefix) return const_write(node, nullptr, &dst, b, true);
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t work = 0;
-    if (!temp(work)) return false;
-    if (b.global && !b.cell) {
-        if (loop_reachable() && (fb_->set_offset(node.begin), !global_check_defined(b.reg, text(target)))) return false;
-        if (!global_read_value(b.reg, work, text(target))) return false;
-    } else if (!read_binding(b, work)) {
-        return false;
-    }
-    if (work == b.reg) {
-        std::uint16_t copy = 0;
-        if (!temp(copy)) return false;
-        fb_->emit(OpCode::Move, copy, work);
-        work = copy;
-    }
-    const bool post = node.op == Op::PostInc || node.op == Op::PostDec;
-    if (loop_reachable() && !post) {
-        // Legacy's expression parser treats `++x`/`--x` on a loop location as
-        // an unapplied prefix read, not a conventional increment/decrement.
-        if (work != dst) fb_->emit(OpCode::Move, dst, work);
-        fb_->release_to(mark);
-        return builder_ok();
-    }
-    if (post) fb_->emit(OpCode::Move, dst, work);
-    const bool up = node.op == Op::PreInc || node.op == Op::PostInc;
-    fb_->emit(OpCode::AddI, work, work, jump_operand(up ? 1 : -1));
-    std::uint16_t untyped = 0;
-    if (!fb_->constant(Value::integer(-1), untyped)) return false;
-    if (b.cell || b.upvalue) {
-        if (!store_binding(b, work, untyped)) return false;
-        fb_->note(fb_->here() - 1u, std::string(text(target)));
-    } else {
-        std::uint16_t binding_type = b.type_reg;
-        if (b.global && !global_read(b.type_reg, binding_type)) return false;
-        const std::size_t check = fb_->emit(OpCode::CheckType, work, binding_type);
-        fb_->note(check, std::string(text(target)));
-        if (b.global) global_put(b, work);
-        else if (work != b.reg) fb_->emit(OpCode::Move, b.reg, work);
-    }
-    if (!post) fb_->emit(OpCode::Move, dst, work);
-    fb_->release_to(mark);
-    return builder_ok();
-}
 
 } // namespace nift::rt::detail

@@ -2,6 +2,7 @@
 // Runtime 2.0 expression compilation and the compiler state shared with statements.
 #include "rt/ast.h"
 #include "rt/compiler.h"
+#include "rt/compiler_lambda_task.h"
 #include "rt/codegen.h"
 #include "rt/compiler_order_guard.h"
 #include "rt/globals.h"
@@ -51,23 +52,6 @@ private:
         std::size_t try_depth = 0;           // CP13B: try scopes active at loop entry
     };
 public:
-    struct Capture {
-        enum class Source : std::uint8_t { LocalCell, OuterUpvalue };
-        Source source = Source::LocalCell;
-        std::uint16_t index = 0;
-        Binding binding;
-    };
-    struct LambdaTask {
-        NodeId lambda = kNoNode;
-        std::uint16_t proto_slot = 0;
-        std::vector<std::string_view> upvalue_names;
-        std::vector<NodeId> upvalue_decls;
-        std::vector<bool> upvalue_loop;
-        std::vector<bool> upvalue_readonly;
-        std::vector<bool> upvalue_const_array;
-        std::vector<Capture> captures;
-        int owner_struct = -1;  // a lambda inside a struct method keeps `this`
-    };
 private:
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
     bool compile_function(std::size_t f, std::unique_ptr<Proto>& out);
@@ -196,6 +180,7 @@ private:
     bool length_call(const Node& node, NodeId receiver_node, bool size, std::uint16_t dst);
     int session_native_call(const Node&, NodeId, std::string_view, std::uint16_t);
     int dynamic_method_call(const Node&, NodeId, std::string_view, std::uint16_t);
+    bool package_method_call(const Node&, NodeId, std::string_view, std::uint16_t, bool&);
     bool builtin_arguments_ok(const Node&, const natives::BuiltinSpec&, NodeId);
     bool builtin_call(const Node& node, const natives::BuiltinSpec& spec, NodeId receiver, std::uint16_t dst,
                       bool dynamic = false);
@@ -254,11 +239,7 @@ private:
     // error differently in loop code (D-018c), so such loop code is refused (context:assignment-error, review round
     // 2).
     bool binding_error_possible(const Binding& b, KindSet value) const;
-    bool binding_error_certain(const Binding& b, KindSet value) const {
-        const auto single = [](KindSet k) { return k != 0 && (k & (k - 1)) == 0; };
-        return binding_error_possible(b, value) && single(b.decl_kinds) && single(value) &&
-               !((b.decl_kinds | value) & kKindUnknown);
-    }
+    bool binding_error_certain(const Binding& b, KindSet value) const;
     // A free function called from a loop runs legacy's prepared path, whose
     // type-check wording differs (and the caller is not known here). Struct
     // methods and top-level code keep the canonical wording; an actual loop
@@ -267,14 +248,8 @@ private:
     // A read in legacy's return value reports its reached error at the
     // return statement, with one return: prefix per return-valued caller.
     // Loop-region code and a loop-called free function keep the plain site.
-    bool return_error_attribution() const {
-        return (fb_->flags() & kInstrReturnCall) != 0 && !loop_region() &&
-               !(in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]);
-    }
-    bool loop_type_error_ambiguous() const {
-        if (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]) return true;
-        return loop_reachable() && !loop_region() && !(in_function_ && plan_.is_method(function_));
-    }
+    bool return_error_attribution() const;
+    bool loop_type_error_ambiguous() const;
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
     std::uint32_t site(const Node& node) const { return node.begin; }
     std::uint32_t prepared_begin(const Node& node) const;
@@ -290,19 +265,10 @@ private:
     const Node& chain_enter(const Node& node);
     bool receiver_text_wording(const Node& node, const Node& chain) const;
     bool may_fault(NodeId id) const;
-    KindSet kinds(NodeId id) const {
-        const KindSet k = kinds_.of(id);
-        if (const KindSet proof = guarded_kind(id)) return proof;
-        if (k == 0 && in_lambda_) return static_cast<KindSet>(kKindAll | kKindUnknown);
-        return (k & kKindUnknown) && !probe_ ? static_cast<KindSet>(kKindAll | kKindUnknown) : k;
-    }
+    KindSet kinds(NodeId id) const;
     // True when kinds `k` include kKindUnknown and the check must pass (probe
     // mode only); outside the probe it records that Unknown decided a refusal.
-    bool unknown_defers(KindSet k) const {
-        if (!(k & kKindUnknown)) return false;
-        if (!probe_) unknown_hit_ = true;
-        return probe_;
-    }
+    bool unknown_defers(KindSet k) const;
     bool no_trailing_comma(const Node& node);
     bool temp(std::uint16_t& reg);
     bool operand_window(std::uint16_t base, std::uint32_t count);
@@ -324,14 +290,10 @@ private:
     // and methods (no copies, so legacy's references and the VM's values never differ). Legacy's loop evaluator fails
     // on struct field access (L42) in loop bodies and in functions called from loops; a method's own body is
     // canonical unless it has a loop of its own.
-    bool field_in_loop_code() const {  // a lambda's index is past loop_called_ (as in loop_reachable)
-        return loop_region() || (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]);
-    }
-    int current_struct() const {
-        if (lambda_struct_override_ >= 0) return lambda_struct_override_;
-        return in_function_ && plan_.is_method(function_) ? plan_.method_of[function_] : -1;
-    }
+    bool field_in_loop_code() const;
+    int current_struct() const;
     bool lambda_references_this(NodeId body) const;
+    bool lambda_locals_free(const Node& lambda);
     const StructFieldInfo* own_field(std::string_view name) const;
     int struct_of_receiver(NodeId object, bool& is_this) const;
     int inferred_struct(NodeId id) const;
@@ -400,6 +362,7 @@ private:
     bool textual_statement_ = false;  // a statement legacy runs textually inside loop code
     int call_args_ = 0;               // inside user-call arguments
     NodeId path_arg_ = kNoNode;       // the user-call argument being compiled (argument_path)
+    bool path_allow_nested_ = false;
     NodeId path_chain_ = kNoNode;     // the next receiver of an admitted path argument
     const Node* chain_top_ = nullptr;   // the outermost member/index chain (chain_enter)
     const Node* chain_next_ = nullptr;  // its next receiver

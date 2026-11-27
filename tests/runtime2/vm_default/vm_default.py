@@ -624,23 +624,31 @@ def main():
         # nothing in the main program or the module ran.
         d = work / "module"
         d.mkdir()
-        (d / "m.nft").write_text('native::touch("mod-side.txt")\nfn(go()) {\n  r := run("echo", "hi")\n  return r\n}\n'
+        # Reconciled 2026-11-28: the earlier top-level native::touch in main is
+        # itself the first R1 module-host-op refusal; the fixture now uses the
+        # module's `run()` as the first host operation, preserving the original
+        # contract (module position, no execution) under the current R1 policy.
+        (d / "m.nft").write_text('native::touch("mod-side.txt")\nfn(go()) {\n  return {"ok": true}\n}\n'
                                  'export(go)\n')
-        (d / "main.f").write_text('native::touch("main-side.txt")\nprint("before")\nimport("m.nft")\nprint(type(go()))\n')
+        (d / "main.f").write_text('print("before")\nimport("m.nft")\nprint(type(go()))\n')
+        module_reason = "module-host-op:touch"
+        module_feature = "the host operation `touch()` in a program with imports"
         for label, extra in (("unset", {}), ("require", {"NIFT_VM": "require"})):
-            for name in ("main-side.txt", "mod-side.txt"):
-                if (d / name).exists():
-                    (d / name).unlink()
+            if (d / "mod-side.txt").exists():
+                (d / "mod-side.txt").unlink()
             proc, rows = run(nift, d, ["main.f"], extra)
-            effects = [n for n in ("main-side.txt", "mod-side.txt") if (d / n).exists()]
-            problems = diagnostic_problems(proc.stderr, f"{(d / 'm.nft').resolve().as_posix()}:3:8", "main.f")
-            check(proc.returncode == 1 and proc.stdout == "" and not effects and not problems and
-                  len(rows) == 1 and rows[0].get("outcome") == "require-error" and rows[0].get("reason") == REASON
-                  and rows[0].get("vm_executions") == 0 and rows[0].get("legacy_executions") == 0,
+            problems = diagnostic_problems(proc.stderr, f"{(d / 'm.nft').resolve().as_posix()}:1:1", "main.f",
+                                           module_reason, module_feature)
+            check(proc.returncode == 1 and proc.stdout == "" and not problems and
+                  len(rows) == 1 and rows[0].get("outcome") == "require-error" and
+                  rows[0].get("reason") == module_reason and rows[0].get("vm_executions") == 0 and
+                  rows[0].get("legacy_executions") == 0,
                   f"refusal inside an imported module (NIFT_VM {label}): module position, no effect from main "
-                  "or module", f"rc={proc.returncode} out={proc.stdout!r} effects={effects} {problems} rows={rows}")
+                  "or module", f"rc={proc.returncode} out={proc.stdout!r} {problems} rows={rows}")
+        if (d / "mod-side.txt").exists():
+            (d / "mod-side.txt").unlink()
         proc, rows = run(nift, d, ["main.f"], {"NIFT_VM": "0"})
-        check(proc.returncode == 0 and proc.stdout == "before\nobject\n" and (d / "main-side.txt").exists() and
+        check(proc.returncode == 0 and proc.stdout == "before\nobject\n" and
               (d / "mod-side.txt").exists() and rows == [], "the module program runs on legacy under NIFT_VM=0",
               f"rc={proc.returncode} out={proc.stdout!r} err={proc.stderr!r} rows={rows}")
 

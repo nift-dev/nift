@@ -99,10 +99,13 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     } restore{*this, saved_textual};
     if (const int r = builtin ? coro_call(node, name, builtin, dst) : -1; r >= 0) return r == 1;  // CP22
     if (builtin) return builtin_call(node, *builtin, kNoNode, dst);
-    if (!operand_window(base, node.count)) return false;
-    if (!is_native) ++call_args_;
+    if (!operand_window(base, node.count)) return false; if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     const Node* const saved_print = print_arg_;
+    const bool saved_path_allow = path_allow_nested_;
+    const bool package_scope = !is_native && f < plan_.functions.size() && plan_.linked &&
+        plan_.linked->locate(ast_.at(plan_.functions[f]).begin).module > 0;
+    path_allow_nested_ = package_scope;
     for (std::uint32_t k = 0; k < node.count; ++k) {
         // The argument itself may be a scalar path (argument_path); a path
         // anywhere else in it, or in an index key, is not.
@@ -113,7 +116,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
                              plan_.escaping[f][k];
         // A non-escaping argument may be read as a value only in imported
         // package code; entry scripts keep the conservative location refusal.
-        const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
         path_arg_ = (escapes || !package_scope) && index_depth_ == 0 && path_kind && bare_argument(node, k)
                         ? args[k] : kNoNode;
         path_chain_ = kNoNode;
@@ -126,6 +128,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (is_native && !print_argument_ok(args[k], ast_.at(args[k]))) return false;
         if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
+    path_allow_nested_ = saved_path_allow;
     path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; if (!is_native) --call_args_;
     if (arity_error) {
         const bool ok = legacy_fatal(node, "callable argument count mismatch: " + std::string(name), base);
@@ -182,86 +185,10 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             const int result = session_native_call(node, callee.a, name, dst);
             if (result >= 0) return result == 1;
         }
+        bool package_matched = false;
+        if (!package_method_call(node, callee.a, name, dst, package_matched)) return false;
+        if (package_matched) return true;
         const KindSet k = kinds(callee.a);
-        // Imported package code may encode/decode unproved values with the
-        // literal UTF-8 encoding; the native validates the reached receiver.
-        const bool conversion = name == "encode" || name == "decode";  // rt-lint: allow-string-compare
-        if (conversion && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
-            imported_module_data(plan_, node) && node.count == 1 && !(k & kKindStruct)) {
-            const auto receiver_kind = name == "encode" ? kKindString : kKindBytes;
-            if (k == 0 || (k & (kKindUnknown | receiver_kind)) != 0) {
-                const Node& label = ast_.at(ast_.list(node)[0]);
-                if (label.kind == NodeKind::String && text(label) == R"("utf-8")") {
-                    const auto family = name == "encode" ? natives::Receiver::String : natives::Receiver::Bytes;
-                    if (const auto* spec = natives::find_builtin(family, name))
-                        return builtin_call(node, *spec, callee.a, dst);
-                }
-            }
-        }
-        // Legacy's `to_int` takes no arguments; the reached call is a fatal
-        // program error before any effect (Uncalled package helpers keep it).
-        if (name == "to_int" && node.count != 0 && imported_module_data(plan_, node))  // rt-lint: allow-string-compare
-            return legacy_fatal(node, "to_int: expected no arguments", dst);
-        // Imported package code may convert an unproved number/string at run
-        // time; the VM dispatches to the number or string native by family.
-        if (name == "to_int" && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
-            imported_module_data(plan_, node) &&
-            (k == 0 || (k & (kKindUnknown | kKindNumber | kKindString)) != 0)) {
-            const MethodAdmission admitted =
-                admit_dynamic_method(static_cast<KindSet>(kKindNumber | kKindString), "to_int", node.count);
-            if (admitted.admission == Admission::Dynamic && admitted.spec)
-                return builtin_call(node, *admitted.spec, callee.a, dst, true);
-        }
-        // Presentation on an unproved package value: the flagged site picks
-        // the run-time family's native (legacy's own reached text).
-        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
-            name == "to_string") {  // rt-lint: allow-string-compare
-            const MethodAdmission admitted = admit_dynamic_method(
-                static_cast<KindSet>(kKindString | kKindBool | kKindNull | kKindNumber), "to_string", node.count);
-            if (admitted.admission == Admission::Dynamic && admitted.spec)
-                return builtin_call(node, *admitted.spec, callee.a, dst, true);
-        }
-        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
-            (k == 0 || (k & kKindUnknown)) && name == "contains") {  // rt-lint: allow-string-compare
-            const MethodAdmission admitted =
-                admit_dynamic_method(static_cast<KindSet>(kKindString | kKindArray), "contains", node.count);
-            if (admitted.admission == Admission::Dynamic && admitted.spec)
-                return builtin_call(node, *admitted.spec, callee.a, dst, true);
-        }
-        // Array methods on an unproved value: the flagged site re-dispatches
-        // (legacy's reached error when the receiver is not an array).
-        if (!session_ && !plan_.coroutines &&
-            (k == 0 || (k & (kKindUnknown | kKindArray)) != 0)) {
-            const bool array_method = name == "join" || name == "slice" || name == "unique" ||  // rt-lint: allow-string-compare
-                                      name == "flatten" || name == "sum" || name == "first" ||
-                                      name == "last" || name == "index_of" || name == "take" || name == "drop";
-            if (array_method)
-                if (const auto* spec = natives::find_builtin(natives::Receiver::Array, name))
-                    return builtin_call(node, *spec, callee.a, dst, true);
-        }
-        // Object methods on an unproved package value: the flagged site
-        // re-dispatches by the receiver's run-time family.
-        const NodeKind object_receiver_kind = ast_.at(callee.a).kind;
-        const bool path_receiver = object_receiver_kind == NodeKind::Member || object_receiver_kind == NodeKind::Index;
-        if (!session_ && !plan_.coroutines && (path_receiver || imported_module_data(plan_, node)) &&
-            (k == 0 || (k & (kKindUnknown | kKindObject)) != 0)) {
-            const bool object_method = name == "omit" || name == "pick" || name == "keys" ||  // rt-lint: allow-string-compare
-                                       name == "values" || name == "entries" || name == "has" ||
-                                       name == "get" || name == "merge" || name == "merge_deep";
-            if (object_method)
-                if (const auto* spec = natives::find_builtin(natives::Receiver::Object, name))
-                    return builtin_call(node, *spec, callee.a, dst, true);
-        }
-        // Numeric conversions/rounding on an unproved package value: the
-        // flagged site re-dispatches by the receiver's run-time family.
-        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
-            (k == 0 || (k & (kKindUnknown | kKindNumber)) != 0)) {
-            const bool numeric_method = name == "floor" || name == "ceil" || name == "round" ||  // rt-lint: allow-string-compare
-                                        name == "abs";  // rt-lint: allow-string-compare compile time
-            if (numeric_method)
-                if (const auto* spec = natives::find_builtin(natives::Receiver::Number, name))
-                    return builtin_call(node, *spec, callee.a, dst, true);
-        }
         // A proved fractional number in loop code keeps the prepared/canonical
         // difference refusal. An unproved or string-capable receiver is
         // legacy's run-time conversion (the native validates the reached value).
@@ -324,64 +251,6 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
 // the value's), but an aggregate is shared, so only an argument that is
 // itself a path whose kinds are certainly scalar is admitted (not empty, no
 // aggregate, not Unknown); every other path in call arguments is refused.
-bool UnitCompiler::argument_path(const Node& node, std::string& note) {
-    if (call_args_ == 0) return true;
-    // A member/index read nested inside a larger argument expression is an
-    // ordinary value read, not the argument's location binding.
-    if (path_arg_ == kNoNode) return true;
-    const bool top = path_arg_ != kNoNode && &node == &ast_.at(path_arg_);
-    if (!top && (path_chain_ == kNoNode || &node != &ast_.at(path_chain_)))
-        return fail(node, "path-in-call-argument");
-    const KindSet k = kinds(path_arg_);
-    bool scalar = k != 0 && (k & ~kKindScalar) == 0;
-    MUTATE_PATH_SCALAR(scalar);
-    if (top && !scalar) return fail(node, "path-in-call-argument");
-    if (module_names_ != nullptr && !module_names_->empty()) {
-        NodeId root = path_arg_;  // records20k: a path rooted at a module's binding is its location
-        while (ast_.at(root).kind == NodeKind::Member || ast_.at(root).kind == NodeKind::Index) root = ast_.at(root).a;
-        const Node& base = ast_.at(root);
-        if (base.kind == NodeKind::Ident &&
-            std::find(module_names_->begin(), module_names_->end(), text(base)) != module_names_->end())
-            return fail(node, "path-in-call-argument:imported");
-    }
-    note = std::string(text(ast_.at(path_arg_)));
-    path_chain_ = node.a;
-    return true;
-}
-// The outermost member/index chain `node` belongs to (D1, path wording):
-// legacy resolves a postfix path operand as one text and quotes all of it in
-// an index message (`a[5].y`: 'a[5].y'); a method call or parentheses end the
-// chain. Sets the chain for `node`'s receiver, compiled next.
-const Node& UnitCompiler::chain_enter(const Node& node) {
-    const Node& top = chain_next_ == &node ? *chain_top_ : node;
-    const std::string_view src = ast_.source();
-    std::uint32_t at = ast_.at(node.a).end;
-    while (at < src.size() && (src[at] == ' ' || src[at] == '\t' || src[at] == '\n' || src[at] == '\r')) ++at;
-    const char joint = node.kind == NodeKind::Member ? '.' : '[';
-    chain_top_ = &top;
-    chain_next_ = at < src.size() && src[at] == joint ? &ast_.at(node.a) : nullptr;
-    return top;
-}
-// D3 (path wording): legacy's textual evaluator resolves a path whose
-// receiver has an index other than plain digits (`a[j].k`, `w["y"].k`,
-// `a[ 1 ].k`) as one text, and a missing member is reported as `JSON value
-// '<receiver>' has no member 'k'`; with digit indexes only, or on its
-// prepared evaluator (loop code, functions called from it), as `value has no
-// member: k`, except for a path that is a print argument by itself, which it
-// resolves as text there too.
-bool UnitCompiler::receiver_text_wording(const Node& node, const Node& chain) const {
-    if (loop_reachable() && print_arg_ != &chain) return false;
-    const std::string_view src = ast_.source();
-    for (const Node* n = &ast_.at(node.a); n->kind == NodeKind::Member || n->kind == NodeKind::Index;
-         n = &ast_.at(n->a)) {
-        if (n->kind != NodeKind::Index) continue;
-        const std::uint32_t open = detail::find_in(src, "[", ast_.at(n->a).end, n->end);
-        if (open + 1 >= n->end) return true;
-        const std::string_view key = src.substr(open + 1, n->end - 1 - (open + 1));
-        if (key.empty() || key.find_first_not_of("0123456789") != std::string_view::npos) return true;
-    }
-    return false;
-}
 // Member and index reads can fail at run time (missing member or key, index
 // out of range). Their legacy diagnostics are reproduced where the shape is
 // known: outside user-call arguments (except an admitted path argument,

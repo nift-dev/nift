@@ -195,6 +195,16 @@ void check_errors() {
         // D-018c: errors at the failing expression, no "return: " prefix.
         {"fn(f(a)) { return a[2] }\nprint(f([1]))\n", StopReason::Error,
          "JSON array index 2 is out of range in 'a[2]'"},
+        // Reconciled package guard controls: these now execute with legacy's
+        // reached values/errors (the old refusals were VM limitations).
+        {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", StopReason::None, "1\n"},
+        {"fn(f(p)) {\nif (p > 1) { return 1 }\nreturn 0\n}\nprint(f(\"s\"))\n", StopReason::Error,
+         "@if ordering comparisons require two numbers or two strings of the same type"},
+        {"s := \"a\"\nwhile (s < 1) { s = \"b\" }\n", StopReason::Error,
+         "ordering comparisons require two numbers or two strings"},
+        {"x := null\nprint(x.size())\n", StopReason::Error,
+         "unknown value or malformed expression: x.size()"},
+        {"o := {\"k\": [1, {\"z\": 4}]}\ni := 1\nprint(o.k[i].z)\n", StopReason::None, "4\n"},
     };
     for (const ErrorCase& c : cases) {
         const rt_vm_tool::Run r = rt_vm_tool::run(c.source);
@@ -209,7 +219,6 @@ void check_errors() {
     // Former replay reasons, and context-dependent legacy behaviour (D-018),
     // refused before execution.
     const Case refused[] = {
-        {"o := {\"k\": 1}\ni := 0\nwhile(i < 1) { i += 1; print(o.length()) }\n", "context:object-length"},
         {"x := 1\ni := 0\nwhile(i < 2) { x = x + 0.5; i += 1 }\n", "context:assignment-type"},
         // A double-typed binding holding a string: the prepared check fails,
         // the canonical one passes (found by the adversarial gate).
@@ -219,8 +228,6 @@ void check_errors() {
         {"x := 0\ni := 0\nwhile(i < 1) { i += 1; print(-x) }\n", "context:negative-zero"},
         // A fused condition takes the comparison's kind check (an ordering
         // of a string and a number reached the VM as an internal failure).
-        {"fn(f(p)) {\nif (p > 1) { return 1 }\nreturn 0\n}\nprint(f(\"s\"))\n", "type:>"},
-        {"s := \"a\"\nwhile (s < 1) { s = \"b\" }\n", "type:<"},
         {"x := 7.5\ni := 0\nwhile(i < 1) { i += 1; x %= 2 }\n", "context:modulo-assignment"},
         {"s := \"a\" + 0.5\ni := 0\nwhile(i < 1) { i += 1; s += \"b\" }\n", "context:string-append-type"},
         {"fn(f(p)) { p = 1\nreturn p }\ni := 0\nwhile(i < 1) { i += 1; print(f(2.0 * i)) }\n",
@@ -234,12 +241,10 @@ void check_errors() {
         // CP25-R: print([1]) compiles; the VM raises legacy's print Error.
         {"s := \"abc\"\nprint(s.size())\n", "type:length"},
         {"x := 5\nprint(x.length())\n", "type:length"},
-        {"x := null\nprint(x.size())\n", "type:length"},
         {"print(\"a\" < 1)\n", "type:<"},
         {"s := \"a\"\nprint(-s)\n", "type:unary"},
         {"s := \"a\"\ns += 1\n", "type:compound-assignment"},
         {"print(\"a\" + [1])\n", "type:+"},
-        {"o := {\"k\": [1, {\"z\": 4}]}\ni := 1\nprint(o.k[i].z)\n", "type:member"},  // positions only for literal indexes
         {"fn(f(p)) { return p.length() }\no := {\"k\": [1, 2]}\nprint(f(o.k))\n", "path-in-call-argument"},
     };
     for (const Case& c : refused) {

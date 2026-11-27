@@ -239,10 +239,12 @@ CASES["f5-unchanged-backslash"] = refused("opaque", PRE + 'print("before")\nprin
 CASES["f5-unchanged-array-literal"] = refused("opaque", PRE + 'print("before")\na := ["$[x]"]\nprint(a.length())\n')
 
 # ---- F6: legacy method precedence -----------------------------------------------------------------------------------
+# write_bytes is a VM stream native since the package ecosystem campaign; a
+# field of that name is not the legacy method-precedence oracle any more.
 PINNED = ("all any append cat count count_by cwd done elapsed env filter find find_index group_by group_by_each "
           "index_by insert insert_after insert_before map max_by min_by partition pause paused pipe prepend "
           "read_all_bytes read_bytes read_val reduce replace_once reset resume run running sort_by start status "
-          "stderr stdin stdout stop unique_by write_bytes write_val").split()
+          "stderr stdin stdout stop unique_by write_val").split()
 
 
 # Legacy calls the field for these; the VM refuses them as builtin-receiver:* before L6 and C145 (pre-existing,

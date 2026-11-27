@@ -322,8 +322,7 @@ VmResult Vm::run_loop(std::string& output) {
     OP(NewIndexedCell) OP(NewSourceSlot) OP(NewCell) { if (!op_new_cell(*pc, R, fault, proto)) FAIL(); NEXT(); }
     OP(CopyCellLocation) { R[pc->a] = copy_cell_location(R[pc->b]); if (!memory_ok(fault)) FAIL(); NEXT(); }
     OP(CellLoadCached) OP(CellStoreCached) OP(CellAnchor) OP(CellSlot) {
-        if (!op_cell_cached(*pc, R, fault, proto)) FAIL();
-        NEXT(); }
+        if (!op_cell_cached(*pc, R, fault, proto)) FAIL(); else NEXT(); }
     OP(CellLoadAlias) OP(CellLoad) { if (!op_cell_load(*pc, R, fault, note_at(proto, pc))) FAIL(); NEXT(); }
     OP(CellStore) { if (!op_cell_store(*pc, R, fault, proto, RK(pc->c).as_int())) FAIL(); NEXT(); }
     OP(Closure) { if (!op_closure(*pc, R, fault)) FAIL(); NEXT(); }

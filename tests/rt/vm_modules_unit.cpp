@@ -138,7 +138,7 @@ const Expect kExpect[] = {
     {"same_file_two_spellings", "ok", "import-reinitialised"},
     {"self_cycle", "import-error:cycle", "import-error:cycle"},
     {"side_effect_order", "ok", "ok"},
-    {"struct_export", "export-struct", "export-struct"},
+    {"struct_export", "ok", "ok"},
     {"template_import", "ok", "ok"},
 };
 

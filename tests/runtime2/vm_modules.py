@@ -118,17 +118,23 @@ SHAPES.update({
                'fn(read()) { result := {"exit_code": 7}; return this.report(result.exit_code) } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.code)\n',
     }, "vm"),
+    # Reconciled 2026-11-28: the VM now reads a non-escaping method
+    # parameter's aggregate path as a value, matching legacy (the method only
+    # reads it). Legacy and VM transcripts are identical; the old
+    # path-in-call-argument pin was a conservative VM limitation.
     "struct-method-module-aggregate-path": ({
         "m.f": 'struct(Box) { private fn(report(value)) { return {"value": value} }\n'
                'fn(read()) { result := {"nested": [7]}; return this.report(result.nested) } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.value)\n',
-    }, "path-in-call-argument"),
+    }, "vm"),
+    # Reconciled 2026-11-28: a scalar path forwarded through non-escaping
+    # methods is a value in legacy and in the VM.
     "struct-method-module-forwarded-path": ({
         "m.f": 'struct(Box) { private fn(change(code)) { return {"code": code} }\n'
                'private fn(report(code)) { return this.change(code) }\n'
                'fn(read()) { result := {"exit_code": 7}; return this.report(result.exit_code) } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nr := b.read()\nprint(r.code)\n',
-    }, "path-in-call-argument"),
+    }, "vm"),
     "struct-method-module-variadic": ({
         "m.f": 'struct(ArgsBox) { fn(gather(head, ...tail)) { tail.push(head); return tail }\n'
                'fn(forward(head, ...tail)) { return this.gather(head, ...tail) } }\nexport(ArgsBox)\n',
@@ -178,11 +184,13 @@ SHAPES.update({
         "main.f": 'import("m.f")\nc := Checks()\n'
                   'print(c.check(false, true))\nprint(c.check(true, true))\n',
     }, "vm"),
-    "struct-method-negated-mixed-operators-refusal": ({
+    # Reconciled 2026-11-28: both operands are negated boolean method results
+    # in an `&&` chain; legacy splits the chain before negating each result.
+    "struct-method-negated-mixed-operators": ({
         "m.f": 'struct(Checks) { private fn(probe(value)) { return value }\n'
                'fn(check(left, right)) { return !this.probe(left) && !this.probe(right) } }\nexport(Checks)\n',
         "main.f": 'import("m.f")\nc := Checks()\nprint(c.check(false, true))\n',
-    }, "prefix-not-precedence"),
+    }, "vm"),
     "struct-method-local-len-value": ({
         "m.f": 'struct(Box) { fn(count(value)) { len := value.length(); return len } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nprint(b.count("abc"))\n',
@@ -327,18 +335,22 @@ SHAPES.update({
                'return {"code": 0} } }\nbox := Box()\nexport(box)\n',
         "main.f": 'import("m.f")\na := box.read(true)\nb := box.read(false)\nprint(a.code)\nprint(b.code)\n',
     }, "vm"),
+    # Reconciled 2026-11-28: a null return reaching `.code` is legacy's
+    # reached "value has no member: code" error on both engines.
     "imported-null-return-result": ({
         "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
                'fn(read(flag)) { item := this.data(flag); if(item == null) { return item }; '
                'return {"code": 0} } }\nbox := Box()\nexport(box)\n',
         "main.f": 'import("m.f")\na := box.read(false)\nprint(a.code)\n',
-    }, "type:member"),
+    }, "vm"),
+    # Reconciled 2026-11-28: the non-null guard makes `item.code` a valid read;
+    # both engines print "before" then 7.
     "imported-nonnull-return-intervening-statement": ({
         "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
                'fn(read(flag)) { item := this.data(flag); if(item != null) { print("before"); return item.code }; '
                'return 0 } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nprint(b.read(true))\n',
-    }, "type:member"),
+    }, "vm"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

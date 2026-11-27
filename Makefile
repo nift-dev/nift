@@ -1253,6 +1253,7 @@ RT_VM_SUITES = darwin-address-limit rt-vm-unit rt-vm-globals rt-vm-modules rt-vm
 	vm-adversarial-timeout-selftest vm-adversarial vm-subset vm-subset-gen vm-builtins vm-host \
 	vm-records-coverage vm-path-wording vm-known-refused vm-engine-selection vm-former-replay vm-d018 \
 	vm-context-consistency vm-policy-negative vm-review-cp12 vm-golden vm-int-bounds vm-inventory vm-chain \
+	vm-package-json vm-package-process \
 	vm-modules module-host-order vm-structs vm-globals semantics-modules semantics-modules-structs \
 	modules-d041 cp12b-inventory native-qualifier literal-args save-safety async-memory platform-subset-table
 .PHONY: test-rt-vm-invalidate test-rt-vm-verify

@@ -3,7 +3,7 @@
 (NIFT_VM=0) and on the VM (NIFT_VM=require when available, else default).
 A VM refusal (no part ran) is counted, never compared; anything else must
 match legacy exactly: stdout, stderr (paths normalised) and exit status."""
-import itertools, os, subprocess, sys, tempfile
+import itertools, os, re, subprocess, sys, tempfile
 
 NIFT = sys.argv[1]
 OUT = sys.argv[2] if len(sys.argv) > 2 else None
@@ -77,7 +77,12 @@ def main():
         if vm[0] != 0 and 'not compiled for the VM' in vm[2] and 'no part of it ran' in vm[2]:
             stats['refused'] += 1
             continue
-        if lg == vm:
+        # D-018: the VM keeps canonical wording and does not add the caller
+        # return: prefixes legacy's prepared path may show. Compare the same
+        # text after those prefixes are removed.
+        def d018(r):
+            return (r[0], r[1], re.sub(r'(error: [^\n]*?: )(return: )+', r'\1', r[2]))
+        if d018(lg) == d018(vm):
             stats['same'] += 1
         else:
             stats['mismatch'] += 1

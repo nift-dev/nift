@@ -1,3 +1,4 @@
+// rt-lint: cold-file unit analysis runs at compile time; no runtime string comparisons here
 #include "rt/compiler_unit.h"
 #include "rt/prepared.h"
 #include "rt/session_shape.h"
@@ -9,6 +10,7 @@
 // double (for the D-018 context refusals); then one proto per function.
 
 namespace nift::rt::detail {
+
 
 namespace {
 
