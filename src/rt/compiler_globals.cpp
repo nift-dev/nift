@@ -1,4 +1,5 @@
 #include "rt/compiler_globals.h"
+#include "rt/module_link.h"
 
 // CP12b globals in the compiler (rt/globals.h): a function's free name that
 // resolves to a top-level binding (G1-G3 hold for every use) is that
@@ -13,22 +14,31 @@ namespace nift::rt::detail {
 
 const Binding* UnitCompiler::find_binding(std::string_view name) const {
     if (const Binding* local = scopes_.find(name)) return local;
-    // Preserve CP12b's method scope: fields are resolved by own_field, and
-    // outer session globals must not silently override them or broaden the
-    // existing refusal of method-global lookup.
-    if (in_function_ && plan_.is_method(function_)) return nullptr;
-    const auto external = session_bindings_.find(std::string(name));
-    if (external != session_bindings_.end()) return &external->second;
-    if (in_lambda_) {
-        const auto top = top_level_bindings_.find(name);
-        return top == top_level_bindings_.end() ? nullptr : &top->second;
+    const bool method = in_function_ && plan_.is_method(function_);
+    if (!method) {
+        const auto external = session_bindings_.find(std::string(name));
+        if (external != session_bindings_.end()) return &external->second;
+        if (in_lambda_) {
+            const auto top = top_level_bindings_.find(name);
+            return top == top_level_bindings_.end() ? nullptr : &top->second;
+        }
     }
     if (!in_function_ || globals_ == nullptr || function_ >= globals_->free.size()) return nullptr;
-    // CP12b structs: methods run wherever an instance is (not ordered by G3): no globals there.
-    if (plan_.is_method(function_)) return nullptr;
     const auto& free = globals_->free[function_];
     const auto ref = free.find(name);
     if (ref == free.end() || !ref->second.ok) return nullptr;
+    if (method) {
+        // An imported method runs with its defining module's own state.
+        // Require the binding to be initialized before the struct exists,
+        // and leave the implicit field lookup and session behavior intact.
+        if (session_ || plan_.coroutines || !plan_.linked || own_field(name)) return nullptr;
+        const auto& info = plan_.structs[static_cast<std::size_t>(plan_.method_of[function_])];
+        const auto& type = ast_.at(info.decl);
+        const auto& declaration = ast_.at(ref->second.decl);
+        const auto owner = plan_.linked->locate(type.begin).module;
+        if (owner == 0 || declaration.begin >= type.begin ||
+            plan_.linked->locate(declaration.begin).module != owner) return nullptr;
+    }
     const auto global = global_bindings_.find(name);
     return global == global_bindings_.end() ? nullptr : &global->second;
 }

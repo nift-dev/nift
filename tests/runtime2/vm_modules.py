@@ -183,6 +183,42 @@ SHAPES.update({
                'fn(check(left, right)) { return !this.probe(left) && !this.probe(right) } }\nexport(Checks)\n',
         "main.f": 'import("m.f")\nc := Checks()\nprint(c.check(false, true))\n',
     }, "prefix-not-precedence"),
+    "struct-method-local-size-value": ({
+        "m.f": 'struct(Box) { fn(size()) { return "method" }\nfn(render()) { size := ""; size = "large"; return size + this.size() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.render())\n',
+    }, "vm"),
+    "struct-method-local-size-callee-refusal": ({
+        "m.f": 'struct(Box) { fn(render()) { size := ""; return size() } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nprint("must not execute")\n',
+    }, "binding-name-reserved"),
+    "imported-prepared-integer-copy": ({
+        "m.f": 'fn(count_cost()) {\n'
+               'row := [3]\nk := 0\nwhile(k < 1) {\n deletion_cost := row[k] + 1\n'
+               'best_cost := deletion_cost\n print(best_cost)\n k += 1\n }\n}\nexport(count_cost)\n',
+        "main.f": 'import("m.f")\ncount_cost()\n',
+    }, "vm"),
+    "imported-prepared-shadowed-copy": ({
+        "m.f": 'fn(count_cost()) {\n deletion_cost := 2.5\n row := [3]\nk := 0\nwhile(k < 1) {\n'
+               ' deletion_cost := row[k] + 1\n best_cost := deletion_cost\n print(best_cost)\nk += 1\n }\n}\n'
+               'export(count_cost)\n',
+        "main.f": 'import("m.f")\ncount_cost()\n',
+    }, "prepared-decl-type"),
+    "imported-prepared-fractional-declaration-copy": ({
+        "m.f": 'fn(count_cost()) {\nk := 0\nwhile(k < 1) {\n deletion_cost := 2.0\n'
+               'best_cost := deletion_cost\n print(best_cost)\n k += 1\n }\n}\nexport(count_cost)\n',
+        "main.f": 'import("m.f")\ncount_cost()\n',
+    }, "prepared-decl-type"),
+    "struct-method-owner-state": ({
+        "m.f": 'counter_local := 6\nstruct(Box) {\nfn(read()) { return counter_local }\n'
+               'fn(advance()) { counter_local += 1; return counter_local }\n}\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nc := Box()\n'
+                  'print(b.read())\nprint(b.advance())\nprint(c.read())\n',
+    }, "vm"),
+    "struct-method-owner-state-late-refusal": ({
+        "m.f": 'struct(Box) { fn(read()) { return counter_local } }\n'
+               'counter_local := 6\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.read())\n',
+    }, "free-name"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

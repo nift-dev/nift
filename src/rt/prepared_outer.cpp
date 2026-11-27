@@ -1,5 +1,6 @@
 #include "rt/prepared_outer.h"
 
+#include "rt/module_data.h"
 #include "rt/source_scan.h"
 #include "rt/text_type.h"
 #include "rt/vm_mutants.h"
@@ -50,6 +51,40 @@ bool outer_bindings_int_typed(const Ast& ast, NodeId root, const UnitPlan& plan,
 // The expression parameter is local to the new callable. A spelling
 // confined to that parameter and its read cannot influence the prepared
 // declaration through another scope.
+// A unique local with an int declaration cannot acquire an ambient text
+// type at preparation time. Both engines then bind the integral value as int.
+bool prepared_module_integer_copy(const Ast& ast, const Node& declaration, const UnitPlan& plan,
+                                  const UnitKinds* kinds) {
+    if (!kinds || declaration.b == kNoNode || !imported_module_data(plan, declaration))
+        return false;
+    const auto& source = ast.at(declaration.b);
+    if (source.kind != NodeKind::Ident || kinds->of(declaration.b) != kKindInt) return false;
+    const auto resolution = kinds->bindings.find(declaration.b);
+    if (resolution == kinds->bindings.end()) return false;
+    const auto name = ast.text(source);
+    const auto same_name = [&](NodeId id) {
+        return id != kNoNode && ast.at(id).kind == NodeKind::Ident &&
+               ast.text(ast.at(id)) == name;  // rt-lint: allow-string-compare
+    };
+    const Node* origin = nullptr;
+    for (NodeId id = 0; id < ast.size(); ++id) {
+        const auto& n = ast.at(id);
+        if ((n.kind == NodeKind::Param && ast.text(n) == name) || n.kind == NodeKind::Command)
+            return false;
+        if (n.kind == NodeKind::Try && same_name(n.b)) return false;
+        if (n.kind == NodeKind::StructField && same_name(n.a)) return false;
+        if (n.kind == NodeKind::ForBinding)
+            for (std::uint32_t k = 0; k < n.count; ++k)
+                if (same_name(ast.list(n)[k])) return false;
+        if (n.kind != NodeKind::Declare) continue;
+        if (n.a == resolution->second) origin = &n;
+        else if (same_name(n.a)) return false;
+        else if (n.a != kNoNode && ast.at(n.a).kind != NodeKind::Ident) return false;
+    }
+    return origin && origin->begin < declaration.begin && kinds->of(origin->b) == kKindInt &&
+           int_typed(ast, *origin, kinds);
+}
+
 std::unordered_set<NodeId> prepared_lambda_literals(const Ast& ast) {
     std::unordered_map<std::string_view, std::size_t> names;
     for (NodeId id = 0; id < ast.size(); ++id) {

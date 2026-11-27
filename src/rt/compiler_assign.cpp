@@ -1,14 +1,10 @@
 #include "rt/compiler_assign.h"
 #include "rt/compiler_element_path.h"
 
+#include "rt/binding_rules.h"
 #include "rt/literal.h"
+#include "rt/module_data.h"
 #include "rt/native.h"
-
-// Declarations, assignments, compound assignments and increments (CP11,
-// CP12). One meaning everywhere (D-018): legacy's canonical (textual)
-// binding-type rules and CP09 arithmetic; constructs whose legacy behaviour
-// in loop code (legacy's prepared evaluator) could differ from that are
-// refused before execution ("context:*").
 
 namespace nift::rt::detail {
 
@@ -58,7 +54,11 @@ bool UnitCompiler::declare(const Node& node) {
         init.kind == NodeKind::Binary && (init.op == Op::Eq || init.op == Op::Ne) &&
         !session_ && !in_function_ && !in_lambda_ && !plan_.coroutines &&
         (!module_names_ || module_names_->empty());
-    if (reserved_name(name) && !same_value && !invocation_shadows_.count(node_id(target)))
+    const bool size_value = name == "size" && init.kind == NodeKind::String &&  // rt-lint: allow-string-compare
+        init_kinds == kKindString && !session_ && in_function_ && !in_lambda_ && plan_.is_method(function_) &&
+        imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
+        !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
+    if (reserved_name(name) && !same_value && !size_value && !invocation_shadows_.count(node_id(target)))
         return fail(target, "binding-name-reserved");
     const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
     if (parameter && parameter->decl_node != kNoNode &&

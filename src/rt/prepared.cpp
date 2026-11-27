@@ -39,7 +39,6 @@ template <class Visit> bool walk(const Ast& ast, NodeId id, const Visit& visit) 
     }
     return true;
 }
-
 class Analysis {
 public:
     Analysis(const Ast& ast, NodeId root, const UnitPlan& plan, const UnitKinds* kinds)
@@ -249,7 +248,8 @@ private:
         for (std::size_t k = 0; params && k < params->size(); ++k)
             if ((*params)[k] == detail::trim(src.substr(op + 2, n.end - op - 2)))
                 return param_copy_matches_legacy(f, *params, k) || refuse(n, "prepared-decl-type");
-        if (refers_to(infer_text_type(src.substr(op + 2, n.end - op - 2)), risky_names))
+        if (refers_to(infer_text_type(src.substr(op + 2, n.end - op - 2)), risky_names) &&
+            !(risky_names && prepared_module_integer_copy(ast_, n, plan_, kinds_)))
             return refuse(n, "prepared-decl-type");
         return true;
     }
