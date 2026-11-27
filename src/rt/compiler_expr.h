@@ -1,6 +1,5 @@
 #pragma once
 // Runtime 2.0 expression compilation and the compiler state shared with statements.
-// CP12 (D-018): compile legacy textual semantics with the approved evaluation-order exceptions.
 #include "rt/ast.h"
 #include "rt/compiler.h"
 #include "rt/codegen.h"
@@ -177,6 +176,7 @@ private:
     void collect_returns(NodeId id, std::vector<NodeId>& out) const;
     bool binary(const Node& node, std::uint16_t dst);
     bool logical(const Node& node, std::uint16_t dst);
+    int guarded_string_contains(const Node& node, std::uint16_t dst);
     bool coalesce(const Node& node, std::uint16_t dst);
     bool ternary(const Node& node, std::uint16_t dst);
     bool unary(const Node& node, std::uint16_t dst);

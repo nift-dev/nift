@@ -210,7 +210,8 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (!expr_to(node.a, dst)) return false;
     const bool is_and = node.op == Op::And;
     const std::size_t decided = fb_->emit(is_and ? OpCode::JmpFalse : OpCode::JmpTrue, dst);
-    if (!expr_to(node.b, dst)) return false;
+    const int guarded = is_and ? guarded_string_contains(node, dst) : -1;
+    if (guarded == 0 || (guarded < 0 && !expr_to(node.b, dst))) return false;
     fb_->emit(OpCode::Truth, dst, dst);
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->patch(decided, fb_->here());

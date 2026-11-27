@@ -7,6 +7,7 @@
 #include "rt/compiler_dispatch.h"
 
 #include "rt/builtin_bind.h"
+#include "rt/module_data.h"
 #include "rt/op_admission.h"
 #include "rt/vm_ops.h"
 
@@ -51,6 +52,40 @@ int UnitCompiler::dynamic_method_call(const Node& node, NodeId receiver, std::st
     const bool flagged = true;
 #endif
     return builtin_call(node, *admitted.spec, receiver, dst, flagged) ? 1 : 0;
+}
+
+// The immediately reached right-hand call reads the same local parameter
+// that the built-in type test just checked. No intermediate code can rebind it.
+int UnitCompiler::guarded_string_contains(const Node& node, std::uint16_t dst) {
+    if (session_ || in_lambda_ || !in_function_ || plan_.coroutines ||
+        !imported_module_data(plan_, node)) return -1;
+    const auto& check = ast_.at(node.a);
+    const auto& call = ast_.at(node.b);
+    if (check.kind != NodeKind::Binary || check.op != Op::Eq || call.kind != NodeKind::Call || call.count != 1)
+        return -1;
+    const auto& test = ast_.at(check.a);
+    const auto& label = ast_.at(check.b);
+    const auto& method = ast_.at(call.a);
+    if (test.kind != NodeKind::Call || test.count != 1 || label.kind != NodeKind::String ||
+        text(label) != R"("string")" || method.kind != NodeKind::Member || text(ast_.at(method.b)) != "contains")
+        return -1;
+    const auto& type_name = ast_.at(test.a);
+    if (type_name.kind != NodeKind::Ident || text(type_name) != "type" ||
+        find_binding("type") || plan_.index.count("type") || plan_.struct_index.count("type")) return -1;
+    const int s = current_struct();
+    if (s >= 0 && plan_.structs[static_cast<std::size_t>(s)].method("type")) return -1;
+    const auto tested = ast_.list(test)[0];
+    const auto& receiver = ast_.at(method.a);
+    const auto& input = ast_.at(tested);
+    if (receiver.kind != NodeKind::Ident || input.kind != NodeKind::Ident || text(receiver) != text(input)) return -1;
+    const auto* binding = find_binding(text(input));
+    if (!binding || binding->cell || binding->decl_node == kNoNode ||
+        ast_.at(binding->decl_node).kind != NodeKind::Param) return -1;
+    const auto possible = kinds(method.a);
+    if (!(possible & kKindString) || (possible & ~(kKindAll | kKindTagged))) return -1;
+    if (!plain_postfix(call) || !plain_postfix(method) || !no_trailing_comma(call)) return 0;
+    const auto& spec = natives::builtin_spec(natives::BuiltinId::StrContains);
+    return builtin_call(call, spec, method.a, dst) ? 1 : 0;
 }
 
 bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size, std::uint16_t dst) {

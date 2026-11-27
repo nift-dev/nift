@@ -219,6 +219,17 @@ SHAPES.update({
                'counter_local := 6\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nprint(b.read())\n',
     }, "free-name"),
+    "imported-guarded-string-contains": ({
+        "m.f": 'needle_text := "a"\nstruct(Box) { fn(check(value)) { return type(value) == "string" && '
+               'value.contains(needle_text) } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.check("abc"))\nprint(b.check(3))\nprint(b.check(map()))\nprint(b.check(b))\nprint(b.check("xyz"))\n',
+    }, "vm"),
+    "imported-guarded-different-receiver-refusal": ({
+        "m.f": 'struct(Box) { private fn(needle()) { print("argument"); return "a" }\n'
+               'fn(check(value, other)) { return type(value) == "string" && '
+               'other.contains(this.needle()) } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.check("abc", 3))\nprint(b.check(3, "abc"))\n',
+    }, "builtin-receiver:contains"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',
