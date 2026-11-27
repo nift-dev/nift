@@ -362,12 +362,16 @@ TyRef Inference::call(const Node& n) {
             return result;
         }
         escape_callables(values);  // B4b C4: a native does not call back
-        const bool package_encode = !session_ && current_ >= 0 && !plan_.coroutines &&
+        const bool package_conversion = !session_ && current_ >= 0 && !plan_.coroutines &&
             static_cast<std::size_t>(current_) < plan_.functions.size() && imported_module_data(plan_, n) &&
-            (recv->kinds == 0 || (recv->kinds & kKindUnknown) || recv->kinds == kKindString) &&
-            key == "encode" && n.count == 1 &&
-            ast_.at(args[0]).kind == NodeKind::String && ast_.text(ast_.at(args[0])) == R"("utf-8")";
+            n.count == 1 && ast_.at(args[0]).kind == NodeKind::String &&
+            ast_.text(ast_.at(args[0])) == R"("utf-8")";
+        const bool package_encode = package_conversion && key == "encode" &&
+            (recv->kinds == 0 || (recv->kinds & kKindUnknown) || recv->kinds == kKindString);
+        const bool package_decode = package_conversion && key == "decode" &&
+            (recv->kinds == 0 || (recv->kinds & kKindUnknown) || recv->kinds == kKindBytes);
         TyRef result=fresh(call_id, package_encode ? kinds_ty(kKindBytes) :
+                          package_decode ? kinds_ty(kKindString) :
                           method_result(ast_, n, recv, values, session_ != nullptr));
         if((result->kinds&kKindNumber)&&key!="size"&&key!="length") result=with_text_number(result,true);
         return result;

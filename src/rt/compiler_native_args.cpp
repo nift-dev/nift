@@ -51,12 +51,15 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         (node.count != 2 || kinds(args[1]) != kKindString))
         return fail(node, "minify-path-mode");
     // Bytes natives outside the admitted subset retain the CP15 W8 refusal.
-    const bool package_encode = spec.id == natives::BuiltinId::StrEncode && !session_ && !in_lambda_ &&
-        in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&
-        receiver != kNoNode && (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) ||
-                               kinds(receiver) == kKindString) && node.count == 1 &&
+    const bool package_conversion = !session_ && !in_lambda_ && in_function_ && !plan_.coroutines &&
+        imported_module_data(plan_, node) && receiver != kNoNode && node.count == 1 &&
         ast_.at(args[0]).kind == NodeKind::String && text(ast_.at(args[0])) == R"("utf-8")";
-    if (bytes_builtin(spec) && !package_encode) return fail(node, "builtin-bytes:" + std::string(spec.name));
+    const bool package_encode = package_conversion && spec.id == natives::BuiltinId::StrEncode &&
+        (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) || kinds(receiver) == kKindString);
+    const bool package_decode = package_conversion && spec.id == natives::BuiltinId::BytesDecode &&
+        (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) || kinds(receiver) == kKindBytes);
+    if (bytes_builtin(spec) && !package_encode && !package_decode)
+        return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
         for (std::uint32_t k = 0; k < node.count; ++k) {
             const Node& arg = ast_.at(args[k]);

@@ -7,6 +7,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/compiler_native_args.h"
 #include "rt/native.h"
+#include "rt/module_data.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
@@ -173,6 +174,16 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             if (result >= 0) return result == 1;
         }
         const KindSet k = kinds(callee.a);
+        // Imported package code may decode unproved bytes with the literal
+        // UTF-8 encoding; the native validates the reached receiver.
+        if (name == "decode" && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
+            imported_module_data(plan_, node) && node.count == 1 &&
+            (k == 0 || (k & (kKindUnknown | kKindBytes)) != 0)) {
+            const Node& label = ast_.at(ast_.list(node)[0]);
+            if (label.kind == NodeKind::String && text(label) == R"("utf-8")")
+                if (const auto* spec = natives::find_builtin(natives::Receiver::Bytes, "decode"))
+                    return builtin_call(node, *spec, callee.a, dst);
+        }
         if (name == "to_int" && (k & kKindFrac) && loop_reachable())  // rt-lint: allow-string-compare B4
             return fail(node, "context:number-to-int");
         const natives::BuiltinSpec* spec = nullptr;
