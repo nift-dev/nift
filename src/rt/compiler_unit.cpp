@@ -289,6 +289,8 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     const NodeId* params = ast_.list(node);
     // CP12b structs: a method's first register holds its instance (a reference).
     const bool method = plan_.is_method(f);
+    this_in_cell_ = false;
+    this_cell_reg_ = 0;
     if (method && !fb_->alloc(this_reg_)) return builder_ok();
     std::vector<std::uint16_t> regs(node.count);
     for (std::uint32_t k = 0; k < node.count; ++k)
@@ -338,6 +340,15 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
             binding.reg = binding.cell_reg;
         }
         if (!scopes_.declare(name, binding)) return fail(param, "param-duplicate");
+    }
+    // A lambda in a method that names `this` captures the receiver in a cell.
+    if (method && lambda_references_this(node.b)) {
+        std::uint16_t cell = 0, untyped = 0;
+        if (!fb_->alloc(cell) || !fb_->alloc(untyped)) return builder_ok();
+        fb_->emit(OpCode::LoadI, untyped, jump_operand(-1));
+        fb_->emit(OpCode::NewCell, cell, this_reg_, untyped);
+        this_in_cell_ = true;
+        this_cell_reg_ = cell;
     }
     // The body shares the parameters' scope: `p := ...` redeclares a parameter.
     if (!statements(ast_.at(node.b))) return false;

@@ -146,8 +146,11 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const std::string_view target = text(ast_.at(node.a));
     const bool numeric = (kinds(node.b) & static_cast<KindSet>(~kKindNumber)) == 0;
     const bool own_type = type.kind == TextType::Kind::Binding && type.binding == target;
-    const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target));
-    if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
+    const bool int_into_maybe_double = (kinds(node.b) & ~kKindInt) == 0 &&
+        may_double_[binding_scope(b)].count(target);
+    const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target) ||
+                                    int_into_maybe_double);
+    if (loop_type_error_ambiguous() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
     if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
     std::uint16_t value = 0;
@@ -344,7 +347,7 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const KindSet l = kinds(node.a), r = kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-    const bool dynamic = ((l | r) & kKindUnknown) != 0 || l == 0 || r == 0;  // legacy checks the reached value kinds
+    const bool dynamic = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;  // legacy checks the reached value kinds
     if (!numbers && !strings && !dynamic && !unknown_defers(l | r))
         return fail(node, "type:compound-assignment");
     if (loop_reachable()) {

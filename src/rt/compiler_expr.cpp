@@ -5,6 +5,7 @@
 #include "rt/native.h"
 #include "rt/natives/json_methods.h"
 #include "rt/prepared_parse.h"
+#include "rt/module_link.h"
 namespace nift::rt::detail {
 namespace {
 OpCode binary_opcode(Op op) {
@@ -188,14 +189,17 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
                 ((l & kKindString) || (r & kKindString)))
                 break;
             if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r)) {
-                // A `+` whose operand kinds are not proved (or an unproved
-                // operand) is legacy's run-time dispatch: numbers, string
-                // concatenation, two arrays, two bytes, else its reached error.
-                add_guard = op == OpCode::Add && (((l | r) & kKindUnknown) != 0 || l == 0 || r == 0);
+                // An unproved operand is legacy's run-time dispatch: numbers
+                // (and string/array/bytes concatenation for `+`), else its
+                // reached arithmetic error.
+                const bool unproved = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;
+                add_guard = op == OpCode::Add && unproved;
+                const bool dynamic_arith = op != OpCode::Add && unproved && plan_.linked &&
+                    plan_.linked->locate(node.begin).module > 0;
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
                     (widened(l) || widened(r) || node.begin < session_->unit_begin);
-                bad_kind = !numeric_guard && !add_guard;
+                bad_kind = !numeric_guard && !add_guard && !dynamic_arith;
             }
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
@@ -244,7 +248,11 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (guarded < 0) {
         NodeId guard_ident = kNoNode;
         const auto saved_conversion = guarded_conversion_;
-        if (string_guard_ident(ast_, node.a, guard_ident, is_and)) {
+        NodeId typed_source = kNoNode;
+        KindSet typed_kind = 0;
+        if (is_and && type_call_positive_guard(ast_.at(node.a), typed_source, typed_kind)) {
+            guarded_conversion_ = {typed_source, typed_kind};
+        } else if (string_guard_ident(ast_, node.a, guard_ident, is_and)) {
             const Binding* guarded = find_binding(text(ast_.at(guard_ident)));
             // The binding must be stable: no assignment anywhere in the body.
             if (guarded && guarded->decl_node != kNoNode && !guarded->cell && !guarded->global &&

@@ -1,4 +1,5 @@
 #include "rt/compiler_loops.h"
+#include "rt/module_link.h"
 
 #include "rt/compiler_loops_step.h"
 
@@ -57,9 +58,16 @@ bool UnitCompiler::for_setup(ForState& state, const Node& node) {
     // sets and stacks the same way and iterates a map's live entry vector).
     const bool keyed = source_kinds == kKindMap || source_kinds == kKindSet || source_kinds == kKindStack;
     if (!unknown && (source_kinds & kKindCollection) && !keyed) return fail(node, "for-collection");
-    const bool has_array = (source_kinds & kKindArray) != 0 || (keyed && source_kinds != kKindMap);
-    const bool has_object = (source_kinds & kKindObject) != 0 || source_kinds == kKindMap;
-    if (unknown) return fail(node, "type:for-source");
+    bool dynamic_pair = false;
+    if (unknown) {
+        // An imported package's pair loop over an unproved value is legacy's
+        // object entry iteration; the run-time iterable check reports others.
+        if (state.pair && plan_.linked && plan_.linked->locate(node.begin).module > 0) dynamic_pair = true;
+        else return fail(node, "type:for-source");
+    }
+    const bool has_array = !dynamic_pair &&
+        ((source_kinds & kKindArray) != 0 || (keyed && source_kinds != kKindMap));
+    const bool has_object = dynamic_pair || (source_kinds & kKindObject) != 0 || source_kinds == kKindMap;
     if (has_array && has_object) return fail(node, "type:for-source-union");
 
     state.mode = state.pair ? 1 : 0;

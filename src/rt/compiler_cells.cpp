@@ -356,6 +356,15 @@ bool UnitCompiler::element_target_ok(const Node& target) {
         plain = true;
         for (char c : text(key))
             if (c < '0' || c > '9') plain = false;
+    } else if (key.kind == NodeKind::String && key.count == 0) {
+        const std::string_view spelled = text(key);
+        plain = spelled.size() >= 2 && (spelled.front() == '"' || spelled.front() == '\'') &&
+                spelled.back() == spelled.front();
+        for (char c : spelled.substr(1, spelled.size() >= 2 ? spelled.size() - 2 : 0)) {
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u < 0x20 || u == 0x7f || c == '.' || c == '[' || c == ']' || c == '\\' || c == '"' ||
+                c == '\'' || c == '{' || c == '}' || c == '$') plain = false;
+        }
     }
     // The bracket holds exactly that token (no parentheses around it).
     std::string_view inside = ast_.source().substr(ast_.at(target.a).end, target.end - ast_.at(target.a).end);

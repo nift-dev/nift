@@ -116,6 +116,11 @@ const BuiltinSpec* bind_function(std::string_view name) {
 
 bool pure_method_name(std::string_view name) { return first_method(name) != nullptr; }
 
+bool boolean_method_name(std::string_view name) {
+    const BuiltinSpec* spec = first_method(name);
+    return spec != nullptr && spec->result == kKindBool;
+}
+
 bool presentation_builtin(const BuiltinSpec& spec) { return spec.receiver == Receiver::Any; }
 
 bool bytes_builtin(const BuiltinSpec& spec) {

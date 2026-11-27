@@ -156,7 +156,7 @@ bool ElementPath::compound(UnitCompiler& c, const Node& node) {
     const KindSet l = c.kinds(node.a), rk = c.kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (rk & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && rk == kKindString;
-    const bool dynamic = ((l | rk) & kKindUnknown) != 0 || l == 0 || rk == 0;
+    const bool dynamic = ((l | rk) & (kKindUnknown | kKindNull)) != 0 || l == 0 || rk == 0;
     if (!numbers && !strings && !dynamic && !c.unknown_defers(l | rk)) return c.fail(node, "type:compound-assignment");
     if (node.op != Op::AddAssign && node.op != Op::SubAssign && node.op != Op::MulAssign &&
         node.op != Op::DivAssign && node.op != Op::ModAssign)

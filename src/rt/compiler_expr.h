@@ -66,6 +66,7 @@ public:
         std::vector<bool> upvalue_readonly;
         std::vector<bool> upvalue_const_array;
         std::vector<Capture> captures;
+        int owner_struct = -1;  // a lambda inside a struct method keeps `this`
     };
 private:
     bool compile_main(NodeId program, std::unique_ptr<Proto>& out);
@@ -86,6 +87,9 @@ private:
     bool if_chain(const Node& node);
     KindSet guarded_kind(NodeId id) const; std::pair<NodeId, KindSet> guarded_conversion(const Node& node) const;
     bool type_test_guard(const Node& condition, NodeId& source, KindSet& kind) const;
+    bool type_call_guard(const Node& condition, NodeId& source, KindSet& kind) const;
+    bool type_call_positive_guard(const Node& condition, NodeId& source, KindSet& kind) const;
+    bool block_exits(const Node& body) const;
     bool null_test_guard(const Node& condition, NodeId& source, KindSet& kind) const;
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
     std::vector<NodeId> guarded_object_reads_; std::pair<NodeId, KindSet> guarded_conversion_ = {kNoNode, 0};
@@ -318,7 +322,11 @@ private:
     bool field_in_loop_code() const {  // a lambda's index is past loop_called_ (as in loop_reachable)
         return loop_region() || (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]);
     }
-    int current_struct() const { return in_function_ && plan_.is_method(function_) ? plan_.method_of[function_] : -1; }
+    int current_struct() const {
+        if (lambda_struct_override_ >= 0) return lambda_struct_override_;
+        return in_function_ && plan_.is_method(function_) ? plan_.method_of[function_] : -1;
+    }
+    bool lambda_references_this(NodeId body) const;
     const StructFieldInfo* own_field(std::string_view name) const;
     int struct_of_receiver(NodeId object, bool& is_this) const;
     int inferred_struct(NodeId id) const;
@@ -343,6 +351,9 @@ private:
     const StructFieldInfo* struct_target(const Node& target);
     NodeId target_receiver(const Node& target) const { return target.kind == NodeKind::Member ? target.a : kNoNode; }
     std::uint16_t this_reg_ = 0;  // a method's register holding its instance (D-NEXT-refsem: a reference)
+    bool this_in_cell_ = false;  // a method whose lambdas need the receiver captured
+    std::uint16_t this_cell_reg_ = 0;
+    int lambda_struct_override_ = -1;
     bool fail(const Node& node, std::string reason);
     bool legacy_fatal(const Node& at, std::string message, std::uint16_t dst);  // CP25 (compiler_rules.cpp)
     bool const_write(const Node& node, const Node* value, const std::uint16_t* result, const Binding& b, bool update);

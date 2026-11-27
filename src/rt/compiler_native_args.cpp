@@ -59,7 +59,13 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         (kinds(receiver) == 0 || (kinds(receiver) & (kKindUnknown | kKindString)));
     const bool package_decode = package_conversion && spec.id == natives::BuiltinId::BytesDecode &&
         (kinds(receiver) == 0 || (kinds(receiver) & (kKindUnknown | kKindBytes)));
-    if (bytes_builtin(spec) && !package_encode && !package_decode)
+    const bool package_open_bytes = spec.id == natives::BuiltinId::HostOpenBytes && !session_ && !in_lambda_ &&
+        in_function_ && !plan_.coroutines && imported_module_data(plan_, node) && node.count == 1 &&
+        (kinds(args[0]) == 0 || (kinds(args[0]) & (kKindUnknown | kKindString)) != 0);
+    const bool package_random = spec.id == natives::BuiltinId::HostSecureRandomBytes && !session_ && !in_lambda_ &&
+        in_function_ && !plan_.coroutines && imported_module_data(plan_, node) && node.count == 1 &&
+        (kinds(args[0]) == 0 || (kinds(args[0]) & (kKindUnknown | kKindNumber)) != 0);
+    if (bytes_builtin(spec) && !package_encode && !package_decode && !package_open_bytes && !package_random)
         return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
         for (std::uint32_t k = 0; k < node.count; ++k) {
@@ -112,8 +118,9 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         // file().write(bytes([literal octets])) can only fail constructing
         // the argument on a resource limit. Keep the guard for constructors
         // with user code or values that could raise a language error.
-        if (spec.id == natives::BuiltinId::FileWrite && arg.kind == NodeKind::Call && arg.count == 1 &&
-            kinds(args[0]) == kKindBytes && plan_.structs.empty()) {
+        if ((spec.id == natives::BuiltinId::FileWrite || spec.id == natives::BuiltinId::StreamWrite ||
+             spec.id == natives::BuiltinId::StreamWriteBytes) &&
+            arg.kind == NodeKind::Call && arg.count == 1 && kinds(args[0]) == kKindBytes && plan_.structs.empty()) {
             const auto& callee = ast_.at(arg.a);
             if (callee.kind == NodeKind::Ident) {
                 const auto name = text(callee);
@@ -151,6 +158,12 @@ bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::Bui
         return true;  // ordinary values: the D-040 #4 error at run time
     }
     if (!unit_makes_collections()) return true;
+    // Imported packages write their own rendered bodies; the native sees the
+    // reached value (a collection is still a normal value for that write).
+    if ((id == BuiltinId::FileWrite || id == BuiltinId::StreamWrite ||
+         id == BuiltinId::StreamWriteBytes) &&
+        plan_.linked && plan_.linked->locate(node.begin).module > 0)
+        return true;
     // Built-ins that only report kinds, copy, or are the collection methods.
     const bool value_ok = id == BuiltinId::FnType || id == BuiltinId::FnCopy || id == BuiltinId::FnDeepcopy ||
                           (id >= BuiltinId::FnIsNull && id <= BuiltinId::FnIsEnum) ||
@@ -235,6 +248,12 @@ bool UnitCompiler::unobservable_argument(NodeId id) {
         if (node.kind == NodeKind::Binary &&
             (node.op == Op::Add || node.op == Op::Sub || node.op == Op::Mul))
             return unobservable_argument(node.a) && unobservable_argument(node.b);
+        if (node.kind == NodeKind::Array || node.kind == NodeKind::Object) {
+            const NodeId* items = ast_.list(node);
+            for (std::uint32_t k = 0; k < node.count; ++k)
+                if (!unobservable_argument(items[k])) return false;
+            return true;
+        }
     }
     // A pure length()/size() of a proved string, array or bytes has no effect
     // and cannot fault; legacy may evaluate it lazily.

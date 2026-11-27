@@ -73,6 +73,25 @@ void UnitCompiler::collect_lambda_names(NodeId id, std::vector<std::string_view>
     }
 }
 
+bool UnitCompiler::lambda_references_this(NodeId body) const {
+    std::vector<std::pair<NodeId, int>> stack{{body, 0}};
+    while (!stack.empty()) {
+        const auto [id, depth] = stack.back();
+        stack.pop_back();
+        if (id == kNoNode) continue;
+        const Node& n = ast_.at(id);
+        if (n.kind == NodeKind::FnDecl) continue;
+        int nested = depth;
+        if (n.kind == NodeKind::Lambda) ++nested;
+        if (n.kind == NodeKind::Ident && nested > 0 && text(n) == "this")  // rt-lint: allow-string-compare
+            return true;
+        for (NodeId child : {n.a, n.b, n.c}) stack.push_back({child, nested});
+        const NodeId* list = ast_.list(n);
+        for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back({list[k], nested});
+    }
+    return false;
+}
+
 bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     if (node.b == kNoNode) return fail(node, "lambda-shape");
     const NodeId* params = ast_.list(node);
@@ -92,6 +111,20 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     std::vector<bool> upvalue_readonly;
     std::vector<bool> upvalue_const_array;
     for (std::string_view name : names) {
+        // A method's captured receiver: the hidden cell made for `this`.
+        if (name == "this" && this_in_cell_) {  // rt-lint: allow-string-compare
+            Binding binding;
+            binding.cell = binding.typed = true;
+            binding.reg = this_cell_reg_;
+            binding.decl_kinds = kKindStruct;
+            captures.push_back({Capture::Source::LocalCell, this_cell_reg_, binding});
+            upvalue_names.push_back(name);
+            upvalue_decls.push_back(kNoNode);
+            upvalue_loop.push_back(false);
+            upvalue_readonly.push_back(true);
+            upvalue_const_array.push_back(false);
+            continue;
+        }
         const Binding* binding = find_binding(name);
         if (binding == nullptr) continue;  // a global/function or a body-local name
         if (binding->global) continue;
@@ -131,7 +164,7 @@ bool UnitCompiler::lambda_value(const Node& node, std::uint16_t dst) {
     lambda_tasks_.push_back(LambdaTask{node_id(node), slot, std::move(upvalue_names), std::move(upvalue_decls),
                                        std::move(upvalue_loop), std::move(upvalue_readonly),
                                        std::move(upvalue_const_array),
-                                       std::move(captures)});
+                                       std::move(captures), current_struct()});
     const LambdaTask& task = lambda_tasks_.back();
     const std::uint16_t mark = fb_->top();
     std::uint16_t base = 0;
@@ -216,6 +249,24 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     const std::string saved_reason = reason_;
     const std::uint32_t saved_offset = offset_; const bool saved_positioned = positioned_;
 
+    struct ReceiverScope {
+        UnitCompiler& c;
+        int saved_override;
+        bool saved_cell;
+        std::uint16_t saved_cell_reg;
+        ReceiverScope(UnitCompiler& compiler, int owner)
+            : c(compiler), saved_override(compiler.lambda_struct_override_),
+              saved_cell(compiler.this_in_cell_), saved_cell_reg(compiler.this_cell_reg_) {
+            c.lambda_struct_override_ = owner;
+            c.this_in_cell_ = false;
+            c.this_cell_reg_ = 0;
+        }
+        ~ReceiverScope() {
+            c.lambda_struct_override_ = saved_override;
+            c.this_in_cell_ = saved_cell;
+            c.this_cell_reg_ = saved_cell_reg;
+        }
+    } receiver_scope(*this, task.owner_struct);
     const Node& lambda = ast_.at(task.lambda);
     in_function_ = true;
     in_lambda_ = true;

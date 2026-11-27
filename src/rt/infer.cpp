@@ -349,6 +349,16 @@ TyRef Inference::call(const Node& n) {
     if (callee.kind == NodeKind::Member) {  // length()/size(), CP14 methods, or a callable field
         const TyRef recv = expr(callee.a);
         const std::string key(ast_.text(ast_.at(callee.b)));
+        // A package reads an object's keys/values/entries as an array even when
+        // the receiver's kind is unproved; the VM checks the reached receiver.
+        if (!session_ && imported_module_data(plan_, n) && n.count == 0 &&
+            (key == "keys" || key == "values" || key == "entries")) {
+            if (key != "keys") return kinds_ty(kKindArray);
+            auto keys = std::make_shared<Ty>();
+            keys->kinds = kKindArray;
+            keys->elem = kinds_ty(kKindString);
+            return fresh(static_cast<NodeId>(&n - &ast_.at(0)), keys);
+        }
         const TyRef field = record(n.a, element_of(recv, &key, true));
         std::vector<TyRef> values(n.count);
         for (std::uint32_t k = 0; k < n.count; ++k) values[k] = expr(args[k]);

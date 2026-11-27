@@ -3,6 +3,7 @@
 #include "rt/alias.h"
 #include "rt/module_link.h"
 #include "rt/structs.h"
+#include "rt/builtin_bind.h"
 
 #include <algorithm>
 #include <optional>
@@ -35,11 +36,14 @@ bool UnitCompiler::boolean_method_condition(NodeId id) const {
     if (node.kind == NodeKind::Binary && kinds(id) == kKindBool) return true;
     if (node.kind == NodeKind::Call) {  // a plain boolean method on the right of ||
         const auto& method = ast_.at(node.a);
-        return kinds(id) == kKindBool && method.kind == NodeKind::Member;
+        return method.kind == NodeKind::Member &&
+               (kinds(id) == kKindBool || boolean_method_name(text(ast_.at(method.b))));
     }
     if (node.kind != NodeKind::Unary || node.op != Op::Not) return false;
     const auto& call = ast_.at(node.a);
-    if (kinds(node.a) != kKindBool) return false;
+    const bool boolean_call = call.kind == NodeKind::Call && ast_.at(call.a).kind == NodeKind::Member &&
+                              boolean_method_name(text(ast_.at(ast_.at(call.a).b)));
+    if (kinds(node.a) != kKindBool && !boolean_call) return false;
     // The comparison is explicitly grouped under !. Its normal admission
     // and operand checks still run when the logical RHS is emitted.
     const auto spelling = text(node);

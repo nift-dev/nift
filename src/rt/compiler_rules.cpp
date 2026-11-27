@@ -54,7 +54,8 @@ bool UnitCompiler::plain_postfix(const Node& node) {
         const bool string_method = kinds(node.a) == kKindString &&
             (name == "split" || name == "stringify");  // rt-lint: allow-string-compare compile time
         // A numeric group `(a / b).floor()` is legacy's ordinary postfix chain.
-        const bool numeric_method = (kinds(node.a) & kKindNumber) &&
+        const KindSet grouped = kinds(node.a);
+        const bool numeric_method = (grouped == 0 || (grouped & (kKindNumber | kKindUnknown)) != 0) &&
             (name == "floor" || name == "ceil" || name == "round" || name == "abs" ||  // rt-lint: allow-string-compare
              name == "to_int" || name == "to_string");  // rt-lint: allow-string-compare compile time
         bool integer_remainder = false;

@@ -9,6 +9,7 @@
 #include "rt/native.h"
 #include "rt/module_data.h"
 #include "rt/module_link.h"
+#include "rt/op_admission.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
@@ -192,6 +193,70 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
                         return builtin_call(node, *spec, callee.a, dst);
                 }
             }
+        }
+        // Legacy's `to_int` takes no arguments; the reached call is a fatal
+        // program error before any effect (Uncalled package helpers keep it).
+        if (name == "to_int" && node.count != 0 && imported_module_data(plan_, node))  // rt-lint: allow-string-compare
+            return legacy_fatal(node, "to_int: expected no arguments", dst);
+        // Imported package code may convert an unproved number/string at run
+        // time; the VM dispatches to the number or string native by family.
+        if (name == "to_int" && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
+            imported_module_data(plan_, node) &&
+            (k == 0 || (k & (kKindUnknown | kKindNumber | kKindString)) != 0)) {
+            const MethodAdmission admitted =
+                admit_dynamic_method(static_cast<KindSet>(kKindNumber | kKindString), "to_int", node.count);
+            if (admitted.admission == Admission::Dynamic && admitted.spec)
+                return builtin_call(node, *admitted.spec, callee.a, dst, true);
+        }
+        // Presentation on an unproved package value: the flagged site picks
+        // the run-time family's native (legacy's own reached text).
+        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
+            name == "to_string") {  // rt-lint: allow-string-compare
+            const MethodAdmission admitted = admit_dynamic_method(
+                static_cast<KindSet>(kKindString | kKindBool | kKindNull | kKindNumber), "to_string", node.count);
+            if (admitted.admission == Admission::Dynamic && admitted.spec)
+                return builtin_call(node, *admitted.spec, callee.a, dst, true);
+        }
+        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
+            (k == 0 || (k & kKindUnknown)) && name == "contains") {  // rt-lint: allow-string-compare
+            const MethodAdmission admitted =
+                admit_dynamic_method(static_cast<KindSet>(kKindString | kKindArray), "contains", node.count);
+            if (admitted.admission == Admission::Dynamic && admitted.spec)
+                return builtin_call(node, *admitted.spec, callee.a, dst, true);
+        }
+        // Array methods on an unproved value: the flagged site re-dispatches
+        // (legacy's reached error when the receiver is not an array).
+        if (!session_ && !plan_.coroutines &&
+            (k == 0 || (k & (kKindUnknown | kKindArray)) != 0)) {
+            const bool array_method = name == "join" || name == "slice" || name == "unique" ||  // rt-lint: allow-string-compare
+                                      name == "flatten" || name == "sum" || name == "first" ||
+                                      name == "last" || name == "index_of" || name == "take" || name == "drop";
+            if (array_method)
+                if (const auto* spec = natives::find_builtin(natives::Receiver::Array, name))
+                    return builtin_call(node, *spec, callee.a, dst, true);
+        }
+        // Object methods on an unproved package value: the flagged site
+        // re-dispatches by the receiver's run-time family.
+        const NodeKind object_receiver_kind = ast_.at(callee.a).kind;
+        const bool path_receiver = object_receiver_kind == NodeKind::Member || object_receiver_kind == NodeKind::Index;
+        if (!session_ && !plan_.coroutines && (path_receiver || imported_module_data(plan_, node)) &&
+            (k == 0 || (k & (kKindUnknown | kKindObject)) != 0)) {
+            const bool object_method = name == "omit" || name == "pick" || name == "keys" ||  // rt-lint: allow-string-compare
+                                       name == "values" || name == "entries" || name == "has" ||
+                                       name == "get" || name == "merge" || name == "merge_deep";
+            if (object_method)
+                if (const auto* spec = natives::find_builtin(natives::Receiver::Object, name))
+                    return builtin_call(node, *spec, callee.a, dst, true);
+        }
+        // Numeric conversions/rounding on an unproved package value: the
+        // flagged site re-dispatches by the receiver's run-time family.
+        if (!session_ && in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&  // rt-lint: allow-string-compare
+            (k == 0 || (k & (kKindUnknown | kKindNumber)) != 0)) {
+            const bool numeric_method = name == "floor" || name == "ceil" || name == "round" ||  // rt-lint: allow-string-compare
+                                        name == "abs";  // rt-lint: allow-string-compare compile time
+            if (numeric_method)
+                if (const auto* spec = natives::find_builtin(natives::Receiver::Number, name))
+                    return builtin_call(node, *spec, callee.a, dst, true);
         }
         // A proved fractional number in loop code keeps the prepared/canonical
         // difference refusal. An unproved or string-capable receiver is
@@ -399,9 +464,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
         key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
         !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    const bool dynamic_index = plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
-        (object_kinds == 0 || (object_kinds & (kKindUnknown | kKindArray | kKindObject)) != 0) &&
-        (key_kinds == 0 || (key_kinds & (kKindUnknown | kKindNull | kKindString | kKindNumber)) != 0);
+    const bool dynamic_index = plan_.linked && plan_.linked->locate(node.begin).module > 0;
     if (!dynamic_index && !(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
         !bad_bytes_key && !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");

@@ -70,6 +70,8 @@ const natives::BuiltinSpec* bind_function(std::string_view name);
 // True when `name` is a method that only reads its receiver for every
 // receiver it is bound on (alias analysis, W5): all CP14 methods.
 bool pure_method_name(std::string_view name);
+// The first method native of this name returns a Bool (has/contains/...).
+bool boolean_method_name(std::string_view name);
 
 // stringify / prettify / highlight (W6: presentation chains are refused).
 bool presentation_builtin(const natives::BuiltinSpec& spec);

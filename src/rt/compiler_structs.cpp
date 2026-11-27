@@ -58,6 +58,16 @@ int UnitCompiler::inferred_struct(NodeId id) const {
 bool UnitCompiler::receiver_value(NodeId object, std::uint16_t dst) {
     bool is_this = false;
     if (object == kNoNode || (struct_of_receiver(object, is_this) >= 0 && is_this)) {
+        // A lambda's `this` is its captured upvalue; a method's is this_reg_.
+        if (const Binding* self = find_binding("this"))  // rt-lint: allow-string-compare
+            if (self->cell || self->upvalue) {
+                const std::uint16_t mark = fb_->top();
+                std::uint16_t source = 0;
+                if (!read_binding(*self, source)) return false;
+                if (source != dst) fb_->emit(OpCode::Move, dst, source);
+                fb_->release_to(mark);
+                return true;
+            }
         fb_->emit(OpCode::Move, dst, this_reg_);
         return true;
     }
@@ -119,7 +129,7 @@ bool UnitCompiler::field_update(const Node& node, NodeId receiver, const StructF
         const KindSet r = kinds(node.b);
         const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
         const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-        const bool dynamic = ((l | r) & kKindUnknown) != 0 || l == 0 || r == 0;
+        const bool dynamic = ((l | r) & (kKindUnknown | kKindNull)) != 0 || l == 0 || r == 0;
         if (!numbers && !strings && !dynamic && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");
 #if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 6
         if (!expr_any(node.b, value)) return false;  // D2-6: the field is read after the rhs

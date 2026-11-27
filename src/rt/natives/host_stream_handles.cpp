@@ -5,6 +5,7 @@
 
 #include "ReadLimit.h"
 #include "rt/natives/support.h"
+#include "rt/string.h"
 
 namespace nift::rt::natives {
 using namespace host_handle_detail;
@@ -259,7 +260,10 @@ static Status stream_write_argument(const Context& context, const Value* args, s
     if (bytes_in_line) { error = "write_line: value is not directly renderable"; return Status::Error; }
     std::string scratch;
     std::string_view data;
-    if (!render_arg(args[1], scratch, data)) {
+    if (args[1].is(Kind::Bytes)) {
+        const auto& octets = bytes_of(args[1]);
+        data = std::string_view(reinterpret_cast<const char*>(octets.data()), octets.size());
+    } else if (!render_arg(args[1], scratch, data)) {
         error = "write: value is not directly renderable";
         return Status::Error;
     }
@@ -277,6 +281,12 @@ static Status stream_write_argument(const Context& context, const Value* args, s
 }
 
 Status stream_write(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+    return stream_write_argument(context, args, argc, out, error, false);
+}
+
+Status stream_write_bytes(const Context& context, const Value* args, std::uint32_t argc, Value& out,
+                         std::string& error) {
+    if (argc != 2) { error = "write_bytes: expected one value"; return Status::Error; }
     return stream_write_argument(context, args, argc, out, error, false);
 }
 

@@ -182,6 +182,7 @@ NIFT_RT_BUILTIN(StreamReadAll, "read_all", Stream, 0, 0, kString, Fixed, true, 1
 NIFT_RT_BUILTIN(StreamReadLine, "read_line", Stream, 0, 0, kString | kNull, Fixed, true, 100)
 NIFT_RT_BUILTIN(StreamWrite, "write", Stream, 1, 1, kNull, Fixed, true, 100)
 NIFT_RT_BUILTIN(StreamWriteLine, "write_line", Stream, 1, 1, kNull, Fixed, true, 100)
+NIFT_RT_BUILTIN(StreamWriteBytes, "write_bytes", Stream, 1, 1, kNull, Fixed, true, 100)
 NIFT_RT_BUILTIN(StreamFlush, "flush", Stream, 0, 0, kNull, Fixed, true, 60)
 NIFT_RT_BUILTIN(StreamEof, "eof", Stream, 0, 0, kBool, Fixed, true, 60)
 

@@ -1,4 +1,5 @@
 #include "rt/compiler_keyed.h"
+#include "rt/module_link.h"
 
 #include "rt/compiler_expr.h"
 #include "rt/builtin_bind.h"
@@ -144,6 +145,9 @@ int UnitCompiler::keyed_method_call(const Node& node, std::uint16_t dst) {
 // identity) are unaffected; anything else is legacy's run-time error.
 bool UnitCompiler::key_kinds_ok(NodeId arg) {
     const KindSet k = kinds(arg);
+    // An imported package key the compiler cannot type is checked by the
+    // run-time key protocol (legacy's reached error for a bad key).
+    if (plan_.linked && plan_.linked->locate(ast_.at(arg).begin).module > 0) return true;
 #if !(defined(NIFT_REFSEM_MUTANT) && NIFT_REFSEM_MUTANT == 11)
     if (k & kKindCollection) return fail(ast_.at(arg), "collection-mutable-key");
 #endif

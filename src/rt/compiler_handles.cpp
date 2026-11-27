@@ -127,7 +127,15 @@ bool handle_position_allowed(const Ast& ast, NodeId id, const std::vector<NodeId
         const Node& cn = ast.at(call);
         if (cn.kind != NodeKind::Call || cn.a != p) return false;
         const natives::BuiltinSpec* spec = nullptr;
-        return bind_method(kinds.of(id), ast.text(ast.at(pn.b)), spec) == MethodBinding::Bound;
+        const auto method = ast.text(ast.at(pn.b));
+        if (bind_method(kinds.of(id), method, spec) == MethodBinding::Bound) return true;
+        // A handle whose inferred type also carries null/other bits still
+        // rejects every non-handle use; the native checks the reached handle.
+        const KindSet handle = kinds.of(id);
+        if ((handle & kKindStream) &&
+            natives::find_builtin(natives::Receiver::Stream, method)) return true;
+        if ((handle & kKindFile) && natives::find_builtin(natives::Receiver::File, method)) return true;
+        return false;
     }
     if (pn.kind == NodeKind::Call) {
         const Node& callee = ast.at(pn.a);

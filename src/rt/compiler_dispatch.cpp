@@ -9,6 +9,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/module_data.h"
 #include "rt/op_admission.h"
+#include "rt/module_link.h"
 #include "rt/vm_ops.h"
 
 // rt-lint: cold-file compile-time admission of dynamic method dispatch
@@ -106,7 +107,12 @@ bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size
     // An unproven receiver is checked at run time (legacy's reached error or
     // the container length); a proved non-container kind keeps the refusal.
     const KindSet length_kinds = kinds(receiver_node);
-    const bool dynamic_length = length_kinds == 0 || (length_kinds & (kKindUnknown | kKindNull)) != 0;
+    const bool multiple_kinds = length_kinds != 0 && (length_kinds & (length_kinds - 1)) != 0;
+    const bool containerish = (length_kinds &
+        (kKindString | kKindArray | kKindObject | kKindBytes | kKindUnknown | kKindNull)) != 0;
+    const bool package_length = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    const bool dynamic_length = package_length || length_kinds == 0 ||
+        (length_kinds & (kKindUnknown | kKindNull)) != 0 || (multiple_kinds && containerish);
     if (!stream_line_length && length_kinds != kKindBytes && !dynamic_length &&
         !kinds_within(receiver_node, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
                       "type:length"))
