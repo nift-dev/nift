@@ -35,6 +35,11 @@ bool UnitCompiler::boolean_method_condition(NodeId id) const {
     if (node.kind == NodeKind::Binary && node.op == Op::Lt && kinds(id) == kKindBool &&
         ast_.at(node.b).kind == NodeKind::Number && text(ast_.at(node.b)) == "0")  // rt-lint: allow-string-compare
         return true;
+    if (node.kind == NodeKind::Call) {  // a plain boolean method of `this` on the right of ||
+        const auto& method = ast_.at(node.a);
+        return kinds(id) == kKindBool && method.kind == NodeKind::Member &&
+               ast_.at(method.a).kind == NodeKind::Ident && text(ast_.at(method.a)) == "this";
+    }
     if (node.kind != NodeKind::Unary || node.op != Op::Not) return false;
     const auto& call = ast_.at(node.a);
     if (kinds(node.a) != kKindBool) return false;
@@ -121,7 +126,10 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     for (std::uint32_t k = 0; ok && k < fixed; ++k) {
         // A bare scalar path is passed by value (legacy does not write a
         // method parameter back to the path); argument_path checks the kinds.
-        path_arg_ = index_depth_ == 0 && bare_argument(node, k) ? args[k] : kNoNode;
+        const NodeKind arg_kind = ast_.at(args[k]).kind;
+        const bool path_kind = arg_kind == NodeKind::Ident || arg_kind == NodeKind::Member ||
+                               arg_kind == NodeKind::Index;
+        path_arg_ = index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&

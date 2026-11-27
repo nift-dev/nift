@@ -42,6 +42,8 @@ bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     const auto only = [](KindSet k, KindSet allowed) { return (k & ~allowed) == 0; };
     if (op == Op::Add) {
         if (only(l, kKindNumber) && only(r, kKindNumber)) return true;
+        // Array concatenation: two arrays.
+        if (only(l, kKindArray) && only(r, kKindArray)) return true;
         // Concatenation: one side is a string, the other a scalar.
         if (only(l, kKindScalar) && only(r, kKindScalar)) {
             for (KindSet a = 1; a <= kKindObject; a <<= 1)
@@ -54,6 +56,25 @@ bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     }
     return only(l, kKindNumber) && only(r, kKindNumber);
 }
+// `type(x) != "string"` (possibly the left part of an OR chain): when it is
+// false, x is a string for the rest of the short-circuit expression.
+bool string_guard_ident(const Ast& ast, NodeId id, NodeId& ident) {
+    if (id == kNoNode) return false;
+    const Node& n = ast.at(id);
+    if (n.kind == NodeKind::Logical && n.op == Op::Or) return string_guard_ident(ast, n.a, ident);
+    if (n.kind != NodeKind::Binary || n.op != Op::Ne) return false;
+    const Node& call = ast.at(n.a);
+    const Node& label = ast.at(n.b);
+    if (call.kind != NodeKind::Call || call.count != 1 || label.kind != NodeKind::String ||
+        ast.text(label) != R"("string")") return false;
+    const Node& callee = ast.at(call.a);
+    if (callee.kind != NodeKind::Ident || ast.text(callee) != "type") return false;
+    const Node& arg = ast.at(ast.list(call)[0]);
+    if (arg.kind != NodeKind::Ident) return false;
+    ident = ast.list(call)[0];
+    return true;
+}
+
 bool ordering_kinds_ok(KindSet l, KindSet r) {
     if ((l | r) & kKindUnknown) return false;  // may be anything: refused (review D1)
     return ((l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0) || ((l & ~kKindString) == 0 && (r & ~kKindString) == 0);
@@ -157,7 +178,7 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
     if (r & kKindAtomicInt) r |= kKindInt;
     l &= ~kKindAtomic;
     r &= ~kKindAtomic;
-    bool numeric_guard = false, bad_kind = false, order_check = false;
+    bool numeric_guard = false, bad_kind = false, order_check = false, add_guard = false;
     switch (op) {
         case OpCode::Add: case OpCode::Sub: case OpCode::Mul: case OpCode::Div: case OpCode::Mod:
             // Legacy's string + callable is a run-time error with a fixed
@@ -166,10 +187,14 @@ bool UnitCompiler::binary(const Node& node, std::uint16_t dst) {
                 ((l & kKindString) || (r & kKindString)))
                 break;
             if (!arithmetic_kinds_ok(node.op, l, r) && !unknown_defers(l | r)) {
+                // A `+` whose operand kinds are not proved (or an unproved
+                // operand) is legacy's run-time dispatch: numbers, string
+                // concatenation, two arrays, two bytes, else its reached error.
+                add_guard = op == OpCode::Add && (((l | r) & kKindUnknown) != 0 || l == 0 || r == 0);
                 const auto widened = [](KindSet k) { return (k & kKindNumber) && (k & ~kKindNumber); };
                 numeric_guard = session_ && op != OpCode::Add && !((l | r) & kKindUnknown) &&
                     (widened(l) || widened(r) || node.begin < session_->unit_begin);
-                bad_kind = !numeric_guard;
+                bad_kind = !numeric_guard && !add_guard;
             }
             break;
         case OpCode::Lt: case OpCode::Le: case OpCode::Gt: case OpCode::Ge:
@@ -214,7 +239,18 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     const bool is_and = node.op == Op::And;
     const std::size_t decided = fb_->emit(is_and ? OpCode::JmpFalse : OpCode::JmpTrue, dst);
     const int guarded = is_and ? guarded_string_contains(node, dst) : -1;
-    if (guarded == 0 || (guarded < 0 && !expr_to(node.b, dst))) return false;
+    if (guarded == 0) return false;
+    if (guarded < 0) {
+        NodeId guard_ident = kNoNode;
+        const auto saved_conversion = guarded_conversion_;
+        if (!is_and && string_guard_ident(ast_, node.a, guard_ident)) {
+            const Binding* guarded = find_binding(text(ast_.at(guard_ident)));
+            guarded_conversion_ = {guarded && guarded->decl_node != kNoNode ? guarded->decl_node : guard_ident, kKindString};
+        }
+        const bool rhs_ok = expr_to(node.b, dst);
+        guarded_conversion_ = saved_conversion;
+        if (!rhs_ok) return false;
+    }
     fb_->emit(OpCode::Truth, dst, dst);
     const std::size_t done = fb_->emit(OpCode::Jmp);
     fb_->patch(decided, fb_->here());

@@ -136,8 +136,28 @@ bool Vm::atomic_update_op(const Instr& in, Value* R, const Value* K, const Proto
 
 bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
     static_cast<void>(in);
-    if (op == OpCode::Add && (left.is(Kind::String) || right.is(Kind::String)))
-        return concatenate(left, right, out, fault);
+    if (op == OpCode::Add) {
+        if (left.is(Kind::Bytes) || right.is(Kind::Bytes)) {
+            if (left.is(Kind::Bytes) && right.is(Kind::Bytes)) {
+                std::vector<std::uint8_t> data = bytes_of(left);
+                const auto& tail = bytes_of(right);
+                data.insert(data.end(), tail.begin(), tail.end());
+                out = make_bytes(std::move(data));
+                return true;
+            }
+            return raise(fault, StopReason::Error,
+                         "bytes values cannot be rendered as text; bytes concatenation requires two bytes values");
+        }
+        if (left.is(Kind::String) || right.is(Kind::String))
+            return concatenate(left, right, out, fault);
+        if (left.is(Kind::Array) && right.is(Kind::Array)) {
+            natives::ArrayBuilder result(array_size(left) + array_size(right));
+            for (const Value& item : array_view(left)) result.push(item);
+            for (const Value& item : array_view(right)) result.push(item);
+            out = result.finish();
+            return true;
+        }
+    }
     // Dynamic admission: the compiler could not prove the operand kinds, so
     // this is legacy's reached operand error, not an internal defect.
     if (!left.is_number() || !right.is_number())
@@ -367,7 +387,8 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
                          "' because the current JSON value is not an object");
         return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
     }
-    if (!object.is(Kind::Object)) return internal(fault, "member");
+    if (!object.is(Kind::Object))
+        return raise(fault, StopReason::Error, "value has no member: " + std::string(atom_text(key)));
     if (const Value* member = object_find(object, key)) {
         out = *member;
         return true;

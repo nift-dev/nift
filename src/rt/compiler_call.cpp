@@ -103,7 +103,10 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     for (std::uint32_t k = 0; k < node.count; ++k) {
         // The argument itself may be a scalar path (argument_path); a path
         // anywhere else in it, or in an index key, is not.
-        path_arg_ = is_native || index_depth_ > 0 || !bare_argument(node, k) ? kNoNode : args[k];
+        const NodeKind arg_kind = ast_.at(args[k]).kind;
+        const bool path_kind = arg_kind == NodeKind::Ident || arg_kind == NodeKind::Member ||
+                               arg_kind == NodeKind::Index;
+        path_arg_ = is_native || index_depth_ > 0 || !path_kind || !bare_argument(node, k) ? kNoNode : args[k];
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
@@ -230,6 +233,9 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
 // aggregate, not Unknown); every other path in call arguments is refused.
 bool UnitCompiler::argument_path(const Node& node, std::string& note) {
     if (call_args_ == 0) return true;
+    // A member/index read nested inside a larger argument expression is an
+    // ordinary value read, not the argument's location binding.
+    if (path_arg_ == kNoNode) return true;
     const bool top = path_arg_ != kNoNode && &node == &ast_.at(path_arg_);
     if (!top && (path_chain_ == kNoNode || &node != &ast_.at(path_chain_)))
         return fail(node, "path-in-call-argument");
@@ -306,7 +312,16 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     if (scalar_parameter_without_members || null_script_member)
         return expr_to(node.a, dst) &&
                legacy_fatal(node, "value has no member: " + std::string(text(ast_.at(node.b))), dst);
-    if (!kinds_within(node.a, kKindObject, node, "type:member")) return false;
+    // A receiver whose kind the compiler cannot prove (or has no proof for)
+    // is checked at run time: legacy's missing-member error is reached.
+    const KindSet member_kinds = kinds(node.a);
+    // A lambda's `this` is resolved through the method receiver; a dynamic
+    // read there is still refused (the lambda body may not capture it).
+    const bool lambda_this = in_lambda_ && ast_.at(node.a).kind == NodeKind::Ident &&
+                             text(ast_.at(node.a)) == "this";  // rt-lint: allow-string-compare compile time
+    const bool dynamic_member = !lambda_this &&
+        (member_kinds == 0 || (member_kinds & (kKindUnknown | kKindObject)) != 0);
+    if (!dynamic_member && !kinds_within(node.a, kKindObject, node, "type:member")) return false;
     const std::uint16_t mark = fb_->top();
     std::uint16_t object = 0;
     const Node& chain = chain_enter(node);

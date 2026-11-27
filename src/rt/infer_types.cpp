@@ -280,6 +280,7 @@ bool fold_constant(Op op, double l, double r, double& out) {
 
 KindSet arithmetic_kinds(Op op, KindSet l, KindSet r) {
     KindSet out = 0;
+    if (op == Op::Add && l == kKindArray && r == kKindArray) out |= kKindArray;
     if (op == Op::Add && ((l & kKindString) || (r & kKindString))) out |= kKindString;
     if ((l & kKindNumber) && (r & kKindNumber)) {
         const bool frac = (l & kKindFrac) || (r & kKindFrac);

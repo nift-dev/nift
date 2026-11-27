@@ -86,6 +86,10 @@ int UnitCompiler::literal_ordering_error(const Node& expression, const Node& dia
 
 KindSet UnitCompiler::guarded_kind(NodeId id) const {
     if (id != kNoNode && id == guarded_conversion_.first) return guarded_conversion_.second;
+    if (id != kNoNode && guarded_conversion_.first != kNoNode && ast_.at(id).kind == NodeKind::Ident) {
+        const Binding* binding = find_binding(text(ast_.at(id)));
+        if (binding && binding->decl_node == guarded_conversion_.first) return guarded_conversion_.second;
+    }
     if (kinds_.of(id) == (kKindObject | kKindNull) &&
         std::find(guarded_object_reads_.begin(), guarded_object_reads_.end(), id) != guarded_object_reads_.end())
         return kKindObject;
