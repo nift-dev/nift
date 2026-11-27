@@ -85,10 +85,11 @@ int UnitCompiler::literal_ordering_error(const Node& expression, const Node& dia
 }
 
 KindSet UnitCompiler::guarded_kind(NodeId id) const {
-    if (id != kNoNode && id == guarded_conversion_.first) return guarded_conversion_.second;
-    if (id != kNoNode && guarded_conversion_.first != kNoNode && ast_.at(id).kind == NodeKind::Ident) {
-        const Binding* binding = find_binding(text(ast_.at(id)));
-        if (binding && binding->decl_node == guarded_conversion_.first) return guarded_conversion_.second;
+    if (id != kNoNode && !guarded_conversions_.empty()) {
+        const auto& node = ast_.at(id);
+        const auto* binding = node.kind == NodeKind::Ident ? find_binding(text(node)) : nullptr;
+        for (auto it = guarded_conversions_.rbegin(); it != guarded_conversions_.rend(); ++it)
+            if (it->first == id || (binding && binding->decl_node == it->first)) return it->second;
     }
     if (kinds_.of(id) == (kKindObject | kKindNull) &&
         std::find(guarded_object_reads_.begin(), guarded_object_reads_.end(), id) != guarded_object_reads_.end())
@@ -377,7 +378,7 @@ bool UnitCompiler::if_chain(const Node& node) {
     BlockRegs body_regs = block_begin(node.b);
     auto saved_reads = std::move(guarded_object_reads_);
     guarded_object_reads_ = guarded_return_reads(node);
-    const auto saved_conversion = guarded_conversion_;
+    const auto saved_conversion = guarded_conversions_.size();
     NodeId guarded_source = kNoNode;
     KindSet guarded_type = 0;
     std::pair<NodeId, KindSet> branch_guard{kNoNode, 0};
@@ -385,9 +386,10 @@ bool UnitCompiler::if_chain(const Node& node) {
         null_test_guard(ast_.at(node.a), guarded_source, guarded_type) ||
         type_call_positive_guard(ast_.at(node.a), guarded_source, guarded_type))
         branch_guard = {guarded_source, guarded_type};
-    guarded_conversion_ = branch_guard.first != kNoNode ? branch_guard : guarded_conversion(node);
+    if (branch_guard.first == kNoNode) branch_guard = guarded_conversion(node);
+    if (branch_guard.first != kNoNode) guarded_conversions_.push_back(branch_guard);
     const bool ok = statements(body);
-    guarded_conversion_ = saved_conversion;
+    guarded_conversions_.resize(saved_conversion);
     guarded_object_reads_ = std::move(saved_reads);
     block_end(body_regs);
     scopes_.pop();
@@ -399,7 +401,7 @@ bool UnitCompiler::if_chain(const Node& node) {
         NodeId guard_source = kNoNode;
         KindSet guard_kind = 0;
         if (type_call_guard(ast_.at(node.a), guard_source, guard_kind))
-            guarded_conversion_ = {guard_source, guard_kind};
+            guarded_conversions_.emplace_back(guard_source, guard_kind);
     }
     if (node.c == kNoNode) {
         for (std::size_t at : to_else) fb_->patch(at, fb_->here());
@@ -410,7 +412,10 @@ bool UnitCompiler::if_chain(const Node& node) {
     const Node& other = ast_.at(node.c);
     bool other_ok = false;
     if (other.kind == NodeKind::If) {
+        const auto before_alternative = guarded_conversions_.size();
         other_ok = if_chain(other);
+        // The jump from the true branch can bypass every alternative guard.
+        guarded_conversions_.resize(before_alternative);
         if (other_ok && loop_region() && !statement_preparable(other))
             other_ok = fail(other, "prepared-unpreparable");
     } else {

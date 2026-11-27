@@ -261,6 +261,24 @@ SHAPES.update({
                'else { print("skip") }\n}\n}\n}\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nb.check(["text"])\n',
     }, "vm"),
+    "imported-successive-branch-type-proofs": ({
+        "m.f": 'struct(Box) {\nfn(check(items)) {\nfor(value : items) {\n'
+               'if(type(value) == "object" && value.has("key")) {\n'
+               'payload := value.get("data", [])\n'
+               'if(type(payload) != "array") { return null }\n'
+               'print(value.get("key"))\nprint(payload.size())\n'
+               '}\n}\nreturn null\n}\n}\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\n'
+                  'b.check(["skip", {"key":"hit","data":[1]}])\n'
+                  'b.check([{"key":"unreachable","data":false}])\n',
+    }, "vm"),
+    "imported-else-if-proof-does-not-escape": ({
+        "m.f": 'struct(Box) {\nfn(check(skip, value)) {\n'
+               'if(skip) { print("skip") }\n'
+               'else if(type(value) != "object") { return null }\n'
+               'return value.has("key")\n}\n}\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.check(true, "text"))\n',
+    }, "builtin-receiver:has"),
     "imported-utf8-encode": ({
         "m.f": 'struct(Box) { fn(to_bytes(text)) { return text.encode("utf-8") } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\na := b.to_bytes("é😀")\n'

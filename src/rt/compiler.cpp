@@ -104,19 +104,19 @@ bool UnitCompiler::compile_main(NodeId program, std::unique_ptr<Proto>& out) {
 
 bool UnitCompiler::statements(const Node& block) {
     const NodeId* list = ast_.list(block);
-    const auto saved_conversion = guarded_conversion_;
+    const auto saved_conversion = guarded_conversions_.size();
     for (std::uint32_t k = 0; k < block.count; ++k) {
         // Legacy ignores a `break`/`continue` that is followed by another
         // statement in the same block and runs the rest (review D2, candidate
         // language change D-014): such blocks are not compiled.
         const Node& node = ast_.at(list[k]);
         if ((node.kind == NodeKind::Break || node.kind == NodeKind::Continue) && k + 1 < block.count) {
-            guarded_conversion_ = saved_conversion;
+            guarded_conversions_.resize(saved_conversion);
             return fail(node, "jump-not-last");
         }
-        if (!statement(list[k])) { guarded_conversion_ = saved_conversion; return false; }
+        if (!statement(list[k])) { guarded_conversions_.resize(saved_conversion); return false; }
     }
-    guarded_conversion_ = saved_conversion;
+    guarded_conversions_.resize(saved_conversion);
     return true;
 }
 

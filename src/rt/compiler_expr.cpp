@@ -246,20 +246,20 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (guarded == 0) return false;
     if (guarded < 0) {
         NodeId guard_ident = kNoNode;
-        const auto saved_conversion = guarded_conversion_;
+        const auto saved_conversion = guarded_conversions_.size();
         NodeId typed_source = kNoNode;
         KindSet typed_kind = 0;
         if (is_and && type_call_positive_guard(ast_.at(node.a), typed_source, typed_kind)) {
-            guarded_conversion_ = {typed_source, typed_kind};
+            guarded_conversions_.emplace_back(typed_source, typed_kind);
         } else if (string_guard_ident(ast_, node.a, guard_ident, is_and)) {
             const Binding* guarded = find_binding(text(ast_.at(guard_ident)));
             // The binding must be stable: no assignment anywhere in the body.
             if (guarded && guarded->decl_node != kNoNode && !guarded->cell && !guarded->global &&
                 !assigned_.count(text(ast_.at(guard_ident))))
-                guarded_conversion_ = {guarded->decl_node, kKindString};
+                guarded_conversions_.emplace_back(guarded->decl_node, kKindString);
         }
         const bool rhs_ok = expr_to(node.b, dst);
-        guarded_conversion_ = saved_conversion;
+        guarded_conversions_.resize(saved_conversion);
         if (!rhs_ok) return false;
     }
     fb_->emit(OpCode::Truth, dst, dst);
@@ -412,14 +412,14 @@ bool UnitCompiler::false_jump(NodeId id, std::vector<std::size_t>& jumps) {
     if ((node.kind == NodeKind::Logical || node.kind == NodeKind::Binary) && !infix_left_ok(node)) return false;
     if (node.kind == NodeKind::Logical && node.op == Op::And) {
         if (!false_jump(node.a, jumps)) return false;
-        const auto saved = guarded_conversion_;
+        const auto saved = guarded_conversions_.size();
         NodeId subject = kNoNode;
         KindSet narrowed = 0;
         if (plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
             type_call_positive_guard(ast_.at(node.a), subject, narrowed))
-            guarded_conversion_ = {subject, narrowed};
+            guarded_conversions_.emplace_back(subject, narrowed);
         const bool ok = false_jump(node.b, jumps);
-        guarded_conversion_ = saved;
+        guarded_conversions_.resize(saved);
         return ok;
     }
     const std::uint16_t mark = fb_->top();

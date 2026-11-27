@@ -92,7 +92,7 @@ private:
     bool block_exits(const Node& body) const;
     bool null_test_guard(const Node& condition, NodeId& source, KindSet& kind) const;
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
-    std::vector<NodeId> guarded_object_reads_; std::pair<NodeId, KindSet> guarded_conversion_ = {kNoNode, 0};
+    std::vector<NodeId> guarded_object_reads_; std::vector<std::pair<NodeId, KindSet>> guarded_conversions_;
     bool while_loop(const Node& node);
     bool try_statement(const Node& node); bool throw_statement(const Node& node);
     bool collection_failure(const Node&,std::uint16_t,std::string);
