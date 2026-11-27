@@ -255,6 +255,18 @@ SHAPES.update({
         "main.f": 'import("m.f")\nb := Box()\na := b.read(true)\nc := b.read(false)\n'
                   'print(a.message)\nprint(c.message)\n',
     }, "vm"),
+    "imported-nonnull-return-result": ({
+        "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
+               'fn(read(flag)) { item := this.data(flag); if(item != null) { return item }; '
+               'return {"code": 0} } }\nbox := Box()\nexport(box)\n',
+        "main.f": 'import("m.f")\na := box.read(true)\nb := box.read(false)\nprint(a.code)\nprint(b.code)\n',
+    }, "vm"),
+    "imported-null-return-result": ({
+        "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
+               'fn(read(flag)) { item := this.data(flag); if(item == null) { return item }; '
+               'return {"code": 0} } }\nbox := Box()\nexport(box)\n',
+        "main.f": 'import("m.f")\na := box.read(false)\nprint(a.code)\n',
+    }, "type:member"),
     "imported-nonnull-return-intervening-statement": ({
         "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
                'fn(read(flag)) { item := this.data(flag); if(item != null) { print("before"); return item.code }; '

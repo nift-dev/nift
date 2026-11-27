@@ -1,6 +1,7 @@
 #include "rt/infer_walk.h"
 #include "rt/aggregate.h"
 
+#include "rt/module_data.h"
 #include "rt/number.h"
 #include "rt/session_mutation_shape.h"
 #include "rt/structs.h"
@@ -10,6 +11,24 @@
 // rt-lint: cold-file compile-time analysis, once per unit
 
 namespace nift::rt::infer_detail {
+
+namespace {
+
+// A sole return reads the same binding as the immediately preceding test.
+// Leave flow and binding types unchanged; only the returned value is non-null.
+NodeId nonnull_return(const Ast& ast, const Node& branch) {
+    const auto& test = ast.at(branch.a);
+    if (test.kind != NodeKind::Binary || test.op != Op::Ne ||
+        ast.at(test.a).kind != NodeKind::Ident || ast.at(test.b).kind != NodeKind::Null) return kNoNode;
+    const auto& body = ast.at(branch.b);
+    if (body.count != 1) return kNoNode;
+    const auto& ret = ast.at(ast.list(body)[0]);
+    if (ret.kind != NodeKind::Return || (ret.flags & kFlagBare) || ret.a == kNoNode) return kNoNode;
+    const auto& value = ast.at(ret.a);
+    return value.kind == NodeKind::Ident && ast.text(value) == ast.text(ast.at(test.a)) ? ret.a : kNoNode;
+}
+
+} // namespace
 
 int Inference::current_struct() const {
     return current_ >= 0 && plan_.is_method(static_cast<std::size_t>(current_))
@@ -243,7 +262,21 @@ void Inference::statement(NodeId id) {
         }
         case NodeKind::If: {
             expr(n.a);
-            block(n.b);
+            const NodeId guarded = !session_ && !plan_.coroutines && current_struct() >= 0 &&
+                                   imported_module_data(plan_, n) ? nonnull_return(ast_, n) : kNoNode;
+            if (guarded != kNoNode) {
+                const auto value = expr(guarded);
+                // A provisional null-only result has no reachable return on this path.
+                if (!value->any && value->kinds == (kKindNull | kKindObject)) {
+                    auto narrowed = std::make_shared<Ty>(*value);
+                    narrowed->kinds = kKindObject;
+                    merge_return(narrowed);
+                } else if (value->any || value->kinds != kKindNull) {
+                    merge_return(value);
+                }
+            } else {
+                block(n.b);
+            }
             if (n.c != kNoNode) {
                 if (ast_.at(n.c).kind == NodeKind::If) statement(n.c);
                 else block(n.c);
