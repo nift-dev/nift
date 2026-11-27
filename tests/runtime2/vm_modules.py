@@ -241,6 +241,12 @@ SHAPES.update({
                   'print(c.check_negative(false, -1))\nprint(c.check_negative(true, -1))\n'
                   'print(c.check_negative(true, 1))\n',
     }, "vm"),
+    "imported-prepared-other-integer-binding-copy": ({
+        "m.f": 'fn(outer_cost()) {\n minc := 0\n return count_cost()\n}\n'
+               'fn(count_cost()) {\n row := [3]\n k := 0\n while(k < 1) {\n'
+               ' minc := row[k]\n j := minc\n print(j)\n k += 1\n }\n}\nexport(outer_cost)\n',
+        "main.f": 'import("m.f")\nouter_cost()\n',
+    }, "vm"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

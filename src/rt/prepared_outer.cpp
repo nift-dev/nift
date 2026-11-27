@@ -51,8 +51,8 @@ bool outer_bindings_int_typed(const Ast& ast, NodeId root, const UnitPlan& plan,
 // The expression parameter is local to the new callable. A spelling
 // confined to that parameter and its read cannot influence the prepared
 // declaration through another scope.
-// A unique local with an int declaration cannot acquire an ambient text
-// type at preparation time. Both engines then bind the integral value as int.
+// An int declaration cannot acquire a different ambient text type at
+// preparation time if every other binding of that name is also int typed.
 bool prepared_module_integer_copy(const Ast& ast, const Node& declaration, const UnitPlan& plan,
                                   const UnitKinds* kinds) {
     if (!kinds || declaration.b == kNoNode || !imported_module_data(plan, declaration))
@@ -78,7 +78,9 @@ bool prepared_module_integer_copy(const Ast& ast, const Node& declaration, const
                 if (same_name(ast.list(n)[k])) return false;
         if (n.kind != NodeKind::Declare) continue;
         if (n.a == resolution->second) origin = &n;
-        else if (same_name(n.a)) return false;
+        else if (same_name(n.a)) {
+            if (n.b == kNoNode || kinds->of(n.b) != kKindInt || !int_typed(ast, n, kinds)) return false;
+        }
         else if (n.a != kNoNode && ast.at(n.a).kind != NodeKind::Ident) return false;
     }
     return origin && origin->begin < declaration.begin && kinds->of(origin->b) == kKindInt &&
