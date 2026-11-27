@@ -247,6 +247,18 @@ SHAPES.update({
                ' minc := row[k]\n j := minc\n print(j)\n k += 1\n }\n}\nexport(outer_cost)\n',
         "main.f": 'import("m.f")\nouter_cost()\n',
     }, "vm"),
+    "imported-cached-numeric-type": ({
+        "m.f": 'struct(Box) { fn(show(value)) { label := type(value); '
+               'if(label == "int" || label == "float") { return value.to_string() }; '
+               'return "other" } }\nbox := Box()\nexport(box)\n',
+        "main.f": 'import("m.f")\nprint(box.show(7))\nprint(box.show(1.5))\nprint(box.show([]))\n',
+    }, "vm"),
+    "imported-cached-numeric-type-rebound": ({
+        "m.f": 'struct(Box) { fn(show(value)) { label := type(value); label = "int"; '
+               'if(label == "int" || label == "float") { return value.to_string() }; '
+               'return "other" } }\nbox := Box()\nexport(box)\n',
+        "main.f": 'import("m.f")\nprint(box.show(7))\nprint(box.show("kept"))\n',
+    }, "vm"),
     "imported-nonnull-return-members": ({
         "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
                'private fn(report(code)) { return {"message": code} }\n'

@@ -83,9 +83,9 @@ private:
     bool compound_assign(const Node& node); friend struct ElementPath;  // checkpoint 1 (compiler_element_path.cpp)
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
-    bool guarded_object(NodeId id) const;
+    KindSet guarded_kind(NodeId id) const; NodeId guarded_numeric_return(const Node& node) const;
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
-    std::vector<NodeId> guarded_object_reads_;
+    std::vector<NodeId> guarded_object_reads_; NodeId guarded_numeric_read_ = kNoNode;
     bool while_loop(const Node& node);
     bool try_statement(const Node& node);
     bool throw_statement(const Node& node);
@@ -264,7 +264,7 @@ private:
     bool may_fault(NodeId id) const;
     KindSet kinds(NodeId id) const {
         const KindSet k = kinds_.of(id);
-        if (k == (kKindObject | kKindNull) && guarded_object(id)) return kKindObject;
+        if (const KindSet proof = guarded_kind(id)) return proof;
         if (k == 0 && in_lambda_) return static_cast<KindSet>(kKindAll | kKindUnknown);
         return (k & kKindUnknown) && !probe_ ? static_cast<KindSet>(kKindAll | kKindUnknown) : k;
     }
