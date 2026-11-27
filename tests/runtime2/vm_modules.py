@@ -255,6 +255,21 @@ SHAPES.update({
                ' minc := row[k]\n j := minc\n print(j)\n k += 1\n }\n}\nexport(outer_cost)\n',
         "main.f": 'import("m.f")\nouter_cost()\n',
     }, "vm"),
+    "imported-utf8-encode": ({
+        "m.f": 'struct(Box) { fn(to_bytes(text)) { return text.encode("utf-8") } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\na := b.to_bytes("é😀")\n'
+                  'print(a.length())\nprint(a[0])\nprint(a[2])\n',
+    }, "vm"),
+    "imported-utf8-encode-legacy-prefix": ({
+        "m.f": 'struct(Box) { fn(convert(text)) { data := text.encode("utf-8"); return data } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\ns := open("input.txt")\nprint(b.convert(s).size())\n',
+        "input.txt": "\x1fnift:ordinary",
+    }, "vm"),
+    "imported-utf8-encode-legacy-prefix-return": ({
+        "m.f": 'struct(Box) { fn(convert(text)) { return text.encode("utf-8") } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\ns := open("input.txt")\nprint(b.convert(s).size())\n',
+        "input.txt": "\x1fnift:ordinary",
+    }, "vm"),
     "imported-cached-numeric-type": ({
         "m.f": 'struct(Box) { fn(show(value)) { label := type(value); '
                'if(label == "int" || label == "float") { return value.to_string() }; '

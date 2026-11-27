@@ -115,12 +115,15 @@ Status fn_bytes(const Context& context, const Value* args, std::uint32_t argc, V
     return Status::Ok;
 }
 
-Status str_encode(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
+Status str_encode(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
     if (argc == 0 || !args[0].is(Kind::String)) return internal(error, "encode receiver");
     if (argc != 2) return fail(error, "encode: expected encoding");
     if (!utf8_name(args[1])) return fail(error, "encode: encoding must be exactly 'utf-8'");
     const std::string_view text = string_view_of(args[0]);
+    if (text.rfind("\x1fnift:", 0) == 0) return fail(error, "unknown value or malformed expression: ");
     if (!strict_utf8(text)) return fail(error, "encode: invalid UTF-8 text");
+    if (text.size() > kMaxResultBytes - sizeof(BytesObject) ||
+        !reserve_result(context, sizeof(BytesObject) + text.size())) return Status::Memory;
     out = make_bytes(std::vector<std::uint8_t>(text.begin(), text.end()));
     return Status::Ok;
 }

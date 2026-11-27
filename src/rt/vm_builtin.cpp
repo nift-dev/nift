@@ -183,6 +183,13 @@ bool Vm::builtin(const Instr& in, const Proto* proto, Value* R, Fault& fault) {
     switch (status) {
         case natives::Status::Ok: break;
         case natives::Status::Error:
+            if (spec.id == natives::BuiltinId::StrEncode &&  // rt-lint: allow-string-compare error path
+                message == "unknown value or malformed expression: ") {  // rt-lint: allow-string-compare error path
+                const auto* note = proto->note(static_cast<std::size_t>(&in - proto->code.data()));
+                if (note) message += note->text;
+            }
+            if (spec.id == natives::BuiltinId::StrEncode && (in.flags & kInstrReturnCall))
+                message.insert(0, "return: ");
             if (!context.host_error_code.empty()) fault.code = context.host_error_code;
             return raise(fault, StopReason::Error, std::move(message));
         case natives::Status::Recoverable: {

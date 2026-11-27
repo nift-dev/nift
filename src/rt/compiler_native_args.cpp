@@ -3,6 +3,7 @@
 #include "rt/builtin_bind.h"
 #include "rt/compiler_handles.h"
 #include "rt/literal.h"
+#include "rt/module_data.h"
 #include "rt/native.h"
 #include "rt/string.h"
 #include <charconv>
@@ -50,7 +51,11 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         (node.count != 2 || kinds(args[1]) != kKindString))
         return fail(node, "minify-path-mode");
     // Bytes natives outside the admitted subset retain the CP15 W8 refusal.
-    if (bytes_builtin(spec)) return fail(node, "builtin-bytes:" + std::string(spec.name));
+    const bool package_encode = spec.id == natives::BuiltinId::StrEncode && !session_ && !in_lambda_ &&
+        in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&
+        receiver != kNoNode && kinds(receiver) == kKindString && node.count == 1 &&
+        ast_.at(args[0]).kind == NodeKind::String && text(ast_.at(args[0])) == R"("utf-8")";
+    if (bytes_builtin(spec) && !package_encode) return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
         for (std::uint32_t k = 0; k < node.count; ++k) {
             const Node& arg = ast_.at(args[k]);
@@ -298,11 +303,13 @@ bool UnitCompiler::builtin_call(const Node& node, const natives::BuiltinSpec& sp
     if (receiver != kNoNode && !next(receiver)) return false;
     for (std::uint32_t k = 0; k < node.count; ++k)
         if (!next(args[k])) return false;
-    fb_->set_offset(site(node));
+    const bool encode_return = spec.id == natives::BuiltinId::StrEncode && (fb_->flags() & kInstrReturnCall);
+    fb_->set_offset(encode_return ? deferred_.return_statement : site(node));
     const std::size_t at = fb_->emit(OpCode::CallNative, base,
                                      static_cast<std::uint16_t>(kFirstBuiltin + static_cast<std::uint16_t>(spec.id)),
                                      static_cast<std::uint16_t>(window | (dynamic ? kDynamicDispatch : 0u)));
-    fb_->note(at, dynamic ? std::string(text(node)) : std::string(spec.name));  // B4: legacy's call text
+    const bool source_note = dynamic || spec.id == natives::BuiltinId::StrEncode;
+    fb_->note(at, source_note ? std::string(text(node)) : std::string(spec.name));
     if (dst != base) fb_->emit(OpCode::Move, dst, base);
     fb_->release_to(mark);
     return builder_ok();

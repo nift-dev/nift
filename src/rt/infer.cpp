@@ -8,6 +8,7 @@
 #include "rt/collection.h"
 #include "rt/literal.h"
 #include "rt/number.h"
+#include "rt/module_data.h"
 #include "rt/structs.h"
 #include <cmath>
 #include <memory>
@@ -85,14 +86,12 @@ void Inference::enqueue(std::size_t unit) {
 std::size_t Inference::current_unit() const {
     return current_ < 0 ? plan_.functions.size() : static_cast<std::size_t>(current_);
 }
-
 bool Inference::merge(TyRef& into, const TyRef& value) {
     TyRef next = unite(into, value);
     if (same(next, into)) return false;
     into = std::move(next);
     return true;
 }
-
 void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (!merge(into, value)) return;
     if (session_locations_) session_sync_locations();
@@ -101,7 +100,6 @@ void Inference::merge_local(TyRef& into, const TyRef& value) {
     if (session_)  // a session's earlier statements' code is not walked here (U6, B5): everything
         for (std::size_t u = 0; u <= plan_.functions.size() + lambdas_.size(); ++u) enqueue(u);
 }
-
 void Inference::merge_return(const TyRef& value) {  // the callers read the return
     if (current_ >= 0 && static_cast<std::size_t>(current_) < plan_.functions.size()) {
         if (merge(returns_[static_cast<std::size_t>(current_)], value))
@@ -110,13 +108,11 @@ void Inference::merge_return(const TyRef& value) {  // the callers read the retu
         merge_lambda_return(static_cast<std::size_t>(current_) - plan_.functions.size() - 1, value);
     }
 }
-
 void Inference::merge_lambda_return(std::size_t lambda, const TyRef& value) {
     LambdaInfo& info = lambdas_[lambda];
     if (!merge(info.returns, value)) return;
     for (std::size_t caller : info.callers) enqueue(caller);
 }
-
 void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     const std::size_t slot = persistent_slot(persist_index_, vars_, ast_.size(), at);
     binding_decls_[slot]=ast_.at(at).kind==NodeKind::Declare?ast_.at(at).a:at;
@@ -143,7 +139,6 @@ void Inference::declare(std::string_view name, NodeId at, const TyRef& value) {
     scopes_.back().emplace_back(name, slot);
     if (current_ == -1 && top_level_decls_.count(at)) top_level_slots_[name] = slot;
 }
-
 
 
 TyRef Inference::expr(NodeId id) {
@@ -367,7 +362,12 @@ TyRef Inference::call(const Node& n) {
             return result;
         }
         escape_callables(values);  // B4b C4: a native does not call back
-        TyRef result=fresh(call_id, method_result(ast_, n, recv, values, session_ != nullptr));
+        const bool package_encode = !session_ && current_ >= 0 && !plan_.coroutines &&
+            static_cast<std::size_t>(current_) < plan_.functions.size() && imported_module_data(plan_, n) &&
+            recv->kinds == kKindString && key == "encode" && n.count == 1 &&
+            ast_.at(args[0]).kind == NodeKind::String && ast_.text(ast_.at(args[0])) == R"("utf-8")";
+        TyRef result=fresh(call_id, package_encode ? kinds_ty(kKindBytes) :
+                          method_result(ast_, n, recv, values, session_ != nullptr));
         if((result->kinds&kKindNumber)&&key!="size"&&key!="length") result=with_text_number(result,true);
         return result;
     }
