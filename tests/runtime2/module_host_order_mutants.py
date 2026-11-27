@@ -6,7 +6,7 @@ tests/runtime2/sanctioned_mutant.py: only module_host_order.cpp differs from pro
 tests/runtime2/module_host_order.py on every case named for N:
 
   1  no leading-import-block check (E)              2  no module-initialisation check (M)
-  3  calls and struct construction count as safe    4  callbacks (collection operations) count as safe
+  3  calls count as safe    4  callbacks (collection operations) count as safe
   5  no shadowing check for the 11 binding-wins built-ins
 
 A mutant build failure is a harness failure, never a detection. Run through make

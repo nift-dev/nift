@@ -68,9 +68,9 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
 
 namespace {
 
-// Operations that may run while modules initialise. Every other operation
-// (calls, callbacks, tasks, struct construction, atomics, session ops, and
-// any future opcode) is refused there.
+// Operations that may run while modules initialise. NewStruct and StructAdd
+// only allocate and fill a fresh instance. A user constructor emits a separate
+// Call, which is refused along with callbacks, tasks and other unknown effects.
 bool init_safe(OpCode op) {
     switch (op) {
     case OpCode::Nop: case OpCode::LoadK: case OpCode::LoadI: case OpCode::LoadNull: case OpCode::LoadBool:
@@ -82,6 +82,7 @@ bool init_safe(OpCode op) {
     case OpCode::JmpNotLe: case OpCode::JmpNotGt: case OpCode::JmpNotGe: case OpCode::JmpNotEq:
     case OpCode::JmpNotNe: case OpCode::NewArray: case OpCode::NewObject: case OpCode::MakeImmutable:
     case OpCode::LoadKFresh: case OpCode::ObjectSet: case OpCode::GetIndex: case OpCode::SetIndex:
+    case OpCode::NewStruct: case OpCode::StructAdd:
     case OpCode::GetMember: case OpCode::Push: case OpCode::Length: case OpCode::GetGlobal:
     case OpCode::GetGlobalChecked: case OpCode::SetGlobal: case OpCode::MarkGlobal: case OpCode::CheckGlobal:
     case OpCode::LoadFunction: case OpCode::NewCell: case OpCode::CellLoad: case OpCode::CellStore:
@@ -94,9 +95,8 @@ bool init_safe(OpCode op) {
     case OpCode::CellSlot: case OpCode::TryBegin: case OpCode::TryEnd: case OpCode::Throw: case OpCode::ErrorNew:
     case OpCode::ErrorJson: case OpCode::ArrayMutate: case OpCode::KeyedMutate: case OpCode::Yield:
         return true;
-#if defined(NIFT_HOST_ORDER_MUTANT) && NIFT_HOST_ORDER_MUTANT == 3  // test-only: calls and struct construction safe
-    case OpCode::Call: case OpCode::CallValue: case OpCode::CallValueAny: case OpCode::NewStruct:
-    case OpCode::StructAdd: return true;
+#if defined(NIFT_HOST_ORDER_MUTANT) && NIFT_HOST_ORDER_MUTANT == 3  // test-only: calls count as safe
+    case OpCode::Call: case OpCode::CallValue: case OpCode::CallValueAny: return true;
 #endif
 #if defined(NIFT_HOST_ORDER_MUTANT) && NIFT_HOST_ORDER_MUTANT == 4  // test-only: callbacks count as safe
     case OpCode::CollectionSort: case OpCode::CollectionStep: case OpCode::CollectionCall: return true;

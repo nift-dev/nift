@@ -8,7 +8,7 @@ files and trace in a different order. Such units are refused before they run
 module read (slot 2, owner 2026-11-11 05:41, D-068 #2; src/rt/module_host_order.h):
 a strict leading import block in the entry, and module initialisation, across
 the whole graph, free of host ops and calls (pure natives and print allowed;
-callbacks, struct construction and shadowable built-ins refused).
+callbacks, user constructors and shadowable built-ins refused).
 
 Each case runs in two fresh copies of its files: legacy (NIFT_VM=0) and the
 VM in auto mode (NIFT_VM=1, which falls back to legacy when refused). stdout,
@@ -65,6 +65,11 @@ CASES = {
                             "vm"),
     "module-exports-host-fn": ({"m.nft": 'fn(probe()) {\n  return exists("a.txt")\n}\nexport(probe)\n',
                                 "main.f": 'import("m.nft")\nprint(probe())\n'}, "vm"),
+    "module-exports-struct-host-method": ({
+        "m.nft": 'struct(Probe) { v := "NIFT_R1_UNSET_VAR"; fn(check()) { return getenv(this.v) == null } }\n'
+                 'probe := Probe()\nexport(probe)\n',
+        "main.f": 'import("m.nft")\nprint(probe.check())\n',
+    }, "vm"),
     "module-init-print-pure": ({"m.nft": 'print("loading")\nk := "ab".to_upper()\nh := sha256("a")\nexport(k)\nexport(h)\n',
                                 "main.f": 'import("m.nft")\nprint(exists("a.txt"))\nprint(k + h)\n'}, "vm"),
     "cwd-change-after-import": ({"m.nft": M, "sub/t.txt": "t", "main.f": 'import("m.nft")\ncd("sub")\n'
@@ -72,7 +77,7 @@ CASES = {
     "nested-import-clean": ({"a.nft": 'import("c.nft")\nk := 1\nexport(k)\n', "c.nft": 'q := 2\nexport(q)\n',
                              "main.f": 'import("a.nft")\nprint(exists("a.txt"))\nprint(k)\n'}, "vm"),
     # Still refused: host effects before the last import (also in branches), in module initialisation
-    # (transitively), and calls, callbacks or struct construction there.
+    # (transitively), and calls, callbacks or user constructors there.
     "host-before-import-untaken": ({"m.nft": M, "main.f": 'if (false) {\n  cd("..")\n}\nimport("m.nft")\nprint(x)\n'},
                                    "module-host-op:cd"),
     "host-before-import-taken": ({"m.nft": M, "main.f": 'if (true) {\n  setenv("NIFT_R1_X", "1")\n}\n'
@@ -94,11 +99,15 @@ CASES = {
                                "main.f": 'import("m.nft")\nprint(ys.size())\n'}, "module-host-op:exists"),
     "comparator-in-init": ({"m.nft": 'zs := [3, 1, 2].sort_by((v) => v)\nexport(zs)\n',
                             "main.f": 'import("m.nft")\nprint(pwd() != "")\nprint(zs.size())\n'}, "module-host-op:pwd"),
+    "struct-constructor-in-init": ({
+        "m.nft": 'struct(Probe) { fn(Probe()) { print("constructor") } }\nprobe := Probe()\nexport(probe)\n',
+        "main.f": 'import("m.nft")\nprint(getenv("NIFT_R1_UNSET_VAR"))\n',
+    }, "module-host-op:getenv"),
     "struct-presentation-in-init": ({"m.nft": 'struct(S) {\n  v := 1\n  fn(to_string()) {\n    return "s"\n  }\n}\n'
                                      's := S()\nt := s.to_string()\nexport(t)\n',
                                      "main.f": 'import("m.nft")\nprint(pwd() != "")\nprint(t)\n'}, "module-host-op:pwd"),
     # Indirect user code (D-070 #4: effects, not names): a struct's own presentation method behind `.stringify()`,
-    # reached in module initialisation, is a user call (struct construction and the method call are refused).
+    # reached in module initialisation, is a user call (the method call is refused).
     "struct-stringify-method-in-init": ({"m.nft": 'struct(S) {\n  v := 1\n  fn(stringify()) {\n    return "custom"\n  }\n}\n'
                                          's := S()\nt := s.stringify()\nexport(t)\n',
                                          "main.f": 'import("m.nft")\nprint(pwd() != "")\nprint(t)\n'}, "module-host-op:pwd"),
@@ -201,8 +210,8 @@ CLASSIFY = {
 MUTANTS = {
     1: ["host-before-empty-module", "declaration-before-import"],  # no leading-import-block check (E)
     2: ["env-in-module-init", "host-in-nested-module-init", "callback-host-in-init"],  # no module-init check (M)
-    3: ["call-in-module-init", "interpolation-call-in-init", "struct-presentation-in-init",
-        "struct-stringify-method-in-init"],  # calls and struct construction safe
+    3: ["struct-constructor-in-init", "call-in-module-init", "interpolation-call-in-init", "struct-presentation-in-init",
+        "struct-stringify-method-in-init"],  # calls count as safe
     4: ["comparator-in-init"],  # callbacks count as safe
     5: ["shadowed-builtin-in-init"],  # no shadowing check for the 11 binding-wins built-ins
 }
