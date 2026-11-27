@@ -10,6 +10,8 @@
 #include "rt/number.h"
 #include "rt/module_data.h"
 #include "rt/structs.h"
+#include "rt/native.h"
+#include "rt/builtin_bind.h"
 #include <cmath>
 #include <memory>
 #include <string>
@@ -334,9 +336,15 @@ TyRef Inference::call(const Node& n) {
             return instance;
         }
         const int own = current_struct();  // an implicit call of a method of the struct
-        if (own >= 0 && function_index(callee) < 0)
-            if (const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(own)].method(ast_.text(callee)))
-                return method_call(m->function, n);
+        if (own >= 0 && function_index(callee) < 0) {
+            // A bare built-in/native name is that callable, not a same-named
+            // method (the compiler's resolution rule).
+            NativeInfo native{};
+            const bool builtin_name = lookup_native(ast_.text(callee), native) || bind_function(ast_.text(callee)) != nullptr;
+            if (!builtin_name)
+                if (const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(own)].method(ast_.text(callee)))
+                    return method_call(m->function, n);
+        }
     }
     if (callee.kind == NodeKind::Member) {  // length()/size(), CP14 methods, or a callable field
         const TyRef recv = expr(callee.a);

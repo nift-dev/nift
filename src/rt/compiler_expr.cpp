@@ -245,7 +245,10 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
         const auto saved_conversion = guarded_conversion_;
         if (!is_and && string_guard_ident(ast_, node.a, guard_ident)) {
             const Binding* guarded = find_binding(text(ast_.at(guard_ident)));
-            guarded_conversion_ = {guarded && guarded->decl_node != kNoNode ? guarded->decl_node : guard_ident, kKindString};
+            // The binding must be stable: no assignment anywhere in the body.
+            if (guarded && guarded->decl_node != kNoNode && !guarded->cell && !guarded->global &&
+                !assigned_.count(text(ast_.at(guard_ident))))
+                guarded_conversion_ = {guarded->decl_node, kKindString};
         }
         const bool rhs_ok = expr_to(node.b, dst);
         guarded_conversion_ = saved_conversion;

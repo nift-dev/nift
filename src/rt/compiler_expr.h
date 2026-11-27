@@ -253,6 +253,13 @@ private:
     // methods and top-level code keep the canonical wording; an actual loop
     // region is marked on its instructions (kInstrLoopPath) and checked at
     // run time with the prepared wording.
+    // A read in legacy's return value reports its reached error at the
+    // return statement, with one return: prefix per return-valued caller.
+    // Loop-region code and a loop-called free function keep the plain site.
+    bool return_error_attribution() const {
+        return (fb_->flags() & kInstrReturnCall) != 0 && !loop_region() &&
+               !(in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]);
+    }
     bool loop_type_error_ambiguous() const {
         if (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]) return true;
         return loop_reachable() && !loop_region() && !(in_function_ && plan_.is_method(function_));

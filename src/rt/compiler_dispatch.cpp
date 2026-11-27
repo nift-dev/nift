@@ -118,9 +118,13 @@ bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;
     if (!reg_any(receiver_node, receiver)) return false;
-    fb_->set_offset(site(node));
+    const bool return_error = return_error_attribution();
+    fb_->set_offset(return_error && deferred_.return_statement != 0 ? deferred_.return_statement : site(node));
     const auto mode = stream_line_length ? LengthMode::StreamLine : size ? LengthMode::Size : LengthMode::Length;
+    const auto saved_flags = fb_->flags();
+    if (return_error) fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrReturnError));
     const std::size_t at = fb_->emit(OpCode::Length, dst, receiver, static_cast<std::uint16_t>(mode));
+    fb_->set_flags(saved_flags);
     fb_->note(at, std::string(text(node)));
     fb_->release_to(mark);
     return true;

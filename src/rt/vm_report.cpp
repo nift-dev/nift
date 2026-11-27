@@ -171,6 +171,14 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             if (frame.return_call && !((frame.ret - 1)->flags & kInstrLoopPath))
                 result.message = "return: " + result.message;
     }
+    if (fault.reason == StopReason::Error && !fault.catchable &&
+        (pc->flags & kInstrReturnError) &&
+        (pc->op == OpCode::GetMember || pc->op == OpCode::Length)) {
+        result.message = "return: " + fault.message;  // the read's own return statement
+        for (const auto& frame : frames_)  // return-valued callers outside a loop region
+            if (frame.return_call && !((frame.ret - 1)->flags & kInstrLoopPath))
+                result.message = "return: " + result.message;
+    }
     if (pc->op == OpCode::OrderGuard && fault.reason == StopReason::Error && !fault.catchable) {
         result.message = fault.message;  // the note: the innermost statement's legacy wording
         for (const auto& frame : frames_)  // a return call in a prepared loop region adds none (legacy)

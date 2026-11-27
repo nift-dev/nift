@@ -42,6 +42,10 @@ enum : std::uint8_t {
     kInstrIndexKey = 1u << 4,  // an expression evaluated as an index key (legacy call-site diagnostics)
     kInstrGlobalTake = 1u << 6,  // SetGlobal that nulls a slot for an in-place update (C6)
     kInstrGlobalPut = 1u << 7,   // the paired put-back SetGlobal
+    // On GetMember/Length: the read is legacy's return value, so its reached
+    // error reports at the return statement with the return: prefixes. (Bit 6
+    // is GlobalTake on the global opcodes; these two opcodes never use it.)
+    kInstrReturnError = 1u << 6,
 };
 
 // Per-instruction note (cold): text used by error messages (an expression's

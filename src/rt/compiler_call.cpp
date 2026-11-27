@@ -349,8 +349,12 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
         location = std::string(text(ast_.at(node.a)));
     const Atom key = atom(text(ast_.at(node.b)));
     if (key.id > 0xffff) return fail(node, "limit:atoms");
-    fb_->set_offset(site(node));
+    const bool return_error = return_error_attribution();
+    fb_->set_offset(return_error && deferred_.return_statement != 0 ? deferred_.return_statement : site(node));
+    const auto saved_flags = fb_->flags();
+    if (return_error) fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrReturnError));
     const std::size_t at = fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
+    fb_->set_flags(saved_flags);
     if (!location.empty()) fb_->note(at, std::move(location));
     fb_->release_to(mark);
     return true;
