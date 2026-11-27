@@ -61,7 +61,7 @@ constexpr NativeFn kFunctions[] = {
     stream_read_bytes, stream_read_all_bytes, stream_extract_string, fn_minify, file_write_val,
     file_append, file_prepend, file_insert, file_insert_before, file_insert_after, file_replace, file_replace_once,
     fn_sorted_map, fn_sorted_set,
-    process_check, process_argument, process_spread, process_run, process_run_stdout,
+    process_check, process_argument, process_spread, process_run, process_run_stdout, host_inject_json,
 };
 
 constexpr BuiltinSpec kSpecs[] = {

@@ -1,6 +1,7 @@
 #include "rt/compiler_process.h"
 #include "rt/compiler_expr.h"
 #include "rt/literal.h"
+#include "rt/infer_types.h"
 #include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/string.h"
@@ -40,6 +41,90 @@ const Node* process_pipeline_command(const Ast& ast, const Node& node, NodeId& o
     if (callee.kind != NodeKind::Ident || ast.text(callee) != "cmd") return nullptr;
     output = ast.list(redirect)[0];
     return &command;
+}
+
+// Admit only a read of the stable local used as the stdout target of a
+// supported JSON backend in this method. The success guard must dominate it.
+bool UnitCompiler::package_json_source(const Node& node) const {
+    if (session_ || in_lambda_ || !in_function_ || plan_.coroutines || !plan_.is_method(function_) ||
+        !package_process_scope(plan_, node) || node.count != 1 || plan_.index.count("cmd")) return false;
+    const auto& path = ast_.at(ast_.list(node)[0]);
+    if (path.kind != NodeKind::Ident) return false;
+    const auto name = text(path);
+    const auto* target = find_binding(name);
+    if (!target || target->cell || target->global || target->upvalue || assigned_.count(name)) return false;
+    const auto* cmd = find_binding("cmd");
+    if (cmd && !cmd->invocation && !invocation_shadows_.count(cmd->decl_node)) return false;
+
+    const auto& method = ast_.at(ast_.at(plan_.functions[function_]).b);
+    const auto* items = ast_.list(method);
+    const auto target_read = [&](NodeId id) {
+        const auto& open = ast_.at(id);
+        return open.kind == NodeKind::Call && open.count == 1 &&
+               ast_.at(open.a).kind == NodeKind::Ident && text(ast_.at(open.a)) == "open" &&
+               !find_binding("open") && !plan_.index.count("open") && !plan_.struct_index.count("open") &&
+               ast_.at(ast_.list(open)[0]).kind == NodeKind::Ident &&
+               text(ast_.at(ast_.list(open)[0])) == name;
+    };
+    const auto zero_argument_method = [&](NodeId id, std::string_view method_name) -> NodeId {
+        const auto& invocation = ast_.at(id);
+        if (invocation.kind != NodeKind::Call || invocation.count) return kNoNode;
+        const auto& member = ast_.at(invocation.a);
+        return member.kind == NodeKind::Member && text(ast_.at(member.b)) == method_name ? member.a : kNoNode;
+    };
+    const auto reads_trimmed = [&](NodeId id) {
+        const NodeId source = zero_argument_method(id, "trim");
+        return source != kNoNode && target_read(source);
+    };
+
+    bool declared = false, succeeded = false;
+    const Node* process_result = nullptr;
+    const Node* text_result = nullptr;
+    for (std::uint32_t i = 0; i < method.count; ++i) {
+        const auto& statement = ast_.at(items[i]);
+        if (statement.kind == NodeKind::Declare && statement.b == node_id(node))
+            return succeeded;
+        if (statement.kind == NodeKind::Declare && statement.a == target->decl_node) {
+            declared = true;
+            continue;
+        }
+        if (!declared) continue;
+        if (statement.kind == NodeKind::Command) return false;
+        if (!process_result) {
+            if (statement.kind != NodeKind::Declare || ast_.at(statement.b).kind != NodeKind::Call) continue;
+            NodeId output = kNoNode;
+            const auto* command = process_pipeline_command(ast_, ast_.at(statement.b), output);
+            if (!command || ast_.at(output).kind != NodeKind::Ident || text(ast_.at(output)) != name) continue;
+            if (command->count < 2 || !process_program_literal(ast_, *command)) continue;
+            const auto* args = ast_.list(*command);
+            if ((text(ast_.at(args[0])) == R"("sqlite3")" && text(ast_.at(args[1])) == R"("-json")") ||
+                (text(ast_.at(args[0])) == R"("redis-cli")" && text(ast_.at(args[1])) == R"("--json")"))
+                process_result = &ast_.at(statement.a);
+            continue;
+        }
+        if (succeeded && !text_result && statement.kind == NodeKind::Declare && reads_trimmed(statement.b)) {
+            text_result = &ast_.at(statement.a);
+            continue;
+        }
+        if (statement.kind != NodeKind::If || statement.c != kNoNode ||
+            infer_detail::block_falls_through(ast_, statement.b)) return false;
+        if (!succeeded) {
+            const auto& check = ast_.at(statement.a);
+            if (check.kind != NodeKind::Binary || check.op != Op::Ne || text(ast_.at(check.b)) != "0") return false;
+            const auto& status = ast_.at(check.a);
+            if (status.kind != NodeKind::Member || ast_.at(status.a).kind != NodeKind::Ident ||
+                text(ast_.at(status.a)) != text(*process_result) || text(ast_.at(status.b)) != "exit_code" ||
+                assigned_.count(text(*process_result))) return false;
+            succeeded = true;
+            continue;
+        }
+        const NodeId empty_source = zero_argument_method(statement.a, "empty");
+        if (empty_source == kNoNode ||
+            !(reads_trimmed(empty_source) ||
+              (text_result && ast_.at(empty_source).kind == NodeKind::Ident &&
+               text(ast_.at(empty_source)) == text(*text_result)))) return false;
+    }
+    return false;
 }
 
 int UnitCompiler::process_call(const Node& node, const Node& command, NodeId output, std::uint16_t dst) {

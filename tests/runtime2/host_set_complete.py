@@ -70,9 +70,9 @@ def check(list_path):
         if i not in names and i != "Count":
             problems.append("classification names an unknown id: %s" % i)
     classifier = open(HEADER).read().split("bool host_builtin(BuiltinId id)", 1)[1].split("}", 1)[0]
-    m = re.search(r"id >= BuiltinId::(\w+) && id <= BuiltinId::(\w+)", classifier)
-    block = set(names[names.index(m.group(1)):names.index(m.group(2)) + 1])
-    block.update(re.findall(r"id == BuiltinId::(\w+)", classifier))
+    block = set(re.findall(r"id == BuiltinId::(\w+)", classifier))
+    for first, last in re.findall(r"id >= BuiltinId::(\w+) && id <= BuiltinId::(\w+)", classifier):
+        block.update(names[names.index(first):names.index(last) + 1])
     host = {i for i, c in classes.items() if c == ["Host"]}
     if host != block:
         problems.append("Host class differs from natives::host_builtin(): extra %s, missing %s" %

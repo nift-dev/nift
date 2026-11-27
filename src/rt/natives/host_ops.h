@@ -4,6 +4,7 @@
 
 namespace nift::rt::natives {
 
+Status host_inject_json(const Context&, const Value*, std::uint32_t, Value&, std::string&);
 Status host_open(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status host_open_bytes(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);
 Status host_cat(const Context&, const Value* args, std::uint32_t argc, Value& out, std::string& error);

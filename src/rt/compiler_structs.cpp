@@ -1,5 +1,6 @@
 #include "rt/compiler_structs.h"
 #include "rt/compiler_presentation.h"
+#include "rt/module_data.h"
 #include "rt/aggregate.h"
 #include "rt/alias.h"
 #include "rt/atom.h"
@@ -219,6 +220,10 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
     if (s < 0 || plan_.index.count(name)) return -1;
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(name);
     if (m == nullptr) return -1;
+    // An explicit receiver selects the method. Legacy bare open(path) is
+    // the file builtin, even inside an imported struct with an open method.
+    if (name == "open" && node.count == 1 && !session_ &&  // rt-lint: allow-string-compare compile time
+        imported_module_data(plan_, node)) return -1;
     return struct_call(node, s, *m, kNoNode, -1, dst) ? 1 : 0;
 }
 

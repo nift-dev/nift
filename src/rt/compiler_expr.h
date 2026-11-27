@@ -186,7 +186,7 @@ private:
     bool inc_dec_expr(const Node& node, std::uint16_t dst);
     bool call(const Node& node, std::uint16_t dst);
     int process_call(const Node& node, const Node& command, NodeId output, std::uint16_t dst);
-    int process_pipeline(const Node& node, std::uint16_t dst);
+    bool package_json_source(const Node& node) const; int process_pipeline(const Node& node, std::uint16_t dst);
     int imported_data_call(const Node& node, std::uint16_t dst);
     bool call_value(const Node& node, NodeId callee, bool member, std::uint16_t dst);
     bool method_call(const Node& node, std::uint16_t dst);

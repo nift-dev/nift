@@ -183,62 +183,6 @@ inline std::string display_glob(const nift::detail::GlobMatch& match, const fs::
     return rendered.empty() ? "." : rendered;
 }
 
-inline Status read_source(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error,
-                   std::string_view name, bool bytes, bool cat) {
-    HostCall call(context.host, bytes ? host::HostOp::ReadBytes : host::HostOp::Read, name);
-    if (resolve_arg(context, call, args, argc, 0, name, error) != Status::Ok) return Status::Error;
-    if (call.begin() != host::HostStatus::Ok) return fail_host(call, call.status(), call.error(), error);
-    if (fs::is_directory(call.target().path)) {
-        return fail_host(call, host::HostStatus::Fatal,
-                         host_error("runtime.invalid_operation", std::string(name) + ": path is a directory"), error);
-    }
-    std::string data;
-    if (std_stream_target(call.target().path)) context.publish_output();  // a read of our own output (D-073 #3)
-#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 6
-    std::error_code size_error;
-    if (fs::is_regular_file(call.target().path, size_error)) {
-        const auto size = fs::file_size(call.target().path, size_error);
-#if !(defined(NIFT_READ_LIMIT_MUTANT) && (NIFT_READ_LIMIT_MUTANT == 1 || NIFT_READ_LIMIT_MUTANT == 5))
-        // B01: the read limit before the heap budget (legacy names the limit; NIFT_READ_LIMIT=1g used
-        // to report "file exceeds the memory budget" for a file one byte over a 1 GiB limit)
-        const auto setting = nift::readlimit::current();
-        if (!size_error && setting.valid && size > setting.bytes)
-            return fail_host(call, host::HostStatus::Limit,
-                             host_error("limit.exceeded",
-                                        nift::readlimit::exceeded_message(std::string(name),
-                                                                          call.target().path.generic_string(),
-                                                                          setting.bytes)),
-                             error);
-#endif
-        if (!size_error && !reserve_result(context, static_cast<std::size_t>(size)))
-            return fail_host(call, host::HostStatus::Limit,
-                             host_error("limit.exceeded",
-                                        std::string(name) + ": file exceeds the memory budget"),
-                             error);
-    }
-#endif
-    const ReadOutcome outcome = read_whole(context, call.target().path, data, name, error);
-    if (outcome != ReadOutcome::Ok) return read_failure(call, outcome, name, error, error);
-    host::Observation obs;
-#if !defined(NIFT_HOST_MUTANT) || NIFT_HOST_MUTANT != 4
-    obs.bytes = data;
-#endif
-    const std::string size = std::to_string(data.size());
-    if (bytes) {
-        obs.size = data.size();
-        if (finish_host(call, size, obs, error) != Status::Ok) return Status::Error;
-        out = make_bytes(std::vector<std::uint8_t>(data.begin(), data.end()));
-    } else if (cat) {
-        if (finish_host(call, size, obs, error) != Status::Ok) return Status::Error;
-        emit_program_output(context, data);  // D-072 #1: program output, in program order
-        out = Value::null();
-    } else {
-        if (finish_host(call, size, obs, error) != Status::Ok) return Status::Error;
-        out = make_string(std::move(data));
-    }
-    return Status::Ok;
-}
-
 inline Status resolve_plain(const Context& context, const std::string& raw, std::string_view name,
                             host::Resolved& out, std::string& error) {
     host::HostError host_error_value;

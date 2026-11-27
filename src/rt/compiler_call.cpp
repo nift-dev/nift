@@ -37,13 +37,14 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         return indexed_call_value(node, fn->second, dst);
     if (fn == plan_.index.end() && name == "run")  // rt-lint: allow-string-compare compile time
         if (const int result = process_call(node, node, kNoNode, dst); result >= 0) return result == 1;
+    if (fn == plan_.index.end() && name == "inject" && package_json_source(node))  // rt-lint: allow-string-compare
+        return builtin_call(node, natives::builtin_spec(natives::BuiltinId::ProcessInjectJson), kNoNode, dst);
     const bool is_native = fn == plan_.index.end() && lookup_native(name, native);
     // CP14: a free built-in; a user function/binding of that name is reserved (D-009#3).
     const natives::BuiltinSpec* builtin = fn == plan_.index.end() && !is_native ? bind_function(name) : nullptr;
     if (fn == plan_.index.end() && !is_native && !builtin) return thread_call(node, name, dst);  // or refused
     const std::uint16_t arity =
         builtin ? 0 : is_native ? native.arity : ast_.at(plan_.functions[fn->second - 1]).count;
-    // Reuse the newest destination for the callee window when nothing above it is live.
     const bool in_place = dst + 1u == fb_->top();
     const std::uint16_t base = in_place ? dst : fb_->top();
     const NodeId* args = ast_.list(node);
@@ -147,7 +148,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
     return builder_ok();
 }
-
 bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
     const Node& callee = ast_.at(node.a);
     bool is_this = false;  // CP12b: a struct method

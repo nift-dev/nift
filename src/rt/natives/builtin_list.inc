@@ -252,3 +252,4 @@ NIFT_RT_BUILTIN(ProcessArg, "<process-argument>", None, 1, 2, kAny, Fixed, true,
 NIFT_RT_BUILTIN(ProcessSpread, "<process-spread>", None, 1, 2, kArray, Fixed, true, 100)
 NIFT_RT_BUILTIN(ProcessRun, "<process-run>", None, 1, 255, kObject, Fixed, true, 100)
 NIFT_RT_BUILTIN(ProcessRunStdout, "<process-run-stdout>", None, 2, 255, kObject, Fixed, true, 100)
+NIFT_RT_BUILTIN(ProcessInjectJson, "<process-inject-json>", None, 1, 1, kScalar | kArray | kObject, Fixed, true, 100)

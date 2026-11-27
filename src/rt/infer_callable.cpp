@@ -10,6 +10,13 @@ namespace nift::rt::infer_detail {
 TyRef Inference::process_call(const Node& call) {
     if (session_ || !imported_module_data(plan_, call)) return {};
     const auto& callee = ast_.at(call.a);
+    const int owner = current_struct();
+    if (owner >= 0 && call.count == 1 && callee.kind == NodeKind::Ident && ast_.text(callee) == "open" &&
+        !find("open") && !plan_.index.count("open") && !plan_.struct_index.count("open") &&
+        plan_.structs[static_cast<std::size_t>(owner)].method("open")) {
+        expr(ast_.list(call)[0]);
+        return kinds_ty(kKindString);
+    }
     if (current_ == static_cast<int>(plan_.functions.size()) && callee.kind == NodeKind::Member &&
         !find("bytes") && !plan_.index.count("bytes") && !plan_.struct_index.count("bytes") &&
         module_ascii_literal(ast_, call))

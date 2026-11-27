@@ -42,7 +42,7 @@ BuiltinEffect builtin_effect(natives::BuiltinId id) {
     case I::HostTouch: case I::HostMkdir: case I::HostMakeDir: case I::HostRemove: case I::HostRm: case I::HostCp:
     case I::HostMv: case I::HostMove: case I::HostWhich: case I::HostGetenv: case I::HostEnv: case I::HostSetenv:
     case I::HostUnsetenv: case I::HostOs: case I::HostArch: case I::HostPlatform: case I::HostHardwareConcurrency:
-    case I::ProcessCheck: case I::ProcessRun: case I::ProcessRunStdout:
+    case I::ProcessCheck: case I::ProcessRun: case I::ProcessRunStdout: case I::ProcessInjectJson:
     case I::HostEpoch: case I::HostSleep: case I::HostSecureRandomBytes: case I::HandleFile: case I::HandleIfstream:
     case I::HandleOfstream: case I::HandleClose: case I::FileOpen: case I::FileClose: case I::FileRead:
     case I::FileReadAll: case I::FileReadLine: case I::FileWrite: case I::FileWriteLine: case I::FileFlush:

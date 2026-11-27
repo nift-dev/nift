@@ -1278,6 +1278,7 @@ test-rt-vm: test-rt-vm-invalidate test-runtime2-vm-corpus-complete $(RT_VM_UNIT)
 	-@$(RT_VM_SUITE) vm-builtins -- python3 tests/runtime2/vm_builtins.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-host -- python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-package-process -- python3 tests/runtime2/vm_package_process.py --nift "$(CURDIR)/$(TARGET)"
+	-@$(RT_VM_SUITE) vm-package-json -- python3 tests/runtime2/vm_package_json.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-records-coverage -- python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-path-wording -- python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(TARGET)"
 	-@$(RT_VM_SUITE) vm-known-refused -- python3 tests/runtime2/vm_known_refused.py --nift "$(CURDIR)/$(TARGET)"
@@ -1339,6 +1340,8 @@ test-rt-vm-sanitize: $(SAN_TARGET) $(TEST_DIR)/rt-parse-dump$(EXEEXT) $(RT_OBJEC
 		python3 tests/runtime2/vm_host.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_package_process.py --nift "$(CURDIR)/$(SAN_TARGET)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+		python3 tests/runtime2/vm_package_json.py --nift "$(CURDIR)/$(SAN_TARGET)"
 	python3 tests/runtime2/vm_records_coverage.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
 		python3 tests/runtime2/vm_path_wording.py --nift "$(CURDIR)/$(SAN_TARGET)" --timeout 300
@@ -1597,6 +1600,10 @@ test-runtime2-module-host-order-mutant: $(TARGET)
 test-runtime2-module-host-order-mutants: $(TARGET)
 	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/module_host_order_mutants.py
 test-rt-vm: test-runtime2-module-host-order-mutants
+.PHONY: test-runtime2-package-json-mutant
+test-runtime2-package-json-mutant: $(TARGET)
+	$(HARNESS_TOOLCHAIN_ENV) $(PYTHON) -B tests/runtime2/vm_package_json.py --nift "$(CURDIR)/$(TARGET)" --mutant
+test-rt-vm: test-runtime2-package-json-mutant
 test-runtime2-host-set-complete:
 	$(PYTHON) -B tests/runtime2/host_set_complete.py
 	$(PYTHON) -B tests/runtime2/host_set_complete.py --mutant
