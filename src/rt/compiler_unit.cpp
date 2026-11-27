@@ -304,9 +304,19 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);
         const std::string_view name = text(param);
-        // A method parameter named `args` was already admitted by
-        // plan_structs (imported module, readonly argv use only); it is an
-        // ordinary local binding here, whatever its inferred kinds.
+        // The size/length exception relies on dispatch to an array builtin.
+        // Argv iteration and spreading have their own receiver checks.
+        if (method && name == "args" && kinds(params[k]) != kKindArray) {  // rt-lint: allow-string-compare
+            const auto& body = ast_.at(node.b);
+            for (NodeId id = 0; id < ast_.size(); ++id) {
+                const auto& member = ast_.at(id);
+                if (member.kind != NodeKind::Member || member.begin < body.begin || member.end > body.end)
+                    continue;
+                const auto& receiver = ast_.at(member.a);
+                if (receiver.kind == NodeKind::Ident && text(receiver) == name)
+                    return fail(param, "param-name-reserved");
+            }
+        }
         if (session_ && plan_.index.count(name)) return fail(param, "param-shadows-fn");
         Binding binding;
         binding.reg = regs[k];
