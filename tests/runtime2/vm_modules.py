@@ -230,6 +230,17 @@ SHAPES.update({
                'other.contains(this.needle()) } }\nexport(Box)\n',
         "main.f": 'import("m.f")\nb := Box()\nprint(b.check("abc", 3))\nprint(b.check(3, "abc"))\n',
     }, "builtin-receiver:contains"),
+    "struct-method-mixed-negation-short-circuit": ({
+        "m.f": 'struct(Checks) {\n private fn(test_bool(v)) { print("left"); return v }\n'
+               'private fn(test_number(v)) { print("right"); return v }\n'
+               'fn(check(left, right)) { return !this.test_bool(left) || !(this.test_number(right) > 0) }\n'
+               'fn(check_negative(left, right)) { return !this.test_bool(left) || this.test_number(right) < 0 } }\n'
+               'export(Checks)\n',
+        "main.f": 'import("m.f")\nc := Checks()\n'
+                  'print(c.check(false, 2))\nprint(c.check(true, 0))\nprint(c.check(true, 2))\n'
+                  'print(c.check_negative(false, -1))\nprint(c.check_negative(true, -1))\n'
+                  'print(c.check_negative(true, 1))\n',
+    }, "vm"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

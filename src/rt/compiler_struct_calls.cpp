@@ -32,9 +32,20 @@ bool UnitCompiler::boolean_method_condition(NodeId id) const {
     const auto& node = ast_.at(id);
     if (node.kind == NodeKind::Logical && node.op == Op::Or)
         return boolean_method_condition(node.a) && boolean_method_condition(node.b);
+    if (node.kind == NodeKind::Binary && node.op == Op::Lt && kinds(id) == kKindBool &&
+        ast_.at(node.b).kind == NodeKind::Number && text(ast_.at(node.b)) == "0")  // rt-lint: allow-string-compare
+        return true;
     if (node.kind != NodeKind::Unary || node.op != Op::Not) return false;
     const auto& call = ast_.at(node.a);
-    if (call.kind != NodeKind::Call || kinds(node.a) != kKindBool) return false;
+    if (kinds(node.a) != kKindBool) return false;
+    // The comparison is explicitly grouped under !. Its normal admission
+    // and operand checks still run when the logical RHS is emitted.
+    const auto spelling = text(node);
+    if (call.kind == NodeKind::Binary && call.op == Op::Gt &&
+        spelling.substr(0, 2) == "!(" && spelling.back() == ')' &&  // rt-lint: allow-string-compare compile time
+        ast_.at(call.b).kind == NodeKind::Number && text(ast_.at(call.b)) == "0")  // rt-lint: allow-string-compare
+        return true;
+    if (call.kind != NodeKind::Call) return false;
     const auto& method = ast_.at(call.a);
     return method.kind == NodeKind::Member && ast_.at(method.a).kind == NodeKind::Ident &&
            text(ast_.at(method.a)) == "this";  // rt-lint: allow-string-compare compile time
