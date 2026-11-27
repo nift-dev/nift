@@ -139,6 +139,25 @@ def main():
             assert (proc.returncode, proc.stdout, proc.stderr) == (0, "126\nfalse\n", ""), proc
         assert not (allowed / "shell-fallback").exists()
         assert not (allowed / "launches").exists()
+        (allowed / "stream_writer.f").write_text(
+            'struct(Box) {\n'
+            'fn(save(path, value)) { h := ofstream(path); h.write_bytes(value); close(h) }\n'
+            '}\nexport(Box)\n', encoding="utf-8")
+        stream_case = 'import("./stream_writer.f")\nb := Box()\n'
+        errors = []
+        for mode in ({}, {"NIFT_VM": "0"}):
+            proc, row = run(stream_case + 'b.save("binary", "wrong")\n', imported=False, **mode)
+            assert proc.returncode == 1 and not proc.stdout and "write_bytes: expected bytes" in proc.stderr, proc
+            assert (allowed / "binary").read_bytes() == b"", proc
+            errors.append(proc.stderr)
+            if not mode:
+                assert (row.get("vm_executions"), row.get("legacy_executions")) == (1, 0), row
+            proc, row = run(stream_case + 'b.save("binary", bytes([0, 127, 255]))\n', imported=False, **mode)
+            assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", ""), proc
+            assert (allowed / "binary").read_bytes() == bytes([0, 127, 255])
+            if not mode:
+                assert (row.get("vm_executions"), row.get("legacy_executions")) == (1, 0), row
+        assert errors[0] == errors[1], errors
     print("PASS package process execution and refusal controls")
 
 

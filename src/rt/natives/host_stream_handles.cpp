@@ -245,18 +245,26 @@ Status stream_eof(const Context& context, const Value* args, std::uint32_t argc,
     return Status::Ok;
 }
 
+enum class StreamWriteMode { Value, Bytes, Line };
+
 static Status stream_write_argument(const Context& context, const Value* args, std::uint32_t argc,
-                                    Value& out, std::string& error, bool line_argument) {
+                                    Value& out, std::string& error, StreamWriteMode mode) {
     std::shared_ptr<StreamResource> stream;
     Status status = Status::Ok;
-    if (!stream_arg(context, args, argc, "write", stream, error, status)) return status;
-    const bool bytes_in_line = line_argument && argc == 2 && args[1].is(Kind::Bytes);
+    const bool bytes_only = mode == StreamWriteMode::Bytes;
+    if (!stream_arg(context, args, argc, bytes_only ? "write_bytes" : "write", stream, error, status)) return status;
+    const bool bytes_in_line = mode == StreamWriteMode::Line && argc == 2 && args[1].is(Kind::Bytes);
     if (stream->kind != StreamResource::Kind::Output || !stream->open || !stream->output) {
-        error = bytes_in_line ? "write_line: expected one value on output stream" :
+        error = bytes_only ? "write_bytes: expected one bytes value on output stream" :
+                bytes_in_line ? "write_line: expected one value on output stream" :
                                 "write: stream is not open for writing";
         return Status::Error;
     }
-    if (argc != 2) { error = "write: expected one value"; return Status::Error; }
+    if (argc != 2) {
+        error = bytes_only ? "write_bytes: expected one bytes value on output stream" : "write: expected one value";
+        return Status::Error;
+    }
+    if (bytes_only && !args[1].is(Kind::Bytes)) { error = "write_bytes: expected bytes"; return Status::Error; }
     if (bytes_in_line) { error = "write_line: value is not directly renderable"; return Status::Error; }
     std::string scratch;
     std::string_view data;
@@ -272,7 +280,7 @@ static Status stream_write_argument(const Context& context, const Value* args, s
 #endif
     stream->output->write(data.data(), static_cast<std::streamsize>(data.size()));
     if (!*stream->output) {
-        error = "write: output failure";
+        error = bytes_only ? "write_bytes: output failure" : "write: output failure";
         if (context.host.error_code) *context.host.error_code = "stream.write_failed";
         return Status::Recoverable;
     }
@@ -281,13 +289,12 @@ static Status stream_write_argument(const Context& context, const Value* args, s
 }
 
 Status stream_write(const Context& context, const Value* args, std::uint32_t argc, Value& out, std::string& error) {
-    return stream_write_argument(context, args, argc, out, error, false);
+    return stream_write_argument(context, args, argc, out, error, StreamWriteMode::Value);
 }
 
 Status stream_write_bytes(const Context& context, const Value* args, std::uint32_t argc, Value& out,
                          std::string& error) {
-    if (argc != 2) { error = "write_bytes: expected one value"; return Status::Error; }
-    return stream_write_argument(context, args, argc, out, error, false);
+    return stream_write_argument(context, args, argc, out, error, StreamWriteMode::Bytes);
 }
 
 Status stream_write_line(const Context& context, const Value* args, std::uint32_t argc, Value& out,
@@ -295,7 +302,7 @@ Status stream_write_line(const Context& context, const Value* args, std::uint32_
     if (argc != 2) { error = "write_line: expected one value"; return Status::Error; }
     Value newline = make_string("\n");
     Value first[2] = {args[0], args[1]};
-    Status status = stream_write_argument(context, first, 2, out, error, true);
+    Status status = stream_write_argument(context, first, 2, out, error, StreamWriteMode::Line);
     if (status != Status::Ok) return status;
     Value second[2] = {args[0], newline};
     return stream_write(context, second, 2, out, error);
