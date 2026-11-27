@@ -85,6 +85,8 @@ private:
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
     KindSet guarded_kind(NodeId id) const; std::pair<NodeId, KindSet> guarded_conversion(const Node& node) const;
+    bool type_test_guard(const Node& condition, NodeId& source, KindSet& kind) const;
+    bool null_test_guard(const Node& condition, NodeId& source, KindSet& kind) const;
     std::vector<NodeId> guarded_return_reads(const Node& node) const;
     std::vector<NodeId> guarded_object_reads_; std::pair<NodeId, KindSet> guarded_conversion_ = {kNoNode, 0};
     bool while_loop(const Node& node);
@@ -269,6 +271,7 @@ private:
     std::uint32_t prepared_begin(const Node& node) const;
     std::uint32_t prepared_end(const Node& node) const;
     bool statement_preparable(const Node& node) const;
+    bool loop_body_abandons_preparation(NodeId body) const;
     // OrderGuard (compiler_order_guard.cpp): the ordering context of the statement being compiled.
     OrderContext order_ctx_;
     bool order_guard(const Node& node, std::uint16_t left, std::uint16_t right); bool order_guarded(const Node&) const;

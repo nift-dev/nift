@@ -322,6 +322,29 @@ bool UnitCompiler::statement_preparable(const Node& node) const {
     }
 }
 
+// Legacy prepares a loop body when the loop starts. An `if`/`while`
+// condition or a `return` expression its prepared parser rejects makes it
+// abandon preparing that whole body (the statements then run textually).
+// Nested loops prepare themselves when reached, so their bodies are not
+// part of this decision.
+bool UnitCompiler::loop_body_abandons_preparation(NodeId body) const {
+    if (body == kNoNode) return false;
+    std::vector<NodeId> stack{body};
+    while (!stack.empty()) {
+        const NodeId id = stack.back();
+        stack.pop_back();
+        if (id == kNoNode) continue;
+        const Node& n = ast_.at(id);
+        if (n.kind == NodeKind::Lambda || n.kind == NodeKind::FnDecl) continue;
+        if (n.kind == NodeKind::While || n.kind == NodeKind::For) continue;
+        if ((n.kind == NodeKind::If || n.kind == NodeKind::Return) && !statement_preparable(n)) return true;
+        for (NodeId child : {n.a, n.b, n.c}) stack.push_back(child);
+        const NodeId* list = ast_.list(n);
+        for (std::uint32_t k = 0; k < n.count; ++k) stack.push_back(list[k]);
+    }
+    return false;
+}
+
 bool UnitCompiler::print_argument_ok(NodeId id, const Node& arg) {
     // Unknown/empty kinds are not assumed scalar and are not a licence to
     // admit blindly: they defer to the VM's checked native print, which now

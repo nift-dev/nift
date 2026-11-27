@@ -218,6 +218,70 @@ std::vector<NodeId> UnitCompiler::guarded_return_reads(const Node& node) const {
     return reads;
 }
 
+// `x != null` / `null != x`: the true branch sees a non-null value. The
+// remaining kinds are unknown when the only proved kind was null.
+bool UnitCompiler::null_test_guard(const Node& condition, NodeId& source, KindSet& kind) const {
+    if (session_ || in_lambda_ || !in_function_ || plan_.coroutines) return false;
+    if (condition.kind != NodeKind::Binary || condition.op != Op::Ne) return false;
+    NodeId ident = kNoNode;
+    if (ast_.at(condition.b).kind == NodeKind::Null && ast_.at(condition.a).kind == NodeKind::Ident)
+        ident = condition.a;
+    else if (ast_.at(condition.a).kind == NodeKind::Null && ast_.at(condition.b).kind == NodeKind::Ident)
+        ident = condition.b;
+    if (ident == kNoNode) return false;
+    const Binding* binding = find_binding(text(ast_.at(ident)));
+    if (!binding || binding->cell || binding->global || binding->decl_node == kNoNode ||
+        assigned_.count(text(ast_.at(ident)))) return false;
+    const KindSet raw = kinds_.of(ident);
+    if (raw & kKindUnknown) return false;  // still unproved: keep the generic dispatch
+    const KindSet remaining = static_cast<KindSet>(raw & ~kKindNull);
+    if (remaining == 0) return false;  // only null was proved: no useful narrowing
+    source = binding->decl_node;
+    kind = remaining;
+    return true;
+}
+
+// `t == "bytes"` where `t := type(x)` and both are stable: the true branch
+// sees x as that kind. This is legacy's type-dispatch idiom.
+bool UnitCompiler::type_test_guard(const Node& condition, NodeId& source, KindSet& kind) const {
+    if (session_ || in_lambda_ || !in_function_ || plan_.coroutines) return false;
+    if (condition.kind != NodeKind::Binary || condition.op != Op::Eq) return false;
+    const Node& label = ast_.at(condition.b);
+    const Node& name = ast_.at(condition.a);
+    if (label.kind != NodeKind::String || name.kind != NodeKind::Ident) return false;
+    const std::string_view spelling = text(label);
+    KindSet narrowed = 0;
+    if (spelling == R"("null")") narrowed = kKindNull;
+    else if (spelling == R"("bool")") narrowed = kKindBool;
+    else if (spelling == R"("int")") narrowed = kKindInt;
+    else if (spelling == R"("float")") narrowed = kKindFrac;
+    else if (spelling == R"("string")") narrowed = kKindString;
+    else if (spelling == R"("array")") narrowed = kKindArray;
+    else if (spelling == R"("object")") narrowed = kKindObject;
+    else if (spelling == R"("bytes")") narrowed = kKindBytes;
+    else return false;
+    const Binding* alias = find_binding(text(name));
+    if (!alias || alias->cell || alias->global || alias->decl_node == kNoNode ||
+        assigned_.count(text(name))) return false;
+    const Node* initializer = nullptr;
+    for (NodeId id = 0; id < ast_.size(); ++id) {
+        const Node& n = ast_.at(id);
+        if (n.kind == NodeKind::Declare && n.a == alias->decl_node) { initializer = &ast_.at(n.b); break; }
+    }
+    if (!initializer || initializer->kind != NodeKind::Call || initializer->count != 1) return false;
+    const Node& test = ast_.at(initializer->a);
+    if (test.kind != NodeKind::Ident || text(test) != "type" || find_binding("type") ||
+        plan_.index.count("type") || plan_.struct_index.count("type")) return false;
+    const Node& input = ast_.at(ast_.list(*initializer)[0]);
+    if (input.kind != NodeKind::Ident) return false;
+    const Binding* target = find_binding(text(input));
+    if (!target || target->cell || target->global || target->decl_node == kNoNode ||
+        assigned_.count(text(input))) return false;
+    source = target->decl_node;
+    kind = narrowed;
+    return true;
+}
+
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
     const int rejected = literal_ordering_error(ast_.at(node.a), node, 0);
@@ -234,7 +298,13 @@ bool UnitCompiler::if_chain(const Node& node) {
     auto saved_reads = std::move(guarded_object_reads_);
     guarded_object_reads_ = guarded_return_reads(node);
     const auto saved_conversion = guarded_conversion_;
-    guarded_conversion_ = guarded_conversion(node);
+    NodeId guarded_source = kNoNode;
+    KindSet guarded_type = 0;
+    std::pair<NodeId, KindSet> branch_guard{kNoNode, 0};
+    if (type_test_guard(ast_.at(node.a), guarded_source, guarded_type) ||
+        null_test_guard(ast_.at(node.a), guarded_source, guarded_type))
+        branch_guard = {guarded_source, guarded_type};
+    guarded_conversion_ = branch_guard.first != kNoNode ? branch_guard : guarded_conversion(node);
     const bool ok = statements(body);
     guarded_conversion_ = saved_conversion;
     guarded_object_reads_ = std::move(saved_reads);

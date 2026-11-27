@@ -8,6 +8,7 @@
 #include "rt/compiler_native_args.h"
 #include "rt/native.h"
 #include "rt/module_data.h"
+#include "rt/module_link.h"
 #include "rt/prepared_parse.h"
 #include "rt/source_scan.h"
 #include "rt/vm_mutants.h"
@@ -107,7 +108,9 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         const NodeKind arg_kind = ast_.at(args[k]).kind;
         const bool path_kind = arg_kind == NodeKind::Ident || arg_kind == NodeKind::Member ||
                                arg_kind == NodeKind::Index;
-        path_arg_ = is_native || index_depth_ > 0 || !path_kind || !bare_argument(node, k) ? kNoNode : args[k];
+        const bool escapes = !is_native && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
+                             plan_.escaping[f][k];
+        path_arg_ = escapes && index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
@@ -125,10 +128,11 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         fb_->release_to(in_place ? static_cast<std::uint16_t>(dst + 1) : base);
         return ok && builder_ok();
     }
-    if (!is_native && loop_reachable()) {
+    if (!is_native && (loop_region() || loop_type_error_ambiguous())) {
         // Legacy's prepared call types a parameter from the value only, the
         // canonical one from the argument's text and value (P5): refused where
-        // the callee can observe a difference (D-018).
+        // the callee can observe a difference (D-018). A struct method outside
+        // a loop runs canonically, so it keeps the canonical check.
         for (std::uint32_t k = 0; k < node.count; ++k)
             if (observable_[f][k] &&
                 type_mismatch_possible(text_type_at(args[k]), kinds(args[k]), scope_index()))
@@ -174,17 +178,26 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
             if (result >= 0) return result == 1;
         }
         const KindSet k = kinds(callee.a);
-        // Imported package code may decode unproved bytes with the literal
-        // UTF-8 encoding; the native validates the reached receiver.
-        if (name == "decode" && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
-            imported_module_data(plan_, node) && node.count == 1 &&
-            (k == 0 || (k & (kKindUnknown | kKindBytes)) != 0)) {
-            const Node& label = ast_.at(ast_.list(node)[0]);
-            if (label.kind == NodeKind::String && text(label) == R"("utf-8")")
-                if (const auto* spec = natives::find_builtin(natives::Receiver::Bytes, "decode"))
-                    return builtin_call(node, *spec, callee.a, dst);
+        // Imported package code may encode/decode unproved values with the
+        // literal UTF-8 encoding; the native validates the reached receiver.
+        const bool conversion = name == "encode" || name == "decode";  // rt-lint: allow-string-compare
+        if (conversion && !session_ && in_function_ && !plan_.coroutines &&  // rt-lint: allow-string-compare
+            imported_module_data(plan_, node) && node.count == 1 && !(k & kKindStruct)) {
+            const auto receiver_kind = name == "encode" ? kKindString : kKindBytes;
+            if (k == 0 || (k & (kKindUnknown | receiver_kind)) != 0) {
+                const Node& label = ast_.at(ast_.list(node)[0]);
+                if (label.kind == NodeKind::String && text(label) == R"("utf-8")") {
+                    const auto family = name == "encode" ? natives::Receiver::String : natives::Receiver::Bytes;
+                    if (const auto* spec = natives::find_builtin(family, name))
+                        return builtin_call(node, *spec, callee.a, dst);
+                }
+            }
         }
-        if (name == "to_int" && (k & kKindFrac) && loop_reachable())  // rt-lint: allow-string-compare B4
+        // A proved fractional number in loop code keeps the prepared/canonical
+        // difference refusal. An unproved or string-capable receiver is
+        // legacy's run-time conversion (the native validates the reached value).
+        if (name == "to_int" && k != 0 && (k & kKindFrac) &&  // rt-lint: allow-string-compare B4
+            !(k & (kKindString | kKindUnknown)) && loop_reachable())
             return fail(node, "context:number-to-int");
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
@@ -386,8 +399,11 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
         key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
         !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    if (!(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key && !bad_bytes_key &&
-        !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
+    const bool dynamic_index = plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
+        (object_kinds == 0 || (object_kinds & (kKindUnknown | kKindArray | kKindObject)) != 0) &&
+        (key_kinds == 0 || (key_kinds & (kKindUnknown | kKindNull | kKindString | kKindNumber)) != 0);
+    if (!dynamic_index && !(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
+        !bad_bytes_key && !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
         return fail(node, "type:index");
     const std::uint16_t mark = fb_->top();
     std::uint16_t object_reg = 0, key = 0;

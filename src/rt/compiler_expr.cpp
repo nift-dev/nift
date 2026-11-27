@@ -56,13 +56,14 @@ bool arithmetic_kinds_ok(Op op, KindSet l, KindSet r) {
     }
     return only(l, kKindNumber) && only(r, kKindNumber);
 }
-// `type(x) != "string"` (possibly the left part of an OR chain): when it is
-// false, x is a string for the rest of the short-circuit expression.
-bool string_guard_ident(const Ast& ast, NodeId id, NodeId& ident) {
+// `type(x) != "string"` (left of an OR) or `type(x) == "string"` (left of an
+// AND): when it falls through, x is a string for the rest of the expression.
+bool string_guard_ident(const Ast& ast, NodeId id, NodeId& ident, bool positive) {
     if (id == kNoNode) return false;
     const Node& n = ast.at(id);
-    if (n.kind == NodeKind::Logical && n.op == Op::Or) return string_guard_ident(ast, n.a, ident);
-    if (n.kind != NodeKind::Binary || n.op != Op::Ne) return false;
+    if (n.kind == NodeKind::Logical && n.op == (positive ? Op::And : Op::Or))
+        return string_guard_ident(ast, n.a, ident, positive);
+    if (n.kind != NodeKind::Binary || n.op != (positive ? Op::Eq : Op::Ne)) return false;
     const Node& call = ast.at(n.a);
     const Node& label = ast.at(n.b);
     if (call.kind != NodeKind::Call || call.count != 1 || label.kind != NodeKind::String ||
@@ -243,7 +244,7 @@ bool UnitCompiler::logical(const Node& node, std::uint16_t dst) {
     if (guarded < 0) {
         NodeId guard_ident = kNoNode;
         const auto saved_conversion = guarded_conversion_;
-        if (!is_and && string_guard_ident(ast_, node.a, guard_ident)) {
+        if (string_guard_ident(ast_, node.a, guard_ident, is_and)) {
             const Binding* guarded = find_binding(text(ast_.at(guard_ident)));
             // The binding must be stable: no assignment anywhere in the body.
             if (guarded && guarded->decl_node != kNoNode && !guarded->cell && !guarded->global &&

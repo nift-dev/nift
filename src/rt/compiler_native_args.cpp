@@ -4,6 +4,7 @@
 #include "rt/compiler_handles.h"
 #include "rt/literal.h"
 #include "rt/module_data.h"
+#include "rt/module_link.h"
 #include "rt/native.h"
 #include "rt/string.h"
 #include <charconv>
@@ -55,9 +56,9 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
         imported_module_data(plan_, node) && receiver != kNoNode && node.count == 1 &&
         ast_.at(args[0]).kind == NodeKind::String && text(ast_.at(args[0])) == R"("utf-8")";
     const bool package_encode = package_conversion && spec.id == natives::BuiltinId::StrEncode &&
-        (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) || kinds(receiver) == kKindString);
+        (kinds(receiver) == 0 || (kinds(receiver) & (kKindUnknown | kKindString)));
     const bool package_decode = package_conversion && spec.id == natives::BuiltinId::BytesDecode &&
-        (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) || kinds(receiver) == kKindBytes);
+        (kinds(receiver) == 0 || (kinds(receiver) & (kKindUnknown | kKindBytes)));
     if (bytes_builtin(spec) && !package_encode && !package_decode)
         return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
@@ -220,7 +221,21 @@ bool UnitCompiler::may_fault(NodeId id) const {
 // CP14 W2/W4: an argument legacy may skip must be unobservable.
 bool UnitCompiler::unobservable_argument(NodeId id) {
     const Node& node = ast_.at(id);
-    if (node.kind == NodeKind::Ident) return scopes_.find(text(node)) != nullptr;
+    // Reading a resolved binding has no observable effect (a local, upvalue,
+    // global or module-private value).
+    if (node.kind == NodeKind::Ident) return find_binding(text(node)) != nullptr;
+    // Imported packages often compute a lazy default from stable parts. A
+    // pure read or arithmetic expression has no effect; admitting it keeps
+    // legacy's laziness for the observable cases.
+    const bool package_scope = plan_.linked && plan_.linked->locate(node.begin).module > 0;
+    if (package_scope) {
+        if (node.kind == NodeKind::Member) return unobservable_argument(node.a);
+        if (node.kind == NodeKind::Index)
+            return unobservable_argument(node.a) && unobservable_argument(node.b);
+        if (node.kind == NodeKind::Binary &&
+            (node.op == Op::Add || node.op == Op::Sub || node.op == Op::Mul))
+            return unobservable_argument(node.a) && unobservable_argument(node.b);
+    }
     // A pure length()/size() of a proved string, array or bytes has no effect
     // and cannot fault; legacy may evaluate it lazily.
     if (node.kind == NodeKind::Call && node.count == 0) {

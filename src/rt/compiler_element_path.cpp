@@ -1,4 +1,5 @@
 #include "rt/compiler_element_path.h"
+#include "rt/module_link.h"
 
 // Checkpoint 1 (combined-b3-b5.md section 94; owner 2026-11-10 16:35, option C).
 //
@@ -74,7 +75,12 @@ bool ElementPath::kinds_ok(UnitCompiler& c, const Node& level, const Node& targe
     const KindSet receiver = c.kinds(level.a), key = c.kinds(level.b);
     const bool array = (receiver & ~kKindArray) == 0 && (key & ~kKindNumber) == 0;
     const bool object = (receiver & ~kKindObject) == 0 && (key & ~kKindString) == 0;
-    if (array || object || c.unknown_defers(receiver | key)) return true;  // Unknown is neither (review D1)
+    // Imported package code may index an unproved array/object; the run-time
+    // protocol selects the array or object store and reports the reached error.
+    const bool dynamic = c.plan_.linked && c.plan_.linked->locate(level.begin).module > 0 &&
+        (receiver == 0 || (receiver & (kKindUnknown | kKindArray | kKindObject)) != 0) &&
+        (key == 0 || (key & (kKindUnknown | kKindNull | kKindString | kKindNumber)) != 0);
+    if (array || object || dynamic || c.unknown_defers(receiver | key)) return true;
     return c.fail(target, "type:element-assignment");
 }
 

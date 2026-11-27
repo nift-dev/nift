@@ -30,15 +30,12 @@ bool UnitCompiler::boolean_method_condition(NodeId id) const {
     if (!plan_.is_method(function_) || !plan_.linked || plan_.linked->locate(ast_.at(id).begin).module == 0)
         return false;
     const auto& node = ast_.at(id);
-    if (node.kind == NodeKind::Logical && node.op == Op::Or)
+    if (node.kind == NodeKind::Logical && (node.op == Op::Or || node.op == Op::And))
         return boolean_method_condition(node.a) && boolean_method_condition(node.b);
-    if (node.kind == NodeKind::Binary && node.op == Op::Lt && kinds(id) == kKindBool &&
-        ast_.at(node.b).kind == NodeKind::Number && text(ast_.at(node.b)) == "0")  // rt-lint: allow-string-compare
-        return true;
-    if (node.kind == NodeKind::Call) {  // a plain boolean method of `this` on the right of ||
+    if (node.kind == NodeKind::Binary && kinds(id) == kKindBool) return true;
+    if (node.kind == NodeKind::Call) {  // a plain boolean method on the right of ||
         const auto& method = ast_.at(node.a);
-        return kinds(id) == kKindBool && method.kind == NodeKind::Member &&
-               ast_.at(method.a).kind == NodeKind::Ident && text(ast_.at(method.a)) == "this";
+        return kinds(id) == kKindBool && method.kind == NodeKind::Member;
     }
     if (node.kind != NodeKind::Unary || node.op != Op::Not) return false;
     const auto& call = ast_.at(node.a);
@@ -50,10 +47,10 @@ bool UnitCompiler::boolean_method_condition(NodeId id) const {
         spelling.substr(0, 2) == "!(" && spelling.back() == ')' &&  // rt-lint: allow-string-compare compile time
         ast_.at(call.b).kind == NodeKind::Number && text(ast_.at(call.b)) == "0")  // rt-lint: allow-string-compare
         return true;
+    // A boolean field/name under `!` in the same split chain.
+    if (call.kind == NodeKind::Member || call.kind == NodeKind::Ident) return true;
     if (call.kind != NodeKind::Call) return false;
-    const auto& method = ast_.at(call.a);
-    return method.kind == NodeKind::Member && ast_.at(method.a).kind == NodeKind::Ident &&
-           text(ast_.at(method.a)) == "this";  // rt-lint: allow-string-compare compile time
+    return ast_.at(call.a).kind == NodeKind::Member;
 }
 
 // A method call: the instance, then the arguments, in a fresh window.
@@ -129,7 +126,12 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
         const NodeKind arg_kind = ast_.at(args[k]).kind;
         const bool path_kind = arg_kind == NodeKind::Ident || arg_kind == NodeKind::Member ||
                                arg_kind == NodeKind::Index;
-        path_arg_ = index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
+        // A non-escaping parameter only reads its argument, so a path may be
+        // read as an ordinary value (shared aggregates included). An escaping
+        // parameter keeps the scalar-only location rule (or alias-argument).
+        const bool escapes = f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
+                             plan_.escaping[f][k];
+        path_arg_ = escapes && index_depth_ == 0 && path_kind && bare_argument(node, k) ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&
@@ -164,7 +166,7 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
     path_chain_ = saved_chain;
     --call_args_;
     if (!ok) return false;
-    if (loop_reachable())
+    if (loop_region() || loop_type_error_ambiguous())
         for (std::uint32_t k = 0; k < fixed; ++k)
             if (observable_[f][k] && type_mismatch_possible(text_type_at(args[k]), kinds(args[k]), scope_index()))
                 return fail(ast_.at(args[k]), "context:parameter-type");

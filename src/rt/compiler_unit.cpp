@@ -30,7 +30,7 @@ struct ArgUse {
 // assignment targets and the bindings named by declaration and assignment
 // texts; and, per user-call argument, the bindings its text names (read only
 // when the callee's parameter is observable).
-void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
+void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body, int owner,
                  const std::unordered_set<std::string_view>& assigned, std::unordered_set<std::string_view>& out,
                  std::vector<ArgUse>& args) {
     out.insert(assigned.begin(), assigned.end());
@@ -43,11 +43,22 @@ void typed_names(const Ast& ast, const UnitPlan& plan, NodeId body,
         if ((n.kind == NodeKind::Declare || n.kind == NodeKind::Assign) && n.b != kNoNode)
             binding_leaves(infer_text_type(ast.text(ast.at(n.b))), out);
         const NodeId* list = ast.list(n);
-        if (n.kind == NodeKind::Call && ast.at(n.a).kind == NodeKind::Ident) {
-            const auto fn = plan.index.find(ast.text(ast.at(n.a)));
-            if (fn != plan.index.end())
+        if (n.kind == NodeKind::Call) {
+            std::size_t callee = static_cast<std::size_t>(-1);
+            const Node& head = ast.at(n.a);
+            if (head.kind == NodeKind::Ident) {
+                const auto fn = plan.index.find(ast.text(head));
+                if (fn != plan.index.end()) callee = fn->second - 1u;
+            } else if (owner >= 0 && static_cast<std::size_t>(owner) < plan.structs.size() &&
+                       head.kind == NodeKind::Member && ast.at(head.a).kind == NodeKind::Ident &&
+                       ast.text(ast.at(head.a)) == "this") {
+                if (const StructMethodInfo* m =
+                        plan.structs[static_cast<std::size_t>(owner)].method(ast.text(ast.at(head.b))))
+                    callee = m->function;
+            }
+            if (callee != static_cast<std::size_t>(-1))
                 for (std::uint32_t k = 0; k < n.count; ++k) {
-                    ArgUse use{fn->second - 1u, k, {}};
+                    ArgUse use{callee, k, {}};
                     binding_leaves(infer_text_type(ast.text(ast.at(list[k]))), use.names);
                     if (!use.names.empty()) args.push_back(std::move(use));
                 }
@@ -74,7 +85,8 @@ UnitCompiler::UnitCompiler(const Ast& ast, NodeId root, const UnitPlan& plan, co
     assigned_fn_.resize(count);
     for (std::size_t f = 0; f < count; ++f) {
         collect_assigned(ast, ast.at(plan.functions[f]).b, assigned_fn_[f]);
-        typed_names(ast, plan, ast.at(plan.functions[f]).b, assigned_fn_[f], names[f], args[f]);
+        const int owner = f < plan.method_of.size() ? plan.method_of[f] : -1;
+        typed_names(ast, plan, ast.at(plan.functions[f]).b, owner, assigned_fn_[f], names[f], args[f]);
         observable_[f].assign(ast.at(plan.functions[f]).count, false);
     }
     // Fixpoint: an argument's named bindings are read when the callee's

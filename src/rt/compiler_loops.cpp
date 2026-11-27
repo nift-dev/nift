@@ -34,9 +34,12 @@ bool UnitCompiler::for_loop(const Node& node) {
     loop.try_depth = try_scopes_.size();
     loops_.push_back(loop);
     if (!for_step(state)) return false;
+    const bool abandoned = loop_body_abandons_preparation(node.b);
+    if (abandoned) { textual_statement_ = true; update_flags(); }
     state.body_regs = block_begin(node.b);
     const bool body_ok = for_emit_body(state);
     block_end(state.body_regs);
+    if (abandoned) { textual_statement_ = false; update_flags(); }
     if (!body_ok) return false;
     if (!for_finish(state)) return false;
     return builder_ok();
@@ -201,9 +204,12 @@ bool UnitCompiler::while_loop(const Node& node) {
     if (ok) {
         scopes_.push();
         const std::uint16_t mark = fb_->top();
+        const bool abandoned = loop_body_abandons_preparation(node.b);
+        if (abandoned) { textual_statement_ = true; update_flags(); }
         body_regs = block_begin(node.b);
         ok = statements(ast_.at(node.b));
         block_end(body_regs);
+        if (abandoned) { textual_statement_ = false; update_flags(); }
         fb_->release_to(mark);
         scopes_.pop();
     }

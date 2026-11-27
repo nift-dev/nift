@@ -207,8 +207,13 @@ bool UnitCompiler::assign(const Node& node, const std::uint16_t* result) {
                               local_register(object, reg))))
             return fail(target, "index-assign-target");
         if (!element_target_ok(target)) return false;
-        if (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
-            !kinds_within(target.b, kKindNumber, target, "type:element-assignment"))
+        const KindSet receiver_kinds = kinds(target.a), key_kinds = kinds(target.b);
+        const bool dynamic_element = plan_.linked && plan_.linked->locate(node.begin).module > 0 &&
+            (receiver_kinds == 0 || (receiver_kinds & (kKindUnknown | kKindArray | kKindObject)) != 0) &&
+            (key_kinds == 0 || (key_kinds & (kKindUnknown | kKindNull | kKindString | kKindNumber)) != 0);
+        if (!dynamic_element &&
+            (!kinds_within(target.a, kKindArray, target, "type:element-assignment") ||
+             !kinds_within(target.b, kKindNumber, target, "type:element-assignment")))
             return false;
 #if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
         // H-A (combined-b3-b5.md): the receiver first, its value retained in a register (a
@@ -350,7 +355,10 @@ bool UnitCompiler::compound_assign(const Node& node) {
         // Legacy's prepared `s += t` on strings skips the binding type check
         // (execute_prepared appends in place), so a binding typed double that
         // holds a string keeps it there and fails canonically.
-        if (node.op == Op::AddAssign && ((l | r) & kKindString) && may_double_[binding_scope(b)].count(text(target)))
+        // Only a textual double binding can hold a string under a double
+        // binding type (the prepared append skips that check). An unproved
+        // binding's tag follows its value, so it needs no refusal.
+        if (node.op == Op::AddAssign && ((l | r) & kKindString) && b.decl_text_double)
             return fail(node, "context:string-append-type");
     }
     // CP25: legacy computes the operation (its errors first), then rejects the write.

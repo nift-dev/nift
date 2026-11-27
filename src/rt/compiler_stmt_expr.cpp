@@ -1,5 +1,6 @@
 #include "rt/compiler_stmt_expr.h"
 #include "rt/compiler.h"
+#include "rt/module_link.h"
 // rt-lint: cold-file statement-expression side effects and presentation lowering
 namespace nift::rt::detail {
 bool UnitCompiler::expression_statement(const Node& node) {
@@ -66,7 +67,10 @@ bool UnitCompiler::expression_statement(const Node& node) {
                     }
                 }
             }
-            if (!(kinds(callee.a) & kKindUnknown) && kinds_.of(callee.a) != 0 &&
+            const KindSet push_kinds = kinds(callee.a);
+            const bool dynamic_push = plan_.linked && plan_.linked->locate(expr.begin).module > 0 &&
+                (push_kinds == 0 || (push_kinds & (kKindUnknown | kKindArray)) != 0);
+            if (!dynamic_push && !(push_kinds & kKindUnknown) && kinds_.of(callee.a) != 0 &&
                 !kinds_within(callee.a, kKindArray, receiver, "type:push"))
                 return false;
 #if !(defined(NIFT_B5_MUTANT) && NIFT_B5_MUTANT == 13)
