@@ -154,9 +154,10 @@ bool Vm::op_cell_cached(const Instr& in, Value* R, Fault& fault, const Proto* pr
 bool Vm::op_cell_store(const Instr& in, Value* R, Fault& fault, const Proto* proto, std::int64_t text_type) {
     CellObject* cell = cell_of(R[in.a]);
     if (cell == nullptr) return internal(fault, "cell");
-    const std::int64_t assigned = text_binding_type(text_type, R[in.b]);
+    const bool loop = (in.flags & kInstrLoopPath) != 0;
+    const std::int64_t assigned = loop ? fast_tag(R[in.b]) : text_binding_type(text_type, R[in.b]);
     if (!tag_assignable(assigned, cell_binding_type(*cell))) {
-        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault);
+        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault, loop);
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)
@@ -219,9 +220,10 @@ bool Vm::op_set_upvalue(const Instr& in, Value* R, Fault& fault, const Proto* pr
     if (closure_ == nullptr || in.a >= closure_->upvalues.size()) return internal(fault, "upvalue");
     CellObject* cell = cell_of(closure_->upvalues[in.a]);
     if (cell == nullptr) return internal(fault, "upvalue cell");
-    const std::int64_t assigned = text_binding_type(text_type, R[in.b]);
+    const bool loop = (in.flags & kInstrLoopPath) != 0;
+    const std::int64_t assigned = loop ? fast_tag(R[in.b]) : text_binding_type(text_type, R[in.b]);
     if (!tag_assignable(assigned, cell_binding_type(*cell))) {
-        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault);
+        binding_type_error(assigned, cell_binding_type(*cell), note_at(proto, &in), fault, loop);
         return false;
     }
 #if !(defined(NIFT_CLOSURE_MUTANT) && NIFT_CLOSURE_MUTANT == 3)

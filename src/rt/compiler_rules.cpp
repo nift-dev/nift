@@ -53,6 +53,10 @@ bool UnitCompiler::plain_postfix(const Node& node) {
         const auto closing = src.substr(left.end, member.begin - left.end - 1);
         const bool string_method = kinds(node.a) == kKindString &&
             (name == "split" || name == "stringify");  // rt-lint: allow-string-compare compile time
+        // A numeric group `(a / b).floor()` is legacy's ordinary postfix chain.
+        const bool numeric_method = (kinds(node.a) & kKindNumber) &&
+            (name == "floor" || name == "ceil" || name == "round" || name == "abs" ||  // rt-lint: allow-string-compare
+             name == "to_int" || name == "to_string");  // rt-lint: allow-string-compare compile time
         bool integer_remainder = false;
         if (left.kind == NodeKind::Binary && left.op == Op::Mod &&
             ast_.at(left.a).kind == NodeKind::Ident &&
@@ -65,7 +69,7 @@ bool UnitCompiler::plain_postfix(const Node& node) {
                 spelling.front() >= '1' && spelling.front() <= '9' &&
                 spelling.find_first_not_of("0123456789") == std::string_view::npos;
         }
-        if ((string_method || integer_remainder) &&
+        if ((string_method || numeric_method || integer_remainder) &&
             opening.size() == closing.size() &&
             opening.find_first_not_of('(') == std::string_view::npos &&
             closing.find_first_not_of(')') == std::string_view::npos &&
@@ -110,7 +114,7 @@ bool UnitCompiler::plain_postfix(const Node& node) {
     // refused (no context-dependent wording, owner decision).
     const bool path = left.kind == NodeKind::Ident || left.kind == NodeKind::Member || left.kind == NodeKind::Index;
     if (node.kind == NodeKind::Member && !path && (node.end >= src.size() || src[node.end] != '(') &&
-        loop_reachable())
+        (loop_region() || loop_type_error_ambiguous()))
         return fail(node, "postfix-receiver:member");
     return true;
 }

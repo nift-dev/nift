@@ -6,6 +6,7 @@
 #include "rt/atom.h"
 #include "rt/natives/builtin.h"
 #include "rt/native.h"
+#include "rt/builtin_bind.h"
 // CP12b structs (rt/structs.h). Struct instances are identity-bearing mutable
 // references (D-NEXT-refsem #1, superseding D-046 #3 / D-040 V9): legacy's
 // model. A binding, parameter, return value, container element or captured
@@ -118,7 +119,8 @@ bool UnitCompiler::field_update(const Node& node, NodeId receiver, const StructF
         const KindSet r = kinds(node.b);
         const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
         const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-        if (!numbers && !strings && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");
+        const bool dynamic = ((l | r) & kKindUnknown) != 0 || l == 0 || r == 0;
+        if (!numbers && !strings && !dynamic && !unknown_defers(l | r)) return fail(node, "type:compound-assignment");
 #if defined(NIFT_D2_MUTANT) && NIFT_D2_MUTANT == 6
         if (!expr_any(node.b, value)) return false;  // D2-6: the field is read after the rhs
 #endif
@@ -218,6 +220,10 @@ int UnitCompiler::struct_callee(const Node& node, std::string_view name, std::ui
         return struct_construct(node, static_cast<int>(made->second), dst) ? 1 : 0;
     const int s = current_struct();
     if (s < 0 || plan_.index.count(name)) return -1;
+    // A bare call of a built-in or native name is that built-in, even inside a
+    // struct that declares a method of the same name (legacy resolution).
+    NativeInfo native{};
+    if (lookup_native(name, native) || bind_function(name) != nullptr) return -1;
     const StructMethodInfo* m = plan_.structs[static_cast<std::size_t>(s)].method(name);
     if (m == nullptr) return -1;
     // An explicit receiver selects the method. Legacy bare open(path) is

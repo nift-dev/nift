@@ -89,6 +89,9 @@ bool readonly_method_args(const Ast& ast, NodeId id, bool native_run) {
                ast.text(ast.at(child)) == "args";  // rt-lint: allow-string-compare compile time
     };
     if (args_ident(id)) return false;
+    // Iterating the value (``for (arg : args)``) only reads it. The loop body
+    // is a separate child of the For node and is still checked.
+    if (node.kind == NodeKind::ForBinding && args_ident(node.a)) return true;
     if (node.kind == NodeKind::Call) {
         const Node& callee = ast.at(node.a);
         if (callee.kind == NodeKind::Member && args_ident(callee.a) && node.count == 0) {
@@ -97,7 +100,9 @@ bool readonly_method_args(const Ast& ast, NodeId id, bool native_run) {
         }
         const bool direct_run = callee.kind == NodeKind::Ident &&
                                 ast.text(callee) == "run";  // rt-lint: allow-string-compare compile time
-        if (native_run && direct_run && detail::process_program_literal(ast, node)) {
+        const bool direct_cmd = callee.kind == NodeKind::Ident &&
+                                ast.text(callee) == "cmd";  // rt-lint: allow-string-compare compile time
+        if (native_run && (direct_run || direct_cmd) && detail::process_program_literal(ast, node)) {
             for (std::uint32_t k = 0; k < node.count; ++k) {
                 const auto item = ast.list(node)[k];
                 const Node& arg = ast.at(item);

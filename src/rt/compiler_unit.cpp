@@ -290,10 +290,9 @@ bool UnitCompiler::compile_function(std::size_t f, std::unique_ptr<Proto>& out) 
     for (std::uint32_t k = 0; k < node.count; ++k) {
         const Node& param = ast_.at(params[k]);
         const std::string_view name = text(param);
-        // Only the built-in size/length and argv forms are read-only. A
-        // user-defined struct may implement an effectful method of that name.
-        if (method && name == "args" && kinds(params[k]) != kKindArray)  // rt-lint: allow-string-compare compile time
-            return fail(param, "param-name-reserved");
+        // A method parameter named `args` was already admitted by
+        // plan_structs (imported module, readonly argv use only); it is an
+        // ordinary local binding here, whatever its inferred kinds.
         if (session_ && plan_.index.count(name)) return fail(param, "param-shadows-fn");
         Binding binding;
         binding.reg = regs[k];

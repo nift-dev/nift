@@ -96,7 +96,7 @@ bool UnitCompiler::compound_snapshot(const Node& node, const Binding& b) {
         case Op::ModAssign: fb_->emit(OpCode::Mod, t, t, value); break;
         default: return fail(node, "compound-operator");
     }
-    if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
+    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
     // 4. The binding-type check, then the write-back (nothing is written before it).
     if (indirect) {
         std::uint16_t untyped = 0;

@@ -48,7 +48,11 @@ bool UnitCompiler::order_guarded(const Node& node) const {
     return false;
 #endif
     if (session_ || in_lambda_ || plan_.coroutines || order_ctx_.root == kNoNode) return false;
-    if (loop_reachable() && !loop_region()) return false;
+    // A struct method is not prepared by legacy: its body keeps the canonical
+    // statement wording even when a caller invokes it from a loop. Only a loop
+    // region inside the method changes the wording. Free functions called from
+    // a loop are prepared and keep the refusal (the call context is dynamic).
+    if (loop_reachable() && !loop_region() && !plan_.is_method(function_)) return false;
     const NodeId id = static_cast<NodeId>(&node - &ast_.at(0));
     return reaches(ast_, order_ctx_.root, id, 0);
 }

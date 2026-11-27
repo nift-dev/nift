@@ -3,6 +3,7 @@
 #include "rt/binding_rules.h"
 #include "rt/literal.h"
 #include "rt/module_data.h"
+#include "rt/module_link.h"
 #include "rt/native.h"
 namespace nift::rt::detail {
 bool UnitCompiler::new_binding(std::string_view name, const Node& at, std::uint16_t& reg, Binding& binding) {
@@ -59,7 +60,23 @@ bool UnitCompiler::declare(const Node& node) {
     const bool method_value = (size_value || length_value) && !session_ && in_function_ && !in_lambda_ &&
         plan_.is_method(function_) && imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
         !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
-    if (reserved_name(name) && !same_value && !method_value && !invocation_shadows_.count(node_id(target)))
+    // A local value binding named `args` in an imported struct method is an
+    // ordinary binding in legacy (a parameter-level exception already covers
+    // methods, a top-level one covers the entry script). It shadows the
+    // script invocation binding, and the module has no generated private
+    // args/cmd name that the linker would rename through it.
+    const bool method_args_binding = name == "args" && !session_ && in_function_ && !in_lambda_ &&  // rt-lint: allow-string-compare
+        plan_.is_method(function_) && imported_module_data(plan_, node) && !captured_binding(node_id(target)) &&
+        (!plan_.linked || plan_.linked->graph.modules[plan_.linked->locate(node.begin).module]->generated_names.empty()) &&
+        !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
+    // A local value binding in a function may take a built-in's name when it is
+    // never called there (legacy resolves the binding; the call split is the
+    // same rule as for-loop/catch bindings). `this`/`self` stay receiver names.
+    const bool local_reserved_value = reserved_name(name) && in_function_ && !in_lambda_ &&
+        name != "this" && name != "self" &&  // rt-lint: allow-string-compare compile time
+        !reserved_name_called_in(ast_, name, ast_.at(ast_.at(plan_.functions[function_]).b));
+    if (reserved_name(name) && !same_value && !method_value && !method_args_binding && !local_reserved_value &&
+        !invocation_shadows_.count(node_id(target)))
         return fail(target, "binding-name-reserved");
     const Binding* parameter = in_lambda_ ? scopes_.find(name) : nullptr;
     if (parameter && parameter->decl_node != kNoNode &&
@@ -132,7 +149,7 @@ bool UnitCompiler::assign_value(const Node& node, const Binding& b) {
     const bool exempt = numeric && (own_type || always_double_[binding_scope(b)].count(target));
     if (loop_reachable() && !exempt && type_mismatch_possible(type, kinds(node.b), scope_index()))
         return fail(node, "context:assignment-type");
-    if (loop_reachable() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
+    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.b))) return fail(node, "context:assignment-error");
     std::uint16_t value = 0;
     if (!temp(value) || !expr_to(node.b, value)) return false;
     std::uint16_t text_type = 0;
@@ -286,7 +303,7 @@ bool UnitCompiler::compound_op(const Node& node, const Binding& b) {
             default: return fail(node, "compound-operator");
         }
     }
-    if (loop_reachable() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
+    if (loop_type_error_ambiguous() && binding_error_possible(b, kinds(node.a))) return fail(node, "context:assignment-error");
     if (indirect) {
         std::uint16_t untyped = 0;
         if (!fb_->constant(Value::integer(-1), untyped)) return builder_ok();
@@ -322,7 +339,8 @@ bool UnitCompiler::compound_assign(const Node& node) {
     const KindSet l = kinds(node.a), r = kinds(node.b);
     const bool numbers = (l & ~kKindNumber) == 0 && (r & ~kKindNumber) == 0;
     const bool strings = node.op == Op::AddAssign && l == kKindString && r == kKindString;
-    if (!numbers && !strings && !unknown_defers(l | r))  // Unknown is neither (review D1)
+    const bool dynamic = ((l | r) & kKindUnknown) != 0 || l == 0 || r == 0;  // legacy checks the reached value kinds
+    if (!numbers && !strings && !dynamic && !unknown_defers(l | r))
         return fail(node, "type:compound-assignment");
     if (loop_reachable()) {
         // Legacy's prepared `%=` computes fmod on any numbers (the canonical

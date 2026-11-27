@@ -103,13 +103,17 @@ bool UnitCompiler::length_call(const Node& node, NodeId receiver_node, bool size
                                  spec->id == natives::BuiltinId::StreamReadLine;
         }
     }
-    if (!stream_line_length && kinds(receiver_node) != kKindBytes &&
+    // An unproven receiver is checked at run time (legacy's reached error or
+    // the container length); a proved non-container kind keeps the refusal.
+    const KindSet length_kinds = kinds(receiver_node);
+    const bool dynamic_length = length_kinds == 0 || (length_kinds & (kKindUnknown | kKindNull)) != 0;
+    if (!stream_line_length && length_kinds != kKindBytes && !dynamic_length &&
         !kinds_within(receiver_node, size ? kKindAggregate : static_cast<KindSet>(kKindAggregate | kKindString), node,
                       "type:length"))
         return false;
     // Legacy's prepared `length()` counts an object's members; the canonical
     // one rejects an object (D-018).
-    if (!size && (kinds(receiver_node) & (kKindObject | kKindUnknown)) && loop_reachable())
+    if (!size && (kinds(receiver_node) & kKindObject) && loop_type_error_ambiguous())
         return fail(node, "context:object-length");
     const std::uint16_t mark = fb_->top();
     std::uint16_t receiver = 0;

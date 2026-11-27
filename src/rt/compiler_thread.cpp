@@ -1,5 +1,7 @@
 #include "rt/compiler_thread.h"
 #include "rt/native_qualifier.h"
+#include "rt/builtin_bind.h"
+#include "rt/module_link.h"
 
 #include <string>
 
@@ -31,7 +33,15 @@ bool UnitCompiler::thread_call(const Node& node, std::string_view name, std::uin
 #if !(defined(NIFT_L6_MUTANT) && NIFT_L6_MUTANT == 2)  // test-only: the unqualified seven stay bound
     // L6 (D-075 #2): no unqualified native of these names in VM-default execution, and no user function either
     // (else the call resolved to it): the whole program is refused, before anything runs, reached or not.
-    if (native_function_name(name)) return fail(callee, "native-unqualified");
+    if (native_function_name(name)) {
+        // Package compatibility (D-065 package scope): imported module code keeps
+        // legacy's unqualified seven. Entry scripts keep the D-075 #2 refusal.
+        if (plan_.linked && plan_.linked->locate(node.begin).module > 0) {
+            if (const auto* spec = natives::find_builtin(natives::Receiver::None, name))
+                return builtin_call(node, *spec, kNoNode, dst);
+        }
+        return fail(callee, "native-unqualified");
+    }
 #endif
     if (name != "thread" && deferred_call(node, name, dst)) return builder_ok();  // slot 3: raised when reached
     if (name != "thread" || !plan_.coroutines) return fail(callee, "callable:" + std::string(name));

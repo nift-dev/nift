@@ -119,8 +119,9 @@ bool UnitCompiler::struct_call(const Node& node, int s, const StructMethodInfo& 
         }
     }
     for (std::uint32_t k = 0; ok && k < fixed; ++k) {
-        path_arg_ = value_only && index_depth_ == 0 && bare_argument(node, k)
-            ? args[k] : kNoNode;
+        // A bare scalar path is passed by value (legacy does not write a
+        // method parameter back to the path); argument_path checks the kinds.
+        path_arg_ = index_depth_ == 0 && bare_argument(node, k) ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         if (ast_.at(args[k]).kind == NodeKind::Spread) ok = fail(ast_.at(args[k]), "spread");
         else if (is_place_argument(ast_, args[k]) && f < plan_.escaping.size() && k < plan_.escaping[f].size() &&

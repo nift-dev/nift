@@ -53,7 +53,8 @@ bool UnitCompiler::builtin_arguments_ok(const Node& node, const natives::Builtin
     // Bytes natives outside the admitted subset retain the CP15 W8 refusal.
     const bool package_encode = spec.id == natives::BuiltinId::StrEncode && !session_ && !in_lambda_ &&
         in_function_ && !plan_.coroutines && imported_module_data(plan_, node) &&
-        receiver != kNoNode && kinds(receiver) == kKindString && node.count == 1 &&
+        receiver != kNoNode && (kinds(receiver) == 0 || (kinds(receiver) & kKindUnknown) ||
+                               kinds(receiver) == kKindString) && node.count == 1 &&
         ast_.at(args[0]).kind == NodeKind::String && text(ast_.at(args[0])) == R"("utf-8")";
     if (bytes_builtin(spec) && !package_encode) return fail(node, "builtin-bytes:" + std::string(spec.name));
     if (plain_arguments_only(spec))
@@ -190,6 +191,21 @@ bool UnitCompiler::collection_inspection_ok(const Node& node, const natives::Bui
 bool UnitCompiler::may_fault(NodeId id) const {
     if (id == kNoNode) return false;
     const Node& n = ast_.at(id);
+    // A zero-argument length()/size() on a proved string, array or bytes
+    // cannot fault (legacy computes it while evaluating a lazy argument).
+    if (n.kind == NodeKind::Call && n.count == 0) {
+        const Node& callee = ast_.at(n.a);
+        if (callee.kind == NodeKind::Member) {
+            const auto method = text(ast_.at(callee.b));
+            const KindSet receiver = kinds(callee.a);
+            const KindSet safe = method == "length"  // rt-lint: allow-string-compare compile time
+                                     ? static_cast<KindSet>(kKindString | kKindArray | kKindBytes)
+                                     : static_cast<KindSet>(kKindString | kKindArray | kKindBytes | kKindObject);
+            if ((method == "length" || method == "size") && receiver != 0 &&  // rt-lint: allow-string-compare
+                (receiver & ~safe) == 0)
+                return may_fault(callee.a);
+        }
+    }
     if (n.kind == NodeKind::Member || n.kind == NodeKind::Index || n.kind == NodeKind::Call) return true;
     if (n.kind == NodeKind::Binary && (n.op == Op::Div || n.op == Op::Mod)) return true;
     if (may_fault(n.a) || may_fault(n.b) || may_fault(n.c)) return true;
@@ -202,6 +218,22 @@ bool UnitCompiler::may_fault(NodeId id) const {
 bool UnitCompiler::unobservable_argument(NodeId id) {
     const Node& node = ast_.at(id);
     if (node.kind == NodeKind::Ident) return scopes_.find(text(node)) != nullptr;
+    // A pure length()/size() of a proved string, array or bytes has no effect
+    // and cannot fault; legacy may evaluate it lazily.
+    if (node.kind == NodeKind::Call && node.count == 0) {
+        const Node& callee = ast_.at(node.a);
+        if (callee.kind == NodeKind::Member && ast_.at(callee.a).kind == NodeKind::Ident &&
+            scopes_.find(text(ast_.at(callee.a))) != nullptr) {
+            const auto method = text(ast_.at(callee.b));
+            const KindSet receiver = kinds(callee.a);
+            const KindSet safe = method == "length"  // rt-lint: allow-string-compare compile time
+                                     ? static_cast<KindSet>(kKindString | kKindArray | kKindBytes)
+                                     : static_cast<KindSet>(kKindString | kKindArray | kKindBytes | kKindObject);
+            if ((method == "length" || method == "size") && receiver != 0 &&  // rt-lint: allow-string-compare
+                (receiver & ~safe) == 0)
+                return true;
+        }
+    }
     Value value;
     bool is_constant = false;
     return constant_of(node, value, is_constant) && is_constant;

@@ -102,7 +102,8 @@ inline std::int64_t text_binding_type(std::int64_t text_type, const Value& value
 }
 // The error of a failed binding-type check (`assigned` is the type legacy
 // computed for the value; `name` the binding).
-bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault);
+bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault,
+                        bool loop = false);
 
 bool get_index(const Note* note, const Value& object, const Value& key, Value& out, Fault& fault,
                bool prepared = false);
@@ -117,6 +118,6 @@ bool get_member(const Note* note, const Value& object, Atom key, Value& out, Fau
 bool push_value(Value& array, const Value& value, Fault& fault, const Note* note = nullptr,
                 const CycleGraph* graph = nullptr, bool* cycle = nullptr);
 enum class LengthMode : std::uint16_t { Length, Size, StreamLine };
-bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out, Fault& fault);
+bool length_of(const Note* note, const Value& value, LengthMode mode, bool loop, Value& out, Fault& fault);
 
 } // namespace nift::rt

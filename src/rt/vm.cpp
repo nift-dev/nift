@@ -307,13 +307,15 @@ VmResult Vm::run_loop(std::string& output) {
     OP(JmpNotNull) { pc += R[pc->a].is_null() ? 1 : 1 + jump_offset(pc->c); DISPATCH(); }
     OP(BindType) { R[pc->a] = Value::integer(text_binding_type(BIND_TEXT(pc->c), R[pc->b])); NEXT(); }
     OP(CheckAssign) {  // textual `x = e`: legacy's text-derived type and the value
-        const std::int64_t assigned = text_binding_type(RK(pc->c).as_int(), R[pc->a]);
+        const bool loop = (pc->flags & kInstrLoopPath) != 0;
+        const std::int64_t assigned = loop ? fast_tag(R[pc->a])
+                                           : text_binding_type(RK(pc->c).as_int(), R[pc->a]);
         if (tag_assignable(assigned, R[pc->b].as_int())) NEXT();
-        binding_type_error(assigned, R[pc->b].as_int(), note_at(proto, pc), fault); FAIL(); }
+        binding_type_error(assigned, R[pc->b].as_int(), note_at(proto, pc), fault, loop); FAIL(); }
     OP(CheckType) {
         const std::int64_t to = R[pc->b].as_int(); const std::int64_t tag = fast_tag(R[pc->a]);
         if (tag_assignable(tag, to)) NEXT();
-        binding_type_error(tag, to, note_at(proto, pc), fault); FAIL(); }
+        binding_type_error(tag, to, note_at(proto, pc), fault, (pc->flags & kInstrLoopPath) != 0); FAIL(); }
     OP(Call) { if (!op_call(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(CallValue) { if (!op_call_value(*pc, R, K, proto, base, pc, fault)) FAIL(); DISPATCH(); }
     OP(LoadFunction) { if (!op_load_function(*pc, R, fault)) FAIL(); NEXT(); }

@@ -19,7 +19,7 @@
 
 namespace nift::rt {
 
-bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out, Fault& fault) {
+bool length_of(const Note* note, const Value& value, LengthMode mode, bool loop, Value& out, Fault& fault) {
     if (mode == LengthMode::StreamLine && value.is(Kind::Null))
         return raise(fault, StopReason::Error,
                      "unknown value or malformed expression: " + (note ? note->text : std::string()));
@@ -33,8 +33,9 @@ bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out
         return true;
     }
     if (value.is(Kind::Object)) {
-        // size() counts members; length() rejects an object.
-        if (!size)
+        // size() counts members; length() rejects an object, except in legacy's
+        // prepared loop code, where length() counts members too.
+        if (!size && !loop)
             return raise(fault, StopReason::Error,
                          "unknown value or malformed expression: " + (note ? note->text : std::string()));
         out = Value::integer(static_cast<std::int64_t>(object_size(value)));
@@ -47,7 +48,11 @@ bool length_of(const Note* note, const Value& value, LengthMode mode, Value& out
         out = Value::integer(count);
         return true;
     }
-    return internal(fault, "length/size");
+    if (value.is_number())
+        return raise(fault, StopReason::Error,
+                     std::string(size ? "size" : "length") + ": unsupported for this value");
+    return raise(fault, StopReason::Error,
+                 "unknown value or malformed expression: " + (note ? note->text : std::string()));
 }
 
 namespace {
@@ -156,6 +161,15 @@ void Vm::error_result(VmResult& result, const Fault& fault, const Proto* proto, 
             }
         }
 #endif
+    }
+    if (fault.reason == StopReason::Error && !fault.catchable &&
+        fault.message.rfind("cannot change binding type:", 0) == 0) {
+        // Legacy's prepared (loop) binding-type check carries one "return: "
+        // per caller frame whose call is a return value outside a loop region.
+        result.message = fault.message;
+        for (const auto& frame : frames_)
+            if (frame.return_call && !((frame.ret - 1)->flags & kInstrLoopPath))
+                result.message = "return: " + result.message;
     }
     if (pc->op == OpCode::OrderGuard && fault.reason == StopReason::Error && !fault.catchable) {
         result.message = fault.message;  // the note: the innermost statement's legacy wording
@@ -285,7 +299,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
                                             RK(in.b), "");
         }
         case OpCode::Length:
-            if (!length_of(note, R[in.b], static_cast<LengthMode>(in.c), out, fault)) return false;
+            if (!length_of(note, R[in.b], static_cast<LengthMode>(in.c), (in.flags & kInstrLoopPath) != 0, out, fault))
+                return false;
             break;
         case OpCode::TypeMeet:
             out = Value::integer(

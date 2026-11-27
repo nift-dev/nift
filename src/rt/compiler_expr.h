@@ -248,6 +248,15 @@ private:
     // error differently in loop code (D-018c), so such loop code is refused (context:assignment-error, review round
     // 2).
     bool binding_error_possible(const Binding& b, KindSet value) const;
+    // A free function called from a loop runs legacy's prepared path, whose
+    // type-check wording differs (and the caller is not known here). Struct
+    // methods and top-level code keep the canonical wording; an actual loop
+    // region is marked on its instructions (kInstrLoopPath) and checked at
+    // run time with the prepared wording.
+    bool loop_type_error_ambiguous() const {
+        if (in_function_ && !in_lambda_ && !plan_.is_method(function_) && loop_called_[function_]) return true;
+        return loop_reachable() && !loop_region() && !(in_function_ && plan_.is_method(function_));
+    }
     std::size_t scope_index() const { return in_function_ ? function_ : plan_.functions.size(); }
     std::uint32_t site(const Node& node) const { return node.begin; }
     std::uint32_t prepared_begin(const Node& node) const;

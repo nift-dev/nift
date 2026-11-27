@@ -364,7 +364,8 @@ TyRef Inference::call(const Node& n) {
         escape_callables(values);  // B4b C4: a native does not call back
         const bool package_encode = !session_ && current_ >= 0 && !plan_.coroutines &&
             static_cast<std::size_t>(current_) < plan_.functions.size() && imported_module_data(plan_, n) &&
-            recv->kinds == kKindString && key == "encode" && n.count == 1 &&
+            (recv->kinds == 0 || (recv->kinds & kKindUnknown) || recv->kinds == kKindString) &&
+            key == "encode" && n.count == 1 &&
             ast_.at(args[0]).kind == NodeKind::String && ast_.text(ast_.at(args[0])) == R"("utf-8")";
         TyRef result=fresh(call_id, package_encode ? kinds_ty(kKindBytes) :
                           method_result(ast_, n, recv, values, session_ != nullptr));

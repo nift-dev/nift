@@ -138,7 +138,10 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
     static_cast<void>(in);
     if (op == OpCode::Add && (left.is(Kind::String) || right.is(Kind::String)))
         return concatenate(left, right, out, fault);
-    if (!left.is_number() || !right.is_number()) return internal(fault, "arithmetic");
+    // Dynamic admission: the compiler could not prove the operand kinds, so
+    // this is legacy's reached operand error, not an internal defect.
+    if (!left.is_number() || !right.is_number())
+        return raise(fault, StopReason::Error, "arithmetic operators require numeric operands");
     // Evidence for the D-018 number policy (VM stats): an operand or result
     // legacy calls large, or a result out of range.
     const bool large = is_large(left) || is_large(right);
@@ -160,6 +163,8 @@ bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& righ
 }
 
 bool add_assign_slow(const Instr& in, Value& target, const Value& right, Fault& fault) {
+    if (target.is(Kind::String) != right.is(Kind::String))
+        return raise(fault, StopReason::Error, "arithmetic operators require numeric operands");
     if (target.is(Kind::String) && right.is(Kind::String)) {
         // `s += t` on an unshared heap string appends in place (legacy does the
         // same when the binding holds the only reference); amortised O(len(t)).
@@ -250,10 +255,12 @@ const char* binding_type_name(std::int64_t tag) {
     }
 }
 
-bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault) {
+bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault, bool loop) {
 #ifdef NIFT_VM_MUTANTS
     if (vm_mutant() == 7) std::swap(assigned, binding);  // M7: wrong kinds in the message
 #endif
+    if (loop)  // legacy's prepared (loop) evaluator: value type only, no textual type
+        return raise(fault, StopReason::Error, "cannot change binding type: " + note_text(note));
     return raise(fault, StopReason::Error,
                  std::string("cannot assign ") + binding_type_name(assigned) + " to " + binding_type_name(binding) +
                      " binding '" + note_text(note) + "'");
