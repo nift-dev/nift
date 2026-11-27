@@ -83,6 +83,9 @@ private:
     bool compound_assign(const Node& node); friend struct ElementPath;  // checkpoint 1 (compiler_element_path.cpp)
     bool inc_dec(const Node& node);
     bool if_chain(const Node& node);
+    bool guarded_object(NodeId id) const;
+    std::vector<NodeId> guarded_return_reads(const Node& node) const;
+    std::vector<NodeId> guarded_object_reads_;
     bool while_loop(const Node& node);
     bool try_statement(const Node& node);
     bool throw_statement(const Node& node);
@@ -259,12 +262,9 @@ private:
     const Node& chain_enter(const Node& node);
     bool receiver_text_wording(const Node& node, const Node& chain) const;
     bool may_fault(NodeId id) const;
-    // kKindUnknown always comes with every kind, so a "may be X" test is
-    // conservative for it too (review CP12 round 1, D1).
     KindSet kinds(NodeId id) const {
         const KindSet k = kinds_.of(id);
-        // A4/B3: an empty kind set inside a lambda is unresolved, not "any";
-        // treat it as Unknown so no check treats it as satisfying every kind.
+        if (k == (kKindObject | kKindNull) && guarded_object(id)) return kKindObject;
         if (k == 0 && in_lambda_) return static_cast<KindSet>(kKindAll | kKindUnknown);
         return (k & kKindUnknown) && !probe_ ? static_cast<KindSet>(kKindAll | kKindUnknown) : k;
     }

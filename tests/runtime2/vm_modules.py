@@ -247,6 +247,20 @@ SHAPES.update({
                ' minc := row[k]\n j := minc\n print(j)\n k += 1\n }\n}\nexport(outer_cost)\n',
         "main.f": 'import("m.f")\nouter_cost()\n',
     }, "vm"),
+    "imported-nonnull-return-members": ({
+        "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
+               'private fn(report(code)) { return {"message": code} }\n'
+               'fn(read(flag)) { item := this.data(flag); if(item != null) { return this.report(item.code) }; '
+               'return {"message": 0} } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\na := b.read(true)\nc := b.read(false)\n'
+                  'print(a.message)\nprint(c.message)\n',
+    }, "vm"),
+    "imported-nonnull-return-intervening-statement": ({
+        "m.f": 'struct(Box) {\n private fn(data(flag)) { if(flag) { return {"code": 7} }; return null }\n'
+               'fn(read(flag)) { item := this.data(flag); if(item != null) { print("before"); return item.code }; '
+               'return 0 } }\nexport(Box)\n',
+        "main.f": 'import("m.f")\nb := Box()\nprint(b.read(true))\n',
+    }, "type:member"),
     "struct-private-type": ({
         "m.f": "struct(Secret) { x := 3 }\n",
         "main.f": 'import("m.f")\np := Secret()\nprint(p.x)\n',

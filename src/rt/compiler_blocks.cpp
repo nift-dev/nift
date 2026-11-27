@@ -1,5 +1,8 @@
 #include "rt/compiler_blocks.h"
+#include "rt/module_data.h"
 #include "Json.h"
+
+#include <algorithm>
 
 // rt-lint: cold-file compile-time block register ranges, once per unit
 
@@ -81,6 +84,47 @@ int UnitCompiler::literal_ordering_error(const Node& expression, const Node& dia
     return ok ? 1 : 0;
 }
 
+bool UnitCompiler::guarded_object(NodeId id) const {
+    return std::find(guarded_object_reads_.begin(), guarded_object_reads_.end(), id) != guarded_object_reads_.end();
+}
+
+// Admit reads only in the immediate return. A call operand may precede a
+// member read, so accept only literals, bare reads, and direct member reads.
+std::vector<NodeId> UnitCompiler::guarded_return_reads(const Node& node) const {
+    if (session_ || in_lambda_ || !in_function_ || plan_.coroutines || !imported_module_data(plan_, node)) return {};
+    const auto& test = ast_.at(node.a);
+    if (test.kind != NodeKind::Binary || test.op != Op::Ne || ast_.at(test.b).kind != NodeKind::Null) return {};
+    const auto& name = ast_.at(test.a);
+    if (name.kind != NodeKind::Ident || kinds(test.a) != (kKindObject | kKindNull)) return {};
+    const auto* binding = find_binding(text(name));
+    if (!binding || binding->global || binding->cell) return {};
+    const auto& body = ast_.at(node.b);
+    if (body.count != 1) return {};
+    const auto& ret = ast_.at(ast_.list(body)[0]);
+    if (ret.kind != NodeKind::Return || ret.a == kNoNode) return {};
+    const auto& expression = ast_.at(ret.a);
+    std::vector<NodeId> reads;
+    const auto check = [&](NodeId id) {
+        const auto& arg = ast_.at(id);
+        if (arg.kind == NodeKind::Member) {
+            const auto& receiver = ast_.at(arg.a);
+            if (receiver.kind != NodeKind::Ident) return false;
+            if (text(receiver) == text(name)) reads.push_back(arg.a);
+            return true;
+        }
+        return arg.kind == NodeKind::Ident || arg.kind == NodeKind::Number || arg.kind == NodeKind::True ||
+               arg.kind == NodeKind::False || arg.kind == NodeKind::Null ||
+               (arg.kind == NodeKind::String && arg.count == 0);
+    };
+    if (expression.kind != NodeKind::Call) return check(ret.a) ? reads : std::vector<NodeId>{};
+    const auto& callee = ast_.at(expression.a);
+    if (callee.kind != NodeKind::Ident &&
+        (callee.kind != NodeKind::Member || ast_.at(callee.a).kind != NodeKind::Ident)) return {};
+    for (std::uint32_t k = 0; k < expression.count; ++k)
+        if (!check(ast_.list(expression)[k])) return {};
+    return reads;
+}
+
 bool UnitCompiler::if_chain(const Node& node) {
     std::vector<std::size_t> to_else;
     const int rejected = literal_ordering_error(ast_.at(node.a), node, 0);
@@ -88,7 +132,10 @@ bool UnitCompiler::if_chain(const Node& node) {
     const Node& body = ast_.at(node.b);
     scopes_.push();
     BlockRegs body_regs = block_begin(node.b);
+    auto saved_reads = std::move(guarded_object_reads_);
+    guarded_object_reads_ = guarded_return_reads(node);
     const bool ok = statements(body);
+    guarded_object_reads_ = std::move(saved_reads);
     block_end(body_regs);
     scopes_.pop();
     if (!ok) return false;
