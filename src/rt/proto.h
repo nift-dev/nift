@@ -58,7 +58,7 @@ struct Note {
     bool indexed_capture_call = false;  // expression-lambda index errors report at its invocation
     bool assign_path = false;  // GetIndex: a step of an assignment path (vm_element_path.h)
     bool deferred_raise = false;  // slot 3: an Undefined raise at a deferred site (legacy's caller return: prefixes)
-    // D-018c row 4: legacy evaluates loop print arguments textually (prepared
+    // D-018c row 4: legacy evaluates loop call arguments textually (prepared
     // code uses the loop wording elsewhere); this note picks the right site.
     bool textual_index = false;
 };

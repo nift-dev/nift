@@ -28,7 +28,7 @@ bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
     const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
     const Node& key_ast = ast_.at(node.b);
     // A loop print argument is re-parsed textually; it rejects object length().
-    const bool print_index = print_span_ && node.begin >= print_span_->begin && node.end <= print_span_->end;
+    const bool print_index = call_arg_span_ && node.begin >= call_arg_span_->begin && node.end <= call_arg_span_->end;
     if (print_index && ast_.at(node.a).kind == NodeKind::Ident && loop_region() &&
         key_ast.kind == NodeKind::Call && key_ast.count == 0) {
         const Node& callee = ast_.at(key_ast.a);

@@ -335,6 +335,18 @@ CASES += [
      b"fn(w0()) {\n  r := null\n  r += 1\n}\ni := 0\nwhile (i < 1) { i += 1\nprint(zz()) }\n", C, None),
 ]
 
+SRC_SHORT = b"a := [1]\nj := 2\nk := 3\ni := 0\nwhile (i < 1) { i += 1\nx := (!(a[j]))\n}\n"
+SHORT = b"invalid index"
+CASES += [
+    ("loop invalid index: short wording, unique index node", (b"", d(6, 8, SHORT), 1),
+     (b"", d(6, 9, SHORT), 1), st(outcome="vm-error", error_in_loop_path=True), SRC_SHORT, A, DIAG),
+    ("loop invalid index: short wording, VM at the parenthesis", (b"", d(6, 8, SHORT), 1),
+     (b"", d(6, 10, SHORT), 1), st(outcome="vm-error", error_in_loop_path=True), SRC_SHORT, C, None),
+    ("loop invalid index: two index candidates", (b"", d(6, 8, SHORT), 1),
+     (b"", d(6, 9, SHORT), 1), st(outcome="vm-error", error_in_loop_path=True),
+     b"a := [1]\nj := 2\nk := 3\ni := 0\nwhile (i < 1) { i += 1\nx := (!(a[j] + a[k]))\n}\n", C, None),
+]
+
 
 def main():
     failures = 0

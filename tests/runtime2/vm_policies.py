@@ -177,6 +177,15 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     reported = vm_sites.statement_at(source, root, offset) if offset is not None else None
     if reported is None:
         return False
+    # Legacy's prepared loop wording can name the same short message as the VM
+    # (both `invalid index`) while its position includes enclosing parentheses.
+    # D-018c still requires the VM to name the one index node in the statement.
+    if legacy_msg == vm_msg == b"invalid index":
+        if not st.get("error_in_loop_path"):
+            return False
+        indices = [n for n in root.walk()
+                   if n.kind == "Index" and reported.begin <= n.begin and n.end <= reported.end]
+        return len(indices) == 1 and vm_sites.position(source, indices[0].begin) == vm_pos
     # The failing node: unique within what legacy reported or, where legacy
     # reports a loop statement or a call site (loop-evaluator code), unique
     # in the program.

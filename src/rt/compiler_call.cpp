@@ -99,7 +99,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (!operand_window(base, node.count)) return false; if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     const Node* const saved_print = print_arg_;
-    const Node* const saved_print_span = print_span_;
+    const Node* const saved_print_span = call_arg_span_;
     const bool saved_path_allow = path_allow_nested_;
     const bool package_scope = !is_native && f < plan_.functions.size() && plan_.linked &&
         plan_.linked->locate(ast_.at(plan_.functions[f]).begin).module > 0;
@@ -118,7 +118,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
                         ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
-        if (is_native && name == "print") print_span_ = &node;  // rt-lint: allow-string-compare compile time
+        call_arg_span_ = &node;
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
         if (!is_native && !arity_error && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
@@ -128,7 +128,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
     path_allow_nested_ = saved_path_allow;
-    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; print_span_ = saved_print_span;
+    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; call_arg_span_ = saved_print_span;
     if (!is_native) --call_args_;
     if (arity_error) {
         const bool ok = legacy_fatal(node, "callable argument count mismatch: " + std::string(name), base);

@@ -367,7 +367,7 @@ private:
     const Node* chain_top_ = nullptr;   // the outermost member/index chain (chain_enter)
     const Node* chain_next_ = nullptr;  // its next receiver
     const Node* print_arg_ = nullptr;   // the native call argument being compiled
-    const Node* print_span_ = nullptr;  // an enclosing print argument, through calls
+    const Node* call_arg_span_ = nullptr;  // an enclosing call argument, through nested calls
     std::string_view global_note_;      // full access path for checked binding reads
     std::uint32_t return_read_offset_ = kNoNode;  // active lambda return expression
     bool global_offset_set_ = false;
