@@ -85,6 +85,7 @@ private:
                 node.kind = WireKind::Collection;
                 node.binding_type = static_cast<std::int64_t>(collection_kind(value));
                 node.sorted_collection = collection_sorted(value);
+                node.collection_tag_length = collection_tag_length(value);
                 break;
             case Kind::Struct: {  // B3: the descriptor by value, once per graph
                 node.kind = WireKind::Struct;

@@ -2,6 +2,7 @@
 #include "rt/parallel_task.h"
 
 #include "rt/aggregate.h"
+#include "rt/aggregate_collection.h"
 #include "rt/vm_in_place.h"
 #include "rt/compare.h"
 #include "rt/copy_graph.h"
@@ -31,6 +32,16 @@ bool length_of(const Note* note, const Value& value, LengthMode mode, bool loop,
     if (value.is(Kind::Array)) {
         out = Value::integer(static_cast<std::int64_t>(array_size(value)));
         return true;
+    }
+    if (value.is(Kind::Collection)) {
+        if (size) {
+            out = Value::integer(static_cast<std::int64_t>(collection_size(value)));
+            return true;
+        }
+        // Legacy's prepared loop evaluator reads length() of a collection as
+        // the length of its internal tag string; the serial is tracked with
+        // the VM's collection creation order (D-018).
+        if (loop) { out = Value::integer(collection_tag_length(value)); return true; }
     }
     if (value.is(Kind::Object)) {
         // size() counts members; length() rejects an object, except in legacy's
@@ -290,7 +301,8 @@ bool Vm::cold(const Instr& in, const Proto* proto, const Note* note, Value* R, c
             return true;
         }
         case OpCode::GetIndex:  // checkpoint 1: a failed step of an assignment path reports legacy's wording
-            if (!get_index(note, R[in.b], RK(in.c), out, fault, (in.flags & kInstrLoopPath) != 0))
+            if (!get_index(note, R[in.b], RK(in.c), out, fault,
+                           (in.flags & kInstrLoopPath) != 0 && !(note && note->textual_index)))
                 return note && note->assign_path && path_step(note, R[in.b], RK(in.c), out, fault);
             break;
         case OpCode::SetIndex: {

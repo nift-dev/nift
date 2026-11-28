@@ -103,7 +103,9 @@ private:
                 value = Value::adopt(new CollectionObject(CollectionKind::Stack)); break;  // M9: kind lost
 #else
                 value = Value::adopt(new CollectionObject(static_cast<CollectionKind>(n.binding_type),
-                                                          n.sorted_collection)); break;
+                                                          n.sorted_collection));
+                value.heap_as<CollectionObject>()->tag_length = n.collection_tag_length;
+                break;
 #endif
             case WireKind::Object: value = Value::adopt(new ObjectObject()); break;
             case WireKind::Struct:

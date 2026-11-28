@@ -84,6 +84,7 @@ private:
         std::uint64_t column = 0;
         std::int64_t binding_type = 0;
         bool sorted_collection = false;
+        std::uint8_t collection_tag_length = 18;  // legacy loop length() evidence (D-018)
         std::uint32_t proto_index = 0;
         std::uint64_t proto_domain = 0;
         std::uint32_t native_id = 0;

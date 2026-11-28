@@ -77,14 +77,33 @@ CollectionObject& collection_mut(Value& collection) {
 
 } // namespace
 
+namespace {
+thread_local std::uint64_t next_collection_tag_serial = 1;
+
+std::uint8_t tag_length_for(std::uint64_t serial) {
+    std::uint8_t digits = 1;
+    while (serial >= 10) {
+        ++digits;
+        serial /= 10;
+    }
+    return static_cast<std::uint8_t>(17 + digits);
+}
+} // namespace
+
+void reset_collection_tag_serial() { next_collection_tag_serial = 1; }
+
 Value make_collection(CollectionKind kind, bool sorted) {
     auto* c = new CollectionObject(kind, sorted);
+    c->tag_length = tag_length_for(next_collection_tag_serial++);
     heap_retally(c);
     return Value::adopt(c);
 }
 
 CollectionKind collection_kind(const Value& collection) { return collection.heap_as<CollectionObject>()->sub; }
 bool collection_sorted(const Value& collection) { return collection.heap_as<CollectionObject>()->sorted; }
+std::uint8_t collection_tag_length(const Value& collection) {
+    return collection.heap_as<CollectionObject>()->tag_length;
+}
 
 std::size_t collection_size(const Value& collection) { return entries(*collection.heap_as<CollectionObject>()); }
 
@@ -262,6 +281,7 @@ Value collection_shallow_clone(const Value& collection) {
     const auto* source = collection.heap_as<CollectionObject>();
     Value owned = Value::adopt(new CollectionObject(source->sub, source->sorted));
     auto* c = owned.heap_as<CollectionObject>();
+    c->tag_length = source->tag_length;
     c->items = source->items;
     c->index = source->index;
     copy_summary(source, c);

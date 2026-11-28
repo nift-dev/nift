@@ -51,6 +51,7 @@ public:
     void mark_indexed_capture_call(std::size_t index) { proto_->note_table[index].indexed_capture_call = true; }
     void mark_assign_path(std::size_t index) { proto_->note_table[index].assign_path = true; }
     void mark_deferred_raise(std::size_t index) { proto_->note_table[index].deferred_raise = true; }
+    void mark_textual_index(std::size_t index) { proto_->note_table[index].textual_index = true; }
     Instr& at(std::size_t index) { return proto_->code[index]; }
     void set_params(std::uint16_t count) { proto_->nparams = count; }
 

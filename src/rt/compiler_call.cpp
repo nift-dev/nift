@@ -24,9 +24,6 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (bound && name == "same" && bound->decl_node != kNoNode &&  // rt-lint: allow-string-compare compile time
         ast_.at(bound->decl_node).kind == NodeKind::Ident && bound->decl_kinds == kKindBool &&
         !session_ && !in_function_ && !in_lambda_) bound = nullptr;
-    // Legacy's built-in `cmd(...)` (the process builder) takes precedence over
-    // the `cmd` invocation binding (a string) or a top-level `cmd := …`: that
-    // call is the built-in's, refused on the VM (`callable:cmd`, deferred).
 #if !(defined(NIFT_ARGSCMD_MUTANT) && NIFT_ARGSCMD_MUTANT == 3)  // test-only control (args_cmd/mutants.sh)
     const bool invocation_cmd = bound && (bound->invocation || invocation_shadows_.count(bound->decl_node));
     if (invocation_cmd && name == "cmd") bound = nullptr;  // rt-lint: allow-string-compare compile time
@@ -102,6 +99,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
     if (!operand_window(base, node.count)) return false; if (!is_native) ++call_args_;
     const NodeId saved_path = path_arg_, saved_chain = path_chain_;
     const Node* const saved_print = print_arg_;
+    const Node* const saved_print_span = print_span_;
     const bool saved_path_allow = path_allow_nested_;
     const bool package_scope = !is_native && f < plan_.functions.size() && plan_.linked &&
         plan_.linked->locate(ast_.at(plan_.functions[f]).begin).module > 0;
@@ -120,6 +118,7 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
                         ? args[k] : kNoNode;
         path_chain_ = kNoNode;
         print_arg_ = is_native ? &ast_.at(args[k]) : nullptr;
+        if (is_native && name == "print") print_span_ = &node;  // rt-lint: allow-string-compare compile time
         if (ast_.at(args[k]).kind == NodeKind::Spread) return fail(ast_.at(args[k]), "spread");
         // A place argument is a legacy location reference (review D6).
         if (!is_native && !arity_error && is_place_argument(ast_, args[k]) && f < plan_.escaping.size() &&
@@ -129,7 +128,8 @@ bool UnitCompiler::call(const Node& node, std::uint16_t dst) {
         if (!window_value(args[k], static_cast<std::uint16_t>(base + k))) return false;
     }
     path_allow_nested_ = saved_path_allow;
-    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; if (!is_native) --call_args_;
+    path_arg_ = saved_path; path_chain_ = saved_chain; print_arg_ = saved_print; print_span_ = saved_print_span;
+    if (!is_native) --call_args_;
     if (arity_error) {
         const bool ok = legacy_fatal(node, "callable argument count mismatch: " + std::string(name), base);
         if (dst != base) fb_->emit(OpCode::Move, dst, base);
@@ -193,7 +193,7 @@ bool UnitCompiler::method_call(const Node& node, std::uint16_t dst) {
         // difference refusal. An unproved or string-capable receiver is
         // legacy's run-time conversion (the native validates the reached value).
         if (name == "to_int" && k != 0 && (k & kKindFrac) &&  // rt-lint: allow-string-compare B4
-            !(k & (kKindString | kKindUnknown)) && loop_reachable())
+            loop_reachable())
             return fail(node, "context:number-to-int");
         const natives::BuiltinSpec* spec = nullptr;
         switch (bind_method(k, name, spec)) {
@@ -307,83 +307,6 @@ bool UnitCompiler::member(const Node& node, std::uint16_t dst) {
     const std::size_t at = fb_->emit(OpCode::GetMember, dst, object, static_cast<std::uint16_t>(key.id));
     fb_->set_flags(saved_flags);
     if (!location.empty()) fb_->note(at, std::move(location));
-    fb_->release_to(mark);
-    return true;
-}
-bool UnitCompiler::index(const Node& node, std::uint16_t dst) {
-    if (!plain_postfix(node)) return false;
-    std::string location;
-    if (!argument_path(node, location)) return false;
-    if (index_depth_ > 0) return fail(node, "path-in-index");
-    const KindSet object_kinds = kinds(node.a), key_kinds = kinds(node.b);
-    const bool array = (object_kinds & ~kKindArray) == 0;
-    const bool bytes = object_kinds == kKindBytes && key_kinds && !(key_kinds & ~kKindNumber) &&
-        (!loop_reachable() || (loop_region() && key_kinds == kKindInt && ast_.at(node.a).kind == NodeKind::Ident &&
-                              ast_.at(node.b).kind == NodeKind::Ident));
-    const bool object = (object_kinds & ~kKindObject) == 0 && (key_kinds & ~kKindString) == 0;
-    const Node& key_ast = ast_.at(node.b);
-    const bool bad_bytes_key = object_kinds == kKindBytes && key_kinds == kKindString &&
-        !loop_reachable() && !session_ && key_ast.kind == NodeKind::Ident;
-    const bool bad_boolean_key = in_lambda_ && !session_ && !loop_reachable() &&
-                                 return_read_offset_ == kNoNode && object_kinds == kKindArray &&
-                                 (key_ast.kind == NodeKind::True || key_ast.kind == NodeKind::False);
-    const Node& receiver = ast_.at(node.a);
-    const Binding* parameter = in_lambda_ && receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
-    const bool null_parameter = parameter && parameter->decl_node != kNoNode &&
-        ast_.at(parameter->decl_node).kind == NodeKind::Param && !session_ && !loop_reachable() &&
-        return_read_offset_ == kNoNode && object_kinds == kKindNull && key_ast.kind == NodeKind::Number;
-    const Node* null_call = null_parameter && (!module_names_ || module_names_->empty())
-        ? direct_null_index_call(ast_, root_, node_id(node)) : nullptr;
-    const bool null_script_index = object_kinds == kKindNull && receiver.kind == NodeKind::Ident && !session_ &&
-        key_ast.kind == NodeKind::String && !key_ast.count && key_ast.a == kNoNode && print_arg_ == &node &&
-        !in_function_ && !loop_reachable() && !plan_.coroutines && (!module_names_ || module_names_->empty());
-    const Binding* local_index = receiver.kind == NodeKind::Ident ? find_binding(text(receiver)) : nullptr;
-    const bool local_value_index = local_index && !local_index->global && !local_index->cell &&
-        local_index->decl_node != kNoNode && ast_.at(local_index->decl_node).kind == NodeKind::Ident;
-    const NodeKind index_receiver_kind = ast_.at(node.a).kind;
-    const bool non_ident_index = index_receiver_kind == NodeKind::Call ||
-        index_receiver_kind == NodeKind::Member || index_receiver_kind == NodeKind::Index;
-    const bool unproved_index = object_kinds == 0 || (object_kinds & (kKindUnknown | kKindNull)) != 0;
-    const bool dynamic_index = (plan_.linked && plan_.linked->locate(node.begin).module > 0) ||
-        ((local_value_index || non_ident_index) && unproved_index);
-    if (!dynamic_index && !(array && !(key_kinds & ~kKindNumber)) && !bytes && !object && !bad_boolean_key &&
-        !bad_bytes_key && !null_call && !null_script_index && !unknown_defers(object_kinds | key_kinds))
-        return fail(node, "type:index");
-    const std::uint16_t mark = fb_->top();
-    std::uint16_t object_reg = 0, key = 0;
-    const Node& chain = chain_enter(node);
-    const std::string_view saved_note = global_note_;
-    const bool note_set = global_note_.empty() && ast_.at(node.a).kind != NodeKind::Array;
-    const bool offset_set = global_offset_set_;
-    if (ast_.at(node.a).kind == NodeKind::Array) { global_offset_set_ = true; global_offset_ = node.begin; }
-    if (note_set) global_note_ = text(node);
-    const bool receiver_ok = reg_any(node.a, object_reg);
-    if (note_set) global_note_ = saved_note;
-    global_offset_set_ = offset_set;
-    chain_next_ = nullptr;
-    if (!receiver_ok || !retain_receiver(object_reg, object_reg < mark, node.b)) return false;  // H-A: b[g()]
-    ++index_depth_;
-    const std::uint8_t saved_flags = fb_->flags();
-    fb_->set_flags(static_cast<std::uint8_t>(saved_flags | kInstrIndexKey));
-    const bool key_ok = expr_any(node.b, key);
-    fb_->set_flags(saved_flags);
-    --index_depth_;
-    if (!key_ok) return false;
-    if (null_call || null_script_index) {
-        const bool ok = legacy_fatal(null_call ? *null_call : node, "invalid index", dst);
-        fb_->release_to(mark);
-        return ok;
-    }
-    if (bad_boolean_key || bad_bytes_key) {
-        const std::string kind = bad_bytes_key ? "bytes" : "JSON array";
-        const bool ok = legacy_fatal(node, kind + " indices must be non-negative integers in '" +
-                                     std::string(location.empty() ? text(chain) : location) + "'", dst);
-        fb_->release_to(mark);
-        return ok;
-    }
-    fb_->set_offset(site(node));
-    const std::size_t at = fb_->emit(OpCode::GetIndex, dst, object_reg, key);
-    fb_->note(at, location.empty() ? std::string(text(chain)) : std::move(location));
     fb_->release_to(mark);
     return true;
 }

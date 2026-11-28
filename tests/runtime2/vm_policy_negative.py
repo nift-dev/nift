@@ -309,6 +309,33 @@ CASES += [
 ]
 
 
+# D-018c audit (owner decisions: cp12-engine-selection rows 4 and 5;
+# vm_policies.py): loop-prepared call-site attribution for an arithmetic error
+# and a numeric to_int failure in a print argument. The VM position must be the
+# independently derived failing node, not merely somewhere in the callee.
+AR_SRC = b"fn(w0()) {\n  r := null\n  r += 1\n}\ni := 0\nwhile (i < 1) { i += 1\nprint(w0()) }\n"
+AR = b"arithmetic operators require numeric operands"
+CASES += [
+    ("arithmetic loop callee: exact failing node", (b"", d(7, 7, AR), 1), (b"", d(3, 3, AR), 1),
+     st(outcome="vm-error", error_in_loop_path=True), AR_SRC, A, DIAG),
+    ("arithmetic loop callee: VM at another node in the callee", (b"", d(7, 7, AR), 1),
+     (b"", d(2, 3, AR), 1), st(outcome="vm-error", error_in_loop_path=True), AR_SRC, C, None),
+    ("arithmetic loop callee: VM outside the callee", (b"", d(7, 7, AR), 1),
+     (b"", d(6, 17, AR), 1), st(outcome="vm-error", error_in_loop_path=True), AR_SRC, C, None),
+    ("arithmetic loop callee: legacy position is not the call", (b"", d(6, 17, AR), 1),
+     (b"", d(3, 3, AR), 1), st(outcome="vm-error", error_in_loop_path=True), AR_SRC, C, None),
+    ("arithmetic loop callee: message changed", (b"", d(7, 7, AR), 1),
+     (b"", d(3, 3, b"division by zero"), 1), st(outcome="vm-error", error_in_loop_path=True), AR_SRC, C, None),
+    ("arithmetic loop callee: ambiguous callee body",
+     (b"", d(7, 7, AR), 1), (b"", d(3, 3, AR), 1), st(outcome="vm-error", error_in_loop_path=True),
+     b"fn(w0()) {\n  r := null\n  r += 1\n  r += 2\n}\ni := 0\nwhile (i < 1) { i += 1\nprint(w0()) }\n",
+     C, None),
+    ("arithmetic loop callee: undeclared call",
+     (b"", d(1, 7, AR), 1), (b"", d(3, 3, AR), 1), st(outcome="vm-error", error_in_loop_path=True),
+     b"fn(w0()) {\n  r := null\n  r += 1\n}\ni := 0\nwhile (i < 1) { i += 1\nprint(zz()) }\n", C, None),
+]
+
+
 def main():
     failures = 0
     rejected = sum(1 for c in CASES if c[5] == C)

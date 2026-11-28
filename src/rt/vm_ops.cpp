@@ -5,7 +5,6 @@
 #include "rt/dispatch_defect.h"  // B4
 #include "rt/vm.h"
 #include "rt/vm_element_path.h"
-
 #include "rt/aggregate.h"
 #include "rt/compare.h"
 #include "rt/error.h"
@@ -16,7 +15,6 @@
 #include "rt/render.h"
 #include "rt/shared_state.h"
 #include "rt/string.h"
-
 #include <charconv>
 #include <cstdlib>
 #include <cmath>
@@ -109,7 +107,6 @@ bool push_kind_error(Fault& fault, const Note* note) {
 }
 
 } // namespace
-
 
 bool arith_slow(const Instr& in, OpCode op, const Value& left, const Value& right, Value& out, Fault& fault) {
     static_cast<void>(in);
@@ -252,7 +249,6 @@ const char* binding_type_name(std::int64_t tag) {
         default: return "unknown";
     }
 }
-
 bool binding_type_error(std::int64_t assigned, std::int64_t binding, const Note* note, Fault& fault, bool loop) {
 #ifdef NIFT_VM_MUTANTS
     if (vm_mutant() == 7) std::swap(assigned, binding);  // M7: wrong kinds in the message
@@ -289,13 +285,14 @@ bool get_index(const Note* note, const Value& object, const Value& key, Value& o
         if (integral && vm_mutant() == 6) ++i;  // M6: wrong index number in the message
 #endif
         if (integral)
-            return raise(fault, StopReason::Error,
+            return raise(fault, StopReason::Error, prepared ? "invalid index" :
                          "JSON array index " + integer_text(i) + " is out of range in '" + note_text(note) + "'");
         // An integral Decimal beyond int64 (-INT64_MIN, review D3): out of
         // range with its spelling, as legacy.
         if (key.is(Kind::Decimal) && number_is_integer(key) && decimal_spelling(key).substr(0, 1) != "-")
-            return raise(fault, StopReason::Error, "JSON array index " + std::string(decimal_spelling(key)) +
-                                                       " is out of range in '" + note_text(note) + "'");
+            return raise(fault, StopReason::Error, prepared ? "invalid index" :
+                         "JSON array index " + std::string(decimal_spelling(key)) +
+                             " is out of range in '" + note_text(note) + "'");
         return raise(fault, StopReason::Error,
                      "JSON array indices must be non-negative integers in '" + note_text(note) + "'");
     }
@@ -322,7 +319,8 @@ bool set_index(const Note* note, Value& object, const Value& key, const Value& v
                const CycleGraph* graph, bool* cycle) {
     if (!object.is(Kind::Array) || !key.is_number()) {
         if (object.is(Kind::Object)) return set_member(note, object, key, value, fault, graph, cycle);  // checkpoint 1
-        return internal(fault, "element assignment");
+        return raise(fault, StopReason::Error,
+                     "assignment index does not address an array or object: " + note_text(note));
     }
     std::int64_t i = 0;
     const bool integral = number_to_i64(key, i) && i >= 0;

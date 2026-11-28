@@ -23,6 +23,10 @@ namespace nift::rt {
 Value make_collection(CollectionKind kind, bool sorted = false);
 CollectionKind collection_kind(const Value& collection);
 bool collection_sorted(const Value& collection);
+// The observable length of legacy's internal collection tag in prepared loop
+// code (D-018); the serial follows legacy's creation order for this run.
+std::uint8_t collection_tag_length(const Value& collection);
+void reset_collection_tag_serial();
 // Entries for a map, members/elements otherwise.
 std::size_t collection_size(const Value& collection);
 const std::vector<Value>& collection_items(const Value& collection);

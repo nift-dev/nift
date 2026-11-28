@@ -202,6 +202,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     const Node* saved_chain_top = chain_top_;
     const Node* saved_chain_next = chain_next_;
     const Node* saved_print_arg = print_arg_;
+    const Node* saved_print_span = print_span_;
     const int saved_depth = depth_;
     const bool saved_probe = probe_;
     const std::string saved_reason = reason_;
@@ -236,6 +237,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     path_arg_ = path_chain_ = kNoNode;
     chain_top_ = chain_next_ = nullptr;
     print_arg_ = nullptr;
+    print_span_ = nullptr;
     depth_ = 0;
     probe_ = false;
     reason_.clear();
@@ -317,6 +319,7 @@ bool UnitCompiler::compile_lambda_task(const LambdaTask& task, std::unique_ptr<P
     chain_top_ = saved_chain_top;
     chain_next_ = saved_chain_next;
     print_arg_ = saved_print_arg;
+    print_span_ = saved_print_span;
     depth_ = saved_depth;
     probe_ = saved_probe;
     reason_ = saved_reason;

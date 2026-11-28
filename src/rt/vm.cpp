@@ -2,6 +2,7 @@
 #include "rt/handles/limit_setting.h"
 
 #include "rt/aggregate.h"
+#include "rt/aggregate_collection.h"
 #include "rt/cell.h"
 #include "rt/compare.h"
 #include "rt/error.h"
@@ -18,7 +19,6 @@
 #include <cstdlib>
 #include <iterator>
 #include <utility>
-
 // Dispatch: computed goto on GCC/Clang (labels-as-values), a portable switch
 // otherwise or when NIFT_RT_VM_SWITCH is defined.
 #if defined(__GNUC__) && !defined(NIFT_RT_VM_SWITCH)
@@ -31,7 +31,6 @@
 #else
 #define NIFT_RT_COMPUTED_GOTO 0
 #endif
-
 namespace nift::rt {
 
 namespace {
@@ -51,6 +50,7 @@ Vm::Vm(const Program& program, VmOptions options)
     : program_(program), options_(options),
       handle_table_owner_(std::make_shared<handles::HandleTable>(handles::table_options_from_environment())),
       handle_table_(*handle_table_owner_) {
+    reset_collection_tag_serial();
     if (!options_.cooperative_tasks && !options_.parallel) {
         const char* cooperative = std::getenv("NIFT_VM_COOPERATIVE_THREADS");
         if (cooperative != nullptr && cooperative[0] == '1' && cooperative[1] == '\0')

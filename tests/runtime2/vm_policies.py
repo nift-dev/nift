@@ -123,12 +123,13 @@ def _fields_ok(source, root, legacy_msg, vm_msg, site):
         if node is None or node.kind != "Assign" or node.children[0].kind != "Index":
             return False
         key = vm_sites.constant(source, root, node.children[0].children[1])
-        if not isinstance(key, (int, float)):
-            return False
         if vm_msg.startswith(b"index out of range: "):
-            return key >= 0 and key == int(key)
+            return isinstance(key, (int, float)) and key >= 0 and key == int(key)
         if vm_msg.startswith(b"assignment index does not address an array or object: "):
-            return key < 0 or key != int(key)
+            field = vm_msg.split(b": ", 1)[1]
+            if isinstance(key, str):
+                return field in (key.encode(), b'"' + key.encode() + b'"')
+            return isinstance(key, (int, float)) and (key < 0 or key != int(key))
     return False
 
 
@@ -187,6 +188,43 @@ def diagnostics_match(legacy_err, vm_err, st, source=None):
     if site is None or site != vm_pos:
         return False
     return not mapped or _fields_ok(source, root, legacy_msg, vm_msg, site)
+
+
+ARITHMETIC_ERROR = b"arithmetic operators require numeric operands"
+
+
+def arithmetic_loop_callee_origin(legacy_err, vm_err, st, source=None):
+    """D-018c: legacy's prepared loop evaluator attributes an arithmetic error
+    in a called function to the call site; the VM reports the statement in the
+    function. Approve only when the VM site is the unique failing arithmetic
+    node inside the function legacy's call site invokes."""
+    lm, vm = DIAGNOSTIC.match(legacy_err), DIAGNOSTIC.match(vm_err)
+    if not lm or not vm or lm.group(1) != vm.group(1):
+        return False
+    if lm.group(4) != ARITHMETIC_ERROR or vm.group(4) != ARITHMETIC_ERROR:
+        return False
+    if not st.get("error_in_loop_path"):
+        return False
+    source = _source_bytes(source, st)
+    root = vm_sites.parse(source) if source else None
+    if root is None:
+        return False
+    legacy_offset = vm_sites.offset_of(source, int(lm.group(2)), int(lm.group(3)))
+    vm_offset = vm_sites.offset_of(source, int(vm.group(2)), int(vm.group(3)))
+    if legacy_offset is None or vm_offset is None:
+        return False
+    declarations = {vm_sites.text(source, n.children[0]): n for n in root.walk()
+                    if n.kind == "FnDecl" and n.children}
+    calls = [n for n in root.walk() if n.kind == "Call" and n.begin == legacy_offset and n.children and
+             n.children[0].kind == "Ident" and vm_sites.text(source, n.children[0]) in declarations]
+    if len(calls) != 1:
+        return False
+    declaration = declarations[vm_sites.text(source, calls[0].children[0])]
+    operators = ("+", "-", "*", "/", "%", "+=", "-=", "*=", "/=", "%=")
+    candidates = [n for n in declaration.walk()
+                  if n.kind in ("Binary", "CompoundAssign") and n.op in operators]
+    vm_pos = (int(vm.group(2)), int(vm.group(3)))
+    return len(candidates) == 1 and vm_sites.position(source, candidates[0].begin) == vm_pos
 
 
 PRINT_PREFIX = b"print: "
@@ -413,6 +451,9 @@ def _classify(legacy, vm, st, source=None):
         return "approved", "D-009#5 return prefix"
     if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
             and diagnostics_match(legacy[1], vm[1], st, source)):
+        return "approved", "D-018c diagnostics"
+    if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
+            and arithmetic_loop_callee_origin(legacy[1], vm[1], st, source)):
         return "approved", "D-018c diagnostics"
     if (st.get("outcome") == "vm-error" and legacy[0] == vm[0] and legacy[2] == 1 and vm[2] == 1
             and interpolation_origin(legacy[1], vm[1], st, source)):

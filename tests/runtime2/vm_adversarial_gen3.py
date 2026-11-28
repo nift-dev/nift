@@ -16,7 +16,8 @@ reason" (vm_adversarial.py checks it with NIFT_VM=classify, nothing runs).
               well (`incdec-target`). Checkpoint 1 (combined-b3-b5.md
               sections 94-95): compound element targets compile (D2) with a
               plain number index and must match legacy (no rhs effect here);
-              a string index on an array stays refused (`type:element-assignment`).
+              an array with a string key stays refused (`type:element-assignment`;
+              cp25 PENDING-OWNER, not an approved admission).
   cmpchain    F2: every comparison whose operand is itself a comparison: the
               exhaustive two-operator sweep (6 x 6 operators, unparenthesised
               and parenthesised on either side) in eight contexts. All must
@@ -42,7 +43,7 @@ ELEM_CTX = {
 
 # (index text, compiled?) -- 33 forms.
 INDEXES = [
-    ("i", True), ("j", True), ("0", True), ("1", True), ("2", True), (" i ", True), ("k", True), ("s", True),
+    ("i", True), ("j", True), ("0", True), ("1", True), ("2", True), (" i ", True), ("k", True), ("s", False),
     ("1.0", False), ("0.0", False), ("1e0", False), ("i + 0", False), ("i - 1", False), ("a.length() - 1", False),
     ("a.size() - 1", False), ("o.k", False), ('o["k"]', False), ('g("x.y")', False), ("g(0)", False),
     ("(i)", False), ("(1)", False), ("-1", False), ("-0", False), ("i * 1", False), ("[0][0]", False),
@@ -62,6 +63,11 @@ def elemtarget(_seed, _count):
                 body = pre + f"a[{index}] = {value}\n" + post
                 src = "fn(g(x)) { return 0 }\n" + wrap(body)
                 expect = None if compiled else ("fallback:index-target", "fallback:opaque:")
+                # A string key on an array stays refused in every context
+                # (cp25 PENDING-OWNER: type:element-assignment), so this is a
+                # conservative fallback, not an approved admission.
+                if index in ("s", '"0"'):
+                    expect = "fallback:type:element-assignment"
                 yield "elemtarget", f"elemtarget-{xi}-{vi}-{cn}", src, {}, expect
     # Compound element targets compile (checkpoint 1); increment element targets are refused.
     for xi, (index, _) in enumerate(INDEXES[:8]):
